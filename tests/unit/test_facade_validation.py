@@ -71,6 +71,8 @@ SINGLE = {
     "rsmax2": andrey.rsmax2,
     "exact_search": andrey.exact_search,
     "calm": andrey.calm,
+    "notears": andrey.notears,
+    "dagma": andrey.dagma,
     "boss": andrey.boss,
     "grasp": andrey.grasp,
     "direct_lingam": andrey.direct_lingam,

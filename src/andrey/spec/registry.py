@@ -8,6 +8,7 @@ display the parameter defaults defined here.
 
 from __future__ import annotations
 
+from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
@@ -73,11 +74,13 @@ _COLLIDER_RULE = ParamSpec(
     name="collider_rule",
     type="str",
     default="sepsets",
-    choices=("sepsets", "majority"),
+    choices=COLLIDER_RULES,
     doc="How colliders are decided on x - z - y: sepsets = z is a collider when it is not in the "
-    "separating set of x and y; majority = test x and y given every subset of each one's "
-    "neighbors, and z is a collider when fewer than half of the separating subsets contain it "
-    "(exactly half: unoriented). Majority costs up to 2**degree tests per triple.",
+    "separating set of x and y; conservative and majority = test x and y given every subset of "
+    "each one's neighbors, and z is a collider when none (conservative) or fewer than half "
+    "(majority) of the separating subsets contain it, a non-collider when all or more than half "
+    "do, and ambiguous otherwise, never oriented through. Both cost up to 2**degree tests per "
+    "pair.",
 )
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
@@ -157,7 +160,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -168,12 +173,20 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_ORDER,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
             "Colombo & Maathuis 2014",
             "Meek 1995",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -188,7 +201,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -212,6 +227,7 @@ _add(
             "Spirtes, Glymour & Scheines 2000",
             "Zhang 2008",
             "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -226,7 +242,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -266,6 +284,7 @@ _add(
             "Zhang 2008",
             "Colombo & Maathuis 2014",
             "Spirtes, Glymour & Scheines 2000",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -292,7 +311,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -307,6 +328,7 @@ _add(
             _ALPHA,
             _INDEP_TEST,
             _COLLIDER_ORDER,
+            _COLLIDER_RULE,
             _CATEGORICAL,
             _MAX_CATEGORIES,
             ParamSpec(
@@ -319,7 +341,7 @@ _add(
                 nullable=True,
             ),
         ),
-        references=("Huang et al. 2020",),
+        references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
 )
 
@@ -701,9 +723,10 @@ _add(
     MethodSpec(
         name="calm",
         family="score",
-        summary="Continuous-optimization structure learning: an L0-penalized likelihood with an "
-        "acyclicity constraint, searched within an estimated moral graph. Returns a weighted DAG. "
-        "Needs the [torch] extra. Seeded on every call: seed, else ANDREY_SEED, else 0.",
+        summary="Continuous-optimization structure learning in the line of NOTEARS: an "
+        "L0-penalized likelihood with an acyclicity constraint, searched within an estimated moral "
+        "graph. Returns a weighted DAG. Needs the [torch] extra. Seeded on every call: seed, else "
+        "ANDREY_SEED, else 0.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -733,6 +756,168 @@ _add(
             ),
         ),
         references=("Jin, Ng, Zhang & Huang 2026",),
+    )
+)
+
+# --- continuous optimization of a weighted DAG: NOTEARS and DAGMA ------------------------------
+
+_CONTINUOUS_PATH_PARAMS = (
+    ParamSpec(
+        name="robust",
+        type="bool",
+        default=False,
+        doc="true follows the first fit with the likelihood path of Deng et al. 2024: the Gaussian "
+        "likelihood with one noise variance per variable and a quasi-MCP penalty, refit while the "
+        "likelihood falls and the penalty shrinks.",
+    ),
+    ParamSpec(
+        name="mcp_lambda",
+        type="float",
+        default=0.4,
+        doc="Penalty level of the path's first step, above 0. Used only with robust.",
+    ),
+    ParamSpec(
+        name="mcp_delta",
+        type="float",
+        default=0.2,
+        doc="Weight magnitude above which the quasi-MCP stops growing, at the path's first step, "
+        "above 0. Used only with robust.",
+    ),
+    ParamSpec(
+        name="mcp_decay",
+        type="float",
+        default=0.8,
+        doc="Factor in (0, 1) by which mcp_lambda and mcp_delta shrink after each accepted step. "
+        "Used only with robust.",
+    ),
+    ParamSpec(
+        name="max_path",
+        type="int",
+        default=50,
+        doc="Most accepted steps of the path, at least 1. Used only with robust.",
+    ),
+)
+_CONTINUOUS_OUTPUT = OutputSpec(
+    structure_type="graph",
+    graph_kind="dag",
+    weighted=True,
+    doc="weighted DAG; no score. metadata['h_final'] is the acyclicity function before the "
+    "threshold and metadata['path_steps'] the accepted steps of the robust path.",
+)
+_add(
+    MethodSpec(
+        name="notears",
+        family="score",
+        summary="NOTEARS: least squares with an l1 penalty under the acyclicity equation "
+        "tr(exp(W*W)) = d, by L-BFGS-B. Returns a weighted DAG. robust=true adds the likelihood "
+        "path of Deng et al. 2024, which does not depend on the scale of the columns. "
+        "Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=_CONTINUOUS_OUTPUT,
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="lambda1",
+                type="float",
+                default=0.1,
+                doc="Weight of the l1 penalty of the first fit, at least 0.",
+            ),
+            ParamSpec(
+                name="w_threshold",
+                type="float",
+                default=0.3,
+                doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
+            ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=100,
+                doc="Most dual steps of the augmented Lagrangian, at least 1.",
+            ),
+            ParamSpec(
+                name="h_tol",
+                type="float",
+                default=1e-8,
+                doc="The fit stops when the acyclicity function falls to this value, above 0.",
+            ),
+            ParamSpec(
+                name="rho_max",
+                type="float",
+                default=1e16,
+                doc="The fit stops when the penalty weight on the acyclicity function reaches "
+                "this value, above 0.",
+            ),
+            *_CONTINUOUS_PATH_PARAMS,
+        ),
+        references=(
+            "Zheng, Aragam, Ravikumar & Xing 2018",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+            "Kaiser & Sipos 2022",
+            "Reisach, Seiler & Weichwald 2021",
+            "Ng, Huang & Zhang 2024",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="dagma",
+        family="score",
+        summary="DAGMA: least squares with an l1 penalty and a log-determinant acyclicity barrier "
+        "lowered along a central path, by Adam. Returns a weighted DAG. robust=true adds the "
+        "likelihood path of Deng et al. 2024, which does not depend on the scale of the columns. "
+        "Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=_CONTINUOUS_OUTPUT,
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="lambda1",
+                type="float",
+                default=0.03,
+                doc="Weight of the l1 penalty of the first fit, at least 0.",
+            ),
+            ParamSpec(
+                name="w_threshold",
+                type="float",
+                default=0.3,
+                doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
+            ),
+            ParamSpec(
+                name="stages",
+                type="int",
+                default=5,
+                doc="Stages of the central path, at least 1 (T in the paper).",
+            ),
+            ParamSpec(
+                name="warm_iter",
+                type="int",
+                default=30000,
+                doc="Most Adam steps of each stage but the last, at least 1.",
+            ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=60000,
+                doc="Most Adam steps of the last stage, at least 1.",
+            ),
+            ParamSpec(name="lr", type="float", default=3e-4, doc="Step size of Adam, above 0."),
+            *_CONTINUOUS_PATH_PARAMS,
+        ),
+        references=(
+            "Bello, Aragam & Ravikumar 2022",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+            "Kaiser & Sipos 2022",
+            "Reisach, Seiler & Weichwald 2021",
+            "Ng, Huang & Zhang 2024",
+        ),
     )
 )
 
@@ -1656,6 +1841,11 @@ _CANDIDATE_RULE = (
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_MASK_RULE = (
+    "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are held at "
+    "zero in the fit; a required edge leaves the penalty and the threshold, and the cycle repair "
+    "never removes it. "
+)
 _REGRESSION_RULE = (
     "The regression drops forbidden parents and does not penalize required ones; every required "
     "edge is in the DAG."
@@ -1681,6 +1871,8 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
+    "notears": _MASK_RULE,
+    "dagma": _MASK_RULE,
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE

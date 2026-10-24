@@ -15,16 +15,22 @@ the CPDAG.
 
 from __future__ import annotations
 
+import functools
 import multiprocessing as mp
+import os
+import socket
 import sys
-from collections.abc import Callable, Sequence
+import tempfile
+from collections.abc import Callable, Generator, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
 
 from andrey.core import env
+from andrey.core.warning_policy import PerformanceWarning, warn_once
 
 
 def even_chunks(n: int, n_chunks: int) -> list[list[int]]:
@@ -118,12 +124,94 @@ _FORKSERVER_PRELOAD = (
 )
 
 
+# Where the forkserver's socket goes when the temporary directory cannot hold it, tried in order.
+_NODE_LOCAL_DIRS = ("/dev/shm", "/tmp")
+
+
+def _holds_forkserver_socket(base: str) -> bool:
+    """True when ``base`` holds a Unix socket that accepts the chmod the forkserver applies.
+
+    The forkserver binds its socket in a fresh ``pymp-*`` directory under ``base`` and sets its mode
+    to ``0o600``. A parallel file system can reject that chmod (``EOPNOTSUPP``), and a long ``base``
+    overruns the limit on a socket path. The probe repeats the bind and the chmod, with a socket
+    name as long as the forkserver's.
+    """
+    try:
+        with tempfile.TemporaryDirectory(prefix="pymp-", dir=base) as scratch:
+            with socket.socket(socket.AF_UNIX) as probe:
+                address = os.path.join(scratch, "listener-00000000")
+                probe.bind(address)
+                os.chmod(address, 0o600)
+    except OSError:
+        return False
+    return True
+
+
+@contextmanager
+def _temporary_dir(directory: str) -> Generator[None]:
+    """Point :mod:`tempfile`, and so multiprocessing's temporary directory, at ``directory``."""
+    previous = tempfile.tempdir
+    tempfile.tempdir = directory
+    try:
+        yield
+    finally:
+        tempfile.tempdir = previous
+
+
+def _fallback_method() -> str:
+    """The start method used without the forkserver: a safe ``fork``, else ``spawn``."""
+    return "fork" if fork_safe() and "fork" in mp.get_all_start_methods() else "spawn"
+
+
+@functools.cache
+def _forkserver_starts() -> bool:
+    """True when the forkserver can start; its socket moves off a directory that cannot hold it.
+
+    Multiprocessing creates the socket under :func:`tempfile.gettempdir` (``TMPDIR``) and keeps
+    that directory for the process, so a start that fails there cannot be retried elsewhere. The
+    directory is therefore chosen first. The default one is used when it holds the socket, and the
+    server starts on first use. Otherwise the first of :data:`_NODE_LOCAL_DIRS` that holds it takes
+    the socket: the server starts now, with :mod:`tempfile` pointed there only for the start. Either
+    move warns once. With no such directory the answer is ``False``, and the caller falls back to
+    :func:`_fallback_method`.
+    """
+    from multiprocessing import forkserver
+
+    default = tempfile.gettempdir()
+    if _holds_forkserver_socket(default):
+        return True
+    local = next((d for d in _NODE_LOCAL_DIRS if _holds_forkserver_socket(d)), None)
+    if local is not None:
+        try:
+            with _temporary_dir(local):
+                forkserver.ensure_running()
+        except OSError:
+            local = None
+    if local is not None:
+        warn_once(
+            f"The forkserver cannot create its socket in {default!r}, the temporary directory "
+            f"(TMPDIR), so its socket is in {local!r} instead. Set TMPDIR to a directory on a "
+            "local file system to silence this warning.",
+            PerformanceWarning,
+        )
+        return True
+    warn_once(
+        f"The forkserver cannot create its socket in {default!r}, the temporary directory "
+        f"(TMPDIR), or in {', '.join(map(repr, _NODE_LOCAL_DIRS))}, so workers start with "
+        f"{_fallback_method()!r} instead, which starts them more slowly. Set TMPDIR to a directory "
+        "on a local file system to use the forkserver.",
+        PerformanceWarning,
+    )
+    return False
+
+
 def pick_context() -> mp.context.BaseContext:
     """Prefer ``forkserver``, then a safe ``fork``, then ``spawn``.
 
     The forkserver starts workers from a clean, single-threaded process, avoiding inherited CUDA
     state, threads, locks, and fork warnings from pool manager threads. ``fork`` is used only when
-    forkserver is unavailable and :func:`fork_safe` permits it.
+    forkserver is unavailable, or cannot place its socket (:func:`_forkserver_starts`), and
+    :func:`fork_safe` permits it.
 
     Preload :data:`_FORKSERVER_PRELOAD` to share imports across workers. Keep ``__main__`` in the
     list: setting a preload replaces that stdlib default, and omitting it repeats parent-module
@@ -131,14 +219,12 @@ def pick_context() -> mp.context.BaseContext:
     effect. All Andrey pools use this function. Registration replaces another library's preload
     because the stdlib has no append operation.
     """
-    available = mp.get_all_start_methods()
-    if "forkserver" in available:
+    if "forkserver" in mp.get_all_start_methods():
         ctx = mp.get_context("forkserver")
         ctx.set_forkserver_preload(["__main__", *_FORKSERVER_PRELOAD])
-        return ctx
-    if fork_safe() and "fork" in available:
-        return mp.get_context("fork")
-    return mp.get_context("spawn")
+        if _forkserver_starts():
+            return ctx
+    return mp.get_context(_fallback_method())
 
 
 def min_work(setting: env.Setting[int], default: int) -> int:

@@ -970,9 +970,19 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     if not pagename.startswith("docs/"):
         return
     includes = app.env.toctree_includes
+    # A toctree entry's own title, where it names one ("0.1.0: the alpha release"), labels the
+    # page in the sidebar in place of the page's heading.
+    if not hasattr(app, "andrey_nav_titles"):
+        app.andrey_nav_titles = {
+            ref: label
+            for doc in includes
+            for toctree in app.env.get_doctree(doc).findall(addnodes.toctree)
+            for label, ref in toctree["entries"]
+            if label
+        }
 
     def title(doc: str) -> str:
-        return app.env.titles[doc].astext()
+        return app.andrey_nav_titles.get(doc) or app.env.titles[doc].astext()
 
     def pages(doc: str) -> set[str]:
         return {doc}.union(*(pages(child) for child in includes.get(doc, ())))

@@ -85,7 +85,9 @@ in a `dag` or `digraph`.
   two directional p-values and HSIC statistics; each two-node graph holds the direction they
   decide, by the rule the method's `alpha` parameter selects. PCMCI reports each lagged link's MCI
   `p_values` and `statistics`, and the `parents` its first step selected; PCMCI+ reports the same
-  for every lag from 0, plus the same-step `conflicts` and `ambiguous_triples`. LPCMCI reports
+  for every lag from 0, plus the same-step `conflicts` and `ambiguous_triples`. PC, CD-NOD, FCI,
+  and GFCI with `collider_rule="conservative"` or `"majority"` report `ambiguous_triples`, the
+  `[x, z, y]` triples, by column position, whose middle node the vote left undecided. LPCMCI reports
   every link with all its marks as `links`, plus `p_values`, `statistics`, its preliminary
   `parents`, and the links with a conflicting mark as `conflicts`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.

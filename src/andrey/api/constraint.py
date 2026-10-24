@@ -42,6 +42,7 @@ def pc(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_order: str | None = None,
+    collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     max_depth: int | None = None,
@@ -80,6 +81,16 @@ def pc(
         column order. ``"column"`` orients them in column order and keeps the first of two that
         conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
         ``"column"`` under ``"position"``. See Notes.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How PC decides whether ``z`` is a collider ``x -> z <- y`` on a triple ``x - z - y`` whose
+        ends are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the
+        separating set that removed the edge ``x - y``. ``"conservative"`` [11]_ and
+        ``"majority"`` [3]_ test ``x`` and ``y`` again given every subset of ``x``'s neighbors and
+        every subset of ``y``'s neighbors, and count the subsets that separate them
+        (``p >= alpha``): ``"conservative"`` makes ``z`` a collider when none of them contains it
+        and a non-collider when all do; ``"majority"`` when fewer than half contain it and when
+        more than half do. Any other triple is ambiguous, and no rule orients through it. Both run
+        up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -94,7 +105,8 @@ def pc(
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
-        tests and can keep edges that a larger conditioning set would remove.
+        tests and can keep edges that a larger conditioning set would remove. It also caps the
+        subsets the conservative and majority rules test.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
@@ -112,7 +124,10 @@ def pc(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"PC"``. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
         equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]`` lists
-        the categorical columns it read, by name or 0-based position.
+        the categorical columns it read, by name or 0-based position. With ``collider_rule``
+        ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
+        unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
+        column positions, the middle node second and ``x < y``, in ascending order.
 
     Raises
     ------
@@ -128,7 +143,8 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. With
+        with another test, if ``collider_order`` is not ``"p_value"`` or ``"column"``, or if
+        ``collider_rule`` is not ``"sepsets"``, ``"conservative"``, or ``"majority"``. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
         before any test runs; one message names every group of copies and says to keep one column
         per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
@@ -193,6 +209,24 @@ def pc(
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
 
+    **Collider rules.** A test error can make the separating set that removed an edge disagree with
+    other sets that also separate the pair, and ``collider_rule="sepsets"`` then decides a collider
+    from that one set. ``"conservative"``, conservative PC [11]_, and ``"majority"``, majority-rule
+    PC [3]_, decide each triple ``x - z - y`` on the final skeleton instead. They test ``x`` and
+    ``y`` given each subset of ``x``'s neighbors, then each subset of ``y``'s, the empty set
+    included, and keep the subsets that separate them; a subset both offer counts twice. Under
+    ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
+    every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
+    than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
+    triple whose ends no subset separates is ambiguous under both: the search separated them only
+    given sets holding a node whose edge to that end it removed later. An ambiguous triple is never
+    oriented as a collider, and Meek's rules do not read it as a non-collider, so edges around it
+    can stay undirected. The colliders are then oriented in ``collider_order`` as under
+    ``"sepsets"``, so with ``"p_value"`` the result still does not depend on the column order.
+    Conservative PC's orientations are correct under adjacency-faithfulness, a weaker assumption
+    than PC's [11]_, at the cost of more undirected edges; the majority rule orients more of them
+    [3]_.
+
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
     (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
@@ -208,8 +242,9 @@ def pc(
     networks with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with
     ``"chisq"`` and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s
     with ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test,
-    on 4 cores. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    on 4 cores. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their
+    tests run them on up to 8 variables. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -258,6 +293,8 @@ def pc(
        Statistical Association 84(405), 165-175.
     .. [10] Ramsey, J. (2016). Improving accuracy and scalability of the PC algorithm by maximizing
        P-value. arXiv:1610.00378, Section 5.
+    .. [11] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
 
     Examples
     --------
@@ -299,20 +336,38 @@ def pc(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
+    ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels):
         cpdag = _pc(
             X,
             alpha=alpha,
             indep_test=indep_test,
             collider_order=resolve_collider_order(collider_order),
+            collider_rule=collider_rule,
             categorical=mask,
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "PC",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _ambiguous_metadata(
+    collider_rule: str, ambiguous: set[tuple[int, int, int]]
+) -> dict[str, list[list[int]]]:
+    """Return the ambiguous triples as metadata, or ``{}`` under ``collider_rule="sepsets"``.
+
+    The triples become ``{"ambiguous_triples": [[a, b, c], ...]}``, in ascending order.
+    """
+    if collider_rule == "sepsets":
+        return {}
+    return {"ambiguous_triples": [list(triple) for triple in sorted(ambiguous)]}
 
 
 def fci(
@@ -353,13 +408,16 @@ def fci(
         test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
         conditional mutual information test; and ``"gpdc"`` Gaussian-process regression with a
         distance correlation test. See Notes.
-    collider_rule : {"sepsets", "majority"}, default="sepsets"
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
-        that removed the edge ``x - y``. ``"majority"`` tests ``x`` and ``y`` given every subset of
-        ``x``'s neighbors and every subset of ``y``'s neighbors, and makes it a collider when
-        fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [4]_; at exactly
-        half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
+        that removed the edge ``x - y``. ``"conservative"`` [4]_ [5]_ and ``"majority"`` [4]_ test
+        ``x`` and ``y`` again given every subset of ``x``'s neighbors and every subset of ``y``'s
+        neighbors, and count the subsets that separate them (``p >= alpha``): ``"conservative"``
+        makes ``z`` a collider when none of them contains it and a non-collider when all do;
+        ``"majority"`` when fewer than half contain it and when more than half do. Any other
+        triple is ambiguous, and no rule orients through it. Both run up to
+        ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -383,8 +441,8 @@ def fci(
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep edges that a larger conditioning set would remove. It caps the tests of
-        the adjacency search, the possible-d-separation step, the majority rule, and the
-        discriminating-path rule.
+        the adjacency search, the possible-d-separation step, the conservative and majority
+        rules, and the discriminating-path rule.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
@@ -403,7 +461,10 @@ def fci(
         ``"FCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
         (``<->``) marks a probable latent common cause. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
+        or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order.
 
     Raises
     ------
@@ -489,6 +550,23 @@ def fci(
     tie rank computed from each column's own data, as for :func:`~andrey.hc`, which moves with its
     column when the columns are reordered; with ``"fast"``, they follow the column order.
 
+    **Collider rules.** ``collider_rule="conservative"``, conservative FCI [4]_ after the idea of
+    conservative PC [5]_, and ``"majority"``, majority-rule FCI [4]_, decide each triple
+    ``x - z - y`` after the possible-d-separation step, on the final skeleton. They test ``x`` and
+    ``y`` given each subset of ``x``'s neighbors, then each subset of ``y``'s, the empty set
+    included, and keep the subsets that separate them; a subset both offer counts twice. Under
+    ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
+    every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
+    than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
+    triple whose ends no subset separates is a collider under both: no kept subset contains ``z``,
+    and the separating set that removed the edge, from a possible-d-separation set or an earlier
+    neighborhood, does not vote. With exact tests this can be wrong where only nodes beyond both
+    ends' neighbors separate them and ``z`` is a non-collider, so on such graphs the voting rules
+    can orient a collider that ``"sepsets"`` does not. An ambiguous triple is never oriented as a
+    collider, and rules R1-R10 do not read it as a non-collider, so endpoints around it can stay
+    circles. A vote reads only the skeleton and the tests, so the rules keep the result independent
+    of the column order wherever ``"sepsets"`` does.
+
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
     because it does not depend on the order of the tests, and on simulated data it gave more
@@ -512,8 +590,10 @@ def fci(
     against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
     its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
     the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
-    variables with 3,000 rows. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
+    benchmarked yet; their tests run them on up to 8 variables. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -526,6 +606,8 @@ def fci(
        1873-1896.
     .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
+    .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
 
     Examples
     --------
@@ -547,6 +629,7 @@ def fci(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="fci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
+    ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels):
         pag = _fci(
             X,
@@ -558,10 +641,14 @@ def fci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "FCI",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 def gfci(
@@ -616,15 +703,17 @@ def gfci(
         continuous data, at a far higher cost per test. Each as for :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    collider_rule : {"sepsets", "majority"}, default="sepsets"
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where the tests
         removed the GES edge between ``x`` and ``y``; on the other triples whose ends are not
         adjacent, the GES CPDAG decides (see Notes). ``"sepsets"`` makes it a collider when ``z``
-        is not in the recorded separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and
-        ``y`` given every subset of ``x``'s neighbors and every subset of ``y``'s neighbors, and
-        makes it a collider when fewer than half of the separating subsets (``p >= alpha``)
-        contain ``z`` [3]_; at exactly half the triple stays unoriented. Majority runs
-        ``2**degree(x) + 2**degree(y)`` tests per triple.
+        is not in the recorded separating set of ``x`` and ``y``. ``"conservative"`` [3]_ [5]_ and
+        ``"majority"`` [3]_ test ``x`` and ``y`` given every subset of ``x``'s neighbors and every
+        subset of ``y``'s neighbors and count the subsets that separate them (``p >= alpha``), as
+        for :func:`~andrey.fci`: ``"conservative"`` makes ``z`` a collider when none of them
+        contains it and a non-collider when all do; ``"majority"`` when fewer than half contain it
+        and when more than half do. Any other triple is ambiguous, and no rule orients through it.
+        Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
@@ -649,8 +738,8 @@ def gfci(
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep edges that a larger conditioning set would remove. It caps the tests of
         the adjacency search, the separating sets for the pairs GES leaves non-adjacent, the
-        possible-d-separation step, the majority rule, and the discriminating-path rule, but not the
-        GES phase.
+        possible-d-separation step, the conservative and majority rules, and the discriminating-path
+        rule, but not the GES phase.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
@@ -665,7 +754,10 @@ def gfci(
         ``"GFCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
         (``<->``) marks a probable latent common cause. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
+        ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in
+        ascending order.
 
     Raises
     ------
@@ -739,8 +831,9 @@ def gfci(
     nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
     variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
     score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
-    3,000 rows. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their
+    tests run them on up to 8 variables. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -753,6 +846,8 @@ def gfci(
        structure learning. JMLR 15, 3921-3962.
     .. [4] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
        2nd ed. MIT Press.
+    .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
 
     Examples
     --------
@@ -783,6 +878,7 @@ def gfci(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
+    ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -797,10 +893,14 @@ def gfci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "GFCI",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 def cdnod(
@@ -810,6 +910,7 @@ def cdnod(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_order: str | None = None,
+    collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
@@ -850,6 +951,14 @@ def cdnod(
         ``andrey.config.tie_break``, which also sets whether Meek's rules run in order-free rounds
         or fire one at a time in column order, as for :func:`~andrey.pc`. Under either order, the
         edges out of the index are directed first, and no collider puts an arrowhead at the index.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How an unshielded triple ``x - z - y`` is decided, as for :func:`~andrey.pc`: by the
+        separating set that removed the edge ``x - y`` (``"sepsets"``), or by a vote over the
+        subsets of ``x``'s and ``y``'s neighbors that separate them, with the index among the
+        variables, which makes ``z`` a collider when none of them contains it and a non-collider
+        when all do (``"conservative"`` [3]_), or when fewer than half and when more than half do
+        (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it. A
+        triple whose middle node is the index is not voted: the index is never a collider.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -870,7 +979,8 @@ def cdnod(
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
-        tests and can keep edges that a larger conditioning set would remove.
+        tests and can keep edges that a larger conditioning set would remove. It also caps the
+        subsets the conservative and majority rules test.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
@@ -894,7 +1004,11 @@ def cdnod(
         :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
         against the graph CD-NOD can identify instead.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
-        read, by name or 0-based position.
+        read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
+        ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
+        reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
+        middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
+        numbered ``n_variables``.
 
     Raises
     ------
@@ -910,11 +1024,12 @@ def cdnod(
         is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
         :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
         value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
-        ``"column"``. With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or
-        ``domain_index`` with more than one domain, repeats another up to scale and shift, before
-        any test runs; one message names every group of copies and says to keep one column per
-        group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        ``"column"``, or ``collider_rule`` not ``"sepsets"``, ``"conservative"``, or ``"majority"``.
+        With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or ``domain_index``
+        with more than one domain, repeats another up to scale and shift, before any test runs; one
+        message names every group of copies and says to keep one column per group. Also if a given
+        ``max_depth`` is negative, or if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -981,9 +1096,10 @@ def cdnod(
     (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
     The paper fits the kernel widths, the index kernel, and the ridge of the step by
     Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
+    them on up to 8 variables. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -992,6 +1108,10 @@ def cdnod(
        1-53.
     .. [2] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
        independence test and application in causal discovery. UAI, 804-813.
+    .. [3] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
 
     Examples
     --------
@@ -1027,6 +1147,7 @@ def cdnod(
         dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
+    ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels, lambda j: "domain_index" if j == d else column(j)):
         cpdag = _cdnod(
             X,
@@ -1034,12 +1155,17 @@ def cdnod(
             alpha=alpha,
             indep_test=indep_test,
             collider_order=resolve_collider_order(collider_order),
+            collider_rule=collider_rule,
             categorical=mask,
             dependence_threshold=dependence_threshold,
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "CDNOD",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    return structure_output(cpdag, labels=labels, metadata=metadata)

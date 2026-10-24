@@ -22,6 +22,14 @@ change names its pull request.
   `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
   or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
   parents and children with `target=`, or every variable's set without it. ([#400])
+- Experimental `notears` and `dagma`, continuous-optimization learners that fit a weighted DAG by
+  minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only: NOTEARS with
+  the least-squares loss and the trace-exponential constraint, DAGMA with its log-determinant
+  constraint and central path. Both take the papers' defaults, honor all four parts of `knowledge`,
+  and fit on rank-ordered columns, so they draw no random numbers and do not depend on the column
+  order. `robust=True` follows the first fit with the likelihood path of Deng et al. (2024): the
+  Gaussian likelihood with one noise variance per variable and a quasi-MCP penalty, refit while the
+  likelihood falls. ([#430])
 - `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
@@ -44,6 +52,9 @@ change names its pull request.
   its maximal ancestral graph, and a DAG or MAG into its PAG; the new `"mag"` kind holds a MAG,
   which scores and draws as a PAG and reads and writes pcalg's `amat.pag`; and `to_dot()` writes
   any graph as Graphviz DOT text, which the graph-representation guide hands to DoWhy. ([#418])
+- `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule="conservative"` or `"majority"`, which decide
+  each collider by a vote over the separating subsets of its ends' neighbors and list the triples
+  the vote leaves undecided in `metadata["ambiguous_triples"]`. ([#397])
 
 ### Changed
 
@@ -66,6 +77,11 @@ change names its pull request.
 
 ### Fixed
 
+- The worker pool starts when `TMPDIR` is on a file system that rejects the forkserver's socket,
+  such as a cluster's parallel file system. `ges`, `gfci`, and the skeleton search of `pc`, `fci`,
+  `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
+  the forkserver's socket now goes in `/dev/shm`, or `/tmp`, with a warning, and the workers start
+  with `fork` or `spawn` when neither holds it. Results do not change. ([#415])
 - `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
   `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
   test or score; an empty list now reads as `None` there. ([#395])
@@ -755,7 +771,10 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
+[#397]: https://github.com/Abel-ai-lab/andrey/pull/397
 [#400]: https://github.com/Abel-ai-lab/andrey/pull/400
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
+[#415]: https://github.com/Abel-ai-lab/andrey/pull/415
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
+[#430]: https://github.com/Abel-ai-lab/andrey/pull/430
