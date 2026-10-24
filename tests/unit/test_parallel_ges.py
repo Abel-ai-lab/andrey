@@ -531,7 +531,14 @@ def test_workers_are_live_at_construction(d):
     x = _gaussian_sem(0, 200, d, 0.3 if d < 10 else 0.02)
     score = BICScore(x, lambda_value=1.0)
     wset = pg._create_pool(
-        score.cov, score.n, d, score.lambda_value, "tok", workers=3, ranks=list(range(d))
+        score.cov,
+        score.n,
+        d,
+        score.lambda_value,
+        score.ebic_gamma,
+        "tok",
+        workers=3,
+        ranks=list(range(d)),
     )
     try:
         assert len(wset._pools) == 3
