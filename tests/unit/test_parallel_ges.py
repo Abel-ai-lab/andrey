@@ -622,13 +622,21 @@ def forkserver_decision():
 
 
 @needs_forkserver
-def test_socket_probe_reports_whether_the_directory_holds_it(monkeypatch, tmp_path):
-    """The probe accepts a usable directory and rejects a missing one or a rejected chmod."""
-    assert par._holds_forkserver_socket(str(tmp_path))
-    assert not par._holds_forkserver_socket(str(tmp_path / "missing"))
-    monkeypatch.setattr(os, "chmod", _reject_chmod)
-    assert not par._holds_forkserver_socket(str(tmp_path))
-    assert list(tmp_path.iterdir()) == [], "the probe left files behind"
+def test_socket_probe_reports_whether_the_directory_holds_it(monkeypatch):
+    """The probe accepts a usable directory and rejects a missing one, a socket path past the
+    platform's limit, or a rejected chmod."""
+    # pytest's tmp_path can itself overrun the limit (104 bytes on macOS), so the base is short.
+    with tempfile.TemporaryDirectory(dir="/tmp") as base:
+        assert par._holds_forkserver_socket(base)
+        assert not par._holds_forkserver_socket(os.path.join(base, "missing"))
+        deep = os.path.join(base, "d" * 120)
+        os.mkdir(deep)
+        assert not par._holds_forkserver_socket(deep)
+        os.rmdir(deep)
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "chmod", _reject_chmod)
+            assert not par._holds_forkserver_socket(base)
+        assert os.listdir(base) == [], "the probe left files behind"
 
 
 @needs_forkserver
