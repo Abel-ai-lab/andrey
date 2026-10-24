@@ -194,58 +194,6 @@ html[data-theme="dark"] .wf { --wf-shade: var(--andrey-paper); }
   white-space: nowrap;
 }
 
-/* ---------- the homepage's plus and the tiles' dialogs ---------- */
-.wf-plus {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--andrey-accent);
-  color: var(--andrey-paper);
-}
-.wf-plus svg { width: 15px; height: 15px; }
-
-dialog.tile-dialog {
-  width: min(940px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  padding: 34px 40px 26px;
-  border: 0;
-  border-radius: 28px;
-  background: var(--andrey-paper);
-  box-shadow: 0 40px 120px -20px color-mix(in srgb, var(--wf-shade) 45%, transparent);
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-dialog.tile-dialog::backdrop {
-  background: color-mix(in srgb, var(--wf-shade) 45%, transparent);
-  backdrop-filter: blur(14px) saturate(1.15);
-}
-.wf-top { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
-.wf .wf-top h2 {
-  margin: 0;
-  font-size: clamp(1.6rem, 3.6vw, 2.2rem);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-  color: var(--andrey-ink);
-}
-.wf .wf-top p { margin: 0.4rem 0 0; font-size: 1rem; color: var(--andrey-muted); }
-.wf-close {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--andrey-surface-2);
-  color: var(--andrey-ink);
-  cursor: pointer;
-}
-.wf-close svg { width: 14px; height: 14px; }
-
 .wf button:focus-visible {
   outline: 2px solid var(--andrey-accent);
   outline-offset: 3px;
@@ -269,5 +217,4 @@ dialog.tile-dialog::backdrop {
 }
 @media (max-width: 680px) {
   .wf-stage { padding: 4px 16px; border-radius: 18px; }
-  dialog.tile-dialog { padding: 24px 18px 20px; border-radius: 24px; }
 }
