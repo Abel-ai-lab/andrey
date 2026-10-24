@@ -47,7 +47,7 @@ from .ci import (
 )
 from .score import CopiedColumnsError, copies_error, copies_message, copy_groups
 
-__all__ = ["TestwiseDeletion", "rows_metadata", "rows_tested"]
+__all__ = ["TestwiseDeletion"]
 
 # The most bytes of row blocks the tests one TestwiseDeletion keeps for reuse hold together.
 _CACHE_BYTES = 1 << 27

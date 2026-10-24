@@ -26,6 +26,7 @@ import andrey.core.ci
 import andrey.core.ci_cmiknn
 import andrey.core.ci_gpdc
 import andrey.core.ci_kernel
+import andrey.core.ci_missing
 import andrey.data.discrete
 import andrey.data.mixed
 import andrey.data.real
@@ -56,6 +57,7 @@ PUBLIC_MODULES = (
     (andrey.core.ci_kernel, "core.ci_kernel."),
     (andrey.core.ci_cmiknn, "core.ci_cmiknn."),
     (andrey.core.ci_gpdc, "core.ci_gpdc."),
+    (andrey.core.ci_missing, "core.ci_missing."),
     (andrey.data.real, "data."),
     (andrey.data.discrete, "data."),
     (andrey.data.mixed, "data."),
