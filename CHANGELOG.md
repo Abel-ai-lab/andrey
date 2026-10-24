@@ -29,7 +29,7 @@ change names its pull request.
   and fit on rank-ordered columns, so they draw no random numbers and do not depend on the column
   order. `robust=True` follows the first fit with the likelihood path of Deng et al. (2024): the
   Gaussian likelihood with one noise variance per variable and a quasi-MCP penalty, refit while the
-  likelihood falls. ([#420])
+  likelihood falls. ([#430])
 - `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
@@ -767,4 +767,4 @@ First alpha release.
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
-[#420]: https://github.com/Abel-ai-lab/andrey/pull/420
+[#430]: https://github.com/Abel-ai-lab/andrey/pull/430
