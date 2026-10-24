@@ -1,6 +1,6 @@
 {
  "release": "0.10.0",
- "generated": "2026-10-24",
+ "generated": "2026-10-23",
  "theme": "boundary",
  "highlights": [
   "PC, GES against FGES, BOSS, GRaSP, and FCI against Tetrad 7.6.10 on the same datasets, re-timed on the 0.9.0 build, each row with the measured cause of any difference in errors"
@@ -65,7 +65,7 @@
   },
   {
    "lane": "comparisons",
-   "reason": "the rows ran on the 0.9.0 build; the release identity check confirms that 0.10.0 returns the same graphs"
+   "reason": "the rows ran on the 0.9.0 build; whether 0.10.0 returns the same graphs is pending the identity check at the 0.10.0 freeze"
   }
  ],
  "not_generated": [],
@@ -314,7 +314,7 @@
     "fits_090": "5 of 5",
     "solution": "andrey.fci.numpy",
     "solution_ref": "tetrad.fci.fisherz",
-    "note": "Median errors 14.0 (Andrey) and 15.0 (Tetrad): Andrey's are lower. The two graphs are the same on 3 of 5 datasets. No cause was measured for the differing graphs."
+    "note": "Median errors 14.0 (Andrey) and 15.0 (Tetrad): Andrey's are lower. The two graphs are the same on 3 of 5 datasets. No cause for the differing graphs was measured on these datasets."
    },
    {
     "method": "fci",
@@ -343,7 +343,7 @@
     "fits_090": "5 of 5",
     "solution": "andrey.fci.numpy",
     "solution_ref": "tetrad.fci.fisherz",
-    "note": "Median errors 28.0 (Andrey) and 32.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause was measured for the differing graphs."
+    "note": "Median errors 28.0 (Andrey) and 32.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause for the differing graphs was measured on these datasets."
    },
    {
     "method": "fci",
@@ -372,7 +372,7 @@
     "fits_090": "5 of 5",
     "solution": "andrey.fci.numpy",
     "solution_ref": "tetrad.fci.fisherz",
-    "note": "Median errors 70.0 (Andrey) and 77.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause was measured for the differing graphs."
+    "note": "Median errors 70.0 (Andrey) and 77.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause for the differing graphs was measured on these datasets."
    },
    {
     "method": "fci",
@@ -401,7 +401,7 @@
     "fits_090": "5 of 5",
     "solution": "andrey.fci.numpy",
     "solution_ref": "tetrad.fci.fisherz",
-    "note": "Median errors 218.0 (Andrey) and 227.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause was measured for the differing graphs."
+    "note": "Median errors 218.0 (Andrey) and 227.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause for the differing graphs was measured on these datasets."
    },
    {
     "method": "ges",
