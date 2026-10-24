@@ -155,10 +155,11 @@ def varma_lingam(
     from 10 variables on. The fit takes minutes at 20 variables and 1,000 time steps. It assumes
     linear effects and non-Gaussian noise. The likelihood fit can stop before it converges, and
     gives no warning; a larger ``max_iter`` does not prevent this. The result then depends on the
-    versions of the numerical libraries, so the same series can give a different graph in another
-    environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    versions of the numerical libraries. Where the fit stops, even when it converges, also depends
+    on the BLAS kernels the CPU runs, so the same series can give a different graph on another
+    type of CPU or in another environment. With ``criterion`` set, it fits one model for every
+    ``(p, q)`` in the grid. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

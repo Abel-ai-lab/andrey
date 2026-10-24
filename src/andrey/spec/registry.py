@@ -1291,8 +1291,9 @@ _add(
         column_order="relabels",
         tie_break=True,
         order_note=(
-            "When the likelihood fit stops before it converges, the graph can change with "
-            "the numerical libraries' versions."
+            "Where the likelihood fit stops depends on the BLAS kernels the CPU runs, so another "
+            "type of CPU can give another graph, and so can other library versions when the fit "
+            "stops before it converges."
         ),
         params=(
             ParamSpec(

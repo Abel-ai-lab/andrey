@@ -75,7 +75,8 @@ p-values then repeat for a fixed thread count.
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
 with one torch version, and another platform can give another graph. When the likelihood fit of
 `varma_lingam` stops before it converges, its graph can change with the versions of the numerical
-libraries.
+libraries. Where the fit stops, even when it converges, also depends on the BLAS kernels the CPU
+runs, so a series can give another graph on another type of CPU.
 
 ### ICA-LiNGAM
 
