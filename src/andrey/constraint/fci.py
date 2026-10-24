@@ -546,6 +546,10 @@ def _possible_dsep(
     return sorted(dsep, key=lambda v: f"X{v + 1}", reverse=True)
 
 
+# The most subsets one possible-d-sep run asks a test for at once (see _try_remove_by_dsep).
+_DSEP_RUN = 256
+
+
 def _iter_dsep_choices(
     dsep: list[int], adj_a: set[int], adj_b: set[int], max_depth: int | None = None
 ) -> Iterator[tuple[int, ...]]:
@@ -580,14 +584,31 @@ def _try_remove_by_dsep(
     max_depth: int | None = None,
 ) -> bool:
     """Remove edge ``x-y`` if some subset of ``dsep``, of at most ``max_depth`` members when one is
-    given, makes ``x`` and ``y`` independent."""
-    for cond in _iter_dsep_choices(dsep, adj_a, adj_b, max_depth):
-        if test(x, y, cond) > alpha:
-            marks[x, y] = NULL
-            marks[y, x] = NULL
-            sepsets[(x, y)] = tuple(int(v) for v in cond)
-            return True
-    return False
+    given, makes ``x`` and ``y`` independent.
+
+    The subsets are tested in :func:`_iter_dsep_choices` order and the first that separates the
+    pair is recorded. A test with ``separating_prefix`` answers them in runs of 1, 2, 4, ... up to
+    ``_DSEP_RUN`` subsets, each run cut at its first separating subset, so it answers the queries
+    the one-at-a-time loop asks, in its order, and no more; another test takes one call per
+    subset.
+    """
+    choices = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth)
+    prefix = getattr(test, "separating_prefix", None)
+    if prefix is None:
+        found = next((cond for cond in choices if test(x, y, cond) > alpha), None)
+    else:
+        found, run = None, 1
+        while found is None and (chunk := list(islice(choices, run))):
+            pvalues = prefix(x, y, chunk, alpha)
+            if pvalues and pvalues[-1] > alpha:
+                found = chunk[len(pvalues) - 1]
+            run = min(2 * run, _DSEP_RUN)
+    if found is None:
+        return False
+    marks[x, y] = NULL
+    marks[y, x] = NULL
+    sepsets[(x, y)] = tuple(int(v) for v in found)
+    return True
 
 
 def _edge_order(marks: np.ndarray, i: int, j: int) -> tuple[int, int]:
