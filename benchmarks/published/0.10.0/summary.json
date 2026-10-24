@@ -1,0 +1,1197 @@
+{
+ "release": "0.10.0",
+ "generated": "2026-10-23",
+ "theme": "boundary",
+ "highlights": [
+  "PC, GES against FGES, BOSS, GRaSP, and FCI against Tetrad 7.6.10 on the same datasets, re-timed on the 0.9.0 build, each row with the measured cause of any difference in errors"
+ ],
+ "andrey_builds": [
+  {
+   "build": "Andrey 0.9.0, release/0.9.0 at b94e647",
+   "solutions": [
+    "andrey.boss.numpy",
+    "andrey.fci.numpy",
+    "andrey.ges.numpy.parallel.uncapped",
+    "andrey.ges.numpy.serial.uncapped",
+    "andrey.grasp.numpy",
+    "andrey.pc.numpy"
+   ]
+  }
+ ],
+ "regime": {
+  "latent_gauss_er": {
+   "name": "latent_gauss_er",
+   "description": "linear-Gaussian data from Erdos-Renyi graphs with hidden confounders"
+  },
+  "linear_gauss_er": {
+   "name": "linear_gauss_er",
+   "description": "linear-Gaussian data from Erdos-Renyi graphs"
+  }
+ },
+ "column_order": "every dataset lists its variables in an order drawn from its seed, with the true graph permuted the same way",
+ "error_metric": "each comparison row's own: median shd of the learned graph against the true graph's CPDAG (mec_shd for a DAG, the PAG of the observed variables for FCI); a matched entry gives the mean shd over its datasets",
+ "hardware": {
+  "comparisons": {
+   "cpu": [
+    "AMD EPYC 7713"
+   ],
+   "cores_per_fit": 4,
+   "fits": "comparison rows: one job per group on one node, both packages on the same datasets, 4 cores per fit, one timed fit per dataset after 1 warm-up fit (Tetrad's in the same JVM), a 1800 s wall cap and a 30000 MB memory cap per fit; matched entries count errors only, not time"
+  }
+ },
+ "packages": {
+  "bench environment": {
+   "python": "3.13.11",
+   "numpy": "2.5.4",
+   "scipy": "1.16.3",
+   "scikit-learn": "1.9.1",
+   "statsmodels": "0.15.0",
+   "torch": "2.14.1+cpu",
+   "pandas": "3.1.0",
+   "networkx": "3.7",
+   "openblas": "0.3.34.106.0"
+  },
+  "comparison packages": {
+   "Tetrad": "tetrad-lib 7.6.10 (shaded jar)",
+   "Java": "OpenJDK 21.0.12.1"
+  }
+ },
+ "complete": false,
+ "pending_fits": 0,
+ "incomplete": [
+  {
+   "lane": "boundary",
+   "reason": "the boundary campaign has not ended; the lane is added when it has"
+  },
+  {
+   "lane": "comparisons",
+   "reason": "the rows ran on the 0.9.0 build; whether 0.10.0 returns the same graphs is pending the identity check at the 0.10.0 freeze"
+  }
+ ],
+ "not_generated": [],
+ "methods": [],
+ "speed": {
+  "builds": {
+   "current": {
+    "commit": "b94e647920b777dd1d2202dd9bb085240fb122a5",
+    "branch": "release/0.9.0"
+   }
+  },
+  "note": "Andrey on the 0.9.0 build against Tetrad 7.6.10 on the same datasets: PC, GES against FGES, BOSS, and GRaSP on linear-Gaussian data, FCI on data with hidden confounders. The rows are the ones the 0.9.0 summary held back.",
+  "comparisons": [
+   {
+    "method": "boss",
+    "regime": "linear_gauss_er",
+    "d": 20,
+    "n": 200,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0591,
+    "seconds_090": 0.026,
+    "speedup": 2.275,
+    "errors_ref": 0.0,
+    "errors_090": 3.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.1529,
+    "same_graph_datasets": 4,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.boss.numpy",
+    "solution_ref": "tetrad.boss.bic",
+    "note": "One search each, from different starts and sweep orders (Tetrad: the data's column order; Andrey: its tie-rank order and a seeded random sweep), so a 5-dataset median moves with the draw. Mean errors over 20 datasets: Andrey 3.0; Tetrad 4.0 from the column order (difference -1.0 [-2.3, +0.4]) and 3.7 from random starts (-0.8 [-1.6, +0.0]).",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 2.97,
+      "errors_mean_ref": 3.95,
+      "difference": -0.98,
+      "difference_95": [
+       -2.33,
+       0.36
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 5 searches from random starts",
+      "datasets": 20,
+      "errors_mean_090": 2.97,
+      "errors_mean_ref": 3.72,
+      "difference": -0.75,
+      "difference_95": [
+       -1.63,
+       0.04
+      ]
+     }
+    ]
+   },
+   {
+    "method": "boss",
+    "regime": "linear_gauss_er",
+    "d": 50,
+    "n": 500,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.248,
+    "seconds_090": 0.1338,
+    "speedup": 1.853,
+    "errors_ref": 0.0,
+    "errors_090": 5.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.8947,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.boss.numpy",
+    "solution_ref": "tetrad.boss.bic",
+    "note": "One search each, from different starts and sweep orders (Tetrad: the data's column order; Andrey: its tie-rank order and a seeded random sweep), so a 5-dataset median moves with the draw. Mean errors over 20 datasets: Andrey 4.2; Tetrad 4.7 from the column order (difference -0.5 [-3.4, +2.0]) and 4.6 from random starts (-0.4 [-1.6, +0.9]).",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 4.22,
+      "errors_mean_ref": 4.7,
+      "difference": -0.48,
+      "difference_95": [
+       -3.35,
+       2.01
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 5 searches from random starts",
+      "datasets": 20,
+      "errors_mean_090": 4.22,
+      "errors_mean_ref": 4.62,
+      "difference": -0.4,
+      "difference_95": [
+       -1.57,
+       0.92
+      ]
+     }
+    ]
+   },
+   {
+    "method": "boss",
+    "regime": "linear_gauss_er",
+    "d": 100,
+    "n": 1000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.869,
+    "seconds_090": 0.4367,
+    "speedup": 1.99,
+    "errors_ref": 13.0,
+    "errors_090": 5.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 4.5617,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.boss.numpy",
+    "solution_ref": "tetrad.boss.bic",
+    "note": "One search each, from different starts and sweep orders (Tetrad: the data's column order; Andrey: its tie-rank order and a seeded random sweep), so a 5-dataset median moves with the draw. Mean errors over 20 datasets: Andrey 6.7; Tetrad 7.5 from the column order (difference -0.8 [-3.4, +1.9]) and 5.5 from random starts (+1.2 [-0.9, +3.5]).",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 6.7,
+      "errors_mean_ref": 7.45,
+      "difference": -0.75,
+      "difference_95": [
+       -3.38,
+       1.91
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 5 searches from random starts",
+      "datasets": 20,
+      "errors_mean_090": 6.7,
+      "errors_mean_ref": 5.48,
+      "difference": 1.22,
+      "difference_95": [
+       -0.93,
+       3.49
+      ]
+     }
+    ]
+   },
+   {
+    "method": "boss",
+    "regime": "linear_gauss_er",
+    "d": 200,
+    "n": 2000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 4.0276,
+    "seconds_090": 1.6631,
+    "speedup": 2.422,
+    "errors_ref": 6.0,
+    "errors_090": 5.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 11.236,
+    "same_graph_datasets": 1,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.boss.numpy",
+    "solution_ref": "tetrad.boss.bic",
+    "note": "One search each, from different starts and sweep orders (Tetrad: the data's column order; Andrey: its tie-rank order and a seeded random sweep), so a 5-dataset median moves with the draw. Mean errors over 10 datasets: Andrey 8.8; Tetrad 3.0 from the column order (difference +5.8 [+3.3, +8.0]) and 7.5 from random starts (+1.3 [-0.7, +3.4]).",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 10,
+      "errors_mean_090": 8.8,
+      "errors_mean_ref": 3.0,
+      "difference": 5.8,
+      "difference_95": [
+       3.32,
+       7.98
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 5 searches from random starts",
+      "datasets": 10,
+      "errors_mean_090": 8.8,
+      "errors_mean_ref": 7.52,
+      "difference": 1.28,
+      "difference_95": [
+       -0.66,
+       3.38
+      ]
+     }
+    ]
+   },
+   {
+    "method": "fci",
+    "regime": "latent_gauss_er",
+    "d": 20,
+    "n": 200,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0388,
+    "seconds_090": 0.0044,
+    "speedup": 8.803,
+    "errors_ref": 15.0,
+    "errors_090": 14.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.068,
+    "same_graph_datasets": 3,
+    "cores": 4,
+    "latents": 2,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.fci.numpy",
+    "solution_ref": "tetrad.fci.fisherz",
+    "note": "Median errors 14.0 (Andrey) and 15.0 (Tetrad): Andrey's are lower. The two graphs are the same on 3 of 5 datasets. No cause for the differing graphs was measured on these datasets."
+   },
+   {
+    "method": "fci",
+    "regime": "latent_gauss_er",
+    "d": 50,
+    "n": 500,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.1024,
+    "seconds_090": 0.0231,
+    "speedup": 4.429,
+    "errors_ref": 32.0,
+    "errors_090": 28.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.3225,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "latents": 5,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.fci.numpy",
+    "solution_ref": "tetrad.fci.fisherz",
+    "note": "Median errors 28.0 (Andrey) and 32.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause for the differing graphs was measured on these datasets."
+   },
+   {
+    "method": "fci",
+    "regime": "latent_gauss_er",
+    "d": 100,
+    "n": 1000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.3206,
+    "seconds_090": 0.1145,
+    "speedup": 2.799,
+    "errors_ref": 77.0,
+    "errors_090": 70.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 3.3554,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "latents": 10,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.fci.numpy",
+    "solution_ref": "tetrad.fci.fisherz",
+    "note": "Median errors 70.0 (Andrey) and 77.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause for the differing graphs was measured on these datasets."
+   },
+   {
+    "method": "fci",
+    "regime": "latent_gauss_er",
+    "d": 200,
+    "n": 2000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 1.4473,
+    "seconds_090": 0.5773,
+    "speedup": 2.507,
+    "errors_ref": 227.0,
+    "errors_090": 218.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 6.2834,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "latents": 20,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.fci.numpy",
+    "solution_ref": "tetrad.fci.fisherz",
+    "note": "Median errors 218.0 (Andrey) and 227.0 (Tetrad): Andrey's are lower. The two graphs are the same on 0 of 5 datasets. No cause for the differing graphs was measured on these datasets."
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 20,
+    "n": 200,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0944,
+    "seconds_090": 0.0286,
+    "speedup": 3.305,
+    "errors_ref": 9.0,
+    "errors_090": 12.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.4163,
+    "same_graph_datasets": 4,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.serial.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 25.7 edges (Andrey) and 25.2 (FGES) against 20.0 true edges, on average over 20 datasets. Mean errors there: Andrey 10.2, FGES 9.9 (difference +0.3 [-1.6, +2.6]). At penalty 2 on both sides: Andrey 5.5, FGES 5.5 (difference +0.0 [-1.9, +2.0]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 10.2,
+      "errors_mean_ref": 9.9,
+      "difference": 0.3,
+      "difference_95": [
+       -1.6,
+       2.6
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 20,
+      "errors_mean_090": 5.5,
+      "errors_mean_ref": 5.5,
+      "difference": 0.0,
+      "difference_95": [
+       -1.95,
+       2.0
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 20,
+    "n": 200,
+    "mean_degree": 2.0,
+    "workers": 4,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0944,
+    "seconds_090": 0.0344,
+    "speedup": 2.744,
+    "errors_ref": 9.0,
+    "errors_090": 12.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.4163,
+    "same_graph_datasets": 4,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.parallel.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 25.7 edges (Andrey) and 25.2 (FGES) against 20.0 true edges, on average over 20 datasets. Mean errors there: Andrey 10.2, FGES 9.9 (difference +0.3 [-1.6, +2.6]). At penalty 2 on both sides: Andrey 5.5, FGES 5.5 (difference +0.0 [-1.9, +2.0]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 10.2,
+      "errors_mean_ref": 9.9,
+      "difference": 0.3,
+      "difference_95": [
+       -1.6,
+       2.6
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 20,
+      "errors_mean_090": 5.5,
+      "errors_mean_ref": 5.5,
+      "difference": 0.0,
+      "difference_95": [
+       -1.95,
+       2.0
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 50,
+    "n": 500,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.2998,
+    "seconds_090": 0.1275,
+    "speedup": 2.35,
+    "errors_ref": 40.0,
+    "errors_090": 47.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 3.0329,
+    "same_graph_datasets": 1,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.serial.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 73.8 edges (Andrey) and 73.4 (FGES) against 50.0 true edges, on average over 20 datasets. Mean errors there: Andrey 36.9, FGES 35.8 (difference +1.1 [-2.7, +5.0]). At penalty 2 on both sides: Andrey 8.9, FGES 8.8 (difference +0.1 [-2.6, +3.5]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 36.85,
+      "errors_mean_ref": 35.75,
+      "difference": 1.1,
+      "difference_95": [
+       -2.7,
+       5.05
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 20,
+      "errors_mean_090": 8.9,
+      "errors_mean_ref": 8.8,
+      "difference": 0.1,
+      "difference_95": [
+       -2.65,
+       3.5
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 50,
+    "n": 500,
+    "mean_degree": 2.0,
+    "workers": 4,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.2998,
+    "seconds_090": 0.1171,
+    "speedup": 2.56,
+    "errors_ref": 40.0,
+    "errors_090": 47.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 3.0329,
+    "same_graph_datasets": 1,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.parallel.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 73.8 edges (Andrey) and 73.4 (FGES) against 50.0 true edges, on average over 20 datasets. Mean errors there: Andrey 36.9, FGES 35.8 (difference +1.1 [-2.7, +5.0]). At penalty 2 on both sides: Andrey 8.9, FGES 8.8 (difference +0.1 [-2.6, +3.5]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 36.85,
+      "errors_mean_ref": 35.75,
+      "difference": 1.1,
+      "difference_95": [
+       -2.7,
+       5.05
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 20,
+      "errors_mean_090": 8.9,
+      "errors_mean_ref": 8.8,
+      "difference": 0.1,
+      "difference_95": [
+       -2.65,
+       3.5
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 100,
+    "n": 1000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 1.2335,
+    "seconds_090": 0.2526,
+    "speedup": 4.883,
+    "errors_ref": 78.0,
+    "errors_090": 82.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 5.5242,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.serial.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 157.8 edges (Andrey) and 156.0 (FGES) against 100.0 true edges, on average over 20 datasets. Mean errors there: Andrey 80.6, FGES 78.2 (difference +2.4 [+0.8, +4.0]). At penalty 2 on both sides: Andrey 8.5, FGES 8.9 (difference -0.5 [-1.7, +0.6]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 80.6,
+      "errors_mean_ref": 78.25,
+      "difference": 2.35,
+      "difference_95": [
+       0.85,
+       3.95
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 20,
+      "errors_mean_090": 8.5,
+      "errors_mean_ref": 8.95,
+      "difference": -0.45,
+      "difference_95": [
+       -1.7,
+       0.55
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 100,
+    "n": 1000,
+    "mean_degree": 2.0,
+    "workers": 4,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 1.2335,
+    "seconds_090": 0.3223,
+    "speedup": 3.827,
+    "errors_ref": 78.0,
+    "errors_090": 82.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 5.5242,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.parallel.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 157.8 edges (Andrey) and 156.0 (FGES) against 100.0 true edges, on average over 20 datasets. Mean errors there: Andrey 80.6, FGES 78.2 (difference +2.4 [+0.8, +4.0]). At penalty 2 on both sides: Andrey 8.5, FGES 8.9 (difference -0.5 [-1.7, +0.6]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 80.6,
+      "errors_mean_ref": 78.25,
+      "difference": 2.35,
+      "difference_95": [
+       0.85,
+       3.95
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 20,
+      "errors_mean_090": 8.5,
+      "errors_mean_ref": 8.95,
+      "difference": -0.45,
+      "difference_95": [
+       -1.7,
+       0.55
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 200,
+    "n": 2000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 10.9496,
+    "seconds_090": 0.9637,
+    "speedup": 11.362,
+    "errors_ref": 194.0,
+    "errors_090": 204.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 25.9311,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.serial.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 351.6 edges (Andrey) and 348.6 (FGES) against 200.0 true edges, on average over 10 datasets. Mean errors there: Andrey 203.8, FGES 198.7 (difference +5.1 [+0.0, +10.5]). At penalty 2 on both sides: Andrey 22.0, FGES 18.6 (difference +3.4 [-4.5, +11.9]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 10,
+      "errors_mean_090": 203.8,
+      "errors_mean_ref": 198.7,
+      "difference": 5.1,
+      "difference_95": [
+       0.0,
+       10.5
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 10,
+      "errors_mean_090": 22.0,
+      "errors_mean_ref": 18.6,
+      "difference": 3.4,
+      "difference_95": [
+       -4.5,
+       11.9
+      ]
+     }
+    ]
+   },
+   {
+    "method": "ges",
+    "regime": "linear_gauss_er",
+    "d": 200,
+    "n": 2000,
+    "mean_degree": 2.0,
+    "workers": 4,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 10.9496,
+    "seconds_090": 2.0104,
+    "speedup": 5.446,
+    "errors_ref": 194.0,
+    "errors_090": 204.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 25.9311,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.ges.numpy.parallel.uncapped",
+    "solution_ref": "tetrad.fges.bic",
+    "note": "Both searches are over-dense at penalty 1: 351.6 edges (Andrey) and 348.6 (FGES) against 200.0 true edges, on average over 10 datasets. Mean errors there: Andrey 203.8, FGES 198.7 (difference +5.1 [+0.0, +10.5]). At penalty 2 on both sides: Andrey 22.0, FGES 18.6 (difference +3.4 [-4.5, +11.9]; the interval includes 0); over all 70 datasets of the four sizes, +0.4 [-1.2, +2.1].",
+    "matched": [
+     {
+      "setting": "penalty 1 on both sides, as the row runs it",
+      "datasets": 10,
+      "errors_mean_090": 203.8,
+      "errors_mean_ref": 198.7,
+      "difference": 5.1,
+      "difference_95": [
+       0.0,
+       10.5
+      ]
+     },
+     {
+      "setting": "penalty 2 on both sides",
+      "datasets": 10,
+      "errors_mean_090": 22.0,
+      "errors_mean_ref": 18.6,
+      "difference": 3.4,
+      "difference_95": [
+       -4.5,
+       11.9
+      ]
+     }
+    ]
+   },
+   {
+    "method": "grasp",
+    "regime": "linear_gauss_er",
+    "d": 20,
+    "n": 200,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0268,
+    "seconds_090": 0.0236,
+    "speedup": 1.134,
+    "errors_ref": 2.0,
+    "errors_090": 1.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.1628,
+    "same_graph_datasets": 3,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.grasp.numpy",
+    "solution_ref": "tetrad.grasp.bic",
+    "note": "Same score, penalty, depth and data; the start and visiting order differ. Mean errors over 20 datasets: Andrey 5.3; Tetrad 4.3 from the column order (difference +1.0 [-0.5, +2.7]) and 3.4 from random starts (+2.0 [+0.9, +3.1]). Fits with 10 or more errors: 23% of Andrey's, 5% of Tetrad's.",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 5.34,
+      "errors_mean_ref": 4.3,
+      "difference": 1.04,
+      "difference_95": [
+       -0.54,
+       2.71
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 3 searches from random starts and random visiting orders",
+      "datasets": 20,
+      "errors_mean_090": 5.34,
+      "errors_mean_ref": 3.35,
+      "difference": 1.99,
+      "difference_95": [
+       0.92,
+       3.14
+      ]
+     }
+    ]
+   },
+   {
+    "method": "grasp",
+    "regime": "linear_gauss_er",
+    "d": 50,
+    "n": 500,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.1816,
+    "seconds_090": 0.138,
+    "speedup": 1.316,
+    "errors_ref": 0.0,
+    "errors_090": 0.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.7182,
+    "same_graph_datasets": 3,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.grasp.numpy",
+    "solution_ref": "tetrad.grasp.bic",
+    "note": "Same score, penalty, depth and data; the start and visiting order differ. Mean errors over 20 datasets: Andrey 5.2; Tetrad 1.6 from the column order (difference +3.6 [+1.8, +5.6]) and 2.8 from random starts (+2.4 [+0.9, +4.2]). Fits with 10 or more errors: 25% of Andrey's, 0% of Tetrad's. Andrey's search ends at a worse BIC than the true graph's in 48% to 65% of finished fits, Tetrad's in 45% to 50% (depths 2 to 6, 20 datasets).",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 5.18,
+      "errors_mean_ref": 1.6,
+      "difference": 3.58,
+      "difference_95": [
+       1.82,
+       5.61
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 3 searches from random starts and random visiting orders",
+      "datasets": 20,
+      "errors_mean_090": 5.18,
+      "errors_mean_ref": 2.82,
+      "difference": 2.36,
+      "difference_95": [
+       0.86,
+       4.16
+      ]
+     }
+    ]
+   },
+   {
+    "method": "grasp",
+    "regime": "linear_gauss_er",
+    "d": 100,
+    "n": 1000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 2.9834,
+    "seconds_090": 0.619,
+    "speedup": 4.82,
+    "errors_ref": 1.0,
+    "errors_090": 1.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 9.1206,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.grasp.numpy",
+    "solution_ref": "tetrad.grasp.bic",
+    "note": "Same score, penalty, depth and data; the start and visiting order differ. Mean errors over 20 datasets: Andrey 7.8; Tetrad 2.6 from the column order (difference +5.2 [+2.8, +7.8]) and 3.3 from random starts (+4.5 [+2.5, +6.8]). Fits with 10 or more errors: 34% of Andrey's, 10% of Tetrad's. Andrey's search ends at a worse BIC than the true graph's in 58% to 75% of finished fits, Tetrad's in 45% to 55% (depths 2 to 6, 20 datasets): a search-quality difference that depth does not explain.",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 7.81,
+      "errors_mean_ref": 2.65,
+      "difference": 5.16,
+      "difference_95": [
+       2.76,
+       7.77
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 3 searches from random starts and random visiting orders",
+      "datasets": 20,
+      "errors_mean_090": 7.81,
+      "errors_mean_ref": 3.32,
+      "difference": 4.49,
+      "difference_95": [
+       2.45,
+       6.78
+      ]
+     }
+    ]
+   },
+   {
+    "method": "grasp",
+    "regime": "linear_gauss_er",
+    "d": 200,
+    "n": 2000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 170.2359,
+    "seconds_090": 5.1307,
+    "speedup": 33.18,
+    "errors_ref": 1.0,
+    "errors_090": 17.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 342.0378,
+    "same_graph_datasets": 1,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.grasp.numpy",
+    "solution_ref": "tetrad.grasp.bic",
+    "note": "Same score, penalty, depth and data; the start and visiting order differ. Mean errors over 10 datasets: Andrey 12.2; Tetrad 3.5 from the column order (difference +8.7 [+3.1, +15.5]) and 8.8 from random starts (+3.3 [+0.0, +6.9]). Fits with 10 or more errors: 42% of Andrey's, 20% of Tetrad's.",
+    "matched": [
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: its search from the data's column order, as the row runs it",
+      "datasets": 10,
+      "errors_mean_090": 12.18,
+      "errors_mean_ref": 3.5,
+      "difference": 8.68,
+      "difference_95": [
+       3.1,
+       15.5
+      ]
+     },
+     {
+      "setting": "Andrey: mean of 5 seeds; Tetrad: mean of 2 searches from random starts and random visiting orders",
+      "datasets": 10,
+      "errors_mean_090": 12.18,
+      "errors_mean_ref": 8.85,
+      "difference": 3.33,
+      "difference_95": [
+       0.01,
+       6.93
+      ]
+     }
+    ]
+   },
+   {
+    "method": "pc",
+    "regime": "linear_gauss_er",
+    "d": 20,
+    "n": 200,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0248,
+    "seconds_090": 0.0039,
+    "speedup": 6.28,
+    "errors_ref": 12.0,
+    "errors_090": 8.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.0457,
+    "same_graph_datasets": 1,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.pc.numpy",
+    "solution_ref": "tetrad.pc.fisherz",
+    "note": "The skeleton scores the same on all 20 datasets; the graphs differ in orientation, from different collider rules: Tetrad keeps the first separating set found, Andrey the union of the sets of that size, and conflicting colliders resolve differently. Mean errors over 20 datasets: Andrey 8.9, Tetrad 10.2 (difference -1.3 [-2.7, -0.1]). The row's medians cover the first 5.",
+    "matched": [
+     {
+      "setting": "Tetrad's separating-set collider rule, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 8.9,
+      "errors_mean_ref": 10.2,
+      "difference": -1.3,
+      "difference_95": [
+       -2.7,
+       -0.15
+      ]
+     }
+    ]
+   },
+   {
+    "method": "pc",
+    "regime": "linear_gauss_er",
+    "d": 50,
+    "n": 500,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.0958,
+    "seconds_090": 0.0243,
+    "speedup": 3.952,
+    "errors_ref": 20.0,
+    "errors_090": 24.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 2.4261,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.pc.numpy",
+    "solution_ref": "tetrad.pc.fisherz",
+    "note": "The skeleton scores the same on all 30 datasets; the graphs differ in orientation, from different collider rules: Tetrad keeps the first separating set found, Andrey the union of the sets of that size, and conflicting colliders resolve differently. Mean errors over 30 datasets: Andrey 17.9, Tetrad 21.2 (difference -3.3 [-5.0, -1.5]). The row's medians cover the first 5.",
+    "matched": [
+     {
+      "setting": "Tetrad's separating-set collider rule, as the row runs it",
+      "datasets": 30,
+      "errors_mean_090": 17.87,
+      "errors_mean_ref": 21.17,
+      "difference": -3.3,
+      "difference_95": [
+       -4.97,
+       -1.53
+      ]
+     }
+    ]
+   },
+   {
+    "method": "pc",
+    "regime": "linear_gauss_er",
+    "d": 100,
+    "n": 1000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 0.3282,
+    "seconds_090": 0.0313,
+    "speedup": 10.494,
+    "errors_ref": 55.0,
+    "errors_090": 32.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 3.3227,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.pc.numpy",
+    "solution_ref": "tetrad.pc.fisherz",
+    "note": "The skeleton scores the same on all 20 datasets; the graphs differ in orientation, from different collider rules: Tetrad keeps the first separating set found, Andrey the union of the sets of that size, and conflicting colliders resolve differently. Mean errors over 20 datasets: Andrey 39.4, Tetrad 47.6 (difference -8.2 [-12.4, -4.2]). The row's medians cover the first 5.",
+    "matched": [
+     {
+      "setting": "Tetrad's separating-set collider rule, as the row runs it",
+      "datasets": 20,
+      "errors_mean_090": 39.4,
+      "errors_mean_ref": 47.6,
+      "difference": -8.2,
+      "difference_95": [
+       -12.45,
+       -4.15
+      ]
+     }
+    ]
+   },
+   {
+    "method": "pc",
+    "regime": "linear_gauss_er",
+    "d": 200,
+    "n": 2000,
+    "mean_degree": 2.0,
+    "workers": 1,
+    "comparator": "Tetrad",
+    "comparator_version": "tetrad-lib 7.6.10, Java 21.0.12.1",
+    "seconds_ref": 1.6195,
+    "seconds_090": 0.1078,
+    "speedup": 15.024,
+    "errors_ref": 123.0,
+    "errors_090": 114.0,
+    "datasets": 5,
+    "rounds": 1,
+    "cpu": "AMD EPYC 7713",
+    "stop_ref": "none",
+    "stop_090": "none",
+    "process_s_ref": 6.7413,
+    "same_graph_datasets": 0,
+    "cores": 4,
+    "fits_ref": "5 of 5",
+    "fits_090": "5 of 5",
+    "solution": "andrey.pc.numpy",
+    "solution_ref": "tetrad.pc.fisherz",
+    "note": "The skeleton scores the same on all 10 datasets; the graphs differ in orientation, from different collider rules: Tetrad keeps the first separating set found, Andrey the union of the sets of that size, and conflicting colliders resolve differently. Mean errors over 10 datasets: Andrey 98.9, Tetrad 111.1 (difference -12.2 [-16.1, -8.3]). The row's medians cover the first 5.",
+    "matched": [
+     {
+      "setting": "Tetrad's separating-set collider rule, as the row runs it",
+      "datasets": 10,
+      "errors_mean_090": 98.9,
+      "errors_mean_ref": 111.1,
+      "difference": -12.2,
+      "difference_95": [
+       -16.1,
+       -8.3
+      ]
+     }
+    ]
+   }
+  ],
+  "comparisons_note": "Andrey 0.9.0 against Tetrad on the same datasets, on the same node in one job. A dataset's time is its timed fit; seconds_ref and seconds_090 are medians over the size's datasets, and speedup is seconds_ref / seconds_090. errors_ref and errors_090 are each side's median shd against the true graph's CPDAG (the PAG of the observed variables for FCI) over the row's 5 datasets. same_graph_datasets counts the datasets on which both packages returned the same graph. seconds_ref is the search inside the JVM (JVM start, source compile, and data loading excluded, as Andrey's time excludes interpreter start and imports) and process_s_ref is the whole call. note states what was measured about the difference between the two packages' errors. matched repeats the comparison over every dataset a diagnosis run covered (20 at d = 20 to 100 and 10 at d = 200; 30 for PC at d = 50), as the mean of each dataset's errors, Andrey's over its seeds; difference is Andrey minus Tetrad, difference_95 its percentile bootstrap 95% interval over the datasets (4,000 resamples). The first entry uses the row's settings; each later entry changes the one setting it names. The GES entries ran Andrey's serial search, which returns the same graph as the parallel one. A median over 5 datasets is fragile for a search that makes one start; the means are the stable figures."
+ }
+}
