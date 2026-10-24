@@ -263,6 +263,17 @@ class PartialCorrelationTest:
 
         return cast("list[float]", results)
 
+    def separating_prefix(
+        self, x: int, y: int, condition_sets: Sequence[Iterable[int]], alpha: float
+    ) -> list[float]:
+        """Return the p-values of ``condition_sets``, in order, up to and including the first above
+        ``alpha``: the answers a loop of scalar calls that stops at the first separating set gets.
+
+        The sets are evaluated together (:func:`_separating_prefix`); each p-value equals
+        :meth:`__call__`'s.
+        """
+        return _separating_prefix(self, x, y, condition_sets, alpha)
+
     def _pvalues(self, x_int: int, y_int: int, conds: list[list[int]]) -> np.ndarray:
         """P-values for stacked queries on one pair sharing one conditioning-set size.
 
@@ -588,6 +599,17 @@ class ChiSquare:
         conds = [_canonical(x_int, y_int, condition_set)[2] for condition_set in condition_sets]
         return self._pvalues(x_int, y_int, conds).tolist()
 
+    def separating_prefix(
+        self, x: int, y: int, condition_sets: Sequence[Iterable[int]], alpha: float
+    ) -> list[float]:
+        """Return the p-values of ``condition_sets``, in order, up to and including the first above
+        ``alpha``: the answers a loop of scalar calls that stops at the first separating set gets.
+
+        The sets are evaluated together (:func:`_separating_prefix`); each p-value equals
+        :meth:`__call__`'s.
+        """
+        return _separating_prefix(self, x, y, condition_sets, alpha)
+
     def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
         """First-order (``|S| == 1``) p-values for pair ``(x, y)`` over single conditioners ``zs``.
 
@@ -845,6 +867,17 @@ class DGTest:
         conds = [tuple(_canonical(x_int, y_int, s)[2]) for s in condition_sets]
         return self._pvalues([x_int] * len(conds), [y_int] * len(conds), conds).tolist()
 
+    def separating_prefix(
+        self, x: int, y: int, condition_sets: Sequence[Iterable[int]], alpha: float
+    ) -> list[float]:
+        """Return the p-values of ``condition_sets``, in order, up to and including the first above
+        ``alpha``: the answers a loop of scalar calls that stops at the first separating set gets.
+
+        The sets are evaluated together (:func:`_separating_prefix`); each p-value equals
+        :meth:`__call__`'s.
+        """
+        return _separating_prefix(self, x, y, condition_sets, alpha)
+
     def _canonical_pvalues(
         self, xs: np.ndarray, ys: np.ndarray, conditions: np.ndarray
     ) -> np.ndarray:
@@ -1048,6 +1081,17 @@ class CGTest:
         x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
         queries = [(x_int, y_int, _canonical(x_int, y_int, s)[2]) for s in condition_sets]
         return self._pvalues(queries).tolist()
+
+    def separating_prefix(
+        self, x: int, y: int, condition_sets: Sequence[Iterable[int]], alpha: float
+    ) -> list[float]:
+        """Return the p-values of ``condition_sets``, in order, up to and including the first above
+        ``alpha``: the answers a loop of scalar calls that stops at the first separating set gets.
+
+        The sets are evaluated together (:func:`_separating_prefix`); each p-value equals
+        :meth:`__call__`'s.
+        """
+        return _separating_prefix(self, x, y, condition_sets, alpha)
 
     def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
         """First-order (``|S| == 1``) p-values for pair ``(x, y)`` over single conditioners ``zs``.
@@ -1253,6 +1297,32 @@ def _raise_if_singular(stack: np.ndarray) -> None:
         raise SingularCorrelationError(
             "correlation matrix is singular; cannot run a partial-correlation test"
         )
+
+
+def _separating_prefix(
+    test: Any, x: int, y: int, condition_sets: Sequence[Iterable[int]], alpha: float
+) -> list[float]:
+    """``test``'s p-values of ``condition_sets`` up to and including the first above ``alpha``.
+
+    One ``batched_call`` evaluates every set; the sets after the first separating one are computed
+    and dropped. When that call raises, the sets are tested one scalar call at a time, stopping at
+    the first separating one, so an error surfaces only from a set the scalar loop reaches.
+    """
+    try:
+        pvalues = list(test.batched_call(x, y, condition_sets))
+    except Exception:
+        pvalues = None
+    if pvalues is not None:
+        for i, p in enumerate(pvalues):
+            if p > alpha:
+                return pvalues[: i + 1]
+        return pvalues
+    out: list[float] = []
+    for condition_set in condition_sets:
+        out.append(test(x, y, condition_set))
+        if out[-1] > alpha:
+            break
+    return out
 
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:
