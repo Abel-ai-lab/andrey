@@ -69,6 +69,14 @@ For the time-series methods, an edge `(cause, effect, lag)` is the link from `ca
 maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
+`pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
+an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
+that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"`
+(Colombo and Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors
+and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
+triple the vote cannot decide is ambiguous: no rule orients through it, and
+`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
+
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
 gives a node more than that many parents, and some graph reaches each node's count.
 

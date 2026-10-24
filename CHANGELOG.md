@@ -52,6 +52,9 @@ change names its pull request.
   its maximal ancestral graph, and a DAG or MAG into its PAG; the new `"mag"` kind holds a MAG,
   which scores and draws as a PAG and reads and writes pcalg's `amat.pag`; and `to_dot()` writes
   any graph as Graphviz DOT text, which the graph-representation guide hands to DoWhy. ([#418])
+- `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule="conservative"` or `"majority"`, which decide
+  each collider by a vote over the separating subsets of its ends' neighbors and list the triples
+  the vote leaves undecided in `metadata["ambiguous_triples"]`. ([#397])
 
 ### Changed
 
@@ -768,6 +771,7 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
+[#397]: https://github.com/Abel-ai-lab/andrey/pull/397
 [#400]: https://github.com/Abel-ai-lab/andrey/pull/400
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411

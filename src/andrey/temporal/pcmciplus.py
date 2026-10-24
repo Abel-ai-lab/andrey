@@ -50,6 +50,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.constraint._skeleton import collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
 from andrey.core.knowledge import orient as orient_known
@@ -358,16 +359,6 @@ def colliders(
         requests = [(source, target) for source, target in requests if not directed[target, source]]
     apply_orientations(marks, requests)
     return marks, frozenset(ambiguous)
-
-
-def collider_verdict(separating: list[frozenset[int]], k: int, collider_rule: str) -> str:
-    """``"collider"``, ``"non-collider"``, or ``"ambiguous"``, by the share of subsets with k."""
-    if not separating:
-        return "ambiguous"
-    share = sum(k in subset for subset in separating) / len(separating)
-    if collider_rule == "conservative":
-        return "collider" if share == 0 else "non-collider" if share == 1 else "ambiguous"
-    return "collider" if share < 0.5 else "non-collider" if share > 0.5 else "ambiguous"
 
 
 def _directed(marks: np.ndarray, a: int, b: int) -> bool:
