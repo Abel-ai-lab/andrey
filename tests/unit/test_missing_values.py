@@ -1,8 +1,9 @@
 """Missing values: test-wise deletion in the CI tests, and the methods that accept or refuse NaN.
 
 A test on data with ``NaN`` reads the rows observed in all of its variables, and gives the p-value
-the same test gives on that block. The methods whose spec sets ``data.missing`` accept ``NaN``;
-every other method raises a ``ValueError`` that names it.
+the same test gives on that block: bit for bit, or for the partial-correlation tests, which compute
+each block's correlations directly, within ``RTOL``. The methods whose spec sets ``data.missing``
+accept ``NaN``; every other method raises a ``ValueError`` that names it.
 """
 
 from __future__ import annotations
@@ -31,6 +32,12 @@ from andrey.temporal.pcmci import design_test, lagged_design
 SUPPORTED = [name for name, spec in REGISTRY.items() if spec.data.missing]
 REFUSED = [name for name, spec in REGISTRY.items() if not spec.data.missing]
 SERIES = [name for name in SUPPORTED if REGISTRY[name].family == "temporal"]
+# The partial-correlation tests compute a block's correlations from sums over every row with the
+# unobserved ones zeroed; their p-values and partial correlations match the test on the block within
+# these tolerances.
+GAUSSIAN = ("fisherz", "student_t")
+RTOL = 1e-8
+ATOL_R = 1e-10
 
 
 @pytest.fixture(autouse=True)
@@ -104,7 +111,11 @@ def test_a_test_on_missing_values_is_the_test_on_the_rows_its_variables_share(na
         at = {c: i for i, c in enumerate(columns)}
         sub_mask = None if mask is None else mask[columns]
         alone = make_indep_test(name, _block(x, columns), categorical=sub_mask)
-        assert test(a, b, cond) == alone(at[a], at[b], [at[c] for c in cond])
+        want = alone(at[a], at[b], [at[c] for c in cond])
+        if name in GAUSSIAN:
+            assert test(a, b, cond) == pytest.approx(want, rel=RTOL, abs=0)
+        else:
+            assert test(a, b, cond) == want
 
 
 @pytest.mark.parametrize("name", ["fisherz", "student_t"])
@@ -112,11 +123,53 @@ def test_a_partial_correlation_on_missing_values_reports_its_block_statistic(nam
     x = _gaps(_continuous(), 0.15)
     test = make_indep_test(name, x)
     statistic, p = test.statistic_pvalue(3, 0, [2])
-    alone = make_indep_test(name, _block(x, [0, 2, 3]))
-    assert (statistic, p) == alone.statistic_pvalue(0, 2, [1])
+    want_r, want_p = make_indep_test(name, _block(x, [0, 2, 3])).statistic_pvalue(0, 2, [1])
+    assert statistic == pytest.approx(want_r, rel=0, abs=ATOL_R)
+    assert p == pytest.approx(want_p, rel=RTOL, abs=0)
     r, ps = test.statistic_pvalues(np.array([0, 3]), np.array([3, 1]), np.array([[2], [2]]))
     assert (r[0], ps[0]) == (statistic, p)
     assert (r[1], ps[1]) == test.statistic_pvalue(1, 3, [2])
+
+
+@pytest.mark.parametrize("name", GAUSSIAN)
+def test_a_partial_correlation_matches_the_test_on_its_block_on_random_gaps(name):
+    rng = np.random.default_rng(11)
+    for _ in range(12):
+        d, n = int(rng.integers(4, 9)), int(rng.choice([40, 300]))
+        x = rng.standard_normal((n, d)) @ rng.standard_normal((d, d)) + rng.uniform(-50, 50, d)
+        x[rng.random(x.shape) < rng.choice([0.05, 0.2, 0.4])] = np.nan
+        test = make_indep_test(name, x)
+        for size in range(min(4, d - 2) + 1):
+            for _ in range(5):
+                a, b, *cond = rng.permutation(d)[: size + 2].tolist()
+                columns = sorted({a, b, *cond})
+                at = {c: i for i, c in enumerate(columns)}
+                block = _block(x, columns)
+                if len(block) < size + 3:
+                    with pytest.raises(ValueError, match="needs at least"):
+                        test.statistic_pvalue(a, b, cond)
+                    continue
+                alone = make_indep_test(name, block)
+                want_r, want_p = alone.statistic_pvalue(at[a], at[b], [at[c] for c in cond])
+                r, p = test.statistic_pvalue(a, b, cond)
+                assert r == pytest.approx(want_r, rel=0, abs=ATOL_R)
+                assert p == pytest.approx(want_p, rel=RTOL, abs=0)
+                for alpha in (0.01, 0.05):
+                    assert (p > alpha) == (want_p > alpha)
+
+
+def test_every_query_path_of_a_partial_correlation_gives_the_same_bits():
+    x = _gaps(_continuous(), 0.2)
+    queries = [(0, 3, (2, 1)), (1, 2, (4, 3)), (0, 4, (1, 3)), (2, 4, (0, 1))]
+    alone = [make_indep_test("fisherz", x)(a, b, cond) for a, b, cond in queries]
+    lo, hi = np.array([q[0] for q in queries]), np.array([q[1] for q in queries])
+    conds = np.array([q[2] for q in queries])
+    together = make_indep_test("fisherz", x)
+    assert together._canonical_pvalues(lo, hi, np.sort(conds, axis=1)).tolist() == alone
+    assert make_indep_test("fisherz", x).statistic_pvalues(hi, lo, conds)[1].tolist() == alone
+    mixed = make_indep_test("fisherz", x).batched_call(0, 3, [(2, 1), (), (1,), (2,)])
+    assert mixed[0] == alone[0]
+    assert mixed[1:] == [make_indep_test("fisherz", x)(0, 3, cond) for cond in [(), (1,), (2,)]]
 
 
 def test_a_registered_test_is_built_on_each_query_block():
@@ -310,7 +363,9 @@ def test_a_lagged_design_reads_the_steps_its_lagged_variables_share():
     rows = ~np.isnan(design[:, columns]).any(axis=1)
     alone = StudentT(design[np.ix_(rows, columns)])
     statistic, p = test.statistic_pvalues(np.array([0]), np.array([13]), np.array([[6]]))
-    assert (statistic[0], p[0]) == alone.statistic_pvalue(0, 2, [1])
+    want_r, want_p = alone.statistic_pvalue(0, 2, [1])
+    assert statistic[0] == pytest.approx(want_r, rel=0, abs=ATOL_R)
+    assert p[0] == pytest.approx(want_p, rel=RTOL, abs=0)
 
 
 # --- the methods ----------------------------------------------------------------------------------
@@ -344,6 +399,23 @@ def test_more_workers_give_the_same_result_on_missing_values(name, monkeypatch):
     serial = _fit(name, x)
     with andrey.config(num_workers=2):
         assert _fit(name, x) == serial
+
+
+def _labeled_marks(out) -> dict:
+    m, labels = out.structure.to_numpy(), out.structure.labels
+    return {(a, b): int(m[i, j]) for i, a in enumerate(labels) for j, b in enumerate(labels)}
+
+
+@pytest.mark.parametrize("name", ["pc", "fci", "mmpc"])
+def test_a_column_order_changes_no_graph_on_missing_values(name):
+    from andrey import data
+
+    sample = data.sample_scm(d=8, n=500, seed=2, density=3.0, scale="standardize")
+    frame = pd.DataFrame(_gaps(np.asarray(sample.data), 0.1), columns=list("abcdefgh"))
+    want = _labeled_marks(getattr(andrey, name)(frame))
+    for seed in (0, 1):
+        order = list(np.random.default_rng(seed).permutation(list(frame.columns)))
+        assert _labeled_marks(getattr(andrey, name)(frame[order])) == want
 
 
 def _refused_inputs(name: str) -> list:

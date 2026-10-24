@@ -458,7 +458,9 @@ out.metadata["rows_tested"]
 ```
 
 `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read; a fit on
-complete data has no such entry. A time series keeps every step: each row of the lagged design that
+complete data has no such entry. With `fisherz` and `student_t`, each test computes its
+correlations directly from its rows, for many tests at once; the other tests are built anew on each
+test's rows, which costs more. A time series keeps every step: each row of the lagged design that
 reads a missing value holds it, and each test of PCMCI, PCMCI+, or LPCMCI reads the design rows
 where all of its lagged variables are observed.
 
@@ -489,7 +491,8 @@ Andrey reads its numeric backend and its worker count from `andrey.config`, or f
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
 serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
-processes with the `fisherz` and `student_t` tests, and return the same graph as with one worker.
+processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
+with one worker.
 `granger` fits its variables on worker threads, with the same coefficients, and needs none of the
 guard below.
 
