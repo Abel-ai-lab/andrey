@@ -478,6 +478,7 @@ def test_website_workflows_request_deployment_for_exact_application_commits(lane
         assert "github.ref == 'refs/heads/main'" in job["if"]
     else:
         assert workflow["on"]["push"]["tags"] == ["v*"]
+        assert job["environment"] == "production-site"  # waits for the owner's approval
         assert set(job["needs"]) == {"ci", "docs"}
         assert workflow["jobs"]["ci"]["uses"] == "./.github/workflows/ci.yml"
         assert workflow["jobs"]["docs"]["uses"] == "./.github/workflows/docs.yml"
