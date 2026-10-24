@@ -28,13 +28,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A tag is live when its deploy check, "Jenkins / PROD", succeeds on the tagged commit (a
-          # post release keeps the package's version, so llms.txt cannot tell); manual runs submit
-          # the live site.
+          # A tag is live when the production deploy check ("<build server> / PROD") succeeds on the
+          # tagged commit (a post release keeps the package's version, so llms.txt cannot tell);
+          # manual runs submit the live site.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             for _ in $(seq 100); do
               state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" \
-                --jq '[.check_runs[] | select(.name == "Jenkins / PROD")][0] | "\(.status) \(.conclusion)"')
+                --jq '[.check_runs[] | select(.name | endswith(" / PROD"))][0] | "\(.status) \(.conclusion)"')
               case "$state" in
                 "completed success") live=1; break ;;
                 "completed "*) echo "::error::The deploy check ended as: $state"; exit 1 ;;
