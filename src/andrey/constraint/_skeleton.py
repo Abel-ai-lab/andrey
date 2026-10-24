@@ -15,6 +15,7 @@ stack one conditioning set at a time.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import partial
@@ -26,7 +27,6 @@ import numpy as np
 
 from andrey.core import backend
 from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
-from andrey.core.ci_kernel import RCoT
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -148,9 +148,14 @@ def _stacked_route(test: CITest) -> Callable[..., np.ndarray] | None:
     """The ``_canonical_pvalues`` that :func:`scan_pairs` stacks the chunks of many pairs into: a
     :func:`canonical_capable` test's, or an RCoT test's, exactly, which evaluates a stack one
     conditioning set at a time; else ``None``."""
-    if type(test) is RCoT:
-        return test._canonical_pvalues
-    return _canonical_route(test)
+    canonical = _canonical_route(test)
+    if canonical is not None:
+        return canonical
+    # An RCoT test has loaded its module; a fit with another test leaves it unloaded.
+    kernel = sys.modules.get("andrey.core.ci_kernel")
+    if kernel is not None and type(test) is kernel.RCoT:
+        return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
+    return None
 
 
 def _query_arrays(

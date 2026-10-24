@@ -258,10 +258,19 @@ def test_rcot_stacks_match_the_per_pair_scan(monkeypatch: pytest.MonkeyPatch, ca
     if cap is not None:
         monkeypatch.setattr(_skeleton, "_STACK_BYTES", cap)
     X, pairs, neighbors = _case(0, d=8, n=500)
-    got = _scan(RCoT(X), pairs, neighbors, size)
+    test, rows = RCoT(X), []
+    grouped = test._canonical_pvalues
+
+    def spy(x, y, conditions):
+        rows.append(len(x))
+        return grouped(x, y, conditions)
+
+    test._canonical_pvalues = spy
+    got = _scan(test, pairs, neighbors, size)
     want = _scan(_PerPairRCoT(X), pairs, neighbors, size)
     assert got == want
     assert got[0], "the case must remove something"
+    assert sum(rows) == sum(pair_queries(neighbors, x, y, size) for x, y in pairs)
 
 
 def test_a_failing_rcot_stack_raises_the_per_pair_error(monkeypatch: pytest.MonkeyPatch) -> None:

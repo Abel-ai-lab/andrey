@@ -442,10 +442,10 @@ class RCoT:
     own. PC removes an edge when any conditioning set gives a p-value above ``alpha``, and features
     shared by those queries would make them reject together, which keeps edges between
     conditionally independent variables. Queries on the same variable and conditioning set share
-    its features, and the test object keeps them, and the residuals, for later queries; the
-    skeleton searches run a pass's queries one conditioning set at a time, so each set's features
-    are built once per pass. A p-value does not depend on the order of the queries, of the
-    arguments, or of the columns, and the same seed reproduces it.
+    its features, and the test object keeps them, and the residuals, for later queries. The
+    skeleton searches hand the test a pass's queries in stacks, which it runs one conditioning set
+    at a time, so each set's features are built once per stack. A p-value does not depend on the
+    order of the queries, of the arguments, or of the columns, and the same seed reproduces it.
 
     **Limitations.** Measured in PC on simulated data from sparse random graphs (mean degree 2),
     each variable a weighted sum of ``z + sin(z)``, or of ``cos(z)``, over its parents plus Gaussian

@@ -53,8 +53,9 @@ change names its pull request.
   graphs and p-values in less time, because their skeleton search hands the test each pair's
   conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` return the same graphs and p-values in
-  less time on large samples, because RCoT runs each skeleton pass's queries one conditioning set
-  at a time and builds each set's random features once per pass. ([#455])
+  less time on large samples, because their skeleton search hands RCoT its queries in stacks, which
+  RCoT runs one conditioning set at a time, building each set's random features once per stack.
+  ([#455])
 - `pc`, `fci`, `gfci`, and `cdnod` return the same graphs and p-values with less memory, because
   their size-one pass builds its queries one stack at a time instead of listing every pair's
   conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
