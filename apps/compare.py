@@ -75,7 +75,7 @@ METHODS = ("PC", "GES")
 CAUSAL_LEARN_PARAMETERS = {
     "PC": {"alpha": ALPHA, "indep_test": "fisherz", "stable": True},
     # Andrey's GES caps parents at half the variables, and causal-learn's lambda 0.5 is the same
-    # BIC penalty as Andrey's default 1.0.
+    # BIC penalty as Andrey's lambda_value=1.0 at ebic_gamma=0.0, the standard BIC.
     "GES": {"score_func": "local_score_BIC", "maxP": len(LABELS) // 2, "lambda_value": 0.5},
 }
 
@@ -162,13 +162,13 @@ def fingerprint(data):
 
 @functools.cache
 def andrey_graphs():
-    """Fit Andrey's PC and GES at their defaults."""
+    """Fit Andrey's PC at its defaults and GES with the standard BIC causal-learn scores."""
     data, _ = dataset()
     return {
         "PC": labeled(
             in_label_order(andrey.pc(data, alpha=ALPHA, indep_test="fisherz").structure.to_numpy())
         ),
-        "GES": labeled(in_label_order(andrey.ges(data).structure.to_numpy())),
+        "GES": labeled(in_label_order(andrey.ges(data, ebic_gamma=0.0).structure.to_numpy())),
     }
 
 

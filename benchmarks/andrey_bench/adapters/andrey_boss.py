@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from andrey_bench.adapters.bic_penalty import ANDREY_LAMBDA, SEARCH_SEED
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, ANDREY_LAMBDA, SEARCH_SEED
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 
@@ -49,6 +49,7 @@ class AndreyBOSS:
         return {
             "score_func": _DEFAULT_SCORE_FUNC,
             "lambda_value": ANDREY_LAMBDA,
+            "ebic_gamma": ANDREY_EBIC_GAMMA,
             "seed": SEARCH_SEED,
         }
 
@@ -62,11 +63,18 @@ class AndreyBOSS:
 
         score_func = params.get("score_func", _DEFAULT_SCORE_FUNC)
         lambda_value = float(params.get("lambda_value", ANDREY_LAMBDA))
+        ebic_gamma = float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA))
         seed = int(params.get("seed", SEARCH_SEED))
 
         X = np.asarray(data, dtype=np.float64)
         with andrey.config(backend=self.backend, num_workers=1):
-            out = andrey.boss(X, score_func=score_func, lambda_value=lambda_value, seed=seed)
+            out = andrey.boss(
+                X,
+                score_func=score_func,
+                lambda_value=lambda_value,
+                ebic_gamma=ebic_gamma,
+                seed=seed,
+            )
         return np.asarray(out.structure.to_numpy())
 
     def to_structure(self, native: np.ndarray) -> Any:

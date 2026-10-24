@@ -22,3 +22,8 @@ ANDREY_LAMBDA = andrey_lambda(CAUSAL_LEARN_LAMBDA)
 
 #: Shared seed because BOSS and GRaSP search random variable orders.
 SEARCH_SEED = 0
+
+#: Andrey's extended-BIC weight in every lane. The reference packages score the standard BIC, so
+#: Andrey's linear-Gaussian BIC runs at ``ebic_gamma=0.0`` and both sides of a row optimize one
+#: objective.
+ANDREY_EBIC_GAMMA = 0.0

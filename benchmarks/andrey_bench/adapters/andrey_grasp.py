@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from andrey_bench.adapters.bic_penalty import ANDREY_LAMBDA, SEARCH_SEED
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, ANDREY_LAMBDA, SEARCH_SEED
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: causal-learn's default tuck-relaxation depth, and Andrey's.
@@ -51,6 +51,7 @@ class AndreyGRaSP:
         return {
             "score_func": _DEFAULT_SCORE_FUNC,
             "lambda_value": ANDREY_LAMBDA,
+            "ebic_gamma": ANDREY_EBIC_GAMMA,
             "depth": _DEFAULT_DEPTH,
             "seed": SEARCH_SEED,
         }
@@ -65,13 +66,19 @@ class AndreyGRaSP:
 
         score_func = params.get("score_func", _DEFAULT_SCORE_FUNC)
         lambda_value = float(params.get("lambda_value", ANDREY_LAMBDA))
+        ebic_gamma = float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA))
         depth = int(params.get("depth", _DEFAULT_DEPTH))
         seed = int(params.get("seed", SEARCH_SEED))
 
         X = np.asarray(data, dtype=np.float64)
         with andrey.config(backend=self.backend, num_workers=1):
             out = andrey.grasp(
-                X, score_func=score_func, lambda_value=lambda_value, depth=depth, seed=seed
+                X,
+                score_func=score_func,
+                lambda_value=lambda_value,
+                ebic_gamma=ebic_gamma,
+                depth=depth,
+                seed=seed,
             )
         return np.asarray(out.structure.to_numpy())
 
