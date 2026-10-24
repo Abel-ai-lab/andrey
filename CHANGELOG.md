@@ -36,7 +36,7 @@ change names its pull request.
 - With more than one worker, `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` run each
   large skeleton pass in worker processes, each conditioning set's queries in one worker, and
   return the same graphs and p-values as with one worker. `ANDREY_RCOT_PARALLEL_MIN_WORK` sets the
-  least work, RCoT tests times rows, a pass needs to use them. The default, 1000000, was measured on
+  least work, RCoT tests times rows, a pass needs to use them. The default, 2000000, was measured on
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])

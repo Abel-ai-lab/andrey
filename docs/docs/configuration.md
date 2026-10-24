@@ -61,7 +61,7 @@ requested backend uses `auto`, without a warning.
   them.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
-  far more than a Fisher-z test and its cost grows with the rows. The default is `1000000`, measured
+  far more than a Fisher-z test and its cost grows with the rows. The default is `2000000`, measured
   on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
 The cutoffs matter only with more than one worker. `andrey calibrate` measures all three for your

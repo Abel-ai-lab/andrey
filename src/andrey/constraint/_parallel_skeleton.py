@@ -188,9 +188,11 @@ class SkeletonWorkerPool:
 #: ``ANDREY_RCOT_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the pool), and a fit with
 #: workers warns once on the default when a pass nears it; ``andrey calibrate --method rcot``
 #: measures the value for a machine. On an Intel Core i7-7820X with 4 workers it measured 270,000,
-#: for many fits per process; the default also repays the 0.8 s the first pool in a process takes
-#: to start, which the calibration's passes put near a million.
-MIN_POOL_RCOT_WORK: int = 1_000_000
+#: for many fits per process. The default also repays the 0.8 s the first pool in a process takes
+#: to start: in single PC fits on 1,000 and 10,000 rows, pooling every pass from 2 million on left
+#: no fit slower than on one worker, the start included, and a pass of conditioning size 0, whose
+#: features each variable reuses, gained little below it.
+MIN_POOL_RCOT_WORK: int = 2_000_000
 
 # How many queries a conditioning set's own features and factor cost: at 10,000 rows a set took 32
 # ms and a query 1.3 ms. It only balances the workers' shares.
