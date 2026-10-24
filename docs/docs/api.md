@@ -54,9 +54,10 @@ data raises a `ValueError` that names the argument and, for a bad cell, its row 
 single column gives a one-node graph.
 
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
-missing values, a `NaN` cell, pandas' `NA`, or an empty field of a CSV file: each
+missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read. A
+deletion), and so do the pair tests `anm` and `pnl`, which read the rows where both columns are
+observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read. A
 column with no observed value, or a constant one over its observed values, raises a `ValueError`
 before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
 `"student_t"` and 2 for the other tests, raises one during it. `cdnod` needs a complete

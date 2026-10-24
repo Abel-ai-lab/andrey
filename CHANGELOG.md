@@ -70,11 +70,11 @@ change names its pull request.
   linear-Gaussian BIC: `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
   `gfci`, `mmhc`, and `rsmax2`, and for `andrey.core.score.BICScore`, with the term itself in
   `andrey.core.score.ebic_penalty`. `0.0` is the standard BIC; the other scores ignore it. ([#445])
-- `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
-  missing values, a `NaN`, pandas' `NA`, or an empty field of a CSV file, each test reading only the
-  rows where all of its variables are observed and `metadata["rows_tested"]` giving the fewest and
-  the median rows a test read, while every other method refuses them with an error that names it
-  and says what to do instead. ([#443])
+- `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`, and
+  `pnl` accept missing values, a `NaN`, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV
+  file, each test reading only the rows where all of its variables are observed and
+  `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
+  method refuses them with an error that names it and says what to do instead. ([#443])
 
 ### Changed
 
