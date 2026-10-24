@@ -2,7 +2,8 @@ name: release-flow
 
 # Only a release branch merges to main (CONTRIBUTING.md, Pull requests): a pull request into main
 # from any other branch fails this check, which the main ruleset requires, and so does a release
-# branch whose package version is not the branch's. The tag and the site take that version.
+# branch whose package version is not the branch's <x.y.z>: the tag and the site take it. A post
+# release, release/<x.y.z>.post<n>, fixes the site or the docs and keeps the package's <x.y.z>.
 # `edited` reruns it when a pull request is retargeted to main.
 on:
   pull_request:
@@ -32,12 +33,14 @@ jobs:
           sparse-checkout: pyproject.toml
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: The package version is the release branch's
+      - name: The package version is the release branch's <x.y.z>
         env:
           HEAD: ${{ github.head_ref }}
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
-          if [[ "$version" != "${HEAD#release/}" ]]; then
-            echo "::error::$HEAD releases ${HEAD#release/}, but pyproject.toml says $version. Commit the version first: the tag and the site's llms.txt take it from the package."
+          release=${HEAD#release/}
+          release=${release%%.post*}
+          if [[ "$version" != "$release" ]]; then
+            echo "::error::$HEAD releases $release, but pyproject.toml says $version. Commit the version first: the tag and the site's llms.txt take it from the package."
             exit 1
           fi

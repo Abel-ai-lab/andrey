@@ -39,8 +39,9 @@ change names its pull request.
   first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
   unstable draw. Every draw that was stationary is unchanged. ([#393])
 - For contributors, a release pull request into `main` fails its required `release-branch` check
-  when `pyproject.toml`'s version is not the release branch's, since the tag and the site take the
-  package's version. ([#439])
+  when `pyproject.toml`'s version is not the release branch's `<x.y.z>`; a post release keeps the
+  package at `<x.y.z>`. A post release's tag also submits the site to search engines again: the
+  job waited for the site to name the post release's version, which it never does. ([#439])
 
 ## [0.9.0] - 2026-10-23
 
