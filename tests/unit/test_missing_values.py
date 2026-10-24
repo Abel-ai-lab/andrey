@@ -320,6 +320,8 @@ def _fit(name: str, x, **kwargs):
     fit = getattr(andrey, name)
     if name == "cdnod":
         return fit(x, np.repeat([0.0, 1.0], len(x) // 2 + 1)[: len(x)], **kwargs)
+    if REGISTRY[name].family == "pairwise":  # a pair test reads two columns
+        return fit(x.iloc[:, :2] if isinstance(x, pd.DataFrame) else x[:, :2], **kwargs)
     return fit(x, **kwargs)
 
 
@@ -389,10 +391,41 @@ def test_a_refused_text_category_names_the_method():
         andrey.hc(frame, score_func="local_score_BDeu")
 
 
-def test_the_refusal_lists_exactly_the_supported_methods():
+def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
     from andrey.api._adapt import TESTWISE_METHODS, TESTWISE_SERIES_METHODS
 
-    assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == SUPPORTED
+    tables = [name for name in SUPPORTED if REGISTRY[name].family != "pairwise"]
+    assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
+
+
+@pytest.mark.parametrize("name", ["anm", "pnl"])
+def test_a_pair_test_reads_the_rows_where_both_columns_are_observed(name):
+    x = np.random.default_rng(0).uniform(-1, 1, (300, 2))
+    x[:, 1] = x[:, 0] ** 3 + 0.3 * x[:, 1]
+    gappy = _gaps(x, 0.1)
+    out = getattr(andrey, name)(gappy)
+    rows = ~np.isnan(gappy).any(axis=1)
+    alone = getattr(andrey, name)(gappy[rows])
+    assert out.structure == alone.structure
+    assert out.metadata == {
+        **alone.metadata,
+        "rows_tested": {"min": rows.sum(), "median": rows.sum()},
+    }
+
+
+@pytest.mark.parametrize("name", ["anm", "pnl"])
+def test_a_pair_test_with_too_few_rows_raises(name):
+    x = _continuous(40)[:, :2]
+    x[2:, 0] = np.nan
+    x[1, 1] = np.nan  # both columns are observed on row 0 only
+    with pytest.raises(ValueError, match="needs at least 2 rows where both columns are observed"):
+        getattr(andrey, name)(x)
+    x = _continuous(40)[:, :2]
+    x[:20, 1] = 1.0
+    x[20:, 0] = np.nan
+    frame = pd.DataFrame(x, columns=["u", "v"])
+    with pytest.raises(ValueError, match="column 'v' is constant on the 20 rows where both"):
+        getattr(andrey, name)(frame)
 
 
 @pytest.mark.parametrize("name", ["pc", "fci"])
@@ -418,6 +451,18 @@ def test_the_cli_reads_an_empty_cell_as_a_missing_value(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert code == 0 and out["metadata"]["rows_tested"]["min"] < 300
     assert out["structure"]["labels"] == list("abcde")
+
+
+@pytest.mark.parametrize("token", ["NA", "N/A", "nan", ""])
+def test_the_cli_reads_na_and_na_with_a_slash_as_missing_values(tmp_path, capsys, token):
+    x = _continuous(300)
+    gappy = _gaps(x, 0.1)
+    path = tmp_path / "tokens.csv"
+    rows = [",".join(token if np.isnan(v) else repr(float(v)) for v in row) for row in gappy]
+    path.write_text("\n".join(rows) + "\n")  # no header: the first row may hold a missing value
+    code = main(["run", "pc", "--data", str(path), "--json"])
+    out = json.loads(capsys.readouterr().out)
+    assert code == 0 and out["metadata"] == andrey.pc(gappy).metadata | {"algorithm": "PC"}
 
 
 def test_the_cli_reports_a_refusal_as_a_data_error(tmp_path, capsys):
