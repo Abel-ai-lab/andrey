@@ -109,6 +109,14 @@ _LAMBDA_VALUE = ParamSpec(
     doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values give sparser "
     "graphs; 1.0 is the standard BIC.",
 )
+_EBIC_GAMMA = ParamSpec(
+    name="ebic_gamma",
+    type="float",
+    default=0.0,
+    doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
+    "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
+    "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
+)
 _SEED = ParamSpec(
     name="seed",
     type="int",
@@ -245,6 +253,7 @@ _add(
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             _INDEP_TEST,
             _ALPHA,
             _COLLIDER_RULE,
@@ -418,6 +427,7 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="max_parents",
                 type="int",
@@ -465,7 +475,7 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        params=(_LAMBDA_VALUE,),
+        params=(_LAMBDA_VALUE, _EBIC_GAMMA),
         references=("Hauser & Buhlmann 2012",),
     )
 )
@@ -501,6 +511,7 @@ _add(
                 doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values "
                 "give sparser graphs; 1.0 is the standard BIC.",
             ),
+            _EBIC_GAMMA,
             ParamSpec(
                 name="extended_search",
                 type="bool",
@@ -555,6 +566,7 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="max_iter",
                 type="int",
@@ -604,6 +616,7 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="tabu_length",
                 type="int",
@@ -677,6 +690,7 @@ _add(
                 choices=EXACT_SCORES,
                 nullable=True,
             ),
+            _EBIC_GAMMA,
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),
@@ -772,6 +786,7 @@ _add(
                 choices=HC_SCORES,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             _HYBRID_MAX_ITER,
             _CATEGORICAL,
             _MAX_CATEGORIES,
@@ -826,6 +841,7 @@ _add(
                 choices=HC_SCORES,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             _HYBRID_MAX_ITER,
             ParamSpec(
                 name="tabu_length",
@@ -895,7 +911,7 @@ _add(
         column_order="relabels",
         tie_break=True,
         seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(_BOSS_SCORE, _LAMBDA_VALUE, _EBIC_GAMMA, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
 )
@@ -924,6 +940,7 @@ _add(
         params=(
             _BOSS_SCORE,
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="depth",
                 type="int",

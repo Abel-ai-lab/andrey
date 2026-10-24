@@ -39,6 +39,7 @@ def boss(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -71,6 +72,11 @@ def boss(
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
         multinomial BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
         finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     seed : int or None, default=None
         Seed for the random order in which the search visits variables. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
@@ -249,6 +255,7 @@ def boss(
         cpdag, score = _boss(
             X,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             random_state=resolve_seed(seed),
             score_func=score_func,
             categorical=mask,
@@ -263,6 +270,7 @@ def grasp(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     depth: int = 3,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -297,6 +305,11 @@ def grasp(
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
         multinomial BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
         finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     depth : int, default=3
         Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
         follows a chain of tucks that leave the score unchanged until one improves it or the chain
@@ -489,6 +502,7 @@ def grasp(
         cpdag, score = _grasp(
             X,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             depth=depth,
             random_state=resolve_seed(seed),
             score_func=score_func,

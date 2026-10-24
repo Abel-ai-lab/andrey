@@ -1052,6 +1052,7 @@ def xges(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     extended_search: bool = True,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -1066,6 +1067,10 @@ def xges(
         BIC, the only score supported.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC.
     extended_search : bool
         Run the extended search after the base search; ``False`` stops after the base search.
     constraints : Constraints or None
@@ -1085,7 +1090,7 @@ def xges(
         )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-    score = BICScore(X, lambda_value=lambda_value)
+    score = BICScore(X, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
     ranks = tie_ranks(X).tolist()
     # One BLAS thread for reproducible scores and move ties.
     with backend.one_blas_thread():

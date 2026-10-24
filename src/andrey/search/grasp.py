@@ -498,6 +498,7 @@ def grasp(
     data: np.ndarray,
     *,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     depth: int = 3,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
@@ -520,6 +521,11 @@ def grasp(
         Data matrix; rows are observations, columns are variables.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     depth : int
         Most tucks in one chain of moves, at least ``1``.
     random_state : int
@@ -552,7 +558,7 @@ def grasp(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score, ranks = ranked_score(X, score_func, lambda_value, categorical)
+    score, ranks = ranked_score(X, score_func, lambda_value, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     before = None

@@ -41,6 +41,7 @@ def _fit(
     indep_test: str,
     score_func: str,
     lambda_value: float,
+    ebic_gamma: float,
     max_iter: int | None,
     tabu_length: int,
     max_tabu: int | None,
@@ -92,6 +93,7 @@ def _fit(
             indep_test=indep_test,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             max_iter=max_iter,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
@@ -115,6 +117,7 @@ def mmhc(
     indep_test: str = "fisherz",
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -148,6 +151,11 @@ def mmhc(
         data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     max_iter : int or None, default=None
         Maximum hill-climbing moves, at least ``1``; ``None`` sets no limit.
     categorical : sequence of str or int, optional
@@ -255,6 +263,7 @@ def mmhc(
         indep_test=indep_test,
         score_func=score_func,
         lambda_value=lambda_value,
+        ebic_gamma=ebic_gamma,
         max_iter=max_iter,
         tabu_length=10,
         max_tabu=None,
@@ -273,6 +282,7 @@ def rsmax2(
     indep_test: str = "fisherz",
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,
@@ -309,6 +319,11 @@ def rsmax2(
         any of :func:`~andrey.tabu`'s, which take no mixed data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     max_iter : int or None, default=None
         Maximum moves of the maximize phase, at least ``1``; ``None`` sets no limit.
     tabu_length : int, default=10
@@ -433,6 +448,7 @@ def rsmax2(
         indep_test=indep_test,
         score_func=score_func,
         lambda_value=lambda_value,
+        ebic_gamma=ebic_gamma,
         max_iter=max_iter,
         tabu_length=tabu_length,
         max_tabu=max_tabu,

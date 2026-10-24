@@ -231,7 +231,14 @@ def test_run_token_guards_pool_reuse():
     score = BICScore(x, lambda_value=1.0)
     n = x.shape[1]
     wset = pg._create_pool(
-        score.cov, score.n, n, score.lambda_value, "token-A", workers=2, ranks=list(range(n))
+        score.cov,
+        score.n,
+        n,
+        score.lambda_value,
+        score.ebic_gamma,
+        "token-A",
+        workers=2,
+        ranks=list(range(n)),
     )
     try:
         adj = np.zeros((n, n), dtype=np.int8)

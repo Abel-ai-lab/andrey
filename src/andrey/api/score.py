@@ -45,6 +45,7 @@ def ges(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -77,6 +78,11 @@ def ges(
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
         be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
         per free parameter of a variable's conditional probability table.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
         node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
@@ -293,6 +299,7 @@ def ges(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
@@ -313,6 +320,7 @@ def gies(
     interventions: npt.ArrayLike | None = None,
     *,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
@@ -335,6 +343,11 @@ def gies(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -427,7 +440,9 @@ def gies(
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
     with copies_named(labels):
-        graph, score = _gies(X, mask, lambda_value=lambda_value, constraints=constraints)
+        graph, score = _gies(
+            X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma, constraints=constraints
+        )
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
     return structure_output(graph, labels=labels, metadata=metadata)
 
@@ -437,6 +452,7 @@ def xges(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     extended_search: bool = True,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -456,6 +472,11 @@ def xges(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
@@ -556,6 +577,7 @@ def xges(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             extended_search=extended_search,
             constraints=constraints,
         )
@@ -568,6 +590,7 @@ def hc(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -599,6 +622,11 @@ def hc(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
         finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     max_iter : int or None, default=None
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
@@ -729,6 +757,7 @@ def hc(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             max_iter=max_iter,
             categorical=mask,
             constraints=constraints,
@@ -742,6 +771,7 @@ def tabu(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
@@ -773,6 +803,11 @@ def tabu(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be finite
         and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     tabu_length : int, default=10
         Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
@@ -890,6 +925,7 @@ def tabu(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
@@ -904,6 +940,7 @@ def exact_search(
     *,
     search_method: str = "astar",
     score_func: str | None = None,
+    ebic_gamma: float = 0.0,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -928,11 +965,16 @@ def exact_search(
         multinomial BIC for categorical data coded by whole numbers; or
         ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or
         conditional Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each BIC uses the
-        standard penalty, ``lambda_value=1``. ``None`` reads the column types from
+        penalty of ``lambda_value=1``. ``None`` reads the column types from
         ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when every column is
         categorical or ``"local_score_cond_gauss"`` when some are, each with a
         ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
         ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -1071,6 +1113,7 @@ def exact_search(
             X,
             search_method=search_method,
             score_func=score_func,
+            ebic_gamma=ebic_gamma,
             categorical=mask,
             constraints=constraints,
         )

@@ -3,18 +3,20 @@
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
 Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
-log(n)``, where ``resid`` is the residual sum of squares of the centered node on its centered
-parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is singular). A
-parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most ``ZERO_RESIDUAL``
-times the node's sum of squares, scores ``inf`` and is never chosen. The categorical scores are
-:class:`~andrey.core.score.BDeuScore` and :class:`~andrey.core.score.CategoricalBICScore`, and the
-mixed-data scores :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each
-BIC with ``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic
-program (``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest
-path from the empty set to the full set gives each variable its best parent set among the
-variables before it. Every DAG of the optimal DAG's Markov equivalence class has the same score, so
-the search's choice among them follows rounding and column order; :func:`_canonical_member`
-replaces it by one member fixed by the CPDAG and :func:`~andrey.search.hc.tie_ranks`.
+log(n)``, plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of ``len(parents)``
+when ``ebic_gamma`` is not 0, where ``resid`` is the residual sum of squares of the centered node on
+its centered parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is
+singular). A parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most
+``ZERO_RESIDUAL`` times the node's sum of squares, scores ``inf`` and is never chosen. The
+categorical scores are :class:`~andrey.core.score.BDeuScore` and
+:class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
+:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each BIC with
+``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic program
+(``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest path from the
+empty set to the full set gives each variable its best parent set among the variables before it.
+Every DAG of the optimal DAG's Markov equivalence class has the same score, so the search's choice
+among them follows rounding and column order; :func:`_canonical_member` replaces it by one member
+fixed by the CPDAG and :func:`~andrey.search.hc.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -38,7 +40,9 @@ from andrey.core.score import (
     ZERO_RESIDUAL,
     Score,
     check_columns,
+    ebic_penalty,
     make_score,
+    penalty_weight,
 )
 from andrey.search.hc import tie_ranks
 
@@ -117,11 +121,15 @@ class _GramBICScore:
     Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
     :meth:`score_many` regresses a node on each parent set through the normal equations on ``S`` to
     get the residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the
-    centering, a nonzero mean would count as shared signal and link independent variables. Raises
-    ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects.
+    centering, a nonzero mean would count as shared signal and link independent variables. A
+    nonzero ``ebic_gamma`` adds the extended-BIC term :func:`~andrey.core.score.ebic_penalty`.
+    Raises ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects, or for an
+    ``ebic_gamma`` that is negative or non-finite.
     """
 
-    def __init__(self, data: np.ndarray) -> None:
+    def __init__(self, data: np.ndarray, ebic_gamma: float = 0.0) -> None:
+        self._ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
+        self._n_vars = data.shape[1]
         data = data - data.mean(axis=0)
         self._gram = data.T @ data
         self._diag = np.diag(self._gram)
@@ -157,12 +165,15 @@ class _GramBICScore:
             resids = [
                 self._diag[node] - b @ beta for b, beta in zip(gram_node_pa, betas, strict=True)
             ]
+        penalty = size * self._log_n
+        if self._ebic_gamma:
+            penalty += ebic_penalty(size, self._n_vars, self._ebic_gamma)
         values = []
         for resid in resids:
             if not resid > ZERO_RESIDUAL * self._diag[node]:
                 values.append(float("inf"))
             else:
-                values.append(float(self._n * np.log(resid / self._n) + size * self._log_n))
+                values.append(float(self._n * np.log(resid / self._n) + penalty))
         return values
 
 
@@ -370,6 +381,7 @@ def exact_search(
     *,
     search_method: str = "astar",
     score_func: str = "local_score_BIC",
+    ebic_gamma: float = 0.0,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> GraphStructure:
@@ -397,6 +409,11 @@ def exact_search(
     score_func : str
         Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"local_score_BIC"``
         or ``"local_score_BIC_from_cov"``), a categorical score, or a mixed-data BIC.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_vars - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
     constraints : Constraints or None
@@ -420,9 +437,9 @@ def exact_search(
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
     score: Score = (
-        _GramBICScore(X)
+        _GramBICScore(X, ebic_gamma)
         if score_func in LINEAR_SCORES
-        else make_score(score_func, X, categorical=categorical)
+        else make_score(score_func, X, ebic_gamma=ebic_gamma, categorical=categorical)
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES
     parent_graphs = [

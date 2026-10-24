@@ -439,6 +439,7 @@ def hc(
     *,
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
@@ -469,6 +470,11 @@ def hc(
         ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     max_iter : int or None
         Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.
@@ -490,7 +496,9 @@ def hc(
 
     if score_func not in HC_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
-    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    score = make_score(
+        score_func, X, lambda_value=lambda_value, ebic_gamma=ebic_gamma, categorical=categorical
+    )
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     forbidden = None
     mask = np.full(d, score_func in DISCRETE_SCORES)

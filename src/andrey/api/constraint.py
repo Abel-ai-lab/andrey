@@ -569,6 +569,7 @@ def gfci(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     indep_test: str = "fisherz",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
@@ -601,6 +602,11 @@ def gfci(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
         BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it.
     indep_test : str, default="fisherz"
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
         ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
@@ -782,6 +788,7 @@ def gfci(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             alpha=alpha,
             indep_test=indep_test,
             collider_rule=collider_rule,
