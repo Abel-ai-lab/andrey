@@ -183,7 +183,7 @@ def augmented_lagrangian(
         h, grad_h = trace_exponential(weights)
         value = loss + 0.5 * rho * h * h + alpha * h + penalty.ravel() @ (w[: d * d] + w[d * d :])
         smooth = grad_loss + (rho * h + alpha) * grad_h
-        return value, np.concatenate((smooth + penalty, -smooth + penalty), axis=None)
+        return float(value), np.concatenate((smooth + penalty, -smooth + penalty), axis=None)
 
     fixed = canonical.forbidden | np.eye(d, dtype=bool)
     bounds = [
