@@ -16,7 +16,7 @@ change names its pull request.
   the identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265], [#267],
   [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#364], [#365],
-  [#368], [#369], [#455])
+  [#368], [#369], [#455], [#459])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -63,6 +63,10 @@ change names its pull request.
   less time on large samples, because their skeleton search hands RCoT its queries in stacks, which
   RCoT runs one conditioning set at a time, building each set's random features once per stack.
   ([#455])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="degen_gauss"` return the same graphs and
+  p-values in less time, because their skeleton search hands the degenerate Gaussian test its
+  queries in stacks, which it runs grouped by shape, with each conditioning set's regression
+  computed once. ([#459])
 - `pc`, `fci`, `gfci`, and `cdnod` return the same graphs and p-values with less memory, because
   their size-one pass builds its queries one stack at a time instead of listing every pair's
   conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
@@ -687,3 +691,4 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#455]: https://github.com/Abel-ai-lab/andrey/pull/455
 [#457]: https://github.com/Abel-ai-lab/andrey/pull/457
+[#459]: https://github.com/Abel-ai-lab/andrey/pull/459
