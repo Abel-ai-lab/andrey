@@ -148,7 +148,7 @@ _add(
         "data determine; returns a CPDAG. A good first method when nothing is known about the "
         "graph; indep_test=chisq or gsq for categorical data, degen_gauss or cond_gauss for mixed "
         "data.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
@@ -189,7 +189,7 @@ _add(
         summary="Structure learning that allows latent confounders and selection bias; returns a "
         "PAG. A circle mark is an endpoint the data cannot determine; a bidirected edge (<->) "
         "marks a latent common cause. Use when unmeasured confounding is plausible.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
@@ -298,6 +298,7 @@ _add(
             ),
             layout=_MATRIX_LAYOUT,
             notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="graph",
@@ -381,7 +382,7 @@ for _name, _summary, _key, _refs in (
             name=_name,
             family="constraint",
             summary=_summary,
-            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
             output=OutputSpec(
                 structure_type="graph",
                 graph_kind="cpdag",
@@ -1362,6 +1363,7 @@ _add(
                 ),
             ),
             layout="(n_samples, n_variables), row = time step",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="temporal",
@@ -1422,6 +1424,7 @@ _add(
                 ),
             ),
             layout="(n_samples, n_variables), row = time step",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="temporal",
@@ -1485,6 +1488,7 @@ _add(
                 ),
             ),
             layout="(n_samples, n_variables), row = time step",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="temporal",

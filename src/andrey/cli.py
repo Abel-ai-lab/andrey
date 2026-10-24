@@ -17,11 +17,13 @@ import contextlib
 import importlib.metadata
 import io
 import json
+import math
 import os
 import platform
 import re
 import sys
 import warnings
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Optional
 
@@ -94,6 +96,11 @@ def _is_number(token: str) -> bool:
         return False
 
 
+def _cell(text: str) -> float:
+    """One field of a data row as a number; an empty field is a missing value, ``NaN``."""
+    return float(text) if text.strip() else math.nan
+
+
 def _row_fields(line: str, delimiter: str | None) -> list[tuple[str, bool]]:
     """Split one text row into ``(field, quoted)`` pairs, one per field.
 
@@ -118,9 +125,10 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
     """Parse delimited text into a 2-D float64 array and its header's column names, if any.
 
     A header is a first row whose every field is text: not a number, or in double quotes, so
-    ``a,b,c`` and ``"1","0","2"`` name the columns. A first row of unquoted numbers is data. A
-    first row that mixes unquoted numbers with text (``a,1,b`` or ``1,2,bad``) is neither, so it
-    surfaces as ``bad_data`` rather than being read as a header or as a truncated dataset.
+    ``a,b,c`` and ``"1","0","2"`` name the columns. A first row of unquoted numbers is data, and an
+    empty field in a data row is a missing value, read as ``NaN``. A first row that mixes unquoted
+    numbers with text (``a,1,b`` or ``1,2,bad``) is neither, so it surfaces as ``bad_data`` rather
+    than being read as a header or as a truncated dataset.
     """
     import numpy as np
 
@@ -129,8 +137,12 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
     delimiter = "," if "," in unquoted else ("\t" if "\t" in unquoted else None)
     fields = _row_fields(first, delimiter)
     numbers = [text for text, quoted in fields if not quoted and _is_number(text)]
-    if numbers and len(numbers) < len(fields):
-        text = next(text for text, quoted in fields if quoted or not _is_number(text))
+    # A data field is an unquoted number, or empty for a missing value.
+    texts = [
+        text for text, quoted in fields if quoted or not (_is_number(text) or not text.strip())
+    ]
+    if numbers and texts:
+        text = texts[0]
         raise CliError(
             "bad_data",
             f"the first row mixes numbers, such as {numbers[0].strip()!r}, with text, such as "
@@ -139,16 +151,20 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
             EXIT_DATA,
         )
     header = bool(fields) and not numbers
+    read = partial(
+        np.loadtxt,
+        delimiter=delimiter,
+        dtype=np.float64,
+        ndmin=2,
+        skiprows=1 if header else 0,
+    )
     try:
-        arr = np.loadtxt(
-            io.StringIO(raw),
-            delimiter=delimiter,
-            dtype=np.float64,
-            ndmin=2,
-            skiprows=1 if header else 0,
-        )
-    except ValueError as exc:
-        raise CliError("bad_data", f"could not parse numeric data: {exc}", EXIT_DATA) from exc
+        arr = read(io.StringIO(raw))
+    except ValueError:
+        try:  # an empty field, a missing value, fails the fast parser
+            arr = read(io.StringIO(raw), converters=_cell)
+        except ValueError as exc:
+            raise CliError("bad_data", f"could not parse numeric data: {exc}", EXIT_DATA) from exc
     if not header:
         return arr, None
     names = [text if quoted else text.strip() for text, quoted in fields]

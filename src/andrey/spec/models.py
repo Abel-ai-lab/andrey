@@ -62,6 +62,7 @@ class DataSpec(Spec):
     inputs: tuple[InputSpec, ...]
     layout: str  # human/agent-readable shape, for example "(n_samples, n_variables), row = sample"
     notes: str = ""
+    missing: bool = False  # accepts NaN as a missing value, its tests deleting rows per test
 
 
 class ParamSpec(Spec):

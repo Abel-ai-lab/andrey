@@ -73,7 +73,7 @@ def _fit(
             f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data, categorical, "indep_test", indep_test, max_categories=max_categories, method=name
     )
     alpha = open_unit_interval(alpha, "alpha")
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
@@ -219,6 +219,11 @@ def mmhc(
     the result does not depend on the column order unless two columns are identical. The
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its hill-climbing phase scores
+    every variable over the same rows, and score terms over different rows do not add up to the
+    score of one dataset. Drop the incomplete rows first, which suits values missing completely at
+    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data. An edge the MMPC phase misses is never added, and the
@@ -388,6 +393,11 @@ def rsmax2(
     Ties go to the column whose rank, computed from its own data, comes first, as for
     :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are
     identical.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its score phase scores every
+    variable over the same rows, and score terms over different rows do not add up to the score of
+    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
+    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data. An edge the restrict phase misses is never added, and the

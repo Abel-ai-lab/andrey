@@ -22,13 +22,52 @@ if TYPE_CHECKING:
     from andrey.core.output import JSONValue
 
 
-def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -> np.ndarray:
+#: The methods that accept missing values, by deleting rows per test, named by the refusal of
+#: every other method.
+TESTWISE_METHODS = ("pc", "fci", "cdnod", "iamb", "inter_iamb", "mmpc")
+TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
+
+
+def _listed(names: Sequence[str]) -> str:
+    """``names`` as an English list: ``"a, b, or c"``."""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])}, or {names[-1]}"
+
+
+#: The ways on that a refusal of missing values names, for a table of independent rows, ``{name}``
+#: the data's argument; for one time series, whose steps cannot be dropped; and for a panel.
+DROP_ROWS = (
+    "drop the rows that hold one (for a DataFrame, {name}.dropna()), or use a method that deletes "
+    f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
+    f"{_listed(TESTWISE_SERIES_METHODS)}"
+)
+FILL_STEPS = (
+    "fill in the missing steps first, as dropping one would join the steps around it, or use "
+    f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
+)
+DROP_UNITS = "drop the units that hold one from every dataset of {name}"
+
+
+def data_matrix(
+    data: npt.ArrayLike,
+    *,
+    name: str = "data",
+    min_rows: int = 2,
+    method: str | None = None,
+    missing: bool = False,
+    fix: str = DROP_ROWS,
+) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
     Raises ``ValueError``, naming ``name``, when two columns share a name (:func:`column_labels`),
     the values are not numeric, the array is not 2-D, it has fewer than ``min_rows`` rows, it holds
-    ``NaN`` or ``inf``, or a column is constant: no method can estimate a variance or a dependence
-    from such data. The message names every constant column.
+    ``inf``, or a column is constant: no method can estimate a variance or a dependence from such
+    data. The message names every constant column.
+
+    ``NaN`` marks a missing value. With ``missing``, for a method whose tests delete rows per test,
+    the matrix keeps them, as one bit pattern, in a copy; a column constant on its observed values,
+    or with none, raises. Without it, ``NaN`` raises, naming ``method`` when it is given, and
+    ``fix``, the way on: :data:`DROP_ROWS` by default, :data:`FILL_STEPS` for one time series, or
+    :data:`DROP_UNITS` for a panel.
     """
     column_labels(data)
     try:
@@ -42,15 +81,13 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
         )
     if X.shape[0] < min_rows:
         raise ValueError(f"{name} needs at least {min_rows} rows (samples), got {X.shape[0]}")
-    bad = np.argwhere(~np.isfinite(X))
-    if bad.size:
-        row, col = (int(k) for k in bad[0])
-        cells = "1 cell" if len(bad) == 1 else f"{len(bad)} cells, the first"
-        raise ValueError(
-            f"{name} holds NaN or inf in {cells} at row {row}, column {col}; drop or impute "
-            "them before the fit"
-        )
-    constant = [_column_name(data, int(j)) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    finite = np.isfinite(X)
+    if not finite.all():
+        X = _missing_values(data, X, finite, name=name, method=method, missing=missing, fix=fix)
+        spread = np.nanmax(X, axis=0) - np.nanmin(X, axis=0)
+    else:
+        spread = np.ptp(X, axis=0)
+    constant = [_column_name(data, int(j)) for j in np.flatnonzero(spread == 0)]
     if constant:
         if len(constant) == 1:
             columns, verb, pronoun = f"column {constant[0]}", "is", "it"
@@ -62,6 +99,62 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
             f"the other variables, so drop {pronoun} before the fit"
         )
     return X
+
+
+def _missing_values(
+    data: object,
+    X: np.ndarray,
+    finite: np.ndarray,
+    *,
+    name: str,
+    method: str | None,
+    missing: bool,
+    fix: str,
+) -> np.ndarray:
+    """Check the cells ``finite`` leaves out: ``inf`` raises, and ``NaN`` does unless ``missing``.
+
+    Returns a copy of ``X`` with every ``NaN`` as one bit pattern, so that hashing a column does not
+    depend on how its missing values were made. Raises ``ValueError`` when a column has no observed
+    value.
+    """
+    infinite = np.argwhere(np.isinf(X))
+    if infinite.size:
+        row, col = (int(k) for k in infinite[0])
+        cells = "1 cell" if len(infinite) == 1 else f"{len(infinite)} cells, the first"
+        raise ValueError(
+            f"{name} holds inf in {cells} at row {row}, column {col}; drop or replace them before "
+            "the fit, with NaN where a value is missing"
+        )
+    if not missing:
+        nan = np.argwhere(~finite)
+        row, col = (int(k) for k in nan[0])
+        cells = "1 cell" if len(nan) == 1 else f"{len(nan)} cells, the first"
+        where = f"holds NaN in {cells} at row {row}, column {col}"
+        raise ValueError(_refusal(method, name, where, fix))
+    empty = [_column_name(data, int(j)) for j in np.flatnonzero((~finite).all(axis=0))]
+    if empty:
+        if len(empty) == 1:
+            columns, verb, pronoun = f"column {empty[0]}", "holds", "it"
+        else:
+            columns = f"columns {', '.join(empty[:-1])} and {empty[-1]}"
+            verb, pronoun = "hold", "them"
+        raise ValueError(
+            f"{name} {columns} {verb} no observed value, only NaN; drop {pronoun} before the fit"
+        )
+    return np.where(finite, X, np.nan)
+
+
+def _refusal(method: str | None, name: str, where: str, fix: str = DROP_ROWS) -> str:
+    """Return the refusal of a method without missing values, found ``where`` in ``name``.
+
+    ``fix``, with ``{name}`` for the data's argument, says what to do instead.
+    """
+    who = "this method" if method is None else method
+    base = name.split("[")[0]
+    return (
+        f"{who} does not accept missing values, and {name} {where}; {fix.format(name=base)} (see "
+        "Missing values in the getting-started guide)"
+    )
 
 
 def check_categories(values: np.ndarray, data: object, setting: str, *, name: str = "data") -> None:
@@ -132,8 +225,8 @@ def default_score(
     when none are, ``linear``, the linear-Gaussian BIC. Either switch warns once with a
     :class:`~andrey.DataTypeWarning`; an inferred one names ``linear`` too, since columns of counts
     or ratings meet the rule. ``mixed=False``, for a search without a mixed-data score, keeps
-    ``linear`` on mixed data. Inferring keeps ``linear`` for data that is not a finite numeric table
-    apart from its typed columns, so that :func:`checked_data` reports it.
+    ``linear`` on mixed data. Inferring keeps ``linear`` for data that is not a numeric table apart
+    from its typed columns, ``NaN`` allowed, so that :func:`checked_data` reports it.
 
     Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
     as :func:`mixed_matrix` does when ``categorical`` is not a list of the columns ``data`` has.
@@ -221,9 +314,9 @@ def _inferred_columns(
 
     ``typed`` marks a DataFrame's ``category``, ``bool``, ``object``, and ``string`` columns;
     ``counts`` holds each other column's count of distinct whole numbers when at most
-    ``max_categories``, else ``0``. ``None`` when ``data`` has no columns, or its untyped columns
-    are not a finite numeric table of at least 2 rows with no constant column, which
-    :func:`data_matrix` rejects.
+    ``max_categories``, else ``0``, counting observed values only. ``None`` when ``data`` has no
+    columns, or its untyped columns are not a numeric table of at least 2 rows, without ``inf``,
+    whose every column has two observed values, which :func:`data_matrix` rejects.
     """
     if getattr(data, "columns", None) is None:
         numeric, typed = data, None
@@ -236,7 +329,13 @@ def _inferred_columns(
         X = np.asarray(numeric, dtype=np.float64)
     except (TypeError, ValueError):
         return None
-    if X.ndim != 2 or X.shape[0] < 2 or not np.isfinite(X).all() or (np.ptp(X, axis=0) == 0).any():
+    if X.ndim != 2 or X.shape[0] < 2 or np.isinf(X).any():
+        return None
+    nan = np.isnan(X)
+    if nan.all(axis=0).any():
+        return None
+    spread = np.nanmax(X, axis=0) - np.nanmin(X, axis=0) if nan.any() else np.ptp(X, axis=0)
+    if (spread == 0).any():
         return None
     if typed is None:
         typed = np.zeros(X.shape[1], dtype=bool)
@@ -255,6 +354,8 @@ def checked_data(
     *,
     max_categories: int = MAX_CATEGORIES,
     index_categorical: bool = False,
+    method: str | None = None,
+    missing: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Return ``data`` checked for the setting ``option=value``, and its categorical-column mask.
 
@@ -265,7 +366,8 @@ def checked_data(
     continuous one gets :func:`data_matrix`'s checks and a
     one-time :class:`~andrey.DataTypeWarning` naming the columns that look like category codes:
     at most ``max_categories`` distinct whole numbers. The mask is ``None`` unless the data are
-    mixed. ``index_categorical`` passes to :func:`mixed_matrix`.
+    mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method`` and ``missing`` to
+    :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
 
     Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
     ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical`` lists a
@@ -282,6 +384,8 @@ def checked_data(
             setting,
             max_categories=max_categories,
             index_categorical=index_categorical,
+            method=method,
+            missing=missing,
         )
     if _lists_columns(categorical):
         reads = "every column as categorical" if kind == "categorical" else "continuous data"
@@ -290,10 +394,14 @@ def checked_data(
             f"{setting} reads {reads}; leave categorical as None or []"
         )
     if kind == "categorical":
-        X = data_matrix(categories_as_numbers(data, setting))
+        X = data_matrix(
+            categories_as_numbers(data, setting, method=method, missing=missing),
+            method=method,
+            missing=missing,
+        )
         check_categories(X, data, setting)
         return X, None
-    X = data_matrix(data)
+    X = data_matrix(data, method=method, missing=missing)
     codes = np.flatnonzero(_category_counts(X, max_categories))
     if codes.size:
         mixed = (
@@ -320,7 +428,12 @@ def _lists_columns(categorical: object) -> bool:
 
 
 def categories_as_numbers(
-    data: npt.ArrayLike, setting: str, *, name: str = "data"
+    data: npt.ArrayLike,
+    setting: str,
+    *,
+    name: str = "data",
+    method: str | None = None,
+    missing: bool = False,
 ) -> npt.ArrayLike:
     """Return ``data`` with each column that does not hold numbers numbered by its values.
 
@@ -329,13 +442,14 @@ def categories_as_numbers(
     :func:`mixed_matrix` numbers its categorical columns. Data that convert to numbers, booleans
     included, are returned unchanged, as is anything that is not a 2-D table, which
     :func:`data_matrix` then rejects. Raises ``ValueError``, naming ``setting``, on a missing value
-    in a numbered column.
+    in a numbered column, naming ``method``, which ``missing`` keeps as ``NaN`` instead.
     """
     try:
         np.asarray(data, dtype=np.float64)
     except (TypeError, ValueError):
         if np.ndim(data) == 2:
-            return _encode_categories(data, np.ones(np.shape(data)[1], dtype=bool), setting, name)
+            every = np.ones(np.shape(data)[1], dtype=bool)
+            return _encode_categories(data, every, setting, name, method=method, missing=missing)
     return data
 
 
@@ -347,6 +461,8 @@ def mixed_matrix(
     name: str = "data",
     max_categories: int = MAX_CATEGORIES,
     index_categorical: bool = False,
+    method: str | None = None,
+    missing: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return mixed data as a float64 matrix and a boolean mask of its categorical columns.
 
@@ -357,7 +473,9 @@ def mixed_matrix(
     most ``max_categories`` distinct whole numbers. A :class:`~andrey.DataTypeWarning` names the
     inferred columns and why. A categorical column that does not hold numbers has its values
     numbered, each distinct value one category; a numeric one must hold whole numbers, as
-    :func:`check_categories` checks. Then :func:`data_matrix` checks the whole matrix.
+    :func:`check_categories` checks. Then :func:`data_matrix` checks the whole matrix, with
+    ``method`` and ``missing``; ``missing`` keeps a missing value, a categorical column's included,
+    as ``NaN``, and the inference counts the observed values only.
 
     With no categorical column, the setting runs as its linear-Gaussian form, and a
     :class:`~andrey.DataTypeWarning` says so, unless ``index_categorical``: a setting that adds a
@@ -365,15 +483,20 @@ def mixed_matrix(
 
     Raises ``TypeError`` when ``categorical`` is not a list of names and positions, and
     ``ValueError``, naming ``setting``, when it names a column the data lack, when a categorical
-    column has a missing value, or when a column that is not categorical does not hold numbers.
+    column has a missing value without ``missing``, or when a column that is not categorical does
+    not hold numbers.
     """
     columns = getattr(data, "columns", None)
     names = None if columns is None else list(columns)
     labels = column_labels(data)
     if categorical is None:
         typed = np.zeros(0, dtype=bool) if names is None else _categorical_dtypes(data)
-        table = data if names is None else _encode_categories(data, typed, setting, name)
-        X = data_matrix(table, name=name)
+        table = (
+            data
+            if names is None
+            else _encode_categories(data, typed, setting, name, method=method, missing=missing)
+        )
+        X = data_matrix(table, name=name, method=method, missing=missing)
         counts = _category_counts(X, max_categories)
         mask = (counts > 0) | (typed if typed.size else False)
         if mask.any():
@@ -386,11 +509,16 @@ def mixed_matrix(
                 DataTypeWarning,
             )
     elif names is None:
-        X = data_matrix(data, name=name)
+        X = data_matrix(data, name=name, method=method, missing=missing)
         mask = _column_mask(categorical, None, X.shape[1])
     else:
         mask = _column_mask(categorical, labels, len(names))
-        X = data_matrix(_encode_categories(data, mask, setting, name), name=name)
+        X = data_matrix(
+            _encode_categories(data, mask, setting, name, method=method, missing=missing),
+            name=name,
+            method=method,
+            missing=missing,
+        )
     check_categories(np.where(mask, X, 0.0), data, setting, name=name)
     if not mask.any() and not index_categorical:
         what = "test" if setting.startswith("indep_test") else "score"
@@ -424,11 +552,13 @@ def categorical_metadata(mask: np.ndarray | None, data: object) -> dict[str, lis
 def _category_counts(X: np.ndarray, max_categories: int) -> np.ndarray:
     """Count each column's values when they are at most ``max_categories`` whole numbers.
 
-    The count reads all the rows; any other column counts ``0``.
+    The count reads all the observed values, ``NaN`` marking a missing one; any other column
+    counts ``0``.
     """
     counts = np.zeros(X.shape[1], dtype=np.int64)
-    for j in np.flatnonzero(np.all(X == np.round(X), axis=0)).tolist():
-        k = np.unique(X[:, j]).size
+    observed = ~np.isnan(X)
+    for j in np.flatnonzero(np.all((X == np.round(X)) | ~observed, axis=0)).tolist():
+        k = np.unique(X[observed[:, j], j]).size
         if k <= max_categories:
             counts[j] = k
     return counts
@@ -497,11 +627,20 @@ def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) ->
     return mask
 
 
-def _encode_categories(data: object, mask: np.ndarray, setting: str, name: str) -> npt.ArrayLike:
+def _encode_categories(
+    data: object,
+    mask: np.ndarray,
+    setting: str,
+    name: str,
+    *,
+    method: str | None = None,
+    missing: bool = False,
+) -> npt.ArrayLike:
     """Replace the values of each categorical column that does not hold numbers by numbers.
 
-    A column that does not hold numbers must be categorical. Raises ``ValueError`` on a missing
-    value in a numbered column, or on such a column left out of ``mask``.
+    A column that does not hold numbers must be categorical. Raises ``ValueError`` on such a column
+    left out of ``mask``, and on a missing value in a numbered column, naming ``method``, which
+    ``missing`` numbers as ``NaN`` instead.
     """
     import pandas as pd
 
@@ -518,13 +657,11 @@ def _encode_categories(data: object, mask: np.ndarray, setting: str, name: str) 
                 "it as numbers"
             )
         codes, _ = pd.factorize(values)
-        missing = np.flatnonzero(codes < 0)
-        if missing.size:
-            raise ValueError(
-                f"{name} column {column!r} has a missing value at row {int(missing[0])}; drop or "
-                f"impute it before the fit ({setting})"
-            )
-        out[column] = codes.astype(np.float64)
+        absent = np.flatnonzero(codes < 0)
+        if absent.size and not missing:
+            where = f"column {column!r} has a missing value at row {int(absent[0])} ({setting})"
+            raise ValueError(_refusal(method, name, where))
+        out[column] = np.where(codes < 0, np.nan, codes.astype(np.float64))
     return pd.DataFrame(out, index=frame.index)
 
 

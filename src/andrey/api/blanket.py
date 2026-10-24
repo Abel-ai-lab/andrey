@@ -21,6 +21,7 @@ from andrey.api._adapt import (
 )
 from andrey.api._experimental import warn_experimental
 from andrey.core import NULL, TAIL
+from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import _node, column_position
 from andrey.core.orient import to_structure
 
@@ -50,7 +51,13 @@ def _fit(
     from andrey.search.hybrid import local_graph, local_set
 
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        max_categories=max_categories,
+        method=method,
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
@@ -58,7 +65,7 @@ def _fit(
     t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
     settings = {"alpha": alpha, "indep_test": indep_test, "categorical": mask}
     metadata: dict[str, object] = {"algorithm": _NAMES[method]}
-    with copies_named(labels):
+    with copies_named(labels), rows_tested() as rows:
         if t is None:
             adjacent = local_graph(X, method, **settings)
         else:
@@ -68,7 +75,7 @@ def _fit(
             name = (lambda j: labels[j]) if labels is not None else int
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
     marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-    metadata |= categorical_metadata(mask, data)
+    metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
     return structure_output(to_structure(marks, kind="cpdag"), labels=labels, metadata=metadata)
 
 
@@ -160,15 +167,33 @@ def iamb(
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [3]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [3]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows.
+
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It
     conditions on the whole current blanket, so each test needs more rows as the blanket grows,
-    and a candidate the grow step adds in error enlarges every later conditioning set.
+    and a candidate the grow step adds in error enlarges every later conditioning set. Missing
+    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
+    the values missing completely at random.
 
     References
     ----------
     .. [1] Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Algorithms for large scale
        Markov blanket discovery. FLAIRS, 376-380.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -284,14 +309,32 @@ def inter_iamb(
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [3]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [3]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows.
+
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It
     conditions on the whole current blanket, so each test needs more rows as the blanket grows.
+    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
+    fifth of the values missing completely at random.
 
     References
     ----------
     .. [1] Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Algorithms for large scale
        Markov blanket discovery. FLAIRS, 376-380.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -411,15 +454,33 @@ def mmpc(
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [3]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [3]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows.
+
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It tests
     each candidate against every subset of the current members, so its cost grows exponentially
-    with the size of the set; the symmetry check runs the search once more for each member.
+    with the size of the set; the symmetry check runs the search once more for each member. Missing
+    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
+    the values missing completely at random.
 
     References
     ----------
     .. [1] Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing
        Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------

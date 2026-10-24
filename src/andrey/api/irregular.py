@@ -91,6 +91,9 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
     deterministic.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. Drop the rows where either
+    column is missing first: for a pair, those are the rows every test of the pair can read.
+
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
     mechanism and Gaussian noise, from 200 to 8,000 rows. It named the true direction on three pairs
     in four at 200 rows and on every pair from 4,000 rows. The median fit took over three minutes at
@@ -128,7 +131,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         raise ValueError(
             f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
-    X = data_matrix(data)
+    X = data_matrix(data, method="anm")
     if alpha is not None:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
@@ -217,6 +220,9 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
     ``PerformanceWarning``.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. Drop the rows where either
+    column is missing first: for a pair, those are the rows every test of the pair can read.
+
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, from 200 to
     5,000 rows. It named the true direction on three pairs in four at 200 rows and on every pair
@@ -257,7 +263,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         raise ValueError(
             f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
-    X = data_matrix(data)
+    X = data_matrix(data, method="pnl")
     if alpha is not None:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
@@ -335,6 +341,11 @@ def rcd(
     RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
     tests compare residuals, and a weak hidden cause leaves only a small trace in them.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on linear data with uniform noise, one node in five hidden, and 2,000
     rows, from 4 to 24 observed variables: its median directed-edge errors were below the empty
     graph's at every size but 8 variables, where they equaled it. A fit took about 2 s at 4
@@ -362,7 +373,7 @@ def rcd(
     """
     from andrey.irregular.rcd import fit_rcd
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    X = data_matrix(data, min_rows=6, method="rcd")  # HSIC's null variance has (n - 4)(n - 5)
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
     labels = column_labels(data)
     model = fit_rcd(
@@ -438,6 +449,11 @@ def bottom_up_parce_lingam(
     required edges: the two ends of a required edge can both end in the unordered block, where no
     edge is directed, so a required edge raises ``NotImplementedError`` rather than be dropped.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Suited to a few variables. Measured on linear data with uniform noise, one node
     in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
     4 observed variables, and above it at every size from 8 to 24. From 16 variables it left none of
@@ -465,7 +481,8 @@ def bottom_up_parce_lingam(
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    # HSIC's null variance has (n - 4)(n - 5).
+    X = data_matrix(data, min_rows=6, method="bottom_up_parce_lingam")
     if X.shape[0] <= X.shape[1]:
         raise ValueError(
             f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"

@@ -200,6 +200,11 @@ def notears(
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
     thread, so the host's thread count does not change it.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
+    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
     variables, five graphs for each combination, at the default settings. Errors are SHD against the
@@ -255,7 +260,7 @@ def notears(
     warn_experimental("notears")
     from andrey.search.continuous import notears as _notears
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="notears")
     lambda1 = _non_negative(lambda1, "lambda1")
     w_threshold = _non_negative(w_threshold, "w_threshold")
     max_iter = int_in_range(max_iter, "max_iter", 1)
@@ -408,6 +413,11 @@ def dagma(
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
     thread, so the host's thread count does not change it.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
+    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on simulated linear data from sparse random graphs (Erdos-Renyi and
     scale-free, mean degree 2) with Gaussian and uniform noise, 1,000 rows, and 10, 20, 50 and 100
     variables, five graphs for each combination, at the default settings. Errors are SHD against the
@@ -462,7 +472,7 @@ def dagma(
     warn_experimental("dagma")
     from andrey.search.continuous import dagma as _dagma
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="dagma")
     lambda1 = _non_negative(lambda1, "lambda1")
     w_threshold = _non_negative(w_threshold, "w_threshold")
     stages = int_in_range(stages, "stages", 1)
