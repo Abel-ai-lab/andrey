@@ -1217,6 +1217,79 @@
   }
 }
 
+/* ---------- the tiles' dialogs: the frame, the header, and the close button ---------- */
+/* Shadows and the backdrop use the theme's darkest ground: ink in light, paper in dark. */
+.andrey-home .wf {
+  --wf-shade: var(--andrey-ink);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--andrey-ink);
+}
+html[data-theme="dark"] .andrey-home .wf { --wf-shade: var(--andrey-paper); }
+.andrey-home .wf-plus {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--andrey-accent);
+  color: var(--andrey-paper);
+}
+.andrey-home .wf-plus svg { width: 15px; height: 15px; }
+
+.andrey-home dialog.tile-dialog {
+  width: min(940px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 34px 40px 26px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--andrey-paper);
+  box-shadow: 0 40px 120px -20px color-mix(in srgb, var(--wf-shade) 45%, transparent);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.andrey-home dialog.tile-dialog::backdrop {
+  background: color-mix(in srgb, var(--wf-shade) 45%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+.andrey-home .wf-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+.andrey-home .wf .wf-top h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.6vw, 2.2rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--andrey-ink);
+}
+.andrey-home .wf .wf-top p { margin: 0.4rem 0 0; font-size: 1rem; color: var(--andrey-muted); }
+.andrey-home .wf-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  cursor: pointer;
+}
+.andrey-home .wf-close svg { width: 14px; height: 14px; }
+
+.andrey-home .wf button:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 680px) {
+  .andrey-home dialog.tile-dialog { padding: 24px 18px 20px; border-radius: 24px; }
+}
+
 /* ---------- the dialogs: a tile's details, as the "Why Andrey is fast" dialog ---------- */
 .andrey-home .tile-details {
   display: contents;
