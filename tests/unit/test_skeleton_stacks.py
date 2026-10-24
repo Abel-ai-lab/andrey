@@ -1,10 +1,10 @@
 """The skeleton scan stacks the chunks of many pairs into one evaluation, with unchanged results.
 
-For FisherZ and StudentT, ``scan_pairs`` evaluates the chunks of consecutive pairs together, up to
-``_STACK_BYTES`` of correlation submatrices. Every cap, from one chunk per stack to the default,
-gives the removals, separating sets, largest p-values, and trace of the per-pair scan, which a
-subclass of either test takes; a singular query raises the per-pair scan's error after the same
-trace. The size-1 pass, ``first_order_removals``, stacks the same way and prepares its queries
+For FisherZ, StudentT, and RCoT, ``scan_pairs`` evaluates the chunks of consecutive pairs
+together, up to ``_STACK_BYTES`` of correlation submatrices. Every cap, from one chunk per stack to
+the default, gives the removals, separating sets, largest p-values, and trace of the per-pair scan,
+which a subclass of each test takes; a query that raises raises the per-pair scan's error after the
+same trace. The size-1 pass, ``first_order_removals``, stacks the same way and prepares its queries
 only as the stacks need them.
 """
 
@@ -21,6 +21,7 @@ from andrey.constraint._skeleton import (
     scan_pairs,
 )
 from andrey.core.ci import FisherZ, SingularCorrelationError, StudentT
+from andrey.core.ci_kernel import RCoT
 
 ALPHA = 0.2
 
@@ -37,6 +38,10 @@ class _PerPairFisherZ(FisherZ):
 
 class _PerPairStudentT(StudentT):
     """A StudentT subclass, which ``scan_pairs`` scans pair by pair."""
+
+
+class _PerPairRCoT(RCoT):
+    """An RCoT subclass, which ``scan_pairs`` scans pair by pair."""
 
 
 TESTS = [(FisherZ, _PerPairFisherZ), (StudentT, _PerPairStudentT)]
@@ -243,3 +248,40 @@ def test_canonical_capable_is_the_exact_type_rule() -> None:
     assert not canonical_capable(_PerPairFisherZ(X))
     assert not canonical_capable(_PerPairStudentT(X))
     assert not canonical_capable(Scalar())  # ty: ignore[invalid-argument-type]
+
+
+@pytest.mark.parametrize("cap", [1, None])
+@pytest.mark.parametrize("size", [0, 1, 2])
+def test_rcot_stacks_match_the_per_pair_scan(monkeypatch: pytest.MonkeyPatch, cap, size) -> None:
+    """RCoT's stacks run each conditioning set's queries together; every p-value, removal, and
+    trace record is the per-pair scan's, bit for bit."""
+    if cap is not None:
+        monkeypatch.setattr(_skeleton, "_STACK_BYTES", cap)
+    X, pairs, neighbors = _case(0, d=8, n=500)
+    got = _scan(RCoT(X), pairs, neighbors, size)
+    want = _scan(_PerPairRCoT(X), pairs, neighbors, size)
+    assert got == want
+    assert got[0], "the case must remove something"
+
+
+def test_a_failing_rcot_stack_raises_the_per_pair_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    X, pairs, neighbors = _case(0, d=8, n=500)
+    failing = pairs[len(pairs) // 2]
+    call = RCoT.__call__
+
+    def raising(test, x, y, condition_set=()):
+        if (min(x, y), max(x, y)) == failing:
+            raise FloatingPointError(f"query {x}, {y}, {tuple(condition_set)}")
+        return call(test, x, y, condition_set)
+
+    monkeypatch.setattr(RCoT, "__call__", raising)
+    errors, traces = [], []
+    for test in (RCoT(X), _PerPairRCoT(X)):
+        trace: list[dict] = []
+        with pytest.raises(FloatingPointError) as raised:
+            scan_pairs(test, pairs, neighbors, 2, ALPHA, trace)
+        errors.append(str(raised.value))
+        traces.append(trace)
+    assert errors[0] == errors[1]
+    assert traces[0] == traces[1]
+    assert traces[0], "the failing query must come after other pairs' tests"
