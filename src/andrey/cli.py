@@ -96,9 +96,13 @@ def _is_number(token: str) -> bool:
         return False
 
 
+#: The fields of a data row that mark a missing value, besides ``nan``, as pandas reads them too.
+MISSING_FIELDS = ("", "NA", "N/A")
+
+
 def _cell(text: str) -> float:
-    """One field of a data row as a number; an empty field is a missing value, ``NaN``."""
-    return float(text) if text.strip() else math.nan
+    """One field of a data row as a number; a field of :data:`MISSING_FIELDS` is ``NaN``."""
+    return math.nan if text.strip() in MISSING_FIELDS else float(text)
 
 
 def _row_fields(line: str, delimiter: str | None) -> list[tuple[str, bool]]:
@@ -126,9 +130,9 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
 
     A header is a first row whose every field is text: not a number, or in double quotes, so
     ``a,b,c`` and ``"1","0","2"`` name the columns. A first row of unquoted numbers is data, and an
-    empty field in a data row is a missing value, read as ``NaN``. A first row that mixes unquoted
-    numbers with text (``a,1,b`` or ``1,2,bad``) is neither, so it surfaces as ``bad_data`` rather
-    than being read as a header or as a truncated dataset.
+    empty, ``NA``, ``N/A``, or ``nan`` field in a data row is a missing value, read as ``NaN``. A
+    first row that mixes unquoted numbers with text (``a,1,b`` or ``1,2,bad``) is neither, so it
+    surfaces as ``bad_data`` rather than being read as a header or as a truncated dataset.
     """
     import numpy as np
 
@@ -137,9 +141,11 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
     delimiter = "," if "," in unquoted else ("\t" if "\t" in unquoted else None)
     fields = _row_fields(first, delimiter)
     numbers = [text for text, quoted in fields if not quoted and _is_number(text)]
-    # A data field is an unquoted number, or empty for a missing value.
+    # A data field is an unquoted number, or a missing value: empty, NA, or N/A.
     texts = [
-        text for text, quoted in fields if quoted or not (_is_number(text) or not text.strip())
+        text
+        for text, quoted in fields
+        if quoted or not (_is_number(text) or text.strip() in MISSING_FIELDS)
     ]
     if numbers and texts:
         text = texts[0]
@@ -161,7 +167,7 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
     try:
         arr = read(io.StringIO(raw))
     except ValueError:
-        try:  # an empty field, a missing value, fails the fast parser
+        try:  # a missing value other than nan fails the fast parser
             arr = read(io.StringIO(raw), converters=_cell)
         except ValueError as exc:
             raise CliError("bad_data", f"could not parse numeric data: {exc}", EXIT_DATA) from exc
@@ -1110,6 +1116,7 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
     lines += [
         "  Files: CSV, TSV, or whitespace-separated text (a header row names the nodes), or .npy.",
         '  A first row of numbers is data; quote a header name that is a number ("1").',
+        "  An empty field, NA, N/A, or nan is a missing value.",
         "  A path of - reads text from stdin.",
     ]
     if spec.params:
