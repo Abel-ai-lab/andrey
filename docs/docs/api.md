@@ -83,8 +83,9 @@ gives a node more than that many parents, and some graph reaches each node's cou
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
 take `ebic_gamma`, the weight of the extended BIC: their linear-Gaussian BIC adds
 `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows
-with the number of variables. `boss` and `gfci` default to `ebic_gamma=0.0`, the standard BIC, and
-the others to `1.0`; {py:func}`~andrey.ges` describes the choice.
+with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the standard BIC, and the others
+to `1.0`; {py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its
+default differs.
 
 ```{eval-rst}
 .. currentmodule:: andrey

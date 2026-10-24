@@ -43,11 +43,12 @@ def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
 
 @pytest.mark.parametrize("seed,d,n,p", _SWEEP)
 @pytest.mark.parametrize("n_chunks", [2, 3, 8])
-def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
+@pytest.mark.parametrize("ebic_gamma", [0.0, 1.0])
+def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks, ebic_gamma):
     """The N-chunk in-process reduce reproduces serial GES's CPDAG and score exactly."""
     x = _gaussian_sem(seed, n, d, p)
-    serial_struct, serial_score = ges(x)
-    decomp_marks, decomp_score = ges_inprocess(x, n_chunks)
+    serial_struct, serial_score = ges(x, ebic_gamma=ebic_gamma)
+    decomp_marks, decomp_score = ges_inprocess(x, n_chunks, ebic_gamma=ebic_gamma)
     assert np.array_equal(serial_struct.to_numpy(), decomp_marks), (
         f"CPDAG differs at seed={seed}, d={d}, n_chunks={n_chunks}"
     )
@@ -121,14 +122,15 @@ def test_chunk_count_invariance_on_move_sequence(seed, d, n, p):
 
 
 @pytest.mark.parametrize("seed,d,n,p", _SWEEP)
-def test_objective_is_self_consistent(seed, d, n, p):
+@pytest.mark.parametrize("ebic_gamma", [0.0, 1.0])
+def test_objective_is_self_consistent(seed, d, n, p, ebic_gamma):
     """GES returns the score recomputed from its emitted CPDAG."""
     from andrey.core.orient import pdag2dag
     from andrey.search import operators as ops
 
     x = _gaussian_sem(seed, n, d, p)
-    struct, total = ges(x)
-    score = BICScore(np.asarray(x, dtype=np.float64), lambda_value=1.0)
+    struct, total = ges(x, ebic_gamma=ebic_gamma)
+    score = BICScore(np.asarray(x, dtype=np.float64), lambda_value=1.0, ebic_gamma=ebic_gamma)
     dag = pdag2dag(struct.to_numpy())
     independent = float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(d)))
     assert independent == total  # byte-identical: the objective is a pure function of the CPDAG

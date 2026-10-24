@@ -1107,7 +1107,7 @@ _add(
         params=(
             _BOSS_SCORE,
             _LAMBDA_VALUE,
-            _EBIC_GAMMA_STANDARD,
+            _EBIC_GAMMA,
             _SEED,
             _CATEGORICAL,
             _MAX_CATEGORIES,

@@ -269,7 +269,8 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
 def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
     x = sample_scm(d=8, n=1000, seed=0, density=2.0, scale="raw").data
     dg_graph, dg_score = search(x, score_func="local_score_degen_gauss")
-    bic_graph, bic_score = search(x, score_func=bic)
+    # The degenerate Gaussian score has no extended-BIC term, so the BIC side is the standard BIC.
+    bic_graph, bic_score = search(x, score_func=bic, ebic_gamma=0.0)
     assert np.array_equal(dg_graph.to_numpy(), bic_graph.to_numpy())
     assert dg_score == bic_score
 

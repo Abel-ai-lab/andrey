@@ -74,18 +74,20 @@ def ges_inprocess(
     max_parents: float | None = None,
     engine: Callable[[BICScore], pg.DeltaEngine] = DeltaBICScore,
     parent_rule: str = "cap",
+    ebic_gamma: float = 1.0,
 ) -> tuple[np.ndarray, float]:
     """Full GES over ``n_chunks`` target chunks, set up as ``ges()`` sets up a serial run.
 
     ``engine`` builds the delta engine from the BIC score: the Schur ``DeltaBICScore``, or
     ``FullScoreDelta`` for two full scores per move. ``max_parents`` and ``parent_rule`` set the
-    forward gate and the parent cap as ``ges()`` does. Returns the CPDAG's marks and the objective
+    forward gate and the parent cap as ``ges()`` does, and ``ebic_gamma`` is the weight of the
+    extended-BIC term, ``ges()``'s default. Returns the CPDAG's marks and the objective
     recomputed from it, as ``ges()`` does.
     """
     X = np.asarray(x, dtype=np.float64)
     n = X.shape[1]
     gate, cap = _parent_limits(n, max_parents, parent_rule)
-    score = BICScore(X, lambda_value=1.0)
+    score = BICScore(X, lambda_value=1.0, ebic_gamma=ebic_gamma)
     delta_engine = engine(score)
     adj = np.zeros((n, n), dtype=np.int8)
     with threadpool_limits(limits=1):

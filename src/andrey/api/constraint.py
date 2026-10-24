@@ -687,13 +687,13 @@ def gfci(
         Gaussian BIC for mixed data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
-        values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-        BDeu ignores it.
+        values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
+        finite and non-negative. BDeu ignores it.
     ebic_gamma : float, default=0.0
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it.
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     indep_test : str, default="fisherz"
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
         ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
@@ -810,6 +810,25 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
+    **Choosing ebic_gamma.** The GES phase scores a variable with the linear-Gaussian BIC, which
+    charges ``lambda_value * log(n_samples)`` per parent, plus the extended-BIC term ``2 *
+    ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, where ``C(n_variables - 1, n_parents)``
+    counts the parent sets of that size. The term grows with the number of variables, so a larger
+    ``ebic_gamma`` gives a sparser GES graph, with fewer false adjacencies and more missed ones; the
+    tests then start from fewer adjacencies and never add one. ``ebic_gamma=0.0`` is the standard
+    BIC, GFCI's default; :func:`~andrey.ges` and most other score-based searches default to ``1.0``.
+    On simulated linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows,
+    ``ebic_gamma=1.0`` lowered GFCI's mean errors (SHD against the true graph) per true edge by
+    0.064 (95% interval 0.055 to 0.074), against 0.78 for GES. In 11 of 65 settings of graph,
+    variables, and rows it made more errors on average than ``0.0``, and in three of them the
+    difference's 95% interval lies above zero: 300.6 against 291.0 with 200 variables, mean degree
+    4, and 2,000 rows (400 true edges); 149.2 against 140.6 with 100 variables, mean degree 4,
+    ``scale="unitless"`` data, and 1,000 rows (200 true edges); and 38.4 against 36.2 with 20
+    variables, mean degree 4, ``scale="unitless"`` data, and 200 rows (40 true edges). Across the
+    295 datasets with both fits, it made more errors on 56, fewer on 198, and the same on 41. Its
+    mean errors stayed below the empty graph's in each of the 65 settings, where the standard BIC's
+    exceeded it in 16. Pass ``ebic_gamma=1.0`` to use the extended BIC.
+
     **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
     random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
     800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
@@ -848,6 +867,8 @@ def gfci(
        2nd ed. MIT Press.
     .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
        causal inference. UAI, 401-408.
+    .. [6] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------

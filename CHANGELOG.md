@@ -15,16 +15,17 @@ change names its pull request.
   default, `scale="standardize"`, so no method can read the causal order off the variances the
   simulation happened to give; VAR and VARMA series take `"standardize"` too. Pass `scale="raw"`
   for the values these functions returned before. ([#411])
-- `ges`, `gies`, `xges`, `hc`, `tabu`, `grasp`, `exact_search`, `mmhc`, and `rsmax2` score
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `mmhc`, and `rsmax2` score
   continuous data with the extended BIC by default: the linear-Gaussian BIC adds
   `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, with
   `ebic_gamma=1.0` (Chen and Chen 2008), a penalty that grows with the number of variables, so the
   graphs keep fewer false edges. On simulated linear-Gaussian data with 20 to 400 variables and 200
-  to 4,000 rows, the mean errors (SHD) per true edge fell by 0.74 to 0.80 for GES, XGES, GIES, hill
-  climbing, Tabu search, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase already
-  leaves out most false edges; exact search's fell by 0.24 at 20 variables. With 200 variables and
-  2,000 rows, GES's errors fell from 211 to 24. `boss` and `gfci` keep `ebic_gamma=0.0`. Pass
-  `ebic_gamma=0.0` for the graphs the others returned before. ([#443])
+  to 4,000 rows, the mean errors (SHD) per true edge fell by 0.74 to 0.81 for GES, XGES, GIES, hill
+  climbing, Tabu search, BOSS, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase
+  already leaves out most false edges; exact search's fell by 0.24 at 20 variables. With 200
+  variables and 2,000 rows, GES's errors fell from 211 to 24. `gfci` keeps `ebic_gamma=0.0`: its
+  errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
+  the graphs the others returned before. ([#443])
 
 ### Added
 
