@@ -112,6 +112,9 @@ change names its pull request.
   possible-d-separation step asks the test for each pair's conditioning sets in runs of 1, 2, 4, and
   up to 256 sets, cut at the first that separates the pair, when the test is `"fisherz"`,
   `"student_t"`, `"chisq"`, `"gsq"`, `"degen_gauss"`, or `"cond_gauss"`. ([#461])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
+  p-values in less time, because the test's batched counts hold a table only for each conditioning
+  configuration that occurs in the data, not for every possible one. ([#463])
 
 
 ## [0.10.0] - 2026-10-27
@@ -882,5 +885,6 @@ First alpha release.
 [#457]: https://github.com/Abel-ai-lab/andrey/pull/457
 [#459]: https://github.com/Abel-ai-lab/andrey/pull/459
 [#461]: https://github.com/Abel-ai-lab/andrey/pull/461
+[#463]: https://github.com/Abel-ai-lab/andrey/pull/463
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
