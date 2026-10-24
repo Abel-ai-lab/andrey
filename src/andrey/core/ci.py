@@ -482,8 +482,8 @@ class StudentT(PartialCorrelationTest):
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
 # that occur, so memory stays proportional to the rows whatever the cardinalities.
 _DENSE_CELLS = 1 << 20
-# The batched chi-square paths count a test's table over every configuration of its conditioning
-# set when it has at most max(_TABLE_ROWS * n, _TABLE_MIN) cells, and take the scalar path above.
+# The batched chi-square path takes a test whose conditioning set's configurations times its table
+# cells are at most max(_TABLE_ROWS * n, _TABLE_MIN), and the scalar path above.
 _TABLE_ROWS = 4
 _TABLE_MIN = 1 << 16
 # The most row indices, table cells, or Gram-matrix entries one batched count holds.
@@ -510,12 +510,12 @@ class ChiSquare:
 
     :meth:`batched_call`, :meth:`first_order_pvalues`, and :meth:`marginal_pvalues` answer many
     queries at once and return the p-values of :meth:`__call__` exactly. They count the tables of
-    many queries together, one ``bincount`` over the queries' cell indices, or, for the marginal
-    tables of all pairs, one product of the category-indicator matrix with itself, whose integer
-    counts are exact in float64. Every step after the counting is elementwise on the tables,
-    except the sum of a query's statistic over its cells, which is ``np.sum`` over that query's
-    cells in the order :meth:`__call__` sums them, so the sum, and a decision on the p-value, does
-    not depend on how the queries are batched.
+    many queries together, with ``bincount`` over the configurations that occur, or, for the
+    marginal tables of all pairs, one product of the category-indicator matrix with itself, whose
+    integer counts are exact in float64. Every step after the counting is elementwise on the
+    tables, except the sum of a query's statistic over its cells, which is ``np.sum`` over that
+    query's cells in the order :meth:`__call__` sums them, so the sum, and a decision on the
+    p-value, does not depend on how the queries are batched.
 
     Parameters
     ----------
@@ -679,7 +679,7 @@ class ChiSquare:
         """P-values of the pair ``x < y`` given each canonical conditioning set in ``conds``.
 
         The sets whose tables have at most ``max(4 * n, 65536)`` possible cells are counted in
-        blocks, grouped by size, one ``bincount`` per block; the others take :meth:`__call__`.
+        blocks, grouped by size (:meth:`_block_pvalues`); the others take :meth:`__call__`.
         """
         out = np.empty(len(conds))
         n = self._n
@@ -717,12 +717,15 @@ class ChiSquare:
     def _block_pvalues(
         self, target: np.ndarray, cells: int, kx: int, ky: int, conds: list[list[int]], size: int
     ) -> np.ndarray:
-        """P-values of one block of conditioning sets of equal ``size``, counted in one bincount.
+        """P-values of one block of conditioning sets of equal ``size``, counted together.
 
-        Row ``r`` of set ``i`` falls in cell ``target[r]`` of configuration ``offset[i] + code``,
-        with ``code`` the mixed-radix code of its conditioning categories, the first column most
-        significant: the order :func:`~andrey.core.categorical.configurations` numbers them in.
-        The configurations that do not occur are then dropped.
+        Row ``r`` of set ``i`` falls in configuration ``offset[i] + code``, with ``code`` the
+        mixed-radix code of its conditioning categories, the first column most significant: the
+        order :func:`~andrey.core.categorical.configurations` numbers them in, and in each
+        configuration in cell ``target[r]``. Only the tables of the configurations that occur are
+        kept, in that order: when every configuration's table together holds no more cells than
+        the block has rows, all are counted and the empty ones dropped; otherwise the occurring
+        configurations are numbered first and only their tables counted.
         """
         sets = np.array(conds, dtype=np.intp).reshape(len(conds), size)
         radix = self._cardinalities[sets]
@@ -731,20 +734,31 @@ class ChiSquare:
         total = int(q.sum())
         dtype = self._rows.dtype if total * cells < 2**31 else np.dtype(np.int64)
         if size:
-            index = self._rows[sets[:, 0]].astype(dtype, copy=False)
+            code = self._rows[sets[:, 0]].astype(dtype, copy=False)
             for j in range(1, size):
-                index *= radix[:, j, None].astype(dtype)
-                index += self._rows[sets[:, j]]
-            index += offset[:, None].astype(dtype)
+                code *= radix[:, j, None].astype(dtype)
+                code += self._rows[sets[:, j]]
+            code += offset[:, None].astype(dtype)
         else:
-            index = np.repeat(offset[:, None].astype(dtype), self._n, axis=1)
-        index *= dtype.type(cells)
-        index += target
-        tables = np.bincount(index.ravel(), minlength=total * cells).reshape(total, kx, ky)
-        occurs = tables.reshape(total, cells).any(axis=1)
-        held = np.add.reduceat(occurs.astype(np.int64), offset)
-        bounds = np.concatenate(([0], np.cumsum(held)))
-        return self._table_pvalues(tables[occurs], bounds)
+            code = np.repeat(offset[:, None].astype(dtype), self._n, axis=1)
+        if total * cells <= code.size:
+            code *= dtype.type(cells)
+            code += target
+            tables = np.bincount(code.ravel(), minlength=total * cells).reshape(total, cells)
+            occurs = np.einsum("sc->s", tables) > 0
+            # rank[c] counts the configurations up to c that occur.
+            rank = np.cumsum(occurs)
+            if rank[-1] < total:
+                tables = tables[occurs]
+        else:
+            rank = np.cumsum(np.bincount(code.ravel(), minlength=total) > 0)
+            index = rank.astype(dtype, copy=False)[code]
+            index -= dtype.type(1)
+            index *= dtype.type(cells)
+            index += target
+            tables = np.bincount(index.ravel(), minlength=int(rank[-1]) * cells)
+        bounds = np.concatenate(([0], rank[offset + q - 1]))
+        return self._table_pvalues(tables.reshape(-1, kx, ky), bounds)
 
     def _table_pvalues(self, tables: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         """P-values of the tests whose ``(kx, ky)`` tables are stacked in ``tables``.
@@ -755,15 +769,15 @@ class ChiSquare:
         :meth:`__call__` visits them, so every p-value equals :meth:`__call__`'s.
         """
         m, kx, ky = tables.shape
-        n_sx = tables.sum(axis=2)
-        n_sy = tables.sum(axis=1)
-        n_s = n_sx.sum(axis=1)
+        n_sx = np.einsum("sxy->sx", tables)
+        n_sy = np.einsum("sxy->sy", tables)
+        n_s = np.einsum("sx->s", n_sx)
         flat = tables.reshape(-1)
         occupied = np.flatnonzero(flat)
         observed = flat[occupied]
-        s, rest = np.divmod(occupied, kx * ky)
-        sx, sy = np.divmod(rest, ky)
-        expected = n_sx[s, sx] * n_sy[s, sy] / n_s[s]
+        row = occupied // ky  # the cell's (configuration, x) row of n_sx
+        s = row // kx
+        expected = n_sx.reshape(-1)[row] * n_sy.reshape(-1)[s * ky + occupied - row * ky] / n_s[s]
         if self._g_square:
             values = observed * np.log(observed / expected)
         else:
@@ -771,7 +785,9 @@ class ChiSquare:
         cuts = np.searchsorted(occupied, bounds * (kx * ky)).tolist()
         sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
-        per_table = ((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)
+        present_x = np.einsum("sx->s", (n_sx > 0).view(np.int8), dtype=np.int64)
+        present_y = np.einsum("sy->s", (n_sy > 0).view(np.int8), dtype=np.int64)
+        per_table = (present_x - 1) * (present_y - 1)
         dof = np.add.reduceat(per_table, bounds[:-1])
         out = np.ones(len(dof))
         live = dof != 0

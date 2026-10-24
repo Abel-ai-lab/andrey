@@ -16,7 +16,7 @@ change names its pull request.
   the identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265], [#267],
   [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#364], [#365],
-  [#368], [#369], [#455], [#459], [#461])
+  [#368], [#369], [#455], [#459], [#461], [#463])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -71,6 +71,9 @@ change names its pull request.
   possible-d-separation step asks the test for each pair's conditioning sets in runs of 1, 2, 4, and
   up to 256 sets, cut at the first that separates the pair, when the test is `"fisherz"`,
   `"student_t"`, `"chisq"`, `"gsq"`, `"degen_gauss"`, or `"cond_gauss"`. ([#461])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
+  p-values in less time, because the test's batched counts hold a table only for each conditioning
+  configuration that occurs in the data, not for every possible one. ([#463])
 - `pc`, `fci`, `gfci`, and `cdnod` return the same graphs and p-values with less memory, because
   their size-one pass builds its queries one stack at a time instead of listing every pair's
   conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
@@ -697,3 +700,4 @@ First alpha release.
 [#457]: https://github.com/Abel-ai-lab/andrey/pull/457
 [#459]: https://github.com/Abel-ai-lab/andrey/pull/459
 [#461]: https://github.com/Abel-ai-lab/andrey/pull/461
+[#463]: https://github.com/Abel-ai-lab/andrey/pull/463
