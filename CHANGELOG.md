@@ -104,6 +104,10 @@ change names its pull request.
   less time on large samples, because their skeleton search hands RCoT its queries in stacks, which
   RCoT runs one conditioning set at a time, building each set's random features once per stack.
   ([#455])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="degen_gauss"` return the same graphs and
+  p-values in less time, because their skeleton search hands the degenerate Gaussian test its
+  queries in stacks, which it runs grouped by shape, with each conditioning set's regression
+  computed once. ([#459])
 
 
 ## [0.10.0] - 2026-10-27
@@ -872,5 +876,6 @@ First alpha release.
 [#453]: https://github.com/Abel-ai-lab/andrey/pull/453
 [#455]: https://github.com/Abel-ai-lab/andrey/pull/455
 [#457]: https://github.com/Abel-ai-lab/andrey/pull/457
+[#459]: https://github.com/Abel-ai-lab/andrey/pull/459
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469

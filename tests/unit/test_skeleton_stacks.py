@@ -1,11 +1,12 @@
 """The skeleton scan stacks the chunks of many pairs into one evaluation, with unchanged results.
 
-For FisherZ, StudentT, and RCoT, ``scan_pairs`` evaluates the chunks of consecutive pairs
-together, up to ``_STACK_BYTES`` of correlation submatrices. Every cap, from one chunk per stack to
-the default, gives the removals, separating sets, largest p-values, and trace of the per-pair scan,
-which a subclass of each test takes; a query that raises raises the per-pair scan's error after the
-same trace. The size-1 pass, ``first_order_removals``, stacks the same way and prepares its queries
-only as the stacks need them.
+For FisherZ, StudentT, RCoT, and the degenerate Gaussian test, ``scan_pairs`` evaluates the
+chunks of consecutive pairs together, up to ``_STACK_BYTES`` of correlation submatrices. Every
+cap, from one chunk per stack to the default, gives the removals, separating sets, largest
+p-values, and trace of the per-pair scan, which a subclass of each test takes; a query that raises
+raises the per-pair scan's error after the same trace; a test with only the scalar call gives the
+degenerate Gaussian test's results too. The size-1 pass, ``first_order_removals``, stacks the same
+way and prepares its queries only as the stacks need them.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from andrey.constraint._skeleton import (
     pair_queries,
     scan_pairs,
 )
-from andrey.core.ci import FisherZ, SingularCorrelationError, StudentT
+from andrey.core.ci import DGTest, FisherZ, SingularCorrelationError, StudentT
 from andrey.core.ci_kernel import RCoT
 
 ALPHA = 0.2
@@ -286,6 +287,87 @@ def test_a_failing_rcot_stack_raises_the_per_pair_error(monkeypatch: pytest.Monk
     monkeypatch.setattr(RCoT, "__call__", raising)
     errors, traces = [], []
     for test in (RCoT(X), _PerPairRCoT(X)):
+        trace: list[dict] = []
+        with pytest.raises(FloatingPointError) as raised:
+            scan_pairs(test, pairs, neighbors, 2, ALPHA, trace)
+        errors.append(str(raised.value))
+        traces.append(trace)
+    assert errors[0] == errors[1]
+    assert traces[0] == traces[1]
+    assert traces[0], "the failing query must come after other pairs' tests"
+
+
+class _PerPairDGTest(DGTest):
+    """A degenerate Gaussian subclass, which ``scan_pairs`` scans pair by pair."""
+
+
+class _ScalarOnly:
+    """A test with only the scalar call, which ``scan_pairs`` evaluates one query at a time."""
+
+    def __init__(self, test) -> None:
+        self._test = test
+
+    def __call__(self, x, y, condition_set=()):
+        return DGTest.__call__(self._test, x, y, condition_set)
+
+
+def _mixed_case(seed: int = 0):
+    """``_case`` with every third column cut into two to four categories."""
+    X, pairs, neighbors = _case(seed, d=10, n=400)
+    mask = np.zeros(X.shape[1], dtype=bool)
+    for j in range(0, X.shape[1], 3):
+        X[:, j] = np.digitize(X[:, j], np.quantile(X[:, j], np.linspace(0, 1, 2 + j % 3)[1:-1]))
+        mask[j] = True
+    return X, mask, pairs, neighbors
+
+
+@pytest.mark.parametrize("cap", [1, None])
+@pytest.mark.parametrize("size", [0, 1, 2, 3])
+def test_dg_stacks_match_the_per_pair_and_the_scalar_scans(
+    monkeypatch: pytest.MonkeyPatch, cap, size
+) -> None:
+    """The degenerate Gaussian test's stacks give every p-value, removal, and trace record of the
+    per-pair scan, which calls its batched path pair by pair, and of a test with only the scalar
+    call, bit for bit."""
+    if cap is not None:
+        monkeypatch.setattr(_skeleton, "_STACK_BYTES", cap)
+    X, mask, pairs, neighbors = _mixed_case()
+    test, rows = DGTest(X, mask), []
+    grouped = test._canonical_pvalues
+
+    def spy(x, y, conditions):
+        rows.append(len(x))
+        return grouped(x, y, conditions)
+
+    test._canonical_pvalues = spy
+    got = _scan(test, pairs, neighbors, size)
+    assert got == _scan(_PerPairDGTest(X, mask), pairs, neighbors, size)
+    assert got == _scan(_ScalarOnly(DGTest(X, mask)), pairs, neighbors, size)
+    assert got[0], "the case must remove something"
+    assert sum(rows) == sum(pair_queries(neighbors, x, y, size) for x, y in pairs)
+    if cap is None:
+        assert len(rows) < len(pairs), "a stack must hold the chunks of several pairs"
+
+
+def test_a_failing_dg_stack_raises_the_per_pair_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    X, mask, pairs, neighbors = _mixed_case()
+    failing = pairs[len(pairs) // 2]
+    call, stacked = DGTest.__call__, DGTest._stacked_pvalues
+
+    def raising(test, x, y, condition_set=()):
+        if (min(x, y), max(x, y)) == failing:
+            raise FloatingPointError(f"query {x}, {y}, {tuple(condition_set)}")
+        return call(test, x, y, condition_set)
+
+    def failing_stack(test, xs, ys, conds):
+        if failing in zip(xs, ys):
+            raise FloatingPointError("stack")
+        return stacked(test, xs, ys, conds)
+
+    monkeypatch.setattr(DGTest, "__call__", raising)
+    monkeypatch.setattr(DGTest, "_stacked_pvalues", failing_stack)
+    errors, traces = [], []
+    for test in (DGTest(X, mask), _ScalarOnly(DGTest(X, mask))):
         trace: list[dict] = []
         with pytest.raises(FloatingPointError) as raised:
             scan_pairs(test, pairs, neighbors, 2, ALPHA, trace)

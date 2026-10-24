@@ -61,7 +61,7 @@ from __future__ import annotations
 import importlib
 import math
 from collections.abc import Callable, Iterable, Sequence
-from functools import partial
+from functools import lru_cache, partial
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
@@ -762,6 +762,10 @@ class ChiSquare:
 # A conditional covariance's eigenvalue, on the scale of unit-variance columns, at or below this
 # marks a direction the conditioning set determines.
 _RANK_TOL = 1e-10
+# The most bytes of correlation blocks one stacked evaluation of the degenerate Gaussian test holds.
+_DG_STACK = 1 << 22
+# The conditioning sets whose regressions one degenerate Gaussian test keeps.
+_DG_SETS = 4096
 
 
 class DGTest:
@@ -781,6 +785,15 @@ class DGTest:
 
     The statistic does not depend on the columns' units, and queries are canonicalized as
     :class:`FisherZ`'s are, so the p-value does not depend on the argument order.
+
+    :meth:`batched_call` and the skeleton's stacked scan answer many queries at once and return
+    :meth:`__call__`'s p-values exactly. Each conditioning set's eigendecomposition is computed
+    once for every query that conditions on it, and the last few thousand sets' are kept for the
+    calls after, scalar ones included. The queries are then grouped by shape: the numbers
+    of columns of ``x``, ``y``, and ``S``, and the directions kept. A group's products, whiteners,
+    and singular values are stacked calls: a stacked NumPy product or decomposition runs, on each
+    query's matrix, the BLAS or LAPACK call that query's own call runs, on the same values with the
+    same memory layout, so every float operation and its order are those of :meth:`__call__`.
 
     Parameters
     ----------
@@ -802,6 +815,10 @@ class DGTest:
         self._dg = DegenerateGaussian(data, categorical)
         sd = np.sqrt(np.diag(self._dg.cov))
         self._corr = self._dg.cov / np.outer(sd, sd)
+        # Each variable's embedded columns are the consecutive ones from _start, _width of them.
+        self._width = np.array([g.size for g in self._dg.groups], dtype=np.intp)
+        self._start = np.array([g[0] if g.size else 0 for g in self._dg.groups], dtype=np.intp)
+        self._regression = lru_cache(_DG_SETS)(self._fit_regression)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
@@ -810,18 +827,139 @@ class DGTest:
         p-value is independent of argument order. A larger p-value means more independence.
         """
         x_int, y_int, cond = _canonical(x, y, condition_set)
-        dg = self._dg
-        cx, cy, cs = dg.columns([x_int]), dg.columns([y_int]), dg.columns(cond)
-        both = np.concatenate([cx, cy])
-        block = self._corr[np.ix_(both, both)]
-        if cs.size:
-            # Regress on the conditioning columns through their nonzero eigen-directions, so
-            # collinear conditioning columns need no inverse.
-            w, u = np.linalg.eigh(self._corr[np.ix_(cs, cs)])
-            keep = w > _RANK_TOL * w[-1]
-            cross = self._corr[np.ix_(both, cs)] @ u[:, keep]
-            block = block - (cross / w[keep]) @ cross.T
-        px = cx.size
+        groups = self._dg.groups
+        both = np.concatenate([groups[x_int], groups[y_int]])
+        block = self._corr[both[:, None], both]
+        regression = self._regression(tuple(cond))
+        if regression is not None:
+            cs, basis, scale = regression
+            cross = self._corr[both[:, None], cs] @ basis
+            block = block - (cross / scale) @ cross.T
+        return self._block_pvalue(block, groups[x_int].size)
+
+    def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
+        """Return p-values for one ``(x, y)`` pair over many conditioning sets.
+
+        The result list matches the order of ``condition_sets``, and each p-value equals
+        :meth:`__call__`'s. A conditioning set is canonicalized as in :meth:`__call__`.
+        """
+        x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
+        conds = [tuple(_canonical(x_int, y_int, s)[2]) for s in condition_sets]
+        return self._pvalues([x_int] * len(conds), [y_int] * len(conds), conds).tolist()
+
+    def _canonical_pvalues(
+        self, xs: np.ndarray, ys: np.ndarray, conditions: np.ndarray
+    ) -> np.ndarray:
+        """P-values of the canonical queries ``(xs[i], ys[i], conditions[i])``, in order:
+        ``xs[i] < ys[i]``, each row of ``conditions`` sorted and distinct."""
+        conds = [tuple(c) for c in conditions.tolist()]
+        return self._pvalues(xs.tolist(), ys.tolist(), conds)
+
+    def _pvalues(self, xs: list[int], ys: list[int], conds: list[tuple[int, ...]]) -> np.ndarray:
+        """P-values of canonical queries, stacked by shape (see :class:`DGTest`).
+
+        When the stacked evaluation raises, each query takes :meth:`__call__` in order, so the error
+        is the one the scalar calls raise.
+        """
+        try:
+            return self._stacked_pvalues(xs, ys, conds)
+        except Exception:
+            return np.array([self(x, y, c) for x, y, c in zip(xs, ys, conds)], dtype=np.float64)
+
+    def _stacked_pvalues(
+        self, xs: list[int], ys: list[int], conds: list[tuple[int, ...]]
+    ) -> np.ndarray:
+        """:meth:`_pvalues`: each conditioning set regressed once, each shape stacked."""
+        out = np.empty(len(xs))
+        if not xs:
+            return out
+        sets: dict[tuple[int, ...], int] = {}
+        zid = np.array([sets.setdefault(c, len(sets)) for c in conds], dtype=np.intp)
+        regressions = [self._regression(c) for c in sets]
+        columns = np.array([0 if r is None else r[0].size for r in regressions], dtype=np.intp)
+        kept = np.array([0 if r is None else r[2].size for r in regressions], dtype=np.intp)
+        x_arr, y_arr = np.array(xs, dtype=np.intp), np.array(ys, dtype=np.intp)
+        px, py = self._width[x_arr], self._width[y_arr]
+        keys = np.stack([px, py, columns[zid], kept[zid]], axis=1)
+        shapes, group = np.unique(keys, axis=0, return_inverse=True)
+        group = group.reshape(-1)
+        for g, (gx, gy, gc, gk) in enumerate(shapes.tolist()):
+            rows = np.flatnonzero(group == g)
+            if not gx or not gy or (gc and not gk):
+                # An empty variable, or a set with no direction kept: the scalar calls.
+                out[rows] = [self(xs[i], ys[i], conds[i]) for i in rows.tolist()]
+                continue
+            step = max(1, _DG_STACK // (8 * (gx + gy) * (gx + gy + gc)))
+            for at in range(0, rows.size, step):
+                part = rows[at : at + step]
+                out[part] = self._shape_pvalues(x_arr[part], y_arr[part], zid[part], regressions)
+        return out
+
+    def _shape_pvalues(
+        self,
+        xs: np.ndarray,
+        ys: np.ndarray,
+        zid: np.ndarray,
+        regressions: list[tuple[np.ndarray, np.ndarray, np.ndarray] | None],
+    ) -> np.ndarray:
+        """P-values of queries of one shape: the same numbers of columns of ``x``, ``y``, and the
+        conditioning set, and of its directions kept. ``zid`` indexes each query's set in
+        ``regressions``. Each stacked operand has the memory layout of its operand in
+        :meth:`__call__` and :func:`_whitener`, so each query's BLAS and LAPACK calls are its
+        own."""
+        corr = self._corr
+        px, py = int(self._width[xs[0]]), int(self._width[ys[0]])
+        both = np.concatenate(
+            (self._start[xs, None] + np.arange(px), self._start[ys, None] + np.arange(py)), axis=1
+        )
+        block = corr[both[:, :, None], both[:, None, :]]
+        if regressions[zid[0]] is not None:
+            sets, inverse = np.unique(zid, return_inverse=True)
+            inverse = inverse.reshape(-1)
+            parts = [cast("tuple[np.ndarray, ...]", regressions[z]) for z in sets.tolist()]
+            cs = np.stack([p[0] for p in parts])[inverse]
+            # Each basis column-major, as u[:, keep] is.
+            basis = np.swapaxes(np.stack([p[1].T for p in parts])[inverse], 1, 2)
+            scale = np.stack([p[2] for p in parts])[inverse]
+            cross = corr[both[:, :, None], cs[:, None, :]] @ basis
+            block = block - (cross / scale[:, None, :]) @ np.swapaxes(cross, 1, 2)
+        values_x, vectors_x = np.linalg.eigh(block[:, :px, :px])
+        values_y, vectors_y = np.linalg.eigh(block[:, px:, px:])
+        out = np.empty(len(xs))
+        full = (values_x > _RANK_TOL).all(axis=1) & (values_y > _RANK_TOL).all(axis=1)
+        for i in np.flatnonzero(~full).tolist():
+            out[i] = self._block_pvalue(block[i], px)
+        if not full.any():
+            return out
+        # wx.T row-major and wy column-major, as _whitener's column-major whiteners give them.
+        wx = vectors_x[full] / np.sqrt(values_x[full])[:, None, :]
+        wy = vectors_y[full] / np.sqrt(values_y[full])[:, None, :]
+        wx_t = np.ascontiguousarray(np.swapaxes(wx, 1, 2))
+        wy = np.swapaxes(np.ascontiguousarray(np.swapaxes(wy, 1, 2)), 1, 2)
+        rho = np.linalg.svd(wx_t @ block[full][:, :px, px:] @ wy, compute_uv=False)
+        rho = np.minimum(rho, _ONE_MINUS_EPS)
+        statistic = -self._dg.n * np.sum(np.log1p(-(rho * rho)), axis=1)
+        out[full] = chdtrc(px * py, np.maximum(statistic, 0.0))
+        return out
+
+    def _fit_regression(
+        self, cond: tuple[int, ...]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """The embedded columns of the conditioning set ``cond``, the eigen-directions of their
+        correlation matrix that are kept, and those directions' eigenvalues; ``None`` when the set
+        has no columns. ``_regression`` keeps the results of the last ``_DG_SETS`` sets."""
+        cs = self._dg.columns(cond)
+        if not cs.size:
+            return None
+        # Regress on the conditioning columns through their nonzero eigen-directions, so collinear
+        # conditioning columns need no inverse.
+        w, u = np.linalg.eigh(self._corr[np.ix_(cs, cs)])
+        keep = w > _RANK_TOL * w[-1]
+        return cs, u[:, keep], w[keep]
+
+    def _block_pvalue(self, block: np.ndarray, px: int) -> float:
+        """The p-value from the correlation ``block`` of ``x``'s first ``px`` columns and ``y``'s,
+        after the regression on the conditioning set."""
         wx = _whitener(block[:px, :px])
         wy = _whitener(block[px:, px:])
         dof = wx.shape[1] * wy.shape[1]
@@ -829,7 +967,7 @@ class DGTest:
             return 1.0
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
         rho = np.minimum(rho, _ONE_MINUS_EPS)
-        statistic = -dg.n * float(np.sum(np.log1p(-(rho * rho))))
+        statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
         return float(chdtrc(dof, max(statistic, 0.0)))
 
 
