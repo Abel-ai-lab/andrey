@@ -1088,3 +1088,61 @@ ul.ablog-archive {
   font-size: 0.8rem;
   color: var(--andrey-muted);
 }
+
+/* The 0.10.0 post's boundary maps (docs/blog/0.10.0/boundary.py): two maps per method, the
+   cells from the cobalt ramp and the boundary as an ink outline. */
+.bnd {
+  margin: 1.5rem 0;
+}
+
+.bnd .bnd-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.bnd .bnd-method {
+  margin: 0 0 1rem;
+}
+
+.bnd .bnd-method p {
+  margin: 0 0 0.15rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bnd svg {
+  display: block;
+  width: 100%;
+  max-width: 42rem;
+  height: auto;
+  overflow: visible;
+}
+
+.bnd .bnd-x,
+.bnd .bnd-y {
+  font-size: 10px;
+  fill: var(--andrey-muted);
+}
+
+.bnd .bnd-map {
+  font-size: 11px;
+  fill: var(--andrey-muted);
+}
+
+.bnd .bnd-stop {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--andrey-muted);
+}
+
+.bnd .bnd-edge {
+  fill: none;
+  stroke: var(--andrey-ink);
+  stroke-width: 2;
+  stroke-linecap: square;
+}
+
+.bnd figcaption {
+  font-size: 0.8rem;
+  color: var(--andrey-muted);
+}
