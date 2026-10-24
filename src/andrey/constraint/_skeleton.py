@@ -8,14 +8,15 @@ calls, and the scalar loop otherwise, so a test that implements only
 :class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
 p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
 chunks, so the scan holds one chunk in memory however many subsets it visits. :func:`scan_pairs`
-scans every pair of one conditioning size; for FisherZ and StudentT it stacks the chunks of
-consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices.
-:func:`vote_triples` decides the unshielded triples of a final skeleton by the conservative or
-majority collider rule.
+scans every pair of one conditioning size; for FisherZ, StudentT, and RCoT it stacks the chunks of
+consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices; RCoT evaluates a
+stack one conditioning set at a time. :func:`vote_triples` decides the unshielded triples of a
+final skeleton by the conservative or majority collider rule.
 """
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import partial
@@ -150,6 +151,20 @@ def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
     of either (:class:`~andrey.core.ci_missing.GaussianDeletion`), which the canonical query arrays
     take, else ``None``."""
     if canonical_capable(test) or isinstance(test, GaussianDeletion):
+        return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
+    return None
+
+
+def _stacked_route(test: CITest) -> Callable[..., np.ndarray] | None:
+    """The ``_canonical_pvalues`` that :func:`scan_pairs` stacks the chunks of many pairs into: a
+    :func:`canonical_capable` test's, or an RCoT test's, exactly, which evaluates a stack one
+    conditioning set at a time; else ``None``."""
+    canonical = _canonical_route(test)
+    if canonical is not None:
+        return canonical
+    # An RCoT test has loaded its module; a fit with another test leaves it unloaded.
+    kernel = sys.modules.get("andrey.core.ci_kernel")
+    if kernel is not None and type(test) is kernel.RCoT:
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
 
@@ -383,14 +398,14 @@ def scan_pairs(
     removals do not depend on column order; a subset both endpoints offer is tested once, from the
     first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
-    and the parallel workers share it, so they stay identical. A FisherZ or StudentT test evaluates
-    the chunks of consecutive pairs in one stack (:func:`_stacked_scan`); another test scans each
-    pair with :func:`scan_conditioning_sets`. Both test the same subsets in the same order. With
-    ``trace`` given, every test is recorded in the order it runs.
+    and the parallel workers share it, so they stay identical. A FisherZ, StudentT, or RCoT test
+    evaluates the chunks of consecutive pairs in one stack (:func:`_stacked_scan`); another test
+    scans each pair with :func:`scan_conditioning_sets`. Both test the same subsets in the same
+    order. With ``trace`` given, every test is recorded in the order it runs.
     """
-    canonical = _canonical_route(test)
-    if canonical is not None:
-        return _stacked_scan(canonical, pairs, neighbors, size, alpha, trace, record_pvalues)
+    stacked = _stacked_route(test)
+    if stacked is not None:
+        return _stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()

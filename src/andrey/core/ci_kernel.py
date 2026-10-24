@@ -444,9 +444,10 @@ class RCoT:
     own. PC removes an edge when any conditioning set gives a p-value above ``alpha``, and features
     shared by those queries would make them reject together, which keeps edges between
     conditionally independent variables. Queries on the same variable and conditioning set share
-    its features, and the test object keeps them, and the residuals, for later queries. A p-value
-    does not depend on the order of the queries, of the arguments, or of the columns, and the same
-    seed reproduces it.
+    its features, and the test object keeps them, and the residuals, for later queries. The
+    skeleton searches hand the test a pass's queries in stacks, which it runs one conditioning set
+    at a time, so each set's features are built once per stack. A p-value does not depend on the
+    order of the queries, of the arguments, or of the columns, and the same seed reproduces it.
 
     **Limitations.** Measured in PC on simulated data from sparse random graphs (mean degree 2),
     each variable a weighted sum of ``z + sin(z)``, or of ``cos(z)``, over its parents plus Gaussian
@@ -538,6 +539,29 @@ class RCoT:
         products = (a[:, :, None] * b[:, None, :]).reshape(n, -1)
         weights = np.clip(np.linalg.eigvalsh(products.T @ products / n), 0.0, None)
         return _hall_buckley_eagleson_pvalue(statistic, weights)
+
+    def _canonical_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> np.ndarray:
+        """P-values of many queries sharing one conditioning-set size, grouped by conditioning set.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of the
+        conditioning sets, as the skeleton searches build their queries. The queries run through
+        :meth:`__call__` one conditioning set at a time, so the set's features and factor are built
+        once for all its queries, and entry ``i`` is ``self(x[i], y[i], conditions[i])`` exactly.
+        When a query raises, the queries run again in their order, so the error is the one the
+        first failing query raises.
+        """
+        queries = list(zip(x.tolist(), y.tolist(), map(tuple, conditions.tolist())))
+        rank = self._tie_rank
+        order = sorted(range(len(queries)), key=lambda i: sorted(rank[c] for c in queries[i][2]))
+        pvalues = np.empty(len(queries))
+        try:
+            for i in order:
+                pvalues[i] = self(*queries[i])
+        except Exception:
+            return np.array([self(*query) for query in queries])
+        return pvalues
 
     def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
         """Standardized features of ``column``, sampled from a generator seeded by the seed,

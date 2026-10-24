@@ -93,6 +93,10 @@ change names its pull request.
 - `varma_lingam`'s **Limitations** paragraph and the column-order guide say that where its
   likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
   the same series can give a different graph on another type of CPU. ([#451])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` return the same graphs and p-values in
+  less time on large samples, because their skeleton search hands RCoT its queries in stacks, which
+  RCoT runs one conditioning set at a time, building each set's random features once per stack.
+  ([#455])
 
 
 ## [0.10.0] - 2026-10-27
@@ -859,5 +863,6 @@ First alpha release.
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451
 [#453]: https://github.com/Abel-ai-lab/andrey/pull/453
+[#455]: https://github.com/Abel-ai-lab/andrey/pull/455
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
