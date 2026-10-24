@@ -141,7 +141,8 @@ def test_reordering_the_columns_of_data_with_missing_values_relabels_the_result(
         return getattr(andrey, spec.name)(*inputs(spec, frames))
 
     want = named_marks(fit(COLUMNS))
-    for order in ([1, 2, 0], [2, 0, 1]):
+    pair = spec.family == "pairwise"  # a pair test reads the first two columns, which swap
+    for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):
         assert named_marks(fit([COLUMNS[k] for k in order])) == want
 
 

@@ -326,7 +326,7 @@ def test_lingam_methods_need_one_more_row_than_variables(method):
 @pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 def test_pairwise_tests_reject_unusable_data(fit):
     with pytest.raises(ValueError, match=r"data .*row 2, column 0"):
-        fit(_with(_data(d=2), (2, 0), np.nan))
+        fit(_with(_data(d=2), (2, 0), np.inf))
     with pytest.raises(ValueError, match=r"data column 1 is constant"):
         fit(_with(_data(d=2), (slice(None), 1), 3.0))
 

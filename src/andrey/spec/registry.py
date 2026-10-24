@@ -1628,6 +1628,7 @@ _add(
                 ),
             ),
             layout="(n_samples, 2), rows are samples",
+            missing=True,
         ),
         params=(
             ParamSpec(
@@ -1669,6 +1670,7 @@ _add(
                 ),
             ),
             layout="(n_samples, 2), rows are samples",
+            missing=True,
         ),
         params=(
             ParamSpec(
