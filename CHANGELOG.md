@@ -25,7 +25,7 @@ change names its pull request.
   already leaves out most false edges; exact search's fell by 0.24 at 20 variables. With 200
   variables and 2,000 rows, GES's errors fell from 211 to 24. `gfci` keeps `ebic_gamma=0.0`: its
   errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
-  the graphs the others returned before. ([#443])
+  the graphs the others returned before. ([#445])
 
 ### Added
 
@@ -69,7 +69,7 @@ change names its pull request.
 - `ebic_gamma`, the weight of the extended-BIC term, for every method that scores with the
   linear-Gaussian BIC: `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
   `gfci`, `mmhc`, and `rsmax2`, and for `andrey.core.score.BICScore`, with the term itself in
-  `andrey.core.score.ebic_penalty`. `0.0` is the standard BIC; the other scores ignore it. ([#443])
+  `andrey.core.score.ebic_penalty`. `0.0` is the standard BIC; the other scores ignore it. ([#445])
 
 ### Changed
 
@@ -797,4 +797,4 @@ First alpha release.
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
 [#430]: https://github.com/Abel-ai-lab/andrey/pull/430
 [#442]: https://github.com/Abel-ai-lab/andrey/pull/442
-[#443]: https://github.com/Abel-ai-lab/andrey/pull/443
+[#445]: https://github.com/Abel-ai-lab/andrey/pull/445
