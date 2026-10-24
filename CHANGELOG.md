@@ -19,6 +19,9 @@ change names its pull request.
   its four vCPUs and logs the runner's CPU. A push to a release pull request that changes only
   `docs/`, `site/`, or top-level Markdown files reuses an earlier passing run instead of fitting the
   methods again. ([#431])
+- For contributors, a production deploy of the site, from a `v*` tag or a manual run, waits
+  for the repository owner's approval in the `production-site` environment, which
+  administrators cannot bypass. ([#441])
 
 ### Removed
 
@@ -728,3 +731,4 @@ First alpha release.
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
 [#431]: https://github.com/Abel-ai-lab/andrey/pull/431
 [#439]: https://github.com/Abel-ai-lab/andrey/pull/439
+[#441]: https://github.com/Abel-ai-lab/andrey/pull/441
