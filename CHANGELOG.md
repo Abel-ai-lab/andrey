@@ -22,6 +22,14 @@ change names its pull request.
   `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
   or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
   parents and children with `target=`, or every variable's set without it. ([#400])
+- Experimental `notears` and `dagma`, continuous-optimization learners that fit a weighted DAG by
+  minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only: NOTEARS with
+  the least-squares loss and the trace-exponential constraint, DAGMA with its log-determinant
+  constraint and central path. Both take the papers' defaults, honor all four parts of `knowledge`,
+  and fit on rank-ordered columns, so they draw no random numbers and do not depend on the column
+  order. `robust=True` follows the first fit with the likelihood path of Deng et al. (2024): the
+  Gaussian likelihood with one noise variance per variable and a quasi-MCP penalty, refit while the
+  likelihood falls. ([#430])
 - `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
@@ -759,3 +767,4 @@ First alpha release.
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
+[#430]: https://github.com/Abel-ai-lab/andrey/pull/430

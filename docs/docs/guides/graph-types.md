@@ -156,7 +156,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin`, `anm`, `pnl` |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `notears`, `dagma`, `gin`, `anm`, `pnl` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`; `iamb`, `inter_iamb`, `mmpc` (undirected edges only) |
 | `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger` |

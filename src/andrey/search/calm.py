@@ -20,9 +20,14 @@ from dataclasses import dataclass
 import numpy as np
 
 from andrey.constraint.blanket import blanket_graph
-from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
+from andrey.core import GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
 from andrey.core.orient import dag2cpdag, to_structure
+from andrey.search.continuous import (
+    break_cycles,
+    endpoint_marks,
+    residual_variances,
+)
 from andrey.search.hc import tie_ranks
 
 
@@ -172,61 +177,6 @@ def _optimize_gated_dag(
 
 
 # --------------------------------------------------------------------------------------------
-# Acyclicity repair and endpoint marks
-# --------------------------------------------------------------------------------------------
-
-
-def _has_cycle(support: np.ndarray) -> bool:
-    """True if the directed graph ``support`` (``[i, j]`` is ``i -> j``) has a directed cycle."""
-    d = support.shape[0]
-    indeg = support.sum(axis=0).astype(int)
-    stack = [k for k in range(d) if indeg[k] == 0]
-    visited = 0
-    while stack:
-        node = stack.pop()
-        visited += 1
-        for nxt in np.nonzero(support[node])[0]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                stack.append(int(nxt))
-    return visited < d
-
-
-def _break_cycles(weighted: np.ndarray, support: np.ndarray) -> np.ndarray:
-    """Drop the weakest edges until ``support`` is acyclic; return the pruned DAG mask."""
-    mask = support.copy()
-    edges = sorted(
-        (
-            (abs(weighted[i, j]), i, j)
-            for i in range(mask.shape[0])
-            for j in range(mask.shape[1])
-            if mask[i, j]
-        ),
-        key=lambda e: e[0],
-    )
-    for _w, i, j in edges:
-        if not _has_cycle(mask):
-            break
-        mask[i, j] = 0
-    return mask
-
-
-def _endpoint_marks(support: np.ndarray) -> np.ndarray:
-    """Endpoint-mark adjacency for a DAG mask (``support[i, j]`` set means ``i -> j``)."""
-    marks = np.zeros(support.shape, dtype=np.int8)
-    src, dst = np.nonzero(support)
-    marks[dst, src] = ARROW
-    marks[src, dst] = TAIL
-    return marks
-
-
-def _residual_variances(weighted: np.ndarray, cov: np.ndarray) -> np.ndarray:
-    """Per-node residual variances ``diag((I - B)^T S (I - B))`` for the fitted weights."""
-    resid = np.eye(weighted.shape[0]) - weighted
-    return np.diagonal(resid.T @ cov @ resid)
-
-
-# --------------------------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------------------------
 
@@ -299,12 +249,12 @@ def calm(
         )
 
     support = ((gate_prob >= gate_threshold) & (np.abs(weight) >= w_threshold)).astype(np.int8)
-    support = _break_cycles(weight, support)
+    support = break_cycles(weight, support)
     weighted = weight * support
-    resid_var = _residual_variances(weighted, cov)
+    resid_var = residual_variances(weighted, cov)
     support, weighted, mask = (m[np.ix_(back, back)] for m in (support, weighted, mask))
 
-    marks = _endpoint_marks(support)
+    marks = endpoint_marks(support)
     dag = to_structure(marks, kind="dag", labels=labels)
     cpdag = to_structure(dag2cpdag(marks), kind="cpdag", labels=labels)
 
