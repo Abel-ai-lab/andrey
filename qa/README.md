@@ -226,7 +226,13 @@ graph, and the gate rejects both.
 ```shell
 uv run python -m qa.quality_gate PC FCI
 uv run python -m qa.quality_gate --capture  # re-measure; review the diff
+uv run python -m qa.quality_gate --jobs 4   # fit four cells at a time
 ```
+
+`--jobs N` fits N cells at a time in N worker processes, the slowest cells first. Each cell is
+fit as with one job, on the numpy backend with one worker and one BLAS thread, so the results,
+the order they print in, and the baselines `--capture` records do not change; the workflow runs
+`--jobs 4` on the four vCPUs of its runner. The default is one job.
 
 ## Reference parity
 

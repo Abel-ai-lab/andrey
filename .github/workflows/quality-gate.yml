@@ -32,5 +32,12 @@ jobs:
         run: uv python install 3.12
       - name: Install the locked environment
         run: uv sync --locked --extra torch --python 3.12
+      - name: Host CPU
+        # GitHub-hosted runners of one image run on different CPUs, and a fit takes about twice as
+        # long on some of them; the log names the one this run got.
+        run: |
+          lscpu | grep -E 'Model name|^CPU\(s\)'
+          grep -qw avx512f /proc/cpuinfo && echo "avx512f: yes" || echo "avx512f: no"
       - name: Supported methods against known graphs
-        run: uv run --no-sync python -m qa.quality_gate
+        # The runner has 4 vCPUs; each cell is fit on one of them (`qa/README.md`).
+        run: uv run --no-sync python -m qa.quality_gate --jobs 4
