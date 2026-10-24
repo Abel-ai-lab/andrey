@@ -14,6 +14,11 @@ change names its pull request.
 - Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
   hard limit: they change with the data generator, the density, the method's settings, and the
   machine. ([#367])
+- For contributors, `python -m qa.quality_gate --jobs N` fits the quality gate's cells in N
+  processes and prints the same results in the same order; the gate's workflow runs `--jobs 4` on
+  its four vCPUs and logs the runner's CPU. A push to a release pull request that changes only
+  `docs/`, `site/`, or top-level Markdown files reuses an earlier passing run instead of fitting the
+  methods again. ([#431])
 
 ### Removed
 
@@ -721,4 +726,5 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
+[#431]: https://github.com/Abel-ai-lab/andrey/pull/431
 [#439]: https://github.com/Abel-ai-lab/andrey/pull/439
