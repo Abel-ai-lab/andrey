@@ -16,8 +16,10 @@ the PyTorch paths must match its results and repeat exactly.
 
 Each release's pull request into `main` runs a quality gate that fits the nine supported methods
 to data with known graphs, seven of them to the Sachs data too, and the release merges only when
-every method passes. The publish reuses that run when the tagged commit has the same files as the
-commit the gate checked, and runs the gate again when it does not.
+every method passes. A push that changes only the documentation, the website's files, or a
+top-level Markdown file such as the CHANGELOG reuses the last passing run instead of fitting the
+methods again. The publish reuses a run when the tagged commit has the same files as the commit the
+gate checked, and runs the gate again when it does not.
 Every pull request also checks the published benchmarks: a method fails when its reference package
 has fewer errors at any size, unless a cited source shows that Andrey follows the method's paper or
 that the reference has a defect.
