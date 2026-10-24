@@ -129,6 +129,22 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
             assert named_marks(fit([COLUMNS[k] for k in order])) == want
 
 
+@pytest.mark.parametrize(
+    "spec", [spec for spec in TABLE_SPECS if spec.data.missing], ids=lambda spec: spec.name
+)
+def test_reordering_the_columns_of_data_with_missing_values_relabels_the_result(spec):
+    """A method that deletes rows per test names the same edges under reordered columns."""
+    cells = np.random.default_rng(5).random((N, 3)) < 0.1
+
+    def fit(columns: list[str]):
+        frames = [frame(seed).mask(cells)[columns] for seed in range(3)]
+        return getattr(andrey, spec.name)(*inputs(spec, frames))
+
+    want = named_marks(fit(COLUMNS))
+    for order in ([1, 2, 0], [2, 0, 1]):
+        assert named_marks(fit([COLUMNS[k] for k in order])) == want
+
+
 @pytest.mark.parametrize("data", [frame().to_numpy(), pd.DataFrame(frame().to_numpy())])
 def test_arrays_and_default_columns_keep_integer_nodes(data):
     out = andrey.pc(data)

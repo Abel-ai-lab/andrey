@@ -33,6 +33,24 @@ TEMPORAL = [
     for name, spec in REGISTRY.items()
     if spec.knowledge and spec.output.structure_type == "temporal"
 ]
+# Each method on complete data, and each that accepts missing values on data with a tenth of its
+# cells missing as well.
+CASES = [
+    *(pytest.param(name, False, id=name) for name in METHODS),
+    *(
+        pytest.param(name, True, id=f"{name}-missing")
+        for name in METHODS
+        if REGISTRY[name].data.missing
+    ),
+]
+SERIES_CASES = [
+    *(pytest.param(name, False, id=name) for name in TEMPORAL),
+    *(
+        pytest.param(name, True, id=f"{name}-missing")
+        for name in TEMPORAL
+        if REGISTRY[name].data.missing
+    ),
+]
 PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
 LABELS = list("abcdef")
@@ -60,6 +78,13 @@ def _sample(seed: int = 0, n: int = 1500) -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def data() -> pd.DataFrame:
     return _sample()
+
+
+def _gaps(table, missing: bool):
+    """``table`` with a tenth of its cells missing completely at random when ``missing``."""
+    if not missing:
+        return table
+    return table.mask(np.random.default_rng(3).random(table.shape) < 0.1)
 
 
 def _fit(name: str, data: pd.DataFrame, **kwargs):
@@ -108,9 +133,9 @@ def _honored(name: str, knowledge: Knowledge) -> Knowledge:
     )
 
 
-@pytest.mark.parametrize("name", METHODS)
-def test_required_forbidden_and_tiers_hold(name, data):
-    marks, labels = _marks(_fit(name, data, knowledge=_honored(name, KNOWLEDGE)))
+@pytest.mark.parametrize(("name", "missing"), CASES)
+def test_required_forbidden_and_tiers_hold(name, missing, data):
+    marks, labels = _marks(_fit(name, _gaps(data, missing), knowledge=_honored(name, KNOWLEDGE)))
     _assert_required_forbidden_and_tiers_hold(name, marks, labels)
 
 
@@ -169,10 +194,10 @@ def test_the_possible_dsep_step_never_removes_a_required_pair(by_rank):
     assert not sepsets
 
 
-@pytest.mark.parametrize("name", METHODS)
-def test_allowed_pairs_hold(name, data):
+@pytest.mark.parametrize(("name", "missing"), CASES)
+def test_allowed_pairs_hold(name, missing, data):
     allowed = {*TRUTH, ("b", "e")}
-    out = _fit(name, data, knowledge=Knowledge(allowed=allowed))
+    out = _fit(name, _gaps(data, missing), knowledge=Knowledge(allowed=allowed))
     marks, labels = _marks(out)
     adjacent = {
         frozenset((labels[i], labels[j]))
@@ -181,8 +206,8 @@ def test_allowed_pairs_hold(name, data):
     assert adjacent <= {frozenset(pair) for pair in allowed}
 
 
-@pytest.mark.parametrize("name", METHODS)
-def test_reordered_columns_relabel_the_result(name, data):
+@pytest.mark.parametrize(("name", "missing"), CASES)
+def test_reordered_columns_relabel_the_result(name, missing, data):
     def edges(frame):
         found = _fit(name, frame, knowledge=_honored(name, KNOWLEDGE)).structure.oriented_edges()
         # An edge with the same mark at both ends lists its ends in column order.
@@ -193,7 +218,8 @@ def test_reordered_columns_relabel_the_result(name, data):
             for a, b, kind in found
         )
 
-    assert edges(data[LABELS[::-1]]) == edges(data)
+    table = _gaps(data, missing)
+    assert edges(table[LABELS[::-1]]) == edges(table)
 
 
 @pytest.mark.parametrize("name", METHODS)
@@ -749,11 +775,12 @@ def test_a_forbidden_pair_is_no_cause_at_any_lag(name):
     assert not any(_may_cause(links, "y", "z", lag) for lag in (0, 1, 2))
 
 
-@pytest.mark.parametrize("name", TEMPORAL)
-def test_a_required_lagged_link_is_a_cause(name):
+@pytest.mark.parametrize(("name", "missing"), SERIES_CASES)
+def test_a_required_lagged_link_is_a_cause(name, missing):
     # z does not drive x; the required link holds anyway.
     knowledge = Knowledge(required=[("z", "x", 2)])
-    assert _cause(_links(_fit_series(name, _input(name), knowledge=knowledge)), "z", "x", 2)
+    data = _gaps(_input(name), missing)
+    assert _cause(_links(_fit_series(name, data, knowledge=knowledge)), "z", "x", 2)
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
@@ -769,10 +796,11 @@ def test_a_required_same_step_link_keeps_its_direction(name, edge):
     assert _cause(_links(_fit_series(name, data, lags=1, knowledge=knowledge)), *edge, 0)
 
 
-@pytest.mark.parametrize("name", TEMPORAL)
-def test_tiers_hold_at_every_lag(name):
+@pytest.mark.parametrize(("name", "missing"), SERIES_CASES)
+def test_tiers_hold_at_every_lag(name, missing):
     # z first: no link runs into z from x or y, at any lag; the true y -> z at lag 0 included.
-    out = _fit_series(name, _input(name), knowledge=Knowledge(tiers=[["z"], ["x", "y"]]))
+    data = _gaps(_input(name), missing)
+    out = _fit_series(name, data, knowledge=Knowledge(tiers=[["z"], ["x", "y"]]))
     links = _links(out)
     for later in ("x", "y"):
         assert not any(_may_cause(links, later, "z", lag) for lag in (0, 1, 2)), links
@@ -795,10 +823,10 @@ def test_knowledge_that_fits_the_truth_does_not_add_errors(name):
     assert errors(_fit_series(name, data, knowledge=knowledge)) <= plain
 
 
-@pytest.mark.parametrize("name", TEMPORAL)
-def test_reordered_series_relabel_the_result_with_knowledge(name):
+@pytest.mark.parametrize(("name", "missing"), SERIES_CASES)
+def test_reordered_series_relabel_the_result_with_knowledge(name, missing):
     knowledge = Knowledge(forbidden=[("x", "y", 1)], required=[("z", "x", 2)], tiers=[["x"]])
-    data = _input(name)
+    data = _gaps(_input(name), missing)
 
     def links(frame):
         return _links(_fit_series(name, frame, knowledge=knowledge))
