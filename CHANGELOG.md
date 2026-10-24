@@ -69,6 +69,9 @@ change names its pull request.
   selection is unchanged and the same fits take about 10% less time. ([#391])
 - `andrey.data.latent.marginal(dag, "mag")` returns a graph of kind `"mag"` instead of `"pag"`,
   with the same marks. ([#418])
+- `grasp` tucks only the edges of the current DAG and never takes a chain of tucks back to a DAG it
+  has visited, as the GRaSP paper's search does, so it returns a different graph on some data,
+  one that scores better about as often as worse. ([#442])
 
 ### Removed
 
@@ -778,3 +781,4 @@ First alpha release.
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
 [#430]: https://github.com/Abel-ai-lab/andrey/pull/430
+[#442]: https://github.com/Abel-ai-lab/andrey/pull/442
