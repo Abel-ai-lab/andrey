@@ -74,7 +74,7 @@ def _fit(
             f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data, categorical, "indep_test", indep_test, max_categories=max_categories, method=name
     )
     alpha = open_unit_interval(alpha, "alpha")
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
@@ -238,6 +238,11 @@ def mmhc(
     with 20 variables, mean degree 2, ``scale="unitless"``, and 1,000 rows); with 200 variables and
     2,000 rows it made 49 errors against 73 (200 true edges). The gain is smaller than hill
     climbing's, since the MMPC phase has already left out most false edges.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its hill-climbing phase scores
+    every variable over the same rows, and score terms over different rows do not add up to the
+    score of one dataset. Drop the incomplete rows first, which suits values missing completely at
+    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data. An edge the MMPC phase misses is never added, and the
@@ -429,6 +434,11 @@ def rsmax2(
     mean degree 4, ``scale="unitless"``, and 1,000 rows. With 200 variables and 2,000 rows it made
     42 errors against 65 (200 true edges). The default ``restrict="mmpc"`` with ``maximize="hc"``
     is :func:`~andrey.mmhc`'s search, whose numbers are given there.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its score phase scores every
+    variable over the same rows, and score terms over different rows do not add up to the score of
+    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
+    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
     simulated linear-Gaussian data. An edge the restrict phase misses is never added, and the

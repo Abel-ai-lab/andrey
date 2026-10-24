@@ -18,6 +18,7 @@ import andrey
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.core.score import LINEAR_SCORES
 from andrey.data import sample_scm
+from andrey.spec import REGISTRY
 
 
 def test_direct_lingam_rejects_non_2d():
@@ -87,12 +88,12 @@ SINGLE = {
     "bottom_up_parce_lingam": andrey.bottom_up_parce_lingam,
 }
 
-# Data no method can fit, and what the error must say about it.
+# Data no method can fit, and what the error must say about it. A missing value, which some
+# methods accept, is checked in test_missing_values.py.
 UNUSABLE = {
     "1-D": (lambda x: x[:, 0], r"data must be a 2-D"),
     "one row": (lambda x: x[:1], r"data needs at least \d+ rows"),
     "no rows": (lambda x: x[:0], r"data needs at least \d+ rows"),
-    "NaN": (lambda x: _with(x, (3, 2), np.nan), r"data .*row 3, column 2"),
     "inf": (lambda x: _with(x, (5, 0), np.inf), r"data .*row 5, column 0"),
     "constant column": (lambda x: _with(x, (slice(None), 1), 3.0), r"data column 1 is constant"),
     "text": (lambda x: np.full(x.shape, "high"), r"data must hold numbers"),
@@ -325,7 +326,7 @@ def test_lingam_methods_need_one_more_row_than_variables(method):
 @pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 def test_pairwise_tests_reject_unusable_data(fit):
     with pytest.raises(ValueError, match=r"data .*row 2, column 0"):
-        fit(_with(_data(d=2), (2, 0), np.nan))
+        fit(_with(_data(d=2), (2, 0), np.inf))
     with pytest.raises(ValueError, match=r"data column 1 is constant"):
         fit(_with(_data(d=2), (slice(None), 1), 3.0))
 
@@ -641,10 +642,13 @@ def test_a_categorical_setting_reads_a_column_of_categories_like_its_codes(setti
 
 
 @pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
-def test_a_categorical_setting_names_a_missing_category(setting):
+def test_a_categorical_setting_reads_or_names_a_missing_category(setting):
     pd = pytest.importorskip("pandas")
     frame = pd.DataFrame(_categories(), columns=["a", "b", "c"])
-    frame["b"] = np.where(frame["b"] > 0, "yes", None)
+    frame["b"] = frame["b"].map({0.0: None, 1.0: "yes", 2.0: "no"})
+    if REGISTRY[setting[0]].data.missing:  # a missing value, deleted per test
+        assert CATEGORICAL[setting](frame).metadata["rows_tested"]["min"] < len(frame)
+        return
     with pytest.raises(ValueError, match=r"column 'b' has a missing value at row \d+"):
         CATEGORICAL[setting](frame)
 
@@ -1228,9 +1232,9 @@ def test_a_column_that_does_not_hold_numbers_must_be_categorical():
     with pytest.raises(ValueError, match="column 'a' does not hold numbers; list it"):
         andrey.pc(frame, indep_test="degen_gauss", categorical=["c"])
     assert andrey.pc(frame, indep_test="degen_gauss").structure.n_nodes == 3  # an object column
-    frame.loc[5, "a"] = None
-    with pytest.raises(ValueError, match="column 'a' has a missing value at row 5"):
-        andrey.pc(frame, indep_test="degen_gauss")
+    frame.loc[5, "a"] = None  # a missing value, which the tests that read column a delete
+    out = andrey.pc(frame, indep_test="degen_gauss")
+    assert out.metadata["rows_tested"]["min"] == len(frame) - 1
 
 
 @pytest.mark.parametrize(

@@ -90,6 +90,11 @@ def gin(
     arbitrary with respect to causal structure. The
     :doc:`column-order guide </docs/guides/column-order>` says what reordering the columns keeps.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its tests compare clusters of
+    variables over the same rows, so a row with a missing value has no place in them. Drop the
+    incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
     rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
     own. With 2 and 3 latents its clusters matched the true ones (median adjusted Rand index 1);
@@ -131,7 +136,7 @@ def gin(
     """
     from andrey.latent.gin import gin_structure
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="gin")
     alpha = open_unit_interval(alpha, "alpha")
     if labels is not None and len(labels) != X.shape[1]:
         raise ValueError(

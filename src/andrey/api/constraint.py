@@ -26,6 +26,7 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
+from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -227,6 +228,17 @@ def pc(
     than PC's [11]_, at the cost of more undirected edges; the majority rule orients more of them
     [3]_.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [12]_ [13]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [13]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [13]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows. With missing values, the
+    skeleton search runs in one process.
+
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
     (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
@@ -243,8 +255,10 @@ def pc(
     ``"chisq"`` and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s
     with ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test,
     on 4 cores. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their
-    tests run them on up to 8 variables. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    tests run them on up to 8 variables. Missing values are not benchmarked yet; the tests run them
+    on up to 20 variables with up to a fifth of the values missing completely at random. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -295,6 +309,12 @@ def pc(
        P-value. arXiv:1610.00378, Section 5.
     .. [11] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
        causal inference. UAI, 401-408.
+    .. [12] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [13] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019).
+       Causal discovery in the presence of missing data. Proceedings of Machine Learning Research
+       89, 1762-1770.
 
     Examples
     --------
@@ -330,14 +350,20 @@ def pc(
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        max_categories=max_categories,
+        method="pc",
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels):
+    with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
             alpha=alpha,
@@ -354,6 +380,7 @@ def pc(
         "algorithm": "PC",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -572,6 +599,17 @@ def fci(
     because it does not depend on the order of the tests, and on simulated data it gave more
     accurate PAGs than the first set found.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [7]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample; FCI allows for selection, and
+    stays sound when no missingness mechanism causally affects another [6]_. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    With missing values, the skeleton search runs in one process.
+
     **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
     random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
     800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
@@ -593,7 +631,8 @@ def fci(
     variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
     benchmarked yet; their tests run them on up to 8 variables. The numbers are a reference, not a
     hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    machine. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random.
 
     References
     ----------
@@ -608,6 +647,12 @@ def fci(
        structure learning. JMLR 15, 3921-3962.
     .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
        causal inference. UAI, 401-408.
+    .. [6] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [7] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -623,14 +668,20 @@ def fci(
     from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
 
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        max_categories=max_categories,
+        method="fci",
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="fci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels):
+    with copies_named(labels), rows_tested() as rows:
         pag = _fci(
             X,
             alpha=alpha,
@@ -647,6 +698,7 @@ def fci(
         "algorithm": "FCI",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 
@@ -829,6 +881,11 @@ def gfci(
     mean errors stayed below the empty graph's in each of the 65 settings, where the standard BIC's
     exceeded it in 16. Pass ``ebic_gamma=1.0`` to use the extended BIC.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its GES phase scores every
+    variable over the same rows, and score terms over different rows do not add up to the score of
+    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
+    use :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
     random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
     800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
@@ -893,7 +950,7 @@ def gfci(
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data, categorical, "indep_test", indep_test, max_categories=max_categories, method="gfci"
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
@@ -1095,6 +1152,19 @@ def cdnod(
     ``"student_t"`` only a variable whose mean follows the index reaches it, and such a shared trend
     makes the changes depend on each other.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [6]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows. ``domain_index`` must be
+    complete, and ``dependence_threshold``, whose kernel measures read every row, raises
+    ``ValueError`` on data with missing values. With missing values, the skeleton search runs in one
+    process.
+
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
     three shifts its mean with the domain, from 10 to 50 variables with 20 datasets per size. Its
@@ -1119,8 +1189,10 @@ def cdnod(
     Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
     not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
+    20 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1133,6 +1205,12 @@ def cdnod(
        causal inference. UAI, 401-408.
     .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
+    .. [5] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [6] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -1156,6 +1234,8 @@ def cdnod(
         indep_test,
         max_categories=max_categories,
         index_categorical=True,
+        method="cdnod",
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
@@ -1166,10 +1246,19 @@ def cdnod(
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
     if dependence_threshold is not None:
         dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
+        if np.isnan(X).any():
+            raise ValueError(
+                "cdnod's dependence_threshold step compares kernel measures over every row, so "
+                "it does not accept missing values; leave dependence_threshold=None, whose tests "
+                "delete rows per test, or drop the rows that hold NaN"
+            )
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
-    with copies_named(labels, lambda j: "domain_index" if j == d else column(j)):
+    with (
+        copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
+        rows_tested() as rows,
+    ):
         cpdag = _cdnod(
             X,
             c,
@@ -1188,5 +1277,6 @@ def cdnod(
         "algorithm": "CDNOD",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)

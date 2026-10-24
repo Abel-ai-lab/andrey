@@ -206,6 +206,12 @@ def boss(
     174 (200 true edges). Its mean errors stayed below the empty graph's in each of the 65 settings,
     where the standard BIC's exceeded it in 22.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from sparse random graphs (mean degree 2), from 20 to 800
     variables with ten rows per variable, at ``lambda_value=4.0``: its
@@ -262,7 +268,7 @@ def boss(
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"BOSS supports {PERMUTATION_SCORES}, not {score_func!r}")
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="boss"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="boss")
@@ -470,6 +476,12 @@ def grasp(
     errors against 179 (200 true edges). Its mean errors stayed below the empty graph's in each of
     the 65 settings, where the standard BIC's exceeded it in 21.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from sparse random graphs (mean degree 2), from 20 to 400
     variables with ten rows per variable, at ``lambda_value=4.0``: its median errors (SHD) stayed
@@ -529,7 +541,7 @@ def grasp(
         raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
     depth = int_in_range(depth, "depth", 1)
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="grasp"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="grasp")

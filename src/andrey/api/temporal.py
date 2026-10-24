@@ -13,9 +13,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve_lagged
 
 from ._adapt import (
+    DROP_UNITS,
+    FILL_STEPS,
     column_labels,
     column_namer,
     copies_named,
@@ -139,6 +142,12 @@ def varma_lingam(
     data, as for :func:`~andrey.hc`, so reordering the columns relabels the result and changes
     nothing else, unless two columns are identical.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the VARMA fit and the LiNGAM
+    step on its residuals read every time step, so a step with a missing value has no place in them.
+    Fill in the missing steps first, as dropping one would join the steps around it, or use
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
+    rows per test.
+
     **Limitations.** Measured on simulated linear series with non-Gaussian noise, one autoregressive
     and one moving-average lag, from 3 to 20 variables with 100 to 1,000 time steps, with
     ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
@@ -172,7 +181,7 @@ def varma_lingam(
     """
     from andrey.temporal.varma import varma_lingam as _native
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="varma_lingam", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     if not isinstance(order, (tuple, list)) or len(order) != 2:
@@ -275,6 +284,11 @@ def longitudinal_lingam(
     data over all time points, as for :func:`~andrey.hc`, so reordering the columns relabels the
     result and changes nothing else, unless two columns are identical.
 
+    **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: each time point's fit compares
+    the residuals of every variable over the same units, so a unit with a missing value has no place
+    in it. Drop the units that hold one from every dataset first, which suits values missing
+    completely at random.
+
     **Limitations.** Measured on simulated panels with non-Gaussian noise, a dense same-step DAG and
     a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first,
     from 2 to 5 variables at 20 or 50 time points with 100 to 1,000 units, with ``n_lags=1``. Its
@@ -302,7 +316,10 @@ def longitudinal_lingam(
     """
     from andrey.temporal.longitudinal import LongitudinalLiNGAM
 
-    panel = [data_matrix(X, name=f"data_list[{t}]") for t, X in enumerate(data_list)]
+    panel = [
+        data_matrix(X, name=f"data_list[{t}]", method="longitudinal_lingam", fix=DROP_UNITS)
+        for t, X in enumerate(data_list)
+    ]
     if len(panel) < 2:
         raise ValueError(f"data_list must hold at least two time points, got {len(panel)}")
     n_lags = int_in_range(n_lags, "n_lags", 1, len(panel) - 1)
@@ -400,14 +417,22 @@ def pcmci(
     the conditions are collinear to working precision, as lagged copies of a strongly
     autocorrelated series can be.
 
-    All tests use the same time steps, the last ``n_samples - 2 * tau_max``, where every lag a test
-    can condition on exists: the MCI test of a link at lag ``k`` conditions on the cause's parents,
-    which reach back ``k + tau_max`` steps. PC1 runs in rounds ``p = 0, 1, ...``: each round tests
-    every remaining candidate given the ``p`` strongest other candidates, one conditioning set per
-    candidate, then drops those that test independent. A candidate's strength is the smallest
-    absolute partial correlation it has had so far. Equal strengths are ordered by each variable's
-    rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
-    what the rank keeps.
+    Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
+    where every lag a test can condition on exists: the MCI test of a link at lag ``k`` conditions
+    on the cause's parents, which reach back ``k + tau_max`` steps. PC1 runs in rounds ``p = 0, 1,
+    ...``: each round tests every remaining candidate given the ``p`` strongest other candidates,
+    one conditioning set per candidate, then drops those that test independent. A candidate's
+    strength is the smallest absolute partial correlation it has had so far. Equal strengths are
+    ordered by each variable's rank, as in :func:`~andrey.hc`; the :doc:`column-order guide
+    </docs/guides/column-order>` says what the rank keeps.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
+    that reads it holds it, and each test reads only the design rows where all of its lagged
+    variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
+    time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
+    When values are missing completely at random, the rows a test keeps are a random sample, so each
+    test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
+    its rows, raises ``ValueError``.
 
     **Limitations.** Measured on simulated linear-Gaussian series with an autodependency in every
     variable and one cross-link per variable at lag 1 or 2, from 10 to 160 variables with 500 to
@@ -418,14 +443,22 @@ def pcmci(
     same-step (lag 0) links: an effect within one time step is missed and can show up as a false
     lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
     the series needs many more time steps than that. The MCI step alone runs
-    ``n_variables ** 2 * tau_max`` tests. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    ``n_variables ** 2 * tau_max`` tests. Missing values are not benchmarked yet; the tests run them
+    on up to 5 variables with up to a fifth of the values missing completely at random. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
     .. [1] Runge, J., Nowack, P., Kretschmer, M., Flaxman, S., and Sejdinovic, D. (2019). Detecting
        and quantifying causal associations in large nonlinear time series datasets. Science
        Advances 5(11), eaau4996.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -446,7 +479,7 @@ def pcmci(
     tau_max = int_in_range(tau_max, "tau_max", 1)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
     alpha_level = open_unit_interval(alpha_level, "alpha_level")
-    X = data_matrix(data)
+    X = data_matrix(data, method="pcmci", missing=True)
     # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = 2 * tau_max * (X.shape[1] + 1) + 3
@@ -459,7 +492,10 @@ def pcmci(
     constraints = resolve_lagged(
         knowledge, X.shape[1], labels, tau_max, method="pcmci", contemporaneous=False
     )
-    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+    with (
+        copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
+        rows_tested() as rows,
+    ):
         result = _native(
             X,
             tau_max=tau_max,
@@ -468,7 +504,7 @@ def pcmci(
             indep_test=indep_test,
             constraints=constraints,
         )
-    return with_labels(_adapt_pcmci(result), labels)
+    return with_labels(_adapt_pcmci(result, rows_metadata(rows)), labels)
 
 
 def pcmciplus(
@@ -584,12 +620,20 @@ def pcmciplus(
     the order of the variables either; ``"none"`` reads the one separating set the skeleton phase
     stored, which can change with the order.
 
-    All tests use the same time steps, the last ``n_samples - 2 * tau_max``. The default test,
-    ``"student_t"``, takes the p-value from the Student-t distribution with ``n - |S| - 2``
-    degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation of the
-    least-squares residuals of the two tested values given the conditions. It is computed from the
-    correlation matrix, and from the residuals themselves when the conditions are collinear to
-    working precision, as lagged copies of a strongly autocorrelated series can be.
+    Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
+    The default test, ``"student_t"``, takes the p-value from the Student-t distribution with ``n -
+    |S| - 2`` degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation
+    of the least-squares residuals of the two tested values given the conditions. It is computed
+    from the correlation matrix, and from the residuals themselves when the conditions are collinear
+    to working precision, as lagged copies of a strongly autocorrelated series can be.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
+    that reads it holds it, and each test reads only the design rows where all of its lagged
+    variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
+    time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
+    When values are missing completely at random, the rows a test keeps are a random sample, so each
+    test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
+    its rows, raises ``ValueError``.
 
     **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation and
     1.5 cross-links per variable, 30% of them within a time step and the rest at lags 1 to 5, from
@@ -599,14 +643,22 @@ def pcmciplus(
     variable's same-step neighbors, so the number of tests grows exponentially with the number of
     same-step links at one variable. A test conditions on up to
     ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
-    than that. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    than that. Missing values are not benchmarked yet; the tests run them on up to 5 variables with
+    up to a fifth of the values missing completely at random. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
     .. [1] Runge, J. (2020). Discovering contemporaneous and lagged causal relations in
        autocorrelated nonlinear time series datasets. Proceedings of the 36th Conference on
        Uncertainty in Artificial Intelligence (UAI), PMLR 124, 1388-1397.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -627,7 +679,7 @@ def pcmciplus(
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
-    X = data_matrix(data)
+    X = data_matrix(data, method="pcmciplus", missing=True)
     # A test conditions on up to 2 * n * tau_max + n - 2 columns of the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = 2 * tau_max * (X.shape[1] + 1) + X.shape[1] + 1
@@ -638,7 +690,10 @@ def pcmciplus(
         )
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="pcmciplus")
-    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+    with (
+        copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
+        rows_tested() as rows,
+    ):
         result = _native(
             X,
             tau_max=tau_max,
@@ -647,7 +702,7 @@ def pcmciplus(
             indep_test=indep_test,
             constraints=constraints,
         )
-    return with_labels(_adapt_pcmciplus(result), labels)
+    return with_labels(_adapt_pcmciplus(result, rows_metadata(rows)), labels)
 
 
 def lpcmci(
@@ -766,12 +821,20 @@ def lpcmci(
     node whose removal leaves the largest p-value, so the stored sets do not depend on the order of
     the variables.
 
-    All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
-    conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is
-    computed from the correlation matrix, and from the least-squares residuals when the conditions
-    are collinear to working precision. The defaults are the authors' published defaults. The
-    earlier end of a lagged link is searched with the empty set only, since time order already
-    rules out the later end as its cause.
+    Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
+    and every node a test conditions on lies within ``tau_max`` steps of the later end. A test's
+    partial correlation is computed from the correlation matrix, and from the least-squares
+    residuals when the conditions are collinear to working precision. The defaults are the authors'
+    published defaults. The earlier end of a lagged link is searched with the empty set only, since
+    time order already rules out the later end as its cause.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
+    that reads it holds it, and each test reads only the design rows where all of its lagged
+    variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
+    time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
+    When values are missing completely at random, the rows a test keeps are a random sample, so each
+    test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
+    its rows, raises ``ValueError``.
 
     **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation, one
     cross-link per variable, 30% of them within a time step and the rest at lags 1 to 3, and 30% of
@@ -784,13 +847,20 @@ def lpcmci(
     the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) - 2``
     values, so the series needs many more time steps than that. The numbers are a reference, not a
     hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    machine. Missing values are not benchmarked yet; the tests run them on up to 5 variables with up
+    to a fifth of the values missing completely at random.
 
     References
     ----------
     .. [1] Gerhardus, A., and Runge, J. (2020). High-recall causal discovery for autocorrelated
        time series with latent confounders. Advances in Neural Information Processing Systems 33
        (NeurIPS 2020), 12615-12625.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -814,7 +884,7 @@ def lpcmci(
     tau_max = int_in_range(tau_max, "tau_max", 1)
     n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
-    X = data_matrix(data)
+    X = data_matrix(data, method="lpcmci", missing=True)
     # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = X.shape[1] * (tau_max + 1) + 2 * tau_max + 1
@@ -825,7 +895,10 @@ def lpcmci(
         )
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
-    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+    with (
+        copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
+        rows_tested() as rows,
+    ):
         result = _native(
             X,
             tau_max=tau_max,
@@ -834,7 +907,7 @@ def lpcmci(
             indep_test=indep_test,
             constraints=constraints,
         )
-    return with_labels(_adapt_lpcmci(result), labels)
+    return with_labels(_adapt_lpcmci(result, rows_metadata(rows)), labels)
 
 
 def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:
@@ -889,6 +962,12 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
     truncating lasso penalty that also selects the lag order; it is not implemented here.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's lasso
+    regression reads every row of the lagged design, so a step with a missing value has no place in
+    it. Fill in the missing steps first, as dropping one would join the steps around it, or use
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
+    rows per test.
+
     **Limitations.** Measured on simulated linear-Gaussian VAR(2) series with no same-step links,
     standardized, from 10 to 160 variables with 1,000 time steps, with ``maxlag=2``. It found most
     true lagged edges but returned many false ones, so its median errors (missing and extra lagged
@@ -922,7 +1001,8 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
 
     maxlag = int_in_range(maxlag, "maxlag", 1)
     cv = int_in_range(cv, "cv", 2)
-    X = data_matrix(data, min_rows=maxlag + cv)  # LassoCV needs a time step in every fold
+    # LassoCV needs a time step in every fold.
+    X = data_matrix(data, min_rows=maxlag + cv, method="granger", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std

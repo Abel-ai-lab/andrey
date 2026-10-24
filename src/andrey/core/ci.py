@@ -35,7 +35,8 @@ time.
 The registry at the end maps each ``indep_test`` name to a factory. The nonlinear tests live in
 their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
 :mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
-built.
+built. On data with ``NaN``, :func:`make_indep_test` wraps the registered test in the test-wise
+deletion of :mod:`andrey.core.ci_missing`, which builds it on each query's rows.
 
 References
 ----------
@@ -1020,6 +1021,10 @@ def make_indep_test(
     :class:`PartialCorrelationTest` raises :class:`~andrey.core.score.CopiedColumnsError`, naming
     every group of :meth:`~PartialCorrelationTest.copies`, when ``data`` holds columns that repeat
     others up to scale and shift: its tests cannot tell such columns apart.
+
+    ``data`` holding ``NaN`` gives a :class:`~andrey.core.ci_missing.TestwiseDeletion` of the test
+    instead: each query reads only the rows observed in all of its columns, and raises where a
+    complete-data test raises before any query, such as on copies among its columns.
     """
     try:
         factory = _CI_REGISTRY[name]
@@ -1027,14 +1032,25 @@ def make_indep_test(
         raise NotImplementedError(
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
-    if name in MIXED_INDEP_TESTS:
-        return factory(data, categorical, **options)
-    if categorical is not None:
+    mixed = name in MIXED_INDEP_TESTS
+    if not mixed and categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
+    if _has_nan(data):
+        from .ci_missing import testwise_deletion
+
+        return testwise_deletion(name, factory, data, categorical, options, mixed=mixed)
+    if mixed:
+        return factory(data, categorical, **options)
     test = factory(data, **options)
     if isinstance(test, PartialCorrelationTest) and test.copies():
         raise copies_error(test.copies())
     return test
+
+
+def _has_nan(data: np.ndarray) -> bool:
+    """Whether ``data``, a float array, holds a ``NaN``; any other array holds none."""
+    arr = np.asarray(data)
+    return arr.dtype.kind == "f" and bool(np.isnan(arr).any())
 
 
 def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:

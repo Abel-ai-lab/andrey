@@ -229,6 +229,12 @@ def ges(
     ``ebic_gamma=0.0`` by a constant per variable, so it finds the same graph. Moves are scored in
     this process.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 200 variables with ten rows per variable and a forward-phase gate of 4
@@ -309,7 +315,7 @@ def ges(
         data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
     )
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="ges"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ges")
@@ -429,6 +435,12 @@ def gies(
     variables and rows measured: 23 against 210 with 200 variables and 2,000 rows (200 true
     edges).
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated
     linear-Gaussian data that mixes observation with
     interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
@@ -468,7 +480,7 @@ def gies(
     from andrey.search.gies import gies as _gies
     from andrey.search.gies import intervention_mask
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="gies")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
@@ -572,6 +584,12 @@ def xges(
     variables and rows measured: 8 against 199 with 200 variables and 2,000 rows (200 true
     edges).
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
@@ -614,7 +632,7 @@ def xges(
     """
     from andrey.search.xges import xges as _xges
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="xges")
     extended_search = flag(extended_search, "extended_search")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="xges")
@@ -759,6 +777,12 @@ def hc(
     109 against 272 with 200 variables and 2,000 rows (200 true edges). Its mean errors stayed below
     the empty graph's in each of the 65 settings, where the standard BIC's exceeded it in 37.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs, from
     10 to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
@@ -806,7 +830,7 @@ def hc(
         max_categories=max_categories,
     )
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="hc"
     )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
@@ -939,6 +963,12 @@ def tabu(
     against 276 with 200 variables and 2,000 rows (200 true edges). Its mean errors stayed below the
     empty graph's in each of the 65 settings, where the standard BIC's exceeded it in 35.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs, from
     10 to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
@@ -982,9 +1012,9 @@ def tabu(
     if score_func not in TABU_SCORES:
         raise NotImplementedError(f"tabu supports {TABU_SCORES}, not {score_func!r}")
     if data_kind(score_func) == "categorical":
-        X, _ = checked_data(data, None, "score_func", score_func)
+        X, _ = checked_data(data, None, "score_func", score_func, method="tabu")
     else:
-        X = data_matrix(data)
+        X = data_matrix(data, method="tabu")
     tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
@@ -1136,6 +1166,12 @@ def exact_search(
     rows measured: 2.0 against 9.6 with 200 rows and 20 true edges. Larger graphs were not
     measured.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from sparse random graphs (mean degree 2), from 5 to 15 variables
     with ten rows per variable. Its median errors (SHD) stayed below the empty graph's at every size
@@ -1187,7 +1223,12 @@ def exact_search(
     if score_func not in EXACT_SCORES:
         raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data,
+        categorical,
+        "score_func",
+        score_func,
+        max_categories=max_categories,
+        method="exact_search",
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
@@ -1296,6 +1337,11 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
     larger ``max_outer`` runs that schedule.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
+    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 10 to 50 variables with ten rows per variable. Its median errors (SHD) stayed
     below the empty graph's at every size (15 against 50 at 50 variables). The median fit took 18 s
@@ -1342,7 +1388,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="calm")
     labels = column_labels(data)
     used_seed = resolve_seed(seed)
     with copies_named(labels):

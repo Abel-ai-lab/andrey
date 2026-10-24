@@ -106,7 +106,10 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"`, and call
-   `warn_experimental("<name>")` first in the facade until the method is supported. Its
+   `warn_experimental("<name>")` first in the facade until the method is supported. A method whose
+   tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True` to its data
+   check; every other method passes its name as `method=`, so its refusal of `NaN` names it.
+   `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
    `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;

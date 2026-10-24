@@ -12,9 +12,17 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ci_missing import rows_metadata
 from andrey.core.knowledge import Knowledge, resolve
 
-from ._adapt import column_labels, data_matrix, int_in_range, open_unit_interval, with_labels
+from ._adapt import (
+    column_labels,
+    column_namer,
+    data_matrix,
+    int_in_range,
+    open_unit_interval,
+    with_labels,
+)
 from ._irregular import (
     _adapt_anm,
     _adapt_bottom_up_parce,
@@ -26,6 +34,34 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+
+
+def _complete_pairs(
+    X: np.ndarray, labels: tuple[str, ...] | None, method: str
+) -> tuple[np.ndarray, dict[str, dict[str, float]]]:
+    """Return the rows of the pair ``X`` where both columns are observed, and ``rows_tested``.
+
+    Without a missing value, ``X`` returns as it is with no metadata. Both tests of the pair read
+    the kept rows, which for two columns are the rows test-wise deletion keeps. Raises
+    ``ValueError`` when fewer than 2 rows are kept, or a column is constant on them.
+    """
+    observed = ~np.isnan(X).any(axis=1)
+    if observed.all():
+        return X, {}
+    kept = X[observed]
+    rows = kept.shape[0]
+    if rows < 2:
+        raise ValueError(
+            f"{method} needs at least 2 rows where both columns are observed, got {rows}"
+        )
+    flat = np.flatnonzero(np.ptp(kept, axis=0) == 0).tolist()
+    if flat:
+        raise ValueError(
+            f"{method}: data column {column_namer(labels)(flat[0])} is constant on the {rows} rows "
+            "where both columns are observed, so no direction can be told; drop the rows that "
+            "hold the missing values"
+        )
+    return kept, rows_metadata({rows: 2})
 
 
 def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
@@ -91,13 +127,20 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
     deterministic.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
+    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
+    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``.
+
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
     mechanism and Gaussian noise, from 200 to 8,000 rows. It named the true direction on three pairs
     in four at 200 rows and on every pair from 4,000 rows. The median fit took over three minutes at
     8,000 rows, on 4 cores. Each regression and HSIC test builds matrices with one row and one
     column per sample, so memory grows with the square of ``n_samples`` and the regression's time
-    with its cube. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    with its cube. Missing values are not benchmarked yet; the tests run them on pairs with up to a
+    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -128,10 +171,11 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         raise ValueError(
             f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
-    X = data_matrix(data)
+    X = data_matrix(data, method="anm", missing=True)
     if alpha is not None:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    X, rows = _complete_pairs(X, labels, "anm")
     X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
     Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
     pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
@@ -142,6 +186,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
+        extra=rows,
     )
 
 
@@ -217,14 +262,21 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
     ``PerformanceWarning``.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
+    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
+    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``.
+
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, from 200 to
     5,000 rows. It named the true direction on three pairs in four at 200 rows and on every pair
     from 1,000 rows. The median fit took 0.8 s at 5,000 rows, on 4 cores. Each HSIC test builds
     kernel matrices with one row and one column per sample, so time and memory grow with the square
     of the row count: each worker thread holds three such float64 matrices, 600 MB at 5,000 rows.
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    Missing values are not benchmarked yet; the tests run them on pairs with up to a fifth of the
+    values missing completely at random. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -257,10 +309,11 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         raise ValueError(
             f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
-    X = data_matrix(data)
+    X = data_matrix(data, method="pnl", missing=True)
     if alpha is not None:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    X, rows = _complete_pairs(X, labels, "pnl")
     pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
     return _adapt_pnl(
         pval_forward,
@@ -269,6 +322,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
+        extra=rows,
     )
 
 
@@ -335,6 +389,11 @@ def rcd(
     RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
     tests compare residuals, and a weak hidden cause leaves only a small trace in them.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on linear data with uniform noise, one node in five hidden, and 2,000
     rows, from 4 to 24 observed variables: its median directed-edge errors were below the empty
     graph's at every size but 8 variables, where they equaled it. A fit took about 2 s at 4
@@ -362,7 +421,7 @@ def rcd(
     """
     from andrey.irregular.rcd import fit_rcd
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    X = data_matrix(data, min_rows=6, method="rcd")  # HSIC's null variance has (n - 4)(n - 5)
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
     labels = column_labels(data)
     model = fit_rcd(
@@ -438,6 +497,11 @@ def bottom_up_parce_lingam(
     required edges: the two ends of a required edge can both end in the unordered block, where no
     edge is directed, so a required edge raises ``NotImplementedError`` rather than be dropped.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Suited to a few variables. Measured on linear data with uniform noise, one node
     in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
     4 observed variables, and above it at every size from 8 to 24. From 16 variables it left none of
@@ -465,7 +529,8 @@ def bottom_up_parce_lingam(
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    # HSIC's null variance has (n - 4)(n - 5).
+    X = data_matrix(data, min_rows=6, method="bottom_up_parce_lingam")
     if X.shape[0] <= X.shape[1]:
         raise ValueError(
             f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"

@@ -158,6 +158,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "data": {
             "layout": spec.data.layout,
             "notes": spec.data.notes,
+            "missing": spec.data.missing,
             "inputs": [
                 {
                     "name": inp.name,
@@ -447,6 +448,21 @@ def render_skill() -> str:
     a("## Data types")
     a("")
     a(_data_types_section())
+    a("")
+    a("## Missing values")
+    a("")
+    a(
+        "A `NaN` cell, or an empty, `NA`, or `N/A` field of the data file, is a missing value. "
+        "The methods whose schema sets `data.missing` accept it and delete rows per test: each "
+        "test reads the rows observed in all of its variables, and `metadata.rows_tested` gives "
+        "the fewest (`min`) and the median rows a test read. They are "
+        + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
+        + ". Every other method refuses a missing value with a data error that says what to do "
+        "instead. The deletion is sound when values are missing completely at random; when "
+        "whether a value is missing depends on the variables, `pc` can keep extra edges, and "
+        "`fci` stays sound "
+        "when no missingness mechanism causally affects another."
+    )
     a("")
     a("## Background knowledge")
     a("")

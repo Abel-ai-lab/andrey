@@ -156,6 +156,11 @@ def direct_lingam(
     weighted by the scale between the two, and no edges to later columns, which take their edges
     from the column it copies.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
     stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
@@ -185,7 +190,7 @@ def direct_lingam(
     """
     from andrey.lingam.direct import direct_lingam as _native
 
-    X = _pruning_rows(data_matrix(data))
+    X = _pruning_rows(data_matrix(data, method="direct_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
     order, B = _native(X, measure=measure, constraints=constraints)
@@ -283,6 +288,11 @@ def ica_lingam(
     under a new column order or on another machine when it converges slowly, at few rows per
     variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
+    unmix every variable over the same rows, so a row with a missing value has no place in them.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
     passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
@@ -309,7 +319,7 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
-    X = _pruning_rows(data_matrix(data))
+    X = _pruning_rows(data_matrix(data, method="ica_lingam"))
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
@@ -383,6 +393,11 @@ def multi_group_direct_lingam(
     group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
     only in the groups where it is one.
 
+    **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Measured on three groups of 1,000 rows over the same variables, from one
     sparse random graph (mean degree 2) with linear effects, uniform noise, and weights drawn for
     each group, from 5 to 20 variables. Its median errors (SHD summed over the groups) were 0 at 5
@@ -415,7 +430,10 @@ def multi_group_direct_lingam(
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native
 
     groups = [
-        _pruning_rows(data_matrix(X, name=f"data_groups[{k}]"), name=f"data_groups[{k}]")
+        _pruning_rows(
+            data_matrix(X, name=f"data_groups[{k}]", method="multi_group_direct_lingam"),
+            name=f"data_groups[{k}]",
+        )
         for k, X in enumerate(data_groups)
     ]
     if len(groups) < 2:
