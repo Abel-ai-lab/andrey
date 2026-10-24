@@ -35,6 +35,9 @@ change names its pull request.
   `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
   the forkserver's socket now goes in `/dev/shm`, or `/tmp`, with a warning, and the workers start
   with `fork` or `spawn` when neither holds it. Results do not change. ([#415])
+- `andrey.data.generate` with several workers starts them when `TMPDIR` rejects the forkserver's
+  socket, as the search workers do; on Linux from Python 3.14 it raised
+  `OSError: [Errno 95] Operation not supported`. ([#446])
 - `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
   `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
   test or score; an empty list now reads as `None` there. ([#395])
@@ -732,3 +735,4 @@ First alpha release.
 [#431]: https://github.com/Abel-ai-lab/andrey/pull/431
 [#439]: https://github.com/Abel-ai-lab/andrey/pull/439
 [#441]: https://github.com/Abel-ai-lab/andrey/pull/441
+[#446]: https://github.com/Abel-ai-lab/andrey/pull/446
