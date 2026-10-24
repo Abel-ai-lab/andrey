@@ -13,11 +13,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+from andrey.constraint._parallel_skeleton import skeleton_pool
 from andrey.constraint._skeleton import (
     Removal,
     adjacent_pairs,
-    canonical_capable,
     first_order_removals,
     marginal_removals,
     pair_queries,
@@ -341,7 +340,11 @@ def _discover_skeleton(
     of at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the result, a raised error included, is
-    identical to the serial scan whatever the partition.
+    identical to the serial scan whatever the partition. With ``workers > 1`` and an RCoT test, a
+    pass whose tests times rows reach
+    :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_RCOT_WORK`, or the
+    ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it, runs each conditioning set's queries in one
+    worker process, with the serial scan's p-values bit for bit.
 
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
@@ -364,8 +367,7 @@ def _discover_skeleton(
     pvalues: dict[tuple[int, int], float] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    parallel = workers > 1 and canonical_capable(test) and _trace is None
-    pool = SkeletonWorkerPool(test, workers) if parallel else None
+    pool = skeleton_pool(test, workers) if _trace is None else None
     try:
         size = 0
         while True:

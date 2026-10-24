@@ -20,7 +20,7 @@ change names its pull request.
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
-  ([#282], [#289], [#290])
+  ([#282], [#289], [#290], [#457])
 
 ### Added
 
@@ -33,6 +33,13 @@ change names its pull request.
   500000, was measured on an AMD EPYC 9534 server running Linux; a fit with more than one worker
   warns once on it when a pass reaches a tenth of it. `andrey calibrate --method skeleton`
   measures the value for your machine, and `andrey calibrate` now measures it with GES's. ([#290])
+- With more than one worker, `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` run each
+  large skeleton pass in worker processes, each conditioning set's queries in one worker, and
+  return the same graphs and p-values as with one worker. `ANDREY_RCOT_PARALLEL_MIN_WORK` sets the
+  least work, RCoT tests times rows, a pass needs to use them. The default, 2000000, was measured on
+  an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
+  on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
+  your machine, and `andrey calibrate` now measures it with the others. ([#457])
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
@@ -679,3 +686,4 @@ First alpha release.
 [#369]: https://github.com/Abel-ai-lab/andrey/pull/369
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#455]: https://github.com/Abel-ai-lab/andrey/pull/455
+[#457]: https://github.com/Abel-ai-lab/andrey/pull/457
