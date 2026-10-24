@@ -34,8 +34,12 @@ def test_grasp_recovery():
 
 
 def test_grasp_at_depth_2_recovers_the_depth_3_graph():
-    out = andrey.grasp(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA, depth=2)
-    assert_recorded_output(out, "GRaSP", case="gauss_5v")
+    # Both depths score with the standard BIC, where the two reach one graph on this case.
+    x = datagen.generate("gauss_5v")
+    depth_3 = andrey.grasp(x, lambda_value=_BASELINE_LAMBDA, ebic_gamma=0.0)
+    depth_2 = andrey.grasp(x, lambda_value=_BASELINE_LAMBDA, ebic_gamma=0.0, depth=2)
+    assert depth_2.structure.oriented_edges() == depth_3.structure.oriented_edges()
+    assert depth_2.metadata["score"] == pytest.approx(depth_3.metadata["score"], abs=1e-9)
 
 
 def test_hc_output_contract():
@@ -59,14 +63,17 @@ def test_boss_grasp_deterministic():
 
 def test_boss_equal_scores_are_stable_under_input_rounding():
     # Four centered rows give every variable variance 18 and every pair covariance 15.
-    # Each single parent has the same BIC; a second parent does not improve it.
+    # Each single parent has the same BIC; a second parent does not improve it. That holds for the
+    # standard BIC: with the extended-BIC term a second parent lowers the score on three variables.
     x = np.array([[6, 6, 6], [0, -3, -3], [-3, 0, -3], [-3, -3, 0]], dtype=float)
     # Scaling each column by its own factor near 1 moves the scores in their last bits and keeps
     # each column's row-to-row pattern, so its tie rank.
     rng = np.random.default_rng(10_000)
     perturbed = x * (1 + 1e-12 * rng.standard_normal(x.shape[1]))
-    base = andrey.boss(x, seed=0, score_func="local_score_BIC_from_cov").structure
-    moved = andrey.boss(perturbed, seed=0, score_func="local_score_BIC_from_cov").structure
+    base = andrey.boss(x, seed=0, score_func="local_score_BIC_from_cov", ebic_gamma=0.0).structure
+    moved = andrey.boss(
+        perturbed, seed=0, score_func="local_score_BIC_from_cov", ebic_gamma=0.0
+    ).structure
 
     assert base.kind == moved.kind == "cpdag"
     # Both inputs give the undirected edges 0 -- 2 and 1 -- 2: column 2 has the lowest tie rank.

@@ -92,6 +92,7 @@ def tabu(
     *,
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
@@ -111,6 +112,11 @@ def tabu(
         (:class:`~andrey.core.score.CategoricalBICScore`), both on category codes.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     tabu_length : int
         Number of recently visited DAGs a move may not return to.
     max_tabu : int or None
@@ -139,7 +145,7 @@ def tabu(
         raise ValueError(f"max_tabu must lie in [1, tabu_length={tabu_length}], got {max_tabu}")
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-    score = make_score(score_func, X, lambda_value=lambda_value)
+    score = make_score(score_func, X, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
 
     ranks = tie_ranks(X, np.full(d, score_func in DISCRETE_SCORES))
     # One BLAS thread keeps the Schur updates reproducible across thread counts.

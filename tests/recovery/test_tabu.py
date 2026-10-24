@@ -23,6 +23,9 @@ from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
+# The extended-BIC weight that tabu search and exact search score with by default.
+_EBIC_GAMMA = 1.0
+
 
 @pytest.fixture(autouse=True)
 def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,7 +46,7 @@ def _bic(x: np.ndarray, dag) -> float:
     for i, j, kind in dag.oriented_edges():
         assert kind == "directed"
         parents[j].append(i)
-    score = BICScore(x)
+    score = BICScore(x, ebic_gamma=_EBIC_GAMMA)
     return float(sum(score.score(i, sorted(parents[i])) for i in range(x.shape[1])))
 
 

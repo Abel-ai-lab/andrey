@@ -40,7 +40,11 @@ _EPS = float(np.finfo(np.float64).eps)
 
 
 def ranked_score(
-    x: np.ndarray, score_func: str, lambda_value: float, categorical: npt.ArrayLike | None
+    x: np.ndarray,
+    score_func: str,
+    lambda_value: float,
+    categorical: npt.ArrayLike | None,
+    ebic_gamma: float = 0.0,
 ) -> tuple[LocalScore, np.ndarray]:
     """The local score over the columns of ``x`` sorted by :func:`~andrey.search.hc.tie_ranks`.
 
@@ -70,11 +74,18 @@ def ranked_score(
             score_func,
             np.ascontiguousarray(x[:, by_rank]),
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             categorical=mask[by_rank] if mixed else None,
         )
     except ValueError:
         # The error names positions in the sorted data; the same check on ``x`` names its columns.
-        make_score(score_func, x, lambda_value=lambda_value, categorical=categorical)
+        make_score(
+            score_func,
+            x,
+            lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
+            categorical=categorical,
+        )
         raise
     return score, ranks
 
@@ -766,6 +777,7 @@ def boss(
     data: np.ndarray,
     *,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
     categorical: np.ndarray | None = None,
@@ -779,6 +791,11 @@ def boss(
         Data matrix; rows are observations, columns are variables.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     random_state : int
         Seed for the sweep-order RNG.
     score_func : str
@@ -820,7 +837,7 @@ def boss(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score, ranks = ranked_score(X, score_func, lambda_value, categorical)
+    score, ranks = ranked_score(X, score_func, lambda_value, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
 

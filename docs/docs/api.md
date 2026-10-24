@@ -80,6 +80,13 @@ triple the vote cannot decide is ambiguous: no rule orients through it, and
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
 gives a node more than that many parents, and some graph reaches each node's count.
 
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+take `ebic_gamma`, the weight of the extended BIC: their linear-Gaussian BIC adds
+`2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows
+with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the standard BIC, and the others
+to `1.0`; {py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its
+default differs.
+
 ```{eval-rst}
 .. currentmodule:: andrey
 
@@ -100,6 +107,7 @@ cards show where a method scores worse than the empty graph, or about as well, a
 at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, hill climbing
 and Tabu search do from 50 variables with ten rows per variable, PCMCI does from 40 series, Granger
 does from 20 series at 1,000 time steps, and GES does at 200 variables with ten rows per variable.
+The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 
 ```{eval-rst}
 .. currentmodule:: andrey

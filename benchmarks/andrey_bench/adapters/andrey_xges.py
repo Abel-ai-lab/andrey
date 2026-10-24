@@ -21,6 +21,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.adapters.andrey_ges import _andrey_version
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA
 
 _SCORE_FUNC = "local_score_BIC"
 
@@ -53,6 +54,7 @@ class AndreyXGES:
         return {
             "score_func": _SCORE_FUNC,
             "lambda_value": float(self.lambda_value),
+            "ebic_gamma": ANDREY_EBIC_GAMMA,
             "extended_search": bool(self.extended_search),
             "max_parents": None,
         }
@@ -65,6 +67,7 @@ class AndreyXGES:
             np.asarray(data, dtype=np.float64),
             score_func=params.get("score_func", _SCORE_FUNC),
             lambda_value=float(params.get("lambda_value", self.lambda_value)),
+            ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
             extended_search=bool(params.get("extended_search", self.extended_search)),
         )
         return np.asarray(cpdag.to_numpy())
