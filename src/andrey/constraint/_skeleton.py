@@ -27,6 +27,7 @@ import numpy as np
 
 from andrey.core import NULL, backend
 from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
+from andrey.core.ci_missing import GaussianDeletion
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -138,15 +139,17 @@ def canonical_capable(test: CITest) -> bool:
 
     A subclass or a wrapper of either keeps the ``batched_call`` and ``first_order_pvalues`` it
     may override, and a worker cannot rebuild it from the correlation matrix, so it scans in the
-    caller's process one call at a time.
+    caller's process; the test-wise deletion of either takes the canonical query arrays there
+    (:func:`_canonical_route`), and any other one call at a time.
     """
     return type(test) in (FisherZ, StudentT)
 
 
 def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
-    """A :func:`canonical_capable` test's ``_canonical_pvalues``, which the canonical query arrays
+    """The ``_canonical_pvalues`` of a :func:`canonical_capable` test or of the test-wise deletion
+    of either (:class:`~andrey.core.ci_missing.GaussianDeletion`), which the canonical query arrays
     take, else ``None``."""
-    if canonical_capable(test):
+    if canonical_capable(test) or isinstance(test, GaussianDeletion):
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
 

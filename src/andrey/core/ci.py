@@ -36,7 +36,8 @@ The registry at the end maps each ``indep_test`` name to a factory. The nonlinea
 their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
 :mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
 built. On data with ``NaN``, :func:`make_indep_test` wraps the registered test in the test-wise
-deletion of :mod:`andrey.core.ci_missing`, which builds it on each query's rows.
+deletion of :mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of
+its columns.
 
 References
 ----------
