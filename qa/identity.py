@@ -723,6 +723,7 @@ def run(
                     andrey.config(num_workers=workers),
                     _environ("ANDREY_GES_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             base = rows[-1]

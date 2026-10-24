@@ -14,10 +14,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+from andrey.constraint._parallel_skeleton import skeleton_pool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
-    canonical_capable,
     check_collider_rule,
     first_order_removals,
     marginal_removals,
@@ -173,7 +172,10 @@ def _fast_adjacency_search(
     :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the skeleton, a raised error included,
-    stays identical to the serial scan.
+    stays identical to the serial scan. With ``workers > 1`` and an RCoT test, a pass whose tests
+    times rows reach :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_RCOT_WORK`, or the
+    ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it, runs each conditioning set's queries in one
+    worker process, with the serial scan's p-values bit for bit.
     """
     d = X.shape[1]
     support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
@@ -181,7 +183,7 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen_capable(test)
-    pool = SkeletonWorkerPool(test, workers) if workers > 1 and canonical_capable(test) else None
+    pool = skeleton_pool(test, workers)
     try:
         size = -1
         while True:
