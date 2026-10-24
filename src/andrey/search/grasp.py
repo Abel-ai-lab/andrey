@@ -461,7 +461,8 @@ def _dfs(
         y_parents = order.get_parents(y)
         rng.shuffle(y_parents)
         y_parent_set = set(y_parents)
-        for x in y_parents:
+        # A copy: re-scoring a tuck refills y's stored parent list.
+        for x in list(y_parents):
             covered = _is_covered(x, y_parent_set, order)
             if len(history) > 0 and not covered:
                 continue
