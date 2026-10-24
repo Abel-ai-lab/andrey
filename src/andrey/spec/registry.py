@@ -817,7 +817,13 @@ _add(
             ),
             *_CONTINUOUS_PATH_PARAMS,
         ),
-        references=("Zheng, Aragam, Ravikumar & Xing 2018", "Deng, Bello, Ravikumar & Aragam 2024"),
+        references=(
+            "Zheng, Aragam, Ravikumar & Xing 2018",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+            "Kaiser & Sipos 2022",
+            "Reisach, Seiler & Weichwald 2021",
+            "Ng, Huang & Zhang 2024",
+        ),
     )
 )
 _add(
@@ -869,7 +875,13 @@ _add(
             ParamSpec(name="lr", type="float", default=3e-4, doc="Step size of Adam, above 0."),
             *_CONTINUOUS_PATH_PARAMS,
         ),
-        references=("Bello, Aragam & Ravikumar 2022", "Deng, Bello, Ravikumar & Aragam 2024"),
+        references=(
+            "Bello, Aragam & Ravikumar 2022",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+            "Kaiser & Sipos 2022",
+            "Reisach, Seiler & Weichwald 2021",
+            "Ng, Huang & Zhang 2024",
+        ),
     )
 )
 
