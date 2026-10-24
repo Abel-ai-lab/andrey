@@ -17,8 +17,9 @@ tau_max``:
 
 Every test reads one lagged design matrix: column ``lag * n + i`` holds ``X^i_{t-lag}`` for ``lag =
 0 .. 2 * tau_max``, over the ``T - 2 * tau_max`` time steps where all those lags exist, so every
-test uses the same samples. Every test is a partial-correlation test: ``indep_test="student_t"``
-(:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
+test uses the same samples, unless the series has missing values: then each test reads the design
+rows observed in all of its columns (:func:`design_test`). Every test is a partial-correlation test:
+``indep_test="student_t"`` (:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
 (:class:`~andrey.core.ci.FisherZ`). A PC1 round tests all of a target's candidates in one call, and
 MCI tests all links into a target together, grouped by conditioning-set size. Any object with
 ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
@@ -42,12 +43,13 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 import numpy as np
 
 from andrey.core import backend
 from andrey.core.ci import FisherZ, PartialCorrelationTest, SingularCorrelationError, StudentT
+from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
 from andrey.core.score import copies_error
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
@@ -112,7 +114,9 @@ class DesignTest:
     not raise returns ``test``'s results unchanged.
     """
 
-    def __init__(self, test: PartialCorrelationTest, design: np.ndarray) -> None:
+    def __init__(
+        self, test: PartialCorrelationTest | PartialCorrelationDeletion, design: np.ndarray
+    ) -> None:
         self.test = test
         self.design = design
 
@@ -144,11 +148,31 @@ def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
     and shift: a variable that copies another, at the same step or some lags apart. A copy at one
     step repeats at every lag of the design, so the error names each group that holds a lag-0
     column, by :func:`design_column_name`.
+
+    A series with ``NaN`` gets a design with ``NaN`` in every row that reads a missing value, and
+    the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
+    rows observed in all of its columns. Two columns are then copies when they repeat each other on
+    the rows where both are observed.
     """
     if indep_test not in INDEP_TESTS:
         raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     design = lagged_design(data, tau_max)
-    test = INDEP_TESTS[indep_test](design)
+    test: PartialCorrelationTest | PartialCorrelationDeletion
+    if np.isnan(design).any():
+        test = cast(
+            "PartialCorrelationDeletion",  # a partial-correlation test gives its deletion this kind
+            testwise_deletion(
+                indep_test,
+                INDEP_TESTS[indep_test],
+                design,
+                None,
+                {},
+                mixed=False,
+                check_copies=False,
+            ),
+        )
+    else:
+        test = INDEP_TESTS[indep_test](design)
     n_vars = data.shape[1]
     groups = [group for group in test.copies() if group[0] < n_vars]
     if groups:
