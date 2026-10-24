@@ -30,6 +30,7 @@ References
 from __future__ import annotations
 
 import contextlib
+import functools
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Generator, Iterable, Mapping
 from contextvars import ContextVar
@@ -556,7 +557,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
             flagged |= (rows[:, None] <= self._most[columns]).any(axis=1)
             flagged |= ~np.isfinite(stack).all(axis=(1, 2))
             if self._check_copies:
-                i, j = np.triu_indices(size + 2, 1)
+                i, j = _apart(size + 2)
                 flagged |= (1.0 - stack[:, i, j] ** 2 <= _MARGIN * ZERO_RESIDUAL).any(axis=1)
             if size == 0:
                 r = stack[:, 0, 1]
@@ -746,6 +747,12 @@ def _block_correlations(
     cov = products - sums[:, :, None] * sums[:, None, :] / count[:, None, None]
     spread = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
     return np.clip(cov / spread[:, :, None] / spread[:, None, :], -1.0, 1.0), count
+
+
+@functools.cache
+def _apart(k: int) -> tuple[np.ndarray, np.ndarray]:
+    """The row and column indices of the entries above the diagonal of a ``(k, k)`` matrix."""
+    return np.triu_indices(k, 1)
 
 
 def _arrays(
