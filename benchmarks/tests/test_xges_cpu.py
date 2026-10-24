@@ -75,7 +75,9 @@ def test_the_andrey_fit_is_the_public_xges(extended_search: bool, lambda_value: 
     data = _dataset()
     adapter = AndreyXGES(extended_search=extended_search, lambda_value=lambda_value)
     marks = adapter.fit(data, adapter.params())
-    public = andrey.xges(data, lambda_value=lambda_value, extended_search=extended_search)
+    public = andrey.xges(
+        data, lambda_value=lambda_value, ebic_gamma=0.0, extended_search=extended_search
+    )
     np.testing.assert_array_equal(marks, public.structure.to_numpy())
     assert adapter.to_structure(marks).kind == "cpdag"
 

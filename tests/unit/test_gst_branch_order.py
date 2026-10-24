@@ -229,5 +229,7 @@ def test_ranks_move_with_the_columns_and_the_score_is_the_same(case) -> None:
 def test_the_seed_still_matters(search) -> None:
     """Different seeds shuffle the sorted columns differently and can reach different graphs."""
     x = _linear(1)
-    graphs = {search(x, random_state=seed)[0].to_numpy().tobytes() for seed in range(4)}
+    graphs = {
+        search(x, random_state=seed, ebic_gamma=0.0)[0].to_numpy().tobytes() for seed in range(4)
+    }
     assert len(graphs) > 1

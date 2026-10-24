@@ -245,6 +245,7 @@ def test_the_continuous_hill_climbing_adapter_keeps_its_declared_settings() -> N
     assert adapter.params() == {
         "score_func": "local_score_BIC_from_cov",
         "lambda_value": 1.0,
+        "ebic_gamma": 0.0,
         "max_iter": 100_000,
     }
 
