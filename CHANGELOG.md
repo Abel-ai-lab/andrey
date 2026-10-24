@@ -66,6 +66,11 @@ change names its pull request.
 
 ### Fixed
 
+- The worker pool starts when `TMPDIR` is on a file system that rejects the forkserver's socket,
+  such as a cluster's parallel file system. `ges`, `gfci`, and the skeleton search of `pc`, `fci`,
+  `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
+  the forkserver's socket now goes in `/dev/shm`, or `/tmp`, with a warning, and the workers start
+  with `fork` or `spawn` when neither holds it. Results do not change. ([#415])
 - `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
   `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
   test or score; an empty list now reads as `None` there. ([#395])
@@ -758,4 +763,5 @@ First alpha release.
 [#400]: https://github.com/Abel-ai-lab/andrey/pull/400
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
+[#415]: https://github.com/Abel-ai-lab/andrey/pull/415
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
