@@ -93,8 +93,8 @@
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "CALM": {
-        "linear_gauss_er_d10": {"median_shd": 4.0, "empty_median_shd": 10.0, "shd": [3, 3, 8, 1, 4, 4, 5, 2, 11, 8]},
-        "asia_gauss": {"median_shd": 4.0, "empty_median_shd": 8.0, "shd": [4, 6, 6, 4, 1, 4, 4, 0, 4, 6]}
+        "linear_gauss_er_d10": {"median_shd": 4.0, "empty_median_shd": 10.0, "shd": [0, 3, 8, 1, 4, 4, 5, 2, 11, 8]},
+        "asia_gauss": {"median_shd": 4.0, "empty_median_shd": 8.0, "shd": [4, 6, 6, 0, 1, 4, 0, 0, 4, 6]}
       },
       "BOSS": {
         "linear_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 20.0, "shd": [0, 0, 1, 0, 0, 6, 0, 12, 0, 4]},
