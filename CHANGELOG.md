@@ -92,6 +92,9 @@ change names its pull request.
 - `grasp` tucks only the edges of the current DAG and never takes a chain of tucks back to a DAG it
   has visited, as the GRaSP paper's search does, so it returns a different graph on some data,
   one that scores better about as often as worse. ([#442])
+- `varma_lingam`'s **Limitations** paragraph and the column-order guide say that where its
+  likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
+  the same series can give a different graph on another type of CPU. ([#451])
 
 ### Removed
 
@@ -804,3 +807,4 @@ First alpha release.
 [#442]: https://github.com/Abel-ai-lab/andrey/pull/442
 [#443]: https://github.com/Abel-ai-lab/andrey/pull/443
 [#445]: https://github.com/Abel-ai-lab/andrey/pull/445
+[#451]: https://github.com/Abel-ai-lab/andrey/pull/451
