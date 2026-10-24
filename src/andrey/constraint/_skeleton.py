@@ -151,11 +151,16 @@ def _stacked_route(test: CITest) -> Callable[..., np.ndarray] | None:
     canonical = _canonical_route(test)
     if canonical is not None:
         return canonical
-    # An RCoT test has loaded its module; a fit with another test leaves it unloaded.
-    kernel = sys.modules.get("andrey.core.ci_kernel")
-    if kernel is not None and type(test) is kernel.RCoT:
+    if is_rcot(test):
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
+
+
+def is_rcot(test: CITest) -> bool:
+    """Whether ``test`` is an RCoT test, exactly: a subclass may change what a query returns."""
+    # An RCoT test has loaded its module; a fit with another test leaves it unloaded.
+    kernel = sys.modules.get("andrey.core.ci_kernel")
+    return kernel is not None and type(test) is kernel.RCoT
 
 
 def _query_arrays(

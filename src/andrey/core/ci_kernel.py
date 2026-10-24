@@ -512,7 +512,11 @@ class RCoT:
         self._n_features = int(n_features)
         self._n_features_cond = int(n_features_cond)
         self._seed = resolve_seed(seed)
-        # Bandwidths, features, and residuals depend only on their columns, so queries share them.
+        self._start_caches()
+
+    def _start_caches(self) -> None:
+        """Empty caches of bandwidths, features, and residuals, which depend only on their columns,
+        so queries share them."""
         n = self._n
         self._scale = lru_cache(maxsize=None)(
             lambda column: _median_distance(self._data[:, [column]])
@@ -520,15 +524,42 @@ class RCoT:
         self._residual = lru_cache(_cache_entries(n * self._n_features))(self._fit_residual)
         self._cond_factor = lru_cache(_cache_entries(n * self._n_features_cond))(self._factor)
 
-    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
-        """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
-        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
-        if cond and self._n < _RCOT_MIN_ROWS:
+    def _state(self) -> tuple[np.ndarray, list[int], int, int, int]:
+        """What :meth:`_from_state` rebuilds this test from: the ranked, standardized data, the
+        column ranks, the two feature counts, and the resolved seed."""
+        return self._data, self._tie_rank, self._n_features, self._n_features_cond, self._seed
+
+    @classmethod
+    def _from_state(
+        cls, data: np.ndarray, tie_rank: list[int], n_features: int, n_features_cond: int, seed: int
+    ) -> RCoT:
+        """A test that holds :meth:`_state`'s arrays and settings as they are, with empty caches,
+        so its p-values are those of the test the state came from, bit for bit."""
+        test = cls.__new__(cls)
+        test._data, test._tie_rank, test._n = data, tie_rank, data.shape[0]
+        test._n_features, test._n_features_cond, test._seed = n_features, n_features_cond, seed
+        test._start_caches()
+        return test
+
+    def _condition_key(self, condition_set: Iterable[int]) -> tuple[int, ...]:
+        """The conditioning set as the features' caches and seeds read it: its columns' ranks,
+        ascending."""
+        return tuple(sorted(self._tie_rank[c] for c in condition_set))
+
+    def _warn_few_rows(self) -> None:
+        """Warn once that a test with a conditioning set has fewer rows than [1]_ evaluates."""
+        if self._n < _RCOT_MIN_ROWS:
             warn_once(
                 f"RCoT on fewer than {_RCOT_MIN_ROWS} rows may reject a true conditional "
                 "independence more often than alpha.",
                 SampleSizeWarning,
             )
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        if cond:
+            self._warn_few_rows()
         n = self._n
         a, b = self._residual(x_int, tuple(cond)), self._residual(y_int, tuple(cond))
         cross_cov = a.T @ b / (n - 1)
@@ -550,8 +581,7 @@ class RCoT:
         first failing query raises.
         """
         queries = list(zip(x.tolist(), y.tolist(), map(tuple, conditions.tolist())))
-        rank = self._tie_rank
-        order = sorted(range(len(queries)), key=lambda i: sorted(rank[c] for c in queries[i][2]))
+        order = sorted(range(len(queries)), key=lambda i: self._condition_key(queries[i][2]))
         pvalues = np.empty(len(queries))
         try:
             for i in order:

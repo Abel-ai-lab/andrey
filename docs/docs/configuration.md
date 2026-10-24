@@ -45,8 +45,9 @@ requested backend uses `auto`, without a warning.
 
 - `ANDREY_NUM_WORKERS`: the worker processes for GES and GFCI, and the worker threads for the
   per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
-  also use the worker processes for their skeleton search with the `fisherz` and `student_t` tests,
-  and send a conditioning-set size to them only when it has enough tests to repay them. `1` (the
+  also use the worker processes for their skeleton search with the `fisherz`, `student_t`, and
+  `rcot` tests, and send a conditioning-set size to them only when it has enough tests to repay
+  them; with `rcot` the p-values are the same with any number of workers. `1` (the
   default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
   threads unlimited and with several limits each thread to one, so on a machine with several cores
   its p-values and statistics can differ in the last digits between one worker and several. Each
@@ -58,11 +59,15 @@ requested backend uses `auto`, without a warning.
   GFCI, and CD-NOD uses the workers only when it holds at least this many conditional-independence
   tests. The default is `500000`, measured on an AMD EPYC 9534 server running Linux; `0` always uses
   them.
+- `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
+  the workers only when its tests times the data's rows reach this value, since an RCoT test costs
+  far more than a Fisher-z test and its cost grows with the rows. The default is `1000000`, measured
+  on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
-The cutoffs matter only with more than one worker. `andrey calibrate` measures both for your
+The cutoffs matter only with more than one worker. `andrey calibrate` measures all three for your
 machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
-alone. With more than one worker and a default cutoff, a fit warns once when a pass reaches a tenth
-of it; setting the variable, to any value, silences the warning.
+alone, and `--method rcot` RCoT's. With more than one worker and a default cutoff, a fit warns once
+when a pass reaches a tenth of it; setting the variable, to any value, silences the warning.
 
 ## GPU dispatch
 
