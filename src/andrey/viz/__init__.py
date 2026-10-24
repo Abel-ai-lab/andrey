@@ -101,8 +101,8 @@ def classify_edge(mark_i: int, mark_j: int, kind: str) -> str:
         The endpoint marks at nodes ``i`` and ``j``: ``TAIL``, ``ARROW``, or ``CIRCLE`` from
         :mod:`andrey.core.structure`.
     kind : str
-        The graph kind (``dag`` / ``cpdag`` / ``pag`` / ``digraph``). Only ``ARROW``/``ARROW``
-        reads differently across kinds.
+        The graph kind (``dag`` / ``cpdag`` / ``pag`` / ``mag`` / ``digraph``). Only
+        ``ARROW``/``ARROW`` reads differently across kinds.
 
     Returns
     -------
@@ -114,7 +114,7 @@ def classify_edge(mark_i: int, mark_j: int, kind: str) -> str:
     Raises
     ------
     ValueError
-        If a mark is not ``TAIL``, ``ARROW``, or ``CIRCLE``, or ``kind`` is not one of the four
+        If a mark is not ``TAIL``, ``ARROW``, or ``CIRCLE``, or ``kind`` is not one of the five
         kinds.
 
     Notes

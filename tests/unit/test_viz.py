@@ -64,6 +64,17 @@ def test_two_cycle_draws_two_curved_edges() -> None:
     assert viz.draw(pag).count("<line") == 1
 
 
+def test_a_mag_draws_as_a_pag_with_the_same_marks() -> None:
+    pairs = {(0, 1): (TAIL, ARROW), (1, 2): (ARROW, ARROW), (2, 3): (TAIL, TAIL)}
+    mag, pag = _from(pairs, 4, "mag"), _from(pairs, 4, "pag")
+    svg = viz.draw(mag)  # Graphviz places the nodes when pygraphviz is installed
+    minidom.parseString(svg)
+    assert svg == viz.draw(pag)
+    assert classify_edge(ARROW, ARROW, "mag") == "bidirected"
+    if viz._graphviz.available():
+        assert viz.to_graphviz(mag).to_string() == viz.to_graphviz(pag).to_string()
+
+
 def test_latent_node_is_hollow_dashed() -> None:
     pag = _from(
         {(0, 1): (TAIL, ARROW)},

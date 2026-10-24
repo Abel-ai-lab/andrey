@@ -1125,14 +1125,14 @@ def test_code_and_its_output_sit_in_windows_named_for_the_file(placeholder_page)
 
 
 def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
-    # Every kind a GraphStructure can be has the homepage's name for it, and the tile lists them
-    # all, with graphs over time, and draws each one; its dialog draws them with captions, and
-    # leads to the guide that explains them.
+    # Every kind a method returns has the homepage's name for it, and the tile lists them all,
+    # with graphs over time, and draws each one; its dialog draws them with captions, and leads to
+    # the guide that explains them. A conversion's kind (a MAG) is not on the tile.
     from typing import get_args
 
     from andrey.core.structure import Kind
 
-    assert set(get_args(Kind)) == build.GRAPH_KINDS.keys()
+    assert set(get_args(Kind)) == build.GRAPH_KINDS.keys() | build.CONVERSION_KINDS
     kinds = build.graph_kinds()
     tile = placeholder_page[placeholder_page.index('data-tile="graphs"') :]
     tile = tile[: tile.index("</li>")]
