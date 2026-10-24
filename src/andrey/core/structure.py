@@ -719,7 +719,7 @@ class GraphStructure(Structure):
 
         Notes
         -----
-        The algorithm of Dor and Tarsi [1]_ keeps every directed edge, then repeatedly removes the
+        The algorithm of Dor and Tarsi (1992) keeps every directed edge, then repeatedly removes the
         first node, in a ranking of the nodes, that has no outgoing directed edge and whose
         undirected neighbors are each adjacent to all its other neighbors, and directs its
         undirected edges into it. When no node qualifies before every node is removed, no
@@ -730,9 +730,8 @@ class GraphStructure(Structure):
 
         References
         ----------
-        .. [1] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent
-           extension of a partially oriented graph. Technical Report R-185, Cognitive Systems
-           Laboratory, UCLA.
+        Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension of a
+        partially oriented graph. Technical Report R-185, Cognitive Systems Laboratory, UCLA.
 
         Examples
         --------
@@ -787,15 +786,15 @@ class GraphStructure(Structure):
 
         Notes
         -----
-        The construction is Richardson and Spirtes' [1]_. Observed ``a`` and ``b`` are adjacent
+        The construction is Richardson and Spirtes' (2002). Observed ``a`` and ``b`` are adjacent
         exactly when the DAG does not d-separate them given the selection variables and the
         observed ancestors of ``a``, ``b``, and the selection variables, so one d-separation
         query decides each pair of observed nodes.
 
         References
         ----------
-        .. [1] Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals
-           of Statistics 30(4), 962-1030.
+        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+        Statistics 30(4), 962-1030.
 
         Examples
         --------
@@ -848,22 +847,23 @@ class GraphStructure(Structure):
 
         Notes
         -----
-        A MAG is read through its canonical DAG [1]_: each ``a <-> b`` becomes a hidden common
-        parent of ``a`` and ``b``, and each ``a -- b`` a selection variable that both ``a`` and
-        ``b`` point into. The MAG of that DAG is the input exactly when the input is a MAG. The
-        PAG then comes from the MAG's skeleton and separating sets: its unshielded colliders,
-        then the orientation rules R1-R10 of Zhang [2]_, which are complete, applied to a fixed
-        point. These are the rules ``andrey.fci`` and ``andrey.gfci`` apply, with the conditional
-        independence test of R4 answered by d-separation in the DAG. R4 and R5 search a bounded
-        number of paths, a bound small graphs do not reach.
+        A MAG is read through its canonical DAG (Richardson and Spirtes 2002): each ``a <-> b``
+        becomes a hidden common parent of ``a`` and ``b``, and each ``a -- b`` a selection variable
+        that both ``a`` and ``b`` point into. The MAG of that DAG is the input exactly when the
+        input is a MAG. The PAG then comes from the MAG's skeleton and separating sets: its
+        unshielded colliders, then the orientation rules R1-R10 of Zhang (2008), which are complete,
+        applied to a fixed point. These are the rules ``andrey.fci`` and ``andrey.gfci`` apply, with
+        the conditional independence test of R4 answered by d-separation in the DAG. R4 and R5
+        search a bounded number of paths, a bound small graphs do not reach.
 
         References
         ----------
-        .. [1] Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals
-           of Statistics 30(4), 962-1030.
-        .. [2] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in
-           the presence of latent confounders and selection bias. Artificial Intelligence
-           172(16-17), 1873-1896.
+        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+        Statistics 30(4), 962-1030.
+
+        Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+        presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+        1873-1896.
 
         Examples
         --------
