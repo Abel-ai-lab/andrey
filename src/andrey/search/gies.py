@@ -29,7 +29,7 @@ import numpy.typing as npt
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta, stats
 from andrey.core.knowledge import Constraints, mpdag, orient, violates
 from andrey.core.orient import pdag2dag, to_structure
-from andrey.core.score import BICScore, check_columns
+from andrey.core.score import BICScore, check_columns, penalty_weight
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search._parallel_ges import move_key
@@ -83,9 +83,11 @@ def cut_pairs(mask: np.ndarray) -> np.ndarray:
 class InterventionalBICScore:
     """Linear-Gaussian BIC with each variable scored on the rows where it was not intervened on.
 
-    A variable's local score is ``n_v * log(R) + lambda_value * log(n) * len(parents)``: ``n_v``
-    counts the rows without an intervention on the variable, ``R`` is the residual variance of its
-    regression on its parents over those rows, and ``n`` counts every row. Variables left alone in
+    A variable's local score is ``n_v * log(R) + lambda_value * log(n) * len(parents)`` plus the
+    extended-BIC term :func:`~andrey.core.score.ebic_penalty` of ``len(parents)`` among the ``d``
+    variables: ``n_v`` counts the rows without an intervention on the variable, ``R`` is the
+    residual variance of its regression on its parents over those rows, and ``n`` counts every
+    row. Variables left alone in
     the same rows share one :class:`~andrey.core.score.BICScore` over those rows' covariance, with
     the penalty of all ``n`` rows. With no interventions it equals
     :class:`~andrey.core.score.BICScore`.
@@ -98,6 +100,9 @@ class InterventionalBICScore:
         True where the row's value of the variable was set by an intervention; None for none.
     lambda_value : float, default=1.0
         Weight on the BIC complexity term of the deviance the search minimizes.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term, ``2 * ebic_gamma * log C(d - 1, len(parents))`` per
+        variable; ``0.0`` is the standard BIC.
     cache_size : int or None, default=1_000_000
         Memoization cache bound of each shared score; ``None`` is unbounded.
     """
@@ -108,6 +113,7 @@ class InterventionalBICScore:
         mask: np.ndarray | None,
         *,
         lambda_value: float = 1.0,
+        ebic_gamma: float = 0.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
         lambda_value = float(lambda_value)
@@ -120,6 +126,7 @@ class InterventionalBICScore:
             mask = np.zeros((n, d), dtype=bool)
         self.n = n
         self.lambda_value = lambda_value
+        self.ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
         self.log_n = float(np.log(n))
         self._groups: list[BICScore] = []
         self._group_of: list[int] = []
@@ -130,7 +137,11 @@ class InterventionalBICScore:
                 rows = ~mask[:, v]
                 cov = np.atleast_2d(stats.cov(X[rows], rowvar=False))
                 group = BICScore.from_cov(
-                    cov, int(rows.sum()), lambda_value=lambda_value, cache_size=cache_size
+                    cov,
+                    int(rows.sum()),
+                    lambda_value=lambda_value,
+                    ebic_gamma=ebic_gamma,
+                    cache_size=cache_size,
                 )
                 group.log_n = self.log_n  # the penalty counts every row
                 index[key] = len(self._groups)
@@ -692,6 +703,7 @@ def gies(
     mask: np.ndarray | None = None,
     *,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover an interventional essential graph by greedy interventional equivalence search.
@@ -711,6 +723,10 @@ def gies(
         :func:`intervention_mask` returns; None for observational data.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC.
     constraints : Constraints or None
         Background knowledge. No step adds a forbidden edge, removes or turns a required one, or
         reaches a class that holds no DAG that satisfies the knowledge (such a step is skipped
@@ -730,7 +746,7 @@ def gies(
     """
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
-    score = InterventionalBICScore(X, mask, lambda_value=lambda_value)
+    score = InterventionalBICScore(X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)
     ranks = tie_ranks(X).tolist()
     start = None

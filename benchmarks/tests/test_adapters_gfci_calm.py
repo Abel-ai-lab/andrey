@@ -47,7 +47,9 @@ def test_every_solution_has_its_own_name() -> None:
 def test_both_gfci_solutions_run_one_setting() -> None:
     mine, theirs = AndreyGFCI(), tetrad_gfci.TetradGFCI()
     assert (mine.algorithm, mine.output_type) == (theirs.algorithm, theirs.output_type)
-    assert mine.params() == theirs.params()
+    mine_params = mine.params()
+    assert mine_params.pop("ebic_gamma") == 0.0  # Tetrad scores the standard BIC
+    assert mine_params == theirs.params()
 
 
 def test_the_parallel_gfci_returns_the_serial_pag(monkeypatch) -> None:

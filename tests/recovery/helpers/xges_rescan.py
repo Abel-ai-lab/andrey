@@ -267,13 +267,14 @@ def xges_rescan(
     data: np.ndarray,
     *,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     extended_search: bool = True,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """:func:`andrey.search.xges.xges` with the rescanning search: the CPDAG and its total score."""
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-    score = BICScore(X, lambda_value=lambda_value)
+    score = BICScore(X, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
     ranks = tie_ranks(X).tolist()
     with backend.one_blas_thread():
         adj = _rescan_search(score, d, extended_search, ranks, constraints)

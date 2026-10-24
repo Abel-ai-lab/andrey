@@ -18,6 +18,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.adapters.andrey_hc import _andrey_version
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA
 
 _DEFAULT_LAMBDA = 1.0
 
@@ -55,7 +56,7 @@ class AndreyGIES:
 
     def params(self) -> dict[str, Any]:
         """BIC in deviance units."""
-        return {"lambda_value": _DEFAULT_LAMBDA}
+        return {"lambda_value": _DEFAULT_LAMBDA, "ebic_gamma": ANDREY_EBIC_GAMMA}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run GIES and return endpoint marks of the essential graph. The only timed region.
@@ -68,7 +69,10 @@ class AndreyGIES:
         X, mask = unstack(data)
         with andrey.config(backend=self.backend):
             graph, _score = gies(
-                X, mask, lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA))
+                X,
+                mask,
+                lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
+                ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
             )
         return np.asarray(graph.to_numpy())
 

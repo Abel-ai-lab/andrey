@@ -519,6 +519,7 @@ def _init_worker(
     n_samples: int,
     n_vars: int,
     lambda_value: float,
+    ebic_gamma: float,
     run_token: object,
     ranks: list[int],
 ) -> None:
@@ -528,14 +529,16 @@ def _init_worker(
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
     Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a pure function
     of the parent set, so it persists across tasks and passes for free. ``n_samples`` is the
-    observation count the BIC penalty uses; ``n_vars`` is the graph's node count; ``ranks`` holds
-    each column's tie rank.
+    observation count the BIC penalty uses, ``lambda_value`` and ``ebic_gamma`` its weights;
+    ``n_vars`` is the graph's node count; ``ranks`` holds each column's tie rank.
     """
     global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS, _WORKER_RANKS
     from threadpoolctl import threadpool_limits
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
-    _WORKER_DELTA = DeltaBICScore(BICScore.from_cov(cov, n_samples, lambda_value=lambda_value))
+    _WORKER_DELTA = DeltaBICScore(
+        BICScore.from_cov(cov, n_samples, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
+    )
     _WORKER_N = n_vars
     _WORKER_TOKEN = run_token
     _WORKER_RANKS = ranks
@@ -657,6 +660,7 @@ def _create_pool(
     n_samples: int,
     n_vars: int,
     lambda_value: float,
+    ebic_gamma: float,
     run_token: object,
     workers: int,
     ranks: list[int],
@@ -666,7 +670,7 @@ def _create_pool(
         n_vars,
         workers,
         _init_worker,
-        (cov, n_samples, n_vars, lambda_value, run_token, ranks),
+        (cov, n_samples, n_vars, lambda_value, ebic_gamma, run_token, ranks),
         context=_pick_context(),
     )
 
@@ -676,8 +680,9 @@ class _LazyWorkerSet:
 
     Never constructed if no pass crosses the work gate -- the property the no-pool-below-gate spy
     asserts by patching :func:`_create_pool`. Reused across passes so each worker's fixed-target
-    inv-cov cache persists (the cross-pass locality lever). Holds the ``token`` (the cov identity a
-    task carries so a worker can reject a mismatched run).
+    inv-cov cache persists (the cross-pass locality lever). Holds the ``token`` (the identity of the
+    score's covariance, sample count, and penalty weights, which a task carries so a worker can
+    reject a mismatched run).
     """
 
     def __init__(self, score: BICScore, n_vars: int, workers: int, ranks: list[int]) -> None:
@@ -690,12 +695,14 @@ class _LazyWorkerSet:
 
     def get(self) -> par.StableWorkerSet:
         if self._wset is None:
-            self.token = hash(self._score.cov.tobytes())
+            score = self._score
+            self.token = hash((score.cov.tobytes(), score.n, score.lambda_value, score.ebic_gamma))
             self._wset = _create_pool(
-                self._score.cov,
-                self._score.n,
+                score.cov,
+                score.n,
                 self._n_vars,
-                self._score.lambda_value,
+                score.lambda_value,
+                score.ebic_gamma,
                 self.token,
                 self._workers,
                 self._ranks,

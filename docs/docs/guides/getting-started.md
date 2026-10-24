@@ -515,10 +515,12 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-GES was more accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical
-to roughly 1,000 variables; FCI's errors passed the empty graph's at 800
-([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the
-data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#known-limits).
+On the large sparse benchmark graphs, GES with the standard BIC (`ebic_gamma=0.0`) kept many false
+edges. The default extended BIC, `ebic_gamma=1.0`, adds a penalty that grows with the number of
+variables, as the {py:func}`~andrey.ges` page describes. PC is practical to roughly 1,000 variables;
+FCI's errors passed the empty graph's at 800 ([Large graphs](../benchmarks/0.1.0.md#large-graphs)).
+Each supported method's API page states the data and sizes it was measured on. See [Known
+limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 

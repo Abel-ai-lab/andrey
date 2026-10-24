@@ -41,6 +41,7 @@ def _fit(
     indep_test: str,
     score_func: str,
     lambda_value: float,
+    ebic_gamma: float,
     max_iter: int | None,
     tabu_length: int,
     max_tabu: int | None,
@@ -92,6 +93,7 @@ def _fit(
             indep_test=indep_test,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             max_iter=max_iter,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
@@ -115,6 +117,7 @@ def mmhc(
     indep_test: str = "fisherz",
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -148,6 +151,11 @@ def mmhc(
         data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_iter : int or None, default=None
         Maximum hill-climbing moves, at least ``1``; ``None`` sets no limit.
     categorical : sequence of str or int, optional
@@ -220,6 +228,17 @@ def mmhc(
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
 
+    **Choosing the penalty.** The hill-climbing phase scores as :func:`~andrey.hc` does: the
+    linear-Gaussian BIC charges a variable ``lambda_value * log(n_samples)`` per parent plus the
+    extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [2]_, and
+    :func:`~andrey.ges` describes the choice. ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the
+    standard BIC. On simulated linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows,
+    the default ``ebic_gamma=1.0`` made fewer or as many errors (SHD) as the standard BIC on average
+    in 64 of 65 settings of graph, variables, and rows, and 0.2 more in the last (7.0 against 6.8
+    with 20 variables, mean degree 2, ``scale="unitless"``, and 1,000 rows); with 200 variables and
+    2,000 rows it made 49 errors against 73 (200 true edges). The gain is smaller than hill
+    climbing's, since the MMPC phase has already left out most false edges.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its hill-climbing phase scores
     every variable over the same rows, and score terms over different rows do not add up to the
     score of one dataset. Drop the incomplete rows first, which suits values missing completely at
@@ -235,6 +254,8 @@ def mmhc(
     ----------
     .. [1] Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing
        Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78.
+    .. [2] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -260,6 +281,7 @@ def mmhc(
         indep_test=indep_test,
         score_func=score_func,
         lambda_value=lambda_value,
+        ebic_gamma=ebic_gamma,
         max_iter=max_iter,
         tabu_length=10,
         max_tabu=None,
@@ -278,6 +300,7 @@ def rsmax2(
     indep_test: str = "fisherz",
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,
@@ -314,6 +337,11 @@ def rsmax2(
         any of :func:`~andrey.tabu`'s, which take no mixed data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_iter : int or None, default=None
         Maximum moves of the maximize phase, at least ``1``; ``None`` sets no limit.
     tabu_length : int, default=10
@@ -394,6 +422,19 @@ def rsmax2(
     :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are
     identical.
 
+    **Choosing the penalty.** The maximize phase scores as :func:`~andrey.hc` does: the
+    linear-Gaussian BIC charges a variable ``lambda_value * log(n_samples)`` per parent plus the
+    extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, and
+    :func:`~andrey.ges` describes the choice. ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the
+    standard BIC. With ``restrict="pc"`` and ``maximize="tabu"``, on simulated linear-Gaussian data
+    with 20 to 400 variables and 200 to 4,000 rows, the default ``ebic_gamma=1.0`` made fewer or as
+    many errors (SHD) as the standard BIC on average in 63 of 65 settings of graph, variables, and
+    rows, and more in two: 38.0 against 36.3 on the 46-variable ECOLI70 network with 1,000
+    simulated rows, where one of three draws moved by 7, and 39.2 against 38.8 with 50 variables,
+    mean degree 4, ``scale="unitless"``, and 1,000 rows. With 200 variables and 2,000 rows it made
+    42 errors against 65 (200 true edges). The default ``restrict="mmpc"`` with ``maximize="hc"``
+    is :func:`~andrey.mmhc`'s search, whose numbers are given there.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its score phase scores every
     variable over the same rows, and score terms over different rows do not add up to the score of
     one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
@@ -418,6 +459,8 @@ def rsmax2(
        structure learning. JMLR 15, 3921-3962.
     .. [5] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+    .. [6] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -443,6 +486,7 @@ def rsmax2(
         indep_test=indep_test,
         score_func=score_func,
         lambda_value=lambda_value,
+        ebic_gamma=ebic_gamma,
         max_iter=max_iter,
         tabu_length=tabu_length,
         max_tabu=max_tabu,
