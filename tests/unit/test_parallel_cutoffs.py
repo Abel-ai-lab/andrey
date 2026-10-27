@@ -19,6 +19,7 @@ import pytest
 import andrey
 from andrey.cli import calibration_report, main, render_calibration
 from andrey.constraint._skeleton import scan_pairs
+from andrey.core import backend
 from andrey.search import calibrate as cal
 
 pg = importlib.import_module("andrey.search._parallel_ges")
@@ -481,7 +482,8 @@ def test_the_rcot_cutoff_weighs_each_test_by_the_rows(rows, pooled, rcot_probe, 
     removals = _rcot_scan(test, rcot_probe)
     assert (removals is not None) is pooled
     if pooled:
-        serial = scan_pairs(_rcot(rcot_probe, rows), *_pass_args(rcot_probe))
+        with backend.one_blas_thread():  # as a fit's pass runs, and as a worker does
+            serial = scan_pairs(_rcot(rcot_probe, rows), *_pass_args(rcot_probe))
         assert removals == serial  # every separating set and p-value, bit for bit
 
 
