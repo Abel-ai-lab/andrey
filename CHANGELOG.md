@@ -83,6 +83,12 @@ change names its pull request.
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])
+- `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
+  the parents of both ends, which also bounds the subsets of the majority vote; unlike the
+  `max_depth` of `pc` and `fci`, it does not count those parents. Its number of tests grows
+  exponentially with the links at one node, so on many strongly related series an uncapped run may
+  not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
+  ([#468])
 - A fit larger than its method was measured to finish warns once per method with
   `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
   the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
@@ -125,6 +131,10 @@ change names its pull request.
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
   p-values in less time, because the test's batched counts hold a table only for each conditioning
   configuration that occurs in the data, not for every possible one. ([#463])
+- `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
+  batch of conditioning sets as one array of column numbers, records its tests once per batch, and,
+  without missing values, tests sets of more than three neighbors, which rarely repeat, without the
+  result cache. ([#468])
 - `fci`, `gfci`, `andrey.data.latent.marginal(dag, "pag")`, and `GraphStructure.to_pag` return the
   same graphs in less time on dense graphs with hidden variables, because the orientation rules R9
   and R10 make each of their path searches once per pass instead of once for each pair of nodes
@@ -900,6 +910,7 @@ First alpha release.
 [#461]: https://github.com/Abel-ai-lab/andrey/pull/461
 [#463]: https://github.com/Abel-ai-lab/andrey/pull/463
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
+[#468]: https://github.com/Abel-ai-lab/andrey/pull/468
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
 [#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481
