@@ -72,9 +72,10 @@ change names its pull request.
   `andrey.core.score.ebic_penalty`. `0.0` is the standard BIC; the other scores ignore it. ([#445])
 - `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`, and
   `pnl` accept missing values, a `NaN`, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV
-  file, each test reading only the rows where all of its variables are observed and
+  file, each test reading only the rows where all of its variables are observed, `fisherz` and
+  `student_t` computing each test's correlations directly from those rows, many tests at once, and
   `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
-  method refuses them with an error that names it and says what to do instead. ([#443])
+  method refuses them with an error that names it and says what to do instead. ([#443], [#453])
 
 ### Changed
 
@@ -806,5 +807,6 @@ First alpha release.
 [#430]: https://github.com/Abel-ai-lab/andrey/pull/430
 [#442]: https://github.com/Abel-ai-lab/andrey/pull/442
 [#443]: https://github.com/Abel-ai-lab/andrey/pull/443
+[#453]: https://github.com/Abel-ai-lab/andrey/pull/453
 [#445]: https://github.com/Abel-ai-lab/andrey/pull/445
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451

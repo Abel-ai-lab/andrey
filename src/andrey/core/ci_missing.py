@@ -2,10 +2,13 @@
 
 :func:`~andrey.core.ci.make_indep_test` returns a :class:`TestwiseDeletion` when the data hold
 ``NaN``; data without ``NaN`` get the registered test itself. A query of ``x`` and ``y`` given
-``S`` reads only the rows where ``x``, ``y``, and every member of ``S`` are observed: the
-registered test is built over those rows of those columns, kept in data order, and asked the same
-query, so the p-value is the one that test gives on that block. Each test thus keeps every row its
-own variables allow, where deleting every row with a missing value would drop rows for all of them.
+``S`` reads only the rows where ``x``, ``y``, and every member of ``S`` are observed. For
+:class:`~andrey.core.ci.FisherZ` and :class:`~andrey.core.ci.StudentT`, a
+:class:`GaussianDeletion` computes the query's correlations directly from those rows, many queries
+at once, so the p-value is the one the test gives on that block up to rounding. Every other test is
+built over those rows of those columns, kept in data order, and asked the same query, so the
+p-value is the one that test gives on that block exactly. Each test thus keeps every row its own
+variables allow, where deleting every row with a missing value would drop rows for all of them.
 
 Deleting rows per test is sound when the values are missing completely at random (MCAR): the rows a
 test keeps are a random sample of all rows, so each test keeps its level and a constraint-based
@@ -27,30 +30,55 @@ References
 from __future__ import annotations
 
 import contextlib
+import functools
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Generator, Iterable, Mapping
 from contextvars import ContextVar
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
 
+from . import backend
 from .ci import (
+    _BOUND_MARGIN,
+    _ONE_MINUS_EPS,
+    _SINGULAR_RTOL,
     CGTest,
     ChiSquare,
     CITest,
     DGTest,
+    FisherZ,
     PartialCorrelationTest,
     SingularCorrelationError,
+    StudentT,
     _canonical,
 )
-from .score import CopiedColumnsError, copies_error, copies_message, copy_groups
+from .score import (
+    ZERO_RESIDUAL,
+    CopiedColumnsError,
+    copies_error,
+    copies_message,
+    copy_groups,
+)
 
 __all__ = ["TestwiseDeletion"]
 
 # The most bytes of row blocks the tests one TestwiseDeletion keeps for reuse hold together.
 _CACHE_BYTES = 1 << 27
+
+# The most bytes of row values GaussianDeletion reads at once to compute new blocks' matrices.
+_STEP_BYTES = 1 << 23
+# The bytes of the Python objects that keep one block's matrix in GaussianDeletion's cache.
+_ENTRY_BYTES = 512
+# How far inside the exact path's thresholds a query stays to keep GaussianDeletion's own answer:
+# a query whose block nears a copy, a singular correlation submatrix, or a constant column is
+# answered by the exact path, which then decides it.
+_MARGIN = 100.0
+# The degrees of freedom of a partial-correlation test given |S| conditioners on n rows are
+# n - |S| - offset.
+_DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 
 #: The row counts of the tests run inside :func:`rows_tested`, or ``None`` outside it.
 _ROWS: ContextVar[Counter[int] | None] = ContextVar("andrey_rows_tested", default=None)
@@ -100,7 +128,8 @@ class TestwiseDeletion:
     for the query. Queries are canonicalized as :class:`~andrey.core.ci.FisherZ`'s are. The test of
     a block answers every later query over the same columns; the blocks the reused tests hold stay
     within ``_CACHE_BYTES``, the least recently used dropped first. A nonlinear or a registered
-    test, whose state grows with its queries, is built anew for each query.
+    test, whose state grows with its queries, is built anew for each query. A partial-correlation
+    test gets the :class:`GaussianDeletion` subclass, which builds no test per block.
 
     A query raises ``ValueError`` when its block has fewer rows than its test needs: 2, or
     ``|S| + 3`` for ``"fisherz"`` and ``"student_t"``, the rows their degrees of freedom need; when
@@ -350,6 +379,274 @@ class PartialCorrelationDeletion(TestwiseDeletion):
         return self._copies
 
 
+class GaussianDeletion(PartialCorrelationDeletion):
+    """:class:`PartialCorrelationDeletion` of :class:`~andrey.core.ci.FisherZ` or
+    :class:`~andrey.core.ci.StudentT` that answers many queries at once.
+
+    A query's correlation submatrix is the correlation of the rows observed in all of its columns,
+    computed directly, with no test built for the block: from sums over those rows of each column's
+    values less its observed mean, for every pair of columns once (:meth:`_pairwise`) and for every
+    larger block once while it is kept (:meth:`_submatrices`). Its partial correlation, clamp,
+    degrees of freedom, and p-value are those of the block's test, so the p-value equals that
+    test's up to rounding, as the sums run in another order. A query's answer does not depend on
+    the queries evaluated with it, so every query path (a single call, :meth:`batched_call`,
+    :meth:`statistic_pvalues`, and the canonical query arrays the skeleton searches pass) gives it
+    the same bits.
+
+    A query whose block has fewer rows than the test needs, a continuous column that may be
+    constant on the block, columns within ``_MARGIN`` of a copy, a correlation submatrix within
+    ``_MARGIN`` of the singular bound, or a partial correlation or p-value that is not a number is
+    answered by :class:`PartialCorrelationDeletion` instead, which raises where it raises. So every
+    error is the exact path's, at the same query.
+    """
+
+    def __init__(
+        self,
+        data: np.ndarray,
+        build: Callable[[np.ndarray, list[int]], CITest],
+        *,
+        name: str,
+        test_class: type | None,
+        continuous: np.ndarray | None,
+        check_copies: bool,
+    ) -> None:
+        super().__init__(
+            data,
+            build,
+            name=name,
+            test_class=test_class,
+            continuous=continuous,
+            check_copies=check_copies,
+        )
+        self._kind = cast("type[PartialCorrelationTest]", test_class)  # FisherZ or StudentT
+        self._offset = _DF_OFFSET[self._kind]
+        # Each column less its observed mean, 0 where unobserved, with the observed rows: one row
+        # of n values per column, so a block's columns are contiguous.
+        values = np.where(self._observed, data, 0.0)
+        values -= values.sum(axis=0) / np.maximum(self._observed.sum(axis=0), 1)
+        self._values = np.ascontiguousarray(np.where(self._observed, values, 0.0).T)
+        self._seen = np.ascontiguousarray(self._observed.T)
+        self._pairs: tuple[np.ndarray, np.ndarray] | None = None
+        self._blocks: OrderedDict[tuple[int, ...], tuple[np.ndarray, int]] = OrderedDict()
+        self._kept = 0
+        self._repeats(list(range(data.shape[1])))
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
+
+        The p-value is the registered test's on the rows observed in all of the query's columns, up
+        to rounding. A larger p-value means more independence.
+        """
+        return self.statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int] = ()
+    ) -> tuple[float, float]:
+        """Return the partial correlation and p-value of ``x`` and ``y`` given ``condition_set``."""
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        r, p = self._answer(
+            np.array([x_int]), np.array([y_int]), np.array([cond], dtype=np.intp).reshape(1, -1)
+        )
+        return float(r[0]), float(p[0])
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of many queries sharing one conditioning-set size.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets, each distinct and excluding ``x[i]`` and ``y[i]``; entry ``i`` equals
+        ``statistic_pvalue(x[i], y[i], conditions[i])``.
+        """
+        x = np.asarray(x, dtype=np.intp)
+        y = np.asarray(y, dtype=np.intp)
+        conds = np.sort(np.asarray(conditions, dtype=np.intp).reshape(len(x), -1), axis=1)
+        return self._answer(np.minimum(x, y), np.maximum(x, y), conds)
+
+    def _canonical_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> np.ndarray:
+        """P-values of many canonical queries sharing one conditioning-set size.
+
+        ``x[i] < y[i]``, and row ``i`` of ``conditions`` is sorted and distinct and excludes both,
+        as the skeleton searches build their queries; entry ``i`` equals
+        ``self(x[i], y[i], conditions[i])``.
+        """
+        return self._answer(
+            np.asarray(x, dtype=np.intp),
+            np.asarray(y, dtype=np.intp),
+            np.asarray(conditions, dtype=np.intp).reshape(len(x), -1),
+        )[1]
+
+    def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
+        """Return the p-values of one pair over many conditioning sets, in their order.
+
+        Entry ``i`` equals ``self(x, y, condition_sets[i])``; the sets may differ in size.
+        """
+        queries = [_canonical(x, y, cond) for cond in condition_sets]
+        sizes: dict[int, list[int]] = {}
+        for i, (_, _, cond) in enumerate(queries):
+            sizes.setdefault(len(cond), []).append(i)
+        r = np.empty(len(queries), dtype=np.float64)
+        p = np.empty(len(queries), dtype=np.float64)
+        rows = np.empty(len(queries), dtype=np.int64)
+        flagged = np.empty(len(queries), dtype=bool)
+        for size, at in sizes.items():
+            arrays = _arrays([queries[i] for i in at], size)
+            r[at], p[at], rows[at], flagged[at] = self._fast(*arrays)
+        self._settle(queries.__getitem__, r, p, rows, flagged)
+        return p.tolist()
+
+    def _answer(
+        self, lo: np.ndarray, hi: np.ndarray, conds: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The partial correlations and p-values of canonical queries of one size, in order."""
+        r, p, rows, flagged = self._fast(lo, hi, conds)
+        self._settle(lambda k: (int(lo[k]), int(hi[k]), conds[k].tolist()), r, p, rows, flagged)
+        return r, p
+
+    def _settle(
+        self,
+        query: Callable[[int], tuple[int, int, list[int]]],
+        r: np.ndarray,
+        p: np.ndarray,
+        rows: np.ndarray,
+        flagged: np.ndarray,
+    ) -> None:
+        """Answer the ``flagged`` queries by the exact path, in order, and count every query.
+
+        ``query(k)`` is query ``k`` as ``(x, y, conditioning set)``. ``r`` and ``p`` hold the fast
+        answers and take the exact ones in place; ``rows`` holds each query's row count. The
+        queries are counted in order, so a query that raises does so after the queries before it,
+        as the exact path's loop does.
+        """
+        counter = _ROWS.get()
+        start = 0
+        for k in np.flatnonzero(flagged).tolist():
+            if counter is not None:
+                counter.update(rows[start:k].tolist())
+            x, y, cond = query(k)
+            r[k], p[k] = self._query(
+                lambda test, a, b, s: test.statistic_pvalue(a, b, s), x, y, cond
+            )
+            start = k + 1
+        if counter is not None:
+            counter.update(rows[start:].tolist())
+
+    def _fast(
+        self, lo: np.ndarray, hi: np.ndarray, conds: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """``(r, p, rows, flagged)`` of canonical queries of one size, without the exact path.
+
+        ``rows`` is each query's row count and ``flagged`` marks the queries the exact path
+        answers instead (see the class); their ``r`` and ``p`` are meaningless.
+        """
+        size = conds.shape[1]
+        columns = np.empty((len(lo), size + 2), dtype=np.intp)
+        columns[:, 0], columns[:, 1], columns[:, 2:] = lo, hi, conds
+        with np.errstate(all="ignore"):
+            if size == 0:
+                count, corr = self._pairwise()
+                rows = count[lo, hi]
+                stack = np.empty((len(lo), 2, 2), dtype=np.float64)
+                stack[:, 0, 0] = stack[:, 1, 1] = 1.0
+                stack[:, 0, 1] = stack[:, 1, 0] = corr[lo, hi]
+            else:
+                stack, rows = self._submatrices(columns)
+            flagged = rows < size + 3
+            flagged |= (rows[:, None] <= self._most[columns]).any(axis=1)
+            flagged |= ~np.isfinite(stack).all(axis=(1, 2))
+            if self._check_copies:
+                i, j = _apart(size + 2)
+                flagged |= (1.0 - stack[:, i, j] ** 2 <= _MARGIN * ZERO_RESIDUAL).any(axis=1)
+            if size == 0:
+                r = stack[:, 0, 1]
+            elif size == 1:
+                rxz, ryz = stack[:, 0, 2], stack[:, 1, 2]
+                r = (stack[:, 0, 1] - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
+            else:
+                inverse, singular = _inverse(stack, flagged)
+                flagged |= singular
+                r = -inverse[:, 0, 1] / np.sqrt(np.abs(inverse[:, 0, 0] * inverse[:, 1, 1]))
+            r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+            p = np.asarray(self._kind._pvalue(r, rows - size - self._offset), dtype=np.float64)
+        flagged |= ~(np.isfinite(r) & np.isfinite(p))
+        return r, p, rows, flagged
+
+    def _pairwise(self) -> tuple[np.ndarray, np.ndarray]:
+        """The rows each pair of columns shares and the pair's correlation on them, ``(d, d)``.
+
+        Computed once, from sums over the rows both columns observe of the values less each
+        column's observed mean: ``[i, j]`` is canonical for ``i < j``.
+        """
+        if self._pairs is None:
+            seen = self._observed.astype(np.float64)
+            values = self._values.T
+            # One BLAS thread: the products' bits then do not depend on the thread count.
+            with np.errstate(all="ignore"), backend.one_blas_thread():
+                count = seen.T @ seen
+                sums = values.T @ seen  # [i, j]: column i's sum over the rows both observe
+                spread = (values * values).T @ seen - sums * sums / count
+                cov = values.T @ values - sums * sums.T / count
+                corr = np.clip(cov / np.sqrt(spread * spread.T), -1.0, 1.0)
+            self._pairs = (np.rint(count).astype(np.int64), corr)
+        return self._pairs
+
+    def _submatrices(self, columns: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """The correlation submatrices of the queries whose columns ``[x, y, *S]`` are the rows of
+        ``columns``, on the rows each observes, and those row counts.
+
+        A block's matrix is computed once, over its columns in data order, from the sums over its
+        rows of the values less each column's observed mean, and kept for later queries over the
+        same columns within ``_CACHE_BYTES``, each taking ``_ENTRY_BYTES`` besides its matrix; a
+        query reads it in its own order. The blocks not
+        kept are computed in steps of at most ``_STEP_BYTES`` of row values.
+        """
+        k = columns.shape[1]
+        keys = [tuple(row) for row in np.sort(columns, axis=1).tolist()]
+        new = list(dict.fromkeys(key for key in keys if key not in self._blocks))
+        step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
+        for start in range(0, len(new), step):
+            chunk = new[start : start + step]
+            blocks, counts = _block_correlations(
+                self._values, self._seen, np.array(chunk, dtype=np.intp)
+            )
+            for key, block, count in zip(chunk, blocks, counts.tolist()):
+                self._blocks[key] = (block, count)
+                self._kept += block.nbytes + _ENTRY_BYTES
+        found = [self._blocks[key] for key in keys]
+        for key in keys:
+            self._blocks.move_to_end(key)
+        while self._kept > _CACHE_BYTES:
+            self._kept -= self._blocks.popitem(last=False)[1][0].nbytes + _ENTRY_BYTES
+        ordered = np.stack([block for block, _ in found])
+        rank = np.argsort(np.argsort(columns, axis=1), axis=1)
+        at = np.arange(len(columns))[:, None, None]
+        stack = ordered[at, rank[:, :, None], rank[:, None, :]]
+        return stack, np.array([count for _, count in found], dtype=np.int64)
+
+    def copies(self) -> tuple[tuple[int, ...], ...]:
+        """The groups of columns that repeat one another up to scale and shift.
+
+        Each pair of columns is compared on the rows where both are observed, as
+        :meth:`PartialCorrelationDeletion.copies` compares them, with the same groups: a pair whose
+        correlation from :meth:`_pairwise` is within ``_MARGIN`` of a copy, or is not a number, is
+        compared on its rows as the exact path compares it, and every other pair is no copy.
+        """
+        if not hasattr(self, "_copies"):
+            count, corr = self._pairwise()
+            with np.errstate(invalid="ignore"):
+                near = (count > 2) & ~(1.0 - corr * corr > _MARGIN * ZERO_RESIDUAL)
+            exact = np.eye(self._data.shape[1])
+            for a, b in zip(*np.nonzero(np.triu(near, 1))):
+                rows = self._observed[:, a] & self._observed[:, b]
+                pair = self._data[rows][:, [a, b]]
+                if (np.ptp(pair, axis=0) > 0).all():
+                    exact[a, b] = exact[b, a] = np.corrcoef(pair, rowvar=False)[0, 1]
+            self._copies = copy_groups(exact, self._data.shape[0])
+        return self._copies
+
+
 class BoundedDeletion(TestwiseDeletion):
     """:class:`TestwiseDeletion` of a test that can stop once the side of ``alpha`` is certain."""
 
@@ -409,8 +706,10 @@ def testwise_deletion(
         continuous = np.ones(arr.shape[1], dtype=bool) if mask is None else ~mask
     else:
         continuous = np.ones(arr.shape[1], dtype=bool)
-    if test_class is not None and issubclass(test_class, PartialCorrelationTest):
-        kind: type[TestwiseDeletion] = PartialCorrelationDeletion
+    if test_class in _DF_OFFSET:
+        kind: type[TestwiseDeletion] = GaussianDeletion
+    elif test_class is not None and issubclass(test_class, PartialCorrelationTest):
+        kind = PartialCorrelationDeletion
     elif test_class is not None and hasattr(test_class, "_bounded_pvalue"):
         kind = BoundedDeletion
     else:
@@ -423,6 +722,71 @@ def testwise_deletion(
         continuous=continuous,
         check_copies=check_copies,
     )
+
+
+def _block_correlations(
+    values: np.ndarray, seen: np.ndarray, columns: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """The correlation matrices of the blocks whose columns are the rows of ``columns``, and their
+    row counts.
+
+    ``values`` holds each column's values less its observed mean, ``0`` where unobserved, and
+    ``seen`` its observed rows, one row per column. Block ``b`` keeps the rows observed in all of
+    ``columns[b]``; its covariances come from the sums over every row with the others zeroed, the
+    sums of its own values only, so a block's matrix does not depend on the others computed with
+    it. Clipped to ``[-1, 1]``, as :func:`numpy.corrcoef` clips.
+    """
+    kept = seen[columns[:, 0]].copy()
+    for c in range(1, columns.shape[1]):
+        kept &= seen[columns[:, c]]
+    count = np.count_nonzero(kept, axis=1)
+    block = values[columns] * kept[:, None, :]
+    sums = block.sum(axis=2)
+    # einsum sums each product along its row in NumPy's own loop, the same whatever the BLAS.
+    products = np.einsum("bin,bjn->bij", block, block)
+    cov = products - sums[:, :, None] * sums[:, None, :] / count[:, None, None]
+    spread = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
+    return np.clip(cov / spread[:, :, None] / spread[:, None, :], -1.0, 1.0), count
+
+
+@functools.cache
+def _apart(k: int) -> tuple[np.ndarray, np.ndarray]:
+    """The row and column indices of the entries above the diagonal of a ``(k, k)`` matrix."""
+    return np.triu_indices(k, 1)
+
+
+def _arrays(
+    queries: list[tuple[int, int, list[int]]], size: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The canonical query arrays ``(x, y, conditions)`` of ``queries``, each of ``size``."""
+    lo = np.array([x for x, _, _ in queries], dtype=np.intp)
+    hi = np.array([y for _, y, _ in queries], dtype=np.intp)
+    conds = np.array([cond for _, _, cond in queries], dtype=np.intp).reshape(len(queries), size)
+    return lo, hi, conds
+
+
+def _inverse(stack: np.ndarray, skip: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The inverses of a ``(N, k, k)`` stack of correlation submatrices, and which are near
+    singular.
+
+    A matrix is near singular when an entry of its inverse reaches ``1 / _MARGIN`` of the bound
+    :func:`~andrey.core.ci._invert_nonsingular` settles a matrix by, or, when the stack has an
+    exactly singular matrix, when its smallest eigenvalue is at most ``_MARGIN`` times
+    ``_SINGULAR_RTOL`` of its largest. The rows ``skip`` marks are inverted as the identity. Each
+    inverse is that of its matrix alone.
+    """
+    k = stack.shape[-1]
+    stack = np.where(skip[:, None, None], np.eye(k), stack)
+    singular = np.zeros(len(stack), dtype=bool)
+    try:
+        inverse = np.linalg.inv(stack)
+    except np.linalg.LinAlgError:
+        w = np.linalg.eigvalsh(stack)
+        singular = ~(w[:, 0] > w[:, -1] * _MARGIN * _SINGULAR_RTOL)
+        stack[singular] = np.eye(k)
+        inverse = np.linalg.inv(stack)
+    limit = 1.0 / (_MARGIN * _BOUND_MARGIN * _SINGULAR_RTOL * k * k)
+    return inverse, singular | ~(np.abs(inverse).max(axis=(1, 2)) < limit)
 
 
 def _shipped_class(factory: Callable[..., CITest]) -> type | None:

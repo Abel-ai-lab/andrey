@@ -260,9 +260,12 @@ andrey.pc(data, indep_test="cmiknn_k5")
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
 
 On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
-{py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query builds the test on the
-rows observed in all of its columns, those columns in data order, so its p-value is the one the test
-gives on that block. A registered test works the same way, built anew for each query.
+{py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
+in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from
+those rows, many queries at once, so the p-value is the one the test gives on that block up to
+rounding in its last digits. Every other test is built on that block, its columns in data order,
+and gives that test's p-value exactly; a registered test works the same way, built anew for each
+query.
 
 ```{eval-rst}
 .. currentmodule:: andrey.core
