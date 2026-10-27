@@ -17,7 +17,8 @@ the rung where a ladder ended past the accuracy boundary carries ``accuracy``. R
 ``uv run python docs/blog/0.10.0/boundary.py [summary.json] [outdir] [card_outdir]``. The release
 card's ``ladders.html`` lists, as a table, the ladders the maps do not draw: the FCI and GFCI
 diagonals, where the rows grow with the variables, and the latent-variable, time-series, and
-pairwise methods, and its ``settings.html`` each method's settings.
+pairwise methods; its ``settings.html`` gives each method's settings and the call that draws its
+data.
 
 The maps are a reference for the measured conditions, not a hard limit: another graph generator,
 other data, other settings, or another machine move a boundary.
@@ -367,6 +368,28 @@ def settings_table(lane: dict) -> str:
     )
 
 
+def generators_table(lane: dict) -> str:
+    """The card's table of the data: for each generator in the lane's ``generators``, what it draws,
+    the methods that ran on it, and the public call that draws it."""
+    order = [spec.name for spec in list_specs()]
+    methods: dict[str, set[str]] = {}
+    for ladder in lane["ladders"]:
+        methods.setdefault(ladder["generator"], set()).add(ladder["method"])
+    body = "".join(
+        f'<tr><th scope="row">{escape(generator["description"])}<small>'
+        f"{escape(', '.join(NAMES.get(m, m) for m in sorted(methods[name], key=order.index)))}"
+        f"</small></th><td><code>{escape(generator['call'])}</code></td></tr>"
+        for name, generator in lane.get("generators", {}).items()
+        if name in methods
+    )
+    return (
+        '<figure class="ct"><p class="ct-title">Each method\'s data</p><div class="ct-scroll">'
+        '<table class="ct-table"><thead><tr><th scope="col">Data</th><th scope="col">Call</th>'
+        f"</tr></thead><tbody>{body}</tbody></table></div><figcaption>The call that draws each "
+        "dataset, with the size, density, and seed of the rung.</figcaption></figure>\n"
+    )
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
     lane = json.loads(path.read_text(encoding="utf-8"))["boundary"]
@@ -378,7 +401,9 @@ def main() -> None:
     card = Path(sys.argv[3]) if len(sys.argv) > 3 else CARD
     card.mkdir(exist_ok=True)
     (card / "ladders.html").write_text(ladders_table(lane), encoding="utf-8")
-    (card / "settings.html").write_text(settings_table(lane), encoding="utf-8")
+    (card / "settings.html").write_text(
+        settings_table(lane) + generators_table(lane), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
