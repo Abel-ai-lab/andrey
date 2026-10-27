@@ -125,6 +125,10 @@ change names its pull request.
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
   p-values in less time, because the test's batched counts hold a table only for each conditioning
   configuration that occurs in the data, not for every possible one. ([#463])
+- `fci`, `gfci`, `andrey.data.latent.marginal(dag, "pag")`, and `GraphStructure.to_pag` return the
+  same graphs in less time on dense graphs with hidden variables, because the orientation rules R9
+  and R10 make each of their path searches once per pass instead of once for each pair of nodes
+  that needs it. ([#485])
 
 ## [0.10.0] - 2026-10-27
 
@@ -899,3 +903,4 @@ First alpha release.
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
 [#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481
+[#485]: https://github.com/Abel-ai-lab/andrey/pull/485
