@@ -1,6 +1,7 @@
 ---
 name: graph-representation
-description: How Andrey stores a causal graph, compared with other causal discovery packages.
+description: How Andrey stores a causal graph, converts it between kinds, and hands it to other
+  packages such as DoWhy.
 meta:
   type: guide
 ---
@@ -60,8 +61,8 @@ the edge between `i` and `j`, so every edge fills two cells. The codes are expor
 | Edge | `M[i, j]` | `M[j, i]` | Valid in |
 |---|---|---|---|
 | `i -> j` | `TAIL` | `ARROW` | every kind |
-| `i -- j` | `TAIL` | `TAIL` | `cpdag`, `pag` |
-| `i <-> j` | `ARROW` | `ARROW` | `pag` (bidirected edge); the same codes mean a 2-cycle in `digraph` |
+| `i -- j` | `TAIL` | `TAIL` | `cpdag`, `pag`, `mag` |
+| `i <-> j` | `ARROW` | `ARROW` | `pag`, `mag` (bidirected edge); the same codes mean a 2-cycle in `digraph` |
 | `i o-> j` | `CIRCLE` | `ARROW` | `pag` |
 | `i -o j` | `TAIL` | `CIRCLE` | `pag` |
 | `i o-o j` | `CIRCLE` | `CIRCLE` | `pag` |
@@ -84,7 +85,9 @@ in a `dag` or `digraph`.
   two directional p-values and HSIC statistics; each two-node graph holds the direction they
   decide, by the rule the method's `alpha` parameter selects. PCMCI reports each lagged link's MCI
   `p_values` and `statistics`, and the `parents` its first step selected; PCMCI+ reports the same
-  for every lag from 0, plus the same-step `conflicts` and `ambiguous_triples`. LPCMCI reports
+  for every lag from 0, plus the same-step `conflicts` and `ambiguous_triples`. PC, CD-NOD, FCI,
+  and GFCI with `collider_rule="conservative"` or `"majority"` report `ambiguous_triples`, the
+  `[x, z, y]` triples, by column position, whose middle node the vote left undecided. LPCMCI reports
   every link with all its marks as `links`, plus `p_values`, `statistics`, its preliminary
   `parents`, and the links with a conflicting mark as `conflicts`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
@@ -160,6 +163,7 @@ mixes numbers with text is an error.
 | `to_edges()` | structured array with fields `i`, `j`, `mark_i`, `mark_j` |
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
 | `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
+| `to_dot()` | Graphviz DOT text, named by `labels` when set |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
 
 `GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
@@ -214,6 +218,60 @@ def from_binary_dag(A):
   needs no transpose. Its wildcard and compound codes (3 and above) have no Andrey equivalent.
 - **lingam** - pass `adjacency_matrix_.T` to `from_binary_dag`. Some estimators write `NaN` for
   an unobserved common cause; decide how to encode those pairs first.
+
+`to_dot()` writes every edge with its endpoint marks as Graphviz arrow shapes: a directed edge runs
+from tail to arrowhead, an undirected edge has `dir=none`, and any other edge has `dir=both`, with
+`arrowtail` and `arrowhead` set to `normal` for an arrowhead, `odot` for a circle, and `none` for a
+tail. Writing it needs no other package; Graphviz renders it.
+
+`GraphStructure` also converts between graph kinds; a result reaches these through its graph, as
+in `out.structure.to_dag(tie_break="label")`:
+
+| Call | Returns |
+|---|---|
+| `cpdag.to_dag(tie_break="label")` or `cpdag.to_dag(seed=0)` | a `dag` of the CPDAG's equivalence class |
+| `dag.to_mag(latent=..., selection=...)` | the `mag` over the other nodes |
+| `graph.to_pag(latent=..., selection=...)` | the `pag` of a DAG or of a MAG over the other nodes |
+
+A CPDAG with an undirected edge holds more than one DAG, so `to_dag` raises a `ValueError` that
+names those edges unless you say how to pick one: `tie_break="label"` takes the DAG the node labels
+decide, the same whatever the column order, and `seed` takes a reproducible random DAG of the
+class, though not every DAG is equally likely. A CPDAG without an undirected edge, or a DAG, needs
+neither.
+
+A `mag`, a maximal ancestral graph, is one member of a PAG's class: it has a PAG's marks without
+circles, and the metrics score it as they score a PAG. `latent` and `selection` name nodes by
+label or 0-based position; `latent` defaults to the nodes that `node_types` flags. A hidden common
+cause becomes `<->` in the MAG, and two ancestors of a selection variable become `--`. `to_pag`
+gives the PAG that `fci` returns with an exact conditional-independence test, the fair target to
+score `fci` against. `andrey.metrics.to_cpdag` returns a DAG's CPDAG. `from_numpy` never infers
+`mag`, so pass `kind="mag"` for one; `to_pcalg` writes a MAG as `amat.pag`, and
+`from_pcalg(amat, "mag")` reads it back.
+
+## Hand a graph to DoWhy
+
+DoWhy estimates a causal effect from data and a DAG. Pass it the DAG as DOT text, with the data
+whose columns name the nodes:
+
+```python
+import andrey
+from dowhy import CausalModel
+
+out = andrey.pc(df)                                # a CPDAG over the columns of df
+dag = out.structure.to_dag(tie_break="label")      # the DAG of its class the labels decide
+model = CausalModel(data=df, treatment="x", outcome="y", graph=dag.to_dot())
+estimand = model.identify_effect()
+estimate = model.estimate_effect(estimand, method_name="backdoor.linear_regression")
+estimate.value
+```
+
+DoWhy reads DOT text through pydot or pygraphviz, so install one of them with DoWhy. It reads every
+edge as directed, so pass a DAG. The DAGs of one CPDAG's class can disagree on the direction of an
+edge near the treatment, and the estimate follows that direction: a common cause of the treatment
+and the outcome in one DAG can be a step between them in another, which changes what DoWhy adjusts
+for. That is why `to_dag` asks you to pick, with `tie_break="label"` or `seed`. Settle such an
+edge with `knowledge` before you estimate, or compare the estimates over several seeds. A PAG has
+no single DAG to hand over.
 
 ## References
 

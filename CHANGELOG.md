@@ -9,8 +9,73 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `andrey.data.sample_scm`, `SCM.sample`, and `andrey.data.generate` z-score every column by
+  default, `scale="standardize"`, so no method can read the causal order off the variances the
+  simulation happened to give; VAR and VARMA series take `"standardize"` too. Pass `scale="raw"`
+  for the values these functions returned before. ([#411])
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `mmhc`, and `rsmax2` score
+  continuous data with the extended BIC by default: the linear-Gaussian BIC adds
+  `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, with
+  `ebic_gamma=1.0` (Chen and Chen 2008), a penalty that grows with the number of variables, so the
+  graphs keep fewer false edges. On simulated linear-Gaussian data with 20 to 400 variables and 200
+  to 4,000 rows, the mean errors (SHD) per true edge fell by 0.74 to 0.82 for GES, XGES, GIES, hill
+  climbing, Tabu search, BOSS, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase
+  already leaves out most false edges; exact search's fell by 0.24 at 20 variables. With 200
+  variables and 2,000 rows, GES's errors fell from 211 to 24. `gfci` keeps `ebic_gamma=0.0`: its
+  errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
+  the graphs the others returned before. ([#445])
+
 ### Added
 
+- Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
+  `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
+  or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
+  parents and children with `target=`, or every variable's set without it. ([#400])
+- Experimental `notears` and `dagma`, continuous-optimization learners that fit a weighted DAG by
+  minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only: NOTEARS with
+  the least-squares loss and the trace-exponential constraint, DAGMA with its log-determinant
+  constraint and central path. Both take the papers' defaults, honor all four parts of `knowledge`,
+  and fit on rank-ordered columns, so they draw no random numbers and do not depend on the column
+  order. `robust=True` follows the first fit with the likelihood path of Deng et al. (2024): the
+  Gaussian likelihood with one noise variance per variable and a quasi-MCP penalty, refit while the
+  likelihood falls. ([#430])
+- `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
+  `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
+  `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
+  pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
+  time-series method on one series resamples blocks of rows; the result is the same at any
+  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
+- `scale="unitless"` in `andrey.data.sample_scm` and `SCM.sample` draws a linear model's weights
+  and noise so that every variable has variance 1 and its parameters depend only on its number of
+  parents (Herman et al. 2025), so on average neither the variances nor the share of each variable
+  the others explain follows the causal order; it takes up to 1,000 variables.
+  `andrey.data.generate` takes `scale`. For contributors, the benchmark harness has unitless
+  variants of its four linear regimes. ([#411])
+- `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
+  take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
+  `cause` at time `t - lag` to `effect` at time `t`, so you can rule links in or out at one lag.
+  ([#410])
+- `GraphStructure.to_dag`, `to_mag`, and `to_pag` turn a CPDAG into one DAG of its class, asking
+  how to pick one when the class holds several, a DAG with hidden and selection variables into
+  its maximal ancestral graph, and a DAG or MAG into its PAG; the new `"mag"` kind holds a MAG,
+  which scores and draws as a PAG and reads and writes pcalg's `amat.pag`; and `to_dot()` writes
+  any graph as Graphviz DOT text, which the graph-representation guide hands to DoWhy. ([#418])
+- `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule="conservative"` or `"majority"`, which decide
+  each collider by a vote over the separating subsets of its ends' neighbors and list the triples
+  the vote leaves undecided in `metadata["ambiguous_triples"]`. ([#397])
+- `ebic_gamma`, the weight of the extended-BIC term, for every method that scores with the
+  linear-Gaussian BIC: `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
+  `gfci`, `mmhc`, and `rsmax2`, and for `andrey.core.score.BICScore`, with the term itself in
+  `andrey.core.score.ebic_penalty`. `0.0` is the standard BIC; the other scores ignore it. ([#445])
+- `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, `lpcmci`, `anm`, and
+  `pnl` accept missing values, a `NaN`, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV
+  file, each test reading only the rows where all of its variables are observed, `fisherz` and
+  `student_t` computing each test's correlations directly from those rows, many tests at once, and
+  `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
+  method refuses them with an error that names it and says what to do instead. ([#443], [#453])
 - `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
   the parents of both ends, which also bounds the subsets of the majority vote. Its number of tests
   grows exponentially with the links at one node, so on many strongly related series an uncapped
@@ -19,9 +84,44 @@ change names its pull request.
 
 ### Changed
 
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="cmiknn"` return the same graphs and p-values
+  in less time on CPUs without AVX512_ICL, such as the AMD EPYC 7713, because CMIknn selects each
+  row's `k`-th neighbor distance in 32-bit integers, which NumPy sorts with SIMD on AVX2. On an
+  EPYC 7713 a fit on 10 variables and 1,000 rows took 6.5 minutes instead of 22, and the quality
+  gate's CMIknn fits took half as long. On CPUs with AVX512_ICL, such as the EPYC 9534, the
+  selection is unchanged and the same fits take about 10% less time. ([#391])
+- `andrey.data.latent.marginal(dag, "mag")` returns a graph of kind `"mag"` instead of `"pag"`,
+  with the same marks. ([#418])
+- `grasp` tucks only the edges of the current DAG and never takes a chain of tucks back to a DAG it
+  has visited, as the GRaSP paper's search does, so it returns a different graph on some data,
+  one that scores better about as often as worse. ([#442])
+- `varma_lingam`'s **Limitations** paragraph and the column-order guide say that where its
+  likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
+  the same series can give a different graph on another type of CPU. ([#451])
+- `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
+  batch of conditioning sets as one array of column numbers, records its tests once per batch, and
+  tests sets of more than three neighbors, which rarely repeat, without the result cache. ([#468])
+
+
+## [0.10.0] - 2026-10-27
+
+### Highlights
+
+- How far each method goes: the 0.10.0 release card maps, for 26 methods, the problems each
+  finishes within one hour and 28 GB on 4 cores with fewer errors than the empty graph, by
+  variables, samples, and density, and each method's **Limitations** paragraph gives its measured
+  boundary. At 2,000 samples and a mean degree of 2, BOSS stays more accurate than the empty graph
+  up to 1,600 variables, GRaSP to 800, and PC to 400. ([#343], [#438], [#469])
+
+### Changed
+
 - Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
   hard limit: they change with the data generator, the density, the method's settings, and the
   machine. ([#367])
+- The **Limitations** paragraph of every method but Granger gives its measured boundary: on each
+  benchmark regime, the largest size through which its median errors stayed below the empty
+  graph's, the largest size its fits finished within 1 h and 28 GB on 4 cores, what ended the
+  measurement, and a median fit time. ([#469])
 - For contributors, `python -m qa.quality_gate --jobs N` fits the quality gate's cells in N
   processes and prints the same results in the same order; the gate's workflow runs `--jobs 4` on
   its four vCPUs and logs the runner's CPU. A push to a release pull request that changes only
@@ -30,9 +130,6 @@ change names its pull request.
 - For contributors, a production deploy of the site, from a `v*` tag or a manual run, waits
   for the repository owner's approval in the `production-site` environment, which
   administrators cannot bypass. ([#441])
-- `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
-  batch of conditioning sets as one array of column numbers, records its tests once per batch, and
-  tests sets of more than three neighbors, which rarely repeat, without the result cache. ([#468])
 
 ### Removed
 
@@ -647,7 +744,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
@@ -729,6 +827,7 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#343]: https://github.com/Abel-ai-lab/andrey/pull/343
 [#346]: https://github.com/Abel-ai-lab/andrey/pull/346
 [#347]: https://github.com/Abel-ai-lab/andrey/pull/347
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
@@ -746,13 +845,28 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#391]: https://github.com/Abel-ai-lab/andrey/pull/391
 [#393]: https://github.com/Abel-ai-lab/andrey/pull/393
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
+[#396]: https://github.com/Abel-ai-lab/andrey/pull/396
+[#397]: https://github.com/Abel-ai-lab/andrey/pull/397
+[#400]: https://github.com/Abel-ai-lab/andrey/pull/400
+[#410]: https://github.com/Abel-ai-lab/andrey/pull/410
+[#411]: https://github.com/Abel-ai-lab/andrey/pull/411
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
+[#418]: https://github.com/Abel-ai-lab/andrey/pull/418
+[#430]: https://github.com/Abel-ai-lab/andrey/pull/430
 [#431]: https://github.com/Abel-ai-lab/andrey/pull/431
+[#438]: https://github.com/Abel-ai-lab/andrey/pull/438
 [#439]: https://github.com/Abel-ai-lab/andrey/pull/439
 [#441]: https://github.com/Abel-ai-lab/andrey/pull/441
+[#442]: https://github.com/Abel-ai-lab/andrey/pull/442
+[#443]: https://github.com/Abel-ai-lab/andrey/pull/443
+[#445]: https://github.com/Abel-ai-lab/andrey/pull/445
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
+[#451]: https://github.com/Abel-ai-lab/andrey/pull/451
+[#453]: https://github.com/Abel-ai-lab/andrey/pull/453
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#468]: https://github.com/Abel-ai-lab/andrey/pull/468
+[#469]: https://github.com/Abel-ai-lab/andrey/pull/469

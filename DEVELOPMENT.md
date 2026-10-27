@@ -33,7 +33,8 @@ Edit the spec, not the surfaces.
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
 | `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
-| `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, and `run`, which validates `<method>` and its `key=value` overrides (and `--config`) against the registry. |
+| `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, and `bootstrap`, the last two of which validate `<method>` and its `key=value` overrides (and `--config`) against the registry. |
+| `src/andrey/resample.py` | `andrey.bootstrap` and `BootstrapOutput`: the refits on resamples, the counts of each edge by endpoint marks, and the averaged graph. |
 
 ### The agent skill
 
@@ -105,7 +106,10 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"`, and call
-   `warn_experimental("<name>")` first in the facade until the method is supported. Its
+   `warn_experimental("<name>")` first in the facade until the method is supported. A method whose
+   tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True` to its data
+   check; every other method passes its name as `method=`, so its refusal of `NaN` names it.
+   `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
    `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
@@ -288,6 +292,9 @@ from the Typer app. A change keeps this contract:
   breakdown stay complete, and `--full` or `-o <file>` keep every edge.
 - Result envelope: `{schema_version, method, status, structure|results, metadata, run}`, where `run`
   carries the resolved params, seed, versions, and sizes.
+- `andrey bootstrap` returns that envelope with `structure` the averaged graph, plus `bootstrap`
+  (the resample settings) and `frequencies` (one row per edge that appeared in a fit); the fields
+  are additive, so `schema_version` stays the same.
 - Error envelope: `{error: {code, message, valid_options?, next?}}`, where `next` lists runnable
   follow-up commands when the fix is obvious.
 - Exit codes (`EXIT_CODES`): `0` success, `2` usage or validation, `3` data, `4` algorithm failure,

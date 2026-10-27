@@ -26,6 +26,7 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
+from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -42,6 +43,7 @@ def pc(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_order: str | None = None,
+    collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     max_depth: int | None = None,
@@ -80,6 +82,16 @@ def pc(
         column order. ``"column"`` orients them in column order and keeps the first of two that
         conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
         ``"column"`` under ``"position"``. See Notes.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How PC decides whether ``z`` is a collider ``x -> z <- y`` on a triple ``x - z - y`` whose
+        ends are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the
+        separating set that removed the edge ``x - y``. ``"conservative"`` [11]_ and
+        ``"majority"`` [3]_ test ``x`` and ``y`` again given every subset of ``x``'s neighbors and
+        every subset of ``y``'s neighbors, and count the subsets that separate them
+        (``p >= alpha``): ``"conservative"`` makes ``z`` a collider when none of them contains it
+        and a non-collider when all do; ``"majority"`` when fewer than half contain it and when
+        more than half do. Any other triple is ambiguous, and no rule orients through it. Both run
+        up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -94,7 +106,8 @@ def pc(
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
-        tests and can keep edges that a larger conditioning set would remove.
+        tests and can keep edges that a larger conditioning set would remove. It also caps the
+        subsets the conservative and majority rules test.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
@@ -112,7 +125,10 @@ def pc(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"PC"``. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
         equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]`` lists
-        the categorical columns it read, by name or 0-based position.
+        the categorical columns it read, by name or 0-based position. With ``collider_rule``
+        ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
+        unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
+        column positions, the middle node second and ``x < y``, in ascending order.
 
     Raises
     ------
@@ -128,7 +144,8 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. With
+        with another test, if ``collider_order`` is not ``"p_value"`` or ``"column"``, or if
+        ``collider_rule`` is not ``"sepsets"``, ``"conservative"``, or ``"majority"``. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
         before any test runs; one message names every group of copies and says to keep one column
         per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
@@ -193,23 +210,58 @@ def pc(
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
 
-    **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
-    default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
-    (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
-    stayed below the empty graph's at every size, 357 against 400 at 400 variables. The median fit
-    took 0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network
-    with 1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
-    practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
-    combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
-    On simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
-    first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with
-    2,000 rows, its median errors stayed below the empty graph's at every size: at 40 variables,
-    18.5 with ``"degen_gauss"`` and 9.5 with ``"cond_gauss"``, against 40. On simulated categorical
-    networks with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with
-    ``"chisq"`` and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s
-    with ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test,
-    on 4 cores. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Collider rules.** A test error can make the separating set that removed an edge disagree with
+    other sets that also separate the pair, and ``collider_rule="sepsets"`` then decides a collider
+    from that one set. ``"conservative"``, conservative PC [11]_, and ``"majority"``, majority-rule
+    PC [3]_, decide each triple ``x - z - y`` on the final skeleton instead. They test ``x`` and
+    ``y`` given each subset of ``x``'s neighbors, then each subset of ``y``'s, the empty set
+    included, and keep the subsets that separate them; a subset both offer counts twice. Under
+    ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
+    every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
+    than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
+    triple whose ends no subset separates is ambiguous under both: the search separated them only
+    given sets holding a node whose edge to that end it removed later. An ambiguous triple is never
+    oriented as a collider, and Meek's rules do not read it as a non-collider, so edges around it
+    can stay undirected. The colliders are then oriented in ``collider_order`` as under
+    ``"sepsets"``, so with ``"p_value"`` the result still does not depend on the column order.
+    Conservative PC's orientations are correct under adjacency-faithfulness, a weaker assumption
+    than PC's [11]_, at the cost of more undirected edges; the majority rule orients more of them
+    [3]_.
+
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [12]_ [13]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [13]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [13]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows. With missing values, the
+    skeleton search runs in one process.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
+    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
+    stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
+    200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2 with 500, 2,000,
+    or 10,000 rows; and 3,200 and 3,200 at mean degree 4 or 8 with 2,000 rows. At 1,600 variables
+    (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
+    row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
+    at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
+    2,000 rows). The numbers below were measured with ``collider_order="column"``. On the
+    223-variable ANDES network with 1,000 simulated rows, its median errors passed the empty graph's
+    (372 against 338). Its run time grows combinatorially with the largest neighborhood. On
+    simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
+    half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
+    rows, its median errors stayed below the empty graph's at every size: at 40 variables, 18.5 with
+    ``"degen_gauss"`` and 9.5 with ``"cond_gauss"``, against 40. On simulated categorical networks
+    with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with ``"chisq"``
+    and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s with
+    ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test, on 4
+    cores. ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests
+    run them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up
+    to 20 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -258,6 +310,14 @@ def pc(
        Statistical Association 84(405), 165-175.
     .. [10] Ramsey, J. (2016). Improving accuracy and scalability of the PC algorithm by maximizing
        P-value. arXiv:1610.00378, Section 5.
+    .. [11] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [12] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [13] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019).
+       Causal discovery in the presence of missing data. Proceedings of Machine Learning Research
+       89, 1762-1770.
 
     Examples
     --------
@@ -293,26 +353,51 @@ def pc(
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        max_categories=max_categories,
+        method="pc",
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    with copies_named(labels):
+    ambiguous: set[tuple[int, int, int]] = set()
+    with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
             alpha=alpha,
             indep_test=indep_test,
             collider_order=resolve_collider_order(collider_order),
+            collider_rule=collider_rule,
             categorical=mask,
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "PC",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
+    }
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _ambiguous_metadata(
+    collider_rule: str, ambiguous: set[tuple[int, int, int]]
+) -> dict[str, list[list[int]]]:
+    """Return the ambiguous triples as metadata, or ``{}`` under ``collider_rule="sepsets"``.
+
+    The triples become ``{"ambiguous_triples": [[a, b, c], ...]}``, in ascending order.
+    """
+    if collider_rule == "sepsets":
+        return {}
+    return {"ambiguous_triples": [list(triple) for triple in sorted(ambiguous)]}
 
 
 def fci(
@@ -353,13 +438,16 @@ def fci(
         test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
         conditional mutual information test; and ``"gpdc"`` Gaussian-process regression with a
         distance correlation test. See Notes.
-    collider_rule : {"sepsets", "majority"}, default="sepsets"
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
-        that removed the edge ``x - y``. ``"majority"`` tests ``x`` and ``y`` given every subset of
-        ``x``'s neighbors and every subset of ``y``'s neighbors, and makes it a collider when
-        fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [4]_; at exactly
-        half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
+        that removed the edge ``x - y``. ``"conservative"`` [4]_ [5]_ and ``"majority"`` [4]_ test
+        ``x`` and ``y`` again given every subset of ``x``'s neighbors and every subset of ``y``'s
+        neighbors, and count the subsets that separate them (``p >= alpha``): ``"conservative"``
+        makes ``z`` a collider when none of them contains it and a non-collider when all do;
+        ``"majority"`` when fewer than half contain it and when more than half do. Any other
+        triple is ambiguous, and no rule orients through it. Both run up to
+        ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -383,8 +471,8 @@ def fci(
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep edges that a larger conditioning set would remove. It caps the tests of
-        the adjacency search, the possible-d-separation step, the majority rule, and the
-        discriminating-path rule.
+        the adjacency search, the possible-d-separation step, the conservative and majority
+        rules, and the discriminating-path rule.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
@@ -403,7 +491,10 @@ def fci(
         ``"FCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
         (``<->``) marks a probable latent common cause. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
+        or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order.
 
     Raises
     ------
@@ -489,14 +580,50 @@ def fci(
     tie rank computed from each column's own data, as for :func:`~andrey.hc`, which moves with its
     column when the columns are reordered; with ``"fast"``, they follow the column order.
 
+    **Collider rules.** ``collider_rule="conservative"``, conservative FCI [4]_ after the idea of
+    conservative PC [5]_, and ``"majority"``, majority-rule FCI [4]_, decide each triple
+    ``x - z - y`` after the possible-d-separation step, on the final skeleton. They test ``x`` and
+    ``y`` given each subset of ``x``'s neighbors, then each subset of ``y``'s, the empty set
+    included, and keep the subsets that separate them; a subset both offer counts twice. Under
+    ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
+    every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
+    than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
+    triple whose ends no subset separates is a collider under both: no kept subset contains ``z``,
+    and the separating set that removed the edge, from a possible-d-separation set or an earlier
+    neighborhood, does not vote. With exact tests this can be wrong where only nodes beyond both
+    ends' neighbors separate them and ``z`` is a non-collider, so on such graphs the voting rules
+    can orient a collider that ``"sepsets"`` does not. An ambiguous triple is never oriented as a
+    collider, and rules R1-R10 do not read it as a non-collider, so endpoints around it can stay
+    circles. A vote reads only the skeleton and the tests, so the rules keep the result independent
+    of the column order wherever ``"sepsets"`` does.
+
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
     because it does not depend on the order of the tests, and on simulated data it gave more
     accurate PAGs than the first set found.
 
-    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
-    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
-    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [7]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample; FCI allows for selection, and
+    stays sound when no missingness mechanism causally affects another [6]_. A test raises
+    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
+    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    With missing values, the skeleton search runs in one process.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
+    hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
+    its median errors (SHD against the PAG of the observed variables) stayed below the empty
+    graph's, and through which its fits finished within the caps, were 200 and 800 variables at mean
+    degree 2 with 10 or 50 rows per variable; and 1,600 and 1,600 at mean degree 4 with 10 or 50
+    rows per variable. The ladders ended after two sizes in a row did not beat the empty graph,
+    except at mean degree 4 with 10 or 50 rows per variable, where they ended when three fits of the
+    next size ran past 1 h. The median fit took 116 s at 1,600 variables (mean degree 4, 50 rows per
+    variable). Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from random
+    graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to 800
+    variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
     endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's at
     every size with mean degree 4, and up to 400 variables with mean degree 2, where they passed it
     at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
@@ -512,8 +639,11 @@ def fci(
     against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
     its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
     the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
-    variables with 3,000 rows. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
+    benchmarked yet; their tests run them on up to 8 variables. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
+    up to a fifth of the values missing completely at random.
 
     References
     ----------
@@ -526,6 +656,14 @@ def fci(
        1873-1896.
     .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
+    .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [6] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [7] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -541,13 +679,20 @@ def fci(
     from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
 
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        max_categories=max_categories,
+        method="fci",
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="fci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    with copies_named(labels):
+    ambiguous: set[tuple[int, int, int]] = set()
+    with copies_named(labels), rows_tested() as rows:
         pag = _fci(
             X,
             alpha=alpha,
@@ -558,10 +703,15 @@ def fci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "FCI",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 def gfci(
@@ -569,6 +719,7 @@ def gfci(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 0.0,
     indep_test: str = "fisherz",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
@@ -599,8 +750,13 @@ def gfci(
         Gaussian BIC for mixed data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
-        values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-        BDeu ignores it.
+        values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
+        finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     indep_test : str, default="fisherz"
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
         ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
@@ -610,15 +766,17 @@ def gfci(
         continuous data, at a far higher cost per test. Each as for :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    collider_rule : {"sepsets", "majority"}, default="sepsets"
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where the tests
         removed the GES edge between ``x`` and ``y``; on the other triples whose ends are not
         adjacent, the GES CPDAG decides (see Notes). ``"sepsets"`` makes it a collider when ``z``
-        is not in the recorded separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and
-        ``y`` given every subset of ``x``'s neighbors and every subset of ``y``'s neighbors, and
-        makes it a collider when fewer than half of the separating subsets (``p >= alpha``)
-        contain ``z`` [3]_; at exactly half the triple stays unoriented. Majority runs
-        ``2**degree(x) + 2**degree(y)`` tests per triple.
+        is not in the recorded separating set of ``x`` and ``y``. ``"conservative"`` [3]_ [5]_ and
+        ``"majority"`` [3]_ test ``x`` and ``y`` given every subset of ``x``'s neighbors and every
+        subset of ``y``'s neighbors and count the subsets that separate them (``p >= alpha``), as
+        for :func:`~andrey.fci`: ``"conservative"`` makes ``z`` a collider when none of them
+        contains it and a non-collider when all do; ``"majority"`` when fewer than half contain it
+        and when more than half do. Any other triple is ambiguous, and no rule orients through it.
+        Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
@@ -643,8 +801,8 @@ def gfci(
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep edges that a larger conditioning set would remove. It caps the tests of
         the adjacency search, the separating sets for the pairs GES leaves non-adjacent, the
-        possible-d-separation step, the majority rule, and the discriminating-path rule, but not the
-        GES phase.
+        possible-d-separation step, the conservative and majority rules, and the discriminating-path
+        rule, but not the GES phase.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
@@ -659,7 +817,10 @@ def gfci(
         ``"GFCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
         (``<->``) marks a probable latent common cause. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
+        ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
+        ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in
+        ascending order.
 
     Raises
     ------
@@ -712,29 +873,62 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
-    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
-    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
-    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
-    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's
-    wherever its fits finished (197 against 444 at 200 variables with mean degree 2, one variable in
-    ten hidden, and ten rows per variable). With those settings the median fit took 0.53 s at 100
-    variables, 2.6 s at 200, and 132 s at 800. Every fit at 800 variables finished within 7,200 s in
-    four of the eight settings; with mean degree 4, one variable in five hidden, and 50 rows per
-    variable, none did, and three of five fits at 400 ran past 3,600 s. The default,
-    ``"order_free"``, took 1.00 to 1.02 times as long as ``"fast"`` up to 200 variables and 0.87 to
-    1.03 times at 400 and 800, and its median endpoint errors were within 2% of ``"fast"``'s. On
-    some graphs from 400 variables its order needs more tests than the column order: on one with 400
-    variables, mean degree 2, one variable in five hidden, and 50 rows per variable, it took 407 s
-    against 120 to 336 s for ``"fast"`` over five column orders. ``possible_dsep="fast"`` gives the
-    column-order mode. It runs a full :func:`~andrey.ges` search before any test, so it takes at
-    least as long as GES on the same data. Its BIC score and Fisher-Z tests assume linear relations
-    with Gaussian noise. With fewer rows than columns the BIC score is unreliable. A parent set of
-    ``n_samples - 1`` or more variables fits its child exactly, so the GES search never selects one,
-    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
-    variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
-    score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
-    3,000 rows. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Choosing the penalty.** The GES phase scores a variable with the linear-Gaussian BIC, which
+    charges ``lambda_value * log(n_samples)`` per parent, plus the extended-BIC term ``2 *
+    ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, where ``C(n_variables - 1, n_parents)``
+    counts the parent sets of that size. The term grows with the number of variables, so a larger
+    ``ebic_gamma`` gives a sparser GES graph, with fewer false adjacencies and more missed ones; the
+    tests then start from fewer adjacencies and never add one. ``ebic_gamma=0.0`` is the standard
+    BIC, GFCI's default; :func:`~andrey.ges` and most other score-based searches default to ``1.0``.
+    On simulated linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows,
+    ``ebic_gamma=1.0`` lowered GFCI's mean errors (SHD against the true graph) per true edge by
+    0.064 (95% interval 0.055 to 0.074), against 0.78 for GES. In 11 of 65 settings of graph,
+    variables, and rows it made more errors on average than ``0.0``, and in three of them the
+    difference's 95% interval lies above zero: 300.6 against 291.0 with 200 variables, mean degree
+    4, and 2,000 rows (400 true edges); 149.2 against 140.6 with 100 variables, mean degree 4,
+    ``scale="unitless"`` data, and 1,000 rows (200 true edges); and 38.4 against 36.2 with 20
+    variables, mean degree 4, ``scale="unitless"`` data, and 200 rows (40 true edges). Across the
+    295 datasets with both fits, it made more errors on 56, fewer on 198, and the same on 41. Its
+    mean errors stayed below the empty graph's in each of the 65 settings, where the standard BIC's
+    exceeded it in 16. Pass ``ebic_gamma=1.0`` to use the extended BIC.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its GES phase scores every
+    variable over the same rows, and score terms over different rows do not add up to the score of
+    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
+    use :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
+    hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
+    its median errors (SHD against the PAG of the observed variables) stayed below the empty
+    graph's, and through which its fits finished within the caps, were 1,600 and 1,600 variables at
+    mean degree 2 or 4 with 10 rows per variable; and 3,200 and 3,200 at mean degree 2 or 4 with 50
+    rows per variable. The ladders ended when three fits of the next size ran past 1 h, except at
+    mean degree 2 or 4 with 50 rows per variable, where they ended at the largest planned size. The
+    median fit took 1,480 s at 3,200 variables (mean degree 4, 50 rows per variable). Measured with
+    ``possible_dsep="fast"`` on simulated linear-Gaussian data from random graphs with mean degree 2
+    or 4 and one variable in ten or one in five hidden, from 20 to 800 variables counting the hidden
+    ones, with 10 or 50 rows per variable, on 4 cores. Its median endpoint errors, each mismatched
+    tail, arrowhead, or circle, stayed below the empty graph's wherever its fits finished (197
+    against 444 at 200 variables with mean degree 2, one variable in ten hidden, and ten rows per
+    variable). With those settings the median fit took 0.53 s at 100 variables, 2.6 s at 200, and
+    132 s at 800. Every fit at 800 variables finished within 7,200 s in four of the eight settings;
+    with mean degree 4, one variable in five hidden, and 50 rows per variable, none did, and three
+    of five fits at 400 ran past 3,600 s. The default, ``"order_free"``, took 1.00 to 1.02 times as
+    long as ``"fast"`` up to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median
+    endpoint errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order
+    needs more tests than the column order: on one with 400 variables, mean degree 2, one variable
+    in five hidden, and 50 rows per variable, it took 407 s against 120 to 336 s for ``"fast"`` over
+    five column orders. ``possible_dsep="fast"`` gives the column-order mode. It runs a full
+    :func:`~andrey.ges` search before any test, so it takes at least as long as GES on the same
+    data. Its BIC score and Fisher-Z tests assume linear relations with Gaussian noise. With fewer
+    rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
+    variables fits its child exactly, so the GES search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. Rule R5 has the
+    search bound described under :func:`~andrey.fci`. With the mixed-data score and test, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
+    them on up to 8 variables. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -747,6 +941,10 @@ def gfci(
        structure learning. JMLR 15, 3921-3962.
     .. [4] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
        2nd ed. MIT Press.
+    .. [5] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [6] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -771,17 +969,19 @@ def gfci(
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
     X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories
+        data, categorical, "indep_test", indep_test, max_categories=max_categories, method="gfci"
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
+    ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels):
         pag = _gfci(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             alpha=alpha,
             indep_test=indep_test,
             collider_rule=collider_rule,
@@ -790,10 +990,14 @@ def gfci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "GFCI",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
 
 
 def cdnod(
@@ -803,6 +1007,7 @@ def cdnod(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_order: str | None = None,
+    collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
@@ -843,6 +1048,14 @@ def cdnod(
         ``andrey.config.tie_break``, which also sets whether Meek's rules run in order-free rounds
         or fire one at a time in column order, as for :func:`~andrey.pc`. Under either order, the
         edges out of the index are directed first, and no collider puts an arrowhead at the index.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How an unshielded triple ``x - z - y`` is decided, as for :func:`~andrey.pc`: by the
+        separating set that removed the edge ``x - y`` (``"sepsets"``), or by a vote over the
+        subsets of ``x``'s and ``y``'s neighbors that separate them, with the index among the
+        variables, which makes ``z`` a collider when none of them contains it and a non-collider
+        when all do (``"conservative"`` [3]_), or when fewer than half and when more than half do
+        (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it. A
+        triple whose middle node is the index is not voted: the index is never a collider.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -863,7 +1076,8 @@ def cdnod(
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
-        tests and can keep edges that a larger conditioning set would remove.
+        tests and can keep edges that a larger conditioning set would remove. It also caps the
+        subsets the conservative and majority rules test.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
@@ -887,7 +1101,11 @@ def cdnod(
         :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
         against the graph CD-NOD can identify instead.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
-        read, by name or 0-based position.
+        read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
+        ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
+        reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
+        middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
+        numbered ``n_variables``.
 
     Raises
     ------
@@ -903,11 +1121,12 @@ def cdnod(
         is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
         :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
         value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
-        ``"column"``. With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or
-        ``domain_index`` with more than one domain, repeats another up to scale and shift, before
-        any test runs; one message names every group of copies and says to keep one column per
-        group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        ``"column"``, or ``collider_rule`` not ``"sepsets"``, ``"conservative"``, or ``"majority"``.
+        With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or ``domain_index``
+        with more than one domain, repeats another up to scale and shift, before any test runs; one
+        message names every group of copies and says to keep one column per group. Also if a given
+        ``max_depth`` is negative, or if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -952,29 +1171,48 @@ def cdnod(
     ``"student_t"`` only a variable whose mean follows the index reaches it, and such a shared trend
     makes the changes depend on each other.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
-    three shifts its mean with the domain, from 10 to 50 variables with 20 datasets per size. Its
-    median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
-    graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
-    variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
-    at most 3 variables with 600 rows from 20 domains. It runs the PC search with the index as one
-    more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
-    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
-    a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
-    a mean shift of the cause oriented the edge on 20 of 20 seeds, and a change of its variance
-    alone, or of the weight of the effect on a mean-zero cause alone, on none. Without the
-    independent-change step, an edge between two variables that both change with the index stays
-    undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
+    where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
+    deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
+    the median rows a test read. When values are missing completely at random, the rows a test keeps
+    are a random sample, so each test keeps its level [6]_. When whether a value is missing depends
+    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
+    where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
+    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
+    other tests, or when a continuous column is constant on its rows. ``domain_index`` must be
+    complete, and ``dependence_threshold``, whose kernel measures read every row, raises
+    ``ValueError`` on data with missing values. With missing values, the skeleton search runs in one
+    process.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
+    shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
+    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 50 variables at mean degree 1 with 2,000 rows; 100 and 100
+    at mean degree 2 with 2,000 or 10,000 rows; 200 and 200 at mean degree 2 with 500 rows and mean
+    degree 4 with 2,000 rows; and 400 and 400 at mean degree 8 with 2,000 rows. At 100 variables
+    (mean degree 2, 10,000 rows pooled from 4 domains), 1 of 5 fits ran past 1 h. Every ladder ended
+    when three fits of the next size ran past 1 h. The median fit took 39 s at 400 variables (mean
+    degree 8, 2,000 rows pooled from 4 domains). The independent-change step is not benchmarked yet;
+    its tests run it on at most 3 variables with 600 rows from 20 domains. It runs the PC search
+    with the index as one more variable, so it costs about as much as :func:`~andrey.pc` on the data
+    plus one column. Its partial-correlation tests assume linear relations with Gaussian noise and
+    find only a change in a variable's mean that is linear in the index: on two variables from two
+    domains with 600 rows, a mean shift of the cause oriented the edge on 20 of 20 seeds, and a
+    change of its variance alone, or of the weight of the effect on a mean-zero cause alone, on
+    none. Without the independent-change step, an edge between two variables that both change with
+    the index stays undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
     ``"student_t"``, the step reaches only variables whose means follow the index. On two variables
     from 20 domains with 600 rows, both means rising linearly by about 1 across the domains, the
-    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from
-    (0.5, 2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton
-    of ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
+    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from (0.5,
+    2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton of
+    ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
     (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
     The paper fits the kernel widths, the index kernel, and the ridge of the step by
     Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows. The numbers are a
+    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
+    them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
+    20 variables with up to a fifth of the values missing completely at random. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
@@ -985,6 +1223,16 @@ def cdnod(
        1-53.
     .. [2] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
        independence test and application in causal discovery. UAI, 804-813.
+    .. [3] Ramsey, J., Zhang, J., and Spirtes, P. (2006). Adjacency-faithfulness and conservative
+       causal inference. UAI, 401-408.
+    .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
+    .. [5] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [6] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -1008,6 +1256,8 @@ def cdnod(
         indep_test,
         max_categories=max_categories,
         index_categorical=True,
+        method="cdnod",
+        missing=True,
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
@@ -1018,21 +1268,37 @@ def cdnod(
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
     if dependence_threshold is not None:
         dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
+        if np.isnan(X).any():
+            raise ValueError(
+                "cdnod's dependence_threshold step compares kernel measures over every row, so "
+                "it does not accept missing values; leave dependence_threshold=None, whose tests "
+                "delete rows per test, or drop the rows that hold NaN"
+            )
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
-    with copies_named(labels, lambda j: "domain_index" if j == d else column(j)):
+    ambiguous: set[tuple[int, int, int]] = set()
+    with (
+        copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
+        rows_tested() as rows,
+    ):
         cpdag = _cdnod(
             X,
             c,
             alpha=alpha,
             indep_test=indep_test,
             collider_order=resolve_collider_order(collider_order),
+            collider_rule=collider_rule,
             categorical=mask,
             dependence_threshold=dependence_threshold,
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
         )
-    return structure_output(
-        cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
-    )
+    metadata = {
+        "algorithm": "CDNOD",
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+        **rows_metadata(rows),
+    }
+    return structure_output(cpdag, labels=labels, metadata=metadata)

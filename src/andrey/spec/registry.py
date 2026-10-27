@@ -8,6 +8,7 @@ display the parameter defaults defined here.
 
 from __future__ import annotations
 
+from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
@@ -16,6 +17,7 @@ from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
 from andrey.search.hc import HC_SCORES
+from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 from andrey.search.tabu import TABU_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
@@ -72,11 +74,13 @@ _COLLIDER_RULE = ParamSpec(
     name="collider_rule",
     type="str",
     default="sepsets",
-    choices=("sepsets", "majority"),
+    choices=COLLIDER_RULES,
     doc="How colliders are decided on x - z - y: sepsets = z is a collider when it is not in the "
-    "separating set of x and y; majority = test x and y given every subset of each one's "
-    "neighbors, and z is a collider when fewer than half of the separating subsets contain it "
-    "(exactly half: unoriented). Majority costs up to 2**degree tests per triple.",
+    "separating set of x and y; conservative and majority = test x and y given every subset of "
+    "each one's neighbors, and z is a collider when none (conservative) or fewer than half "
+    "(majority) of the separating subsets contain it, a non-collider when all or more than half "
+    "do, and ambiguous otherwise, never oriented through. Both cost up to 2**degree tests per "
+    "pair.",
 )
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
@@ -106,7 +110,23 @@ _LAMBDA_VALUE = ParamSpec(
     type="float",
     default=1.0,
     doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values give sparser "
-    "graphs; 1.0 is the standard BIC.",
+    "graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
+)
+_EBIC_GAMMA = ParamSpec(
+    name="ebic_gamma",
+    type="float",
+    default=1.0,
+    doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
+    "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
+    "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
+)
+_EBIC_GAMMA_STANDARD = ParamSpec(
+    name="ebic_gamma",
+    type="float",
+    default=0.0,
+    doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
+    "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
+    "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
 )
 _SEED = ParamSpec(
     name="seed",
@@ -144,11 +164,13 @@ _add(
         "data determine; returns a CPDAG. A good first method when nothing is known about the "
         "graph; indep_test=chisq or gsq for categorical data, degen_gauss or cond_gauss for mixed "
         "data.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -159,12 +181,20 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_ORDER,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
             "Colombo & Maathuis 2014",
             "Meek 1995",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -175,11 +205,13 @@ _add(
         summary="Structure learning that allows latent confounders and selection bias; returns a "
         "PAG. A circle mark is an endpoint the data cannot determine; a bidirected edge (<->) "
         "marks a latent common cause. Use when unmeasured confounding is plausible.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -203,6 +235,7 @@ _add(
             "Spirtes, Glymour & Scheines 2000",
             "Zhang 2008",
             "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -217,7 +250,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -244,6 +279,7 @@ _add(
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA_STANDARD,
             _INDEP_TEST,
             _ALPHA,
             _COLLIDER_RULE,
@@ -256,6 +292,7 @@ _add(
             "Zhang 2008",
             "Colombo & Maathuis 2014",
             "Spirtes, Glymour & Scheines 2000",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -278,11 +315,14 @@ _add(
             ),
             layout=_MATRIX_LAYOUT,
             notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -297,6 +337,7 @@ _add(
             _ALPHA,
             _INDEP_TEST,
             _COLLIDER_ORDER,
+            _COLLIDER_RULE,
             _CATEGORICAL,
             _MAX_CATEGORIES,
             ParamSpec(
@@ -309,9 +350,70 @@ _add(
                 nullable=True,
             ),
         ),
-        references=("Huang et al. 2020",),
+        references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
 )
+
+# --- local structure: one variable's Markov blanket or parents and children ----------------------
+
+_TARGET = ParamSpec(
+    name="target",
+    type="str",
+    default=None,
+    doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
+    "position. null learns every variable's set and keeps a pair when each is in the other's set.",
+    nullable=True,
+)
+_LOCAL_OUTPUT_DOC = (
+    "undirected edges only, from target to each member, or between each pair in each other's "
+    "set when target is null; metadata['target'] names the target and metadata['{key}'] lists the "
+    "members in the order they joined"
+)
+for _name, _summary, _key, _refs in (
+    (
+        "iamb",
+        "One variable's Markov blanket (its parents, children, and children's other parents) by "
+        "incremental association: grow by conditional-independence tests, then shrink. With "
+        "target=null, the moral graph of every variable's blanket.",
+        "markov_blanket",
+        ("Tsamardinos, Aliferis & Statnikov 2003",),
+    ),
+    (
+        "inter_iamb",
+        "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
+        "With target=null, the moral graph of every variable's blanket.",
+        "markov_blanket",
+        ("Tsamardinos, Aliferis & Statnikov 2003",),
+    ),
+    (
+        "mmpc",
+        "One variable's parents and children, undirected, by max-min parents and children: "
+        "conditional-independence tests over subsets of the members so far, with a symmetry "
+        "check. With target=null, the skeleton that mmhc searches.",
+        "parents_and_children",
+        ("Tsamardinos, Brown & Aliferis 2006",),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="constraint",
+            summary=_summary,
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="cpdag",
+                doc=_LOCAL_OUTPUT_DOC.format(key=_key),
+            ),
+            determinism="deterministic",
+            accel="numpy",
+            status="experimental",
+            column_order="relabels",
+            tie_break=True,
+            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+            references=_refs,
+        )
+    )
 
 # --- score-based ----------------------------------------------------------------------------------
 
@@ -356,6 +458,7 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="max_parents",
                 type="int",
@@ -403,7 +506,7 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        params=(_LAMBDA_VALUE,),
+        params=(_LAMBDA_VALUE, _EBIC_GAMMA),
         references=("Hauser & Buhlmann 2012",),
     )
 )
@@ -437,8 +540,9 @@ _add(
                 type="float",
                 default=1.0,
                 doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values "
-                "give sparser graphs; 1.0 is the standard BIC.",
+                "give sparser graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
             ),
+            _EBIC_GAMMA,
             ParamSpec(
                 name="extended_search",
                 type="bool",
@@ -493,6 +597,7 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="max_iter",
                 type="int",
@@ -542,6 +647,7 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="tabu_length",
                 type="int",
@@ -615,6 +721,7 @@ _add(
                 choices=EXACT_SCORES,
                 nullable=True,
             ),
+            _EBIC_GAMMA,
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),
@@ -625,9 +732,10 @@ _add(
     MethodSpec(
         name="calm",
         family="score",
-        summary="Continuous-optimization structure learning: an L0-penalized likelihood with an "
-        "acyclicity constraint, searched within an estimated moral graph. Returns a weighted DAG. "
-        "Needs the [torch] extra. Seeded on every call: seed, else ANDREY_SEED, else 0.",
+        summary="Continuous-optimization structure learning in the line of NOTEARS: an "
+        "L0-penalized likelihood with an acyclicity constraint, searched within an estimated moral "
+        "graph. Returns a weighted DAG. Needs the [torch] extra. Seeded on every call: seed, else "
+        "ANDREY_SEED, else 0.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -657,6 +765,302 @@ _add(
             ),
         ),
         references=("Jin, Ng, Zhang & Huang 2026",),
+    )
+)
+
+# --- continuous optimization of a weighted DAG: NOTEARS and DAGMA ------------------------------
+
+_CONTINUOUS_PATH_PARAMS = (
+    ParamSpec(
+        name="robust",
+        type="bool",
+        default=False,
+        doc="true follows the first fit with the likelihood path of Deng et al. 2024: the Gaussian "
+        "likelihood with one noise variance per variable and a quasi-MCP penalty, refit while the "
+        "likelihood falls and the penalty shrinks.",
+    ),
+    ParamSpec(
+        name="mcp_lambda",
+        type="float",
+        default=0.4,
+        doc="Penalty level of the path's first step, above 0. Used only with robust.",
+    ),
+    ParamSpec(
+        name="mcp_delta",
+        type="float",
+        default=0.2,
+        doc="Weight magnitude above which the quasi-MCP stops growing, at the path's first step, "
+        "above 0. Used only with robust.",
+    ),
+    ParamSpec(
+        name="mcp_decay",
+        type="float",
+        default=0.8,
+        doc="Factor in (0, 1) by which mcp_lambda and mcp_delta shrink after each accepted step. "
+        "Used only with robust.",
+    ),
+    ParamSpec(
+        name="max_path",
+        type="int",
+        default=50,
+        doc="Most accepted steps of the path, at least 1. Used only with robust.",
+    ),
+)
+_CONTINUOUS_OUTPUT = OutputSpec(
+    structure_type="graph",
+    graph_kind="dag",
+    weighted=True,
+    doc="weighted DAG; no score. metadata['h_final'] is the acyclicity function before the "
+    "threshold and metadata['path_steps'] the accepted steps of the robust path.",
+)
+_add(
+    MethodSpec(
+        name="notears",
+        family="score",
+        summary="NOTEARS: least squares with an l1 penalty under the acyclicity equation "
+        "tr(exp(W*W)) = d, by L-BFGS-B. Returns a weighted DAG. robust=true adds the likelihood "
+        "path of Deng et al. 2024, which does not depend on the scale of the columns. "
+        "Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=_CONTINUOUS_OUTPUT,
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="lambda1",
+                type="float",
+                default=0.1,
+                doc="Weight of the l1 penalty of the first fit, at least 0.",
+            ),
+            ParamSpec(
+                name="w_threshold",
+                type="float",
+                default=0.3,
+                doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
+            ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=100,
+                doc="Most dual steps of the augmented Lagrangian, at least 1.",
+            ),
+            ParamSpec(
+                name="h_tol",
+                type="float",
+                default=1e-8,
+                doc="The fit stops when the acyclicity function falls to this value, above 0.",
+            ),
+            ParamSpec(
+                name="rho_max",
+                type="float",
+                default=1e16,
+                doc="The fit stops when the penalty weight on the acyclicity function reaches "
+                "this value, above 0.",
+            ),
+            *_CONTINUOUS_PATH_PARAMS,
+        ),
+        references=(
+            "Zheng, Aragam, Ravikumar & Xing 2018",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+            "Kaiser & Sipos 2022",
+            "Reisach, Seiler & Weichwald 2021",
+            "Ng, Huang & Zhang 2024",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="dagma",
+        family="score",
+        summary="DAGMA: least squares with an l1 penalty and a log-determinant acyclicity barrier "
+        "lowered along a central path, by Adam. Returns a weighted DAG. robust=true adds the "
+        "likelihood path of Deng et al. 2024, which does not depend on the scale of the columns. "
+        "Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=_CONTINUOUS_OUTPUT,
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="lambda1",
+                type="float",
+                default=0.03,
+                doc="Weight of the l1 penalty of the first fit, at least 0.",
+            ),
+            ParamSpec(
+                name="w_threshold",
+                type="float",
+                default=0.3,
+                doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
+            ),
+            ParamSpec(
+                name="stages",
+                type="int",
+                default=5,
+                doc="Stages of the central path, at least 1 (T in the paper).",
+            ),
+            ParamSpec(
+                name="warm_iter",
+                type="int",
+                default=30000,
+                doc="Most Adam steps of each stage but the last, at least 1.",
+            ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=60000,
+                doc="Most Adam steps of the last stage, at least 1.",
+            ),
+            ParamSpec(name="lr", type="float", default=3e-4, doc="Step size of Adam, above 0."),
+            *_CONTINUOUS_PATH_PARAMS,
+        ),
+        references=(
+            "Bello, Aragam & Ravikumar 2022",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+            "Kaiser & Sipos 2022",
+            "Reisach, Seiler & Weichwald 2021",
+            "Ng, Huang & Zhang 2024",
+        ),
+    )
+)
+
+# --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
+
+_HYBRID_SCORE_DOC = (
+    "Local score of the maximize phase: local_score_BIC_from_cov or local_score_BIC = "
+    "covariance-based BIC; "
+    "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
+    "data coded by whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
+    "and conditional Gaussian BIC, for mixed data (not with maximize=tabu). It must read the same "
+    "kind of data as indep_test."
+)
+_HYBRID_MAX_ITER = ParamSpec(
+    name="max_iter",
+    type="int",
+    default=None,
+    doc="Most moves the score search takes, at least 1; null sets no limit (the search still "
+    "ends). Reaching a set limit warns with SearchLimitWarning.",
+    nullable=True,
+)
+_add(
+    MethodSpec(
+        name="mmhc",
+        family="score",
+        summary="Max-min hill climbing: MMPC's conditional-independence tests learn a skeleton, "
+        "then hill climbing searches DAGs whose edges join only its pairs. Faster than hc on "
+        "sparse graphs with many variables. BIC with Fisher-z tests by default; "
+        "indep_test=chisq with score_func=local_score_BDeu for categorical data. Returns the "
+        "CPDAG of the final DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
+            "the phases",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc=_HYBRID_SCORE_DOC,
+                choices=HC_SCORES,
+            ),
+            _LAMBDA_VALUE,
+            _EBIC_GAMMA,
+            _HYBRID_MAX_ITER,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
+        references=("Tsamardinos, Brown & Aliferis 2006",),
+    )
+)
+_add(
+    MethodSpec(
+        name="rsmax2",
+        family="score",
+        summary="Restrict-maximize search: conditional-independence tests keep the candidate pairs "
+        "(restrict=mmpc, iamb, inter_iamb, or pc), then a score search (maximize=hc or tabu) "
+        "searches DAGs whose edges join only those pairs. mmhc is restrict=mmpc with maximize=hc. "
+        "Returns the CPDAG of the final DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
+            "the phases",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="restrict",
+                type="str",
+                default="mmpc",
+                doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
+                "children; iamb and inter_iamb = each in the other's Markov blanket (the moral "
+                "graph); pc = PC's skeleton.",
+                choices=RESTRICTS,
+            ),
+            ParamSpec(
+                name="maximize",
+                type="str",
+                default="hc",
+                doc="The maximize phase: hc = hill climbing; tabu = tabu search.",
+                choices=MAXIMIZES,
+            ),
+            _ALPHA,
+            _INDEP_TEST,
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc=_HYBRID_SCORE_DOC,
+                choices=HC_SCORES,
+            ),
+            _LAMBDA_VALUE,
+            _EBIC_GAMMA,
+            _HYBRID_MAX_ITER,
+            ParamSpec(
+                name="tabu_length",
+                type="int",
+                default=10,
+                doc="With maximize=tabu, the number of most recently visited DAGs a move may not "
+                "return to, at least 1.",
+            ),
+            ParamSpec(
+                name="max_tabu",
+                type="int",
+                default=None,
+                doc="With maximize=tabu, the non-improving moves allowed without a better DAG, "
+                "from 1 to tabu_length; null uses tabu_length.",
+                nullable=True,
+            ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
+        references=(
+            "Friedman, Nachman & Pe'er 1999",
+            "Tsamardinos, Brown & Aliferis 2006",
+            "Tsamardinos, Aliferis & Statnikov 2003",
+            "Scutari 2010",
+        ),
     )
 )
 
@@ -701,7 +1105,14 @@ _add(
         column_order="relabels",
         tie_break=True,
         seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _BOSS_SCORE,
+            _LAMBDA_VALUE,
+            _EBIC_GAMMA,
+            _SEED,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
 )
@@ -730,6 +1141,7 @@ _add(
         params=(
             _BOSS_SCORE,
             _LAMBDA_VALUE,
+            _EBIC_GAMMA,
             ParamSpec(
                 name="depth",
                 type="int",
@@ -879,8 +1291,9 @@ _add(
         column_order="relabels",
         tie_break=True,
         order_note=(
-            "When the likelihood fit stops before it converges, the graph can change with "
-            "the numerical libraries' versions."
+            "Where the likelihood fit stops depends on the BLAS kernels the CPU runs, so another "
+            "type of CPU can give another graph, and so can other library versions when the fit "
+            "stops before it converges."
         ),
         params=(
             ParamSpec(
@@ -983,6 +1396,7 @@ _add(
                 ),
             ),
             layout="(n_samples, n_variables), row = time step",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="temporal",
@@ -1043,6 +1457,7 @@ _add(
                 ),
             ),
             layout="(n_samples, n_variables), row = time step",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="temporal",
@@ -1106,6 +1521,7 @@ _add(
                 ),
             ),
             layout="(n_samples, n_variables), row = time step",
+            missing=True,
         ),
         output=OutputSpec(
             structure_type="temporal",
@@ -1222,6 +1638,7 @@ _add(
                 ),
             ),
             layout="(n_samples, 2), rows are samples",
+            missing=True,
         ),
         params=(
             ParamSpec(
@@ -1263,6 +1680,7 @@ _add(
                 ),
             ),
             layout="(n_samples, 2), rows are samples",
+            missing=True,
         ),
         params=(
             ParamSpec(
@@ -1447,8 +1865,27 @@ _MOVE_RULE = (
     "No move adds a forbidden edge or removes a required one; the search starts from the required "
     "edges. "
 )
+_CANDIDATE_RULE = (
+    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
+    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
+    "alone. "
+)
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_MASK_RULE = (
+    "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are held at "
+    "zero in the fit; a required edge leaves the penalty and the threshold, and the cycle repair "
+    "never removes it. "
+)
+_REGRESSION_RULE = (
+    "The regression drops forbidden parents and does not penalize required ones; every required "
+    "edge is in the DAG."
+)
+_LINK_RULE = (
+    "An edge [cause, effect, lag] is the link from cause at time t - lag to effect at time t; a "
+    "forbidden [cause, effect] pair forbids it at every lag, and a required link names its lag. "
+    "Tiers and allowed hold at every lag; a variable's links to its own past stay allowed. "
+)
 _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
@@ -1460,16 +1897,45 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "xges": _MOVE_RULE + _CLASS_RULE,
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
+    "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
-    "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
-    "required ones; every required edge is in the DAG.",
+    "notears": _MASK_RULE,
+    "dagma": _MASK_RULE,
+    "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
+    "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
+    + _ORDER_RULE
+    + _REGRESSION_RULE,
+    "multi_group_direct_lingam": "It holds for every group. " + _ORDER_RULE + _REGRESSION_RULE,
+    "pcmci": _LINK_RULE + "No test runs on a forbidden or a required link: a forbidden link is not "
+    "in the graph, and a required one is.",
+    "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
+    "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
+    "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "varma_lingam": _LINK_RULE + "Lags run over the autoregressive part, 0 to order[0]. At lag 0 "
+    "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
+    "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
+    "prune=false every lagged weight stays, so a forbidden lagged link raises.",
+    "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
+    "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
+    "fit of its effect's lagged weights; every other lagged weight stays.",
+    "rcd": "The ancestor search runs as without knowledge; the parent sets then drop forbidden "
+    "parents and gain required ones, and a pair forbidden both ways is never marked <->.",
+    "bottom_up_parce_lingam": "A sink is taken only when no remaining variable is in a later "
+    "tier, and each regression drops forbidden parents. In the unordered block, a pair forbidden "
+    "both ways is not adjacent and a pair forbidden one way has an arrowhead at the cause. "
+    "Required edges raise.",
+    "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
+    "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
+    "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors (every part, for every method that takes knowledge).
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
-    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
-)
+#: The Knowledge parts each method honors: every part, but for BottomUpParceLiNGAM.
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
+    **dict.fromkeys(_KNOWLEDGE_HOW, KNOWLEDGE_PARTS),
+    "bottom_up_parce_lingam": ("forbidden", "allowed", "tiers"),
+}
 _MAX_DEPTH = ParamSpec(
     name="max_depth",
     type="int",

@@ -90,7 +90,7 @@ Not always. In the release cards, which use sparse simulated graphs with ten sam
 FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
 causal-learn, so there the limit is the algorithm's, not the software's. The 0.1.0 release card's
 [large graphs](benchmarks/0.1.0.md#large-graphs) section lists every case, including Andrey's GES
-at 200 variables with the default penalty.
+at 200 variables with the standard BIC (`ebic_gamma=0.0`).
 
 ### Why does a result differ from another package's?
 
@@ -263,7 +263,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.9.0},
+  version = {0.10.0},
   url = {https://andrey.abel.ai},
 }
 ```

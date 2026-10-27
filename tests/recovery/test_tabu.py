@@ -23,6 +23,9 @@ from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
+# The extended-BIC weight that tabu search and exact search score with by default.
+_EBIC_GAMMA = 1.0
+
 
 @pytest.fixture(autouse=True)
 def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,7 +46,7 @@ def _bic(x: np.ndarray, dag) -> float:
     for i, j, kind in dag.oriented_edges():
         assert kind == "directed"
         parents[j].append(i)
-    score = BICScore(x)
+    score = BICScore(x, ebic_gamma=_EBIC_GAMMA)
     return float(sum(score.score(i, sorted(parents[i])) for i in range(x.shape[1])))
 
 
@@ -108,7 +111,7 @@ def test_tabu_is_deterministic_across_runs_and_worker_counts():
 
 def test_tabu_sets_no_move_limit_by_default():
     # 200 variables need over 400 moves: a limit of 200 stops the search, the default does not.
-    x = data.sample_scm(d=200, n=2000, seed=0, density=2.0).data
+    x = data.sample_scm(d=200, n=2000, seed=0, density=2.0, scale="raw").data
     with pytest.warns(andrey.SearchLimitWarning):
         andrey.tabu(x, max_iter=200)
     with warnings.catch_warnings():

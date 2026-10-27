@@ -83,6 +83,7 @@ from collections import Counter, OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations, islice
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -91,6 +92,9 @@ from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
 from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, design_test
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import LaggedConstraints
 
 CONFLICT = 4  # an edge mark the rules oriented both as a tail and as an arrowhead
 BATCH = 4096  # tests per call to the test object: bounds its stack of correlation submatrices
@@ -117,8 +121,8 @@ class LPCMCIResult:
     ``end_marks`` the mark at ``X^j_t``, ``NULL`` where there is no link. Marks are ``TAIL``,
     ``ARROW``, ``CIRCLE``, or :data:`CONFLICT`. Lag 0 holds both orders of a link, so
     ``start_marks[0, i, j] == end_marks[0, j, i]``. ``statistics`` and ``p_values`` have the same
-    shape; a pair's entry is its final-phase test with the largest p-value, and ``0`` and ``1``
-    where no test ran. ``sepsets[(i, j, lag)]`` lists the
+    shape; a pair's entry is its final-phase test with the largest p-value, ``0`` and ``1``
+    where no test ran, and ``1`` and ``0`` for a required link. ``sepsets[(i, j, lag)]`` lists the
     separating sets of a removed link (``i < j`` at lag 0) as ``(variable, lag)`` nodes relative
     to ``X^j_t``. ``parents[j]`` holds the ``(i, lag)`` nodes the last preliminary iteration found
     to be parents of ``X^j_t``, kept as directed links for the final phase.
@@ -185,6 +189,9 @@ class _Search:
     parents and children until an edge mark changes or a link is removed, its path steps until any
     mark changes or a link is removed, and the stored separating sets moved into a frame until a
     set is stored. Callers read these and do not change them.
+
+    ``constraints``, background knowledge, set the links :meth:`initialize` leaves out, the
+    required links, and the edge marks no rule changes (:meth:`_knowledge`).
     """
 
     def __init__(
@@ -194,11 +201,15 @@ class _Search:
         tau_max: int,
         alpha: float,
         ranks: Sequence[int],
+        constraints: LaggedConstraints | None = None,
         max_depth: int | None = None,
     ) -> None:
         self.test, self.n, self.tau_max, self.alpha = test, n_vars, tau_max, alpha
         self.max_depth = max_depth
         self.ranks = ranks
+        self.absent, self.required, self.arrowheads = self._knowledge(constraints)
+        self.locked = {(key, at_start) for key in self.required for at_start in (True, False)}
+        self.locked |= self.arrowheads
         self.window = [(v, lag) for lag in range(tau_max + 1) for v in range(n_vars)]
         self.edges: dict[Key, Edge] = {}
         self.neighbors_of: dict[int, set[tuple[int, int]]] = {}
@@ -218,21 +229,61 @@ class _Search:
 
     # ---- the graph -----------------------------------------------------------------------
 
+    def _knowledge(
+        self, constraints: LaggedConstraints | None
+    ) -> tuple[set[Key], dict[Key, bool], set[tuple[Key, bool]]]:
+        """Read ``constraints`` as ``(absent, required, arrowheads)``.
+
+        ``absent`` holds the links the knowledge forbids: a lagged one, or a lag-0 pair forbidden
+        both ways. ``required`` maps each required link to whether its tail is at the start.
+        ``arrowheads`` holds ``(key, at_start)`` for each lag-0 link forbidden one way: the
+        arrowhead at its cause.
+        """
+        absent: set[Key] = set()
+        required: dict[Key, bool] = {}
+        arrowheads: set[tuple[Key, bool]] = set()
+        if constraints is None:
+            return absent, required, arrowheads
+        forbidden, needed = constraints.forbidden, constraints.required
+        for lag, i, j in zip(*np.nonzero(forbidden[1:] | needed[1:]), strict=True):
+            key = (int(i), int(j), int(lag) + 1)
+            if needed[key[2], i, j]:
+                required[key] = True
+            else:
+                absent.add(key)
+        for i, j in combinations(range(self.n), 2):
+            key = (i, j, 0)
+            if needed[0, i, j] or needed[0, j, i]:
+                required[key] = bool(needed[0, i, j])
+            elif forbidden[0, i, j] and forbidden[0, j, i]:
+                absent.add(key)
+            elif forbidden[0, i, j] or forbidden[0, j, i]:
+                arrowheads.add((key, bool(forbidden[0, i, j])))
+        return absent, required, arrowheads
+
     def initialize(self, directed: Iterable[tuple[Key, bool]] = ()) -> None:
         """Algorithm 1, line 1: the complete graph, with ``directed`` links oriented ``->``.
 
         ``directed`` holds ``(key, start_is_tail)`` pairs; their middle mark is ``"?"`` updated by
-        MMR. Test memories and separating sets reset.
+        MMR. The knowledge then leaves out the absent links, directs each required link with the
+        empty middle mark, and puts its arrowheads in place, updating the middle mark as MMR does.
+        Test memories and separating sets reset.
         """
         self.edges = {}
         for lag in range(self.tau_max + 1):
             for i in range(self.n):
                 for j in range(self.n):
-                    if lag == 0 and i >= j:
+                    if lag == 0 and i >= j or (i, j, lag) in self.absent:
                         continue
                     self.edges[(i, j, lag)] = [CIRCLE, "L", ARROW] if lag else [CIRCLE, "?", CIRCLE]
         for key, start_is_tail in directed:
             self.edges[key] = [TAIL, "L", ARROW] if start_is_tail else [ARROW, "R", TAIL]
+        for key, start_is_tail in self.required.items():
+            self.edges[key] = [TAIL, "", ARROW] if start_is_tail else [ARROW, "", TAIL]
+        for key, at_start in self.arrowheads:
+            edge = self.edges[key]
+            edge[0 if at_start else 2] = ARROW
+            edge[1] = _add_middle(edge[1], "R" if at_start else "L")
         self.neighbors_of = {v: set() for v in range(self.n)}
         for i, j, lag in self.edges:
             self.neighbors_of[j].add((i, lag))
@@ -831,6 +882,8 @@ class _Search:
         for (key, at_start), proposed in marks.items():
             if lagged_only and key[2] == 0 or key not in self.edges or key in removals:
                 continue
+            if (key, at_start) in self.locked:
+                continue  # a mark the knowledge sets
             edge = self.edges[key]
             position = 0 if at_start else 2
             current = edge[position]
@@ -1267,10 +1320,12 @@ def lpcmci(
     pc_alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
+    constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
 ) -> LPCMCIResult:
     """Run LPCMCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
 
+    ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach :func:`run`.
     ``max_depth`` caps the size of the searched subsets ``S`` in both removal phases and in the
     majority vote; the default conditions ``S_def`` come on top. ``None`` sets no cap.
 
@@ -1284,7 +1339,14 @@ def lpcmci(
     ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():
         return run(
-            test, data.shape[1], tau_max, pc_alpha, n_preliminary_iterations, ranks, max_depth
+            test,
+            data.shape[1],
+            tau_max,
+            pc_alpha,
+            n_preliminary_iterations,
+            ranks,
+            constraints,
+            max_depth,
         )
 
 
@@ -1295,14 +1357,19 @@ def run(
     alpha: float,
     n_preliminary_iterations: int,
     ranks: Sequence[int],
+    constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
 ) -> LPCMCIResult:
     """Run Algorithm 1 with ``test`` over the columns of the lagged design.
 
-    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`; ``max_depth`` caps the
-    searched subset size (see :func:`lpcmci`).
+    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`. With ``constraints``, a
+    forbidden lagged link and a lag-0 pair forbidden both ways are never linked; a lag-0 link
+    forbidden one way carries an arrowhead at its cause; a required link is directed, with the
+    empty middle mark, so no removal phase or rule tests or removes it. No rule changes a mark
+    the knowledge sets. Every re-initialization applies the knowledge again. ``max_depth`` caps
+    the searched subset size (see :func:`lpcmci`).
     """
-    search = _Search(test, n_vars, tau_max, alpha, ranks, max_depth)
+    search = _Search(test, n_vars, tau_max, alpha, ranks, constraints, max_depth)
     search.initialize()
     kept: list[tuple[Key, bool]] = []
     for _ in range(n_preliminary_iterations):
@@ -1329,6 +1396,10 @@ def _result(search: _Search, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         statistics[lag, i, j], p_values[lag, i, j] = statistic, p_value
         if lag == 0:
             statistics[0, j, i], p_values[0, j, i] = statistic, p_value
+    for i, j, lag in search.required:  # never tested
+        statistics[lag, i, j], p_values[lag, i, j] = 1.0, 0.0
+        if lag == 0:
+            statistics[0, j, i], p_values[0, j, i] = 1.0, 0.0
     parents: list[list[Node]] = [[] for _ in range(n)]
     for (i, j, lag), start_is_tail in kept:
         if start_is_tail:

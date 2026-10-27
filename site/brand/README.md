@@ -33,6 +33,9 @@
     tracing a figure of cosine curves that spiral inward on its table. One curve is amber.
   - `art-rocket.jpg`: 0.9.0, a rocket in engraved lines, climbing steeply out of a bank of clouds.
     Its engine flare and trail are amber.
+  - `art-ceiling.jpg`: 0.10.0, the rocket of `art-rocket.jpg` later in its flight, its nose
+    against the curved edge of the sky like a glass dome, with stars beyond. The edge is amber, and
+    it cracks where the rocket meets it.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at

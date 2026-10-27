@@ -268,6 +268,48 @@ On these data GES returns the same graph as PC. Agreement between methods is rea
 proof: GES's score assumes linear-Gaussian data too. The {doc}`../examples/index` compare more
 methods, and draw the learned graph beside the known one.
 
+### Resampling
+
+One run gives one graph, and a different sample of cells could give another. `andrey.bootstrap`
+refits PC on resamples of the cells, drawn with replacement, and counts how often each link
+appears. `seed` fixes the resamples, so a rerun gives the same counts:
+
+```{code-cell} ipython3
+boot = andrey.bootstrap("pc", sachs.data, n_boot=100, seed=0)
+pd.DataFrame(boot.table()[:8]).round(2)
+```
+
+`table()` lists every link that appeared in some resample, with the direction it had there, most
+frequent first. The four undirected links appear in 79 to 96 of the 100 resamples. Directions are
+less stable: each arrow of the collider at pkc appears in 56 resamples, and `plc -> pip3` in 41.
+
+`boot.structure` is the averaged graph. A pair is in it when it is adjacent in at least half of the
+resamples (`threshold=0.5`), with the edge it has most often. It holds the same eight links as
+`out`. A stricter threshold keeps the links the resamples agree on, without refitting:
+
+```{code-cell} ipython3
+print(boot.average(0.9))
+```
+
+```{code-cell} ipython3
+:tags: [remove-cell]
+
+# The prose below holds only while these do.
+table = pd.DataFrame(boot.table())
+assert table.iloc[:4]["type"].eq("undirected").all()
+assert table.iloc[:4]["count"].between(75, 100).all()
+arrows = table[table["target"].eq("pkc") & table["type"].eq("directed")]
+assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(50, 65).all()
+assert 70 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 90
+assert links(boot.structure) == links(out.structure)
+assert links(boot.average(0.9)) < links(out.structure)
+assert len(links(out.structure) - links(boot.average(0.9))) == 1
+```
+
+That drops the link between plc and pip3, which is in 81 of the 100 resamples. Treat the counts as a
+ranking of the links, not as probabilities. A resample repeats some cells, so PC's tests see more
+evidence than it holds and keep weak links more often than they do on the data.
+
 ## Your own data
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
@@ -312,6 +354,24 @@ in any column order. A label is the column name as text: name a column called `1
 the integer `1` is the second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
+PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
+lagged variables. A third entry
+gives an edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`,
+and lag `0` is the same step. A forbidden pair without a lag holds at every lag, and a required
+link names its lag. Tiers and `allowed` hold at every lag, and a variable's links to its own past
+stay allowed:
+
+```python
+from andrey import Knowledge, pcmciplus
+
+knowledge = Knowledge(
+    forbidden=[("y", "x", 1)],     # no link from y at t - 1 to x at t
+    required=[("x", "y", 0)],      # x drives y within a step
+    tiers=[["temperature"], ["x", "y"]],
+)
+result = pcmciplus(series, tau_max=2, knowledge=knowledge)
+```
+
 ## Data types
 
 Each test and score reads the columns as one kind of data:
@@ -322,9 +382,10 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_cond_gauss` (the default when some columns are categorical), `local_score_degen_gauss` |
 
-`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, `boss`, `grasp`, and
-`exact_search` take every score, and `tabu` the continuous and categorical ones. `gfci` takes a
-score and a test that read the same kind of data, such as
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
+`ges`, `gfci`, `hc`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score, and
+`tabu` the continuous and categorical ones. `gfci`, `mmhc`, and `rsmax2` take a score and a test
+that read the same kind of data, such as
 `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
@@ -381,6 +442,48 @@ From the command line, the same settings are `key=value` arguments, such as
 JSON result lists the categorical columns under `metadata.categorical` and the warnings under
 `run.warnings`.
 
+## Missing values
+
+Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty or
+write `NA` or `N/A` in the data file. PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and
+LPCMCI accept missing values: each conditional-independence test reads only the rows where all of
+its variables are observed (test-wise deletion), so it keeps the rows that deleting every incomplete
+row first would drop. The pair tests ANM and PNL read the rows where both columns are observed,
+which for a pair is the same deletion. Here a tenth of the Sachs measurements go missing at random:
+
+```{code-cell} ipython3
+gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)
+out = andrey.pc(gappy)
+out.metadata["rows_tested"]
+```
+
+`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read; a fit on
+complete data has no such entry. With `fisherz` and `student_t`, each test computes its
+correlations directly from its rows, for many tests at once; the other tests are built anew on each
+test's rows, which costs more. A time series keeps every step: each row of the lagged design that
+reads a missing value holds it, and each test of PCMCI, PCMCI+, or LPCMCI reads the design rows
+where all of its lagged variables are observed.
+
+Deleting rows per test is sound when values are missing completely at random: the rows a test keeps
+are then a random sample of all rows. When whether a value is missing depends on the variables, as
+when high incomes go unreported, the rows a test keeps are a selected sample. PC's tests can then
+find dependence where the population has none and keep extra edges ([Tu et al., 2019][tu]); FCI
+allows for selection and stays sound when no missingness mechanism causally affects another
+([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
+
+A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
+with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
+`ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
+with `max_depth` in PC, FCI, and CD-NOD. A column with no observed value, or with one value
+throughout, raises before the fit, and so does infinity, which is not a missing value. CD-NOD needs
+a complete domain index.
+
+Every other method raises a `ValueError` that names it: its score or loss reads every variable over
+the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
+`data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
+methods above. A time series cannot lose a step without joining the steps around it, so for
+VARMA-LiNGAM and Granger, fill in the missing steps first.
+
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
@@ -388,7 +491,8 @@ Andrey reads its numeric backend and its worker count from `andrey.config`, or f
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
 serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
-processes with the `fisherz` and `student_t` tests, and return the same graph as with one worker.
+processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
+with one worker.
 `granger` fits its variables on worker threads, with the same coefficients, and needs none of the
 guard below.
 
@@ -415,10 +519,14 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-GES was more accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical
-to roughly 1,000 variables; FCI's errors passed the empty graph's at 800
-([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the
-data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#known-limits).
+On the large sparse benchmark graphs, GES with the standard BIC (`ebic_gamma=0.0`) kept many false
+edges. The default extended BIC, `ebic_gamma=1.0`, adds a penalty that grows with the number of
+variables, as the {py:func}`~andrey.ges` page describes. On linear-Gaussian data from Erdos-Renyi
+graphs with mean degree 2, PC's median errors stayed below the empty graph's through 400 variables
+with 2,000 rows, and its fits finished within 1 h on 4 cores through 1,600; with 10 rows per
+variable, FCI's stayed below the empty graph's through 200 variables. Each method's API page states
+the data and sizes it was measured on, the largest sizes where its errors stayed below the empty
+graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 
@@ -431,6 +539,10 @@ data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#kno
   rules with background knowledge.
 - [Perkovic, Kalisch, and Maathuis (2017), Interpreting and Using CPDAGs with Background
   Knowledge][mpdag]: the MPDAG.
+- [Strobl, Visweswaran, and Spirtes (2018), Fast Causal Inference with Non-Random Missingness by
+  Test-Wise Deletion][strobl]: FCI with test-wise deletion.
+- [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
+  deletion.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
@@ -438,3 +550,5 @@ data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#kno
 [lingam]: https://www.jmlr.org/papers/v7/shimizu06a.html
 [meek]: https://arxiv.org/abs/1302.4972
 [mpdag]: https://arxiv.org/abs/1707.02171
+[strobl]: https://doi.org/10.1007/s41060-017-0094-6
+[tu]: https://proceedings.mlr.press/v89/tu19a.html

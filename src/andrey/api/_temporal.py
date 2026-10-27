@@ -20,6 +20,8 @@ from andrey.api._marks import directed_marks
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from andrey.temporal.lpcmci import LPCMCIResult
     from andrey.temporal.pcmci import PCMCIResult
     from andrey.temporal.pcmciplus import PCMCIPlusResult
@@ -138,7 +140,7 @@ def _adapt_granger(coeff: np.ndarray, n_vars: int, maxlag: int) -> StructureOutp
     return structure_output(temporal, metadata={"algorithm": "granger"})
 
 
-def _adapt_pcmci(result: PCMCIResult) -> StructureOutput:
+def _adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None) -> StructureOutput:
     """PCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure` of lags ``1..tau_max``.
 
     ``result.graph[k, i, j]`` marks the link ``i -> j`` at lag ``k + 1`` (row = cause), so each
@@ -155,11 +157,14 @@ def _adapt_pcmci(result: PCMCIResult) -> StructureOutput:
         "p_values": result.p_values,
         "statistics": result.statistics,
         "parents": [[list(link) for link in links] for links in result.parents],
+        **(extra or {}),
     }
     return structure_output(temporal, metadata=metadata)
 
 
-def _adapt_pcmciplus(result: PCMCIPlusResult) -> StructureOutput:
+def _adapt_pcmciplus(
+    result: PCMCIPlusResult, extra: Mapping[str, object] | None = None
+) -> StructureOutput:
     """PCMCI+ result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
 
     Lag 0 is a ``cpdag`` built from ``result.marks``; a conflict (an arrowhead at both ends) has no
@@ -183,11 +188,14 @@ def _adapt_pcmciplus(result: PCMCIPlusResult) -> StructureOutput:
         "parents": [[list(link) for link in links] for links in result.parents],
         "conflicts": [list(pair) for pair in result.conflicts],
         "ambiguous_triples": [list(triple) for triple in result.ambiguous_triples],
+        **(extra or {}),
     }
     return structure_output(temporal, metadata=metadata)
 
 
-def _adapt_lpcmci(result: LPCMCIResult) -> StructureOutput:
+def _adapt_lpcmci(
+    result: LPCMCIResult, extra: Mapping[str, object] | None = None
+) -> StructureOutput:
     """LPCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
 
     Lag 0 is a ``pag`` built from the lag-0 marks; a conflict mark has no mark of its own, so it
@@ -222,5 +230,6 @@ def _adapt_lpcmci(result: LPCMCIResult) -> StructureOutput:
         "statistics": result.statistics,
         "parents": [[list(node) for node in nodes] for nodes in result.parents],
         "conflicts": conflicts,
+        **(extra or {}),
     }
     return structure_output(temporal, metadata=metadata)

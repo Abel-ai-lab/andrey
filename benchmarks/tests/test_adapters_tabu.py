@@ -58,7 +58,7 @@ def test_the_bic_is_the_score_andrey_reports() -> None:
     x = _sample(0).data
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        out = andrey.tabu(x)
+        out = andrey.tabu(x, ebic_gamma=0.0)
     assert tabu_cpu.graph_bic(x, out.structure) == pytest.approx(out.metadata["score"], rel=1e-12)
 
 

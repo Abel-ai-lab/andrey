@@ -55,7 +55,7 @@ _JSON_TYPES: dict[str, dict] = {
                         "type": "array",
                         "items": {"type": ["string", "integer"]},
                         "minItems": 2,
-                        "maxItems": 2,
+                        "maxItems": 2 if part == "allowed" else 3,
                     },
                 }
                 for part in ("required", "forbidden", "allowed")
@@ -73,8 +73,9 @@ _JSON_TYPES: dict[str, dict] = {
 KNOWLEDGE_NOTE = (
     "knowledge= takes a JSON object, inline or as a .json file path: required and forbidden list "
     "directed edges [cause, effect], allowed lists the only pairs that may be adjacent, and tiers "
-    "lists groups of columns in time order (no edge from a later tier into an earlier one). Name "
-    "columns by the data file's header or by 0-based position, for example, "
+    "lists groups of columns in time order (no edge from a later tier into an earlier one). For a "
+    "time-series method, [cause, effect, lag] is the link from cause at time t - lag to effect at "
+    "time t. Name columns by the data file's header or by 0-based position, for example, "
     'knowledge=\'{"forbidden": [["y", "x"]], "tiers": [["age"], ["x", "y"]]}\'.'
 )
 
@@ -157,6 +158,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "data": {
             "layout": spec.data.layout,
             "notes": spec.data.notes,
+            "missing": spec.data.missing,
             "inputs": [
                 {
                     "name": inp.name,
@@ -246,6 +248,26 @@ def cli_meta() -> dict:
             "metadata": "scores / p-values / provenance from the run",
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",
+        },
+        "bootstrap": {
+            "invocation": (
+                "andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] "
+                "[--threshold T] [--block-length ROWS] [key=value ...]"
+            ),
+            "what": (
+                "refits the method on bootstrap resamples of the rows (blocks of rows for a "
+                "time-series method on one series) and reports how often each edge appears; "
+                "takes the inputs, params, --config, -o, --json, and --full of `run`, and not "
+                "gin. The method's own seed= is the bootstrap's --seed. Workers follow "
+                "ANDREY_NUM_WORKERS and the result does not depend on their number."
+            ),
+            "envelope": (
+                "the result envelope of `run`, with `structure` the averaged graph, plus "
+                "bootstrap (n_boot, threshold, seed, block_length) and frequencies[] (source, "
+                "target, type, count, and frequency for each edge that appeared in a fit, most "
+                "frequent first, and lag for a time-series method); capped at 1000 "
+                "(frequencies_truncated)"
+            ),
         },
         "error_envelope": {
             "error": {
@@ -407,9 +429,40 @@ def render_skill() -> str:
         "report them as such."
     )
     a("")
+    a("## How stable an edge is")
+    a("")
+    a(
+        "`andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] [--threshold T] "
+        "[key=value ...]` refits the method on resamples of the rows and answers how often each "
+        "edge appears. It takes the inputs and `key=value` params of `andrey run`, and not `gin`. "
+        "Its envelope is a run's, with `structure` the averaged graph: a pair is in it when it is "
+        "adjacent in at least `--threshold` of the fits (default 0.5), with the edge it has most "
+        "often. `bootstrap` gives `n_boot`, `threshold`, `seed`, and `block_length`, and "
+        "`frequencies` lists each edge that appeared in some fit, most frequent first, with its "
+        "`source`, `target`, `type`, `count`, and `frequency` (a time-series method adds `lag`). "
+        "Report an edge with its frequency: 0.95 is stable, 0.3 is not. A time-series method on "
+        "one series resamples blocks of `--block-length` rows. Set `--seed` when the result must "
+        "repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without changing it."
+    )
+    a("")
     a("## Data types")
     a("")
     a(_data_types_section())
+    a("")
+    a("## Missing values")
+    a("")
+    a(
+        "A `NaN` cell, or an empty, `NA`, or `N/A` field of the data file, is a missing value. "
+        "The methods whose schema sets `data.missing` accept it and delete rows per test: each "
+        "test reads the rows observed in all of its variables, and `metadata.rows_tested` gives "
+        "the fewest (`min`) and the median rows a test read. They are "
+        + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
+        + ". Every other method refuses a missing value with a data error that says what to do "
+        "instead. The deletion is sound when values are missing completely at random; when "
+        "whether a value is missing depends on the variables, `pc` can keep extra edges, and "
+        "`fci` stays sound "
+        "when no missingness mechanism causally affects another."
+    )
     a("")
     a("## Background knowledge")
     a("")

@@ -249,13 +249,13 @@ def test_the_parallel_path_returns_the_serial_answer(tmp_path, tiny_keys):
 
 
 # --------------------------------------------------------------------------------------------------
-# Sortability — two checks on the DGP readback path, which never sees a solution's estimate.
+# Sortability — checks on the DGP readback path, which never sees a solution's estimate.
 # --------------------------------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="module")
 def sortability_pairs(tmp_path_factory):
-    """One seed, two ``standardize`` coordinates, materialized side by side."""
+    """One seed, three ``standardize`` coordinates, materialized side by side."""
     from andrey_bench import datasets, scoring
 
     def key(standardize):
@@ -271,7 +271,7 @@ def sortability_pairs(tmp_path_factory):
         )
 
     out = tmp_path_factory.mktemp("sortability")
-    keys = {name: key(name) for name in ("standardized", "raw")}
+    keys = {name: key(name) for name in ("standardized", "raw", "unitless")}
     datasets.materialize(list(keys.values()), out)
 
     measured = {}
@@ -300,6 +300,50 @@ def test_a_raw_dataset_reads_the_truths_orientation_the_right_way_round(sortabil
     tie survives a transpose unchanged.
     """
     assert sortability_pairs["raw"]["varsortability"] >= 0.9
+
+
+def test_standardizing_leaves_r2_sortability_and_unitless_lowers_it(sortability_pairs):
+    """R^2 comes from the correlations, which z-scoring leaves alone, so the standardized and raw
+    datasets of one seed agree on it; the unitless one draws other weights for the same graph."""
+    raw, standardized = sortability_pairs["raw"], sortability_pairs["standardized"]
+    assert standardized["r2_sortability"] == pytest.approx(raw["r2_sortability"])
+    assert sortability_pairs["unitless"]["r2_sortability"] < raw["r2_sortability"]
+
+
+def test_a_unitless_cell_records_both_sortabilities(tmp_path):
+    """One small unitless dataset through the real pipeline: every record of it carries the
+    dataset's var- and R^2-sortability, and each solution's fit succeeds."""
+    from andrey_bench import datasets
+    from andrey_bench.adapters.andrey_pc import AndreyPC
+    from andrey_bench.adapters.baseline_empty import BaselineEmpty
+    from andrey_bench.contracts import Status
+    from andrey_bench.integration import run_batch
+
+    topology, functional, noise, standardize = datasets.REGIMES["linear_gauss_er_unitless"]
+    key = datasets.DatasetKey(
+        topology=topology,
+        functional=functional,
+        noise=noise,
+        standardize=standardize,
+        density=datasets.CANONICAL_DENSITY,
+        d=10,
+        n=100,
+        seed=0,
+    )
+    result = run_batch(
+        tmp_path,
+        [AndreyPC(), BaselineEmpty()],
+        [key],
+        machine_id="tiny-cpu",
+        cap_wall_s=240.0,
+        repeats=1,
+        warmup=0,
+    )
+    assert not result.errors, result.errors
+    assert {r.status for r in result.records} == {Status.OK.value}
+    assert len({(r.varsortability, r.r2_sortability) for r in result.records}) == 1
+    record = result.records[0]
+    assert 0.0 <= record.varsortability <= 1.0 and 0.0 <= record.r2_sortability <= 1.0
 
 
 # --------------------------------------------------------------------------------------------------

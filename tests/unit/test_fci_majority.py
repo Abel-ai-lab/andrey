@@ -55,7 +55,7 @@ def test_majority_decisions(separating, decision, batched):
 
         oracle.batched_call = batch
 
-    ambiguous = fci_module._majority_sepsets(marks, oracle, 0.05, sepsets)
+    ambiguous = fci_module._vote_sepsets(marks, oracle, 0.05, sepsets, rule="majority")
     queried = [subset for a, c, subset in calls if (a, c) == (0, 2)]
     assert queried == [(), (1,), (3,), (1, 3), (), (1,), (4,), (1, 4)]
     assert ((0, 1, 2) in ambiguous) == (decision == "ambiguous")
@@ -74,8 +74,8 @@ def test_majority_decisions(separating, decision, batched):
 def test_majority_has_no_conditioning_size_cap():
     marks = circle_graph(6, [(0, 1), (1, 2), (0, 3), (0, 4), (0, 5)])
     sepsets = {}
-    fci_module._majority_sepsets(
-        marks, lambda a, c, subset: float(subset == (1, 3, 4, 5)), 0.05, sepsets
+    fci_module._vote_sepsets(
+        marks, lambda a, c, subset: float(subset == (1, 3, 4, 5)), 0.05, sepsets, rule="majority"
     )
     assert sepsets[0, 2] == sepsets[2, 0] == (1,)
 
@@ -84,7 +84,7 @@ def test_majority_has_no_conditioning_size_cap():
 def test_public_collider_rule_validation(engine):
     with pytest.raises(ValueError, match="collider_rule"):
         getattr(andrey, engine)(
-            np.random.default_rng(0).standard_normal((8, 2)), collider_rule="conservative"
+            np.random.default_rng(0).standard_normal((8, 2)), collider_rule="none"
         )
 
 
@@ -98,7 +98,7 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
     for name, event in [
         ("_orient_colliders" if engine == "fci" else "_orient_colliders_from_pattern", "colliders"),
         ("_remove_by_possible_dsep", "possible_dsep"),
-        ("_majority_sepsets", "majority"),
+        ("_vote_sepsets", "majority"),
         ("_fci_orient", "orient"),
     ]:
         original = getattr(module, name)
@@ -115,7 +115,9 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
             return result
 
         monkeypatch.setattr(module, name, wrap)
-    arr = data.sample_scm(graph="scale_free", d=6, n=500, seed=5, density=2.0, latents=1).data
+    arr = data.sample_scm(
+        graph="scale_free", d=6, n=500, seed=5, density=2.0, latents=1, scale="raw"
+    ).data
     fit = getattr(andrey, engine)
     fit(arr, collider_rule="majority")
     assert events == ["colliders", "possible_dsep", "majority", "colliders", "orient"]
@@ -248,8 +250,12 @@ def test_r4_reads_rewritten_separating_set(middle_in_set):
     sepsets = {(0, 3): () if middle_in_set else (2,)}
     # For the triple 0-1-3, node 2 is unrelated; create the 0-2-3 adjacency for voting.
     vote_graph = circle_graph(4, [(0, 2), (2, 3)])
-    fci_module._majority_sepsets(
-        vote_graph, lambda a, c, subset: float((2 in subset) == middle_in_set), 0.05, sepsets
+    fci_module._vote_sepsets(
+        vote_graph,
+        lambda a, c, subset: float((2 in subset) == middle_in_set),
+        0.05,
+        sepsets,
+        rule="majority",
     )
     oriented, changed = fci_module._do_ddp(
         marks, 0, 1, 2, 3, {0: 1, 1: 2}, lambda *args: 0.0, 0.05, sepsets, False
@@ -284,7 +290,9 @@ def test_orientation_rules_without_ambiguity_guard(rule):
 def test_missing_recorded_sets(pvalue):
     marks = circle_graph(3, [(0, 1), (1, 2)])
     sepsets = {}
-    ambiguous = fci_module._majority_sepsets(marks, lambda *args: pvalue, 0.05, sepsets)
+    ambiguous = fci_module._vote_sepsets(
+        marks, lambda *args: pvalue, 0.05, sepsets, rule="majority"
+    )
     fci_module._orient_colliders(marks, sepsets, ambiguous)
     if pvalue == 0.0:
         assert sepsets == {(0, 2): (), (2, 0): ()}
@@ -308,7 +316,7 @@ def test_majority_preserves_members_of_one_way_recorded_set(pair, decision):
             return 1.0
         return float(decision == "noncollider" and 1 in subset)
 
-    ambiguous = fci_module._majority_sepsets(marks, oracle, 0.05, sepsets)
+    ambiguous = fci_module._vote_sepsets(marks, oracle, 0.05, sepsets, rule="majority")
     if decision == "ambiguous":
         assert (0, 1, 2) in ambiguous
         assert sepsets[pair] == recorded
@@ -324,7 +332,7 @@ def test_r4_preserves_unvoted_member_from_one_way_separating_set(pair):
     marks = circle_graph(4, [(0, 1), (1, 2), (2, 3), (1, 3)])
     # Node 2 is not a common neighbor of 0 and 3, so their vote only decides node 1.
     sepsets = {pair: (2,)}
-    fci_module._majority_sepsets(marks, lambda *args: 0.0, 0.05, sepsets)
+    fci_module._vote_sepsets(marks, lambda *args: 0.0, 0.05, sepsets, rule="majority")
     marks[1, 0] = marks[1, 2] = marks[3, 1] = ARROW
     marks[1, 3] = TAIL
     done, changed = fci_module._do_ddp(

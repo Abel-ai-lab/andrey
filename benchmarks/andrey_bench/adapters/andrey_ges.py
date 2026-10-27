@@ -8,6 +8,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA
+
 _DEFAULT_SCORE_FUNC = "local_score_BIC"
 #: Matches causal-learn's 0.5 penalty after conversion to deviance units.
 _DEFAULT_LAMBDA = 1.0
@@ -86,6 +88,8 @@ class AndreyGES:
             params["parent_rule"] = self.parent_rule
         if self.score_func != "local_score_BDeu":
             params["lambda_value"] = float(self.lambda_value)
+        if self.score_func in ("local_score_BIC", "local_score_BIC_from_cov"):
+            params["ebic_gamma"] = ANDREY_EBIC_GAMMA
         return params
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
@@ -105,6 +109,7 @@ class AndreyGES:
                 X,
                 score_func=score_func,
                 lambda_value=lambda_value,
+                ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
                 max_parents=max_parents,
                 _parent_rule=parent_rule,
             )

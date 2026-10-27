@@ -62,6 +62,7 @@ RELEASES = (
     "0.7.0",
     "0.8.0",
     "0.9.0",
+    "0.10.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -1343,16 +1344,18 @@ TEMPORAL_CAPTIONS = (
         "every arrow over time points forward.",
     ),
 )
-# Every kind a GraphStructure can be (andrey.core.structure.Kind), in the homepage's words, then
-# the graphs over time a TemporalStructure holds.
+# Every kind a method returns as a GraphStructure (andrey.core.structure.Kind), in the homepage's
+# words, then the graphs over time a TemporalStructure holds. A MAG comes from a conversion,
+# GraphStructure.to_mag, never from a method.
 GRAPH_KINDS = {"dag": "DAGs", "cpdag": "CPDAGs", "pag": "PAGs", "digraph": "cyclic graphs"}
+CONVERSION_KINDS = {"mag"}
 TEMPORAL_KIND = "graphs over time"
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 
 
 def graph_kinds() -> list[str]:
     """Every kind of causal graph the package returns, in the homepage's words."""
-    kinds = get_args(Kind)
+    kinds = [kind for kind in get_args(Kind) if kind not in CONVERSION_KINDS]
     if set(kinds) != GRAPH_KINDS.keys():
         raise ValueError(f"name every graph kind in GRAPH_KINDS: {sorted(kinds)}")
     return [GRAPH_KINDS[kind] for kind in kinds] + [TEMPORAL_KIND]

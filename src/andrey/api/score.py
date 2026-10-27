@@ -45,6 +45,7 @@ def ges(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -74,9 +75,14 @@ def ges(
         ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers. See Notes.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
-        be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
-        per free parameter of a variable's conditional probability table.
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC. Must be finite and non-negative. BDeu ignores it; for the multinomial BIC
+        it weighs ``log(n)`` per free parameter of a variable's conditional probability table.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
         node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
@@ -107,9 +113,10 @@ def ges(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
-        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; for BDeu, ``-2`` times the log of the structure prior times the marginal
-        likelihood; for the multinomial BIC and the mixed-data scores, see Notes. Directed marks
+        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) * n_parents
+        + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``; for BDeu, ``-2`` times the log of
+        the structure prior times the marginal likelihood; for the multinomial BIC and the
+        mixed-data scores, see Notes. Directed marks
         (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves open.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
         read, by name or 0-based position.
@@ -159,11 +166,24 @@ def ges(
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
 
-    **Choosing lambda_value.** A larger value raises the penalty per parent, giving a sparser graph:
-    fewer false edges and more missed ones. ``1.0`` is the standard BIC. With many variables and
-    about ``10 * n_variables`` samples, ``lambda_value=2.0`` gave more accurate graphs than ``1.0``
-    on the published benchmarks. FGES, a fast GES, multiplied the BIC penalty by 4 when searching
-    continuous data on graphs of up to a million variables [2]_.
+    **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``lambda_value *
+    log(n_samples)`` per parent and adds ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``,
+    where ``C(n_variables - 1, n_parents)`` counts the parent sets of that size: this extended BIC
+    [8]_ charges more as the number of variables grows. A larger value of either gives a sparser
+    graph, with fewer false edges and more missed ones. The standard BIC, ``ebic_gamma=0.0``,
+    charges a fixed ``log(n_samples)`` per edge while the candidate edges grow with the square of
+    the number of variables, so with many variables it keeps many false edges. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured, and the most where the rows are few for the variables: 24 against
+    211 with 200 variables and 2,000 rows (200 true edges), and 46 against 2,162 with 400 variables
+    and 200 rows (400 true edges). It misses more weak edges: on four Gaussian networks with
+    published parameters, the share of true adjacencies it found fell from 0.84 to 0.77, while the
+    share of its adjacencies that were true rose from 0.72 to 0.94. With about
+    ``10 * n_variables`` rows or more, ``lambda_value=2.0`` at ``ebic_gamma=0.0`` made about as few
+    errors as the default, and more with fewer rows. Pass ``ebic_gamma=0.0`` for the standard BIC.
+    FGES, a fast GES, multiplied the BIC penalty by 4 when searching continuous data on graphs of up
+    to a million variables [2]_.
 
     **How it works.** Without ``max_parents``, a variable that already has more than
     ``n_variables / 2`` parents gains no new parents in the forward phase; the backward phase has
@@ -199,32 +219,49 @@ def ges(
     the same. The degenerate Gaussian score [4]_ replaces a categorical column of ``k`` categories
     by ``k - 1`` indicator columns and scores every column as Gaussian, by the residual covariance
     of a linear regression on the parents' columns; on continuous columns only, it equals
-    ``"local_score_BIC"``. The conditional Gaussian score [5]_ fits the continuous variables of a
-    variable and its parents in each joint category of their categorical ones, with a Gaussian of
+    ``"local_score_BIC"`` at ``ebic_gamma=0.0``. The conditional Gaussian score [5]_ fits the
+    continuous variables of a variable and its parents in each joint category of their categorical
+    ones, with a Gaussian of
     that category's own mean and a covariance shrunk toward that of all rows by one pseudo-row [6]_,
     and divides by the same fit of the parents alone, so a categorical variable can have continuous
     parents. It counts parameters for every joint category, so a parent with many categories costs
-    many parameters; on continuous columns only, it differs from ``"local_score_BIC"`` by a
-    constant per variable, so it finds the same graph. Moves are scored in this process.
+    many parameters; on continuous columns only, it differs from ``"local_score_BIC"`` at
+    ``ebic_gamma=0.0`` by a constant per variable, so it finds the same graph. Moves are scored in
+    this process.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 200 variables with ten rows per variable and a forward-phase gate of 4
-    parents rather than ``n_variables / 2``; the cap ``max_parents`` sets is not benchmarked yet.
-    At ``lambda_value=1.0`` its median errors (SHD) stayed below the empty graph's up to 150
-    variables (141 against 150) and passed it at 200 (206 against 200), where ``lambda_value=2.0``
-    brought them to 43. The median fit took 0.15 s at 20 variables and 40 s at 150, on 128 cores.
-    On the 223-variable ANDES network with 1,000 simulated rows and the default limit, its median
-    errors passed the empty graph's (612 against 338). With fewer rows than columns the BIC score
-    is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so
-    the search never selects one, nor any parent set that leaves its child a residual variance of
-    at most ``1e-12`` times its variance. On simulated
-    mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
-    variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
-    median errors at 40 variables were 8 with ``"local_score_degen_gauss"`` and 6.5 with
-    ``"local_score_cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4 cores.
-    On simulated categorical networks with 2 or 3 categories per variable, of the same sizes and
-    rows, ``"local_score_BDeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC
-    is not benchmarked with GES yet: its tests check it against the formula and run GES on small
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``max_parents=4``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000 rows and mean
+    degree 2 with 500 rows; 400 and 1,600 at mean degree 2 with 10,000 rows; 200 and 800 at mean
+    degree 2 with 2,000 rows; 800 and 3,200 at mean degree 4 with 2,000 rows; and none and 50 at
+    mean degree 8 with 2,000 rows. Every ladder ended after two sizes in a row did not beat the
+    empty graph. The median fit took 2,626 s at 3,200 variables (mean degree 4, 2,000 rows). The
+    measured build applied ``max_parents=4`` as a gate on the forward phase: a node holding 4
+    parents gained no new parent while edges were added, and one move could still give a node more.
+    On this release, ``max_parents=4`` caps every DAG of the returned class at 4 parents, a stricter
+    rule that is not benchmarked yet. With the same gate, mean degree 2, and ten rows per variable,
+    at 200 variables its median errors were 206 against the empty graph's 200 at
+    ``lambda_value=1.0`` and 43 at ``lambda_value=2.0``. On the 223-variable ANDES network with
+    1,000 simulated rows and a forward-phase gate of ``n_variables / 2`` parents, its median errors
+    passed the empty graph's (612 against 338). With fewer rows than columns the standard BIC is
+    unreliable; the extended BIC made far fewer errors there (see Choosing the penalty). A parent
+    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
+    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. On simulated mixed data (conditional linear Gaussian networks on sparse random graphs,
+    the first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables
+    with 2,000 rows, its median errors at 40 variables were 8 with ``"local_score_degen_gauss"`` and
+    6.5 with ``"local_score_cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4
+    cores. On simulated categorical networks with 2 or 3 categories per variable, of the same sizes
+    and rows, ``"local_score_BDeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial
+    BIC is not benchmarked with GES yet: its tests check it against the formula and run GES on small
     fixed categorical networks. The numbers are a reference, not a hard limit: they change with the
     data generator, the density, the method's settings, and the machine.
 
@@ -246,6 +283,8 @@ def ges(
        Statistical Association 84(405), 165-175.
     .. [7] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
        461-464.
+    .. [8] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -284,7 +323,7 @@ def ges(
         data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
     )
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="ges"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ges")
@@ -293,6 +332,7 @@ def ges(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
@@ -313,6 +353,7 @@ def gies(
     interventions: npt.ArrayLike | None = None,
     *,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
@@ -334,7 +375,13 @@ def gies(
         variable needs at least two rows without an intervention.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and
+        non-negative.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -349,8 +396,9 @@ def gies(
         graph: directed marks (``->``) are edges every graph in the class orients alike,
         undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"GIES"`` and
         ``metadata["score"]`` the BIC score of the result, the sum over variables of
-        ``n_v * log(residual variance) + lambda_value * log(n_samples) * n_parents``, where
-        ``n_v`` counts the rows without an intervention on the variable; lower is better.
+        ``n_v * log(residual variance) + lambda_value * log(n_samples) * n_parents + 2 *
+        ebic_gamma * log C(n_variables - 1, n_parents)``, where ``n_v`` counts the rows without an
+        intervention on the variable; lower is better.
 
     Raises
     ------
@@ -386,24 +434,46 @@ def gies(
     :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
     keeps.
 
-    **Limitations.** Measured on simulated linear-Gaussian data that mixes observation with
-    interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
-    rows per variable and four intervention targets per ten variables. Its median errors (SHD
-    against the true interventional essential graph) stayed below the empty graph's at every size
-    (181 against 198 at 200 variables, where one of the five fits had more). The median fit took
-    0.25 s at 100 variables and 1.0 s at 200, on 4 cores. Each distinct set of rows without an
-    intervention on a variable keeps its own covariance matrix of all the variables, so memory
-    grows with the number of intervened variables times the square of the variable count. A parent
-    set of ``m - 1`` or more variables, where ``m`` counts the rows without an intervention on the
-    child, fits its child exactly, so the search never selects one, nor any parent set that leaves
-    its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Choosing the penalty.** The score charges a variable ``lambda_value * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
+    [2]_, which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the standard BIC. On simulated observational
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured: 23 against 210 with 200 variables and 2,000 rows (200 true
+    edges).
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian
+    data from Erdos-Renyi graphs with single-variable interventions on 40% of the variables, the
+    rows split evenly between observation and each intervention, on 4 cores with a cap of 1 h and 28
+    GB per fit. The largest sizes through which its median errors (SHD against the interventional
+    essential graph) stayed below the empty graph's, and through which its fits finished within the
+    caps, were 50 and 200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2
+    with 10,000 rows; 200 and 800 at mean degree 2 with 2,000 rows; 100 and 400 at mean degree 2
+    with 500 rows; 400 and 800 at mean degree 4 with 2,000 rows; and 800 and 800 at mean degree 8
+    with 2,000 rows. The ladders ended after two sizes in a row did not beat the empty graph, except
+    at mean degree 4 or 8 with 2,000 rows, where they ended when three fits of the next size ran
+    past 1 h. The median fit took 1,231 s at 1,600 variables (mean degree 2, 10,000 rows in total).
+    Each distinct set of rows without an intervention on a variable keeps its own covariance matrix
+    of all the variables, so memory grows with the number of intervened variables times the square
+    of the variable count. A parent set of ``m - 1`` or more variables, where ``m`` counts the rows
+    without an intervention on the child, fits its child exactly, so the search never selects one,
+    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
     .. [1] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
        interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+    .. [2] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -422,12 +492,14 @@ def gies(
     from andrey.search.gies import gies as _gies
     from andrey.search.gies import intervention_mask
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="gies")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
     with copies_named(labels):
-        graph, score = _gies(X, mask, lambda_value=lambda_value, constraints=constraints)
+        graph, score = _gies(
+            X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma, constraints=constraints
+        )
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
     return structure_output(graph, labels=labels, metadata=metadata)
 
@@ -437,6 +509,7 @@ def xges(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     extended_search: bool = True,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -455,7 +528,13 @@ def xges(
         Two names of the Gaussian BIC, the only score XGES supports.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and
+        non-negative.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. See Notes.
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
@@ -508,21 +587,41 @@ def xges(
     :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
     keeps.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
-    variable. On the denser graphs its median errors (SHD) stayed below the empty graph's at every
-    size. On the sparse graphs they exceeded it from 500 variables on, where the BIC score still
-    preferred the returned graphs to the true one. At 1,000 variables, the median fit took under a
-    minute on the sparse graphs and under five minutes on the denser ones, on one core; with
-    ``extended_search=False``, a few seconds. The extended search reruns the base search for each
-    edge it tries to delete and retries the edges after keeping a result, so its run time grows
-    with the number of edges and of results kept. Its BIC score assumes linear relations with
-    Gaussian noise.
-    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
-    more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Choosing the penalty.** The score charges a variable ``lambda_value * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
+    [4]_, which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the standard BIC. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured: 8 against 199 with 200 variables and 2,000 rows (200 true
+    edges).
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
+    cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors
+    (SHD) stayed below the empty graph's, and through which its fits finished within the caps, were
+    50 and 200 variables at mean degree 1 with 2,000 rows and mean degree 2 with 500 rows; 400 and
+    1,600 at mean degree 2 with 10,000 rows and mean degree 4 with 2,000 rows; 200 and 800 at mean
+    degree 2 with 2,000 rows; and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
+    after two sizes in a row did not beat the empty graph. The median fit took 828 s at 1,600
+    variables (mean degree 4, 2,000 rows). With ten rows per variable at mean degree 2, where its
+    errors exceeded the empty graph's from 500 variables, the BIC score still preferred the returned
+    graphs to the true one. At 1,000 variables with ten rows per variable, the median fit took under
+    a minute at mean degree 2 and under five minutes at mean degree 4, on one core, and a few
+    seconds with ``extended_search=False``. The extended search reruns the base search for each edge
+    it tries to delete and retries the edges after keeping a result, so its run time grows with the
+    number of edges and of results kept. Its BIC score assumes linear relations with Gaussian noise.
+    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
+    or more variables fits its child exactly, so the search never selects one, nor any parent set
+    that leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -532,6 +631,8 @@ def xges(
        507-554.
     .. [3] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
        interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+    .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -547,7 +648,7 @@ def xges(
     """
     from andrey.search.xges import xges as _xges
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="xges")
     extended_search = flag(extended_search, "extended_search")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="xges")
@@ -556,6 +657,7 @@ def xges(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             extended_search=extended_search,
             constraints=constraints,
         )
@@ -568,6 +670,7 @@ def hc(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -597,8 +700,14 @@ def hc(
         ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
-        finite and non-negative. BDeu ignores it.
+        Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
+        standard BIC. Must be finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See
+        Notes.
     max_iter : int or None, default=None
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
@@ -675,22 +784,45 @@ def hc(
     column order and on another machine, and how ``andrey.config(tie_break="position")`` orders the
     ties by column position instead.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
-    to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
-    exceeded the empty graph's. The median fit took under a second at 800 variables and about 20 s
-    at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
-    takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
-    assumes linear relations with Gaussian noise. With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. On simulated mixed data (conditional linear Gaussian
-    networks on sparse random graphs, the first half of the variables categorical with 2 to 5
-    categories), from 10 to 40 variables with 2,000 rows, its median errors at 40 variables were
-    12.5 with ``"local_score_degen_gauss"`` and 11 with ``"local_score_cond_gauss"``, against 40. On
-    simulated categorical networks with 2 or 3 categories per variable, of the same sizes and rows,
-    they were 18 with ``"local_score_BDeu"`` and 20 with ``"local_score_BIC_categorical"``. Every
-    median fit took under 0.2 s at 40 variables, on 4 cores. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Choosing the penalty.** The score charges a variable ``lambda_value * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [3]_,
+    which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the standard BIC. On simulated linear-Gaussian
+    data with 20 to 400 variables and 200 to 4,000 rows, the default ``ebic_gamma=1.0`` made fewer
+    errors (SHD) than the standard BIC on average at every number of variables and rows measured:
+    109 against 272 with 200 variables and 2,000 rows (200 true edges). Its mean errors stayed below
+    the empty graph's in each of the 65 settings, where the standard BIC's exceeded it in 37.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``max_iter=100000``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 1,600 variables at mean degree 1 with 2,000 rows; 200 and
+    1,600 at mean degree 2 with 10,000 rows; 100 and 3,200 at mean degree 2 with 2,000 rows; 20 and
+    1,600 at mean degree 2 with 500 rows; none and 800 at mean degree 4 with 2,000 rows (below it
+    only at 100); and none and 800 at mean degree 8 with 2,000 rows. The ladders ended after two
+    sizes in a row did not beat the empty graph, except at mean degree 2 with 2,000 rows, where the
+    ladder ended at the largest planned size. Each accuracy stop was set after larger sizes had run.
+    The median fit took 148 s at 3,200 variables (mean degree 2, 2,000 rows). It has no move limit
+    by default; run time grows with the moves the search takes. A graph that no single move improves
+    need not be the best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
+    or more variables fits its child exactly, so the search never selects one, nor any parent set
+    that leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
+    mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
+    variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
+    median errors at 40 variables were 12.5 with ``"local_score_degen_gauss"`` and 11 with
+    ``"local_score_cond_gauss"``, against 40. On simulated categorical networks with 2 or 3
+    categories per variable, of the same sizes and rows, they were 18 with ``"local_score_BDeu"``
+    and 20 with ``"local_score_BIC_categorical"``. Every median fit took under 0.2 s at 40
+    variables, on 4 cores. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -698,6 +830,8 @@ def hc(
        search methods and experimental results. AISTATS, PMLR R0, 112-128.
     .. [2] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+    .. [3] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -719,7 +853,7 @@ def hc(
         max_categories=max_categories,
     )
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="hc"
     )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
@@ -729,6 +863,7 @@ def hc(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             max_iter=max_iter,
             categorical=mask,
             constraints=constraints,
@@ -742,6 +877,7 @@ def tabu(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    ebic_gamma: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
@@ -771,8 +907,14 @@ def tabu(
         numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be finite
-        and non-negative. BDeu ignores it.
+        Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
+        standard BIC. Must be finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See
+        Notes.
     tabu_length : int, default=10
         Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
@@ -835,15 +977,37 @@ def tabu(
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
-    to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
-    exceeded the empty graph's. The median fit took under 2 s at 800 variables and under a minute
-    at 3,200, on 4 cores. It takes hill climbing's moves plus up to ``max_tabu`` non-improving
+    **Choosing the penalty.** The score charges a variable ``lambda_value * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [4]_,
+    which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the standard BIC. On simulated linear-Gaussian
+    data with 20 to 400 variables and 200 to 4,000 rows, the default ``ebic_gamma=1.0`` made fewer
+    errors (SHD) than the standard BIC on average at every number of variables and rows measured: 85
+    against 276 with 200 variables and 2,000 rows (200 true edges). Its mean errors stayed below the
+    empty graph's in each of the 65 settings, where the standard BIC's exceeded it in 35.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``max_iter=100000`` and ``max_tabu=10``, on 4 cores with a cap of 1 h and 28 GB per fit. The
+    largest sizes through which its median errors (SHD) stayed below the empty graph's, and through
+    which its fits finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000
+    rows and mean degree 2 with 500 rows; 200 and 800 at mean degree 2 with 10,000 rows; 100 and 800
+    at mean degree 2 with 2,000 rows; 20 and 800 at mean degree 4 with 2,000 rows (also below it
+    from 100 through 200); and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
+    after two sizes in a row did not beat the empty graph. The accuracy stop at mean degree 2 with
+    2,000 rows was set after larger sizes had run. The median fit took 6.6 s at 800 variables (mean
+    degree 4, 2,000 rows). It takes hill climbing's moves plus up to ``max_tabu`` non-improving
     moves between new best scores, with no move limit by default; run time grows with the moves
     taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
-    missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than
-    columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more variables fits
-    its child exactly, so the search never selects one, nor any parent set that leaves its child a
+    missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than columns
+    the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its
+    child exactly, so the search never selects one, nor any parent set that leaves its child a
     residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
     run it on small fixed categorical networks. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
@@ -857,6 +1021,8 @@ def tabu(
        3rd edition. Prentice Hall.
     .. [3] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+    .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -875,9 +1041,9 @@ def tabu(
     if score_func not in TABU_SCORES:
         raise NotImplementedError(f"tabu supports {TABU_SCORES}, not {score_func!r}")
     if data_kind(score_func) == "categorical":
-        X, _ = checked_data(data, None, "score_func", score_func)
+        X, _ = checked_data(data, None, "score_func", score_func, method="tabu")
     else:
-        X = data_matrix(data)
+        X = data_matrix(data, method="tabu")
     tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
@@ -890,6 +1056,7 @@ def tabu(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            ebic_gamma=ebic_gamma,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
@@ -904,6 +1071,7 @@ def exact_search(
     *,
     search_method: str = "astar",
     score_func: str | None = None,
+    ebic_gamma: float = 1.0,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -928,11 +1096,17 @@ def exact_search(
         multinomial BIC for categorical data coded by whole numbers; or
         ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or
         conditional Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each BIC uses the
-        standard penalty, ``lambda_value=1``. ``None`` reads the column types from
+        penalty of ``lambda_value=1``, and the linear-Gaussian BIC adds the extended-BIC term that
+        ``ebic_gamma`` weighs. ``None`` reads the column types from
         ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when every column is
         categorical or ``"local_score_cond_gauss"`` when some are, each with a
         ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
         ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -1012,20 +1186,37 @@ def exact_search(
     categorical columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so
     the optimum is again identified up to its equivalence class.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 5 to 15 variables with ten rows per variable. Its median errors (SHD) stayed
-    below the empty graph's at every size (7 against 15 at 15 variables). The median fit took
-    0.11 s at 10 variables and 6.4 s at 15, on 4 cores. With a mixed-data or categorical score it
-    is not benchmarked yet: its tests run it with a mixed-data score on 5 variables with 3,000 rows,
-    and with a categorical score on small fixed categorical networks.
-    It scores every possible parent set of every variable, so its run time at least doubles with
-    each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
-    its memory doubles as well.
-    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
-    more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Choosing the penalty.** With ``"local_score_BIC"``, the score charges a variable
+    ``log(n_samples)`` per parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables -
+    1, n_parents)`` [7]_, which grows with the number of variables; :func:`~andrey.ges` describes
+    the choice. ``ebic_gamma=0.0`` is the standard BIC. On simulated linear-Gaussian data with 20
+    variables and 200 or 1,000 rows, the best-scoring graph under the default ``ebic_gamma=1.0`` had
+    fewer errors (SHD) than the standard BIC's on average in each of the 10 settings of graph and
+    rows measured: 2.0 against 9.6 with 200 rows and 20 true edges. Larger graphs were not
+    measured.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
+    simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores with a cap of 1 h and 28 GB
+    per fit. The largest sizes through which its median errors (SHD) stayed below the empty graph's,
+    and through which its fits finished within the caps, were 24 and 24 variables at mean degree 1
+    with 2,000 rows; and 22 and 22 at mean degree 2 with 500, 2,000, or 10,000 rows and mean degree
+    4 or 8 with 2,000 rows. Every ladder ended when three fits of the next size ran past 1 h. The
+    median fit took 1,457 s at 24 variables (mean degree 1, 2,000 rows). With a mixed-data or
+    categorical score it is not benchmarked yet: its tests run it with a mixed-data score on 5
+    variables with 3,000 rows, and with a categorical score on small fixed categorical networks. It
+    scores every possible parent set of every variable, so its run time at least doubles with each
+    added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so its
+    memory doubles as well. With fewer rows than columns the standard BIC is unreliable. A parent
+    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
+    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1041,6 +1232,8 @@ def exact_search(
        the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
     .. [6] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
        461-464.
+    .. [7] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -1062,7 +1255,12 @@ def exact_search(
     if score_func not in EXACT_SCORES:
         raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data,
+        categorical,
+        "score_func",
+        score_func,
+        max_categories=max_categories,
+        method="exact_search",
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
@@ -1071,6 +1269,7 @@ def exact_search(
             X,
             search_method=search_method,
             score_func=score_func,
+            ebic_gamma=ebic_gamma,
             categorical=mask,
             constraints=constraints,
         )
@@ -1087,8 +1286,10 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     CALM (Continuous and Acyclicity-constrained L0-penalized likelihood with an estimated Moral
     graph) [1]_ fits a linear-Gaussian DAG with torch. By default it keeps only the candidate edges
     of an estimated moral graph, then minimizes the Gaussian likelihood plus a penalty per edge
-    under an acyclicity constraint. The optimizer draws random numbers and is seeded on every call;
-    see ``seed``.
+    under an acyclicity constraint. It is a continuous-optimization method in the line of NOTEARS
+    (:func:`~andrey.notears`), with a likelihood in place of least squares, gates that count edges
+    in place of an ``l1`` penalty, and a candidate set restricted to the moral graph. The optimizer
+    draws random numbers and is seeded on every call; see ``seed``.
 
     Parameters
     ----------
@@ -1168,19 +1369,30 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
     larger ``max_outer`` runs that schedule.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 10 to 50 variables with ten rows per variable. Its median errors (SHD) stayed
-    below the empty graph's at every size (15 against 50 at 50 variables). The median fit took 18 s
-    at 10 variables and 59 s at 50, on 4 cores. The paper's schedule (``lr=0.001``,
-    ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``, ``w_threshold=0.0``) took 174 s
-    and 472 s for median errors of 6 and 12. Every optimizer step computes a determinant and a
-    matrix power of the full weight matrix, one row and one column per variable, so a step's cost
-    grows with the cube of the variable count; the defaults allow up to 75,000 steps (``max_outer``
-    times ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider
-    whose two parents are independent, it can return both edges reversed and an edge between the
-    parents, with the defaults and with the paper's schedule alike. The numbers are a reference, not
-    a hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
+    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
+    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
+    stayed below the empty graph's, and through which its fits finished within the caps, were 200
+    and 200 variables at mean degree 1 with 2,000 rows; 400 and 400 at mean degree 2 with 500,
+    2,000, or 10,000 rows and mean degree 4 with 2,000 rows; and none and 400 at mean degree 8 with
+    2,000 rows (below it only from 50 through 400). At 400 variables at mean degree 2 with 500 rows
+    and mean degree 4 or 8 with 2,000 rows, 1 or 2 of 5 fits ran past 1 h. Every ladder ended when
+    three fits of the next size ran past 1 h. The median fit took 3,332 s at 400 variables (mean
+    degree 4, 2,000 rows). With mean degree 2 and ten rows per variable, the median fit took 18 s at
+    10 variables and 59 s at 50, where its median errors were 15; the paper's schedule
+    (``lr=0.001``, ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
+    ``w_threshold=0.0``) took 174 s and 472 s for median errors of 6 and 12. Every optimizer step
+    computes a determinant and a matrix power of the full weight matrix, one row and one column per
+    variable, so a step's cost grows with the cube of the variable count; the defaults allow up to
+    75,000 steps (``max_outer`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
+    local optimum: on a collider whose two parents are independent, it can return both edges
+    reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -1214,7 +1426,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="calm")
     labels = column_labels(data)
     used_seed = resolve_seed(seed)
     with copies_named(labels):

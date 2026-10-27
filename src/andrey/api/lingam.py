@@ -156,13 +156,26 @@ def direct_lingam(
     weighted by the scale between the two, and no edges to later columns, which take their edges
     from the column it copies.
 
-    **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
-    uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
-    stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
-    variables and 545 s at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300
-    variables did not finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a
-    fit took 528 s at 300 variables and 1,410 s at 400. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
+    with no hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
+    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 400 and 400 variables at mean degree 1, 2, 4, or 8 with 2,000
+    rows; 200 and 200 at mean degree 2 with 10,000 rows; and 200 and 400 at mean degree 2 with 500
+    rows. The ladders ended when three fits of the next size ran past 1 h, except at mean degree 2
+    with 500 rows, where the ladder ended when three fits of the next size, with more variables than
+    rows, stopped with an error. The median fit took 2,211 s at 400 variables (mean degree 8, 2,000
+    rows). Measured on simulated data from scale-free graphs with linear effects and uniform noise,
+    with ten rows per variable. From 20 to 200 variables its median errors (SHD) stayed below the
+    empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20 variables and 545 s
+    at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300 variables did not
+    finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a fit took 528 s at
+    300 variables and 1,410 s at 400. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -185,7 +198,7 @@ def direct_lingam(
     """
     from andrey.lingam.direct import direct_lingam as _native
 
-    X = _pruning_rows(data_matrix(data))
+    X = _pruning_rows(data_matrix(data, method="direct_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
     order, B = _native(X, measure=measure, constraints=constraints)
@@ -201,7 +214,11 @@ def direct_lingam(
 
 
 def ica_lingam(
-    data: npt.ArrayLike, *, random_state: int | None = None, max_iter: int = 1000
+    data: npt.ArrayLike,
+    *,
+    random_state: int | None = None,
+    max_iter: int = 1000,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a fully oriented DAG with ICA-LiNGAM (linear, non-Gaussian noise).
 
@@ -221,6 +238,15 @@ def ica_lingam(
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset.
     max_iter : int, default=1000
         Maximum FastICA iterations; at least ``1``.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The order search reads the unmixing
+        weight of every edge the knowledge forbids as ``0``, the reverse of each required edge and
+        every edge into an earlier tier included, and puts the cause of each required edge, and each
+        earlier tier, first. The regression on that order drops the forbidden parents and does not
+        penalize the required ones. A variable with a required parent takes least-squares weights on
+        the parents it keeps; the others keep the adaptive Lasso's. Every required edge is in the
+        DAG, even where its least-squares weight is ``0``.
 
     Returns
     -------
@@ -228,18 +254,21 @@ def ica_lingam(
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"ICALiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
-        adaptive Lasso; the DAG has an edge exactly where the coefficient is nonzero.
+        adaptive Lasso, or by least squares for a variable with a required parent; the DAG has an
+        edge where the coefficient is nonzero and at every required edge.
 
     Raises
     ------
     RuntimeError
         If no causal order can be read from the FastICA result.
     TypeError
-        If ``max_iter`` is not an int.
+        If ``max_iter`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0`` to
         ``2**32 - 1``, or if ``data`` has fewer than ``n_variables + 1`` rows, the fewest with which
-        the pruning step can estimate the edge weights.
+        the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -267,13 +296,29 @@ def ica_lingam(
     under a new column order or on another machine when it converges slowly, at few rows per
     variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
-    **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
-    uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
-    passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
-    100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's
-    protein-signaling data (853 rows, 11 variables), its errors were below the empty graph's (14
-    against 17). The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
+    unmix every variable over the same rows, so a row with a missing value has no place in them.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
+    with no hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
+    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 400 variables at mean degree 1 or 2 with 2,000 rows; 100
+    and 400 at mean degree 2 with 10,000 rows; 20 and 400 at mean degree 2 with 500 rows and mean
+    degree 4 with 2,000 rows; and none and 400 at mean degree 8 with 2,000 rows. The ladders ended
+    when three fits of the next size ran past 1 h, except at mean degree 2 with 500 rows, where the
+    ladder ended when three fits of the next size, with more variables than rows, stopped with an
+    error, and at mean degree 8 with 2,000 rows, where the ladder ended after two sizes in a row did
+    not beat the empty graph. The accuracy stop at mean degree 8 with 2,000 rows was set after
+    larger sizes had run. The median fit took 516 s at 400 variables (mean degree 2, 10,000 rows).
+    Measured on simulated data from scale-free graphs with linear effects and uniform noise, from 20
+    to 100 variables with ten rows per variable: its median errors (SHD) passed the empty graph's at
+    every size, 27 against 19 at 20 variables and 181 against 99 at 100. The median fit took 0.44 s
+    at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
+    variables), its errors were below the empty graph's (14 against 17). The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -293,13 +338,15 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
-    X = _pruning_rows(data_matrix(data))
+    X = _pruning_rows(data_matrix(data, method="ica_lingam"))
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
-    order, B = _native(X, random_state=random_state, max_iter=max_iter)
+    constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
+    order, B = _native(X, random_state=random_state, max_iter=max_iter, constraints=constraints)
     weighted = _canonical_weights(B)
+    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
     return structure_output(
-        dag_from_adjacency(weighted),
+        dag_from_adjacency(edges),
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,
@@ -308,7 +355,10 @@ def ica_lingam(
 
 
 def multi_group_direct_lingam(
-    data_groups: Sequence[npt.ArrayLike], *, random_state: int | None = None
+    data_groups: Sequence[npt.ArrayLike],
+    *,
+    random_state: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> list[StructureOutput]:
     """Jointly learn one fully oriented DAG per group with multi-group DirectLiNGAM.
 
@@ -326,6 +376,14 @@ def multi_group_direct_lingam(
     random_state : int or None, default=None
         Ignored. The method is deterministic; the argument exists so that
         ``multi_group_direct_lingam`` accepts ``random_state`` as the other LiNGAM methods do.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. It holds for every group. The
+        shared causal order puts the cause of each required edge, and each earlier tier, first. The
+        regression on that order drops the forbidden parents and does not penalize the required
+        ones. A variable with a required parent takes least-squares weights on the parents it keeps;
+        the others keep the adaptive Lasso's. Every required edge is in every group's DAG, even
+        where its least-squares weight is ``0``.
 
     Returns
     -------
@@ -338,11 +396,14 @@ def multi_group_direct_lingam(
 
     Raises
     ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If fewer than two groups are given, if the groups disagree on the variable count or on
         their column names, or if a group is not a usable 2-D matrix or has fewer than
         ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
-        weights.
+        weights. Also if ``knowledge`` names a column the groups lack or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -351,14 +412,20 @@ def multi_group_direct_lingam(
     group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
     only in the groups where it is one.
 
-    **Limitations.** Measured on three groups of 1,000 rows over the same variables, from one
-    sparse random graph (mean degree 2) with linear effects, uniform noise, and weights drawn for
-    each group, from 5 to 20 variables. Its median errors (SHD summed over the groups) were 0 at 5
-    and 10 variables and 1 at 20, against the empty graph's 15, 30, and 60. The median fit took
-    1.2 s at 20 variables, on 4 cores. It assumes linear effects and non-Gaussian noise
-    in every group, and it gives every group the one shared causal order, even when a group's own
-    order differs. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured on simulated linear data with uniform noise in 3 groups that share one
+    Erdos-Renyi graph, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 200 and 200 variables at mean degree 2 or 4 with 1,000 or 5,000
+    rows per group. Every ladder ended at the largest planned size. The median fit took 1,996 s at
+    200 variables (mean degree 4, 5,000 rows per group, 3 groups). It assumes linear effects and
+    non-Gaussian noise in every group, and it gives every group the one shared causal order, even
+    when a group's own order differs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -383,7 +450,10 @@ def multi_group_direct_lingam(
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native
 
     groups = [
-        _pruning_rows(data_matrix(X, name=f"data_groups[{k}]"), name=f"data_groups[{k}]")
+        _pruning_rows(
+            data_matrix(X, name=f"data_groups[{k}]", method="multi_group_direct_lingam"),
+            name=f"data_groups[{k}]",
+        )
         for k, X in enumerate(data_groups)
     ]
     if len(groups) < 2:
@@ -392,14 +462,16 @@ def multi_group_direct_lingam(
         widths = [X.shape[1] for X in groups]
         raise ValueError(f"every dataset in data_groups needs the same columns, got {widths}")
     labels = shared_labels(column_labels(X) for X in data_groups)
-    order, adjacency_matrices = _native(groups)
+    constraints = resolve(knowledge, groups[0].shape[1], labels, method="multi_group_direct_lingam")
+    order, adjacency_matrices = _native(groups, constraints=constraints)
     n_groups = len(groups)
     outputs = []
     for k, B in enumerate(adjacency_matrices):
         weighted = _canonical_weights(B)
+        edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
         outputs.append(
             structure_output(
-                dag_from_adjacency(weighted),
+                dag_from_adjacency(edges),
                 labels=labels,
                 ordering=order,
                 weighted_adjacency=weighted,

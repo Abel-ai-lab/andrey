@@ -18,6 +18,7 @@ COVERS = {
     "punch-cards": "a shuffled fan of punch cards, one card amber",
     "harmonograph": "a harmonograph tracing a figure of cosine curves, one curve amber",
     "rocket": "a rocket climbing out of a bank of clouds, its engine flare amber",
+    "ceiling": "a rocket reaching the curved edge of the sky, the edge amber and cracking",
     "ground": "the stipple ground",
 }
 

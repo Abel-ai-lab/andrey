@@ -15,10 +15,15 @@ non-Gaussianity" (MLSP 2013).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from andrey.lingam.direct import direct_lingam
 from andrey.search.hc import tie_ranks
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints, LaggedConstraints
 
 
 def _check_panel(X_list: list[np.ndarray]) -> tuple[list[np.ndarray], int, int, int]:
@@ -83,13 +88,16 @@ def _compute_residuals(
 
 
 def _estimate_instantaneous(
-    N_t: np.ndarray, T: int, p: int, measure: str
+    N_t: np.ndarray, T: int, p: int, measure: str, constraints: Constraints | None = None
 ) -> tuple[np.ndarray, list[list[int]]]:
-    """Apply DirectLiNGAM to each residual set; return ``B(t,t)`` and per-time causal orders."""
+    """Apply DirectLiNGAM to each residual set; return ``B(t,t)`` and per-time causal orders.
+
+    ``constraints``, the lag-0 knowledge, reach every time point's DirectLiNGAM.
+    """
     B_t = np.zeros((T, p, p))
     causal_orders: list[list[int]] = [[]]
     for t in range(1, T):
-        order, B = direct_lingam(N_t[t].T, measure=measure)
+        order, B = direct_lingam(N_t[t].T, measure=measure, constraints=constraints)
         causal_orders.append(order)
         B_t[t] = B
     return B_t, causal_orders
@@ -105,6 +113,33 @@ def _estimate_lagged(B_t: np.ndarray, M_tau: np.ndarray, T: int, p: int, n_lags:
     return B_tau
 
 
+def _estimate_lagged_without(
+    X_t: list[np.ndarray], B_t: np.ndarray, forbidden: np.ndarray, T: int, p: int, n_lags: int
+) -> np.ndarray:
+    """Lagged adjacencies by least squares on the allowed lags only.
+
+    ``(I - B(t,t)) M(t,t-tau)`` is the least-squares fit of ``(I - B(t,t)) X(t)`` on the lags, as
+    least squares is linear in the response. Each variable's row is that fit on the lagged
+    columns ``forbidden[tau, :, i]`` leaves, so a forbidden link's weight is ``0``; with nothing
+    forbidden it equals :func:`_estimate_lagged`.
+    """
+    B_tau = np.zeros((T, n_lags, p, p))
+    eye = np.eye(p)
+    for t in range(1, T):
+        n_avail = min(n_lags, t)
+        lagged = np.concatenate([X_t[t - (tau + 1)].T for tau in range(n_avail)], axis=1)
+        response = X_t[t].T @ (eye - B_t[t]).T
+        for i in range(p):
+            keep = ~np.concatenate([forbidden[tau + 1, :, i] for tau in range(n_avail)])
+            if not keep.any():
+                continue
+            coef = np.zeros(p * n_avail)
+            coef[keep] = _regress_out_lags(lagged[:, keep], response[:, [i]])[0]
+            for tau in range(n_avail):
+                B_tau[t, tau, i] = coef[p * tau : p * tau + p]
+    return B_tau
+
+
 class LongitudinalLiNGAM:
     """Longitudinal LiNGAM estimator for panel / repeated-measures data.
 
@@ -114,10 +149,22 @@ class LongitudinalLiNGAM:
     orders.
     """
 
-    def __init__(self, n_lags: int = 1, measure: str = "pwling") -> None:
-        """Configure the number of lags and the DirectLiNGAM independence ``measure``."""
+    def __init__(
+        self,
+        n_lags: int = 1,
+        measure: str = "pwling",
+        constraints: LaggedConstraints | None = None,
+    ) -> None:
+        """Configure the number of lags, the DirectLiNGAM independence ``measure``, and the
+        background knowledge ``constraints`` over lags ``0`` to ``n_lags``.
+
+        The lag-0 knowledge reaches each time point's DirectLiNGAM. A forbidden lagged link is
+        left out of its effect's lag regression (:func:`_estimate_lagged_without`); every other
+        lagged weight stays, a required one included.
+        """
         self.n_lags = n_lags
         self.measure = measure
+        self.constraints = constraints
         self._T = 0
         self._n = 0
         self._p = 0
@@ -137,8 +184,20 @@ class LongitudinalLiNGAM:
         # Row k of each time point is the data's column by_rank[k].
         X_t = [np.ascontiguousarray(X[by_rank]) for X in X_t]
         M_tau, N_t = _compute_residuals(X_t, self._T, self._n, self._p, self.n_lags)
-        B_t, causal_orders = _estimate_instantaneous(N_t, self._T, self._p, self.measure)
-        B_tau = _estimate_lagged(B_t, M_tau, self._T, self._p, self.n_lags)
+        if self.constraints is None:
+            B_t, causal_orders = _estimate_instantaneous(N_t, self._T, self._p, self.measure)
+            B_tau = _estimate_lagged(B_t, M_tau, self._T, self._p, self.n_lags)
+        else:
+            known = self.constraints.permuted(by_rank)
+            B_t, causal_orders = _estimate_instantaneous(
+                N_t, self._T, self._p, self.measure, known.contemporaneous()
+            )
+            if known.lagged_forbidden() is None:
+                B_tau = _estimate_lagged(B_t, M_tau, self._T, self._p, self.n_lags)
+            else:
+                B_tau = _estimate_lagged_without(
+                    X_t, B_t, known.forbidden, self._T, self._p, self.n_lags
+                )
 
         adjacency = np.full((self._T, 1 + self.n_lags, self._p, self._p), np.nan)
         for t in range(1, self._T):

@@ -339,7 +339,7 @@ def granger_draws(d: int, n: int) -> tuple[Draw, ...]:
             ),
             noise=data.noise.gaussian(),
         )
-        ds = scm.sample(n=n, seed=seed)
+        ds = scm.sample(n=n, seed=seed, scale="raw")
         x = np.asarray(ds.data, dtype=np.float64)
         weights = np.asarray(ds.graph.lag_weights)  # (1 + lags, cause, effect), lag 0 first
         out.append(Draw((x - x.mean(axis=0)) / x.std(axis=0), weights[1:] != 0))

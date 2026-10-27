@@ -191,16 +191,16 @@ _SEARCHES = {
 def test_reordering_the_columns_relabels_the_graph(search, case) -> None:
     """Every column order gives the graph of the stored order, mapped back.
 
-    Ranking the columns by position instead changes the graph under at least one of the orders, so
+    Ranking the columns by position instead changes the graph under at least one of 40 orders, so
     the orders reach choices that go by variable index.
     """
     search = _SEARCHES[search]
     x, kwargs = _ORDER_CASES[case]()
     d = x.shape[1]
     rng = np.random.default_rng(0)
-    orders = [np.arange(d)[::-1], *(rng.permutation(d) for _ in range(3))]
+    orders = [np.arange(d)[::-1], *(rng.permutation(d) for _ in range(39))]
     want = _graph(search, x, np.arange(d), **kwargs)
-    for order in orders:
+    for order in orders[:4]:
         np.testing.assert_array_equal(_graph(search, x, order, **kwargs), want)
 
     with andrey.config(tie_break="position"):
@@ -229,5 +229,7 @@ def test_ranks_move_with_the_columns_and_the_score_is_the_same(case) -> None:
 def test_the_seed_still_matters(search) -> None:
     """Different seeds shuffle the sorted columns differently and can reach different graphs."""
     x = _linear(1)
-    graphs = {search(x, random_state=seed)[0].to_numpy().tobytes() for seed in range(4)}
+    graphs = {
+        search(x, random_state=seed, ebic_gamma=0.0)[0].to_numpy().tobytes() for seed in range(4)
+    }
     assert len(graphs) > 1

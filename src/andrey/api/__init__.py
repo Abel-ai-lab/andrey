@@ -12,7 +12,10 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 ``StructureOutput`` construction.
 """
 
+from .blanket import iamb, inter_iamb, mmpc
 from .constraint import cdnod, fci, gfci, pc
+from .continuous import dagma, notears
+from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
@@ -26,6 +29,10 @@ __all__ = [
     "fci",
     "gfci",
     "cdnod",
+    # local structure: one variable's Markov blanket or parents and children
+    "iamb",
+    "inter_iamb",
+    "mmpc",
     # score-based
     "ges",
     "gies",
@@ -34,6 +41,11 @@ __all__ = [
     "tabu",
     "exact_search",
     "calm",
+    "notears",
+    "dagma",
+    # hybrid: a restrict phase of CI tests, then a score search
+    "mmhc",
+    "rsmax2",
     # permutation-based
     "boss",
     "grasp",

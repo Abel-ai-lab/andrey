@@ -211,10 +211,9 @@ def _all_dags(d: int):
 def test_exact_search_scores_as_well_as_every_dag(search_method):
     """On four variables the search returns one of the 543 DAGs, and none has a lower BIC."""
     x = datagen.generate("gauss_5v")[:, 1:]
-    score = BICScore(x)
-    found = (andrey.exact_search(x, search_method=search_method).structure.to_numpy() == 1).astype(
-        np.int8
-    )
+    score = BICScore(x, ebic_gamma=1.0)
+    dag = andrey.exact_search(x, search_method=search_method, ebic_gamma=1.0).structure
+    found = (dag.to_numpy() == 1).astype(np.int8)
     dags = list(_all_dags(4))
     assert any(np.array_equal(found, dag) for dag in dags)
     assert _bic(found, score) <= min(_bic(dag, score) for dag in dags) + 1e-9

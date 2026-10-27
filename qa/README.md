@@ -17,16 +17,17 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 
 ## Identity
 
-A speed change must return the same answers. `identity.py` fits every supported method on the
-first two draws of each of its quality-gate datasets and of one larger dataset, on the numpy
-backend with one worker and one BLAS thread, and hashes each fit's full output: the graph, the edge
-weights, the causal order, and every metadata value, such as a score or a p-value. Floats enter as
-their bytes, so equal hashes mean equal bits; a second hash covers only the graphs' endpoint marks.
-The manifest has one row per fit, keyed by method, dataset, seed, permutation, and worker count,
-under a header naming the commit, the Python, NumPy, and SciPy versions, the loaded BLAS, the CPU,
-and the thread settings. It also names the directory of the Andrey package the run imported and,
-when that directory is in a git work tree, that tree's commit, so a manifest made with Andrey
-imported from another tree through `PYTHONPATH` names the tree it ran.
+A speed change must return the same answers. `identity.py` fits every supported method, and IAMB,
+Inter-IAMB, MMPC, MMHC, and RSMAX2, on the first two draws of each of its quality-gate datasets and
+of one larger dataset, on the numpy backend with one worker and one BLAS thread, and hashes each
+fit's full output: the graph, the edge weights, the causal order, and every metadata value, such as
+a score or a p-value. Floats enter as their bytes, so equal hashes mean equal bits; a second hash
+covers only the graphs' endpoint marks. The manifest has one row per fit, keyed by method, dataset,
+seed, permutation, and worker count, under a header naming the commit, the Python, NumPy, and SciPy
+versions, the loaded BLAS, the CPU, and the thread settings. It also names the directory of the
+Andrey package the run imported and, when that directory is in a git work tree, that tree's commit,
+so a manifest made with Andrey imported from another tree through `PYTHONPATH` names the tree it
+ran.
 
 A fit that queries a CI test or a local score also records two counts, which are deterministic, so
 a change can be held to not raising them: the CI-test queries of a pair made after a query of that
@@ -46,8 +47,9 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out.
-- `--workers N` refits PC, FCI, GFCI, CD-NOD, GES, and Granger on `N` workers, with every GES pass
-  and every skeleton pass of conditioning size two or more sent to the worker pool.
+- `--workers N` refits PC, FCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, Granger, and PNL
+  on `N` workers, with every GES pass and every skeleton pass of conditioning size two or more sent
+  to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
 sets the draws per dataset.

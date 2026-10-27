@@ -19,10 +19,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
+from andrey.constraint.blanket import blanket_graph
+from andrey.core import GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.search._parallel import _KEY_DP
+from andrey.search.continuous import (
+    break_cycles,
+    endpoint_marks,
+    residual_variances,
+)
 from andrey.search.hc import tie_ranks
 
 
@@ -61,54 +66,19 @@ class CalmResult:
 # --------------------------------------------------------------------------------------------
 
 
-def _markov_blanket(
-    test: FisherZ, target: int, d: int, alpha: float, ranks: list[int]
-) -> list[int]:
-    """Estimate ``target``'s Markov blanket by the interleaved IAMB grow/shrink search.
-
-    Grow: repeatedly add the candidate most dependent on ``target`` given the current blanket
-    until none qualifies. A candidate qualifies at a p-value at or below ``alpha``; the most
-    dependent has the largest absolute partial correlation, which keeps its order where p-values
-    underflow to zero. Candidates whose absolute partial correlations agree to ``_KEY_DP`` decimals
-    are chosen by ``ranks``, from :func:`~andrey.search.hc.tie_ranks`. Shrink: drop any member that
-    has become conditionally independent of ``target`` given the rest. Returns the surviving
-    indices.
-    """
-    blanket: list[int] = []
-    while True:
-        best_key, best_x = None, None
-        for x in range(d):
-            if x == target or x in blanket:
-                continue
-            r, p = test.statistic_pvalue(target, x, blanket)
-            key = (-round(abs(r), _KEY_DP), ranks[x])
-            if p <= alpha and (best_key is None or key < best_key):
-                best_key, best_x = key, x
-        if best_x is None:
-            break
-        blanket.append(best_x)
-    for x in list(blanket):
-        rest = [z for z in blanket if z != x]
-        if test(target, x, rest) > alpha:
-            blanket.remove(x)
-    return blanket
-
-
 def moral_graph(data: np.ndarray, *, alpha: float = 0.01) -> np.ndarray:
     """Estimate the undirected moral graph (symmetric ``0/1`` mask) by an IAMB Markov network.
 
-    Runs IAMB for every variable and keeps edge ``(i, j)`` only when each lies in the other's
-    estimated Markov blanket (the AND rule), yielding a symmetric adjacency with a zero diagonal.
+    Runs IAMB with a Fisher-Z test for every variable and keeps edge ``(i, j)`` only when each lies
+    in the other's estimated Markov blanket (the AND rule,
+    :func:`~andrey.constraint.blanket.blanket_graph`), yielding a symmetric adjacency with a zero
+    diagonal.
     """
     arr = np.asarray(data, dtype=np.float64)
     d = arr.shape[1]
     test = FisherZ(arr)
     ranks = tie_ranks(arr).tolist()
-    raw = np.zeros((d, d), dtype=bool)
-    for i in range(d):
-        for j in _markov_blanket(test, i, d, alpha, ranks):
-            raw[i, j] = True
-    mask = (raw & raw.T).astype(np.float64)
+    mask = blanket_graph(test, d, alpha, ranks).astype(np.float64)
     np.fill_diagonal(mask, 0.0)
     return mask
 
@@ -207,61 +177,6 @@ def _optimize_gated_dag(
 
 
 # --------------------------------------------------------------------------------------------
-# Acyclicity repair and endpoint marks
-# --------------------------------------------------------------------------------------------
-
-
-def _has_cycle(support: np.ndarray) -> bool:
-    """True if the directed graph ``support`` (``[i, j]`` is ``i -> j``) has a directed cycle."""
-    d = support.shape[0]
-    indeg = support.sum(axis=0).astype(int)
-    stack = [k for k in range(d) if indeg[k] == 0]
-    visited = 0
-    while stack:
-        node = stack.pop()
-        visited += 1
-        for nxt in np.nonzero(support[node])[0]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                stack.append(int(nxt))
-    return visited < d
-
-
-def _break_cycles(weighted: np.ndarray, support: np.ndarray) -> np.ndarray:
-    """Drop the weakest edges until ``support`` is acyclic; return the pruned DAG mask."""
-    mask = support.copy()
-    edges = sorted(
-        (
-            (abs(weighted[i, j]), i, j)
-            for i in range(mask.shape[0])
-            for j in range(mask.shape[1])
-            if mask[i, j]
-        ),
-        key=lambda e: e[0],
-    )
-    for _w, i, j in edges:
-        if not _has_cycle(mask):
-            break
-        mask[i, j] = 0
-    return mask
-
-
-def _endpoint_marks(support: np.ndarray) -> np.ndarray:
-    """Endpoint-mark adjacency for a DAG mask (``support[i, j]`` set means ``i -> j``)."""
-    marks = np.zeros(support.shape, dtype=np.int8)
-    src, dst = np.nonzero(support)
-    marks[dst, src] = ARROW
-    marks[src, dst] = TAIL
-    return marks
-
-
-def _residual_variances(weighted: np.ndarray, cov: np.ndarray) -> np.ndarray:
-    """Per-node residual variances ``diag((I - B)^T S (I - B))`` for the fitted weights."""
-    resid = np.eye(weighted.shape[0]) - weighted
-    return np.diagonal(resid.T @ cov @ resid)
-
-
-# --------------------------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------------------------
 
@@ -334,12 +249,12 @@ def calm(
         )
 
     support = ((gate_prob >= gate_threshold) & (np.abs(weight) >= w_threshold)).astype(np.int8)
-    support = _break_cycles(weight, support)
+    support = break_cycles(weight, support)
     weighted = weight * support
-    resid_var = _residual_variances(weighted, cov)
+    resid_var = residual_variances(weighted, cov)
     support, weighted, mask = (m[np.ix_(back, back)] for m in (support, weighted, mask))
 
-    marks = _endpoint_marks(support)
+    marks = endpoint_marks(support)
     dag = to_structure(marks, kind="dag", labels=labels)
     cpdag = to_structure(dag2cpdag(marks), kind="cpdag", labels=labels)
 

@@ -14,11 +14,12 @@ Fitted models are read by attribute name.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
+from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
 
 from ._adapt import structure_output
 from ._marks import marks_from_signed
@@ -91,10 +92,12 @@ def _pairwise_output(
     stat_backward: Any = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
+    extra: Mapping[str, Any] | None = None,
 ) -> StructureOutput:
     """Return a two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
-    Test statistics, when given, decide a p-value tie and go in metadata beside the p-values.
+    Test statistics, when given, decide a p-value tie and go in metadata beside the p-values;
+    ``extra`` adds its entries after them.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -116,6 +119,7 @@ def _pairwise_output(
             "pval_forward": forward,
             "pval_backward": backward,
             **stats,
+            **(extra or {}),
         },
     )
 
@@ -128,12 +132,13 @@ def _adapt_anm(
     stat_backward: Any = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
+    extra: Mapping[str, Any] | None = None,
 ) -> StructureOutput:
     """Convert ANM p-values, and the statistics when given, to a two-node ``dag`` and metadata.
 
     Each statistic is an HSIC statistic divided by its mean under independence. With
     ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
-    gives no edge.
+    gives no edge. ``extra`` adds metadata entries, such as ``rows_tested``.
     """
     return _pairwise_output(
         pval_forward,
@@ -143,6 +148,7 @@ def _adapt_anm(
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
+        extra=extra,
     )
 
 
@@ -154,13 +160,14 @@ def _adapt_pnl(
     stat_backward: Any = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
+    extra: Mapping[str, Any] | None = None,
 ) -> StructureOutput:
     """Convert PNL p-values, and the statistics when given, to a two-node ``dag`` and metadata.
 
     Each statistic is an HSIC statistic divided by its mean under independence. With
     ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
     gives no edge. A p-value or statistic may be a shape-``(1,)`` array; :func:`_coerce_float`
-    converts it to a Python ``float``.
+    converts it to a Python ``float``. ``extra`` adds metadata entries, such as ``rows_tested``.
     """
     return _pairwise_output(
         pval_forward,
@@ -170,6 +177,7 @@ def _adapt_pnl(
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
+        extra=extra,
     )
 
 
@@ -198,7 +206,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
 # ---- BottomUpParceLiNGAM (order-unknown adjacency) ----------------------------------------------
 
 
-def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
+def _adapt_bottom_up_parce(model: Any, arrowheads: np.ndarray | None = None) -> StructureOutput:
     """BottomUpParceLiNGAM adjacency -> directed edges + circle ``o-o`` at ``NaN`` cells.
 
     A symmetric ``NaN`` block is an order-unknown pair and becomes a circle ``pag`` edge. The
@@ -207,9 +215,13 @@ def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
     ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The unordered
     variables form one block, which also holds the confounded variables' observed ancestors, so an
     ``o-o`` pair need not share a hidden cause, and no ``confounded_pairs`` are listed.
+    ``arrowheads[i, j]``, from background knowledge, puts an arrowhead at ``i`` on an ``o-o``
+    pair ``i - j``.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")
+    if arrowheads is not None:
+        M[arrowheads & (M == CIRCLE)] = ARROW
     structure = GraphStructure.from_numpy(M, kind="pag")
     metadata: dict[str, Any] = {"algorithm": "BottomUpParceLiNGAM"}
     order = getattr(model, "causal_order_", None)

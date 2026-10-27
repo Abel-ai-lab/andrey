@@ -13,7 +13,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.knowledge import Knowledge, resolve_lagged
+
 from ._adapt import (
+    DROP_UNITS,
+    FILL_STEPS,
     column_labels,
     column_namer,
     copies_named,
@@ -48,6 +53,7 @@ def varma_lingam(
     prune: bool = False,
     structural_ma: bool = False,
     max_iter: int = 100,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from one multivariate time series with VARMA-LiNGAM.
 
@@ -79,6 +85,22 @@ def varma_lingam(
     max_iter : int, default=100
         Most iterations of the likelihood fit, at least ``1``. With ``criterion`` set, every fit
         in the grid gets this limit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
+        links, the pairs allowed to be linked, and temporal tiers, all honored. A link
+        ``(cause, effect, lag)`` is the link from ``cause`` at time ``t - lag`` to ``effect`` at
+        time ``t``, lag ``0`` being the same step; a forbidden ``(cause, effect)`` pair forbids it
+        at every lag, and a required link names its lag. At lag ``0``, DirectLiNGAM on the
+        innovations honors the knowledge as :func:`~andrey.direct_lingam` does: the causal order
+        puts the cause of each required link, and each earlier tier, first, and the regression
+        drops forbidden parents and keeps required ones unpenalized. With ``prune=True``, each
+        variable's regression also drops its forbidden lagged regressors and keeps its required
+        ones unpenalized. With ``prune=False`` every lagged weight stays, so a required lagged
+        link is in the graph, and a forbidden lagged link raises. Tiers forbid every link from a
+        later tier into an earlier one, and a pair left out of ``allowed`` has no link at any
+        lag; a variable's links to its own past stay allowed. The moving-average weights are not
+        constrained.
 
     Returns
     -------
@@ -93,11 +115,14 @@ def varma_lingam(
     Raises
     ------
     TypeError
-        If ``order`` is not a pair of ints, or ``max_iter`` is not an int.
+        If ``order`` is not a pair of ints, ``max_iter`` is not an int, or ``knowledge`` is
+        neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
         holds a negative count or is ``(0, 0)``, if ``max_iter`` is below 1, or if ``data`` has
-        fewer than 2 columns.
+        fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, requires a link without a lag or beyond ``order[0]``, forbids a lagged link while
+        ``prune=False``, or requires a link at a lag beyond the ``p`` that ``criterion`` selected.
 
     Notes
     -----
@@ -117,17 +142,30 @@ def varma_lingam(
     data, as for :func:`~andrey.hc`, so reordering the columns relabels the result and changes
     nothing else, unless two columns are identical.
 
-    **Limitations.** Measured on simulated linear series with non-Gaussian noise, one autoregressive
-    and one moving-average lag, from 3 to 20 variables with 100 to 1,000 time steps, with
-    ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
-    below the empty graph's from 300 time steps at every size; at 100 time steps they exceeded it
-    from 10 variables on. The fit takes minutes at 20 variables and 1,000 time steps. It assumes
-    linear effects and non-Gaussian noise. The likelihood fit can stop before it converges, and
-    gives no warning; a larger ``max_iter`` does not prevent this. The result then depends on the
-    versions of the numerical libraries, so the same series can give a different graph in another
-    environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the VARMA fit and the LiNGAM
+    step on its residuals read every time step, so a step with a missing value has no place in them.
+    Fill in the missing steps first, as dropping one would join the steps around it, or use
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
+    rows per test.
+
+    **Limitations.** Measured on simulated linear non-Gaussian VARMA time series, of ``max(1000, 4 *
+    (d + 1))`` time steps for ``d`` variables and of five times as many, with ``prune=True``, on 4
+    cores with a cap of 1 h and 28 GB per fit. The median F1 score of its directed cross-links
+    (same-step and lag 1), which is 0 for the empty graph, was 0.66 to 0.88 at every size through 40
+    variables with the shorter series and 0.90 to 0.96 through 20 with the series five times as
+    long, the largest sizes its fits finished within the caps. Every ladder ended when three fits of
+    the next size ran past 1 h. The median fit took 1,845 s at 20 variables with the series five
+    times as long. On series with one autoregressive and one moving-average lag, from 3 to 20
+    variables with 100 to 1,000 time steps, with ``order=(1, 1)`` and ``prune=True``, its median
+    errors (missing and extra cross-links) stayed below the empty graph's from 300 time steps at
+    every size; at 100 time steps they exceeded it from 10 variables on. It assumes linear effects
+    and non-Gaussian noise. The likelihood fit can stop before it converges, and gives no warning; a
+    larger ``max_iter`` does not prevent this. The result then depends on the versions of the
+    numerical libraries. Where the fit stops, even when it converges, also depends on the BLAS
+    kernels the CPU runs, so the same series can give a different graph on another type of CPU or in
+    another environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -150,7 +188,7 @@ def varma_lingam(
     """
     from andrey.temporal.varma import varma_lingam as _native
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="varma_lingam", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     if not isinstance(order, (tuple, list)) or len(order) != 2:
@@ -160,6 +198,7 @@ def varma_lingam(
         raise ValueError("order must have p or q above 0, got (0, 0)")
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, order[0], method="varma_lingam")
     causal_order, psis, omegas = _native(
         X,
         order=order,
@@ -167,13 +206,19 @@ def varma_lingam(
         prune=prune,
         structural_ma=structural_ma,
         max_iter=max_iter,
+        constraints=constraints,
+        name=column_namer(labels),
     )
     model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
     return with_labels(_adapt_varma_lingam(model), labels)
 
 
 def longitudinal_lingam(
-    data_list: Sequence[npt.ArrayLike], *, n_lags: int = 1, measure: str = "pwling"
+    data_list: Sequence[npt.ArrayLike],
+    *,
+    n_lags: int = 1,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from panel data with Longitudinal LiNGAM.
 
@@ -193,6 +238,21 @@ def longitudinal_lingam(
         number of time points minus one.
     measure : {"pwling"}, default="pwling"
         DirectLiNGAM pairwise independence measure for the instantaneous fit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over lags ``0`` to ``n_lags``, the same at every time point: required and
+        forbidden links, the pairs allowed to be linked, and temporal tiers, all honored. A link
+        ``(cause, effect, lag)`` is the link from ``cause`` at time point ``t - lag`` to
+        ``effect`` at time point ``t``, lag ``0`` being the same time point; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag. At
+        lag ``0``, each time point's DirectLiNGAM honors the knowledge as
+        :func:`~andrey.direct_lingam` does: the causal order puts the cause of each required
+        link, and each earlier tier, first, and the regression drops forbidden parents and keeps
+        required ones unpenalized. A forbidden lagged link is left out of the least-squares fit
+        of its effect's lagged weights, so its weight is ``0``; every other lagged weight stays,
+        so a required lagged link is in the graph. Tiers forbid every link from a later tier into
+        an earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's
+        links to its own past stay allowed.
 
     Returns
     -------
@@ -212,10 +272,13 @@ def longitudinal_lingam(
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
     TypeError
-        If ``n_lags`` is not an int.
+        If ``n_lags`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
-        the per-time arrays differ in shape, or if the DataFrames' column names differ.
+        the per-time arrays differ in shape, or if the DataFrames' column names differ. Also if
+        ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
+        without a lag or beyond ``n_lags``.
 
     Notes
     -----
@@ -228,14 +291,20 @@ def longitudinal_lingam(
     data over all time points, as for :func:`~andrey.hc`, so reordering the columns relabels the
     result and changes nothing else, unless two columns are identical.
 
-    **Limitations.** Measured on simulated panels with non-Gaussian noise, a dense same-step DAG and
-    a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first,
-    from 2 to 5 variables at 20 or 50 time points with 100 to 1,000 units, with ``n_lags=1``. Its
-    median errors (missing and extra cross-links) stayed far below the empty graph's at every size.
-    It assumes linear effects and non-Gaussian noise. Each time point's fit uses only the units'
-    rows at that time, so its accuracy depends on the number of units, not on the number of time
-    points. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: each time point's fit compares
+    the residuals of every variable over the same units, so a unit with a missing value has no place
+    in it. Drop the units that hold one from every dataset first, which suits values missing
+    completely at random.
+
+    **Limitations.** Measured on simulated linear non-Gaussian panels, each unit observed at 20 time
+    points, on 4 cores with a cap of 1 h and 28 GB per fit. The median F1 score of its directed
+    cross-links (same-step and lag 1), which is 0 for the empty graph, was 0.98 to 1 at every size
+    through 40 variables with 2,000 units and 0.94 to 1 through 40 with 500 units, the largest sizes
+    its fits finished within the caps. Every ladder ended at the largest planned size. The median
+    fit took 41 s at 40 variables with 2,000 units. It assumes linear effects and non-Gaussian
+    noise. Each time point's fit uses only the units' rows at that time, so its accuracy depends on
+    the number of units, not on the number of time points. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -255,12 +324,18 @@ def longitudinal_lingam(
     """
     from andrey.temporal.longitudinal import LongitudinalLiNGAM
 
-    panel = [data_matrix(X, name=f"data_list[{t}]") for t, X in enumerate(data_list)]
+    panel = [
+        data_matrix(X, name=f"data_list[{t}]", method="longitudinal_lingam", fix=DROP_UNITS)
+        for t, X in enumerate(data_list)
+    ]
     if len(panel) < 2:
         raise ValueError(f"data_list must hold at least two time points, got {len(panel)}")
     n_lags = int_in_range(n_lags, "n_lags", 1, len(panel) - 1)
     labels = shared_labels(column_labels(X) for X in data_list)
-    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure).fit(panel)
+    constraints = resolve_lagged(
+        knowledge, panel[0].shape[1], labels, n_lags, method="longitudinal_lingam"
+    )
+    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure, constraints=constraints).fit(panel)
     return with_labels(_adapt_longitudinal_lingam(model), labels)
 
 
@@ -271,6 +346,7 @@ def pcmci(
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
     indep_test: str = "student_t",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged causal links of one multivariate time series with PCMCI.
 
@@ -298,6 +374,16 @@ def pcmci(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables: required and forbidden links, the pairs allowed to be linked, and temporal
+        tiers, all honored. A link ``(cause, effect, lag)`` is the link from ``cause`` at time
+        ``t - lag`` to ``effect`` at time ``t``; a forbidden ``(cause, effect)`` pair forbids it at
+        every lag, and a required link names its lag, from ``1`` to ``tau_max``. No test runs on
+        a forbidden or a required link: a forbidden link is in no conditioning set and not in the
+        graph, and a required one is a parent in every PC1 round and in the graph. Tiers forbid
+        every link from a later tier into an earlier one, and a pair left out of ``allowed`` has
+        no link at any lag; a variable's links to its own past stay allowed.
 
     Returns
     -------
@@ -307,15 +393,17 @@ def pcmci(
         the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a self-loop
         is a variable's dependence on its own past. The structure has no ``lag_weights``.
         ``metadata["p_values"][k - 1][i][j]`` and ``metadata["statistics"][k - 1][i][j]`` hold the
-        MCI p-value and partial correlation of that link, for every pair, significant or not.
-        ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``) that
-        PC1 selected for variable ``j``, strongest first. ``ordering`` is ``None``, and
+        MCI p-value and partial correlation of that link, for every pair, significant or not; a
+        link the knowledge forbids reads p-value 1 and statistic 0, and a required one reads 0 and
+        1. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``)
+        that PC1 selected for variable ``j``, strongest first. ``ordering`` is ``None``, and
         ``metadata["algorithm"]`` is ``"pcmci"``.
 
     Raises
     ------
     TypeError
-        If ``tau_max`` is not an int.
+        If ``tau_max`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, if
         ``indep_test`` is neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is not a usable
@@ -323,7 +411,8 @@ def pcmci(
         every test keeps a degree of freedom. Also if a variable repeats another up to scale and
         shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
         message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, or requires a link without a lag or outside lags ``1`` to ``tau_max``.
 
     Notes
     -----
@@ -336,32 +425,52 @@ def pcmci(
     the conditions are collinear to working precision, as lagged copies of a strongly
     autocorrelated series can be.
 
-    All tests use the same time steps, the last ``n_samples - 2 * tau_max``, where every lag a test
-    can condition on exists: the MCI test of a link at lag ``k`` conditions on the cause's parents,
-    which reach back ``k + tau_max`` steps. PC1 runs in rounds ``p = 0, 1, ...``: each round tests
-    every remaining candidate given the ``p`` strongest other candidates, one conditioning set per
-    candidate, then drops those that test independent. A candidate's strength is the smallest
-    absolute partial correlation it has had so far. Equal strengths are ordered by each variable's
-    rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
-    what the rank keeps.
+    Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
+    where every lag a test can condition on exists: the MCI test of a link at lag ``k`` conditions
+    on the cause's parents, which reach back ``k + tau_max`` steps. PC1 runs in rounds ``p = 0, 1,
+    ...``: each round tests every remaining candidate given the ``p`` strongest other candidates,
+    one conditioning set per candidate, then drops those that test independent. A candidate's
+    strength is the smallest absolute partial correlation it has had so far. Equal strengths are
+    ordered by each variable's rank, as in :func:`~andrey.hc`; the :doc:`column-order guide
+    </docs/guides/column-order>` says what the rank keeps.
 
-    **Limitations.** Measured on simulated linear-Gaussian series with an autodependency in every
-    variable and one cross-link per variable at lag 1 or 2, from 10 to 160 variables with 500 to
-    2,000 time steps, with ``tau_max=2``. It found nearly every true link at every size, but its
-    false links grew with the number of variables: its median errors (lag-resolved SHD) stayed below
-    the empty graph's at 10 variables, came close to it at 20, and exceeded it from 40 on. It
-    assumes linear effects, a stationary series, and no hidden common causes. It does not test
-    same-step (lag 0) links: an effect within one time step is missed and can show up as a false
-    lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
-    the series needs many more time steps than that. The MCI step alone runs
-    ``n_variables ** 2 * tau_max`` tests. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
+    that reads it holds it, and each test reads only the design rows where all of its lagged
+    variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
+    time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
+    When values are missing completely at random, the rows a test keeps are a random sample, so each
+    test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
+    its rows, raises ``ValueError``.
+
+    **Limitations.** Measured on simulated linear-Gaussian time series with lagged links, of
+    ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five times as many, with
+    ``tau_max=2``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
+    its median errors (lag-resolved SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 20 and 80 variables with the shorter series or the series five
+    times as long. Every ladder ended after two sizes in a row did not beat the empty graph. The
+    median fit took 0.87 s at 80 variables with the series five times as long. On series with an
+    autodependency in every variable and one cross-link per variable at lag 1 or 2, from 10 to 160
+    variables with 500 to 2,000 time steps, it found nearly every true link at every size, but its
+    false links grew with the number of variables. It assumes linear effects, a stationary series,
+    and no hidden common causes. It does not test same-step (lag 0) links: an effect within one time
+    step is missed and can show up as a false lagged link. An MCI test conditions on up to ``2 *
+    n_variables * tau_max - 1`` lagged values, so the series needs many more time steps than that.
+    The MCI step alone runs ``n_variables ** 2 * tau_max`` tests. Missing values are not benchmarked
+    yet; the tests run them on up to 5 variables with up to a fifth of the values missing completely
+    at random. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
     .. [1] Runge, J., Nowack, P., Kretschmer, M., Flaxman, S., and Sejdinovic, D. (2019). Detecting
        and quantifying causal associations in large nonlinear time series datasets. Science
        Advances 5(11), eaau4996.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -382,7 +491,7 @@ def pcmci(
     tau_max = int_in_range(tau_max, "tau_max", 1)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
     alpha_level = open_unit_interval(alpha_level, "alpha_level")
-    X = data_matrix(data)
+    X = data_matrix(data, method="pcmci", missing=True)
     # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = 2 * tau_max * (X.shape[1] + 1) + 3
@@ -392,11 +501,22 @@ def pcmci(
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
     labels = column_labels(data)
-    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+    constraints = resolve_lagged(
+        knowledge, X.shape[1], labels, tau_max, method="pcmci", contemporaneous=False
+    )
+    with (
+        copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
+        rows_tested() as rows,
+    ):
         result = _native(
-            X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
+            X,
+            tau_max=tau_max,
+            pc_alpha=pc_alpha,
+            alpha_level=alpha_level,
+            indep_test=indep_test,
+            constraints=constraints,
         )
-    return with_labels(_adapt_pcmci(result), labels)
+    return with_labels(_adapt_pcmci(result, rows_metadata(rows)), labels)
 
 
 def pcmciplus(
@@ -406,6 +526,7 @@ def pcmciplus(
     pc_alpha: float = 0.01,
     collider_rule: str = "majority",
     indep_test: str = "student_t",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged and same-step causal links of one multivariate time series with PCMCI+.
 
@@ -438,6 +559,22 @@ def pcmciplus(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables: required and forbidden links, the pairs allowed to be linked, and temporal
+        tiers, all honored. A link ``(cause, effect, lag)`` is the link from ``cause`` at time
+        ``t - lag`` to ``effect`` at time ``t``, lag ``0`` being the same step; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
+        ``0`` to ``tau_max``. The lagged and skeleton phases test neither: a required link stays
+        and a forbidden one is never linked. The collider phase tests a pair kept apart for the
+        subsets that separate it, as it does any unlinked pair; with ``collider_rule="none"``,
+        which reads the skeleton phase's separating set, a triple over such a pair is ambiguous.
+        At the same step, a pair forbidden in both directions is not linked, and a link the
+        knowledge allows in one direction only is directed that way before the colliders, which
+        never reverse it. Tiers forbid every link from a later tier into an earlier one, and a
+        pair left out of ``allowed`` has no link at any lag; a variable's links to its own past
+        stay allowed. The rule phase applies R1 to R3 only, so a same-step link that Meek's rule R4
+        would direct from the knowledge can stay undirected.
 
     Returns
     -------
@@ -453,7 +590,9 @@ def pcmciplus(
         skeleton-phase tests of the link between variable ``i`` at ``t - k`` and variable ``j``
         at ``t`` (the first step's tests for a lagged link that step removed), and
         ``metadata["statistics"][k][i][j]`` the partial correlation of that test; lag ``0`` is
-        symmetric with ``1`` and ``0`` on the diagonal. ``metadata["parents"][j]`` lists the
+        symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never
+        tested, reads p-value 1 and statistic 0, and a required one reads 0 and 1.
+        ``metadata["parents"][j]`` lists the
         ``[i, k]`` pairs (variable ``i`` at lag ``k``) the first step selected for variable
         ``j``, strongest first, and ``metadata["ambiguous_triples"]`` the ``[i, k, m, j]``
         triples (variable ``i`` at lag ``k``, then ``m`` and ``j`` at lag ``0``) the collider rule
@@ -463,7 +602,8 @@ def pcmciplus(
     Raises
     ------
     TypeError
-        If ``tau_max`` is not an int.
+        If ``tau_max`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``tau_max`` is below 1, if ``pc_alpha`` is not in ``(0, 1)``, if ``collider_rule`` or
         ``indep_test`` is not one of its choices, or if ``data`` is not a usable 2-D matrix with
@@ -471,7 +611,9 @@ def pcmciplus(
         every test keeps a degree of freedom. Also if a variable repeats another up to scale and
         shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
         message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, requires a link without a lag or beyond ``tau_max``, or directs same-step links
+        into a directed cycle over the links the skeleton phase kept.
 
     Notes
     -----
@@ -490,29 +632,48 @@ def pcmciplus(
     the order of the variables either; ``"none"`` reads the one separating set the skeleton phase
     stored, which can change with the order.
 
-    All tests use the same time steps, the last ``n_samples - 2 * tau_max``. The default test,
-    ``"student_t"``, takes the p-value from the Student-t distribution with ``n - |S| - 2``
-    degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation of the
-    least-squares residuals of the two tested values given the conditions. It is computed from the
-    correlation matrix, and from the residuals themselves when the conditions are collinear to
-    working precision, as lagged copies of a strongly autocorrelated series can be.
+    Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
+    The default test, ``"student_t"``, takes the p-value from the Student-t distribution with ``n -
+    |S| - 2`` degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation
+    of the least-squares residuals of the two tested values given the conditions. It is computed
+    from the correlation matrix, and from the residuals themselves when the conditions are collinear
+    to working precision, as lagged copies of a strongly autocorrelated series can be.
 
-    **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation and
-    1.5 cross-links per variable, 30% of them within a time step and the rest at lags 1 to 5, from
-    10 to 80 variables with 500 to 2,000 time steps, with ``tau_max=5``. Its median errors (endpoint
-    SHD) stayed well below the empty graph's at every size. It assumes linear effects, a stationary
-    series, and no hidden common causes. The skeleton and collider phases test every subset of a
-    variable's same-step neighbors, so the number of tests grows exponentially with the number of
-    same-step links at one variable. A test conditions on up to
-    ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
-    than that. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
+    that reads it holds it, and each test reads only the design rows where all of its lagged
+    variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
+    time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
+    When values are missing completely at random, the rows a test keeps are a random sample, so each
+    test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
+    its rows, raises ``ValueError``.
+
+    **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
+    links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
+    with ``tau_max=5``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (endpoint SHD) stayed below the empty graph's, and through which its
+    fits finished within the caps, were 160 and 160 variables with the shorter series or the series
+    five times as long. Every ladder ended when the data generator drew no stationary series at 320
+    variables, so no fit ran. The median fit took 336 s at 160 variables with the series five times
+    as long. It assumes linear effects, a stationary series, and no hidden common causes. The
+    skeleton and collider phases test every subset of a variable's same-step neighbors, so the
+    number of tests grows exponentially with the number of same-step links at one variable. A test
+    conditions on up to ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs
+    many more time steps than that. Missing values are not benchmarked yet; the tests run them on up
+    to 5 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
     .. [1] Runge, J. (2020). Discovering contemporaneous and lagged causal relations in
        autocorrelated nonlinear time series datasets. Proceedings of the 36th Conference on
        Uncertainty in Artificial Intelligence (UAI), PMLR 124, 1388-1397.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -533,7 +694,7 @@ def pcmciplus(
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
-    X = data_matrix(data)
+    X = data_matrix(data, method="pcmciplus", missing=True)
     # A test conditions on up to 2 * n * tau_max + n - 2 columns of the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = 2 * tau_max * (X.shape[1] + 1) + X.shape[1] + 1
@@ -543,15 +704,20 @@ def pcmciplus(
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
     labels = column_labels(data)
-    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="pcmciplus")
+    with (
+        copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
+        rows_tested() as rows,
+    ):
         result = _native(
             X,
             tau_max=tau_max,
             pc_alpha=pc_alpha,
             collider_rule=collider_rule,
             indep_test=indep_test,
+            constraints=constraints,
         )
-    return with_labels(_adapt_pcmciplus(result), labels)
+    return with_labels(_adapt_pcmciplus(result, rows_metadata(rows)), labels)
 
 
 def lpcmci(
@@ -562,6 +728,7 @@ def lpcmci(
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
     max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a time-series partial ancestral graph that allows hidden common causes with LPCMCI.
 
@@ -598,6 +765,19 @@ def lpcmci(
         with the links at one node, so on many strongly related series an uncapped run may not
         finish; a capped run always does, and can keep links that a larger conditioning set would
         remove.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables: required and forbidden links, the pairs allowed to be linked, and temporal
+        tiers, all honored. A link ``(cause, effect, lag)`` is the link from ``cause`` at time
+        ``t - lag`` to ``effect`` at time ``t``, lag ``0`` being the same step; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
+        ``0`` to ``tau_max``. A forbidden lagged link, and a same-step pair forbidden in both
+        directions, is never linked. A same-step link forbidden in one direction carries an
+        arrowhead at the cause, as in :func:`~andrey.fci`: the cause is not an ancestor of the
+        effect. A required link is ``-->`` from the start and no test or rule removes it. No rule
+        changes a mark the knowledge sets. Tiers forbid every link from a later tier into an
+        earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's links
+        to its own past stay allowed.
 
     Returns
     -------
@@ -617,23 +797,26 @@ def lpcmci(
         ``structure.lag(k)`` leaves out. ``metadata["p_values"][k][i][j]`` is the largest p-value
         of the final round's tests of that pair, and ``metadata["statistics"][k][i][j]`` the
         partial correlation of that test; lag ``0`` is symmetric with ``1`` and ``0`` on the
-        diagonal. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag
+        diagonal and on pairs no test ran on, and a required link, never tested, reads ``0`` and
+        ``1``. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag
         ``k``) the last preliminary round found to be parents of variable ``j``. ``ordering`` is
         ``None``, and ``metadata["algorithm"]`` is ``"lpcmci"``.
 
     Raises
     ------
     TypeError
-        If ``tau_max``, ``n_preliminary_iterations``, or a given ``max_depth`` is not an int.
+        If ``tau_max``, ``n_preliminary_iterations``, or a given ``max_depth`` is not an int, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``tau_max`` is below 1, ``n_preliminary_iterations`` or a given ``max_depth`` below 0,
         ``pc_alpha`` not in ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or
         if ``data`` is not a usable 2-D matrix with at least
         ``n_variables * (tau_max + 1) + 2 * tau_max + 1`` rows, the length at which every test
-        keeps a degree of freedom. Also if a
-        variable repeats another up to scale and shift, at the same step or up to ``2 * tau_max``
-        steps apart, before any test runs; one message names every group of copies, a lagged value
-        as ``'x' at lag k``, and says to keep one column per group.
+        keeps a degree of freedom. Also if a variable repeats another up to scale and shift, at the
+        same step or up to ``2 * tau_max`` steps apart, before any test runs; one message names
+        every group of copies, a lagged value as ``'x' at lag k``, and says to keep one column per
+        group. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires
+        a link without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -661,31 +844,51 @@ def lpcmci(
     node whose removal leaves the largest p-value, so the stored sets do not depend on the order of
     the variables.
 
-    All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
-    conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is
-    computed from the correlation matrix, and from the least-squares residuals when the conditions
-    are collinear to working precision. The defaults are the authors' published defaults. The
-    earlier end of a lagged link is searched with the empty set only, since time order already
-    rules out the later end as its cause.
+    Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
+    and every node a test conditions on lies within ``tau_max`` steps of the later end. A test's
+    partial correlation is computed from the correlation matrix, and from the least-squares
+    residuals when the conditions are collinear to working precision. The defaults are the authors'
+    published defaults. The earlier end of a lagged link is searched with the empty set only, since
+    time order already rules out the later end as its cause.
 
-    **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation, one
-    cross-link per variable, 30% of them within a time step and the rest at lags 1 to 3, and 30% of
-    the series unobserved, from 5 to 20 variables with 500 to 2,000 time steps, with ``tau_max=3``.
-    Its median errors (endpoint SHD against the true PAG of the observed series) stayed below the
-    empty graph's at every size. It assumes linear effects, a stationary series, and no selection
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
+    that reads it holds it, and each test reads only the design rows where all of its lagged
+    variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
+    time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
+    When values are missing completely at random, the rows a test keeps are a random sample, so each
+    test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
+    its rows, raises ``ValueError``.
+
+    **Limitations.** Measured on simulated linear-Gaussian time series with 30% of the series
+    unobserved, of ``max(1000, 12 * (d + 1))`` time steps for ``d`` variables and of five times as
+    many, the unobserved series counted among the variables, with ``tau_max=3``, on 4 cores with a
+    cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (endpoint SHD
+    against the PAG of the observed series) stayed below the empty graph's, and through which its
+    fits finished within the caps, were 40 and 40 variables with the shorter series or the series
+    five times as long. At 40 variables with the shorter series, 1 of 10 fits ran past 1 h; at 40
+    variables with the series five times as long, 2 of 5 fits ran past 1 h. Every ladder ended when
+    three fits of the next size ran past 1 h. The median fit took 263 s at 40 variables with the
+    series five times as long. It assumes linear effects, a stationary series, and no selection
     bias; hidden common causes are allowed. The graph covers ``tau_max + 1`` time steps, and a
     hidden cause that acts through earlier steps can add links within that window. The removal and
     rule steps test subsets of a node's neighbors, so the number of tests grows exponentially with
     the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) - 2``
     values, so the series needs many more time steps than that. The numbers are a reference, not a
     hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    machine. Missing values are not benchmarked yet; the tests run them on up to 5 variables with up
+    to a fifth of the values missing completely at random.
 
     References
     ----------
     .. [1] Gerhardus, A., and Runge, J. (2020). High-recall causal discovery for autocorrelated
        time series with latent confounders. Advances in Neural Information Processing Systems 33
        (NeurIPS 2020), 12615-12625.
+    .. [2] Strobl, E. V., Visweswaran, S., and Spirtes, P. L. (2018). Fast causal inference with
+       non-random missingness by test-wise deletion. International Journal of Data Science and
+       Analytics 6(1), 47-62.
+    .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
+       discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
+       1762-1770.
 
     Examples
     --------
@@ -710,7 +913,7 @@ def lpcmci(
     n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    X = data_matrix(data)
+    X = data_matrix(data, method="lpcmci", missing=True)
     # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = X.shape[1] * (tau_max + 1) + 2 * tau_max + 1
@@ -720,7 +923,11 @@ def lpcmci(
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
     labels = column_labels(data)
-    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
+    with (
+        copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
+        rows_tested() as rows,
+    ):
         result = _native(
             X,
             tau_max=tau_max,
@@ -728,8 +935,9 @@ def lpcmci(
             n_preliminary_iterations=n_preliminary_iterations,
             indep_test=indep_test,
             max_depth=max_depth,
+            constraints=constraints,
         )
-    return with_labels(_adapt_lpcmci(result), labels)
+    return with_labels(_adapt_lpcmci(result, rows_metadata(rows)), labels)
 
 
 def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:
@@ -784,6 +992,12 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
     truncating lasso penalty that also selects the lag order; it is not implemented here.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's lasso
+    regression reads every row of the lagged design, so a step with a missing value has no place in
+    it. Fill in the missing steps first, as dropping one would join the steps around it, or use
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
+    rows per test.
+
     **Limitations.** Measured on simulated linear-Gaussian VAR(2) series with no same-step links,
     standardized, from 10 to 160 variables with 1,000 time steps, with ``maxlag=2``. It found most
     true lagged edges but returned many false ones, so its median errors (missing and extra lagged
@@ -817,7 +1031,8 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
 
     maxlag = int_in_range(maxlag, "maxlag", 1)
     cv = int_in_range(cv, "cv", 2)
-    X = data_matrix(data, min_rows=maxlag + cv)  # LassoCV needs a time step in every fold
+    # LassoCV needs a time step in every fold.
+    X = data_matrix(data, min_rows=maxlag + cv, method="granger", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
