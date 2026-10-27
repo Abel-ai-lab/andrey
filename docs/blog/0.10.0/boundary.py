@@ -296,7 +296,7 @@ def ladders_table(lane: dict) -> str:
     )
     return (
         '<figure class="ct"><p class="ct-title">The other methods\' boundaries</p>'
-        '<div class="ct-scroll"><table class="ct-table"><thead><tr><td colspan="2"></td>'
+        '<div class="ct-scroll"><table class="ct-table ct-text"><thead><tr><td colspan="2"></td>'
         '<th scope="col" class="ct-ours">Inside the boundary up to</th>'
         '<th scope="col">Ended</th></tr></thead>'
         f"<tbody>{body}</tbody></table></div>"
@@ -344,26 +344,30 @@ def reach_table(lane: dict) -> str:
 
 def settings_table(lane: dict) -> str:
     """The card's table of each method's settings: the keyword arguments of its ladders' fits, one
-    row per method, or per ladder where a method's ladders differ; a setting not listed is at its
-    default."""
+    row per method, or per ladder where a method's ladders differ, with the ladder's
+    ``params_note`` where the measured build applied a setting differently from 0.10.0; a setting
+    not listed is at its default."""
     order = [spec.name for spec in list_specs()]
-    found: dict[str, dict[str, list[str]]] = {}
+    found: dict[str, dict[tuple[str, str], list[str]]] = {}
     for ladder in lane["ladders"]:
         params = ladder.get("params") or {}
         call = ", ".join(f"{key}={value!r}" for key, value in sorted(params.items()))
-        found.setdefault(ladder["method"], {}).setdefault(call, []).append(ladder["label"])
+        key = (call, ladder.get("params_note") or "")
+        found.setdefault(ladder["method"], {}).setdefault(key, []).append(ladder["label"])
     body = ""
     for method in sorted(found, key=order.index):
-        for call, labels in found[method].items():
+        for (call, note), labels in found[method].items():
             where = "" if len(found[method]) == 1 else f"<small>{escape('; '.join(labels))}</small>"
+            setting = f"<code>{escape(call)}</code>" if call else "defaults"
             body += (
                 f'<tr><th scope="row">{escape(NAMES.get(method, method))}{where}</th>'
-                f"<td>{f'<code>{escape(call)}</code>' if call else 'defaults'}</td></tr>"
+                f"<td>{setting}{f'<small>{escape(note)}</small>' if note else ''}</td></tr>"
             )
     return (
         '<figure class="ct"><p class="ct-title">Each method\'s settings</p><div class="ct-scroll">'
-        '<table class="ct-table"><thead><tr><th scope="col">Method</th><th scope="col">Settings'
-        f"</th></tr></thead><tbody>{body}</tbody></table></div><figcaption>The keyword arguments "
+        '<table class="ct-table ct-text"><thead><tr><th scope="col">Method</th>'
+        '<th scope="col">Settings</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div><figcaption>The keyword arguments "
         "of every fit; a setting not listed is at its default.</figcaption></figure>\n"
     )
 
@@ -376,7 +380,8 @@ def generators_table(lane: dict) -> str:
     for ladder in lane["ladders"]:
         methods.setdefault(ladder["generator"], set()).add(ladder["method"])
     body = "".join(
-        f'<tr><th scope="row">{escape(generator["description"])}<small>'
+        f'<tr><th scope="row">{escape(generator["description"][0].upper())}'
+        f"{escape(generator['description'][1:])}<small>"
         f"{escape(', '.join(NAMES.get(m, m) for m in sorted(methods[name], key=order.index)))}"
         f"</small></th><td><code>{escape(generator['call'])}</code></td></tr>"
         for name, generator in lane.get("generators", {}).items()
@@ -384,8 +389,9 @@ def generators_table(lane: dict) -> str:
     )
     return (
         '<figure class="ct"><p class="ct-title">Each method\'s data</p><div class="ct-scroll">'
-        '<table class="ct-table"><thead><tr><th scope="col">Data</th><th scope="col">Call</th>'
-        f"</tr></thead><tbody>{body}</tbody></table></div><figcaption>The call that draws each "
+        '<table class="ct-table ct-text"><thead><tr><th scope="col">Data</th>'
+        '<th scope="col">Call</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div><figcaption>The call that draws each "
         "dataset, with its variables, rows, density, and seed.</figcaption></figure>\n"
     )
 
