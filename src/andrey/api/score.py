@@ -221,8 +221,8 @@ def ges(
     rule that is not benchmarked yet. With the same gate, mean degree 2, and ten rows per variable,
     at 200 variables its median errors were 206 against the empty graph's 200 at
     ``lambda_value=1.0`` and 43 at ``lambda_value=2.0``. On the 223-variable ANDES network with
-    1,000 simulated rows and the build's default gate of ``n_variables / 2`` parents, its median
-    errors passed the empty graph's (612 against 338). With fewer rows than columns the BIC score is
+    1,000 simulated rows and a forward-phase gate of ``n_variables / 2`` parents, its median errors
+    passed the empty graph's (612 against 338). With fewer rows than columns the BIC score is
     unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
     search never selects one, nor any parent set that leaves its child a residual variance of at
     most ``1e-12`` times its variance. On simulated mixed data (conditional linear Gaussian networks

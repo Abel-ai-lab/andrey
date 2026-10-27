@@ -284,14 +284,15 @@ def ica_lingam(
     when three fits of the next size ran past 1 h, except at mean degree 2 with 500 rows, where the
     ladder ended when three fits of the next size, with more variables than rows, stopped with an
     error, and at mean degree 8 with 2,000 rows, where the ladder ended after two sizes in a row did
-    not beat the empty graph. Each accuracy stop was set after larger sizes had run. The median fit
-    took 516 s at 400 variables (mean degree 2, 10,000 rows). Measured on simulated data from
-    scale-free graphs with linear effects and uniform noise, from 20 to 100 variables with ten rows
-    per variable: its median errors (SHD) passed the empty graph's at every size, 27 against 19 at
-    20 variables and 181 against 99 at 100. The median fit took 0.44 s at 20 variables and 15.8 s at
-    100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11 variables), its errors were
-    below the empty graph's (14 against 17). The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    not beat the empty graph. The accuracy stop at mean degree 8 with 2,000 rows was set after
+    larger sizes had run. The median fit took 516 s at 400 variables (mean degree 2, 10,000 rows).
+    Measured on simulated data from scale-free graphs with linear effects and uniform noise, from 20
+    to 100 variables with ten rows per variable: its median errors (SHD) passed the empty graph's at
+    every size, 27 against 19 at 20 variables and 181 against 99 at 100. The median fit took 0.44 s
+    at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
+    variables), its errors were below the empty graph's (14 against 17). The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

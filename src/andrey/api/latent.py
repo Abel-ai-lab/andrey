@@ -94,9 +94,9 @@ def gin(
     complete DAG, each measured by 3 observed indicators, on 4 cores with a cap of 1 h and 28 GB per
     fit. The median adjusted Rand index of its clusters, which is 0 for the empty graph, was 0.77 to
     1 at every size through 16 latents (48 indicators) with 1,000 rows and 1 through 8 latents (24
-    indicators) with 5,000 rows, the largest sizes its fits finished within the caps. The ladders
-    ended at the largest planned size, except with 5,000 rows, where the ladder ended when three
-    fits of the next size ran past 1 h. The median fit took 340 s at 16 latents (48 indicators) with
+    indicators) with 5,000 rows, the largest sizes its fits finished within the caps. The ladder
+    with 1,000 rows ended at the largest planned size, and the one with 5,000 rows when three fits
+    of the next size ran past 1 h. The median fit took 340 s at 16 latents (48 indicators) with
     1,000 rows. Given the true clusters and 1,000 rows, over 10 seeds each, the order of a chain of
     three latents never stopped early and that of a complete three-latent model stopped early once,
     with no latent put after one it causes; with the benchmark's random weights instead, 2 of 10

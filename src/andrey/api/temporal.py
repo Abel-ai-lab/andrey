@@ -125,15 +125,15 @@ def varma_lingam(
     series five times as long, the largest sizes its fits finished within the caps. Every ladder
     ended when three fits of the next size ran past 1 h. The median fit took 1,845 s at 20 variables
     with the series five times as long. On series with one autoregressive and one moving-average
-    lag, from 3 to 20 variables with 100 to 1,000 time steps, with ``order=(1, 1)``, its median
-    errors (missing and extra cross-links) stayed below the empty graph's from 300 time steps at
-    every size; at 100 time steps they exceeded it from 10 variables on. It assumes linear effects
-    and non-Gaussian noise. The likelihood fit can stop before it converges, and gives no warning; a
-    larger ``max_iter`` does not prevent this. The result then depends on the versions of the
-    numerical libraries, so the same series can give a different graph in another environment. With
-    ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    lag, from 3 to 20 variables with 100 to 1,000 time steps, with ``order=(1, 1)`` and
+    ``prune=True``, its median errors (missing and extra cross-links) stayed below the empty graph's
+    from 300 time steps at every size; at 100 time steps they exceeded it from 10 variables on. It
+    assumes linear effects and non-Gaussian noise. The likelihood fit can stop before it converges,
+    and gives no warning; a larger ``max_iter`` does not prevent this. The result then depends on
+    the versions of the numerical libraries, so the same series can give a different graph in
+    another environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
