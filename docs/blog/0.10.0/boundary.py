@@ -386,7 +386,7 @@ def generators_table(lane: dict) -> str:
         '<figure class="ct"><p class="ct-title">Each method\'s data</p><div class="ct-scroll">'
         '<table class="ct-table"><thead><tr><th scope="col">Data</th><th scope="col">Call</th>'
         f"</tr></thead><tbody>{body}</tbody></table></div><figcaption>The call that draws each "
-        "dataset, with the size, density, and seed of the rung.</figcaption></figure>\n"
+        "dataset, with its variables, rows, density, and seed.</figcaption></figure>\n"
     )
 
 
