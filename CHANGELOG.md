@@ -15,7 +15,7 @@ change names its pull request.
   the parents of both ends, which also bounds the subsets of the majority vote. Its number of tests
   grows exponentially with the links at one node, so on many strongly related series an uncapped
   run may not finish; a capped run always does. The default, `None`, keeps the uncapped search.
-  ([#PR])
+  ([#468])
 
 ### Changed
 
@@ -32,7 +32,7 @@ change names its pull request.
   administrators cannot bypass. ([#441])
 - `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
   batch of conditioning sets as one array of column numbers, records its tests once per batch, and
-  tests sets of more than three neighbors, which rarely repeat, without the result cache. ([#PR])
+  tests sets of more than three neighbors, which rarely repeat, without the result cache. ([#468])
 
 ### Removed
 
@@ -755,3 +755,4 @@ First alpha release.
 [#441]: https://github.com/Abel-ai-lab/andrey/pull/441
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
+[#468]: https://github.com/Abel-ai-lab/andrey/pull/468
