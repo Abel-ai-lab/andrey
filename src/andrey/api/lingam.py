@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     shared_labels,
     structure_output,
 )
+from andrey.api._boundary import warn_past_boundary
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -201,6 +202,7 @@ def direct_lingam(
     X = _pruning_rows(data_matrix(data, method="direct_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
+    warn_past_boundary("direct_lingam", X.shape)
     order, B = _native(X, measure=measure, constraints=constraints)
     weighted = _canonical_weights(B)
     edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
@@ -342,6 +344,7 @@ def ica_lingam(
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
+    warn_past_boundary("ica_lingam", X.shape)
     order, B = _native(X, random_state=random_state, max_iter=max_iter, constraints=constraints)
     weighted = _canonical_weights(B)
     edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
