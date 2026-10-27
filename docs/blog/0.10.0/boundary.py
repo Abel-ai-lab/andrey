@@ -14,7 +14,10 @@ The cells come from the release card's summary (``SUMMARY``), its ``boundary`` l
 per method and regime, each a list of rungs (one per number of variables) and how the ladder ended
 (``end``). A rung that is not through, three or more of its fits cut, carries its cut as its mark;
 the rung where a ladder ended past the accuracy boundary carries ``accuracy``. Run with
-``uv run python docs/blog/0.10.0/boundary.py [summary.json] [outdir]``.
+``uv run python docs/blog/0.10.0/boundary.py [summary.json] [outdir] [card_outdir]``. The release
+card's ``ladders.html`` lists, as a table, the ladders the maps do not draw: the FCI and GFCI
+diagonals, where the rows grow with the variables, and the latent-variable, time-series, and
+pairwise methods.
 
 The maps are a reference for the measured conditions, not a hard limit: another graph generator,
 other data, other settings, or another machine move a boundary.
@@ -32,6 +35,8 @@ from andrey.spec import list_specs
 
 HERE = Path(__file__).parent
 SUMMARY = HERE.parents[2] / "benchmarks" / "published" / "0.10.0" / "summary.json"
+# The release card's figures; it holds the ladders the maps do not draw as a table.
+CARD = HERE.parents[1] / "docs" / "benchmarks" / "0.10.0"
 FAMILIES = {
     "constraint": "Constraint-based",
     "score": "Score-based",
@@ -44,8 +49,28 @@ NAMES = {
     "ges": "GES", "gies": "GIES", "xges": "XGES", "hc": "Hill climbing", "tabu": "Tabu search",
     "exact_search": "Exact search", "calm": "CALM", "boss": "BOSS", "grasp": "GRaSP",
     "direct_lingam": "DirectLiNGAM", "ica_lingam": "ICA-LiNGAM",
-    "multi_group_direct_lingam": "MultiGroupDirectLiNGAM",
+    "multi_group_direct_lingam": "MultiGroupDirectLiNGAM", "rcd": "RCD",
+    "bottom_up_parce_lingam": "BottomUpParceLiNGAM", "gin": "GIN", "anm": "ANM", "pnl": "PNL",
+    "pcmci": "PCMCI", "pcmciplus": "PCMCI+", "lpcmci": "LPCMCI", "varma_lingam": "VARMA-LiNGAM",
+    "longitudinal_lingam": "LongitudinalLiNGAM",
 }  # fmt: skip
+# The table's groups, by registry family, in the order the card lists them.
+TABLE_FAMILIES = {
+    "constraint": "Constraint-based",
+    "lingam": "Linear non-Gaussian",
+    "latent": "Latent variables",
+    "temporal": "Time series",
+    "pairwise": "Pairwise",
+}
+# How a ladder ended, in the table's words.
+ENDS = {
+    "time": "time cap",
+    "memory": "memory cap",
+    "error": "failed",
+    "accuracy": "past the accuracy boundary",
+    "ladder_end": "largest size measured",
+    "open": "still running",
+}
 STOPS = {
     "time": ("×", "time cap"),
     "memory": ("■", "memory cap"),
@@ -217,6 +242,67 @@ def cells(lane: dict) -> list[dict]:
     return out
 
 
+def mapped(ladder: dict) -> bool:
+    """Whether a ladder is drawn on a map: a mapped family's fixed-row regime."""
+    family = {s.name: s.family for s in list_specs()}[ladder["method"]]
+    return family in FAMILIES and ladder["axis"] == "d" and bool(FIXED.match(ladder["regime"]))
+
+
+def size(ladder: dict, value: int | None) -> str:
+    """A ladder's size in its own unit: variables, rows, or latent variables."""
+    if value is None:
+        return "-"
+    if ladder["axis"] == "n":
+        return f"{value:,} rows"
+    if ladder["axis"] == "latents":
+        latents = next(r["latents"] for r in ladder["rungs"] if r["d"] == value)
+        return f"{latents} latent variables"
+    return f"{value:,} variables"
+
+
+def ladders_table(lane: dict) -> str:
+    """The ladders the maps do not draw, one row each, grouped by family: the largest size inside
+    the boundary, and how and where the ladder ended."""
+    family = {s.name: s.family for s in list_specs()}
+    groups = {key: [] for key in TABLE_FAMILIES}
+    for ladder in lane["ladders"]:
+        if mapped(ladder):
+            continue
+        axis = "n" if ladder["axis"] == "n" else "d"
+        inside = ladder[f"beats_empty_through_{axis}"]
+        end = ladder["end"]
+        where = end.get("latents") if ladder["axis"] == "latents" else end.get(axis)
+        if end.get("reason", "").startswith("no fit attempted"):
+            ended = f"no data could be generated at {size(ladder, where)}"
+        elif ladder["axis"] == "latents" and where is not None:
+            ended = f"{ENDS[end['stop']]}, {where} latent variables"
+        else:
+            ended = ENDS[end["stop"]] + (f", {size(ladder, where)}" if where is not None else "")
+        groups[family[ladder["method"]]].append(
+            "<tr>"
+            f'<th scope="row">{escape(NAMES.get(ladder["method"], ladder["method"]))}'
+            f"<small>{escape(ladder['label'])}</small></th>"
+            f'<td class="ct-ours">{escape(size(ladder, inside))}</td>'
+            f"<td>{escape(ended)}</td></tr>"
+        )
+    body = "".join(
+        f'<tr><th class="ct-group" rowspan="{len(rows)}"><span>{escape(TABLE_FAMILIES[key])}</span>'
+        f"</th>{rows[0][4:]}{''.join(rows[1:])}"
+        for key, rows in groups.items()
+        if rows
+    )
+    return (
+        '<figure class="ct"><p class="ct-title">The other methods\' boundaries</p>'
+        '<div class="ct-scroll"><table class="ct-table"><thead><tr><td colspan="2"></td>'
+        '<th scope="col" class="ct-ours">Inside the boundary up to</th>'
+        '<th scope="col">Ended</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div>"
+        "<figcaption>Inside the boundary: the largest size up to which every size finished and "
+        "beat the empty graph. For the latent-variable and LPCMCI ladders, the variables include "
+        "the hidden ones.</figcaption></figure>\n"
+    )
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
     lane = json.loads(path.read_text(encoding="utf-8"))["boundary"]
@@ -224,6 +310,9 @@ def main() -> None:
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE
     for family in FAMILIES:
         (out / f"boundary-{family}.html").write_text(family_figure(family, found), encoding="utf-8")
+    card = Path(sys.argv[3]) if len(sys.argv) > 3 else CARD
+    card.mkdir(exist_ok=True)
+    (card / "ladders.html").write_text(ladders_table(lane), encoding="utf-8")
 
 
 if __name__ == "__main__":
