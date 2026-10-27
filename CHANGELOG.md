@@ -104,6 +104,16 @@ change names its pull request.
 
 ### Fixed
 
+- The adaptive Lasso that prunes the edges of `direct_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`
+  keeps the same edges in any unit of the data. scikit-learn's LARS ended the Lasso path once its
+  penalty fell to `2**-23` in the data's units, so data in small units lost edges (14 to 41
+  percent of DirectLiNGAM's true edges at a standard deviation near `1e-3`, all of them near
+  `1e-5`), standardized data could lose a parent of a nearly noiseless variable, and data with a
+  standard deviation near `2**124` raised a LAPACK error. A fit whose path stops before the
+  least-squares fit now runs again on the data divided by a power of two, and BIC picks its point
+  on the whole path; a fit whose path reached the least-squares fit returns the same values as
+  before. ([#478])
 - The worker pool starts when `TMPDIR` is on a file system that rejects the forkserver's socket,
   such as a cluster's parallel file system. `ges`, `gfci`, and the skeleton search of `pc`, `fci`,
   `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
@@ -808,5 +818,6 @@ First alpha release.
 [#442]: https://github.com/Abel-ai-lab/andrey/pull/442
 [#443]: https://github.com/Abel-ai-lab/andrey/pull/443
 [#453]: https://github.com/Abel-ai-lab/andrey/pull/453
+[#478]: https://github.com/Abel-ai-lab/andrey/pull/478
 [#445]: https://github.com/Abel-ai-lab/andrey/pull/445
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451
