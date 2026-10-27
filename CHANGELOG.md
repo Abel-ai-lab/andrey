@@ -135,10 +135,10 @@ change names its pull request.
   batch of conditioning sets as one array of column numbers, records its tests once per batch, and,
   without missing values, tests sets of more than three neighbors, which rarely repeat, without the
   result cache. ([#468])
-- `fci`, `gfci`, `andrey.data.latent.marginal(dag, "pag")`, and `GraphStructure.to_pag` return the
-  same graphs in less time on dense graphs with hidden variables, because the orientation rules R9
-  and R10 make each of their path searches once per pass instead of once for each pair of nodes
-  that needs it. ([#485])
+- `andrey.data.latent.marginal(dag, "pag")` and `GraphStructure.to_pag` return the same graphs in
+  less time on dense graphs with hidden variables, because the orientation rules R9 and R10, which
+  `fci` and `gfci` share, make each of their path searches once per pass instead of once for each
+  pair of nodes that needs it. ([#485])
 
 ## [0.10.0] - 2026-10-27
 
