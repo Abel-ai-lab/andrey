@@ -14,6 +14,10 @@ change names its pull request.
 - Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
   hard limit: they change with the data generator, the density, the method's settings, and the
   machine. ([#367])
+- The **Limitations** paragraph of every method but Granger gives its measured boundary: on each
+  benchmark regime, the largest size through which its median errors stayed below the empty
+  graph's, the largest size its fits finished within 1 h and 28 GB on 4 cores, what ended the
+  measurement, and a median fit time. ([#469])
 - For contributors, `python -m qa.quality_gate --jobs N` fits the quality gate's cells in N
   processes and prints the same results in the same order; the gate's workflow runs `--jobs 4` on
   its four vCPUs and logs the runner's CPU. A push to a release pull request that changes only
@@ -744,3 +748,4 @@ First alpha release.
 [#441]: https://github.com/Abel-ai-lab/andrey/pull/441
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
+[#469]: https://github.com/Abel-ai-lab/andrey/pull/469
