@@ -95,6 +95,7 @@ from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, design_test
 CONFLICT = 4  # an edge mark the rules oriented both as a tail and as an arrowhead
 BATCH = 4096  # tests per call to the test object: bounds its stack of correlation submatrices
 CACHE_SIZE = 1 << 18  # test results kept for reuse, least recently used dropped first
+CACHED_DEPTH = 3  # larger searched sets rarely repeat: their batches skip the cache
 
 # A node ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Node = tuple[int, int]
@@ -187,9 +188,16 @@ class _Search:
     """
 
     def __init__(
-        self, test: LinkTest, n_vars: int, tau_max: int, alpha: float, ranks: Sequence[int]
+        self,
+        test: LinkTest,
+        n_vars: int,
+        tau_max: int,
+        alpha: float,
+        ranks: Sequence[int],
+        max_depth: int | None = None,
     ) -> None:
         self.test, self.n, self.tau_max, self.alpha = test, n_vars, tau_max, alpha
+        self.max_depth = max_depth
         self.ranks = ranks
         self.window = [(v, lag) for lag in range(tau_max + 1) for v in range(n_vars)]
         self.edges: dict[Key, Edge] = {}
@@ -446,6 +454,80 @@ class _Search:
             size = min(2 * size, BATCH)
         return None
 
+    def separating_subsets(
+        self, a: Node, b: Node, search: list[Node], sdef: frozenset[Node] | set[Node], p: int
+    ) -> frozenset[Node] | None:
+        """:meth:`separating` over ``S | sdef`` for the ``p``-subsets ``S`` of ``search``, in the
+        order of :func:`itertools.combinations`.
+
+        The sets are built as rows of column numbers, so a batch costs one array operation rather
+        than one Python set per test; the tests, their order, and the memories they update are
+        those of :meth:`separating`.
+        """
+        key, _ = _key(a, b)
+        shift = -min(a[1], b[1])
+        x, y = self._column((a[0], a[1] + shift)), self._column((b[0], b[1] + shift))
+        columns = np.array([self._column((v, lag + shift)) for v, lag in search], dtype=np.intp)
+        fixed = np.array([self._column((v, lag + shift)) for v, lag in sdef], dtype=np.intp)
+        subsets = combinations(range(len(search)), p)
+        size = 16
+        while batch := list(islice(subsets, size)):
+            picks = np.array(batch, dtype=np.intp).reshape(len(batch), p)
+            fixed_rows = np.broadcast_to(fixed, (len(batch), len(fixed)))
+            rows = np.concatenate([columns[picks], fixed_rows], axis=1)
+            rows.sort(axis=1)
+            statistics, p_values = self._test_rows(x, y, rows, cached=p <= CACHED_DEPTH)
+            above = np.flatnonzero(p_values > self.alpha)
+            made = len(batch) if len(above) == 0 else int(above[0]) + 1
+            self._record_batch(key, statistics[:made], p_values[:made])
+            if len(above):
+                return frozenset(search[k] for k in batch[int(above[0])]) | frozenset(sdef)
+            size = min(2 * size, BATCH)
+        return None
+
+    def _test_rows(
+        self, x: int, y: int, rows: np.ndarray, cached: bool
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Statistics and p-values of ``x`` against ``y`` given each sorted row of columns, through
+        the cache that :meth:`run_tests` keeps when ``cached``, else in one call."""
+        if not cached:
+            n = len(rows)
+            return self.test.statistic_pvalues(
+                np.full(n, x, dtype=np.intp), np.full(n, y, dtype=np.intp), rows
+            )
+        keys = [(x, y, row) for row in map(tuple, rows.tolist())]
+        statistics, p_values = np.empty(len(keys)), np.empty(len(keys))
+        missing: dict[tuple[int, int, tuple[int, ...]], list[int]] = {}
+        for k, cache_key in enumerate(keys):
+            hit = self.cache.get(cache_key)
+            if hit is None:
+                missing.setdefault(cache_key, []).append(k)
+            else:
+                self.cache.move_to_end(cache_key)
+                statistics[k], p_values[k] = hit
+        if missing:
+            order = sorted(missing)
+            found_s, found_p = self.test.statistic_pvalues(
+                np.full(len(order), x, dtype=np.intp),
+                np.full(len(order), y, dtype=np.intp),
+                np.array([k[2] for k in order], dtype=np.intp).reshape(len(order), rows.shape[1]),
+            )
+            for cache_key, statistic, p_value in zip(order, found_s.tolist(), found_p.tolist()):
+                statistics[missing[cache_key]], p_values[missing[cache_key]] = statistic, p_value
+                self.cache[cache_key] = (statistic, p_value)
+                if len(self.cache) > CACHE_SIZE:
+                    self.cache.popitem(last=False)
+        return statistics, p_values
+
+    def _record_batch(self, key: Key, statistics: np.ndarray, p_values: np.ndarray) -> None:
+        """:meth:`_record` of each test in order, with ``rank`` and ``report``."""
+        if not len(p_values):
+            return
+        self.imin[key] = min(float(np.abs(statistics).min()), self.imin.get(key, np.inf))
+        best = int(np.argmax(p_values))  # the first of equal largest p-values, as _record keeps
+        if key not in self.best or p_values[best] > self.best[key][1]:
+            self.best[key] = (float(statistics[best]), float(p_values[best]))
+
     def add_sepset(self, key: Key, sepset: frozenset[Node], frame: int) -> None:
         """Store ``sepset``, given in a frame whose later node is ``frame`` steps back."""
         stored = _shift(sepset, -frame)
@@ -492,7 +574,7 @@ class _Search:
                 candidates = []
             fresh = (
                 frozenset(s)
-                for size in range(len(candidates) + 1)
+                for size in range(self._depth(len(candidates)) + 1)
                 for s in combinations(candidates, size)
                 if tested is None or not tested.issuperset(s)
             )
@@ -584,12 +666,11 @@ class _Search:
                         search = ranked(self.apds(anchor, other) - sdef, anchor)
                         if not forward and lag > 0:
                             search = search[:0]  # time order: the later node is no ancestor
-                        if len(search) < p:
+                        if len(search) < p or self._past_depth(p):
                             letter = "R" if forward else "L"
                             self.set_middle(key, _add_middle(self.edges[key][1], letter))
                             continue
-                        sets = (frozenset(s) | sdef for s in combinations(search, p))
-                        found = self.separating(start, end, sets)
+                        found = self.separating_subsets(start, end, search, sdef, p)
                         if found is not None:
                             self.add_sepset(key, found, 0)
                             separated = True
@@ -606,6 +687,14 @@ class _Search:
             if all(edge[1] in ("!", "") for edge in self.edges.values()):
                 break
         self.apply_rules(self.full_rules(), lagged_only=False)
+
+    def _past_depth(self, p: int) -> bool:
+        """Whether ``p`` is above ``max_depth``: a search of that size is not run."""
+        return self.max_depth is not None and p > self.max_depth
+
+    def _depth(self, n_candidates: int) -> int:
+        """The largest search-set size among ``n_candidates`` that ``max_depth`` allows."""
+        return n_candidates if self.max_depth is None else min(n_candidates, self.max_depth)
 
     def napds(self, b: Node, a: Node) -> set[Node]:
         """``napds_t(b, a)``: candidates for a separating set of ``a`` and ``b``, neither ancestral.
@@ -681,15 +770,14 @@ class _Search:
                     near_start = self.napds(start, end)
                     search1 = ranked(near_end - sdef1 - sdef2, end)
                     search2 = ranked(near_start - sdef1 - sdef2, start)
-                    if len(search1) < p or (lag == 0 and len(search2) < p):
+                    if len(search1) < p or (lag == 0 and len(search2) < p) or self._past_depth(p):
                         self.set_middle(key, "")
                         continue
                     separated = False
                     sides = [(search1, near_end)] + ([(search2, near_start)] if lag == 0 else [])
                     for search, near in sides:
                         sdef = sdef1 | (sdef2 & near)
-                        sets = (frozenset(s) | sdef for s in combinations(search, p))
-                        found = self.separating(start, end, sets)
+                        found = self.separating_subsets(start, end, search, sdef, p)
                         if found is not None:
                             self.add_sepset(key, found, 0)
                             separated = True
@@ -1179,8 +1267,12 @@ def lpcmci(
     pc_alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
+    max_depth: int | None = None,
 ) -> LPCMCIResult:
     """Run LPCMCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
+
+    ``max_depth`` caps the size of the searched subsets ``S`` in both removal phases and in the
+    majority vote; the default conditions ``S_def`` come on top. ``None`` sets no cap.
 
     Raises :class:`ValueError` when ``indep_test`` is not a key of
     :data:`~andrey.temporal.pcmci.INDEP_TESTS`.
@@ -1191,7 +1283,9 @@ def lpcmci(
     test = design_test(indep_test, data, tau_max)
     ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():
-        return run(test, data.shape[1], tau_max, pc_alpha, n_preliminary_iterations, ranks)
+        return run(
+            test, data.shape[1], tau_max, pc_alpha, n_preliminary_iterations, ranks, max_depth
+        )
 
 
 def run(
@@ -1201,12 +1295,14 @@ def run(
     alpha: float,
     n_preliminary_iterations: int,
     ranks: Sequence[int],
+    max_depth: int | None = None,
 ) -> LPCMCIResult:
     """Run Algorithm 1 with ``test`` over the columns of the lagged design.
 
-    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`.
+    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`; ``max_depth`` caps the
+    searched subset size (see :func:`lpcmci`).
     """
-    search = _Search(test, n_vars, tau_max, alpha, ranks)
+    search = _Search(test, n_vars, tau_max, alpha, ranks, max_depth)
     search.initialize()
     kept: list[tuple[Key, bool]] = []
     for _ in range(n_preliminary_iterations):

@@ -411,6 +411,8 @@ def test_pcmciplus_takes_one_variable():
         ({"n_preliminary_iterations": -1}, ValueError, "n_preliminary_iterations"),
         ({"n_preliminary_iterations": 1.5}, TypeError, "n_preliminary_iterations"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
+        ({"max_depth": -1}, ValueError, "max_depth"),
+        ({"max_depth": 1.5}, TypeError, "max_depth"),
     ],
 )
 def test_lpcmci_checks_its_parameters(params, error, name):

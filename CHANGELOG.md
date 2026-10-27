@@ -9,6 +9,14 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
+  the parents of both ends, which also bounds the subsets of the majority vote. Its number of tests
+  grows exponentially with the links at one node, so on many strongly related series an uncapped
+  run may not finish; a capped run always does. The default, `None`, keeps the uncapped search.
+  ([#PR])
+
 ### Changed
 
 - Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
@@ -22,6 +30,9 @@ change names its pull request.
 - For contributors, a production deploy of the site, from a `v*` tag or a manual run, waits
   for the repository owner's approval in the `production-site` environment, which
   administrators cannot bypass. ([#441])
+- `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
+  batch of conditioning sets as one array of column numbers, records its tests once per batch, and
+  tests sets of more than three neighbors, which rarely repeat, without the result cache. ([#PR])
 
 ### Removed
 

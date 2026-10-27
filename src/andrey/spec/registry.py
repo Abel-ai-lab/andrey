@@ -1149,6 +1149,15 @@ _add(
                 "distribution, as in the authors' reference implementation; fisherz = Fisher's "
                 "z-transform.",
             ),
+            ParamSpec(
+                name="max_depth",
+                type="int",
+                default=None,
+                doc="The largest number of neighbors a removal step conditions on, at least 0, on "
+                "top of the parents of both ends; null sets no limit. A capped run always finishes "
+                "and can keep links that a larger conditioning set would remove.",
+                nullable=True,
+            ),
         ),
         references=("Gerhardus & Runge 2020",),
     )
