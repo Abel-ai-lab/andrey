@@ -28,6 +28,7 @@ from ._adapt import (
     shared_labels,
     with_labels,
 )
+from ._boundary import warn_past_boundary
 from ._temporal import (
     _adapt_granger,
     _adapt_longitudinal_lingam,
@@ -148,18 +149,24 @@ def varma_lingam(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
     rows per test.
 
-    **Limitations.** Measured on simulated linear series with non-Gaussian noise, one autoregressive
-    and one moving-average lag, from 3 to 20 variables with 100 to 1,000 time steps, with
-    ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
-    below the empty graph's from 300 time steps at every size; at 100 time steps they exceeded it
-    from 10 variables on. The fit takes minutes at 20 variables and 1,000 time steps. It assumes
-    linear effects and non-Gaussian noise. The likelihood fit can stop before it converges, and
-    gives no warning; a larger ``max_iter`` does not prevent this. The result then depends on the
-    versions of the numerical libraries. Where the fit stops, even when it converges, also depends
-    on the BLAS kernels the CPU runs, so the same series can give a different graph on another
-    type of CPU or in another environment. With ``criterion`` set, it fits one model for every
-    ``(p, q)`` in the grid. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear non-Gaussian VARMA time series, of ``max(1000, 4 *
+    (d + 1))`` time steps for ``d`` variables and of five times as many, with ``prune=True``, on 4
+    cores with a cap of 1 h and 28 GB per fit. The median F1 score of its directed cross-links
+    (same-step and lag 1), which is 0 for the empty graph, was 0.66 to 0.88 at every size through 40
+    variables with the shorter series and 0.90 to 0.96 through 20 with the series five times as
+    long, the largest sizes its fits finished within the caps. Every ladder ended when three fits of
+    the next size ran past 1 h. The median fit took 1,845 s at 20 variables with the series five
+    times as long. On series with one autoregressive and one moving-average lag, from 3 to 20
+    variables with 100 to 1,000 time steps, with ``order=(1, 1)`` and ``prune=True``, its median
+    errors (missing and extra cross-links) stayed below the empty graph's from 300 time steps at
+    every size; at 100 time steps they exceeded it from 10 variables on. It assumes linear effects
+    and non-Gaussian noise. The likelihood fit can stop before it converges, and gives no warning; a
+    larger ``max_iter`` does not prevent this. The result then depends on the versions of the
+    numerical libraries. Where the fit stops, even when it converges, also depends on the BLAS
+    kernels the CPU runs, so the same series can give a different graph on another type of CPU or in
+    another environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -193,6 +200,7 @@ def varma_lingam(
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, order[0], method="varma_lingam")
+    warn_past_boundary("varma_lingam", X.shape)
     causal_order, psis, omegas = _native(
         X,
         order=order,
@@ -290,14 +298,15 @@ def longitudinal_lingam(
     in it. Drop the units that hold one from every dataset first, which suits values missing
     completely at random.
 
-    **Limitations.** Measured on simulated panels with non-Gaussian noise, a dense same-step DAG and
-    a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first,
-    from 2 to 5 variables at 20 or 50 time points with 100 to 1,000 units, with ``n_lags=1``. Its
-    median errors (missing and extra cross-links) stayed far below the empty graph's at every size.
-    It assumes linear effects and non-Gaussian noise. Each time point's fit uses only the units'
-    rows at that time, so its accuracy depends on the number of units, not on the number of time
-    points. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear non-Gaussian panels, each unit observed at 20 time
+    points, on 4 cores with a cap of 1 h and 28 GB per fit. The median F1 score of its directed
+    cross-links (same-step and lag 1), which is 0 for the empty graph, was 0.98 to 1 at every size
+    through 40 variables with 2,000 units and 0.94 to 1 through 40 with 500 units, the largest sizes
+    its fits finished within the caps. Every ladder ended at the largest planned size. The median
+    fit took 41 s at 40 variables with 2,000 units. It assumes linear effects and non-Gaussian
+    noise. Each time point's fit uses only the units' rows at that time, so its accuracy depends on
+    the number of units, not on the number of time points. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -435,19 +444,23 @@ def pcmci(
     test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
     its rows, raises ``ValueError``.
 
-    **Limitations.** Measured on simulated linear-Gaussian series with an autodependency in every
-    variable and one cross-link per variable at lag 1 or 2, from 10 to 160 variables with 500 to
-    2,000 time steps, with ``tau_max=2``. It found nearly every true link at every size, but its
-    false links grew with the number of variables: its median errors (lag-resolved SHD) stayed below
-    the empty graph's at 10 variables, came close to it at 20, and exceeded it from 40 on. It
-    assumes linear effects, a stationary series, and no hidden common causes. It does not test
-    same-step (lag 0) links: an effect within one time step is missed and can show up as a false
-    lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
-    the series needs many more time steps than that. The MCI step alone runs
-    ``n_variables ** 2 * tau_max`` tests. Missing values are not benchmarked yet; the tests run them
-    on up to 5 variables with up to a fifth of the values missing completely at random. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** Measured on simulated linear-Gaussian time series with lagged links, of
+    ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five times as many, with
+    ``tau_max=2``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
+    its median errors (lag-resolved SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 20 and 80 variables with the shorter series or the series five
+    times as long. Every ladder ended after two sizes in a row did not beat the empty graph. The
+    median fit took 0.87 s at 80 variables with the series five times as long. On series with an
+    autodependency in every variable and one cross-link per variable at lag 1 or 2, from 10 to 160
+    variables with 500 to 2,000 time steps, it found nearly every true link at every size, but its
+    false links grew with the number of variables. It assumes linear effects, a stationary series,
+    and no hidden common causes. It does not test same-step (lag 0) links: an effect within one time
+    step is missed and can show up as a false lagged link. An MCI test conditions on up to ``2 *
+    n_variables * tau_max - 1`` lagged values, so the series needs many more time steps than that.
+    The MCI step alone runs ``n_variables ** 2 * tau_max`` tests. Missing values are not benchmarked
+    yet; the tests run them on up to 5 variables with up to a fifth of the values missing completely
+    at random. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -636,18 +649,21 @@ def pcmciplus(
     test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
     its rows, raises ``ValueError``.
 
-    **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation and
-    1.5 cross-links per variable, 30% of them within a time step and the rest at lags 1 to 5, from
-    10 to 80 variables with 500 to 2,000 time steps, with ``tau_max=5``. Its median errors (endpoint
-    SHD) stayed well below the empty graph's at every size. It assumes linear effects, a stationary
-    series, and no hidden common causes. The skeleton and collider phases test every subset of a
-    variable's same-step neighbors, so the number of tests grows exponentially with the number of
-    same-step links at one variable. A test conditions on up to
-    ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
-    than that. Missing values are not benchmarked yet; the tests run them on up to 5 variables with
-    up to a fifth of the values missing completely at random. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
+    links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
+    with ``tau_max=5``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (endpoint SHD) stayed below the empty graph's, and through which its
+    fits finished within the caps, were 160 and 160 variables with the shorter series or the series
+    five times as long. Every ladder ended when the data generator drew no stationary series at 320
+    variables, so no fit ran. The median fit took 336 s at 160 variables with the series five times
+    as long. It assumes linear effects, a stationary series, and no hidden common causes. The
+    skeleton and collider phases test every subset of a variable's same-step neighbors, so the
+    number of tests grows exponentially with the number of same-step links at one variable. A test
+    conditions on up to ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs
+    many more time steps than that. Missing values are not benchmarked yet; the tests run them on up
+    to 5 variables with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -837,11 +853,16 @@ def lpcmci(
     test keeps its level [3]_. A test with fewer than ``|S| + 3`` rows, or with a column constant on
     its rows, raises ``ValueError``.
 
-    **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation, one
-    cross-link per variable, 30% of them within a time step and the rest at lags 1 to 3, and 30% of
-    the series unobserved, from 5 to 20 variables with 500 to 2,000 time steps, with ``tau_max=3``.
-    Its median errors (endpoint SHD against the true PAG of the observed series) stayed below the
-    empty graph's at every size. It assumes linear effects, a stationary series, and no selection
+    **Limitations.** Measured on simulated linear-Gaussian time series with 30% of the series
+    unobserved, of ``max(1000, 12 * (d + 1))`` time steps for ``d`` variables and of five times as
+    many, the unobserved series counted among the variables, with ``tau_max=3``, on 4 cores with a
+    cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (endpoint SHD
+    against the PAG of the observed series) stayed below the empty graph's, and through which its
+    fits finished within the caps, were 40 and 40 variables with the shorter series or the series
+    five times as long. At 40 variables with the shorter series, 1 of 10 fits ran past 1 h; at 40
+    variables with the series five times as long, 2 of 5 fits ran past 1 h. Every ladder ended when
+    three fits of the next size ran past 1 h. The median fit took 263 s at 40 variables with the
+    series five times as long. It assumes linear effects, a stationary series, and no selection
     bias; hidden common causes are allowed. The graph covers ``tau_max + 1`` time steps, and a
     hidden cause that acts through earlier steps can add links within that window. The removal and
     rule steps test subsets of a node's neighbors, so the number of tests grows exponentially with
@@ -896,6 +917,7 @@ def lpcmci(
         )
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
+    warn_past_boundary("lpcmci", X.shape)
     with (
         copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
         rows_tested() as rows,

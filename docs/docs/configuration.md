@@ -68,7 +68,9 @@ The workers start from a forkserver, whose socket goes in your temporary directo
 that directory is on a file system that rejects the socket, as some cluster file systems do, we
 start the forkserver with its socket in `/dev/shm`, or `/tmp`, and warn once; if neither works,
 the workers start with `fork` or `spawn`. The results do not change. Set `TMPDIR` to a directory on
-a local file system to silence the warning.
+a local file system to silence the warning. `andrey.data.generate` with several workers starts them
+the same way when your Python's default start method is the forkserver, as on Linux from Python
+3.14; otherwise it keeps the default.
 
 ## GPU dispatch
 

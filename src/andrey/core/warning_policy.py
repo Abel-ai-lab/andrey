@@ -66,14 +66,25 @@ class DataTypeWarning(AndreyWarning):
     """
 
 
-def warn_once(message: str, category: type[AndreyWarning]) -> None:
-    """Warn with ``message`` the first time this process sees it, at the caller's line."""
-    key = (category, message)
+class BoundaryWarning(AndreyWarning):
+    """A fit larger than the largest size the method finished within the caps of the published
+    boundary lane, at the nearest measured setting.
+
+    Each method warns once per process, whatever the size.
+    """
+
+
+def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = None) -> None:
+    """Warn with ``message`` the first time this process sees it, at the caller's line.
+
+    With ``key``, the warning is seen once per ``key`` instead, whatever the message.
+    """
+    seen = (category, message if key is None else key)
     with _lock:
-        if key in _warned:
+        if seen in _warned:
             return
         warnings.warn(message, category, stacklevel=_caller_stacklevel())
-        _warned.add(key)
+        _warned.add(seen)
 
 
 def _reset_after_fork() -> None:

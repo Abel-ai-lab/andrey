@@ -133,6 +133,14 @@ Change the facade **and** its `ParamSpec` in the same commit; the signature-agre
 when they differ. A new enumerated value goes in `ParamSpec.choices`, so the schema, the CLI's
 `key=value` coercion, and `andrey run <method> --help` all learn it at once.
 
+### Publish a boundary lane
+
+A release summary with `boundary.ladders` sets where each method's `BoundaryWarning` starts:
+regenerate its table with `uv run python scripts/boundary_table.py`, which writes
+`src/andrey/api/_boundary_table.py` from the newest such summary. `tests/unit/test_boundary.py`
+fails until the table matches it, and names a method whose ladder newly ended on the time or memory
+cap until its facade calls `warn_past_boundary`, after the input checks and before the fit.
+
 ### Add an environment variable
 
 Read it in the code, then add an `EnvVarSpec` to `environment.py` (and to `PRECEDENCE` if it takes
@@ -228,8 +236,10 @@ uv run python -m qa.quality_gate <NAME>
 
 On each dataset the method passes when its median SHD is below the empty graph's and within its
 tolerance of the recorded baseline in either direction. The gate runs once per release, on the
-release pull request into `main`, which `main` requires to pass; the publish reuses that run when
-the tagged commit has the same tree and runs the gate itself otherwise.
+release pull request into `main`, which `main` requires to pass; a push that changes only `docs/`,
+`site/`, or top-level Markdown files reuses an earlier passing run, and the publish reuses that run
+when the tagged commit has the same tree and runs the gate itself otherwise. `--jobs N` fits N cells
+at a time.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
 soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
 than the reference package (from 0.8.0, when the paired bootstrap 95% interval of the difference
