@@ -32,7 +32,7 @@ mixtures only as plots, so each variable's noise here is one of those 5, scaled 
 unit variance before its own variance. Each time point draws its own lag matrix, so a panel is not
 stationary, and its scale grows with the product of those matrices unless each is small. A time
 point whose lag matrix through the same-step part, ``(I - B(t,t))^-1 B(t,t-1)``, has spectral norm
-1 or more, which is almost every time point from ``N = 10`` on, has ``B(t,t-1)`` scaled down until
+1 or more, which is about 60% of the time points at ``N = 3`` and every one from ``N = 5`` on, has ``B(t,t-1)`` scaled down until
 that norm is 0.95 (:func:`_contract_lags`). Every step then contracts, and the panel stays within a
 fixed multiple of one time point's scale for any ``T``. The norm bounds the spectral radius, which
 alone does not bound a product of different, non-normal matrices. A time point below norm 1 keeps

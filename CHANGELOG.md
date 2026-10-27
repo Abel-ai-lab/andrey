@@ -50,8 +50,9 @@ change names its pull request.
   first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
   unstable draw. Every draw that was stationary is unchanged. ([#393])
 - For contributors, the benchmark harness's longitudinal LiNGAM panels no longer diverge as the
-  number of variables grows: from 10 variables on, the lag matrices of almost every time point were
-  far above 1, and the panel's standard deviation reached 1e14 at 10 variables and 1e90 at 40. A
+  number of variables grows: the lag matrices of about 60% of the time points had norm 1 or more at
+  3 variables and all of them from 5 on, and the panel's standard deviation reached 1e14 at 10
+  variables and 1e90 at 40. A
   time point whose lag matrix through the same-step part has spectral norm 1 or more now has its
   lag-1 block scaled down until that norm is 0.95, so every step contracts. A time point already
   below 1 keeps its draw, and the panel's dataset identity changes. ([#467])
