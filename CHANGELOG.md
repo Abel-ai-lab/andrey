@@ -76,6 +76,13 @@ change names its pull request.
   `student_t` computing each test's correlations directly from those rows, many tests at once, and
   `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
   method refuses them with an error that names it and says what to do instead. ([#443], [#453])
+- With more than one worker, `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` run each
+  large skeleton pass in worker processes, each conditioning set's queries in one worker, and
+  return the same graphs and p-values as with one worker. `ANDREY_RCOT_PARALLEL_MIN_WORK` sets the
+  least work, RCoT tests times rows, a pass needs to use them. The default, 2000000, was measured on
+  an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
+  on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
+  your machine, and `andrey calibrate` now measures it with the others. ([#457])
 - A fit larger than its method was measured to finish warns once per method with
   `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
   the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
@@ -100,6 +107,21 @@ change names its pull request.
 - `varma_lingam`'s **Limitations** paragraph and the column-order guide say that where its
   likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
   the same series can give a different graph on another type of CPU. ([#451])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` return the same graphs and p-values in
+  less time on large samples, because their skeleton search hands RCoT its queries in stacks, which
+  RCoT runs one conditioning set at a time, building each set's random features once per stack.
+  ([#455])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="degen_gauss"` return the same graphs and
+  p-values in less time, because their skeleton search hands the degenerate Gaussian test its
+  queries in stacks, which it runs grouped by shape, with each conditioning set's regression
+  computed once. ([#459])
+- `fci` and `gfci` return the same graphs and p-values in less time, because their
+  possible-d-separation step asks the test for each pair's conditioning sets in runs of 1, 2, 4, and
+  up to 256 sets, cut at the first that separates the pair, when the test is `"fisherz"`,
+  `"student_t"`, `"chisq"`, `"gsq"`, `"degen_gauss"`, or `"cond_gauss"`. ([#461])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
+  p-values in less time, because the test's batched counts hold a table only for each conditioning
+  configuration that occurs in the data, not for every possible one. ([#463])
 
 ## [0.10.0] - 2026-10-27
 
@@ -865,6 +887,11 @@ First alpha release.
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451
 [#453]: https://github.com/Abel-ai-lab/andrey/pull/453
+[#455]: https://github.com/Abel-ai-lab/andrey/pull/455
+[#457]: https://github.com/Abel-ai-lab/andrey/pull/457
+[#459]: https://github.com/Abel-ai-lab/andrey/pull/459
+[#461]: https://github.com/Abel-ai-lab/andrey/pull/461
+[#463]: https://github.com/Abel-ai-lab/andrey/pull/463
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
 [#479]: https://github.com/Abel-ai-lab/andrey/pull/479
