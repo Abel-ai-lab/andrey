@@ -33,8 +33,10 @@ constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also ne
 `n_variables + 1` rows in each dataset, the fewest with which their pruning step can estimate the
 edge weights. That pruning step, an adaptive Lasso in `direct_lingam`, `ica_lingam`,
 `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`,
-picks the edges by BIC over the whole Lasso path, so it keeps the same edges in any unit of the data
-and you need not rescale it first.
+picks the edges by BIC over the whole Lasso path, so for a given causal order it keeps the same
+edges in any unit of the data. The steps before it can still depend on the units: the causal order
+of `ica_lingam` reads the magnitudes of its unmixing matrix, and the VARMA fit of `varma_lingam` runs
+on the values as given.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
 `"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
 whole numbers in a column of numbers, each distinct value of a column one category. `ges`, `hc`,
