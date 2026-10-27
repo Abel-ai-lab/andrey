@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from scipy.linalg import solve_discrete_lyapunov
 
+import andrey
 import andrey.temporal.lpcmci as engine
 from andrey.api._temporal import _adapt_lpcmci
 from andrey.core import ARROW, CIRCLE, NULL, TAIL
@@ -203,6 +204,68 @@ def test_no_preliminary_round_runs_the_final_round_alone():
 def test_an_unknown_test_name_is_refused():
     with pytest.raises(ValueError, match="indep_test"):
         lpcmci(_hidden_cause_series(), indep_test="kci")
+
+
+def _result_arrays(result: LPCMCIResult) -> tuple:
+    return (
+        result.start_marks.tolist(),
+        result.end_marks.tolist(),
+        result.statistics.tolist(),
+        result.p_values.tolist(),
+        result.sepsets,
+        result.parents,
+    )
+
+
+def _related_series(n_vars: int = 6, n_steps: int = 600, seed: int = 0) -> np.ndarray:
+    """Autocorrelated series with a chain of lagged links and two shared drivers."""
+    rng = np.random.default_rng(seed)
+    drivers = rng.standard_normal((n_steps, 2))
+    x = np.zeros((n_steps, n_vars))
+    for t in range(1, n_steps):
+        x[t] = 0.5 * x[t - 1] + rng.standard_normal(n_vars)
+        x[t, 1:] += 0.4 * x[t - 1, :-1]
+        x[t, : n_vars // 2] += 0.6 * drivers[t, 0]
+        x[t, n_vars // 3 :] += 0.5 * drivers[t, 1]
+    return x
+
+
+def test_a_depth_above_every_search_returns_the_uncapped_graph():
+    data = _related_series()
+    uncapped = lpcmci(data, tau_max=2, pc_alpha=0.01)
+    assert _result_arrays(lpcmci(data, tau_max=2, pc_alpha=0.01, max_depth=50)) == _result_arrays(
+        uncapped
+    )
+
+
+@pytest.mark.parametrize("max_depth", [0, 1, 2])
+def test_a_depth_cap_bounds_every_removal_search(monkeypatch, max_depth):
+    sizes = []
+    searched = engine._Search.separating_subsets
+
+    def recorded(self, a, b, search, sdef, p):
+        sizes.append(p)
+        return searched(self, a, b, search, sdef, p)
+
+    monkeypatch.setattr(engine._Search, "separating_subsets", recorded)
+    lpcmci(_related_series(), tau_max=1, pc_alpha=0.05, max_depth=max_depth)
+    assert sizes and max(sizes) == max_depth
+
+
+@pytest.mark.parametrize("cached_depth", [-1, 100])
+def test_tests_with_or_without_the_cache_give_the_same_graph(monkeypatch, cached_depth):
+    data = _related_series(seed=2)
+    expected = _result_arrays(lpcmci(data, tau_max=1, pc_alpha=0.05))
+    monkeypatch.setattr(engine, "CACHED_DEPTH", cached_depth)
+    assert _result_arrays(lpcmci(data, tau_max=1, pc_alpha=0.05)) == expected
+
+
+def test_missing_values_count_each_query_once_at_any_cached_depth(monkeypatch):
+    data = _related_series(n_steps=800)
+    data[np.random.default_rng(1).random(data.shape) < 0.1] = np.nan
+    expected = andrey.lpcmci(data, tau_max=2, pc_alpha=0.05).metadata
+    monkeypatch.setattr(engine, "CACHED_DEPTH", -1)
+    assert andrey.lpcmci(data, tau_max=2, pc_alpha=0.05).metadata == expected
 
 
 # ---- bounded test calls, cache, and vote ------------------------------------------------------
