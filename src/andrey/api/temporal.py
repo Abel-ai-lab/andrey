@@ -512,17 +512,16 @@ def pcmciplus(
     **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
     links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
     with ``tau_max=5``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
-    which its median errors (endpoint SHD against the PAG of the observed series) stayed below the
-    empty graph's, and through which its fits finished within the caps, were 160 and 160 variables
-    with the shorter series or the series five times as long. Every ladder ended when the data
-    generator drew no stationary series at 320 variables, so no fit ran. The median fit took 336 s
-    at 160 variables with the series five times as long. It assumes linear effects, a stationary
-    series, and no hidden common causes. The skeleton and collider phases test every subset of a
-    variable's same-step neighbors, so the number of tests grows exponentially with the number of
-    same-step links at one variable. A test conditions on up to
-    ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
-    than that. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    which its median errors (endpoint SHD) stayed below the empty graph's, and through which its
+    fits finished within the caps, were 160 and 160 variables with the shorter series or the series
+    five times as long. Every ladder ended when the data generator drew no stationary series at 320
+    variables, so no fit ran. The median fit took 336 s at 160 variables with the series five times
+    as long. It assumes linear effects, a stationary series, and no hidden common causes. The
+    skeleton and collider phases test every subset of a variable's same-step neighbors, so the
+    number of tests grows exponentially with the number of same-step links at one variable. A test
+    conditions on up to ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs
+    many more time steps than that. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
