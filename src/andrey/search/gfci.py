@@ -193,10 +193,11 @@ def _derive_sepsets(
     subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
 
-    A FisherZ or StudentT test answers the size-0 query of every pair in one canonical query array
-    (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates each nonempty size's
-    subsets in chunks of them (:func:`~andrey.constraint._skeleton.separating_subsets`), with the
-    p-values of the scalar calls. Every query of another test, or of ``in_column_order``, is a
+    A FisherZ, StudentT, or degenerate Gaussian test answers the size-0 query of every pair in one
+    canonical query array (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates
+    each nonempty size's subsets in chunks of them
+    (:func:`~andrey.constraint._skeleton.separating_subsets`), with the p-values of the scalar
+    calls. Every query of another test, or of ``in_column_order``, is a
     scalar call.
     """
     adjacent = cpdag != NULL

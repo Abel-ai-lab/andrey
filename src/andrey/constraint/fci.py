@@ -9,15 +9,14 @@ from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
-from itertools import combinations, permutations
+from itertools import combinations, islice, permutations
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+from andrey.constraint._parallel_skeleton import skeleton_pool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
-    canonical_capable,
     check_collider_rule,
     first_order_removals,
     marginal_removals,
@@ -173,7 +172,10 @@ def _fast_adjacency_search(
     :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the skeleton, a raised error included,
-    stays identical to the serial scan.
+    stays identical to the serial scan. With ``workers > 1`` and an RCoT test, a pass whose tests
+    times rows reach :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_RCOT_WORK`, or the
+    ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it, runs each conditioning set's queries in one
+    worker process, with the serial scan's p-values bit for bit.
     """
     d = X.shape[1]
     support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
@@ -181,7 +183,7 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen_capable(test)
-    pool = SkeletonWorkerPool(test, workers) if workers > 1 and canonical_capable(test) else None
+    pool = skeleton_pool(test, workers)
     try:
         size = -1
         while True:
@@ -506,6 +508,10 @@ def _possible_dsep(
     return sorted(dsep, key=lambda v: f"X{v + 1}", reverse=True)
 
 
+# The most subsets one possible-d-sep run asks a test for at once (see _try_remove_by_dsep).
+_DSEP_RUN = 256
+
+
 def _iter_dsep_choices(
     dsep: list[int], adj_a: set[int], adj_b: set[int], max_depth: int | None = None
 ) -> Iterator[tuple[int, ...]]:
@@ -540,14 +546,31 @@ def _try_remove_by_dsep(
     max_depth: int | None = None,
 ) -> bool:
     """Remove edge ``x-y`` if some subset of ``dsep``, of at most ``max_depth`` members when one is
-    given, makes ``x`` and ``y`` independent."""
-    for cond in _iter_dsep_choices(dsep, adj_a, adj_b, max_depth):
-        if test(x, y, cond) > alpha:
-            marks[x, y] = NULL
-            marks[y, x] = NULL
-            sepsets[(x, y)] = tuple(int(v) for v in cond)
-            return True
-    return False
+    given, makes ``x`` and ``y`` independent.
+
+    The subsets are tested in :func:`_iter_dsep_choices` order and the first that separates the
+    pair is recorded. A test with ``separating_prefix`` answers them in runs of 1, 2, 4, ... up to
+    ``_DSEP_RUN`` subsets, each run cut at its first separating subset, so it answers the queries
+    the one-at-a-time loop asks, in its order, and no more; another test takes one call per
+    subset.
+    """
+    choices = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth)
+    prefix = getattr(test, "separating_prefix", None)
+    if prefix is None:
+        found = next((cond for cond in choices if test(x, y, cond) > alpha), None)
+    else:
+        found, run = None, 1
+        while found is None and (chunk := list(islice(choices, run))):
+            pvalues = prefix(x, y, chunk, alpha)
+            if pvalues and pvalues[-1] > alpha:
+                found = chunk[len(pvalues) - 1]
+            run = min(2 * run, _DSEP_RUN)
+    if found is None:
+        return False
+    marks[x, y] = NULL
+    marks[y, x] = NULL
+    sepsets[(x, y)] = tuple(int(v) for v in found)
+    return True
 
 
 def _edge_order(marks: np.ndarray, i: int, j: int) -> tuple[int, int]:

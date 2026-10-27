@@ -416,6 +416,37 @@ def test_rcot_samples_features_per_variable_and_conditioning_set(monkeypatch):
     assert [RCoT(data)(*query) for query in queries] == pvalues
 
 
+@pytest.mark.parametrize("size", [0, 1, 3])
+def test_rcot_grouped_pvalues_equal_its_queries_in_any_order(monkeypatch, size):
+    """``_canonical_pvalues`` returns each query's own p-value, bit for bit, whatever the order of
+    the queries, and samples each conditioning set's features once, though at size 3 the sets
+    outnumber the 16 entries the test keeps."""
+    data = np.random.default_rng(5).standard_normal((120, 10))
+    data[:, 1] += np.sin(2 * data[:, 0])
+    rng = np.random.default_rng(size)
+    queries = []
+    for _ in range(80):
+        x, y, *cond = rng.permutation(10)[: size + 2].tolist()
+        queries.append((x, y, tuple(cond)))
+    want = [RCoT(data)(*query) for query in queries]
+    counts = []
+    sample = ci_kernel._fourier_features
+    monkeypatch.setattr(
+        ci_kernel,
+        "_fourier_features",
+        lambda v, count, rng, scale=None: counts.append(count) or sample(v, count, rng, scale),
+    )
+    monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", 0)  # the smallest caches, 16 entries each
+    for order in (np.arange(80), rng.permutation(80)):
+        test = RCoT(data)
+        counts.clear()
+        xs, ys, conds = (np.array([queries[i][k] for i in order]) for k in range(3))
+        got = test._canonical_pvalues(xs, ys, conds.reshape(80, size))
+        assert got.tolist() == [want[i] for i in order]
+        sets = {frozenset(queries[i][2]) for i in order} if size else set()
+        assert counts.count(100) == len(sets)
+
+
 def test_rcot_queries_of_one_pair_sample_independent_features():
     """PC removes an edge when any conditioning set accepts, so one pair's queries over different
     conditioning sets sample their own features: given each of 40 independent columns, the
