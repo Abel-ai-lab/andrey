@@ -89,7 +89,7 @@ SIZE_DEGREE, DENSITY_ROWS = 2, 2000
 SIZE_ROWS = (500, 2000, 10000)
 # A map's geometry: a cell's width and height, the row labels' width, and the room for the title
 # above and the column labels below.
-CELL_W, CELL_H, LABEL, TOP, BOTTOM = 30, 22, 78, 22, 30
+CELL_W, CELL_H, LABEL, TOP, BOTTOM = 30, 22, 96, 22, 30
 
 
 def maps(cells: list[dict]) -> dict[str, dict[tuple[int, int], dict]]:
@@ -187,8 +187,8 @@ def panel(method: str, cells: list[dict]) -> str:
     if not ds:
         return ""
     name = NAMES.get(method, method)
-    titles = {"size": "Rows, mean degree 2", "density": "Mean degree, 2,000 rows"}
-    labels = {"size": lambda n: f"{n:,} rows", "density": lambda k: f"degree {k}"}
+    titles = {"size": "Samples, mean degree 2", "density": "Mean degree, 2,000 samples"}
+    labels = {"size": lambda n: f"{n:,} samples", "density": lambda k: f"degree {k}"}
     drawings = []
     for key in ("size", "density"):
         ys = sorted({y for y, _ in both[key]})
@@ -277,7 +277,7 @@ def size(ladder: dict, value: int | None) -> str:
     if value is None:
         return "-"
     if ladder["axis"] == "n":
-        return f"{value:,} rows"
+        return f"{value:,} samples"
     if ladder["axis"] == "latents":
         latents = next(r["latents"] for r in ladder["rungs"] if r["d"] == value)
         return f"{latents} latent variables"
@@ -305,7 +305,7 @@ def ladders_table(lane: dict) -> str:
         groups[family[ladder["method"]]].append(
             "<tr>"
             f'<th scope="row">{escape(NAMES.get(ladder["method"], ladder["method"]))}'
-            f"<small>{escape(ladder['label'])}</small></th>"
+            f"<small>{escape(ladder['label'].replace('rows', 'samples'))}</small></th>"
             f'<td class="ct-ours">{escape(size(ladder, inside))}</td>'
             f"<td>{escape(ended)}</td></tr>"
         )
@@ -337,7 +337,7 @@ def reach_table(lane: dict) -> str:
         fixed = FIXED.match(ladder["regime"])
         if mapped(ladder) and int(fixed[1]) == SIZE_DEGREE and int(fixed[2]) in SIZE_ROWS:
             reach.setdefault(ladder["method"], {})[int(fixed[2])] = ladder
-    head = "".join(f'<th scope="col">{n:,} rows</th>' for n in SIZE_ROWS)
+    head = "".join(f'<th scope="col">{n:,} samples</th>' for n in SIZE_ROWS)
     body = ""
     for key, title in FAMILIES.items():
         methods = sorted((m for m in reach if family[m] == key), key=order.index)
@@ -414,7 +414,7 @@ def generators_table(lane: dict) -> str:
         '<table class="ct-table ct-text"><thead><tr><th scope="col">Data</th>'
         '<th scope="col">Call</th></tr></thead>'
         f"<tbody>{body}</tbody></table></div><figcaption>The call that draws each "
-        "dataset, with its variables, rows, density, and seed.</figcaption></figure>\n"
+        "dataset, with its variables, samples, density, and seed.</figcaption></figure>\n"
     )
 
 

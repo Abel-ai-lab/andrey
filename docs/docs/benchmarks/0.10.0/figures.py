@@ -49,7 +49,7 @@ def method_table(method: str, rows: list[dict]) -> str:
     for row in sorted(rows, key=lambda r: r["d"]):
         ours_errors, their_errors, datasets = errors(row)
         body += (
-            f'<tr><th scope="row">{row["d"]:,}<small>{row["n"]:,} rows</small></th>'
+            f'<tr><th scope="row">{row["d"]:,}<small>{row["n"]:,} samples</small></th>'
             f'<td class="ct-ours">{figure(row["seconds_090"])}</td>'
             f"<td>{figure(row['seconds_ref'])}</td>"
             f'<td class="ct-ours">{figure(row["speedup"])}x</td>'
