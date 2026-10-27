@@ -187,7 +187,8 @@ def family_figure(family: str, cells: list[dict]) -> str:
         "graph's, the stronger the fewer; gray does no better than the empty graph. × stopped at "
         "the time cap, ■ at the memory cap, ! failed, ○ past the accuracy boundary. The outline is "
         "the boundary: in each row, the sizes before the first that does not finish or does not "
-        "beat the empty graph.</figcaption>"
+        "beat the empty graph. A cell's tip gives its errors as a share of the empty graph's: on a "
+        "denser graph the empty graph makes more errors, so beating it says less.</figcaption>"
         "</figure>\n"
     )
 
@@ -198,6 +199,8 @@ def cells(lane: dict) -> list[dict]:
     for ladder in lane["ladders"]:
         end = ladder["end"]
         for rung in ladder["rungs"]:
+            # A rung that is not through shows only its cut: its median, from the few fits that
+            # finished, is not the rung's result.
             stop = "none" if rung["through"] else rung["stop"]
             if end["stop"] == "accuracy" and rung["d"] == end["d"]:
                 stop = "accuracy"
@@ -206,8 +209,8 @@ def cells(lane: dict) -> list[dict]:
                     "method": ladder["method"],
                     "regime": ladder["regime"],
                     "d": rung["d"],
-                    "share_of_empty": rung["share_of_empty"],
-                    "beats_empty": rung["beats_empty"],
+                    "share_of_empty": rung["share_of_empty"] if rung["through"] else None,
+                    "beats_empty": rung["beats_empty"] if rung["through"] else None,
                     "stop": stop,
                 }
             )
