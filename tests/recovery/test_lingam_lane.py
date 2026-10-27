@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey import data
+from andrey.metrics import shd
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -131,6 +133,30 @@ def test_ica_lingam_random_state_and_max_iter_accepted():
     assert list(andrey.ica_lingam(X, random_state=123, max_iter=500).ordering) == list(
         other.ordering
     )
+
+
+def test_ica_lingam_ignores_the_columns_units():
+    """Multiplying the columns by positive numbers keeps the order and the graph; the weights
+    take the new units."""
+    X = datagen.generate("lingam_5v_uniform")
+    scale = np.array([0.01, 7.3, 1.0, 250.0, 0.4])
+    want = andrey.ica_lingam(X)
+    got = andrey.ica_lingam(X * scale)
+    assert list(got.ordering) == list(want.ordering)
+    expected = want.weighted_adjacency * scale[None, :] / scale[:, None]  # [i, j] weighs i -> j
+    np.testing.assert_array_equal(got.weighted_adjacency != 0, expected != 0)
+    np.testing.assert_allclose(got.weighted_adjacency, expected, rtol=1e-9, atol=0)
+
+
+def test_ica_lingam_recovers_a_standardized_graph():
+    """On z-scored linear uniform-noise data (andrey.data's default scale), the DAG is close."""
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=10, avg_degree=4),
+        functional=data.functional.linear(),
+        noise=data.noise.uniform(),
+    )
+    ds = scm.sample(n=1000, seed=0)
+    assert shd(andrey.ica_lingam(ds.data).structure, ds.graph) <= 4  # of 20 edges
 
 
 def _ica_in_original_labels(X: np.ndarray, order: tuple[int, ...]) -> tuple[list[int], np.ndarray]:

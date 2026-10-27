@@ -293,6 +293,14 @@ def ica_lingam(
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
 
+    **Units.** Multiplying a column by a positive number changes neither the order nor the graph;
+    the column's edge weights take its new unit. FastICA runs on the z-scored columns, and both
+    order steps read each unmixing weight divided by the norm of its column, a weight measured
+    against its estimation error: the rows are permuted so that no such ratio on the diagonal is
+    small, and the order search sets the smallest ratios to zero first. The original steps [1]_
+    read the weights in the data's units, so rescaling a column, z-scoring included, could change
+    the order [2]_.
+
     **Column order and machines.** When several variables can come next in the causal order, the one
     whose column ranks first by its own values goes first. FastICA itself can reach another solution
     under a new column order or on another machine when it converges slowly, at few rows per
@@ -326,6 +334,9 @@ def ica_lingam(
     ----------
     .. [1] Shimizu, S., Hoyer, P. O., Hyvarinen, A., and Kerminen, A. (2006). A linear
        non-Gaussian acyclic model for causal discovery. JMLR 7, 2003-2030.
+    .. [2] Shimizu, S., Inazumi, T., Sogawa, Y., Hyvarinen, A., Kawahara, Y., Washio, T., Hoyer,
+       P. O., and Bollen, K. (2011). DirectLiNGAM: A direct method for learning a linear
+       non-Gaussian structural equation model. JMLR 12, 1225-1248.
 
     Examples
     --------
