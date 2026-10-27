@@ -17,7 +17,7 @@ the rung where a ladder ended past the accuracy boundary carries ``accuracy``. R
 ``uv run python docs/blog/0.10.0/boundary.py [summary.json] [outdir] [card_outdir]``. The release
 card's ``ladders.html`` lists, as a table, the ladders the maps do not draw: the FCI and GFCI
 diagonals, where the rows grow with the variables, and the latent-variable, time-series, and
-pairwise methods.
+pairwise methods, and its ``settings.html`` each method's settings.
 
 The maps are a reference for the measured conditions, not a hard limit: another graph generator,
 other data, other settings, or another machine move a boundary.
@@ -341,6 +341,32 @@ def reach_table(lane: dict) -> str:
     )
 
 
+def settings_table(lane: dict) -> str:
+    """The card's table of each method's settings: the keyword arguments of its ladders' fits, one
+    row per method, or per ladder where a method's ladders differ; a setting not listed is at its
+    default."""
+    order = [spec.name for spec in list_specs()]
+    found: dict[str, dict[str, list[str]]] = {}
+    for ladder in lane["ladders"]:
+        params = ladder.get("params") or {}
+        call = ", ".join(f"{key}={value!r}" for key, value in sorted(params.items()))
+        found.setdefault(ladder["method"], {}).setdefault(call, []).append(ladder["label"])
+    body = ""
+    for method in sorted(found, key=order.index):
+        for call, labels in found[method].items():
+            where = "" if len(found[method]) == 1 else f"<small>{escape('; '.join(labels))}</small>"
+            body += (
+                f'<tr><th scope="row">{escape(NAMES.get(method, method))}{where}</th>'
+                f"<td>{f'<code>{escape(call)}</code>' if call else 'defaults'}</td></tr>"
+            )
+    return (
+        '<figure class="ct"><p class="ct-title">Each method\'s settings</p><div class="ct-scroll">'
+        '<table class="ct-table"><thead><tr><th scope="col">Method</th><th scope="col">Settings'
+        f"</th></tr></thead><tbody>{body}</tbody></table></div><figcaption>The keyword arguments "
+        "of every fit; a setting not listed is at its default.</figcaption></figure>\n"
+    )
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
     lane = json.loads(path.read_text(encoding="utf-8"))["boundary"]
@@ -352,6 +378,7 @@ def main() -> None:
     card = Path(sys.argv[3]) if len(sys.argv) > 3 else CARD
     card.mkdir(exist_ok=True)
     (card / "ladders.html").write_text(ladders_table(lane), encoding="utf-8")
+    (card / "settings.html").write_text(settings_table(lane), encoding="utf-8")
 
 
 if __name__ == "__main__":
