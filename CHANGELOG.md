@@ -100,8 +100,9 @@ change names its pull request.
   likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
   the same series can give a different graph on another type of CPU. ([#451])
 - `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
-  batch of conditioning sets as one array of column numbers, records its tests once per batch, and
-  tests sets of more than three neighbors, which rarely repeat, without the result cache. ([#468])
+  batch of conditioning sets as one array of column numbers, records its tests once per batch, and,
+  without missing values, tests sets of more than three neighbors, which rarely repeat, without the
+  result cache. ([#468])
 
 
 ## [0.10.0] - 2026-10-27

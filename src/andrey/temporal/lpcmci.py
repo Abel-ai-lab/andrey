@@ -88,6 +88,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.core import backend
+from andrey.core.ci_missing import PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
@@ -206,6 +207,9 @@ class _Search:
     ) -> None:
         self.test, self.n, self.tau_max, self.alpha = test, n_vars, tau_max, alpha
         self.max_depth = max_depth
+        # A test that deletes rows counts every query it answers in rows_tested, so a repeated
+        # query of any size comes from the cache.
+        self.cache_every_size = isinstance(getattr(test, "test", None), PartialCorrelationDeletion)
         self.ranks = ranks
         self.absent, self.required, self.arrowheads = self._knowledge(constraints)
         self.locked = {(key, at_start) for key in self.required for at_start in (True, False)}
@@ -521,13 +525,14 @@ class _Search:
         columns = np.array([self._column((v, lag + shift)) for v, lag in search], dtype=np.intp)
         fixed = np.array([self._column((v, lag + shift)) for v, lag in sdef], dtype=np.intp)
         subsets = combinations(range(len(search)), p)
+        cached = self.cache_every_size or p <= CACHED_DEPTH
         size = 16
         while batch := list(islice(subsets, size)):
             picks = np.array(batch, dtype=np.intp).reshape(len(batch), p)
             fixed_rows = np.broadcast_to(fixed, (len(batch), len(fixed)))
             rows = np.concatenate([columns[picks], fixed_rows], axis=1)
             rows.sort(axis=1)
-            statistics, p_values = self._test_rows(x, y, rows, cached=p <= CACHED_DEPTH)
+            statistics, p_values = self._test_rows(x, y, rows, cached)
             above = np.flatnonzero(p_values > self.alpha)
             made = len(batch) if len(above) == 0 else int(above[0]) + 1
             self._record_batch(key, statistics[:made], p_values[:made])
