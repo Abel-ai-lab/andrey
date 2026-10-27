@@ -76,12 +76,16 @@ change names its pull request.
   `student_t` computing each test's correlations directly from those rows, many tests at once, and
   `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
   method refuses them with an error that names it and says what to do instead. ([#443], [#453])
+- A fit larger than its method was measured to finish warns once per method with
+  `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
+  the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
+  setting whose rows are nearest the data's, and that ladder ended on the time or memory cap, as
+  exact search does past 24 variables at 2,000 rows. The message names the measured size and its
+  setting and points to the method's **Limitations** paragraph and the release card; the sizes are
+  generated from the published summary by `scripts/boundary_table.py`. ([#479])
 
 ### Changed
 
-- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
-  hard limit: they change with the data generator, the density, the method's settings, and the
-  machine. ([#367])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="cmiknn"` return the same graphs and p-values
   in less time on CPUs without AVX512_ICL, such as the AMD EPYC 7713, because CMIknn selects each
   row's `k`-th neighbor distance in 32-bit integers, which NumPy sorts with SIMD on AVX2. On an
@@ -100,6 +104,34 @@ change names its pull request.
   likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
   the same series can give a different graph on another type of CPU. ([#451])
 
+## [0.10.0] - 2026-10-27
+
+### Highlights
+
+- How far each method goes: the 0.10.0 release card maps, for 26 methods, the problems each
+  finishes within one hour and 28 GB on 4 cores with fewer errors than the empty graph, by
+  variables, samples, and density, and each method's **Limitations** paragraph gives its measured
+  boundary. At 2,000 samples and a mean degree of 2, BOSS stays more accurate than the empty graph
+  up to 1,600 variables, GRaSP to 800, and PC to 400. ([#343], [#438], [#469])
+
+### Changed
+
+- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
+  hard limit: they change with the data generator, the density, the method's settings, and the
+  machine. ([#367])
+- The **Limitations** paragraph of every method but Granger gives its measured boundary: on each
+  benchmark regime, the largest size through which its median errors stayed below the empty
+  graph's, the largest size its fits finished within 1 h and 28 GB on 4 cores, what ended the
+  measurement, and a median fit time. ([#469])
+- For contributors, `python -m qa.quality_gate --jobs N` fits the quality gate's cells in N
+  processes and prints the same results in the same order; the gate's workflow runs `--jobs 4` on
+  its four vCPUs and logs the runner's CPU. A push to a release pull request that changes only
+  `docs/`, `site/`, or top-level Markdown files reuses an earlier passing run instead of fitting the
+  methods again. ([#431])
+- For contributors, a production deploy of the site, from a `v*` tag or a manual run, waits
+  for the repository owner's approval in the `production-site` environment, which
+  administrators cannot bypass. ([#441])
+
 ### Removed
 
 - `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
@@ -112,6 +144,9 @@ change names its pull request.
   `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
   the forkserver's socket now goes in `/dev/shm`, or `/tmp`, with a warning, and the workers start
   with `fork` or `spawn` when neither holds it. Results do not change. ([#415])
+- `andrey.data.generate` with several workers starts them when `TMPDIR` rejects the forkserver's
+  socket, as the search workers do; on Linux from Python 3.14 it raised
+  `OSError: [Errno 95] Operation not supported`. ([#446])
 - `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
   `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
   test or score; an empty list now reads as `None` there. ([#395])
@@ -123,6 +158,19 @@ change names its pull request.
   large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
   first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
   unstable draw. Every draw that was stationary is unchanged. ([#393])
+- For contributors, the benchmark harness's longitudinal LiNGAM panels no longer diverge as the
+  number of variables grows: the lag matrices of about 60% of the time points had norm 1 or more at
+  3 variables and all of them from 5 on, and the panel's standard deviation reached 1e14 at 10
+  variables and 1e90 at 40. A
+  time point whose lag matrix through the same-step part has spectral norm 1 or more now has its
+  lag-1 block scaled down until that norm is 0.95, so every step contracts. A time point already
+  below 1 keeps its draw, and the panel's dataset identity changes. ([#467])
+- For contributors, a release pull request into `main` fails its required `release-branch` check
+  when `pyproject.toml`'s version is not the release branch's `<x.y.z>`. A post release keeps the
+  package at `<x.y.z>`, and the check also fails one that changes anything under `src/` or whose
+  `main` is at another version. A release's tag now submits the site to search engines once its
+  production deploy check passes; a post release's tag waited for a version the site never
+  shows and failed. ([#439])
 
 ## [0.9.0] - 2026-10-23
 
@@ -697,7 +745,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
@@ -779,6 +828,7 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#343]: https://github.com/Abel-ai-lab/andrey/pull/343
 [#346]: https://github.com/Abel-ai-lab/andrey/pull/346
 [#347]: https://github.com/Abel-ai-lab/andrey/pull/347
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
@@ -808,9 +858,17 @@ First alpha release.
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
 [#418]: https://github.com/Abel-ai-lab/andrey/pull/418
 [#430]: https://github.com/Abel-ai-lab/andrey/pull/430
+[#431]: https://github.com/Abel-ai-lab/andrey/pull/431
+[#438]: https://github.com/Abel-ai-lab/andrey/pull/438
+[#439]: https://github.com/Abel-ai-lab/andrey/pull/439
+[#441]: https://github.com/Abel-ai-lab/andrey/pull/441
 [#442]: https://github.com/Abel-ai-lab/andrey/pull/442
 [#443]: https://github.com/Abel-ai-lab/andrey/pull/443
-[#453]: https://github.com/Abel-ai-lab/andrey/pull/453
 [#445]: https://github.com/Abel-ai-lab/andrey/pull/445
+[#446]: https://github.com/Abel-ai-lab/andrey/pull/446
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451
+[#453]: https://github.com/Abel-ai-lab/andrey/pull/453
+[#467]: https://github.com/Abel-ai-lab/andrey/pull/467
+[#469]: https://github.com/Abel-ai-lab/andrey/pull/469
+[#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481

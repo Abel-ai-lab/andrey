@@ -18,14 +18,14 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.9.0
+## ⭐ What's new in 0.10.0
 
-Our biggest speed breakthrough: BOSS runs up to 8.1x faster than before, exact search 5.2x, and FCI
-and GFCI 3.1x, with exactly the same graphs. GES now runs up to 5.4x faster than pcalg's C++ GES,
-with the same or fewer errors.
+How far can each method go? We mapped the boundary of every supported method by variables, samples,
+and graph density: BOSS stays more accurate than the empty graph up to 1,600 variables, GRaSP to
+800, and PC to 400.
 
-**[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-9-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.9.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261027-andrey-0-10-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.10.0.html)**
 
 ---
 
@@ -194,7 +194,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.9.0},
+  version = {0.10.0},
   url = {https://andrey.abel.ai},
 }
 ```

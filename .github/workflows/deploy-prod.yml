@@ -34,6 +34,9 @@ jobs:
     if: >-
       github.repository == 'Abel-ai-lab/andrey'
       && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    # The environment holds the job until its required reviewer approves; administrators cannot
+    # bypass it, so no production deploy starts without the owner.
+    environment: production-site
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

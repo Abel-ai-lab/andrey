@@ -93,6 +93,9 @@ jobs:
     needs: gate-lookup
     if: ${{ !cancelled() && needs.gate-lookup.outputs.reuse != 'true' }}
     uses: ./.github/workflows/quality-gate.yml
+    permissions:
+      contents: read
+      actions: read # the called workflow lists its earlier runs; it cannot ask for more than this
 
   publish-testpypi:
     needs: [build, install, gate-lookup, quality-gate]

@@ -66,6 +66,8 @@ jobs:
               - 'README.md'
               - 'LICENSE'
               - 'scripts/check_dist.py'
+              - 'scripts/boundary_table.py'
+              - 'benchmarks/published/*/summary.json'
               - 'scripts/gate_reuse.py'
               - '.github/workflows/ci.yml'
               - '.github/workflows/publish.yml'

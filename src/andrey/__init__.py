@@ -59,6 +59,7 @@ from .core.seeding import seed_all
 from .core.warning_policy import (
     AndreyWarning,
     BackendFallbackWarning,
+    BoundaryWarning,
     DataTypeWarning,
     ExperimentalWarning,
     PerformanceWarning,
@@ -67,7 +68,7 @@ from .core.warning_policy import (
 )
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 __all__ = [
     "__version__",
@@ -89,6 +90,7 @@ __all__ = [
     # Warning categories: every warning Andrey raises is an AndreyWarning.
     "AndreyWarning",
     "BackendFallbackWarning",
+    "BoundaryWarning",
     "DataTypeWarning",
     "ExperimentalWarning",
     "PerformanceWarning",

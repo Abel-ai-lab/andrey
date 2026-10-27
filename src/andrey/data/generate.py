@@ -7,6 +7,7 @@ byte-identical across worker counts and scheduling orders.
 
 from __future__ import annotations
 
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -64,7 +65,11 @@ def generate(
     ensemble : Ensemble
         The scenario/seed grid.
     workers : int, default=1
-        Worker processes; affects runtime only, preserving byte-identical results.
+        Worker processes; affects runtime only, preserving byte-identical results. They start with
+        the interpreter's default start method. When that is ``forkserver`` (Linux from Python
+        3.14), they start as the search workers do: if the temporary directory cannot hold the
+        forkserver's socket, it goes in ``/dev/shm`` or ``/tmp``, else the workers start with
+        ``fork`` or ``spawn``, with a warning.
     dtype : npt.DTypeLike, default=np.float64
         Output dtype of every dataset's ``data``; forwarded to :meth:`SCM.sample`.
     scale : {"standardize", "unitless", "rescale", "raw"}, default="standardize"
@@ -79,8 +84,18 @@ def generate(
     tasks = [(scm, ensemble.n, seed, dtype, scale) for scm, seed in ensemble.tasks]
     if workers <= 1:
         return [_run(t) for t in tasks]
-    with ProcessPoolExecutor(max_workers=workers) as pool:
+    with ProcessPoolExecutor(max_workers=workers, mp_context=_context()) as pool:
         return list(pool.map(_run, tasks))
+
+
+def _context() -> mp.context.BaseContext:
+    """Return the default context, or ``pick_context()``'s choice when the default is forkserver."""
+    ctx = mp.get_context()
+    if ctx.get_start_method() != "forkserver":
+        return ctx
+    from andrey.search._parallel import pick_context
+
+    return pick_context()
 
 
 def _run(task: tuple[SCM, int, int, npt.DTypeLike, str]) -> CausalDataset:

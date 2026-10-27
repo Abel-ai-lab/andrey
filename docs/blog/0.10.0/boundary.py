@@ -1,0 +1,440 @@
+"""The 0.10.0 post's boundary maps, written next to it as HTML that the post includes.
+
+``boundary-example.html``: the example the post reads, one method's two maps; ``boundary-all.html``:
+every mapped method's maps, by family, without a caption, after the example;
+``boundary-<family>.html``: the card's figures, for each method of a family, two maps over the
+number of variables (columns), with a caption on how to read them. On the size map, the rows are the
+number of rows of data, with a mean degree of 2; on the density map, the rows are the mean degree,
+with 2,000 rows. A cell's color is the method's median errors as a share of the empty graph's, from
+the cobalt ramp, the stronger the fewer; a cell where it does no better than the empty graph is
+gray; a mark is a problem where a row stopped: on time or memory, on a failed fit, or past the
+accuracy boundary, after two sizes in a row that do not beat the empty graph. The outline around the
+cells inside the boundary is the boundary: in each row, the sizes before the first one that does not
+finish or does not beat the empty graph. Every color is an ``--andrey-*`` token.
+
+The cells come from the release card's summary (``SUMMARY``), its ``boundary`` lane: one ladder
+per method and regime, each a list of rungs (one per number of variables) and how the ladder ended
+(``end``). A rung that is not through, three or more of its fits cut, carries its cut as its mark;
+the rung where a ladder ended past the accuracy boundary carries ``accuracy``. Run with
+``uv run python docs/blog/0.10.0/boundary.py [summary.json] [outdir] [card_outdir]``. The release
+card's ``ladders.html`` lists, as a table, the ladders the maps do not draw: the FCI and GFCI
+diagonals, where the rows grow with the variables, and the latent-variable, time-series, and
+pairwise methods; its ``settings.html`` gives each method's settings and the call that draws its
+data.
+
+The maps are a reference for the measured conditions, not a hard limit: another graph generator,
+other data, other settings, or another machine move a boundary.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from html import escape
+from pathlib import Path
+
+from andrey.spec import list_specs
+
+HERE = Path(__file__).parent
+SUMMARY = HERE.parents[2] / "benchmarks" / "published" / "0.10.0" / "summary.json"
+# The release card's figures; it holds the ladders the maps do not draw as a table.
+CARD = HERE.parents[1] / "docs" / "benchmarks" / "0.10.0"
+FAMILIES = {
+    "constraint": "Constraint-based",
+    "score": "Score-based",
+    "permutation": "Permutation-based",
+    "lingam": "Linear non-Gaussian",
+}
+# The method whose maps the post reads as its example.
+EXAMPLE = "boss"
+# Each method as the post names it.
+NAMES = {
+    "pc": "PC", "cdnod": "CD-NOD", "fci": "FCI", "gfci": "GFCI",
+    "ges": "GES", "gies": "GIES", "xges": "XGES", "hc": "Hill climbing", "tabu": "Tabu search",
+    "exact_search": "Exact search", "calm": "CALM", "boss": "BOSS", "grasp": "GRaSP",
+    "direct_lingam": "DirectLiNGAM", "ica_lingam": "ICA-LiNGAM",
+    "multi_group_direct_lingam": "MultiGroupDirectLiNGAM", "rcd": "RCD",
+    "bottom_up_parce_lingam": "BottomUpParceLiNGAM", "gin": "GIN", "anm": "ANM", "pnl": "PNL",
+    "pcmci": "PCMCI", "pcmciplus": "PCMCI+", "lpcmci": "LPCMCI", "varma_lingam": "VARMA-LiNGAM",
+    "longitudinal_lingam": "LongitudinalLiNGAM",
+}  # fmt: skip
+# The table's groups, by registry family, in the order the card lists them.
+TABLE_FAMILIES = {
+    "constraint": "Constraint-based",
+    "lingam": "Linear non-Gaussian",
+    "latent": "Latent variables",
+    "temporal": "Time series",
+    "pairwise": "Pairwise",
+}
+# How a ladder ended, in the table's words.
+ENDS = {
+    "time": "time cap",
+    "memory": "memory cap",
+    "error": "failed",
+    "accuracy": "past the accuracy boundary",
+    "ladder_end": "largest size measured",
+    "open": "still running",
+}
+STOPS = {
+    "time": ("×", "time cap"),
+    "memory": ("■", "memory cap"),
+    "error": ("!", "failed"),
+    "accuracy": ("○", "past the accuracy boundary"),
+}
+# A regime with a fixed number of rows, e.g. ``deg2-n2000``; ``deg2-n10d`` scales them with d.
+FIXED = re.compile(r"deg(\d+)-n(\d+)$")
+SIZE_DEGREE, DENSITY_ROWS = 2, 2000
+# The size map's row counts.
+SIZE_ROWS = (500, 2000, 10000)
+# A map's geometry: a cell's width and height, the row labels' width, and the room for the title
+# above and the column labels below.
+CELL_W, CELL_H, LABEL, TOP, BOTTOM = 30, 22, 96, 22, 30
+
+
+def maps(cells: list[dict]) -> dict[str, dict[tuple[int, int], dict]]:
+    """One method's cells on each map, keyed by (row value, variables)."""
+    out: dict[str, dict[tuple[int, int], dict]] = {"size": {}, "density": {}}
+    for cell in cells:
+        fixed = FIXED.match(cell["regime"])
+        if not fixed:
+            continue
+        degree, n = int(fixed[1]), int(fixed[2])
+        if degree == SIZE_DEGREE:
+            out["size"][n, cell["d"]] = cell
+        if n == DENSITY_ROWS:
+            out["density"][degree, cell["d"]] = cell
+    return out
+
+
+def good(cell: dict | None) -> bool:
+    """Inside the boundary: finished every dataset, with fewer errors than the empty graph."""
+    return bool(cell and cell["stop"] == "none" and cell.get("beats_empty"))
+
+
+def shade(share: float) -> str:
+    """A cell's fill from the cobalt ramp's top three steps, which stay apart from the gray of a
+    cell that does no better than the empty graph in both themes: the stronger, the fewer errors."""
+    return f"var(--andrey-ramp-{3 + min(2, int((1 - min(max(share, 0.0), 1.0)) * 3))})"
+
+
+def grid(cells: dict[tuple[int, int], dict], ys: list[int], ds: list[int], x0: float, label) -> str:
+    """One map: its cells, stop marks, and the outline of the cells inside the boundary."""
+    out, inside = [], set()
+    for row, y in enumerate(reversed(ys)):  # the largest value at the top
+        top = TOP + row * CELL_H
+        out.append(
+            f'<text class="bnd-y" x="{x0 + LABEL - 6}" y="{top + CELL_H / 2 + 4}" '
+            f'text-anchor="end">{escape(label(y))}</text>'
+        )
+        stopped = False
+        for col, d in enumerate(ds):
+            cell = cells.get((y, d))
+            left = x0 + LABEL + col * CELL_W
+            if cell is None:
+                continue
+            stopped = stopped or not good(cell)
+            if not stopped:
+                inside.add((row, col))
+            share = cell.get("share_of_empty")
+            tip = f"{d:,} variables, {label(y)}"
+            if share is not None:
+                tip += f": {share:.0%} of the empty graph's errors"
+            if cell["stop"] != "none":
+                tip += f"; stopped: {STOPS[cell['stop']][1]}"
+            if share is not None:
+                fill = shade(share) if cell.get("beats_empty") else "var(--andrey-line)"
+                out.append(
+                    f'<rect x="{left + 1}" y="{top + 1}" width="{CELL_W - 2}" '
+                    f'height="{CELL_H - 2}" rx="2" fill="{fill}">'
+                    f"<title>{escape(tip)}</title></rect>"
+                )
+            if cell["stop"] != "none":
+                out.append(
+                    f'<text class="bnd-stop" x="{left + CELL_W / 2}" y="{top + CELL_H / 2 + 4}" '
+                    f'text-anchor="middle">{STOPS[cell["stop"]][0]}<title>{escape(tip)}</title>'
+                    "</text>"
+                )
+    # The outline: every side of a cell inside the boundary whose neighbor is outside it.
+    sides = []
+    for row, col in inside:
+        left, top = x0 + LABEL + col * CELL_W, TOP + row * CELL_H
+        right, bottom = left + CELL_W, top + CELL_H
+        if (row - 1, col) not in inside:
+            sides.append(f"M{left} {top}H{right}")
+        if (row + 1, col) not in inside:
+            sides.append(f"M{left} {bottom}H{right}")
+        if (row, col - 1) not in inside:
+            sides.append(f"M{left} {top}V{bottom}")
+        if (row, col + 1) not in inside:
+            sides.append(f"M{right} {top}V{bottom}")
+    if sides:
+        out.append(f'<path class="bnd-edge" d="{"".join(sorted(sides))}"/>')
+    bottom = TOP + len(ys) * CELL_H
+    for col, d in enumerate(ds):
+        out.append(
+            f'<text class="bnd-x" x="{x0 + LABEL + col * CELL_W + CELL_W / 2}" y="{bottom + 14}" '
+            f'text-anchor="middle">{d:,}</text>'
+        )
+    return "".join(out)
+
+
+def panel(method: str, cells: list[dict]) -> str:
+    """A method's two maps, each its own drawing at its own size, side by side where they fit and
+    stacked on a narrow screen; both share the columns of variables."""
+    both = maps(cells)
+    ds = sorted({d for cells in both.values() for _, d in cells})
+    if not ds:
+        return ""
+    name = NAMES.get(method, method)
+    titles = {"size": "Samples, mean degree 2", "density": "Mean degree, 2,000 samples"}
+    labels = {"size": lambda n: f"{n:,} samples", "density": lambda k: f"degree {k}"}
+    drawings = []
+    for key in ("size", "density"):
+        ys = sorted({y for y, _ in both[key]})
+        if not ys:
+            continue
+        width, height = LABEL + len(ds) * CELL_W, TOP + len(ys) * CELL_H + BOTTOM
+        drawings.append(
+            f'<svg viewBox="0 0 {width} {height}" width="{width}" height="{height}" role="img" '
+            f'aria-label="{escape(name)}: errors relative to the empty graph, by variables and '
+            f'{escape(titles[key].lower())}">'
+            f'<text class="bnd-map" x="{LABEL}" y="14">{titles[key]}</text>'
+            f"{grid(both[key], ys, ds, 0, labels[key])}</svg>"
+        )
+    return (
+        f'<div class="bnd-method"><p>{escape(name)}</p>'
+        f'<div class="bnd-maps">{"".join(drawings)}</div></div>'
+    )
+
+
+def family_panels(family: str, cells: list[dict]) -> str:
+    """A family's title and its methods, two maps each."""
+    names = {s.name: s.family for s in list_specs()}
+    methods = [m for m in dict.fromkeys(c["method"] for c in cells) if names.get(m) == family]
+    panels = "".join(panel(m, [c for c in cells if c["method"] == m]) for m in methods)
+    return f'<p class="bnd-title">{escape(FAMILIES[family])}</p>{panels}'
+
+
+def example_figure(method: str, cells: list[dict]) -> str:
+    """The post's example: one method's two maps, which the post's text reads."""
+    maps = panel(method, [c for c in cells if c["method"] == method])
+    return f'<figure class="bnd">{maps}</figure>\n'
+
+
+def all_figure(cells: list[dict]) -> str:
+    """The post's figure of every mapped method, by family, after the example has shown how to read
+    a map."""
+    return f'<figure class="bnd">{"".join(family_panels(f, cells) for f in FAMILIES)}</figure>\n'
+
+
+def family_figure(family: str, cells: list[dict]) -> str:
+    """The card's figure of a family's methods, two maps each, with how to read them."""
+    return (
+        f'<figure class="bnd">{family_panels(family, cells)}'
+        "<figcaption>Columns: the number of variables. Color: errors as a share of the empty "
+        "graph's, the stronger the fewer; gray does no better than the empty graph. × stopped at "
+        "the time cap, ■ at the memory cap, ! failed, ○ past the accuracy boundary. The outline is "
+        "the boundary: in each row, the sizes before the first that does not finish or does not "
+        "beat the empty graph. A cell's tip gives its errors as a share of the empty graph's: on a "
+        "denser graph the empty graph makes more errors, so beating it says less.</figcaption>"
+        "</figure>\n"
+    )
+
+
+def cells(lane: dict) -> list[dict]:
+    """The lane's rungs as map cells: a rung's method, regime, size, and errors, and its mark."""
+    out = []
+    for ladder in lane["ladders"]:
+        end = ladder["end"]
+        for rung in ladder["rungs"]:
+            # A rung that is not through shows only its cut: its median, from the few fits that
+            # finished, is not the rung's result.
+            stop = "none" if rung["through"] else rung["stop"]
+            if end["stop"] == "accuracy" and rung["d"] == end["d"]:
+                stop = "accuracy"
+            out.append(
+                {
+                    "method": ladder["method"],
+                    "regime": ladder["regime"],
+                    "d": rung["d"],
+                    "share_of_empty": rung["share_of_empty"] if rung["through"] else None,
+                    "beats_empty": rung["beats_empty"] if rung["through"] else None,
+                    "stop": stop,
+                }
+            )
+    return out
+
+
+def mapped(ladder: dict) -> bool:
+    """Whether a ladder is drawn on a map: a mapped family's fixed-row regime."""
+    family = {s.name: s.family for s in list_specs()}[ladder["method"]]
+    return family in FAMILIES and ladder["axis"] == "d" and bool(FIXED.match(ladder["regime"]))
+
+
+def size(ladder: dict, value: int | None) -> str:
+    """A ladder's size in its own unit: variables, rows, or latent variables."""
+    if value is None:
+        return "-"
+    if ladder["axis"] == "n":
+        return f"{value:,} samples"
+    if ladder["axis"] == "latents":
+        latents = next(r["latents"] for r in ladder["rungs"] if r["d"] == value)
+        return f"{latents} latent variables"
+    return f"{value:,} variables"
+
+
+def ladders_table(lane: dict) -> str:
+    """The ladders the maps do not draw, one row each, grouped by family: the largest size inside
+    the boundary, and how and where the ladder ended."""
+    family = {s.name: s.family for s in list_specs()}
+    groups = {key: [] for key in TABLE_FAMILIES}
+    for ladder in lane["ladders"]:
+        if mapped(ladder):
+            continue
+        axis = "n" if ladder["axis"] == "n" else "d"
+        inside = ladder[f"beats_empty_through_{axis}"]
+        end = ladder["end"]
+        where = end.get("latents") if ladder["axis"] == "latents" else end.get(axis)
+        if end.get("reason", "").startswith("no fit attempted"):
+            ended = f"no data could be generated at {size(ladder, where)}"
+        elif ladder["axis"] == "latents" and where is not None:
+            ended = f"{ENDS[end['stop']]}, {where} latent variables"
+        else:
+            ended = ENDS[end["stop"]] + (f", {size(ladder, where)}" if where is not None else "")
+        groups[family[ladder["method"]]].append(
+            "<tr>"
+            f'<th scope="row">{escape(NAMES.get(ladder["method"], ladder["method"]))}'
+            f"<small>{escape(ladder['label'].replace('rows', 'samples'))}</small></th>"
+            f'<td class="ct-ours">{escape(size(ladder, inside))}</td>'
+            f"<td>{escape(ended)}</td></tr>"
+        )
+    body = "".join(
+        f'<tr><th class="ct-group" rowspan="{len(rows)}"><span>{escape(TABLE_FAMILIES[key])}</span>'
+        f"</th>{rows[0][4:]}{''.join(rows[1:])}"
+        for key, rows in groups.items()
+        if rows
+    )
+    return (
+        '<figure class="ct"><p class="ct-title">The other methods\' boundaries</p>'
+        '<div class="ct-scroll"><table class="ct-table ct-text"><thead><tr><td colspan="2"></td>'
+        '<th scope="col" class="ct-ours">Max size</th>'
+        '<th scope="col">Ended</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div>"
+        "<figcaption>Max size: the largest size up to which every size finished and "
+        "beat the empty graph. For the latent-variable and LPCMCI ladders, the variables include "
+        "the hidden ones.</figcaption></figure>\n"
+    )
+
+
+def reach_table(lane: dict) -> str:
+    """The post's table: for each mapped method, grouped by family, the largest number of variables
+    inside the boundary at each row count of the size map, with a mean degree of 2."""
+    family = {spec.name: spec.family for spec in list_specs()}
+    order = [spec.name for spec in list_specs()]
+    reach: dict[str, dict[int, dict]] = {}
+    for ladder in lane["ladders"]:
+        fixed = FIXED.match(ladder["regime"])
+        if mapped(ladder) and int(fixed[1]) == SIZE_DEGREE and int(fixed[2]) in SIZE_ROWS:
+            reach.setdefault(ladder["method"], {})[int(fixed[2])] = ladder
+    head = "".join(f'<th scope="col">{n:,} samples</th>' for n in SIZE_ROWS)
+    body = ""
+    for key, title in FAMILIES.items():
+        methods = sorted((m for m in reach if family[m] == key), key=order.index)
+        for k, m in enumerate(methods):
+            group = (
+                f'<th class="ct-group" rowspan="{len(methods)}"><span>{escape(title)}</span></th>'
+                if k == 0
+                else ""
+            )
+            cells = "".join(
+                f"<td>{reach[m][n]['beats_empty_through_d'] or '-':,}</td>"
+                if n in reach[m]
+                else "<td></td>"
+                for n in SIZE_ROWS
+            )
+            body += f'<tr>{group}<th scope="row">{escape(NAMES.get(m, m))}</th>{cells}</tr>'
+    return (
+        '<figure class="ct"><p class="ct-title">How far each method goes</p><div class="ct-scroll">'
+        '<table class="ct-table"><thead><tr><th scope="col" colspan="2">Max variables at</th>'
+        f"{head}</tr></thead>"
+        f"<tbody>{body}</tbody></table></div><figcaption>The largest number of variables inside "
+        "the boundary, with a mean degree of 2: every size up to it finished and beat the empty "
+        "graph.</figcaption></figure>\n"
+    )
+
+
+def settings_table(lane: dict) -> str:
+    """The card's table of each method's settings: the keyword arguments of its ladders' fits, one
+    row per method, or per ladder where a method's ladders differ, with the ladder's
+    ``params_note`` where the measured build applied a setting differently from 0.10.0; a setting
+    not listed is at its default."""
+    order = [spec.name for spec in list_specs()]
+    found: dict[str, dict[tuple[str, str], list[str]]] = {}
+    for ladder in lane["ladders"]:
+        params = ladder.get("params") or {}
+        call = ", ".join(f"{key}={value!r}" for key, value in sorted(params.items()))
+        key = (call, ladder.get("params_note") or "")
+        found.setdefault(ladder["method"], {}).setdefault(key, []).append(ladder["label"])
+    body = ""
+    for method in sorted(found, key=order.index):
+        for (call, note), labels in found[method].items():
+            where = "" if len(found[method]) == 1 else f"<small>{escape('; '.join(labels))}</small>"
+            setting = f"<code>{escape(call)}</code>" if call else "defaults"
+            body += (
+                f'<tr><th scope="row">{escape(NAMES.get(method, method))}{where}</th>'
+                f"<td>{setting}{f'<small>{escape(note)}</small>' if note else ''}</td></tr>"
+            )
+    return (
+        '<figure class="ct"><p class="ct-title">Each method\'s settings</p><div class="ct-scroll">'
+        '<table class="ct-table ct-text"><thead><tr><th scope="col">Method</th>'
+        '<th scope="col">Settings</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div><figcaption>The keyword arguments "
+        "of every fit; a setting not listed is at its default.</figcaption></figure>\n"
+    )
+
+
+def generators_table(lane: dict) -> str:
+    """The card's table of the data: for each generator in the lane's ``generators``, what it draws,
+    the methods that ran on it, and the public call that draws it."""
+    order = [spec.name for spec in list_specs()]
+    methods: dict[str, set[str]] = {}
+    for ladder in lane["ladders"]:
+        methods.setdefault(ladder["generator"], set()).add(ladder["method"])
+    body = "".join(
+        f'<tr><th scope="row">{escape(generator["description"][0].upper())}'
+        f"{escape(generator['description'][1:])}<small>"
+        f"{escape(', '.join(NAMES.get(m, m) for m in sorted(methods[name], key=order.index)))}"
+        f"</small></th><td><code>{escape(generator['call'])}</code></td></tr>"
+        for name, generator in lane.get("generators", {}).items()
+        if name in methods
+    )
+    return (
+        '<figure class="ct"><p class="ct-title">Each method\'s data</p><div class="ct-scroll">'
+        '<table class="ct-table ct-text"><thead><tr><th scope="col">Data</th>'
+        '<th scope="col">Call</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div><figcaption>The call that draws each "
+        "dataset, with its variables, samples, density, and seed.</figcaption></figure>\n"
+    )
+
+
+def main() -> None:
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
+    lane = json.loads(path.read_text(encoding="utf-8"))["boundary"]
+    found = cells(lane)
+    out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE
+    for family in FAMILIES:
+        (out / f"boundary-{family}.html").write_text(family_figure(family, found), encoding="utf-8")
+    (out / "boundary-example.html").write_text(example_figure(EXAMPLE, found), encoding="utf-8")
+    (out / "boundary-all.html").write_text(all_figure(found), encoding="utf-8")
+    (out / "reach.html").write_text(reach_table(lane), encoding="utf-8")
+    card = Path(sys.argv[3]) if len(sys.argv) > 3 else CARD
+    card.mkdir(exist_ok=True)
+    (card / "ladders.html").write_text(ladders_table(lane), encoding="utf-8")
+    (card / "settings.html").write_text(
+        settings_table(lane) + generators_table(lane), encoding="utf-8"
+    )
+
+
+if __name__ == "__main__":
+    main()

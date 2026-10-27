@@ -368,8 +368,8 @@ environment variables and the order in which the settings apply, and
 
 Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`. A warning
 never changes a result. Each distinct message warns once per process, at the line in your code that
-made the call. A warning from a dependency keeps its own category, such as scikit-learn's
-`ConvergenceWarning` from `ica_lingam`.
+made the call; a `BoundaryWarning` warns once per method. A warning from a dependency keeps its own
+category, such as scikit-learn's `ConvergenceWarning` from `ica_lingam`.
 
 | Category | When |
 |---|---|
@@ -378,7 +378,17 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
+| {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
 | {py:class}`~andrey.DataTypeWarning` | A score search's default picked BDeu because every column is categorical or the conditional Gaussian score because some are, a mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
+
+A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
+the largest number of variables any measured mean degree finished there, since the data's density
+is unknown; `anm` and `pnl` count rows instead. It warns when the data have more and that ladder
+ended on the time or memory cap. Past a ladder that ended on accuracy, an error, or its last
+planned size, the method was not measured, so it does not warn, and a method with no ladder never
+does. The sizes are a reference, not a hard limit: they change with the data, the density, the
+settings, and the machine. The method's **Limitations** paragraph and the release card give them,
+and `warnings.filterwarnings("ignore", category=andrey.BoundaryWarning)` silences the warning.
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -415,6 +425,7 @@ name.
    SearchLimitWarning
    SampleSizeWarning
    DataTypeWarning
+   BoundaryWarning
 ```
 
 ## Datasets

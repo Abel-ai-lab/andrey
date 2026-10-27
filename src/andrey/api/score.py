@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     json_safe,
     structure_output,
 )
+from andrey.api._boundary import warn_past_boundary
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.seeding import resolve_seed
@@ -236,13 +237,21 @@ def ges(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 200 variables with ten rows per variable and a forward-phase gate of 4
-    parents rather than ``n_variables / 2``; the cap ``max_parents`` sets is not benchmarked yet. At
-    ``lambda_value=1.0`` its median errors (SHD) stayed below the empty graph's up to 150 variables
-    (141 against 150) and passed it at 200 (206 against 200), where ``lambda_value=2.0`` brought
-    them to 43. The median fit took 0.15 s at 20 variables and 40 s at 150, on 128 cores. On the
-    223-variable ANDES network with 1,000 simulated rows and the default limit, its median errors
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``max_parents=4``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000 rows and mean
+    degree 2 with 500 rows; 400 and 1,600 at mean degree 2 with 10,000 rows; 200 and 800 at mean
+    degree 2 with 2,000 rows; 800 and 3,200 at mean degree 4 with 2,000 rows; and none and 50 at
+    mean degree 8 with 2,000 rows. Every ladder ended after two sizes in a row did not beat the
+    empty graph. The median fit took 2,626 s at 3,200 variables (mean degree 4, 2,000 rows). The
+    measured build applied ``max_parents=4`` as a gate on the forward phase: a node holding 4
+    parents gained no new parent while edges were added, and one move could still give a node more.
+    On this release, ``max_parents=4`` caps every DAG of the returned class at 4 parents, a stricter
+    rule that is not benchmarked yet. With the same gate, mean degree 2, and ten rows per variable,
+    at 200 variables its median errors were 206 against the empty graph's 200 at
+    ``lambda_value=1.0`` and 43 at ``lambda_value=2.0``. On the 223-variable ANDES network with
+    1,000 simulated rows and a forward-phase gate of ``n_variables / 2`` parents, its median errors
     passed the empty graph's (612 against 338). With fewer rows than columns the standard BIC is
     unreliable; the extended BIC made far fewer errors there (see Choosing the penalty). A parent
     set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
@@ -441,20 +450,24 @@ def gies(
     Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated
-    linear-Gaussian data that mixes observation with
-    interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
-    rows per variable and four intervention targets per ten variables. Its median errors (SHD
-    against the true interventional essential graph) stayed below the empty graph's at every size
-    (181 against 198 at 200 variables, where one of the five fits had more). The median fit took
-    0.25 s at 100 variables and 1.0 s at 200, on 4 cores. Each distinct set of rows without an
-    intervention on a variable keeps its own covariance matrix of all the variables, so memory
-    grows with the number of intervened variables times the square of the variable count. A parent
-    set of ``m - 1`` or more variables, where ``m`` counts the rows without an intervention on the
-    child, fits its child exactly, so the search never selects one, nor any parent set that leaves
-    its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian
+    data from Erdos-Renyi graphs with single-variable interventions on 40% of the variables, the
+    rows split evenly between observation and each intervention, on 4 cores with a cap of 1 h and 28
+    GB per fit. The largest sizes through which its median errors (SHD against the interventional
+    essential graph) stayed below the empty graph's, and through which its fits finished within the
+    caps, were 50 and 200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2
+    with 10,000 rows; 200 and 800 at mean degree 2 with 2,000 rows; 100 and 400 at mean degree 2
+    with 500 rows; 400 and 800 at mean degree 4 with 2,000 rows; and 800 and 800 at mean degree 8
+    with 2,000 rows. The ladders ended after two sizes in a row did not beat the empty graph, except
+    at mean degree 4 or 8 with 2,000 rows, where they ended when three fits of the next size ran
+    past 1 h. The median fit took 1,231 s at 1,600 variables (mean degree 2, 10,000 rows in total).
+    Each distinct set of rows without an intervention on a variable keeps its own covariance matrix
+    of all the variables, so memory grows with the number of intervened variables times the square
+    of the variable count. A parent set of ``m - 1`` or more variables, where ``m`` counts the rows
+    without an intervention on the child, fits its child exactly, so the search never selects one,
+    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -484,6 +497,7 @@ def gies(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
+    warn_past_boundary("gies", X.shape)
     with copies_named(labels):
         graph, score = _gies(
             X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma, constraints=constraints
@@ -591,16 +605,20 @@ def xges(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
-    variable. On the denser graphs its median errors (SHD) stayed below the empty graph's at every
-    size. On the sparse graphs they exceeded it from 500 variables on, where the BIC score still
-    preferred the returned graphs to the true one. At 1,000 variables, the median fit took under a
-    minute on the sparse graphs and under five minutes on the denser ones, on one core; with
-    ``extended_search=False``, a few seconds. The extended search reruns the base search for each
-    edge it tries to delete and retries the edges after keeping a result, so its run time grows
-    with the number of edges and of results kept. Its BIC score assumes linear relations with
-    Gaussian noise.
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
+    cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors
+    (SHD) stayed below the empty graph's, and through which its fits finished within the caps, were
+    50 and 200 variables at mean degree 1 with 2,000 rows and mean degree 2 with 500 rows; 400 and
+    1,600 at mean degree 2 with 10,000 rows and mean degree 4 with 2,000 rows; 200 and 800 at mean
+    degree 2 with 2,000 rows; and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
+    after two sizes in a row did not beat the empty graph. The median fit took 828 s at 1,600
+    variables (mean degree 4, 2,000 rows). With ten rows per variable at mean degree 2, where its
+    errors exceeded the empty graph's from 500 variables, the BIC score still preferred the returned
+    graphs to the true one. At 1,000 variables with ten rows per variable, the median fit took under
+    a minute at mean degree 2 and under five minutes at mean degree 4, on one core, and a few
+    seconds with ``extended_search=False``. The extended search reruns the base search for each edge
+    it tries to delete and retries the edges after keeping a result, so its run time grows with the
+    number of edges and of results kept. Its BIC score assumes linear relations with Gaussian noise.
     With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
     or more variables fits its child exactly, so the search never selects one, nor any parent set
     that leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers
@@ -784,22 +802,29 @@ def hc(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs, from
-    10 to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
-    exceeded the empty graph's. The median fit took under a second at 800 variables and about 20 s
-    at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
-    takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
-    assumes linear relations with Gaussian noise. With fewer rows than columns the standard BIC is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. On simulated mixed data (conditional linear Gaussian
-    networks on sparse random graphs, the first half of the variables categorical with 2 to 5
-    categories), from 10 to 40 variables with 2,000 rows, its median errors at 40 variables were
-    12.5 with ``"local_score_degen_gauss"`` and 11 with ``"local_score_cond_gauss"``, against 40. On
-    simulated categorical networks with 2 or 3 categories per variable, of the same sizes and rows,
-    they were 18 with ``"local_score_BDeu"`` and 20 with ``"local_score_BIC_categorical"``. Every
-    median fit took under 0.2 s at 40 variables, on 4 cores. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``max_iter=100000``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 1,600 variables at mean degree 1 with 2,000 rows; 200 and
+    1,600 at mean degree 2 with 10,000 rows; 100 and 3,200 at mean degree 2 with 2,000 rows; 20 and
+    1,600 at mean degree 2 with 500 rows; none and 800 at mean degree 4 with 2,000 rows (below it
+    only at 100); and none and 800 at mean degree 8 with 2,000 rows. The ladders ended after two
+    sizes in a row did not beat the empty graph, except at mean degree 2 with 2,000 rows, where the
+    ladder ended at the largest planned size. Each accuracy stop was set after larger sizes had run.
+    The median fit took 148 s at 3,200 variables (mean degree 2, 2,000 rows). It has no move limit
+    by default; run time grows with the moves the search takes. A graph that no single move improves
+    need not be the best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
+    or more variables fits its child exactly, so the search never selects one, nor any parent set
+    that leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
+    mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
+    variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
+    median errors at 40 variables were 12.5 with ``"local_score_degen_gauss"`` and 11 with
+    ``"local_score_cond_gauss"``, against 40. On simulated categorical networks with 2 or 3
+    categories per variable, of the same sizes and rows, they were 18 with ``"local_score_BDeu"``
+    and 20 with ``"local_score_BIC_categorical"``. Every median fit took under 0.2 s at 40
+    variables, on 4 cores. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -970,15 +995,21 @@ def tabu(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from sparse random graphs, from
-    10 to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
-    exceeded the empty graph's. The median fit took under 2 s at 800 variables and under a minute
-    at 3,200, on 4 cores. It takes hill climbing's moves plus up to ``max_tabu`` non-improving
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``max_iter=100000`` and ``max_tabu=10``, on 4 cores with a cap of 1 h and 28 GB per fit. The
+    largest sizes through which its median errors (SHD) stayed below the empty graph's, and through
+    which its fits finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000
+    rows and mean degree 2 with 500 rows; 200 and 800 at mean degree 2 with 10,000 rows; 100 and 800
+    at mean degree 2 with 2,000 rows; 20 and 800 at mean degree 4 with 2,000 rows (also below it
+    from 100 through 200); and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
+    after two sizes in a row did not beat the empty graph. The accuracy stop at mean degree 2 with
+    2,000 rows was set after larger sizes had run. The median fit took 6.6 s at 800 variables (mean
+    degree 4, 2,000 rows). It takes hill climbing's moves plus up to ``max_tabu`` non-improving
     moves between new best scores, with no move limit by default; run time grows with the moves
     taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
-    missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than
-    columns the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits
-    its child exactly, so the search never selects one, nor any parent set that leaves its child a
+    missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than columns
+    the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its
+    child exactly, so the search never selects one, nor any parent set that leaves its child a
     residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
     run it on small fixed categorical networks. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
@@ -1173,18 +1204,21 @@ def exact_search(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
-    simulated linear-Gaussian data from sparse random graphs (mean degree 2), from 5 to 15 variables
-    with ten rows per variable. Its median errors (SHD) stayed below the empty graph's at every size
-    (7 against 15 at 15 variables). The median fit took 0.11 s at 10 variables and 6.4 s at 15, on 4
-    cores. With a mixed-data or categorical score it is not benchmarked yet: its tests run it with a
-    mixed-data score on 5 variables with 3,000 rows, and with a categorical score on small fixed
-    categorical networks. It scores every possible parent set of every variable, so its run time at
-    least doubles with each added variable. The ``"dp"`` search also keeps one entry per subset of
-    the variables, so its memory doubles as well. With fewer rows than columns the standard BIC is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores with a cap of 1 h and 28 GB
+    per fit. The largest sizes through which its median errors (SHD) stayed below the empty graph's,
+    and through which its fits finished within the caps, were 24 and 24 variables at mean degree 1
+    with 2,000 rows; and 22 and 22 at mean degree 2 with 500, 2,000, or 10,000 rows and mean degree
+    4 or 8 with 2,000 rows. Every ladder ended when three fits of the next size ran past 1 h. The
+    median fit took 1,457 s at 24 variables (mean degree 1, 2,000 rows). With a mixed-data or
+    categorical score it is not benchmarked yet: its tests run it with a mixed-data score on 5
+    variables with 3,000 rows, and with a categorical score on small fixed categorical networks. It
+    scores every possible parent set of every variable, so its run time at least doubles with each
+    added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so its
+    memory doubles as well. With fewer rows than columns the standard BIC is unreliable. A parent
+    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
+    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1232,6 +1266,7 @@ def exact_search(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
+    warn_past_boundary("exact_search", X.shape)
     with copies_named(labels):
         dag = _exact(
             X,
@@ -1342,19 +1377,25 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 10 to 50 variables with ten rows per variable. Its median errors (SHD) stayed
-    below the empty graph's at every size (15 against 50 at 50 variables). The median fit took 18 s
-    at 10 variables and 59 s at 50, on 4 cores. The paper's schedule (``lr=0.001``,
-    ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``, ``w_threshold=0.0``) took 174 s
-    and 472 s for median errors of 6 and 12. Every optimizer step computes a determinant and a
-    matrix power of the full weight matrix, one row and one column per variable, so a step's cost
-    grows with the cube of the variable count; the defaults allow up to 75,000 steps (``max_outer``
-    times ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider
-    whose two parents are independent, it can return both edges reversed and an edge between the
-    parents, with the defaults and with the paper's schedule alike. The numbers are a reference, not
-    a hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
+    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
+    stayed below the empty graph's, and through which its fits finished within the caps, were 200
+    and 200 variables at mean degree 1 with 2,000 rows; 400 and 400 at mean degree 2 with 500,
+    2,000, or 10,000 rows and mean degree 4 with 2,000 rows; and none and 400 at mean degree 8 with
+    2,000 rows (below it only from 50 through 400). At 400 variables at mean degree 2 with 500 rows
+    and mean degree 4 or 8 with 2,000 rows, 1 or 2 of 5 fits ran past 1 h. Every ladder ended when
+    three fits of the next size ran past 1 h. The median fit took 3,332 s at 400 variables (mean
+    degree 4, 2,000 rows). With mean degree 2 and ten rows per variable, the median fit took 18 s at
+    10 variables and 59 s at 50, where its median errors were 15; the paper's schedule
+    (``lr=0.001``, ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
+    ``w_threshold=0.0``) took 174 s and 472 s for median errors of 6 and 12. Every optimizer step
+    computes a determinant and a matrix power of the full weight matrix, one row and one column per
+    variable, so a step's cost grows with the cube of the variable count; the defaults allow up to
+    75,000 steps (``max_outer`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
+    local optimum: on a collider whose two parents are independent, it can return both edges
+    reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -1391,6 +1432,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     X = data_matrix(data, method="calm")
     labels = column_labels(data)
     used_seed = resolve_seed(seed)
+    warn_past_boundary("calm", X.shape)
     with copies_named(labels):
         result = _calm(X, seed=used_seed, **params)
     return structure_output(
