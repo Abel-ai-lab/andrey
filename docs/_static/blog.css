@@ -1110,10 +1110,15 @@ ul.ablog-archive {
   font-weight: 600;
 }
 
+.bnd .bnd-maps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+}
+
 .bnd svg {
   display: block;
-  width: 100%;
-  max-width: 42rem;
+  max-width: 100%;
   height: auto;
   overflow: visible;
 }
