@@ -297,10 +297,10 @@ def ladders_table(lane: dict) -> str:
     return (
         '<figure class="ct"><p class="ct-title">The other methods\' boundaries</p>'
         '<div class="ct-scroll"><table class="ct-table ct-text"><thead><tr><td colspan="2"></td>'
-        '<th scope="col" class="ct-ours">Inside the boundary up to</th>'
+        '<th scope="col" class="ct-ours">Max size</th>'
         '<th scope="col">Ended</th></tr></thead>'
         f"<tbody>{body}</tbody></table></div>"
-        "<figcaption>Inside the boundary: the largest size up to which every size finished and "
+        "<figcaption>Max size: the largest size up to which every size finished and "
         "beat the empty graph. For the latent-variable and LPCMCI ladders, the variables include "
         "the hidden ones.</figcaption></figure>\n"
     )
@@ -327,7 +327,7 @@ def reach_table(lane: dict) -> str:
                 else ""
             )
             cells = "".join(
-                f"<td>{size(reach[m][n], reach[m][n]['beats_empty_through_d'])}</td>"
+                f"<td>{reach[m][n]['beats_empty_through_d'] or '-':,}</td>"
                 if n in reach[m]
                 else "<td></td>"
                 for n in SIZE_ROWS
@@ -335,7 +335,8 @@ def reach_table(lane: dict) -> str:
             body += f'<tr>{group}<th scope="row">{escape(NAMES.get(m, m))}</th>{cells}</tr>'
     return (
         '<figure class="ct"><p class="ct-title">How far each method goes</p><div class="ct-scroll">'
-        f'<table class="ct-table"><thead><tr><td colspan="2"></td>{head}</tr></thead>'
+        '<table class="ct-table"><thead><tr><th scope="col" colspan="2">Max variables at</th>'
+        f"{head}</tr></thead>"
         f"<tbody>{body}</tbody></table></div><figcaption>The largest number of variables inside "
         "the boundary, with a mean degree of 2: every size up to it finished and beat the empty "
         "graph.</figcaption></figure>\n"
