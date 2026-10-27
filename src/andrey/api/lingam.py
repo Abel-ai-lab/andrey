@@ -293,13 +293,15 @@ def ica_lingam(
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
 
-    **Units.** Multiplying a column by a positive number changes neither the order nor the graph;
-    the column's edge weights take its new unit. FastICA runs on the z-scored columns, and both
-    order steps read each unmixing weight divided by the norm of its column, a weight measured
-    against its estimation error: the rows are permuted so that no such ratio on the diagonal is
-    small, and the order search sets the smallest ratios to zero first. The original steps [1]_
-    read the weights in the data's units, so rescaling a column, z-scoring included, could change
-    the order [2]_.
+    **Units.** The causal order does not read the columns' units. FastICA runs on the z-scored
+    columns, and both order steps read each unmixing weight divided by the norm of its column, a
+    weight measured against its estimation error: the rows are permuted so that no such ratio on
+    the diagonal is small, and the order search sets the smallest ratios to zero first. Multiplying
+    a column by a power of two leaves the order and the graph unchanged, with the column's edge
+    weights in its new unit. Another positive factor changes the z-scored values in their last
+    bits, which, like a new column order, can lead FastICA to another solution (below). The
+    original steps [1]_ read the weights in the data's units, so rescaling a column, z-scoring
+    included, could change the order [2]_.
 
     **Column order and machines.** When several variables can come next in the causal order, the one
     whose column ranks first by its own values goes first. FastICA itself can reach another solution

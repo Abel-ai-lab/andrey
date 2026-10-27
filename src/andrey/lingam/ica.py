@@ -91,12 +91,12 @@ def ica_lingam(
     has the same distribution. A Hungarian assignment on ``1 / t`` permutes the rows so the
     diagonal holds no small entry. The causal order is the permutation that makes the
     off-diagonal ``t`` closest to lower-triangular, found by zeroing its smallest entries until a
-    strict order appears. ``t`` does not change when a column is multiplied by a positive number,
-    so neither does the order; the paper's ``1 / |W|`` and ``|B|`` do (Shimizu et al. 2011,
-    Sec. 2.4). When several rows could come next, the one with the lowest
-    :func:`~andrey.search.hc.tie_ranks` rank does, so the choice moves with its column when the
-    columns are reordered. The weights are then re-estimated from that order with adaptive Lasso,
-    as DirectLiNGAM does, so they depend only on the order and the data.
+    strict order appears. ``t`` reads no unit of the columns, so neither does the order; the
+    paper's ``1 / |W|`` and ``|B|`` do (Shimizu et al. 2011, Sec. 2.4). When several rows could
+    come next, the one with the lowest :func:`~andrey.search.hc.tie_ranks` rank does, so the
+    choice moves with its column when the columns are reordered. The weights are then
+    re-estimated from that order with adaptive Lasso, as DirectLiNGAM does, so they depend only on
+    the order and the data.
 
     ``random_state`` resolves through :func:`andrey.core.seeding.resolve_seed` (default seed ``0``)
     and is passed straight to FastICA. FastICA starts from a random rotation of the whitened data;

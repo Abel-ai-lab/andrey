@@ -171,17 +171,18 @@ change names its pull request.
 
 ### Fixed
 
-- `ica_lingam` returns the same causal order and graph for any positive rescaling of the columns,
-  with the edge weights in the new units. Its row assignment and order search read the unmixing
-  weights in the data's units, so z-scored data, `andrey.data`'s default since this release, gave
-  another and often wrong order: on simulated linear data with uniform noise, 20 variables, mean
-  degree 4, and 500 rows, its errors (SHD) summed over five datasets were 248 on z-scored data and
-  10 on the raw values. FastICA now runs on the z-scored columns, and both steps read each unmixing
-  weight divided by the norm of its column. On z-scored data no measured setting got worse beyond
-  the spread between datasets, and at 50 variables, mean degree 4, and 2,000 rows the errors fell
-  from 1,784 to 11. On raw values whose noise has the same variance at every node they rose where
-  the old order read those variances, from 573 to 1,826 at 50 variables, mean degree 4, and 500
-  rows, against the empty graph's 500. ([#484])
+- `ica_lingam`'s causal order no longer reads the columns' units: multiplying a column by a power of
+  two leaves the order and the graph unchanged, and another factor changes them only through
+  FastICA's rounding, as a new column order can. Its row assignment and order search read the
+  unmixing weights in the data's units, so z-scored data, `andrey.data`'s default since this
+  release, gave another and often wrong order: on simulated linear data with uniform noise, 20
+  variables, mean degree 4, and 500 rows, its errors (SHD) summed over five datasets were 248 on
+  z-scored data and 10 on the raw values. FastICA now runs on the z-scored columns, and both steps
+  read each unmixing weight divided by the norm of its column. On z-scored data no measured setting
+  got worse beyond the spread between datasets, and at 50 variables, mean degree 4, and 2,000 rows
+  the errors fell from 1,784 to 11. On raw values whose noise has the same variance at every node
+  they rose where the old order read those variances, from 573 to 1,826 at 50 variables, mean degree
+  4, and 500 rows, against the empty graph's 500. ([#484])
 - The worker pool starts when `TMPDIR` is on a file system that rejects the forkserver's socket,
   such as a cluster's parallel file system. `ges`, `gfci`, and the skeleton search of `pc`, `fci`,
   `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
