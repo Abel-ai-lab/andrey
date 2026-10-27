@@ -1367,7 +1367,7 @@ def _rule_r10(
 
     The paths reach the tails ``b`` and ``d`` from two non-adjacent possible children of ``a``.
     A path search depends on ``a``, the child, and the tail, not on ``c``, so each runs once per
-    call, until a mark set on ``marks`` itself clears the answers.
+    call, until a mark R10 sets on ``marks`` directly clears the answers.
     """
     out = marks if out is None else out
     neighbors = _neighbor_lists(marks)
