@@ -80,6 +80,8 @@ STOPS = {
 # A regime with a fixed number of rows, e.g. ``deg2-n2000``; ``deg2-n10d`` scales them with d.
 FIXED = re.compile(r"deg(\d+)-n(\d+)$")
 SIZE_DEGREE, DENSITY_ROWS = 2, 2000
+# The size map's row counts.
+SIZE_ROWS = (500, 2000, 10000)
 # A map's geometry: a cell's width and height, the row labels' width, and the room for the title
 # above and the column labels below.
 CELL_W, CELL_H, LABEL, TOP, BOTTOM = 30, 22, 78, 22, 30
@@ -303,6 +305,42 @@ def ladders_table(lane: dict) -> str:
     )
 
 
+def reach_table(lane: dict) -> str:
+    """The post's table: for each mapped method, grouped by family, the largest number of variables
+    inside the boundary at each row count of the size map, with a mean degree of 2."""
+    family = {spec.name: spec.family for spec in list_specs()}
+    order = [spec.name for spec in list_specs()]
+    reach: dict[str, dict[int, dict]] = {}
+    for ladder in lane["ladders"]:
+        fixed = FIXED.match(ladder["regime"])
+        if mapped(ladder) and int(fixed[1]) == SIZE_DEGREE and int(fixed[2]) in SIZE_ROWS:
+            reach.setdefault(ladder["method"], {})[int(fixed[2])] = ladder
+    head = "".join(f'<th scope="col">{n:,} rows</th>' for n in SIZE_ROWS)
+    body = ""
+    for key, title in FAMILIES.items():
+        methods = sorted((m for m in reach if family[m] == key), key=order.index)
+        for k, m in enumerate(methods):
+            group = (
+                f'<th class="ct-group" rowspan="{len(methods)}"><span>{escape(title)}</span></th>'
+                if k == 0
+                else ""
+            )
+            cells = "".join(
+                f"<td>{size(reach[m][n], reach[m][n]['beats_empty_through_d'])}</td>"
+                if n in reach[m]
+                else "<td></td>"
+                for n in SIZE_ROWS
+            )
+            body += f'<tr>{group}<th scope="row">{escape(NAMES.get(m, m))}</th>{cells}</tr>'
+    return (
+        '<figure class="ct"><p class="ct-title">How far each method goes</p><div class="ct-scroll">'
+        f'<table class="ct-table"><thead><tr><td colspan="2"></td>{head}</tr></thead>'
+        f"<tbody>{body}</tbody></table></div><figcaption>The largest number of variables inside "
+        "the boundary, with a mean degree of 2: every size up to it finished and beat the empty "
+        "graph.</figcaption></figure>\n"
+    )
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
     lane = json.loads(path.read_text(encoding="utf-8"))["boundary"]
@@ -310,6 +348,7 @@ def main() -> None:
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE
     for family in FAMILIES:
         (out / f"boundary-{family}.html").write_text(family_figure(family, found), encoding="utf-8")
+    (out / "reach.html").write_text(reach_table(lane), encoding="utf-8")
     card = Path(sys.argv[3]) if len(sys.argv) > 3 else CARD
     card.mkdir(exist_ok=True)
     (card / "ladders.html").write_text(ladders_table(lane), encoding="utf-8")
