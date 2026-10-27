@@ -1,2 +1,2 @@
-mean degree 2: 15 errors; the empty graph makes 50
-mean degree 10: 257 errors; the empty graph makes 250
+mean degree 2: 16 errors; the empty graph makes 50
+mean degree 8: 657 errors; the empty graph makes 200
