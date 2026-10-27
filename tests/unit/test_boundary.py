@@ -64,7 +64,7 @@ def test_the_pair_methods_measure_rows(method):
 
 def test_methods_with_no_capped_ladder_never_warn():
     others = set(andrey.api.__all__) - set(_capped())
-    assert others >= {"pc", "granger"}  # no cap stop, and no ladder
+    assert "granger" in others  # no ladder
     for method in others:
         for shape in ((10**7, 10**6), (10**7, 2)):
             assert past_boundary(method, shape) is None
@@ -121,14 +121,14 @@ def test_the_table_is_generated_from_the_newest_boundary_lane():
 
 
 class _Checked(Exception):
-    """Raised by the check in place of the fit."""
+    """Raised by the check, so the fit does not run."""
 
 
 CALLS = {"cdnod": lambda data: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2)}
 
 
 @pytest.mark.parametrize("method", _capped())
-def test_a_facade_checks_its_data_before_the_fit(method, monkeypatch):
+def test_a_facade_checks_its_data(method, monkeypatch):
     if method == "calm" and backend.torch() is None:
         pytest.skip("calm needs torch")
     checked = []
