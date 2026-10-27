@@ -415,10 +415,13 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-GES was more accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical
-to roughly 1,000 variables; FCI's errors passed the empty graph's at 800
-([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the
-data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#known-limits).
+GES was more accurate with a stronger penalty on the large sparse benchmark graphs. On
+linear-Gaussian data from Erdos-Renyi graphs with mean degree 2, PC's median errors stayed below the
+empty graph's through 400 variables with 2,000 rows, and its fits finished within 1 h on 4 cores
+through 1,600; with 10 rows per variable, FCI's stayed below the empty graph's through 200
+variables. Each method's API page states the data and sizes it was measured on, the largest sizes
+where its errors stayed below the empty graph's, and what ended each measurement. See
+[Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 
