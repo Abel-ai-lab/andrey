@@ -1,14 +1,16 @@
 """The 0.10.0 post's boundary maps, written next to it as HTML that the post includes.
 
-``boundary-<family>.html``: for each method of a family, two maps over the number of variables
-(columns). On the size map, the rows are the number of rows of data, with a mean degree of 2; on the
-density map, the rows are the mean degree, with 2,000 rows. A cell's color is the method's median
-errors as a share of the empty graph's, from the cobalt ramp, the stronger the fewer; a cell where
-it does no better than the empty graph is gray; a mark is a problem where a row stopped: on time or
-memory, on a failed fit, or past the accuracy boundary, after two sizes in a row that do not beat
-the empty graph. The outline around the cells inside the boundary is the boundary: in each row, the
-sizes before the first one that does not finish or does not beat the empty graph. Every color is an
-``--andrey-*`` token.
+``boundary-example.html``: the example the post reads, one method's two maps; ``boundary-all.html``:
+every mapped method's maps, by family, without a caption, after the example;
+``boundary-<family>.html``: the card's figures, for each method of a family, two maps over the
+number of variables (columns), with a caption on how to read them. On the size map, the rows are the
+number of rows of data, with a mean degree of 2; on the density map, the rows are the mean degree,
+with 2,000 rows. A cell's color is the method's median errors as a share of the empty graph's, from
+the cobalt ramp, the stronger the fewer; a cell where it does no better than the empty graph is
+gray; a mark is a problem where a row stopped: on time or memory, on a failed fit, or past the
+accuracy boundary, after two sizes in a row that do not beat the empty graph. The outline around the
+cells inside the boundary is the boundary: in each row, the sizes before the first one that does not
+finish or does not beat the empty graph. Every color is an ``--andrey-*`` token.
 
 The cells come from the release card's summary (``SUMMARY``), its ``boundary`` lane: one ladder
 per method and regime, each a list of rungs (one per number of variables) and how the ladder ended
@@ -44,6 +46,8 @@ FAMILIES = {
     "permutation": "Permutation-based",
     "lingam": "Linear non-Gaussian",
 }
+# The method whose maps the post reads as its example.
+EXAMPLE = "boss"
 # Each method as the post names it.
 NAMES = {
     "pc": "PC", "cdnod": "CD-NOD", "fci": "FCI", "gfci": "GFCI",
@@ -204,13 +208,30 @@ def panel(method: str, cells: list[dict]) -> str:
     )
 
 
-def family_figure(family: str, cells: list[dict]) -> str:
-    """A family's methods, two maps each."""
+def family_panels(family: str, cells: list[dict]) -> str:
+    """A family's title and its methods, two maps each."""
     names = {s.name: s.family for s in list_specs()}
     methods = [m for m in dict.fromkeys(c["method"] for c in cells) if names.get(m) == family]
     panels = "".join(panel(m, [c for c in cells if c["method"] == m]) for m in methods)
+    return f'<p class="bnd-title">{escape(FAMILIES[family])}</p>{panels}'
+
+
+def example_figure(method: str, cells: list[dict]) -> str:
+    """The post's example: one method's two maps, which the post's text reads."""
+    maps = panel(method, [c for c in cells if c["method"] == method])
+    return f'<figure class="bnd">{maps}</figure>\n'
+
+
+def all_figure(cells: list[dict]) -> str:
+    """The post's figure of every mapped method, by family, after the example has shown how to read
+    a map."""
+    return f'<figure class="bnd">{"".join(family_panels(f, cells) for f in FAMILIES)}</figure>\n'
+
+
+def family_figure(family: str, cells: list[dict]) -> str:
+    """The card's figure of a family's methods, two maps each, with how to read them."""
     return (
-        f'<figure class="bnd"><p class="bnd-title">{escape(FAMILIES[family])}</p>{panels}'
+        f'<figure class="bnd">{family_panels(family, cells)}'
         "<figcaption>Columns: the number of variables. Color: errors as a share of the empty "
         "graph's, the stronger the fewer; gray does no better than the empty graph. × stopped at "
         "the time cap, ■ at the memory cap, ! failed, ○ past the accuracy boundary. The outline is "
@@ -404,6 +425,8 @@ def main() -> None:
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE
     for family in FAMILIES:
         (out / f"boundary-{family}.html").write_text(family_figure(family, found), encoding="utf-8")
+    (out / "boundary-example.html").write_text(example_figure(EXAMPLE, found), encoding="utf-8")
+    (out / "boundary-all.html").write_text(all_figure(found), encoding="utf-8")
     (out / "reach.html").write_text(reach_table(lane), encoding="utf-8")
     card = Path(sys.argv[3]) if len(sys.argv) > 3 else CARD
     card.mkdir(exist_ok=True)
