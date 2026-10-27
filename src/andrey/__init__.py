@@ -59,6 +59,7 @@ from .core.seeding import seed_all
 from .core.warning_policy import (
     AndreyWarning,
     BackendFallbackWarning,
+    BoundaryWarning,
     DataTypeWarning,
     ExperimentalWarning,
     PerformanceWarning,
@@ -89,6 +90,7 @@ __all__ = [
     # Warning categories: every warning Andrey raises is an AndreyWarning.
     "AndreyWarning",
     "BackendFallbackWarning",
+    "BoundaryWarning",
     "DataTypeWarning",
     "ExperimentalWarning",
     "PerformanceWarning",

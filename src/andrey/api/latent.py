@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
+from andrey.api._boundary import warn_past_boundary
 from andrey.core.structure import node_labels
 
 if TYPE_CHECKING:
@@ -145,4 +146,5 @@ def gin(
             f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
         )
     names = node_labels(labels) if labels is not None else column_labels(data)
+    warn_past_boundary("gin", X.shape)
     return gin_structure(X, alpha=alpha, labels=names)

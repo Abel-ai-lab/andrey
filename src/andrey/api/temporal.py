@@ -28,6 +28,7 @@ from ._adapt import (
     shared_labels,
     with_labels,
 )
+from ._boundary import warn_past_boundary
 from ._temporal import (
     _adapt_granger,
     _adapt_longitudinal_lingam,
@@ -199,6 +200,7 @@ def varma_lingam(
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, order[0], method="varma_lingam")
+    warn_past_boundary("varma_lingam", X.shape)
     causal_order, psis, omegas = _native(
         X,
         order=order,
@@ -915,6 +917,7 @@ def lpcmci(
         )
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
+    warn_past_boundary("lpcmci", X.shape)
     with (
         copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
         rows_tested() as rows,

@@ -133,6 +133,14 @@ Change the facade **and** its `ParamSpec` in the same commit; the signature-agre
 when they differ. A new enumerated value goes in `ParamSpec.choices`, so the schema, the CLI's
 `key=value` coercion, and `andrey run <method> --help` all learn it at once.
 
+### Publish a boundary lane
+
+A release summary with `boundary.ladders` sets where each method's `BoundaryWarning` starts:
+regenerate its table with `uv run python scripts/boundary_table.py`, which writes
+`src/andrey/api/_boundary_table.py` from the newest such summary. `tests/unit/test_boundary.py`
+fails until the table matches it, and names a method whose ladder newly ended on the time or memory
+cap until its facade calls `warn_past_boundary`, after the input checks and before the fit.
+
 ### Add an environment variable
 
 Read it in the code, then add an `EnvVarSpec` to `environment.py` (and to `PRECEDENCE` if it takes
