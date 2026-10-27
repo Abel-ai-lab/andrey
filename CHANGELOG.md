@@ -49,6 +49,13 @@ change names its pull request.
   large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
   first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
   unstable draw. Every draw that was stationary is unchanged. ([#393])
+- For contributors, the benchmark harness's longitudinal LiNGAM panels no longer diverge as the
+  number of variables grows: the lag matrices of about 60% of the time points had norm 1 or more at
+  3 variables and all of them from 5 on, and the panel's standard deviation reached 1e14 at 10
+  variables and 1e90 at 40. A
+  time point whose lag matrix through the same-step part has spectral norm 1 or more now has its
+  lag-1 block scaled down until that norm is 0.95, so every step contracts. A time point already
+  below 1 keeps its draw, and the panel's dataset identity changes. ([#467])
 - For contributors, a release pull request into `main` fails its required `release-branch` check
   when `pyproject.toml`'s version is not the release branch's `<x.y.z>`. A post release keeps the
   package at `<x.y.z>`, and the check also fails one that changes anything under `src/` or whose
@@ -736,3 +743,4 @@ First alpha release.
 [#439]: https://github.com/Abel-ai-lab/andrey/pull/439
 [#441]: https://github.com/Abel-ai-lab/andrey/pull/441
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
+[#467]: https://github.com/Abel-ai-lab/andrey/pull/467
