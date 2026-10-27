@@ -759,12 +759,15 @@ def lpcmci(
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
     max_depth : int or None, default=None
-        The largest number of neighbors a removal step conditions on, at least ``0``, on top of the
-        parents of both ends that every test includes; it also bounds the subsets the majority vote
-        reads. ``None`` sets no limit, as in the paper. The number of tests grows exponentially
-        with the links at one node, so on many strongly related series an uncapped run may not
-        finish; a capped run always does, and can keep links that a larger conditioning set would
-        remove.
+        The largest number of neighbors a removal step conditions on, at least ``0``, counted
+        beyond the default conditions, the parents of both ends, which every test includes; it
+        also bounds the subsets the majority vote reads. A test can therefore condition on more
+        than ``max_depth`` nodes, while the ``max_depth`` of :func:`~andrey.pc` and
+        :func:`~andrey.fci` counts the whole conditioning set. ``None`` sets no limit, as in the
+        paper. The number of tests grows exponentially with the links at one node, so on many
+        strongly related series an uncapped run may not finish. A cap bounds the number of tests,
+        though a capped run can still take long, and can keep links that a larger conditioning set
+        would remove.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal

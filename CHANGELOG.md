@@ -77,9 +77,10 @@ change names its pull request.
   `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
   method refuses them with an error that names it and says what to do instead. ([#443], [#453])
 - `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
-  the parents of both ends, which also bounds the subsets of the majority vote. Its number of tests
-  grows exponentially with the links at one node, so on many strongly related series an uncapped
-  run may not finish; a capped run always does. The default, `None`, keeps the uncapped search.
+  the parents of both ends, which also bounds the subsets of the majority vote; unlike the
+  `max_depth` of `pc` and `fci`, it does not count those parents. Its number of tests grows
+  exponentially with the links at one node, so on many strongly related series an uncapped run may
+  not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
   ([#468])
 
 ### Changed

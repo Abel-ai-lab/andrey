@@ -79,7 +79,9 @@ forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each meth
 parameter says how it honors them. `bottom_up_parce_lingam` honors every part but required edges.
 For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time
 `t - lag` to `effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`, the
-maximum conditioning-set size of their conditional-independence tests.
+maximum conditioning-set size of their conditional-independence tests. `lpcmci`'s `max_depth`
+counts only the neighbors a removal step conditions on beyond the parents of both ends, which every
+test includes.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of

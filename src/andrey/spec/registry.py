@@ -1569,9 +1569,11 @@ _add(
                 name="max_depth",
                 type="int",
                 default=None,
-                doc="The largest number of neighbors a removal step conditions on, at least 0, on "
-                "top of the parents of both ends; null sets no limit. A capped run always finishes "
-                "and can keep links that a larger conditioning set would remove.",
+                doc="The largest number of neighbors a removal step conditions on, at least 0, "
+                "counted beyond the default conditions, the parents of both ends, unlike pc's and "
+                "fci's max_depth, which counts the whole conditioning set; null sets no limit. A "
+                "cap bounds the number of tests and can keep links that a larger conditioning set "
+                "would remove.",
                 nullable=True,
             ),
         ),
