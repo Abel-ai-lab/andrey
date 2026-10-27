@@ -156,13 +156,21 @@ def direct_lingam(
     weighted by the scale between the two, and no edges to later columns, which take their edges
     from the column it copies.
 
-    **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
-    uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
-    stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
-    variables and 545 s at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300
-    variables did not finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a
-    fit took 528 s at 300 variables and 1,410 s at 400. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
+    with no hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
+    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 400 and 400 variables at mean degree 1, 2, 4, or 8 with 2,000
+    rows; 200 and 200 at mean degree 2 with 10,000 rows; and 200 and 400 at mean degree 2 with 500
+    rows. The ladders ended when three fits of the next size ran past 1 h, except at mean degree 2
+    with 500 rows, where the ladder ended when three fits of the next size, with more variables than
+    rows, stopped with an error. The median fit took 2,211 s at 400 variables (mean degree 8, 2,000
+    rows). Measured on simulated data from scale-free graphs with linear effects and uniform noise,
+    with ten rows per variable. From 20 to 200 variables its median errors (SHD) stayed below the
+    empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20 variables and 545 s
+    at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300 variables did not
+    finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a fit took 528 s at
+    300 variables and 1,410 s at 400. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -267,13 +275,24 @@ def ica_lingam(
     under a new column order or on another machine when it converges slowly, at few rows per
     variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
-    **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
-    uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
-    passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
-    100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's
-    protein-signaling data (853 rows, 11 variables), its errors were below the empty graph's (14
-    against 17). The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
+    with no hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
+    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 400 variables at mean degree 1 or 2 with 2,000 rows; 100
+    and 400 at mean degree 2 with 10,000 rows; 20 and 400 at mean degree 2 with 500 rows and mean
+    degree 4 with 2,000 rows; and none and 400 at mean degree 8 with 2,000 rows. The ladders ended
+    when three fits of the next size ran past 1 h, except at mean degree 2 with 500 rows, where the
+    ladder ended when three fits of the next size, with more variables than rows, stopped with an
+    error, and at mean degree 8 with 2,000 rows, where the ladder ended after two sizes in a row did
+    not beat the empty graph. The accuracy stop at mean degree 8 with 2,000 rows was set after
+    larger sizes had run. The median fit took 516 s at 400 variables (mean degree 2, 10,000 rows).
+    Measured on simulated data from scale-free graphs with linear effects and uniform noise, from 20
+    to 100 variables with ten rows per variable: its median errors (SHD) passed the empty graph's at
+    every size, 27 against 19 at 20 variables and 181 against 99 at 100. The median fit took 0.44 s
+    at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
+    variables), its errors were below the empty graph's (14 against 17). The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -351,14 +370,15 @@ def multi_group_direct_lingam(
     group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
     only in the groups where it is one.
 
-    **Limitations.** Measured on three groups of 1,000 rows over the same variables, from one
-    sparse random graph (mean degree 2) with linear effects, uniform noise, and weights drawn for
-    each group, from 5 to 20 variables. Its median errors (SHD summed over the groups) were 0 at 5
-    and 10 variables and 1 at 20, against the empty graph's 15, 30, and 60. The median fit took
-    1.2 s at 20 variables, on 4 cores. It assumes linear effects and non-Gaussian noise
-    in every group, and it gives every group the one shared causal order, even when a group's own
-    order differs. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear data with uniform noise in 3 groups that share one
+    Erdos-Renyi graph, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 200 and 200 variables at mean degree 2 or 4 with 1,000 or 5,000
+    rows per group. Every ladder ended at the largest planned size. The median fit took 1,996 s at
+    200 variables (mean degree 4, 5,000 rows per group, 3 groups). It assumes linear effects and
+    non-Gaussian noise in every group, and it gives every group the one shared causal order, even
+    when a group's own order differs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

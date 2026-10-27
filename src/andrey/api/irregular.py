@@ -90,12 +90,14 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     deterministic.
 
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
-    mechanism and Gaussian noise, from 200 to 8,000 rows. It named the true direction on three pairs
-    in four at 200 rows and on every pair from 4,000 rows. The median fit took over three minutes at
-    8,000 rows, on 4 cores. Each regression and HSIC test builds matrices with one row and one
-    column per sample, so memory grows with the square of ``n_samples`` and the regression's time
-    with its cube. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    mechanism and Gaussian noise, with rows doubling from 1,000, on 4 cores with a cap of 1 h and 28
+    GB per fit. It named the true direction on 95% to 100% of the 20 pairs at every size through
+    16,000 rows, the largest its fits finished within the caps. The ladder ended when three fits of
+    the next size ran out of the 28 GB. The median fit took 380 s at 8,000 rows. At 200 rows it
+    named the true direction on three pairs in four. Each regression and HSIC test builds matrices
+    with one row and one column per sample, so memory grows with the square of ``n_samples`` and the
+    regression's time with its cube. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -216,13 +218,15 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     ``PerformanceWarning``.
 
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
-    linear inner transform and an invertible nonlinear outer one, and Laplace noise, from 200 to
-    5,000 rows. It named the true direction on three pairs in four at 200 rows and on every pair
-    from 1,000 rows. The median fit took 0.8 s at 5,000 rows, on 4 cores. Each HSIC test builds
-    kernel matrices with one row and one column per sample, so time and memory grow with the square
-    of the row count: each worker thread holds three such float64 matrices, 600 MB at 5,000 rows.
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    linear inner transform and an invertible nonlinear outer one, and Laplace noise, with rows
+    doubling from 1,000, on 4 cores with a cap of 1 h and 28 GB per fit. It named the true direction
+    on 100% of the 20 pairs at every size through 32,000 rows, the largest its fits finished within
+    the caps. The ladder ended when three fits of the next size ran out of the 28 GB. The median fit
+    took 80 s at 32,000 rows. At 200 rows it named the true direction on three pairs in four. Each
+    HSIC test builds kernel matrices with one row and one column per sample, so time and memory grow
+    with the square of the row count: each worker thread holds three such float64 matrices, 600 MB
+    at 5,000 rows. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -321,12 +325,21 @@ def rcd(
     RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
     tests compare residuals, and a weak hidden cause leaves only a small trace in them.
 
-    **Limitations.** Measured on linear data with uniform noise, one node in five hidden, and 2,000
-    rows, from 4 to 24 observed variables: its median directed-edge errors were below the empty
-    graph's at every size but 8 variables, where they equaled it. A fit took about 2 s at 4
-    variables and 18 s at 24, on two cores. Larger problems are untested; the work grows with the
-    number of variables and with ``max_explanatory_vars``. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
+    which one node in five is hidden (at least one), the hidden ones counted among the variables, on
+    4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median endpoint
+    errors against the PAG of the observed variables stayed below the empty graph's, and through
+    which its fits finished within the caps, were 30 and 40 variables at mean degree 2 with 10,000
+    rows; none and 60 at mean degree 2 with 2,000 rows (below it only from 10 through 30); none and
+    20 at mean degree 4 with 10,000 rows (below it only from 10 through 20); and none and 10 at mean
+    degree 4 with 2,000 rows. At 40 variables (mean degree 2, 10,000 rows), 2 of 10 fits ran out of
+    memory. The ladders ended after two sizes in a row did not beat the empty graph, except at mean
+    degree 2 with 10,000 rows, where the ladder ended when three fits of the next size ran out of
+    the 28 GB, and at mean degree 4 with 10,000 rows, where the ladder ended when three fits of the
+    next size ran past 1 h. The median fit took 45 s at 60 variables (mean degree 2, 2,000 rows).
+    The work grows with the number of variables and with ``max_explanatory_vars``. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -402,12 +415,19 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     weights come from an adaptive-Lasso regression of each variable on those before it, which needs
     more rows than columns.
 
-    **Limitations.** Suited to a few variables. Measured on linear data with uniform noise, one node
-    in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
-    4 observed variables, and above it at every size from 8 to 24. From 16 variables it left none of
-    the confounded pairs unordered. A fit took about 2 s at 4 variables and 96 s at 24, on two
-    cores. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
+    which one node in five is hidden (at least one), the hidden ones counted among the variables, on
+    4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median endpoint
+    errors against the PAG of the observed variables stayed below the empty graph's, and through
+    which its fits finished within the caps, were 10 and 20 variables at mean degree 2 with 2,000 or
+    10,000 rows; none and 20 at mean degree 4 with 10,000 rows (below it only from 10 through 20);
+    and none and 20 at mean degree 4 with 2,000 rows (below it only at 10). The ladders ended after
+    two sizes in a row did not beat the empty graph, except at mean degree 4 with 10,000 rows, where
+    the ladder ended when three fits of the next size ran past 1 h. The median fit took 1,902 s at
+    20 variables (mean degree 4, 10,000 rows). On the same data with 2,000 rows, from 16 observed
+    variables it left none of the confounded pairs unordered. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

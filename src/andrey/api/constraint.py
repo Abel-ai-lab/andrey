@@ -193,23 +193,26 @@ def pc(
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
 
-    **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
-    default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
-    (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
-    stayed below the empty graph's at every size, 357 against 400 at 400 variables. The median fit
-    took 0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network
-    with 1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
-    practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
-    combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
-    On simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
-    first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with
-    2,000 rows, its median errors stayed below the empty graph's at every size: at 40 variables,
-    18.5 with ``"degen_gauss"`` and 9.5 with ``"cond_gauss"``, against 40. On simulated categorical
-    networks with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with
-    ``"chisq"`` and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s
-    with ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test,
-    on 4 cores. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
+    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
+    stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
+    200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2 with 500, 2,000,
+    or 10,000 rows; and 3,200 and 3,200 at mean degree 4 or 8 with 2,000 rows. At 1,600 variables
+    (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
+    row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
+    at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
+    2,000 rows). The numbers below were measured with ``collider_order="column"``. On the
+    223-variable ANDES network with 1,000 simulated rows, its median errors passed the empty graph's
+    (372 against 338). Its run time grows combinatorially with the largest neighborhood. On
+    simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
+    half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
+    rows, its median errors stayed below the empty graph's at every size: at 40 variables, 18.5 with
+    ``"degen_gauss"`` and 9.5 with ``"cond_gauss"``, against 40. On simulated categorical networks
+    with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with ``"chisq"``
+    and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s with
+    ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test, on 4
+    cores. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -494,9 +497,17 @@ def fci(
     because it does not depend on the order of the tests, and on simulated data it gave more
     accurate PAGs than the first set found.
 
-    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
-    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
-    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
+    hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
+    its median errors (SHD against the PAG of the observed variables) stayed below the empty
+    graph's, and through which its fits finished within the caps, were 200 and 800 variables at mean
+    degree 2 with 10 or 50 rows per variable; and 1,600 and 1,600 at mean degree 4 with 10 or 50
+    rows per variable. The ladders ended after two sizes in a row did not beat the empty graph,
+    except at mean degree 4 with 10 or 50 rows per variable, where they ended when three fits of the
+    next size ran past 1 h. The median fit took 116 s at 1,600 variables (mean degree 4, 50 rows per
+    variable). Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from random
+    graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to 800
+    variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
     endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's at
     every size with mean degree 4, and up to 400 variables with mean degree 2, where they passed it
     at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
@@ -712,29 +723,37 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
-    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
-    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
-    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
-    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's
-    wherever its fits finished (197 against 444 at 200 variables with mean degree 2, one variable in
-    ten hidden, and ten rows per variable). With those settings the median fit took 0.53 s at 100
-    variables, 2.6 s at 200, and 132 s at 800. Every fit at 800 variables finished within 7,200 s in
-    four of the eight settings; with mean degree 4, one variable in five hidden, and 50 rows per
-    variable, none did, and three of five fits at 400 ran past 3,600 s. The default,
-    ``"order_free"``, took 1.00 to 1.02 times as long as ``"fast"`` up to 200 variables and 0.87 to
-    1.03 times at 400 and 800, and its median endpoint errors were within 2% of ``"fast"``'s. On
-    some graphs from 400 variables its order needs more tests than the column order: on one with 400
-    variables, mean degree 2, one variable in five hidden, and 50 rows per variable, it took 407 s
-    against 120 to 336 s for ``"fast"`` over five column orders. ``possible_dsep="fast"`` gives the
-    column-order mode. It runs a full :func:`~andrey.ges` search before any test, so it takes at
-    least as long as GES on the same data. Its BIC score and Fisher-Z tests assume linear relations
-    with Gaussian noise. With fewer rows than columns the BIC score is unreliable. A parent set of
-    ``n_samples - 1`` or more variables fits its child exactly, so the GES search never selects one,
-    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
-    variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
-    score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
-    3,000 rows. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
+    hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
+    its median errors (SHD against the PAG of the observed variables) stayed below the empty
+    graph's, and through which its fits finished within the caps, were 1,600 and 1,600 variables at
+    mean degree 2 or 4 with 10 rows per variable; and 3,200 and 3,200 at mean degree 2 or 4 with 50
+    rows per variable. The ladders ended when three fits of the next size ran past 1 h, except at
+    mean degree 2 or 4 with 50 rows per variable, where they ended at the largest planned size. The
+    median fit took 1,480 s at 3,200 variables (mean degree 4, 50 rows per variable). Measured with
+    ``possible_dsep="fast"`` on simulated linear-Gaussian data from random graphs with mean degree 2
+    or 4 and one variable in ten or one in five hidden, from 20 to 800 variables counting the hidden
+    ones, with 10 or 50 rows per variable, on 4 cores. Its median endpoint errors, each mismatched
+    tail, arrowhead, or circle, stayed below the empty graph's wherever its fits finished (197
+    against 444 at 200 variables with mean degree 2, one variable in ten hidden, and ten rows per
+    variable). With those settings the median fit took 0.53 s at 100 variables, 2.6 s at 200, and
+    132 s at 800. Every fit at 800 variables finished within 7,200 s in four of the eight settings;
+    with mean degree 4, one variable in five hidden, and 50 rows per variable, none did, and three
+    of five fits at 400 ran past 3,600 s. The default, ``"order_free"``, took 1.00 to 1.02 times as
+    long as ``"fast"`` up to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median
+    endpoint errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order
+    needs more tests than the column order: on one with 400 variables, mean degree 2, one variable
+    in five hidden, and 50 rows per variable, it took 407 s against 120 to 336 s for ``"fast"`` over
+    five column orders. ``possible_dsep="fast"`` gives the column-order mode. It runs a full
+    :func:`~andrey.ges` search before any test, so it takes at least as long as GES on the same
+    data. Its BIC score and Fisher-Z tests assume linear relations with Gaussian noise. With fewer
+    rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
+    variables fits its child exactly, so the GES search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. Rule R5 has the
+    search bound described under :func:`~andrey.fci`. With the mixed-data score and test, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -952,25 +971,28 @@ def cdnod(
     ``"student_t"`` only a variable whose mean follows the index reaches it, and such a shared trend
     makes the changes depend on each other.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
-    three shifts its mean with the domain, from 10 to 50 variables with 20 datasets per size. Its
-    median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
-    graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
-    variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
-    at most 3 variables with 600 rows from 20 domains. It runs the PC search with the index as one
-    more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
-    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
-    a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
-    a mean shift of the cause oriented the edge on 20 of 20 seeds, and a change of its variance
-    alone, or of the weight of the effect on a mean-zero cause alone, on none. Without the
-    independent-change step, an edge between two variables that both change with the index stays
-    undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
+    shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
+    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 50 and 50 variables at mean degree 1 with 2,000 rows; 100 and 100
+    at mean degree 2 with 2,000 or 10,000 rows; 200 and 200 at mean degree 2 with 500 rows and mean
+    degree 4 with 2,000 rows; and 400 and 400 at mean degree 8 with 2,000 rows. At 100 variables
+    (mean degree 2, 10,000 rows pooled from 4 domains), 1 of 5 fits ran past 1 h. Every ladder ended
+    when three fits of the next size ran past 1 h. The median fit took 39 s at 400 variables (mean
+    degree 8, 2,000 rows pooled from 4 domains). The independent-change step is not benchmarked yet;
+    its tests run it on at most 3 variables with 600 rows from 20 domains. It runs the PC search
+    with the index as one more variable, so it costs about as much as :func:`~andrey.pc` on the data
+    plus one column. Its partial-correlation tests assume linear relations with Gaussian noise and
+    find only a change in a variable's mean that is linear in the index: on two variables from two
+    domains with 600 rows, a mean shift of the cause oriented the edge on 20 of 20 seeds, and a
+    change of its variance alone, or of the weight of the effect on a mean-zero cause alone, on
+    none. Without the independent-change step, an edge between two variables that both change with
+    the index stays undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
     ``"student_t"``, the step reaches only variables whose means follow the index. On two variables
     from 20 domains with 600 rows, both means rising linearly by about 1 across the domains, the
-    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from
-    (0.5, 2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton
-    of ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
+    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from (0.5,
+    2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton of
+    ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
     (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
     The paper fits the kernel widths, the index kernel, and the ridge of the step by
     Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
