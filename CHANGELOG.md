@@ -9,6 +9,16 @@ change names its pull request.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-27
+
+### Highlights
+
+- How far each method goes: the 0.10.0 release card maps, for 26 methods, the problems each
+  finishes within one hour and 28 GB on 4 cores with fewer errors than the empty graph, by
+  variables, samples, and density, and each method's **Limitations** paragraph gives its measured
+  boundary. At 2,000 samples and a mean degree of 2, BOSS stays more accurate than the empty graph
+  up to 1,600 variables, GRaSP to 800, and PC to 400. ([#343], [#438], [#469])
+
 ### Changed
 
 - Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
@@ -640,7 +650,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
@@ -722,6 +733,7 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#343]: https://github.com/Abel-ai-lab/andrey/pull/343
 [#346]: https://github.com/Abel-ai-lab/andrey/pull/346
 [#347]: https://github.com/Abel-ai-lab/andrey/pull/347
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
@@ -744,6 +756,7 @@ First alpha release.
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
 [#431]: https://github.com/Abel-ai-lab/andrey/pull/431
+[#438]: https://github.com/Abel-ai-lab/andrey/pull/438
 [#439]: https://github.com/Abel-ai-lab/andrey/pull/439
 [#441]: https://github.com/Abel-ai-lab/andrey/pull/441
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
