@@ -23,6 +23,7 @@ from ._adapt import (
     open_unit_interval,
     with_labels,
 )
+from ._boundary import warn_past_boundary
 from ._irregular import (
     _adapt_anm,
     _adapt_bottom_up_parce,
@@ -179,6 +180,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     X, rows = _complete_pairs(X, labels, "anm")
+    warn_past_boundary("anm", X.shape)
     X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
     Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
     pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
@@ -319,6 +321,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     X, rows = _complete_pairs(X, labels, "pnl")
+    warn_past_boundary("pnl", X.shape)
     pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
     return _adapt_pnl(
         pval_forward,
@@ -438,13 +441,18 @@ def rcd(
     X = data_matrix(data, min_rows=6, method="rcd")  # HSIC's null variance has (n - 4)(n - 5)
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
     labels = column_labels(data)
+    cor_alpha = open_unit_interval(cor_alpha, "cor_alpha")
+    ind_alpha = open_unit_interval(ind_alpha, "ind_alpha")
+    shapiro_alpha = open_unit_interval(shapiro_alpha, "shapiro_alpha")
+    constraints = resolve(knowledge, X.shape[1], labels, method="rcd")
+    warn_past_boundary("rcd", X.shape)
     model = fit_rcd(
         X,
         max_explanatory_num=max_explanatory_vars,
-        cor_alpha=open_unit_interval(cor_alpha, "cor_alpha"),
-        ind_alpha=open_unit_interval(ind_alpha, "ind_alpha"),
-        shapiro_alpha=open_unit_interval(shapiro_alpha, "shapiro_alpha"),
-        constraints=resolve(knowledge, X.shape[1], labels, method="rcd"),
+        cor_alpha=cor_alpha,
+        ind_alpha=ind_alpha,
+        shapiro_alpha=shapiro_alpha,
+        constraints=constraints,
     )
     return with_labels(_adapt_rcd(model), labels)
 
@@ -564,7 +572,9 @@ def bottom_up_parce_lingam(
         method="bottom_up_parce_lingam",
         honors=("forbidden", "allowed", "tiers"),
     )
-    model = _native(X, alpha=open_unit_interval(alpha, "alpha"), constraints=constraints)
+    alpha = open_unit_interval(alpha, "alpha")
+    warn_past_boundary("bottom_up_parce_lingam", X.shape)
+    model = _native(X, alpha=alpha, constraints=constraints)
     if constraints is None:
         return with_labels(_adapt_bottom_up_parce(model), labels)
     one_way = constraints.forbidden & ~constraints.forbidden.T

@@ -82,6 +82,13 @@ change names its pull request.
   exponentially with the links at one node, so on many strongly related series an uncapped run may
   not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
   ([#468])
+- A fit larger than its method was measured to finish warns once per method with
+  `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
+  the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
+  setting whose rows are nearest the data's, and that ladder ended on the time or memory cap, as
+  exact search does past 24 variables at 2,000 rows. The message names the measured size and its
+  setting and points to the method's **Limitations** paragraph and the release card; the sizes are
+  generated from the published summary by `scripts/boundary_table.py`. ([#479])
 
 ### Changed
 
@@ -103,7 +110,6 @@ change names its pull request.
   batch of conditioning sets as one array of column numbers, records its tests once per batch, and,
   without missing values, tests sets of more than three neighbors, which rarely repeat, without the
   result cache. ([#468])
-
 
 ## [0.10.0] - 2026-10-27
 
@@ -872,3 +878,4 @@ First alpha release.
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#468]: https://github.com/Abel-ai-lab/andrey/pull/468
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
+[#479]: https://github.com/Abel-ai-lab/andrey/pull/479
