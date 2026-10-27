@@ -90,6 +90,9 @@ change names its pull request.
   selection is unchanged and the same fits take about 10% less time. ([#391])
 - `andrey.data.latent.marginal(dag, "mag")` returns a graph of kind `"mag"` instead of `"pag"`,
   with the same marks. ([#418])
+- `andrey.data.latent.marginal`, `GraphStructure.to_mag`, and `to_pag` decide each pair of observed
+  nodes by one moral-graph search from each node instead of a d-separation test per pair, and
+  return the same graphs in less time. ([#481])
 - `grasp` tucks only the edges of the current DAG and never takes a chain of tucks back to a DAG it
   has visited, as the GRaSP paper's search does, so it returns a different graph on some data,
   one that scores better about as often as worse. ([#442])
@@ -810,3 +813,4 @@ First alpha release.
 [#453]: https://github.com/Abel-ai-lab/andrey/pull/453
 [#445]: https://github.com/Abel-ai-lab/andrey/pull/445
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451
+[#481]: https://github.com/Abel-ai-lab/andrey/pull/481
