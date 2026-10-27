@@ -215,8 +215,9 @@ def pick_context() -> mp.context.BaseContext:
     Preload :data:`_FORKSERVER_PRELOAD` to share imports across workers. Keep ``__main__`` in the
     list: setting a preload replaces that stdlib default, and omitting it repeats parent-module
     imports in each child. Register the list before the forkserver starts; later calls have no
-    effect. All Andrey pools use this function. Registration replaces another library's preload
-    because the stdlib has no append operation.
+    effect. All Andrey pools use this function, and ``andrey.data.generate`` when the default start
+    method is ``forkserver``. Registration replaces another library's preload because the stdlib
+    has no append operation.
     """
     if "forkserver" in mp.get_all_start_methods():
         ctx = mp.get_context("forkserver")

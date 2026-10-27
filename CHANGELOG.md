@@ -14,6 +14,14 @@ change names its pull request.
 - Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
   hard limit: they change with the data generator, the density, the method's settings, and the
   machine. ([#367])
+- For contributors, `python -m qa.quality_gate --jobs N` fits the quality gate's cells in N
+  processes and prints the same results in the same order; the gate's workflow runs `--jobs 4` on
+  its four vCPUs and logs the runner's CPU. A push to a release pull request that changes only
+  `docs/`, `site/`, or top-level Markdown files reuses an earlier passing run instead of fitting the
+  methods again. ([#431])
+- For contributors, a production deploy of the site, from a `v*` tag or a manual run, waits
+  for the repository owner's approval in the `production-site` environment, which
+  administrators cannot bypass. ([#441])
 
 ### Removed
 
@@ -27,6 +35,9 @@ change names its pull request.
   `gfci`, and `cdnod` with several workers raised `OSError: [Errno 95] Operation not supported`;
   the forkserver's socket now goes in `/dev/shm`, or `/tmp`, with a warning, and the workers start
   with `fork` or `spawn` when neither holds it. Results do not change. ([#415])
+- `andrey.data.generate` with several workers starts them when `TMPDIR` rejects the forkserver's
+  socket, as the search workers do; on Linux from Python 3.14 it raised
+  `OSError: [Errno 95] Operation not supported`. ([#446])
 - `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
   `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
   test or score; an empty list now reads as `None` there. ([#395])
@@ -38,6 +49,12 @@ change names its pull request.
   large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
   first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
   unstable draw. Every draw that was stationary is unchanged. ([#393])
+- For contributors, a release pull request into `main` fails its required `release-branch` check
+  when `pyproject.toml`'s version is not the release branch's `<x.y.z>`. A post release keeps the
+  package at `<x.y.z>`, and the check also fails one that changes anything under `src/` or whose
+  `main` is at another version. A release's tag now submits the site to search engines once its
+  production deploy check passes; a post release's tag waited for a version the site never
+  shows and failed. ([#439])
 
 ## [0.9.0] - 2026-10-23
 
@@ -715,3 +732,7 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
+[#431]: https://github.com/Abel-ai-lab/andrey/pull/431
+[#439]: https://github.com/Abel-ai-lab/andrey/pull/439
+[#441]: https://github.com/Abel-ai-lab/andrey/pull/441
+[#446]: https://github.com/Abel-ai-lab/andrey/pull/446

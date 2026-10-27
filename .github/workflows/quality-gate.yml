@@ -5,7 +5,10 @@ name: quality-gate
 # (`release-flow.yml` lets only `release/<x.y.z>` merge there), and `main`'s ruleset requires it.
 # `publish.yml` reuses a passing run on the published tree (`scripts/gate_reuse.py`) or calls this
 # workflow itself; every job that publishes to PyPI needs a job that calls it, as
-# `tests/unit/test_release_gates.py` checks.
+# `tests/unit/test_release_gates.py` checks. A push that changes only files the gate does not read
+# (`docs/`, `site/`, and top-level Markdown files) reuses a passing run on an earlier commit: the job
+# still succeeds under this name, and its steps after the lookup are skipped
+# (`scripts/gate_reuse.py --ancestor`).
 on:
   pull_request:
     branches: [main]
@@ -13,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # the lookup lists this workflow's earlier runs; `publish.yml` passes the same
 
 env:
   ANDREY_DEVICE: cpu
@@ -27,10 +31,31 @@ jobs:
           # The pull request's head, not the merge with `main`: the run records the head's tree,
           # which `publish.yml` compares with the tree it publishes.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # The lookup compares this commit with the commits of earlier runs.
+          fetch-depth: 0
+      - name: A passing run on an earlier commit, with only unread files changed since
+        id: reuse
+        # The script reports every failure as reuse=false; an empty output also runs the gate.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/gate_reuse.py --ancestor
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: steps.reuse.outputs.reuse != 'true'
       - name: Set up Python
+        if: steps.reuse.outputs.reuse != 'true'
         run: uv python install 3.12
       - name: Install the locked environment
+        if: steps.reuse.outputs.reuse != 'true'
         run: uv sync --locked --extra torch --python 3.12
+      - name: Host CPU
+        if: steps.reuse.outputs.reuse != 'true'
+        # GitHub-hosted runners of one image run on different CPUs, and a fit takes about twice as
+        # long on some of them; the log names the one this run got.
+        run: |
+          lscpu | grep -E 'Model name|^CPU\(s\)'
+          grep -qw avx512f /proc/cpuinfo && echo "avx512f: yes" || echo "avx512f: no"
       - name: Supported methods against known graphs
-        run: uv run --no-sync python -m qa.quality_gate
+        if: steps.reuse.outputs.reuse != 'true'
+        # The runner has 4 vCPUs; each cell is fit on one of them (`qa/README.md`).
+        run: uv run --no-sync python -m qa.quality_gate --jobs 4
