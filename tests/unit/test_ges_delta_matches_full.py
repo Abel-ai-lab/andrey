@@ -11,7 +11,8 @@ import numpy as np
 import andrey
 from andrey import data, metrics
 from andrey.core import GraphStructure, stats
-from andrey.search.ges import ges as _ges_internal
+from andrey.core.score_delta import FullScoreDelta
+from tests.unit.ges_chunks import ges_inprocess
 
 # A near-tie can resolve differently on another CPU; more than this many edges is a real divergence.
 _MAX_EDGES_APART = 2
@@ -22,7 +23,7 @@ def _delta_ges_marks(x: np.ndarray) -> np.ndarray:
 
 
 def _full_ges_marks(x: np.ndarray) -> np.ndarray:
-    return _ges_internal(x, _full_scores=True)[0].to_numpy()
+    return ges_inprocess(x, 1, engine=FullScoreDelta)[0]
 
 
 def sample_dag(d: int, n: int, density: float, seed: int) -> data.CausalDataset:

@@ -143,7 +143,30 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
     X, mask = _random_interventional(seed, d, p, n_targets, n=40 * d)
     mask = mask if n_targets else None
     kept_graph, kept_score = gies_search.gies(X, mask)
-    monkeypatch.setattr(gies_search, "_FULL_RESCAN", True)
+    kept_backward = gies_search._Search.backward_best
+
+    def forward_best(self, excluded=None):
+        """The lowest-keyed valid insertion over the candidates of every target, enumerated now."""
+        adj, n = self.adj, self.n
+        reachable = gies_search._reachable(adj)
+        valid = (
+            (key, u, v, C)
+            for v in range(n)
+            for key, u, C in gies_search._forward_candidates(
+                v, adj, self.score, n, self.ranks, self.forbidden
+            )
+            if not reachable(v, u, C) and not (excluded and (u, v, frozenset(C)) in excluded)
+        )
+        best = min(valid, key=lambda move: move[0], default=None)
+        return None if best is None else best[1:]
+
+    def backward_best(self, excluded=None):
+        """The best deletion over the candidates of every target, enumerated now."""
+        self.backward.clear()
+        return kept_backward(self, excluded)
+
+    monkeypatch.setattr(gies_search._Search, "forward_best", forward_best)
+    monkeypatch.setattr(gies_search._Search, "backward_best", backward_best)
     full_graph, full_score = gies_search.gies(X, mask)
     assert np.array_equal(kept_graph.to_numpy(), full_graph.to_numpy())
     assert kept_score == full_score

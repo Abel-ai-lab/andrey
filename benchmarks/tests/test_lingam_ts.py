@@ -8,6 +8,7 @@ are checked by running one, and skipped when that environment has not been built
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -90,6 +91,73 @@ def test_the_varma_noise_is_super_gaussian_and_the_draw_repeats() -> None:
     assert (kurtosis > 0.5).all()
 
 
+#: SHA-256 of the stacks, column orders, and series of the VARMA model over ``d`` in (5, 20, 60)
+#: and seeds 0 to 2, where a stable draw comes within ``MAX_DRAWS``. A change to any drawn value
+#: changes it, and with it the datasets a campaign has stored.
+VARMA_DRAWS = "9de53e12198817cb9cd6640a3f4a8fb4b907b16e42dfdbafb184eacba3268a0c"
+
+
+def _varma_digest() -> str:
+    digest = hashlib.sha256()
+    for d in (5, 20, 60):
+        for seed in range(3):
+            data, stack, columns = lingam_models.sample_varma("varma2010", d, n=200, seed=seed)
+            # The stack and the columns are random draws and exact; the series goes through BLAS,
+            # so it is rounded.
+            for part in (stack, columns, np.round(data, 5) + 0.0):
+                digest.update(np.ascontiguousarray(part).tobytes())
+    return digest.hexdigest()
+
+
+def test_a_varma_model_with_a_stable_draw_keeps_its_draws() -> None:
+    assert _varma_digest() == VARMA_DRAWS
+
+
+def test_a_varma_model_with_no_stable_draw_is_rescaled_to_be_stable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Strong coefficients make every draw unstable; the first of three is kept and rescaled."""
+    model = lingam_models.MODELS["varma2010"]
+    monkeypatch.setitem(
+        lingam_models.MODELS, "varma2010", dataclasses.replace(model, coefficient=(0.9, 1.0))
+    )
+    monkeypatch.setattr(lingam_models, "MAX_DRAWS", 3)
+    first = []
+    rescale = lingam_models._rescale
+
+    def record(inverse: np.ndarray, b1: np.ndarray, m1: np.ndarray):
+        first.append((inverse @ b1, m1))
+        return rescale(inverse, b1, m1)
+
+    monkeypatch.setattr(lingam_models, "_rescale", record)
+    d = 60
+    data, stack, columns = lingam_models.sample_varma("varma2010", d, n=300, seed=0, shuffle=False)
+    ((reduced, drawn_ma),) = first
+    assert lingam_models._radius(reduced) >= 1 and lingam_models._radius(drawn_ma) >= 1
+    b0, b1, m1 = stack
+    target = lingam_models.STATIONARY_TARGET
+    inverse = np.linalg.inv(np.eye(d) - b0)
+    assert lingam_models._radius(inverse @ b1) == pytest.approx(target)
+    assert lingam_models._radius(m1) == pytest.approx(target)
+    assert np.count_nonzero(b0) == round(0.8 * d)
+    assert np.count_nonzero(b1) == np.count_nonzero(m1) == 2 * d
+    assert np.isfinite(data).all()
+    again, stack_again, _ = lingam_models.sample_varma("varma2010", d, n=300, seed=0, shuffle=False)
+    np.testing.assert_array_equal(data, again)
+    np.testing.assert_array_equal(stack, stack_again)
+
+
+def test_the_rescale_changes_only_a_part_that_is_not_stable() -> None:
+    inverse = np.linalg.inv(np.eye(3) - np.tril(np.ones((3, 3)), k=-1) * 0.5)
+    stable = 0.5 * np.eye(3)
+    b1, m1 = lingam_models._rescale(inverse, 2.0 * np.eye(3), stable)
+    np.testing.assert_array_equal(m1, stable)
+    assert lingam_models._radius(inverse @ b1) == pytest.approx(lingam_models.STATIONARY_TARGET)
+    b1, m1 = lingam_models._rescale(inverse, stable, 3.0 * np.eye(3))
+    np.testing.assert_array_equal(b1, stable)
+    assert lingam_models._radius(m1) == pytest.approx(lingam_models.STATIONARY_TARGET)
+
+
 @pytest.mark.parametrize("d", [3, 10])
 def test_the_panel_model_draws_a_dense_dag_and_a_dense_lag_block_per_time_point(d: int) -> None:
     times, m = 6, 400
@@ -107,6 +175,95 @@ def test_the_panel_model_draws_a_dense_dag_and_a_dense_lag_block_per_time_point(
     # Every time point draws its own matrices.
     assert not np.array_equal(truth[1, 0], truth[2, 0])
     assert np.isfinite(data).all()
+
+
+def _lag_matrices(truth: np.ndarray) -> list[np.ndarray]:
+    """The reduced-form lag matrix ``(I - B(t,t))^-1 B(t,t-1)`` of each time point after the first."""
+    eye = np.eye(truth.shape[-1])
+    return [np.linalg.solve(eye - truth[t, 0], truth[t, 1]) for t in range(1, len(truth))]
+
+
+def _not_contracted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the panel generator keep every lag block as drawn."""
+    monkeypatch.setattr(lingam_models, "_contract_lags", lambda truth, target: None)
+
+
+#: SHA-256 of the stacks and series of the panels below, drawn before the lag blocks were scaled.
+#: Each of these panels has every time point's reduced-form lag matrix below norm 1, so a draw
+#: that was already contracting must give the same bytes.
+CONTRACTING_PANELS = ((2, 3, (2, 3, 4)), (3, 3, (19, 24, 39)), (3, 4, (1, 6, 22)))
+PANEL_DRAWS = "4054765b8701741af2620e3f3a7dc1e62ff5dffaa769d56d1ac8e51d70aacad7"
+
+
+def test_a_panel_with_every_lag_matrix_below_norm_1_keeps_its_draws() -> None:
+    digest = hashlib.sha256()
+    for d, times, seeds in CONTRACTING_PANELS:
+        for seed in seeds:
+            data, truth = lingam_models.sample_panel("panel2013", d, times, 100, seed)
+            assert max(np.linalg.norm(a, 2) for a in _lag_matrices(truth)) < 1.0
+            # The stack is a random draw and exact; the series goes through BLAS, so it is rounded.
+            for part in (truth, np.round(data, 5) + 0.0):
+                digest.update(np.ascontiguousarray(part).tobytes())
+    assert digest.hexdigest() == PANEL_DRAWS
+
+
+@pytest.mark.parametrize("d", [3, 10, 40])
+def test_a_lag_block_is_scaled_only_where_its_lag_matrix_has_norm_1_or_more(
+    d: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = lingam_models.MODELS["panel2013"].lag_norm
+    _, kept = lingam_models.sample_panel("panel2013", d, 20, 60, seed=1)
+    with monkeypatch.context() as patch:
+        _not_contracted(patch)
+        _, drawn = lingam_models.sample_panel("panel2013", d, 20, 60, seed=1)
+    np.testing.assert_array_equal(kept[:, 0], drawn[:, 0])  # the same-step blocks are as drawn
+    assert not kept[0, 1].any()
+    factors = []
+    for t, (drawn_lag, kept_lag) in enumerate(zip(_lag_matrices(drawn), _lag_matrices(kept)), 1):
+        factor = float(kept[t, 1].flat[0] / drawn[t, 1].flat[0])
+        # One positive factor scales the whole block, so every link keeps its place and sign.
+        assert factor > 0
+        np.testing.assert_allclose(kept[t, 1], factor * drawn[t, 1], rtol=1e-12)
+        norm = float(np.linalg.norm(drawn_lag, 2))
+        if norm < 1.0:
+            assert factor == 1.0
+        else:
+            assert factor == pytest.approx(target / norm, rel=1e-9)
+            assert np.linalg.norm(kept_lag, 2) == pytest.approx(target, rel=1e-9)
+        factors.append(factor)
+    if d == 3:  # this size draws both kinds of time point
+        assert 1.0 in factors and any(f < 1.0 for f in factors)
+    else:
+        assert all(f < 1.0 for f in factors)
+
+
+@pytest.mark.parametrize("d", [5, 10, 20, 40])
+def test_a_panel_stays_bounded_over_its_time_points(
+    d: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every step contracts, so no time point is far beyond the first's scale, at any ``d``."""
+    for seed in range(3):
+        data, truth = lingam_models.sample_panel("panel2013", d, 20, 100, seed)
+        lag = _lag_matrices(truth)
+        norms = np.array([np.linalg.norm(a, 2) for a in lag])
+        radii = np.array([lingam_models._radius(a) for a in lag])
+        assert (norms < 1.0).all() and (radii <= norms * (1 + 1e-9)).all()
+        size = np.linalg.norm(data, axis=(1, 2))
+        # ||x_t|| <= q ||x_{t-1}|| + ||innovation_t||, with q the largest norm and the innovation the
+        # part of x_t its own time point adds.
+        innovation = [size[0]] + [
+            np.linalg.norm(data[t] - data[t - 1] @ lag[t - 1].T) for t in range(1, 20)
+        ]
+        assert (size[1:] <= norms * size[:-1] + np.array(innovation[1:]) * (1 + 1e-9)).all()
+        assert size.max() <= max(innovation) / (1 - norms.max()) * (1 + 1e-9)
+        # And the scale does not run away from the first time point's.
+        assert size.max() < 1e3 * size[0]
+    # Without the scaling the same setting runs away: the check above can fail.
+    _not_contracted(monkeypatch)
+    if d >= 10:
+        data, _ = lingam_models.sample_panel("panel2013", d, 20, 100, seed=0)
+        size = np.linalg.norm(data, axis=(1, 2))
+        assert not size.max() < 1e3 * size[0]
 
 
 @pytest.mark.parametrize("density", lingam_models.DENSITIES)

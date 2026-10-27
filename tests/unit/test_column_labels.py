@@ -77,6 +77,8 @@ def test_dataframe_columns_become_labels_as_text(spec):
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
 def test_columns_named_alike_as_text_raise_before_the_fit(spec):
+    if spec.name == "calm":
+        pytest.importorskip("torch")
     # One row: a fit, or any other check of the rows, would fail on it first.
     frames = [frame(seed).head(1).set_axis(["1", 1, 0], axis=1) for seed in range(3)]
     with pytest.raises(ValueError, match=r"'1' names columns \[0, 1\]"):

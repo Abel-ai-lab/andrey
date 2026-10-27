@@ -46,9 +46,14 @@ from scipy.special import gammaln
 from . import categorical, stats
 from .mixed import _LRU, ConditionalGaussian, DegenerateGaussian
 
+#: The two names of the linear-Gaussian BIC, which :func:`make_score` builds alike. A search that
+#: takes this score takes both.
+LINEAR_SCORES: tuple[str, ...] = ("local_score_BIC", "local_score_BIC_from_cov")
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
 DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu", "local_score_BIC_categorical")
 MIXED_SCORES: tuple[str, ...] = ("local_score_cond_gauss", "local_score_degen_gauss")
+#: Every score name :func:`make_score` builds: what a search with all three kinds of score accepts.
+SCORES: tuple[str, ...] = (*LINEAR_SCORES, *DISCRETE_SCORES, *MIXED_SCORES)
 
 # A residual variance at most this fraction of the node's variance is zero up to rounding.
 ZERO_RESIDUAL = 1e-12
@@ -595,7 +600,8 @@ class CategoricalBICScore(_CountScore):
     and the score prefers fewer parents than the data support. Its tests check it against the
     formula on fixed tables. Hill climbing was measured with it on simulated categorical networks
     of 10 to 40 variables with 2,000 rows (``andrey.hc``); the other searches that take it are not
-    benchmarked on it yet.
+    benchmarked on it yet. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -863,7 +869,7 @@ def make_score(
     ``lambda_value``'s range. A search checks ``score_func`` against the names it takes before
     calling this. Raises :class:`NotImplementedError` for any other name.
     """
-    if score_func in ("local_score_BIC", "local_score_BIC_from_cov"):
+    if score_func in LINEAR_SCORES:
         return BICScore(np.asarray(data, dtype=np.float64), lambda_value=lambda_value)
     if score_func == "local_score_BDeu":
         penalty_weight(lambda_value)

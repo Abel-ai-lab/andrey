@@ -14,7 +14,7 @@ from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, Score, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, Score, make_score
 from andrey.search import operators as ops
 from andrey.search.hc import tie_ranks
 
@@ -76,13 +76,7 @@ def _parent_limits(
 
 
 #: The local scores :func:`ges` accepts.
-GES_SCORES: tuple[str, ...] = (
-    "local_score_BIC",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_degen_gauss",
-    "local_score_cond_gauss",
-)
+GES_SCORES: tuple[str, ...] = SCORES
 
 
 def ges(
@@ -95,7 +89,6 @@ def ges(
     constraints: Constraints | None = None,
     workers: int | None = None,
     _parent_rule: str = "cap",
-    _full_scores: bool = False,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
 
@@ -113,8 +106,9 @@ def ges(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"`` (BDeu on
-        category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC),
+        ``"local_score_BDeu"`` (BDeu on category codes,
+        :class:`~andrey.core.score.BDeuScore` with its default priors),
         ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
         ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
@@ -143,10 +137,6 @@ def ges(
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
         ``max_parents`` directed parents gains no new ones, and a move can still leave a node above
         it. Not part of the public contract.
-    _full_scores : bool
-        Private test lever: score every candidate by two full local scores (the pre-Schur reference)
-        instead of the Schur delta. Tests compare the two scoring paths; this option is not part of
-        the public contract.
 
     Returns
     -------
@@ -187,7 +177,6 @@ def ges(
             gate,
             workers=workers,
             ranks=ranks,
-            full_scores=_full_scores,
             constraints=constraints,
             cap=cap,
         )

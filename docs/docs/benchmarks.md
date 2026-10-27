@@ -17,41 +17,72 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.9.0
+:link: benchmarks/0.10.0
 :link-type: doc
-:link-alt: The 0.9.0 release card: acceleration
-:class-card: release-cover release-art release-art-0-9-0
+:link-alt: The 0.10.0 release card: the boundary
+:class-card: release-cover release-art release-art-0-10-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Acceleration
+The boundary
 
-0.9.0
+0.10.0
 :::
 
 ::::{div} release-tldr
 
-0.9.0 is here: the same answers as 0.8.0, in less time. With one worker, BOSS runs up to 8.19x
-faster than 0.8.0, exact search 5.29x, and FCI and GFCI more than 3x; with four workers, CD-NOD runs
-4.62x faster and PC 2.60x. On an AMD EPYC 7713, GES runs more than 5x faster than pcalg at 400
-variables, with the same or fewer errors.
+0.10.0 is here: how far each method goes. For 26 methods, the card maps the problems each finishes
+within the time and memory caps and solves with fewer errors than the empty graph, by variables,
+samples, and density. At 2,000 samples and a mean degree of 2, BOSS stays more accurate than the
+empty graph up to 1,600 variables, GRaSP to 800, and PC to 400.
 
 :::{div} release-stats
 
-- **More than 8x** BOSS speedup over Andrey 0.8.0 at 400 variables
-- **More than 5x** exact search speedup over Andrey 0.8.0
-- **More than 5x** GES speedup over pcalg at 400 variables
+- **1,600 variables** BOSS stays more accurate than the empty graph, at 2,000 samples
+- **800 variables** GRaSP stays more accurate than the empty graph, at 2,000 samples
+- **26 methods** mapped by variables, samples, and density
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.9.0.md)
+[Read the release card](benchmarks/0.10.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.9.0
+:link-type: doc
+:link-alt: The 0.9.0 release card: acceleration
+:class-card: release-tile release-art-0-9-0
+:shadow: none
+:margin: 0
+
+0.9.0
+:::
+
+:::{div} release-body
+<h3>Acceleration</h3>
+
+The same answers as 0.8.0, in less time, with each sped-up method checked for the same output, and
+GES compared with pcalg.
+
+- BOSS up to **8.19x** faster than 0.8.0 with one worker
+- GES **more than 5x** faster than pcalg at 400 variables
+:::
+
+:::{div} release-meta
+Released October 23, 2026
+
+- [Release card<span class="visually-hidden"> 0.9.0</span>](benchmarks/0.9.0.md)
+- [Post: Acceleration](../blog/20261023-andrey-0-9-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -304,6 +335,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.10.0: the boundary <benchmarks/0.10.0>
 0.9.0: acceleration <benchmarks/0.9.0>
 0.8.0: nonlinear tests <benchmarks/0.8.0>
 0.7.0: permutation invariance <benchmarks/0.7.0>

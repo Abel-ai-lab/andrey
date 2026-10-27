@@ -56,9 +56,10 @@ def boss(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
-        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
-        multinomial BIC for categorical data coded by whole numbers, and
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, the
+        covariance-based linear-Gaussian BIC; ``"local_score_BDeu"`` and
+        ``"local_score_BIC_categorical"`` are the BDeu score and the multinomial BIC for
+        categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
         column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
@@ -78,8 +79,9 @@ def boss(
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
@@ -186,19 +188,27 @@ def boss(
     categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
     local scores, without the Schur update the BIC search uses.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 800 variables with ten rows per variable, at ``lambda_value=4.0``: its
-    median errors (SHD) stayed below the empty graph's at every size, 24 against 800 at 800
-    variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
-    223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors
-    passed the empty graph's (506 against 338). With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. Against :func:`~andrey.exact_search` on small simulated
-    categorical networks, with BDeu or the multinomial BIC, BOSS stopped at a DAG that scores worse
-    than the optimum on some draws; comparing a few seeds shows whether a result depends on the
-    seed. Neither categorical score is benchmarked with BOSS yet. The mixed-data scores are
-    experimental and not benchmarked yet; their tests run BOSS on 5 variables with 3,000 rows.
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``lambda_value=4.0``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 1,600 and 1,600 variables at mean degree 1 with 2,000 rows and
+    mean degree 2 with 500 or 2,000 rows; 800 and 800 at mean degree 2 with 10,000 rows and mean
+    degree 4 with 2,000 rows; and none and 400 at mean degree 8 with 2,000 rows (below it only from
+    50 through 400). At 1,600 variables (mean degree 2, 2,000 rows), 1 of 5 fits ran past 1 h. The
+    ladders ended when three fits of the next size ran past 1 h, except at mean degree 8 with 2,000
+    rows, where the ladder ended when three fits of the next size ran out of the 28 GB. The median
+    fit took 3,214 s at 1,600 variables (mean degree 2, 2,000 rows). On the 223-variable ANDES
+    network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors passed the empty
+    graph's (506 against 338). With fewer rows than columns the BIC score is unreliable. A parent
+    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
+    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. Against :func:`~andrey.exact_search` on small simulated categorical networks, with
+    BDeu or the multinomial BIC, BOSS stopped at a DAG that scores worse than the optimum on some
+    draws; comparing a few seeds shows whether a result depends on the seed. Neither categorical
+    score is benchmarked with BOSS yet. The mixed-data scores are experimental and not benchmarked
+    yet; their tests run BOSS on 5 variables with 3,000 rows. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -278,9 +288,10 @@ def grasp(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
-        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
-        multinomial BIC for categorical data coded by whole numbers, and
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, the
+        covariance-based linear-Gaussian BIC; ``"local_score_BDeu"`` and
+        ``"local_score_BIC_categorical"`` are the BDeu score and the multinomial BIC for
+        categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
         column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
@@ -305,8 +316,9 @@ def grasp(
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
@@ -420,21 +432,24 @@ def grasp(
     categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
     local scores, without the Schur update the BIC search uses.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 400 variables with ten rows per variable, at ``lambda_value=4.0``: its
-    median errors (SHD) stayed below the empty graph's at every size, 0 against 400 at 400
-    variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
-    cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
-    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
-    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
-    more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. Against
-    :func:`~andrey.exact_search` on small simulated categorical networks, with BDeu or the
-    multinomial BIC, GRaSP stopped at a DAG that scores worse than the optimum on some draws;
-    comparing a few seeds shows whether a result depends on the seed. Neither categorical score is
-    benchmarked with GRaSP yet. The
-    mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
-    with 3,000 rows.
+    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    ``lambda_value=4.0``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
+    which its median errors (SHD) stayed below the empty graph's, and through which its fits
+    finished within the caps, were 800 and 800 variables at mean degree 1, 4, or 8 with 2,000 rows
+    and mean degree 2 with 500, 2,000, or 10,000 rows. At 800 variables at mean degree 1, 4, or 8
+    with 2,000 rows, 1 or 2 of 5 fits ran past 1 h. Every ladder ended when three fits of the next
+    size ran past 1 h. The median fit took 3,108 s at 800 variables (mean degree 8, 2,000 rows). On
+    the 223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median
+    errors passed the empty graph's (471 against 338). With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. Against :func:`~andrey.exact_search` on small simulated
+    categorical networks, with BDeu or the multinomial BIC, GRaSP stopped at a DAG that scores worse
+    than the optimum on some draws; comparing a few seeds shows whether a result depends on the
+    seed. Neither categorical score is benchmarked with GRaSP yet. The mixed-data scores are
+    experimental and not benchmarked yet; their tests run GRaSP on 5 variables with 3,000 rows. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

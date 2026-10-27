@@ -292,11 +292,6 @@ def _orient_component(adj: np.ndarray, first: Sequence[int]) -> None:
 # the targets a step touched (:func:`_touched_targets`); the path condition is checked when a
 # candidate is selected. The selected move is the full scan's: the lowest key among valid moves.
 
-# The scan the forward and backward phases use. ``True`` enumerates every target at every step and
-# checks every insertion's path condition before choosing; ``False`` keeps each target's candidates
-# until a step touches it and checks the path condition in key order.
-_FULL_RESCAN = False
-
 
 def _changed_vertices(before: np.ndarray, after: np.ndarray) -> np.ndarray:
     """A boolean mask of the vertices with a mark that differs between the two graphs."""
@@ -608,18 +603,6 @@ class _Search:
     def forward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
         """The best-improving insertion not in ``excluded`` as ``(u, v, C)`` (Prop. 25)."""
         adj, n = self.adj, self.n
-        if _FULL_RESCAN:
-            reachable = _reachable(adj)
-            valid = (
-                (key, u, v, C)
-                for v in range(n)
-                for key, u, C in _forward_candidates(
-                    v, adj, self.score, n, self.ranks, self.forbidden
-                )
-                if not reachable(v, u, C) and not (excluded and (u, v, frozenset(C)) in excluded)
-            )
-            best = min(valid, key=lambda move: move[0], default=None)
-            return None if best is None else best[1:]
         for v in range(n):
             if v not in self.forward:
                 self.forward[v] = _forward_candidates(
@@ -648,8 +631,6 @@ class _Search:
         the excluded moves.
         """
         adj, n = self.adj, self.n
-        if _FULL_RESCAN:
-            self.backward.clear()
         for v in range(n):
             if v not in self.backward:
                 self.backward[v] = _backward_candidate(

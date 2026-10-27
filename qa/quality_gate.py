@@ -15,6 +15,7 @@ check that exits 1 on such a row, and the release checklist reviews it.
 
     uv run python -m qa.quality_gate                  # exit 1 if a baseline check fails
     uv run python -m qa.quality_gate PC FCI KCI
+    uv run python -m qa.quality_gate --jobs 4         # fit four cells at a time
     uv run python -m qa.quality_gate --capture        # re-measure the baselines; review the diff
 """
 
@@ -23,10 +24,11 @@ from __future__ import annotations
 import argparse
 import functools
 import json
+import multiprocessing
 import statistics
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -753,6 +755,67 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
     return [(m, ds) for m in methods or list(CHECKS) for ds in CHECKS[m].datasets]
 
 
+#: The cells that take over 10 seconds on a CI runner, slowest first. With several jobs they start
+#: first, so no worker is left fitting one long cell after the others have finished.
+SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
+    ("CMIknn", "anm_er_d5"),
+    ("CALM", "linear_gauss_er_d10"),
+    ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
+    ("CMIknn", "nonmonotone_er_d5"),
+    ("CALM", "asia_gauss"),
+    ("VARMA-LiNGAM", "varma_lingam_paper_d5_n300"),
+    ("KCI", "anm_er_d10"),
+    ("KCI", "nonmonotone_er_d10"),
+    ("BottomUpParceLiNGAM", "latent_lingam_er_d10"),
+    ("RCD", "latent_lingam_er_d15"),
+    ("DirectLiNGAM", "lingam_sf_d50"),
+    ("RCD", "latent_lingam_er_d10"),
+    ("ANM", "anm_pair_n1000"),
+    ("GIN", "latent_measurement_d12"),
+    ("GPDC", "anm_er_d5"),
+    ("VARMA-LiNGAM", "varma_lingam_paper_d3_n300"),
+    ("GPDC", "nonmonotone_er_d5"),
+    ("ExactSearch", "linear_gauss_er_d15"),
+)
+
+
+def start_order(todo: list[tuple[str, str]]) -> list[int]:
+    """Return the indices of ``todo`` in the order its cells start: :data:`SLOWEST_FIRST`, then the
+    rest in their own order."""
+    rank = {cell: i for i, cell in enumerate(SLOWEST_FIRST)}
+    return sorted(range(len(todo)), key=lambda i: (rank.get(todo[i], len(rank)), i))
+
+
+def evaluate_indexed(task: tuple[int, str, str]) -> tuple[int, CellResult]:
+    index, method, dataset = task
+    return index, evaluate(method, dataset)
+
+
+def run_cells(todo: list[tuple[str, str]], jobs: int = 1) -> Iterator[CellResult]:
+    """Yield the result of each ``(method, dataset)`` cell of ``todo``, in order.
+
+    With ``jobs`` above 1, worker processes fit the cells, longest first (:func:`start_order`), and
+    a result is yielded once it and every cell before it have finished. Each worker runs
+    :func:`evaluate`, so a cell's fit has the same settings as with one job. The workers start with
+    ``spawn``: ``forkserver`` needs a socket in ``TMPDIR``, which some cluster file systems reject.
+    """
+    if jobs == 1 or len(todo) < 2:
+        for method, dataset in todo:
+            yield evaluate(method, dataset)
+        return
+    if any(dataset == "sachs" for _, dataset in todo):
+        draws("sachs")  # download the rows once, before the workers read the cache
+    tasks = [(i, *todo[i]) for i in start_order(todo)]
+    done: dict[int, CellResult] = {}
+    next_index = 0
+    with multiprocessing.get_context("spawn").Pool(min(jobs, len(todo))) as pool:
+        for index, result in pool.imap_unordered(evaluate_indexed, tasks, chunksize=1):
+            done[index] = result
+            while next_index in done:
+                yield done.pop(next_index)
+                next_index += 1
+
+
 def capture(results: list[CellResult]) -> None:
     """Replace the baselines of each method in ``results``; keep every other recorded value."""
     everything = json.loads(BASELINES.read_text())
@@ -787,7 +850,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Check Andrey's methods against known graphs.")
     ap.add_argument("methods", nargs="*", help="methods or tests to check (default: all)")
     ap.add_argument("--capture", action="store_true", help="record the results as baselines")
+    ap.add_argument(
+        "--jobs", type=int, default=1, metavar="N", help="fit N cells at a time (default: 1)"
+    )
     args = ap.parse_args(argv)
+    if args.jobs < 1:
+        ap.error("--jobs must be at least 1")
 
     unknown = sorted(set(args.methods) - set(CHECKS))
     if unknown:
@@ -796,9 +864,9 @@ def main(argv: list[str] | None = None) -> int:
     parity_failed = 0 if args.capture else reference_parity.main()
     print("\nQuality gate: median SHD over each dataset's draws, against the known graph.\n")
     results = []
-    for method, dataset in cells(args.methods or None):
-        results.append(evaluate(method, dataset))
-        print(results[-1].describe("----" if args.capture else None), flush=True)
+    for result in run_cells(cells(args.methods or None), args.jobs):
+        results.append(result)
+        print(result.describe("----" if args.capture else None), flush=True)
     if args.capture:
         capture(results)
         print(f"\nRecorded {len(results)} baselines in {BASELINES.name}; review the diff.")

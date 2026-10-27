@@ -176,7 +176,7 @@ class GraphStructure(Structure):
     call. The graph is read-only.
     """
 
-    type: ClassVar[Literal["graph"]] = "graph"
+    type = "graph"
 
     _indptr: np.ndarray  # int64, (n_nodes + 1,)
     _indices: np.ndarray  # int32, (nnz,)
@@ -935,7 +935,7 @@ class TemporalStructure(Structure):
     ``summary_graph()`` describe the final occasion only.
     """
 
-    type: ClassVar[Literal["temporal"]] = "temporal"
+    type = "temporal"
 
     _lags: tuple[GraphStructure, ...] = ()
     _lag_indices: tuple[int, ...] = ()  # explicit lag value of each graph; () -> 0..L-1

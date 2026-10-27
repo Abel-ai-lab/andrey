@@ -94,7 +94,8 @@ class GPDC:
     residuals and reads as conditional dependence. The null ignores the degrees of freedom the
     regressions use, as [1]_ does. Each regression costs the cube of the number of rows per
     optimizer step, so thousands of rows take seconds per query. The p-value is a multiple of
-    ``1 / (n_null + 1)``, and is at least that.
+    ``1 / (n_null + 1)``, and is at least that. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

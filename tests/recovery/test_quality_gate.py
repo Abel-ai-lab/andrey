@@ -86,6 +86,37 @@ def test_tolerance_is_two_sided() -> None:
     assert qg.CellResult("PC", "x", shd=[5], empty_shd=[5], baseline=5, tolerance=1).failures
 
 
+def test_the_slowest_cells_are_cells_of_the_gate_and_start_first() -> None:
+    every = qg.cells()
+    assert len(set(qg.SLOWEST_FIRST)) == len(qg.SLOWEST_FIRST)
+    assert set(qg.SLOWEST_FIRST) <= set(every)
+    order = qg.start_order(every)
+    assert sorted(order) == list(range(len(every)))
+    started = [every[i] for i in order]
+    assert started[: len(qg.SLOWEST_FIRST)] == list(qg.SLOWEST_FIRST)
+    rest = [cell for cell in every if cell not in qg.SLOWEST_FIRST]
+    assert started[len(qg.SLOWEST_FIRST) :] == rest
+
+
+def test_several_jobs_return_the_same_results_in_the_same_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    todo = [("PC", "asia_gauss"), ("GES", "asia_gauss"), ("PC", "linear_gauss_er_d20")]
+    # The last cell starts first, so the results arrive out of order and are held back.
+    monkeypatch.setattr(qg, "SLOWEST_FIRST", (todo[2],))
+    assert qg.start_order(todo) == [2, 0, 1]
+
+    def rows(jobs: int) -> list[tuple]:
+        return [
+            (r.method, r.dataset, r.shd, r.empty_shd, r.baseline, r.tolerance)
+            for r in qg.run_cells(todo, jobs)
+        ]
+
+    parallel = rows(2)
+    assert parallel == rows(1)
+    assert [row[:2] for row in parallel] == todo
+
+
 def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate draws each regime with the arguments the published benchmarks used."""
     pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl

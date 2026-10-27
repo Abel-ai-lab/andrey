@@ -14,9 +14,10 @@ variable, ``0.8 N`` and ``2 N``, so the graph does not grow denser with ``N``. V
 fits a moving-average part, which the paper's VAR model does not have: the series adds one
 moving-average matrix ``M1`` on the noise, drawn as ``B1`` is,
 ``x_t = B0 x_t + B1 x_{t-1} + e_t + M1 e_{t-1}``. A draw whose autoregressive or moving-average
-part is not stable is drawn again. Its columns are then listed in an order drawn from a stream of
-their own, with the stack permuted the same way, so the column order does not follow ``B0``'s causal
-order.
+part is not stable is drawn again; if none of the :data:`MAX_DRAWS` is stable, the first draw is kept
+and each part that is not stable is scaled until it is (:func:`_rescale`). Its columns are then
+listed in an order drawn from a stream of their own, with the stack permuted the same way, so the
+column order does not follow ``B0``'s causal order.
 
 ``panel2013`` follows Kadowaki, Shimizu, and Washio's longitudinal LiNGAM experiments as their JSAI
 2013 paper describes them (Sect. 6.1; the MLSP 2013 paper is not openly available): ``M`` units
@@ -28,7 +29,14 @@ weight uniform on [0, 1]. The variables are then put in a random order. The pape
 from the 18 densities of Bach and Jordan (2002); that paper specifies 5 of them in full (Student t
 with 3 and 5 degrees of freedom, double exponential, uniform, and exponential) and shows the
 mixtures only as plots, so each variable's noise here is one of those 5, scaled to zero mean and
-unit variance before its own variance.
+unit variance before its own variance. Each time point draws its own lag matrix, so a panel is not
+stationary, and its scale grows with the product of those matrices unless each is small. A time
+point whose lag matrix through the same-step part, ``(I - B(t,t))^-1 B(t,t-1)``, has spectral norm
+1 or more, which is about 60% of the time points at ``N = 3`` and every one from ``N = 5`` on, has ``B(t,t-1)`` scaled down until
+that norm is 0.95 (:func:`_contract_lags`). Every step then contracts, and the panel stays within a
+fixed multiple of one time point's scale for any ``T``. The norm bounds the spectral radius, which
+alone does not bound a product of different, non-normal matrices. A time point below norm 1 keeps
+its draw.
 """
 
 from __future__ import annotations
@@ -39,10 +47,12 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
+from andrey_bench.temporal_models import STATIONARY_TARGET
+
 #: Time steps simulated and discarded before a series starts.
 BURN_IN = 500
 
-#: Draws of a model before giving up on a stable one.
+#: Draws of a model before rescaling the first one to stability.
 MAX_DRAWS = 1000
 
 #: The last seed coordinate of the column-order stream, which no other draw uses.
@@ -66,6 +76,7 @@ class PanelModel:
     instantaneous: tuple[float, float]  # |B(t,t)| entries are uniform on this range
     lagged: float  # B(t,t-1) entries are uniform on [-lagged, lagged]
     noise_variance: tuple[float, float]
+    lag_norm: float  # a time point's reduced-form lag matrix of norm 1 or more is scaled to this
 
 
 MODELS: dict[str, VarmaModel | PanelModel] = {
@@ -75,7 +86,12 @@ MODELS: dict[str, VarmaModel | PanelModel] = {
         coefficient=(0.05, 0.5),
         exponent=(1.5, 2.0),
     ),
-    "panel2013": PanelModel(instantaneous=(0.5, 1.5), lagged=0.5, noise_variance=(1.0, 2.0)),
+    "panel2013": PanelModel(
+        instantaneous=(0.5, 1.5),
+        lagged=0.5,
+        noise_variance=(1.0, 2.0),
+        lag_norm=STATIONARY_TARGET,
+    ),
 }
 
 #: The noise densities of Bach and Jordan (2002) given in full, each with zero mean, unit variance.
@@ -116,6 +132,22 @@ def _radius(matrix: np.ndarray) -> float:
     return float(np.max(np.abs(np.linalg.eigvals(matrix))))
 
 
+def _rescale(inverse: np.ndarray, b1: np.ndarray, m1: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Scale ``B1`` and ``M1`` each down to the stationary target, if it is not stable.
+
+    ``inverse`` is ``(I - B0)^-1``. Scaling a single-lag matrix by ``s`` scales its eigenvalues by
+    ``s``, so one ``s`` lands the radius of ``inverse @ B1``, or of ``M1``, on the target exactly; it
+    is the rescale of ``andrey.data.temporal.stabilize`` at one lag. A positive scale leaves every
+    link where it was, and a part that is stable stays as drawn.
+    """
+    ar, ma = _radius(inverse @ b1), _radius(m1)
+    if ar >= 1.0:
+        b1 = b1 * (STATIONARY_TARGET / ar)
+    if ma >= 1.0:
+        m1 = m1 * (STATIONARY_TARGET / ma)
+    return b1, m1
+
+
 def sample_varma(
     name: str, d: int, n: int, seed: int, *, shuffle: bool = True
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -131,6 +163,7 @@ def sample_varma(
     rng = _rng(name, d, seed)
     lower = np.tril(np.ones((d, d), dtype=bool), k=-1)
     everywhere = np.ones((d, d), dtype=bool)
+    first = None
     for _ in range(MAX_DRAWS):
         b0 = _sparse(rng, lower, round(model.instantaneous_per_variable * d), model.coefficient)
         b1 = _sparse(rng, everywhere, round(model.lagged_per_variable * d), model.coefficient)
@@ -138,8 +171,12 @@ def sample_varma(
         inverse = np.linalg.inv(np.eye(d) - b0)
         if _radius(inverse @ b1) < 1.0 and _radius(m1) < 1.0:
             break
+        if first is None:
+            first = (b0, b1, m1)
     else:
-        raise RuntimeError(f"no stable draw in {MAX_DRAWS} tries for d={d}, seed={seed}")
+        b0, b1, m1 = first
+        inverse = np.linalg.inv(np.eye(d) - b0)
+        b1, m1 = _rescale(inverse, b1, m1)
     exponent = rng.uniform(*model.exponent, size=d)
     z = rng.standard_normal((n + BURN_IN, d))
     noise = np.sign(z) * np.abs(z) ** exponent
@@ -166,14 +203,32 @@ def _standard_noise(rng: np.random.Generator, density: str, size: tuple[int, ...
     raise ValueError(f"unknown density {density!r}")
 
 
+def _contract_lags(truth: np.ndarray, target: float) -> None:
+    """Scale each ``B(t,t-1)`` in ``truth`` so its reduced-form lag matrix has norm ``target``, if needed.
+
+    The reduced-form lag matrix of time point ``t`` is ``A_t = (I - B(t,t))^-1 B(t,t-1)``, so
+    ``x_t = A_t x_{t-1} + (I - B(t,t))^-1 e_t``. Scaling ``B(t,t-1)`` by ``s`` scales ``A_t`` by
+    ``s``, so one ``s`` puts ``A_t``'s spectral norm on ``target`` exactly. A norm below 1 makes the
+    step a contraction, which bounds the series for any number of time points, and bounds the radius
+    too. A positive scale leaves every link where it was, and a time point already below norm 1
+    stays as drawn. No random numbers are drawn.
+    """
+    identity = np.eye(truth.shape[-1])
+    for t in range(1, len(truth)):
+        norm = float(np.linalg.norm(np.linalg.solve(identity - truth[t, 0], truth[t, 1]), 2))
+        if norm >= 1.0:
+            truth[t, 1] *= target / norm
+
+
 def sample_panel(
     name: str, d: int, times: int, m: int, seed: int, *, scale: float = 1.0
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(data, truth)``: ``m`` units of ``d`` variables at ``times`` time points.
 
     ``data`` has shape ``(times, m, d)``. ``truth`` has shape ``(times, 2, d, d)``: ``truth[t, 0]``
-    is ``B(t,t)`` and ``truth[t, 1]`` is ``B(t,t-1)``, zero at the first time point. ``scale``
-    multiplies every drawn ``B(t,t)`` and ``B(t,t-1)`` entry and leaves every other draw as it is.
+    is ``B(t,t)`` and ``truth[t, 1]`` is ``B(t,t-1)``, zero at the first time point, scaled where
+    :func:`_contract_lags` says. ``scale`` multiplies every drawn ``B(t,t)`` and ``B(t,t-1)`` entry
+    and leaves every other draw as it is.
     """
     model = MODELS[name]
     assert isinstance(model, PanelModel)
@@ -186,6 +241,7 @@ def sample_panel(
         truth[t, 0] = np.where(lower, magnitude * sign * scale, 0.0)
         if t:
             truth[t, 1] = rng.uniform(-model.lagged, model.lagged, size=(d, d)) * scale
+    _contract_lags(truth, model.lag_norm)
     noise_scale = np.sqrt(rng.uniform(*model.noise_variance, size=d))
     densities = rng.choice(len(DENSITIES), size=d)
     noise = (

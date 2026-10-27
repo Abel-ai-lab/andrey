@@ -8,8 +8,11 @@ with an autodependency ``a_j`` for every variable and ``L`` cross-links ``k_i ->
 where ``L`` grows with the number of variables ``d``, so each variable has the same expected number
 of cross-links at every size. A cross-link at ``tau_i = 0`` acts within a time step; the same-step
 links follow one random causal order, so they form a DAG. A model whose reduced-form process is not
-stationary is drawn again, as the papers keep stationary models only. A share of the variables can
-be left unobserved: they are generated, then dropped from the data, and placed last in the truth.
+stationary is drawn again, as the papers keep stationary models only. The share of stationary draws
+falls as ``d`` grows; when none of the :data:`MAX_DRAWS` is, the first draw is kept and its lagged
+coefficients are scaled until the process is stationary (:func:`_rescale`), so no size fails.
+A share of the variables can be left unobserved: they are generated, then dropped from the data,
+and placed last in the truth.
 
 The three models, with each paper's section:
 
@@ -45,8 +48,12 @@ from andrey_bench.window import ARROW, TAIL
 #: Time steps simulated and discarded before the series starts.
 BURN_IN = 1000
 
-#: Draws of a model's links and coefficients before giving up on a stationary one.
+#: Draws of a model's links and coefficients before rescaling the first one to stationarity.
 MAX_DRAWS = 1000
+
+#: The spectral radius a rescaled draw lands on, the papers' strongest autodependency. The draws a
+#: small ``d`` keeps are about that persistent, and a lower target would weaken the lagged links more.
+STATIONARY_TARGET = 0.95
 
 
 @dataclass(frozen=True)
@@ -125,13 +132,29 @@ def _spectral_radius(lag0: np.ndarray, lagged: np.ndarray) -> float:
     return float(np.max(np.abs(np.linalg.eigvals(companion))))
 
 
+def _rescale(stack: np.ndarray) -> np.ndarray:
+    """Scale lag ``k`` of a ``[lag, effect, cause]`` stack by ``s**k`` to the stationary target.
+
+    The scaling maps every companion eigenvalue ``λ`` to ``sλ`` for any lag order, so one ``s`` lands
+    the spectral radius on :data:`STATIONARY_TARGET` exactly; it is the rescale of
+    ``andrey.data.temporal.stabilize``. The autodependencies are lagged coefficients and scale with
+    the rest. The same-step part enters through ``(I - B0)^-1`` and stays as drawn, so the same-step
+    links remain a DAG. A positive scale leaves every link where it was.
+    """
+    s = STATIONARY_TARGET / _spectral_radius(stack[0], stack[1:])
+    lagged = stack[1:] * (s ** np.arange(1, len(stack)))[:, None, None]
+    return np.concatenate([stack[:1], lagged])
+
+
 def _draw_model(model: Model, d: int, seed: int, rng: np.random.Generator) -> np.ndarray:
     """Draw links and coefficients until the process is stationary.
 
-    Returns the ``(max_lag + 1, d, d)`` ``[lag, effect, cause]`` coefficient stack.
+    Returns the ``(max_lag + 1, d, d)`` ``[lag, effect, cause]`` coefficient stack. If none of the
+    :data:`MAX_DRAWS` is stationary, returns the first draw rescaled by :func:`_rescale`.
     """
     n_links = math.floor(model.cross_degree * d)
     n_same = round(model.same_step * n_links)
+    first = None
     for _ in range(MAX_DRAWS):
         if model.autocorrelation_sets:
             choices = model.autocorrelation_sets[seed % len(model.autocorrelation_sets)]
@@ -158,7 +181,11 @@ def _draw_model(model: Model, d: int, seed: int, rng: np.random.Generator) -> np
             continue
         if _spectral_radius(stack[0], stack[1:]) < 1.0:
             return stack
-    raise RuntimeError(f"no stationary draw in {MAX_DRAWS} tries for d={d}, seed={seed}")
+        if first is None:
+            first = stack
+    if first is None:
+        raise RuntimeError(f"no valid draw in {MAX_DRAWS} tries for d={d}, seed={seed}")
+    return _rescale(first)
 
 
 def sample(name: str, d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:

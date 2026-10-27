@@ -9,15 +9,13 @@ import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
 
-from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
-from andrey.search.ges import _parent_limits, _recompute_objective, ges
-from andrey.search.hc import tie_ranks
-from tests.unit.ges_chunks import backward_inprocess, forward_inprocess
+from andrey.search.ges import ges
+from tests.unit.ges_chunks import backward_inprocess, forward_inprocess, ges_inprocess
 
 # Random linear-Gaussian datasets spanning sparse/dense and small/large graphs (the test_pc_ges
 # sweep): the general-input regime a single fixed baseline cannot reach.
@@ -43,38 +41,14 @@ def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
     return x
 
 
-def _ges_decomposed(
-    x: np.ndarray, n_chunks: int, max_parents: float | None = None, parent_rule: str = "cap"
-):
-    """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
-
-    Drives the PURE Schur delta engine through ``forward_chunk_best`` / ``backward_chunk_best`` and
-    the :func:`~andrey.search._parallel_ges.move_key` reduce, then recomputes the objective from the
-    final CPDAG exactly as ``ges()`` does.
-    """
-    X = np.asarray(x, dtype=np.float64)
-    n = X.shape[1]
-    gate, cap = _parent_limits(n, max_parents, parent_rule)
-    score = BICScore(X, lambda_value=1.0)
-    engine = DeltaBICScore(score)
-    adj = np.zeros((n, n), dtype=np.int8)
-    # Match ges()'s BLAS pin so the in-process vs serial comparison is thread-count-invariant.
-    with threadpool_limits(limits=1):
-        ranks = tie_ranks(X).tolist()
-        adj = forward_inprocess(adj, engine, n, gate, n_chunks, ranks, cap)
-        adj = backward_inprocess(adj, engine, n, n_chunks, ranks, cap)
-        total = _recompute_objective(adj, score, n)
-    return to_structure(adj, kind="cpdag"), total
-
-
 @pytest.mark.parametrize("seed,d,n,p", _SWEEP)
 @pytest.mark.parametrize("n_chunks", [2, 3, 8])
 def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
     """The N-chunk in-process reduce reproduces serial GES's CPDAG and score exactly."""
     x = _gaussian_sem(seed, n, d, p)
     serial_struct, serial_score = ges(x)
-    decomp_struct, decomp_score = _ges_decomposed(x, n_chunks)
-    assert np.array_equal(serial_struct.to_numpy(), decomp_struct.to_numpy()), (
+    decomp_marks, decomp_score = ges_inprocess(x, n_chunks)
+    assert np.array_equal(serial_struct.to_numpy(), decomp_marks), (
         f"CPDAG differs at seed={seed}, d={d}, n_chunks={n_chunks}"
     )
     assert serial_score == decomp_score  # bit-identical accumulated BIC
@@ -84,9 +58,9 @@ def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
 def test_chunk_count_invariance(seed, d, n, p):
     """Every chunk count (2, 3, one-per-target, more-than-targets) gives the identical result."""
     x = _gaussian_sem(seed, n, d, p)
-    reference = _ges_decomposed(x, 2)[0].to_numpy()
+    reference = ges_inprocess(x, 2)[0]
     for n_chunks in (3, d, d + 5):
-        assert np.array_equal(_ges_decomposed(x, n_chunks)[0].to_numpy(), reference), (
+        assert np.array_equal(ges_inprocess(x, n_chunks)[0], reference), (
             f"chunk count {n_chunks} changed the result at seed={seed}, d={d}"
         )
 
@@ -616,6 +590,164 @@ def test_script_without_main_guard(tmp_path, d, guarded):
     assert last.startswith("RuntimeError: parallel-search workers failed to start"), last
     assert last.index('if __name__ == "__main__":') < last.index("out of memory"), last
     assert "ANDREY_NUM_WORKERS=1" in last, last
+
+
+# --- the forkserver's socket on a file system that rejects chmod ----------------------------------
+# The forkserver chmods its Unix socket in ``TMPDIR``; a parallel file system can reject that call
+# (``EOPNOTSUPP``). The tests stand in for it with a rejecting ``chmod``, or with a stub for the
+# probe and the start.
+
+import errno  # noqa: E402
+import re  # noqa: E402
+import tempfile  # noqa: E402
+import warnings  # noqa: E402
+
+from andrey.core.warning_policy import PerformanceWarning  # noqa: E402
+
+needs_forkserver = pytest.mark.skipif(
+    "forkserver" not in mp.get_all_start_methods(), reason="forkserver unavailable on this platform"
+)
+
+
+def _reject_chmod(path, *args, **kwargs):
+    raise OSError(errno.EOPNOTSUPP, os.strerror(errno.EOPNOTSUPP), str(path))
+
+
+@pytest.fixture
+def forkserver_decision():
+    """Start and end a test with no recorded decision on where the forkserver's socket goes."""
+    par._forkserver_starts.cache_clear()
+    yield
+    par._forkserver_starts.cache_clear()
+
+
+@needs_forkserver
+def test_socket_probe_reports_whether_the_directory_holds_it(monkeypatch):
+    """The probe accepts a usable directory and rejects a missing one, a socket path past the
+    platform's limit, or a rejected chmod."""
+    # pytest's tmp_path can itself overrun the limit (104 bytes on macOS), so the base is short.
+    with tempfile.TemporaryDirectory(dir="/tmp") as base:
+        assert par._holds_forkserver_socket(base)
+        assert not par._holds_forkserver_socket(os.path.join(base, "missing"))
+        deep = os.path.join(base, "d" * 120)
+        os.mkdir(deep)
+        assert not par._holds_forkserver_socket(deep)
+        os.rmdir(deep)
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "chmod", _reject_chmod)
+            assert not par._holds_forkserver_socket(base)
+        assert os.listdir(base) == [], "the probe left files behind"
+
+
+@needs_forkserver
+def test_forkserver_socket_moves_off_a_tmpdir_that_rejects_it(
+    forkserver_decision, monkeypatch, tmp_path
+):
+    """The server starts with its socket in a node-local directory and the temporary one returns."""
+    from multiprocessing import forkserver
+
+    bad, local = str(tmp_path), par._NODE_LOCAL_DIRS[0]
+    monkeypatch.setattr(tempfile, "tempdir", bad)
+    monkeypatch.setattr(par, "_holds_forkserver_socket", lambda base: base != bad)
+    started = []
+    monkeypatch.setattr(forkserver, "ensure_running", lambda: started.append(tempfile.gettempdir()))
+    with pytest.warns(PerformanceWarning, match=re.escape(repr(local))) as caught:
+        ctx = par.pick_context()
+    assert repr(bad) in str(caught[0].message)
+    assert ctx.get_start_method() == "forkserver"
+    assert started == [local]
+    assert tempfile.gettempdir() == bad, "the directory change outlived the start"
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert par.pick_context() is ctx  # decided once per process: no second start or warning
+    assert started == [local]
+
+
+@needs_forkserver
+@pytest.mark.parametrize("start_fails", [False, True], ids=["no directory holds it", "start fails"])
+@pytest.mark.parametrize("safe,method", [(True, "fork"), (False, "spawn")])
+def test_forkserver_is_replaced_when_its_socket_cannot_be_placed(
+    forkserver_decision, monkeypatch, tmp_path, start_fails, safe, method
+):
+    """Without a socket directory the pool starts with ``fork`` or ``spawn``, and says so."""
+    from multiprocessing import forkserver
+
+    bad = str(tmp_path)
+    monkeypatch.setattr(tempfile, "tempdir", bad)
+    monkeypatch.setattr(par, "_holds_forkserver_socket", lambda base: start_fails and base != bad)
+
+    def start():
+        if not start_fails:
+            raise AssertionError("no directory holds the socket, so the server must not start")
+        raise OSError(errno.EOPNOTSUPP, os.strerror(errno.EOPNOTSUPP))
+
+    monkeypatch.setattr(forkserver, "ensure_running", start)
+    monkeypatch.setattr(par, "fork_safe", lambda: safe)
+    with pytest.warns(PerformanceWarning, match=re.escape(repr(method))) as caught:
+        ctx = par.pick_context()
+    assert repr(bad) in str(caught[0].message)
+    assert ctx.get_start_method() == method
+    assert tempfile.gettempdir() == bad
+
+
+_REJECTED_TMPDIR_SCRIPT = """\
+import errno
+import os
+import warnings
+
+import numpy as np
+
+import andrey
+
+
+def rejecting(real_chmod, tmpdir):
+    def chmod(path, *args, **kwargs):
+        if str(path).startswith(tmpdir):
+            raise OSError(errno.EOPNOTSUPP, os.strerror(errno.EOPNOTSUPP), str(path))
+        return real_chmod(path, *args, **kwargs)
+
+    return chmod
+
+
+if __name__ == "__main__":
+    os.chmod = rejecting(os.chmod, os.environ["TMPDIR"])
+    X = np.random.default_rng(0).standard_normal((300, 10))
+    X[:, 1:] += 0.6 * X[:, :-1]
+    serial = andrey.ges(X)
+    with andrey.config(num_workers=2), warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        pooled = andrey.ges(X)
+    print(np.array_equal(serial.structure.to_numpy(), pooled.structure.to_numpy()))
+    print(*(str(w.message) for w in caught), sep="\\n")
+"""
+
+
+@needs_forkserver
+def test_pool_starts_with_tmpdir_on_a_file_system_that_rejects_chmod(tmp_path):
+    """A fit on two workers completes with the serial answer when ``TMPDIR`` rejects the socket."""
+    rejected = tmp_path / "rejected"
+    rejected.mkdir()
+    script = tmp_path / "fit.py"
+    script.write_text(_REJECTED_TMPDIR_SCRIPT)
+    src_dir = str(pathlib.Path(pg.__file__).resolve().parents[2])
+    env = {
+        **os.environ,
+        "TMPDIR": str(rejected),
+        "PYTHONPATH": os.pathsep.join(filter(None, [src_dir, os.environ.get("PYTHONPATH")])),
+        "ANDREY_GES_PARALLEL_MIN_WORK": "0",
+    }
+    proc = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=tmp_path,
+        timeout=300,
+    )
+    assert proc.returncode == 0, proc.stderr
+    identical, *messages = proc.stdout.splitlines()
+    assert identical == "True"
+    assert any(str(rejected) in m and "forkserver" in m for m in messages), proc.stdout
 
 
 @pytest.mark.parametrize("seed", range(30))

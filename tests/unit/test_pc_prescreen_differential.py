@@ -17,13 +17,18 @@ both PC and FCI condition on either endpoint's snapshot neighborhood and union t
 (FCI records a removed pair both ways); both snapshot neighborhoods at the start of a conditioning
 size and apply removals only after the size completes.
 
-The toggle and serial-vs-parallel checks compare each fast path with the same search's scalar path.
+The prescreen and serial-vs-parallel checks compare each fast path with the same search's scan: the
+prescreen with the generic scan a test without the vectorized paths takes, the pool with the
+in-process scan.
 The last section runs the reference against the chi-square, G-square, and conditional Gaussian
 tests, whose batched, marginal, and first-order paths the searches take the same way.
 """
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from functools import partial
 from itertools import combinations
 
@@ -48,6 +53,24 @@ def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
     # Pin the numpy oracle so an ambient ANDREY_DEVICE cannot make the correlation matrix (and thus
     # the p-values the reference and the production search compare) differ across backends.
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
+
+
+@contextmanager
+def _generic_scan() -> Iterator[None]:
+    """Let PC and FCI treat every test as one without the vectorized size-0 and size-1 paths."""
+    with pytest.MonkeyPatch.context() as patch:
+        for module in ("pc", "fci"):
+            patch.setattr(
+                importlib.import_module(f"andrey.constraint.{module}"),
+                "prescreen_capable",
+                lambda test: False,
+            )
+        yield
+
+
+def _scan(prescreen: bool):
+    """The context a search runs in: the vectorized passes when ``prescreen``, else the scan."""
+    return nullcontext() if prescreen else _generic_scan()
 
 
 def _gaussian_dag(seed: int, n: int, d: int, density: float) -> np.ndarray:
@@ -167,31 +190,32 @@ def test_fci_skeleton_matches_scalar_reference(seed: int, d: int, n: int, p: flo
     _assert_same(prod, ref, f"FCI seed={seed} d={d} n={n} p={p}")
 
 
-# ---- prescreen on/off is bit-identical (the vectorized path vs the scalar scan) ------------------
+# ---- the prescreen is bit-identical to the scan (the vectorized path vs the generic scan) --------
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
 def test_pc_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    on = _discover_skeleton(x, 0.05, "fisherz", prescreen=True)
-    off = _discover_skeleton(x, 0.05, "fisherz", prescreen=False)
-    _assert_same(on, off, f"PC prescreen toggle seed={seed} d={d} n={n} p={p}")
+    on = _discover_skeleton(x, 0.05, "fisherz")
+    with _generic_scan():
+        off = _discover_skeleton(x, 0.05, "fisherz")
+    _assert_same(on, off, f"PC prescreen seed={seed} d={d} n={n} p={p}")
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
 def test_fci_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
-    on = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, prescreen=True)
-    off = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, prescreen=False)
-    _assert_same(on, off, f"FCI prescreen toggle seed={seed} d={d} n={n} p={p}")
+    on = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05)
+    with _generic_scan():
+        off = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05)
+    _assert_same(on, off, f"FCI prescreen seed={seed} d={d} n={n} p={p}")
 
 
 # ---- the prescreen leaves the full CPDAG / PAG unchanged (covers downstream queries) ----------
 #
 # The skeleton comparisons above pin the adjacency and separating sets. The full pipelines also
 # issue CI queries downstream (FCI's possible-d-sep pass and discriminating-path rule), so these
-# assert the recovered CPDAG / PAG itself is byte-identical with the prescreen on versus off --
-# forcing prescreen off by wrapping the internal search each facade calls.
+# assert the recovered CPDAG / PAG itself is byte-identical with the prescreen on versus off.
 
 _PIPELINE_SWEEP = [(6, 300, 0.40), (8, 400, 0.30), (10, 500, 0.30)]
 _PIPELINE_CASES = [(seed, d, n, p) for seed in range(2) for (d, n, p) in _PIPELINE_SWEEP]
@@ -199,56 +223,37 @@ _PIPELINE_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _PIPELINE_CASES]
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PIPELINE_CASES, ids=_PIPELINE_IDS)
-def test_pc_pipeline_prescreen_invariant(
-    monkeypatch: pytest.MonkeyPatch, seed: int, d: int, n: int, p: float
-) -> None:
-    import importlib
-
+def test_pc_pipeline_prescreen_invariant(seed: int, d: int, n: int, p: float) -> None:
     import andrey
 
-    pc_mod = importlib.import_module("andrey.constraint.pc")
     x = _gaussian_dag(seed, n, d, p)
     prescreened = andrey.pc(x).structure.to_numpy()
-    monkeypatch.setattr(pc_mod, "_discover_skeleton", partial(_discover_skeleton, prescreen=False))
-    baseline = andrey.pc(x).structure.to_numpy()
+    with _generic_scan():
+        baseline = andrey.pc(x).structure.to_numpy()
     assert np.array_equal(prescreened, baseline), f"PC CPDAG differs seed={seed} d={d}"
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PIPELINE_CASES, ids=_PIPELINE_IDS)
-def test_fci_pipeline_prescreen_invariant(
-    monkeypatch: pytest.MonkeyPatch, seed: int, d: int, n: int, p: float
-) -> None:
-    import importlib
-
+def test_fci_pipeline_prescreen_invariant(seed: int, d: int, n: int, p: float) -> None:
     import andrey
 
-    fci_mod = importlib.import_module("andrey.constraint.fci")
     x = _gaussian_dag(seed, n, d, p)
     prescreened = andrey.fci(x).structure.to_numpy()
-    monkeypatch.setattr(
-        fci_mod, "_fast_adjacency_search", partial(_fast_adjacency_search, prescreen=False)
-    )
-    baseline = andrey.fci(x).structure.to_numpy()
+    with _generic_scan():
+        baseline = andrey.fci(x).structure.to_numpy()
     assert np.array_equal(prescreened, baseline), f"FCI PAG differs seed={seed} d={d}"
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PIPELINE_CASES, ids=_PIPELINE_IDS)
-def test_cdnod_pipeline_prescreen_invariant(
-    monkeypatch: pytest.MonkeyPatch, seed: int, d: int, n: int, p: float
-) -> None:
-    import importlib
-
+def test_cdnod_pipeline_prescreen_invariant(seed: int, d: int, n: int, p: float) -> None:
     import andrey
 
-    cdnod_mod = importlib.import_module("andrey.constraint.cdnod")
     x = _gaussian_dag(seed, n, d, p)
     context = np.zeros((n, 1))
     context[n // 2 :, 0] = 1.0
     prescreened = andrey.cdnod(x, context).structure.to_numpy()
-    monkeypatch.setattr(
-        cdnod_mod, "_discover_skeleton", partial(_discover_skeleton, prescreen=False)
-    )
-    baseline = andrey.cdnod(x, context).structure.to_numpy()
+    with _generic_scan():
+        baseline = andrey.cdnod(x, context).structure.to_numpy()
     assert np.array_equal(prescreened, baseline), f"CDNOD CPDAG differs seed={seed} d={d}"
 
 
@@ -284,10 +289,9 @@ def test_pc_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None
 def test_pc_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) -> None:
     # The column collider order skips the p-values on the prescreen, scan, and worker paths.
     x = _gaussian_dag(0, 600, 20, 0.25)
-    full = _discover_skeleton(x, 0.05, "fisherz", prescreen=prescreen, workers=workers)
-    bare = _discover_skeleton(
-        x, 0.05, "fisherz", prescreen=prescreen, workers=workers, record_pvalues=False
-    )
+    with _scan(prescreen):
+        full = _discover_skeleton(x, 0.05, "fisherz", workers=workers)
+        bare = _discover_skeleton(x, 0.05, "fisherz", workers=workers, record_pvalues=False)
     assert full[2] and bare[2] == {}
     _assert_same(bare[:2], full[:2], f"PC without p-values prescreen={prescreen} workers={workers}")
 
@@ -331,16 +335,13 @@ def test_student_t_skeletons_match_scalar_reference(seed: int, d: int, n: int, p
 def test_student_t_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
     label = f"seed={seed} d={d} n={n} p={p}"
-    _assert_same(
-        _discover_skeleton(x, 0.05, "student_t", prescreen=True),
-        _discover_skeleton(x, 0.05, "student_t", prescreen=False),
-        f"PC {label}",
-    )
-    _assert_same(
-        _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, prescreen=True),
-        _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, prescreen=False),
-        f"FCI {label}",
-    )
+    pc_on = _discover_skeleton(x, 0.05, "student_t")
+    fci_on = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05)
+    with _generic_scan():
+        pc_off = _discover_skeleton(x, 0.05, "student_t")
+        fci_off = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05)
+    _assert_same(pc_on, pc_off, f"PC {label}")
+    _assert_same(fci_on, fci_off, f"FCI {label}")
 
 
 @pytest.mark.usefixtures("_open_gate")
@@ -386,8 +387,8 @@ def test_categorical_and_mixed_skeletons_match_scalar_reference(
     pc = _discover_skeleton(x, 0.05, indep_test, categorical=mask)
     assert any(len(s) >= 2 for s in pc[1].values()), "no pair separated at size 2 or more"
     _assert_same(pc, reference(mode="pc"), f"PC {label}")
-    _assert_same(
-        pc, _discover_skeleton(x, 0.05, indep_test, categorical=mask, prescreen=False), label
-    )
+    with _generic_scan():
+        unprescreened = _discover_skeleton(x, 0.05, indep_test, categorical=mask)
+    _assert_same(pc, unprescreened, label)
     test = make_indep_test(indep_test, x, categorical=mask)
     _assert_same(_fast_adjacency_search(x, test, 0.05), reference(mode="fci"), f"FCI {label}")

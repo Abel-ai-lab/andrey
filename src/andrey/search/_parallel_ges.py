@@ -12,8 +12,8 @@ reorders the CPDAG the same way. Each key is unique, so the CPDAG is byte-identi
 partitions and worker assignments.
 
 The forward phase keeps each target's Insert candidates between passes and enumerates them again
-only for the targets a move touches (:class:`_ForwardScan`); it selects the move a full scan
-(:func:`forward_chunk_best`) selects.
+only for the targets a move touches (:class:`_ForwardScan`); it selects the move a full scan of
+every target selects.
 
 A parent cap (``cap``) holds on the CPDAG after every move of either phase: no DAG of its class
 gives a node more than ``cap`` parents (:func:`~andrey.search.operators.max_parents_in_class`). A
@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import heapq
 import math
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Protocol
 
 import numpy as np
@@ -42,7 +42,6 @@ from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
-from andrey.search.ges import _reachable
 
 _pick_context = par.pick_context
 
@@ -82,8 +81,8 @@ class DeltaEngine(Protocol):
     """A move scorer: raw local-score deltas for single add/remove moves off a shared base.
 
     Satisfied by the PURE Schur :class:`~andrey.core.score_delta.DeltaBICScore` (BIC) and by
-    :class:`~andrey.core.score_delta.FullScoreDelta`, which differences two full scores: BIC's
-    reference arm, which the quality gate pairs against the Schur path, and BDeu.
+    :class:`~andrey.core.score_delta.FullScoreDelta`, which differences two full scores, for BDeu
+    and the mixed-data scores.
     """
 
     @property
@@ -130,33 +129,6 @@ def _rows(mask: np.ndarray) -> list[np.ndarray]:
     return np.split(cols, np.searchsorted(rows, np.arange(1, mask.shape[0])))
 
 
-def _insert_candidates(
-    y: int, adj: np.ndarray, state: NeighborState, forbidden: np.ndarray | None = None
-) -> Iterator[tuple[int, int, tuple[int, ...], set[int]]]:
-    """Yield ``(x, t_index, T, clique)`` for every Insert into ``y`` whose ``NA u T`` is a clique.
-
-    ``clique = NA u T`` is the node set every semi-directed ``y ~> x`` path must meet for the
-    Insert to be valid; the caller checks that. Sources come in ascending ``x``, and each source's
-    subsets in :func:`~andrey.search.operators.clique_extensions` order. With ``forbidden``
-    (``[i, j]``: no edge ``i -> j``), neither ``x`` nor a member of ``T`` is forbidden into ``y``.
-    """
-    adj_sets, _par_of, nbr = state
-    nbrs_y = nbr[y]
-    sources = np.flatnonzero((adj[:, y] == ops.NULL) & (adj[y] == ops.NULL))
-    free = nbrs_y  # the undirected neighbors T may hold
-    if forbidden is not None:
-        sources = sources[~forbidden[sources, y]]
-        free = nbrs_y - set(np.flatnonzero(forbidden[:, y]).tolist())
-    for x in sources.tolist():
-        if x == y:
-            continue
-        adj_x = adj_sets[x]
-        na = nbrs_y & adj_x
-        t0 = sorted(free - adj_x)
-        for t_index, T in ops.clique_extensions(adj, na, t0):
-            yield x, t_index, T, na | set(T)
-
-
 def _over_cap(cap: float | None, parents: int) -> bool:
     """Whether ``parents`` parents exceed ``cap``; never when ``cap`` is ``None``.
 
@@ -179,68 +151,6 @@ def _breaks_cap(
     after it is the one checked.
     """
     return cap is not None and ops.exceeds_parent_cap(rebuilt(adj.copy(), *move), cap)
-
-
-def forward_chunk_best(
-    targets: Sequence[int],
-    adj: np.ndarray,
-    delta_engine: DeltaEngine,
-    n: int,
-    max_parents: float | None,
-    state: NeighborState,
-    reachable: Callable[[int, int, set[int]], bool],
-    ranks: Sequence[int],
-    forbidden: np.ndarray | None = None,
-    excluded: Excluded = None,
-    cap: float | None = None,
-) -> ForwardResult:
-    """The best-improving Insert whose target is in ``targets``, by :func:`move_key`.
-
-    Enumerates the chunk's valid Insert candidates score-free (clique + reachability), groups them
-    per target by ``base = sorted(NA u T u Pa)``, and scores each group with one batched
-    ``delta_many_with_base`` call over its ``("add", x)`` moves -- so one shared ``inv(cov[base,
-    base])`` amortizes across all sources sharing a base. A candidate is improving iff its raw delta
-    is below ``-_EPS_IMPROVE``; the argmin is over the quantized key, so the visitation order
-    cannot change the result. Grouping is per target, and a target lives wholly in one
-    chunk, so the batch shape (hence each delta) is identical however the targets are partitioned.
-    ``forbidden`` filters the candidates as in :func:`_insert_candidates`; a move in ``excluded``
-    is never selected. Under ``cap``, an Insert whose family exceeds it is left out before scoring
-    (:func:`_over_cap`) and one whose CPDAG breaks it is never selected (:func:`_breaks_cap`).
-    """
-    par_of = state[1]
-    best: ForwardResult = None
-    best_key: tuple | None = None
-    for y in targets:
-        paj = par_of[y]
-        if max_parents is not None and len(paj) > max_parents:
-            continue  # y already carries the maximum admissible parent count.
-        if _over_cap(cap, len(paj) + 1):
-            continue  # every family of y holds its parents and one source more.
-        pa_set = set(int(p) for p in paj)
-        # Group valid candidates by their base parent set; each base scores its adds in one batch.
-        groups: dict[tuple[int, ...], list[tuple[int, tuple[int, ...]]]] = {}
-        for x, _t_index, T, clique in _insert_candidates(y, adj, state, forbidden):
-            if reachable(y, x, clique):
-                continue  # some semi-directed y ~> x path misses the clique: invalid Insert.
-            base = tuple(sorted(pa_set | clique))
-            if _over_cap(cap, len(base) + 1):
-                continue
-            groups.setdefault(base, []).append((x, T))
-        for base, cands in groups.items():
-            moves = [("add", x) for x, _ in cands]
-            for (x, T), delta in zip(
-                cands, delta_engine.delta_many_with_base(y, base, moves), strict=True
-            ):
-                if delta < -_EPS_IMPROVE:
-                    key = move_key(delta, n, x, y, T, ranks)
-                    if best_key is None or key < best_key:
-                        if excluded and key[1:] in excluded:
-                            continue
-                        if _breaks_cap(adj, ops.insert_cpdag, (x, y, T), cap):
-                            continue
-                        best_key = key
-                        best = (key, x, y, T)
-    return best
 
 
 def backward_chunk_best(
@@ -319,14 +229,15 @@ def backward_chunk_best(
 # other target are kept. The reachability condition reads the whole graph, so it is checked when a
 # candidate is considered for selection.
 #
-# The selected move is the one forward_chunk_best selects, whose deltas come from one batch per
-# base of the candidates that pass the reachability check. A kept candidate carries a screening
+# The selected move is the one a full scan of every target selects, whose deltas come from one batch
+# per base of the candidates that pass the reachability check. A kept candidate carries a screening
 # delta from one batch of every candidate sharing its base. The two batches round differently, by
 # a few units in the last place on well-conditioned data and by any amount when the rank-one
 # update cancels, so the delta engine bounds the difference per candidate. A candidate is kept
 # under the lowest delta that bound allows, or minus infinity when another batch can take the
 # other side of a guard. The scan visits candidates in that order and recomputes each visited
-# base group with forward_chunk_best's batch, until no lower bound can beat the best exact key.
+# base group with one batch of the candidates that pass the reachability check, until no lower
+# bound can beat the best exact key.
 #
 # A batch's deltas depend only on the target, the base, and the batch's sources, and its bounds
 # hold against any other batch over the same base. So a target enumerated again keeps a base's
@@ -334,11 +245,6 @@ def backward_chunk_best(
 # every batch. The nodes a target reaches around a clique depend only on those nodes' successors,
 # so a reach set is kept while no successor change among its nodes can cut a path inside it or
 # open one out of it (:func:`_kept_reach`).
-
-# The scan the forward phase uses in-process: ``True`` runs forward_chunk_best over every target at
-# every pass; ``False`` keeps each target's candidates until a move touches it. Tests flip it to
-# compare the two. Pooled workers always keep their candidates.
-_FULL_RESCAN = False
 
 # A candidate kept for selection: ``(lowest exact delta, x, t_index, T, base)``.
 _Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
@@ -396,8 +302,11 @@ def _kept_reach(
 class _ForwardScan:
     """The forward pass over fixed targets, keeping each target's candidates between passes.
 
-    :meth:`best` returns what :func:`forward_chunk_best` returns for the same targets and graph.
-    ``forbidden`` (``[i, j]``: no edge ``i -> j``) and ``cap`` restrict the candidates as there.
+    :meth:`best` returns the best-improving Insert into the targets on the graph, by
+    :func:`move_key`; a move in ``excluded`` is never selected. With ``forbidden`` (``[i, j]``: no
+    edge ``i -> j``), neither a source nor a member of ``T`` is forbidden into the target. Under
+    ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG breaks
+    it is never selected.
     """
 
     def __init__(
@@ -434,22 +343,6 @@ class _ForwardScan:
 
     def best(self, adj: np.ndarray, excluded: Excluded = None) -> ForwardResult:
         """The best-improving Insert into the targets not in ``excluded``, by :func:`move_key`."""
-        if _FULL_RESCAN:
-            state = neighborhood_state(adj)
-            reachable = _reachable(adj)
-            return forward_chunk_best(
-                self.targets,
-                adj,
-                self.delta_engine,
-                self.n,
-                self.max_parents,
-                state,
-                reachable,
-                self.ranks,
-                self.forbidden,
-                excluded,
-                self.cap,
-            )
         self._refresh(adj)
         heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
         heapq.heapify(heap)
@@ -500,7 +393,8 @@ class _ForwardScan:
         """Group ``y``'s clique-valid candidates by base and score each group in one batch.
 
         ``adjacent`` and ``lines`` hold each node's adjacent nodes and undirected neighbors as
-        bitmasks. The candidates are :func:`_insert_candidates`'s. Sources adjacent to the same
+        bitmasks. The candidates are the Inserts ``x -> y`` whose ``NA u T`` is a clique
+        (:func:`~andrey.search.operators.clique_extensions`). Sources adjacent to the same
         undirected neighbors of ``y`` share ``NA``, ``t0``, and every subset ``T``, so the subsets
         are enumerated once per such group. A candidate is kept when the lowest exact delta its
         screening delta and bound allow can improve.
@@ -544,7 +438,7 @@ class _ForwardScan:
                 cands.extend((x, t_index, T) for x in xs)
                 members[base] = (cands, mask | xs_mask)
         for base, (cands, mask) in members.items():
-            cands.sort()  # ascending sources, as _insert_candidates yields them
+            cands.sort()  # ascending sources
             sources = [x for x, _, _ in cands]
             kept = previous.get(base)
             if kept is not None and kept[2].issuperset(sources):
@@ -571,9 +465,9 @@ class _ForwardScan:
         """Exact deltas of ``base``'s group at ``y`` by source, and a mask of its passing sources.
 
         A source passes when no semi-directed ``y ~> x`` path avoids the group's clique. The
-        passing sources are scored in one batch, as :func:`forward_chunk_best` scores them. The
-        group's batch serves when it holds exactly the passing sources, or when every passing
-        source's bound is 0; otherwise the last exact batch serves while the same sources pass.
+        passing sources are scored in one batch. The group's batch serves when it holds exactly the
+        passing sources, or when every passing source's bound is 0; otherwise the last exact batch
+        serves while the same sources pass.
         """
         clique, sources, batch, deltas, bounds = self.groups[y][base]
         reach = self.reach.get((y, clique))
@@ -842,7 +736,6 @@ def run_ges(
     *,
     workers: int,
     ranks: list[int],
-    full_scores: bool = False,
     constraints: Constraints | None = None,
     cap: float | None = None,
 ) -> np.ndarray:
@@ -854,14 +747,12 @@ def run_ges(
     worker owns a FIXED contiguous target partition, so its inv-cov cache persists across passes.
     Either way the reduce keys on :func:`move_key`, so the selected CPDAG is partition-invariant;
     ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`. Returns only the CPDAG;
-    ``ges()`` recomputes the objective from it. ``full_scores`` swaps the in-process PURE Schur
-    engine for the two-full-score reference (the quality gate's ``_full_scores`` arm); pooled
-    workers only ever run Schur on BIC, so the reference arm, like any score other than
-    :class:`~andrey.core.score.BICScore` (BDeu and the mixed-data scores), is held in-process and
-    never fans out.
+    ``ges()`` recomputes the objective from it. Pooled workers only ever run Schur on BIC, so any
+    score other than :class:`~andrey.core.score.BICScore` (BDeu and the mixed-data scores) is held
+    in-process and never fans out.
 
-    ``constraints`` filters the candidates (:func:`forward_chunk_best`, :func:`backward_chunk_best`)
-    and rejects a selected move whose class holds no DAG that satisfies them; the pass then runs
+    ``constraints`` filters the candidates (:class:`_ForwardScan`, :func:`backward_chunk_best`) and
+    rejects a selected move whose class holds no DAG that satisfies them; the pass then runs
     again on the same graph without that move. Serial and pooled passes see the same rejections.
 
     ``max_parents`` is the forward phase's gate on a node's directed parents and ``cap`` the cap on
@@ -873,7 +764,7 @@ def run_ges(
     w_min = _min_work()
     engine: DeltaEngine
     lazy: _LazyWorkerSet | None
-    if isinstance(score, BICScore) and not full_scores:
+    if isinstance(score, BICScore):
         engine = DeltaBICScore(score)
         lazy = _LazyWorkerSet(score, n, workers, ranks)
     else:
@@ -901,9 +792,7 @@ def run_ges(
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
-            # The full-score engine never fans out: pooled workers always run the Schur engine on
-            # BIC, so routing it to the workers would silently swap the two-full-score reference
-            # for Schur. It stays in-process, keeping the quality gate's reference pure.
+            # The full-score engine never fans out: pooled workers only run Schur on BIC.
             if lazy is not None and workers > 1 and sum(work) > w_min:
                 # Each worker scans its own fixed target partition (stable assignment); reduce keys
                 # on the global order, so this is bit-identical to the whole-range serial scan.

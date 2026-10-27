@@ -1001,7 +1001,9 @@ dataset is one series, stored with `d = N` and `n = T`.
 
 Each method runs on the simulation of its own paper, drawn by `andrey_bench/temporal_models.py`,
 which keeps the expected number of cross-links per variable fixed as N grows. Every variable
-depends on its own previous step, and a model whose process is not stationary is drawn again:
+depends on its own previous step, and a model whose process is not stationary is drawn again. If
+none of 1000 draws is stationary, as for PCMCI+ at N = 240 and seed 1, the first draw is kept and
+its lagged coefficients are scaled together until the spectral radius is 0.95:
 
 | regime | method | source | cross-links per variable | same-step share | lags |
 |---|---|---|---|---|---|
@@ -1185,14 +1187,17 @@ its paper, drawn by `andrey_bench/lingam_models.py`:
 
 `varma_lingam_paper` draws a same-step DAG with 0.8 N links (strictly lower-triangular before the
 [column shuffle](#column-order)) and a lag-1 matrix with 2 N links, the paper's 40% of entries at
-N = 5 held per variable as N grows,
-weights 0.05 to 0.5 in magnitude with a random sign, and super-Gaussian noise. The paper's model
-has no moving-average part, so the series adds one moving-average matrix drawn like the lag-1 one.
-`longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
-1.5 in magnitude and a dense lag-1 matrix with weights up to 0.5, a hidden common cause at the
-first time point, and non-Gaussian noise; Bach and Jordan's (2002) densities that the paper names
-are specified in full for 5 of the 18, which are the ones used. A panel's data has shape `(T, M,
-N)`, stored with `d = N`, `n = M`, and `times = T`.
+N = 5 held per variable as N grows, weights 0.05 to 0.5 in magnitude with a random sign, and
+super-Gaussian noise. The paper's model has no moving-average part, so the series adds one
+moving-average matrix drawn like the lag-1 one. `longitudinal_lingam_paper` draws, at every time
+point, a dense same-step DAG with weights 0.5 to 1.5 in magnitude and a dense lag-1 matrix with
+weights up to 0.5, a hidden common cause at the first time point, and non-Gaussian noise; Bach and
+Jordan's (2002) densities that the paper names are specified in full for 5 of the 18, which are the
+ones used. A time point whose lag matrix through the same-step part, `(I - B(t,t))^-1 B(t,t-1)`, has
+spectral norm 1 or more (about 60% of the time points at N = 3 and every one from N = 5 on) has its
+lag-1 matrix scaled down until that norm is 0.95, so every step contracts and the panel's scale
+stays bounded as T grows; a time point below 1 keeps its draw. A panel's data has shape `(T, M, N)`,
+stored with `d = N`, `n = M`, and `times = T`.
 
 Both packages run the same settings: VARMA-LiNGAM with `order=(1, 1)`, no order search, and the lag
 blocks pruned by adaptive Lasso (lingam's defaults are an order search by BIC and pruning);

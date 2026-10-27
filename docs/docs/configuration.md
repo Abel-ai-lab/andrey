@@ -64,6 +64,14 @@ machine and prints the values to set; `andrey calibrate --method skeleton` measu
 alone. With more than one worker and a default cutoff, a fit warns once when a pass reaches a tenth
 of it; setting the variable, to any value, silences the warning.
 
+The workers start from a forkserver, whose socket goes in your temporary directory (`TMPDIR`). If
+that directory is on a file system that rejects the socket, as some cluster file systems do, we
+start the forkserver with its socket in `/dev/shm`, or `/tmp`, and warn once; if neither works,
+the workers start with `fork` or `spawn`. The results do not change. Set `TMPDIR` to a directory on
+a local file system to silence the warning. `andrey.data.generate` with several workers starts them
+the same way when your Python's default start method is the forkserver, as on Linux from Python
+3.14; otherwise it keeps the default.
+
 ## GPU dispatch
 
 - `ANDREY_COV_GPU_THRESHOLD`: under `auto`, covariance and correlation run on `cuda` from this many
