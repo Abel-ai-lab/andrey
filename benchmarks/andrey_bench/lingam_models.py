@@ -29,7 +29,14 @@ weight uniform on [0, 1]. The variables are then put in a random order. The pape
 from the 18 densities of Bach and Jordan (2002); that paper specifies 5 of them in full (Student t
 with 3 and 5 degrees of freedom, double exponential, uniform, and exponential) and shows the
 mixtures only as plots, so each variable's noise here is one of those 5, scaled to zero mean and
-unit variance before its own variance.
+unit variance before its own variance. Each time point draws its own lag matrix, so a panel is not
+stationary, and its scale grows with the product of those matrices unless each is small. A time
+point whose lag matrix through the same-step part, ``(I - B(t,t))^-1 B(t,t-1)``, has spectral norm
+1 or more, which is almost every time point from ``N = 10`` on, has ``B(t,t-1)`` scaled down until
+that norm is 0.95 (:func:`_contract_lags`). Every step then contracts, and the panel stays within a
+fixed multiple of one time point's scale for any ``T``. The norm bounds the spectral radius, which
+alone does not bound a product of different, non-normal matrices. A time point below norm 1 keeps
+its draw.
 """
 
 from __future__ import annotations
@@ -69,6 +76,7 @@ class PanelModel:
     instantaneous: tuple[float, float]  # |B(t,t)| entries are uniform on this range
     lagged: float  # B(t,t-1) entries are uniform on [-lagged, lagged]
     noise_variance: tuple[float, float]
+    lag_norm: float  # a time point's reduced-form lag matrix of norm 1 or more is scaled to this
 
 
 MODELS: dict[str, VarmaModel | PanelModel] = {
@@ -78,7 +86,12 @@ MODELS: dict[str, VarmaModel | PanelModel] = {
         coefficient=(0.05, 0.5),
         exponent=(1.5, 2.0),
     ),
-    "panel2013": PanelModel(instantaneous=(0.5, 1.5), lagged=0.5, noise_variance=(1.0, 2.0)),
+    "panel2013": PanelModel(
+        instantaneous=(0.5, 1.5),
+        lagged=0.5,
+        noise_variance=(1.0, 2.0),
+        lag_norm=STATIONARY_TARGET,
+    ),
 }
 
 #: The noise densities of Bach and Jordan (2002) given in full, each with zero mean, unit variance.
@@ -190,14 +203,32 @@ def _standard_noise(rng: np.random.Generator, density: str, size: tuple[int, ...
     raise ValueError(f"unknown density {density!r}")
 
 
+def _contract_lags(truth: np.ndarray, target: float) -> None:
+    """Scale each ``B(t,t-1)`` in ``truth`` so its reduced-form lag matrix has norm ``target``, if needed.
+
+    The reduced-form lag matrix of time point ``t`` is ``A_t = (I - B(t,t))^-1 B(t,t-1)``, so
+    ``x_t = A_t x_{t-1} + (I - B(t,t))^-1 e_t``. Scaling ``B(t,t-1)`` by ``s`` scales ``A_t`` by
+    ``s``, so one ``s`` puts ``A_t``'s spectral norm on ``target`` exactly. A norm below 1 makes the
+    step a contraction, which bounds the series for any number of time points, and bounds the radius
+    too. A positive scale leaves every link where it was, and a time point already below norm 1
+    stays as drawn. No random numbers are drawn.
+    """
+    identity = np.eye(truth.shape[-1])
+    for t in range(1, len(truth)):
+        norm = float(np.linalg.norm(np.linalg.solve(identity - truth[t, 0], truth[t, 1]), 2))
+        if norm >= 1.0:
+            truth[t, 1] *= target / norm
+
+
 def sample_panel(
     name: str, d: int, times: int, m: int, seed: int, *, scale: float = 1.0
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(data, truth)``: ``m`` units of ``d`` variables at ``times`` time points.
 
     ``data`` has shape ``(times, m, d)``. ``truth`` has shape ``(times, 2, d, d)``: ``truth[t, 0]``
-    is ``B(t,t)`` and ``truth[t, 1]`` is ``B(t,t-1)``, zero at the first time point. ``scale``
-    multiplies every drawn ``B(t,t)`` and ``B(t,t-1)`` entry and leaves every other draw as it is.
+    is ``B(t,t)`` and ``truth[t, 1]`` is ``B(t,t-1)``, zero at the first time point, scaled where
+    :func:`_contract_lags` says. ``scale`` multiplies every drawn ``B(t,t)`` and ``B(t,t-1)`` entry
+    and leaves every other draw as it is.
     """
     model = MODELS[name]
     assert isinstance(model, PanelModel)
@@ -210,6 +241,7 @@ def sample_panel(
         truth[t, 0] = np.where(lower, magnitude * sign * scale, 0.0)
         if t:
             truth[t, 1] = rng.uniform(-model.lagged, model.lagged, size=(d, d)) * scale
+    _contract_lags(truth, model.lag_norm)
     noise_scale = np.sqrt(rng.uniform(*model.noise_variance, size=d))
     densities = rng.choice(len(DENSITIES), size=d)
     noise = (

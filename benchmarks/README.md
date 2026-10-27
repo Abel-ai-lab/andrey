@@ -1193,8 +1193,11 @@ has no moving-average part, so the series adds one moving-average matrix drawn l
 `longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
 1.5 in magnitude and a dense lag-1 matrix with weights up to 0.5, a hidden common cause at the
 first time point, and non-Gaussian noise; Bach and Jordan's (2002) densities that the paper names
-are specified in full for 5 of the 18, which are the ones used. A panel's data has shape `(T, M,
-N)`, stored with `d = N`, `n = M`, and `times = T`.
+are specified in full for 5 of the 18, which are the ones used. A time point whose lag matrix
+through the same-step part, `(I - B(t,t))^-1 B(t,t-1)`, has spectral norm 1 or more (almost every
+time point from N = 10 on) has its lag-1 matrix scaled down until that norm is 0.95, so every step
+contracts and the panel's scale stays bounded as T grows; a time point below 1 keeps its draw. A
+panel's data has shape `(T, M, N)`, stored with `d = N`, `n = M`, and `times = T`.
 
 Both packages run the same settings: VARMA-LiNGAM with `order=(1, 1)`, no order search, and the lag
 blocks pruned by adaptive Lasso (lingam's defaults are an order search by BIC and pruning);
