@@ -115,10 +115,10 @@
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "ICA-LiNGAM": {
-        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [0, 11, 1, 2, 0, 0, 8, 0, 3, 5]},
-        "lingam_sf_d50": {"median_shd": 14.0, "empty_median_shd": 49.0, "shd": [11, 17, 2, 10, 19, 77, 36, 4, 0, 19]},
-        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 4, 0, 0, 0, 0, 0]},
-        "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
+        "lingam_sf_d20": {"median_shd": 0.0, "empty_median_shd": 19.0, "shd": [0, 0, 1, 1, 0, 0, 1, 0, 0, 0]},
+        "lingam_sf_d50": {"median_shd": 0.0, "empty_median_shd": 49.0, "shd": [2, 1, 0, 0, 0, 0, 2, 2, 0, 0]},
+        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 0, 0, 0, 0, 0]},
+        "sachs": {"median_shd": 13.0, "empty_median_shd": 17.0, "shd": [13]}
       },
       "MultiGroupDirectLiNGAM": {
         "multi_group_er_d10": {"median_shd": 0.0, "empty_median_shd": 30.0, "shd": [0, 0, 1, 1, 0, 0, 1, 0, 0, 2]},
