@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     json_safe,
     structure_output,
 )
+from andrey.api._boundary import warn_past_boundary
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.seeding import resolve_seed
@@ -496,6 +497,7 @@ def gies(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
+    warn_past_boundary("gies", X.shape)
     with copies_named(labels):
         graph, score = _gies(
             X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma, constraints=constraints
@@ -1264,6 +1266,7 @@ def exact_search(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
+    warn_past_boundary("exact_search", X.shape)
     with copies_named(labels):
         dag = _exact(
             X,
@@ -1429,6 +1432,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     X = data_matrix(data, method="calm")
     labels = column_labels(data)
     used_seed = resolve_seed(seed)
+    warn_past_boundary("calm", X.shape)
     with copies_named(labels):
         result = _calm(X, seed=used_seed, **params)
     return structure_output(

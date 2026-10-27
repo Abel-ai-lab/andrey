@@ -23,6 +23,7 @@ from andrey.api._adapt import (
     json_safe,
     structure_output,
 )
+from andrey.api._boundary import warn_past_boundary
 from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.seeding import resolve_seed
 
@@ -277,6 +278,7 @@ def boss(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="boss")
+    warn_past_boundary("boss", X.shape)
     with copies_named(labels):
         cpdag, score = _boss(
             X,
@@ -553,6 +555,7 @@ def grasp(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="grasp")
+    warn_past_boundary("grasp", X.shape)
     with copies_named(labels):
         cpdag, score = _grasp(
             X,

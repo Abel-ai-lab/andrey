@@ -26,6 +26,7 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
+from andrey.api._boundary import warn_past_boundary
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve
 
@@ -692,6 +693,7 @@ def fci(
     constraints = resolve(knowledge, X.shape[1], labels, method="fci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
+    warn_past_boundary("fci", X.shape)
     with copies_named(labels), rows_tested() as rows:
         pag = _fci(
             X,
@@ -976,6 +978,7 @@ def gfci(
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
+    warn_past_boundary("gfci", X.shape)
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -1274,6 +1277,7 @@ def cdnod(
                 "it does not accept missing values; leave dependence_threshold=None, whose tests "
                 "delete rows per test, or drop the rows that hold NaN"
             )
+    warn_past_boundary("cdnod", X.shape)
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()

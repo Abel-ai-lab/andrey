@@ -83,6 +83,13 @@ change names its pull request.
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])
+- A fit larger than its method was measured to finish warns once per method with
+  `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
+  the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
+  setting whose rows are nearest the data's, and that ladder ended on the time or memory cap, as
+  exact search does past 24 variables at 2,000 rows. The message names the measured size and its
+  setting and points to the method's **Limitations** paragraph and the release card; the sizes are
+  generated from the published summary by `scripts/boundary_table.py`. ([#479])
 
 ### Changed
 
@@ -115,7 +122,6 @@ change names its pull request.
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
   p-values in less time, because the test's batched counts hold a table only for each conditioning
   configuration that occurs in the data, not for every possible one. ([#463])
-
 
 ## [0.10.0] - 2026-10-27
 
@@ -888,3 +894,4 @@ First alpha release.
 [#463]: https://github.com/Abel-ai-lab/andrey/pull/463
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
+[#479]: https://github.com/Abel-ai-lab/andrey/pull/479
