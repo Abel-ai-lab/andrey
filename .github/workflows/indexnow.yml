@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 jobs:
   indexnow:
@@ -23,20 +24,24 @@ jobs:
         env:
           SITE: andrey.abel.ai
           KEY: f57e1cb079cc40b67a5dd117b8cd4dc4  # gitleaks:allow (public by design)
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          # A tagged release is live when llms.txt names its version; manual runs submit the live site.
+          # A tag is live when the production deploy check ("<build server> / PROD") succeeds on the
+          # tagged commit (a post release keeps the package's version, so llms.txt cannot tell);
+          # manual runs submit the live site.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            version=${GITHUB_REF_NAME#v}
             for _ in $(seq 100); do
-              if curl -fsS "https://$SITE/llms.txt" | grep -qx "Version: $version."; then
-                live=1
-                break
-              fi
+              state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" \
+                --jq '[.check_runs[] | select(.name | endswith(" / PROD"))][0] | "\(.status) \(.conclusion)"')
+              case "$state" in
+                "completed success") live=1; break ;;
+                "completed "*) echo "::error::The deploy check ended as: $state"; exit 1 ;;
+              esac
               sleep 30
             done
-            : "${live:?The site did not show $version within 50 minutes}"
+            : "${live:?The deploy check did not succeed within 50 minutes}"
           fi
           curl -fsS "https://$SITE/sitemap.xml" | grep -o '<loc>[^<]*' | sed 's/<loc>//' \
             | jq -R . | jq -s --arg host "$SITE" --arg key "$KEY" \

@@ -302,6 +302,164 @@ def test_an_unusable_api_response_runs_the_gate(gate_reuse, monkeypatch, tmp_pat
     assert _reuse(gate_reuse, monkeypatch, tmp_path, output) == "reuse=false"
 
 
+@pytest.mark.parametrize(
+    "paths",
+    [
+        [],  # the same tree
+        ["CHANGELOG.md"],
+        ["README.md", "AGENTS.md", "CHANGELOG.md"],
+        ["docs/docs/ci.md", "docs/blog/20261023-post.md", "docs/conf.py"],
+        ["site/brand/art-launch.jpg", "site/home/index.html"],
+        ["docs/docs/ci.md", "site/brand/art-launch.jpg", "CHANGELOG.md"],
+    ],
+)
+def test_a_change_the_gate_does_not_read_keeps_its_result(gate_reuse, paths):
+    assert all(gate_reuse.unread_by_gate(path) for path in paths)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "src/andrey/search/ges.py",
+        "qa/quality_gate.py",
+        "qa/README.md",  # a Markdown file is unread only at the top level
+        "benchmarks/published/0.9.0/summary.json",  # reference parity reads the summaries
+        "benchmarks/README.md",
+        "tests/unit/test_release_gates.py",
+        "scripts/gate_reuse.py",
+        "pyproject.toml",
+        "uv.lock",
+        ".github/workflows/quality-gate.yml",
+        "docs",  # a file named like the directory
+        "documents/guide.md",
+        "sitemap.xml",
+        "CHANGELOG.txt",
+    ],
+)
+def test_a_change_the_gate_may_read_runs_it(gate_reuse, path):
+    assert not gate_reuse.unread_by_gate(path)
+    assert not all(gate_reuse.unread_by_gate(p) for p in ["docs/docs/ci.md", path])  # mixed
+
+
+def _ancestor_runs(*runs: tuple[str, str]) -> list[dict]:
+    return [
+        {"id": i, "head_sha": sha, "conclusion": conclusion, "html_url": f"https://example/{i}"}
+        for i, (sha, conclusion) in enumerate(runs, start=1)
+    ]
+
+
+def test_the_first_passing_ancestor_with_only_unread_changes_is_reused(gate_reuse):
+    changes = {
+        "new": ["docs/docs/ci.md"],  # newest run, but it failed
+        "src": ["docs/docs/ci.md", "src/andrey/search/ges.py"],  # mixed
+        "docs": ["docs/docs/ci.md", "CHANGELOG.md"],
+        "older": [],
+    }
+    runs = _ancestor_runs(
+        ("new", "failure"),
+        ("gone", "success"),
+        ("src", "success"),
+        ("docs", "success"),
+        ("older", "success"),
+    )
+    found = gate_reuse.inert_run(runs, changes.get)  # "gone" is not an ancestor: None
+    assert found is not None
+    run, paths = found
+    assert run["head_sha"] == "docs"
+    assert paths == ["docs/docs/ci.md", "CHANGELOG.md"]
+    assert gate_reuse.inert_run(runs[:3], changes.get) is None
+    assert gate_reuse.inert_run([{"conclusion": "success"}], changes.get) is None
+    assert gate_reuse.inert_run([], changes.get) is None
+
+
+def _git_history(ancestors: dict[str, str]):
+    """A fake ``_output`` for ``git``: ``ancestors`` maps each ancestor of HEAD to its diff."""
+
+    def output(command: list[str]) -> str:
+        assert command[0] == "git"
+        sha = command[command.index("HEAD") - 1]
+        if command[1] == "merge-base":
+            if sha not in ancestors:
+                raise subprocess.CalledProcessError(1 if sha == "other" else 128, command)
+            return ""
+        assert command[1:4] == ["diff", "--name-only", "--no-renames"] and "-z" in command
+        return ancestors[sha]
+
+    return output
+
+
+def _ancestor_lookup(gate_reuse, monkeypatch, tmp_path, ancestors, runs, failure=None):
+    git = _git_history(ancestors)
+
+    def output(command: list[str]) -> str:
+        if command[0] == "git":
+            return git(command)
+        if failure:
+            raise failure
+        assert command[:2] == ["gh", "api"] and "quality-gate.yml/runs" in command[2]
+        return json.dumps({"workflow_runs": runs})
+
+    files = {name: tmp_path / name for name in ("output", "summary")}
+    monkeypatch.setenv("GITHUB_OUTPUT", str(files["output"]))
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(files["summary"]))
+    monkeypatch.setenv("GITHUB_REPOSITORY", "example/andrey")
+    monkeypatch.setattr(gate_reuse, "_output", output)
+    assert gate_reuse.main(["--ancestor"]) == 0
+    read = {name: path.read_text() if path.exists() else "" for name, path in files.items()}
+    for path in files.values():
+        path.unlink(missing_ok=True)
+    return read
+
+
+def test_an_ancestor_run_is_reused_when_only_unread_paths_changed_since(
+    gate_reuse, monkeypatch, tmp_path
+):
+    runs = _ancestor_runs(("other", "success"), ("src", "success"), ("docs", "success"))
+    history = {"src": "src/andrey/pc.py\0docs/a.md", "docs": "docs/a.md\0CHANGELOG.md\0"}
+    read = _ancestor_lookup(gate_reuse, monkeypatch, tmp_path, history, runs)
+    assert read["output"].splitlines() == ["reuse=true", "run=https://example/3", "commit=docs"]
+    assert "https://example/3" in read["summary"] and "`docs`" in read["summary"]
+    assert "`CHANGELOG.md`" in read["summary"]
+    unchanged = _ancestor_lookup(gate_reuse, monkeypatch, tmp_path, {"docs": ""}, runs)
+    assert unchanged["output"].startswith("reuse=true")  # the same tree
+
+
+def test_an_ancestor_lookup_runs_the_gate_unless_every_changed_path_is_unread(
+    gate_reuse, monkeypatch, tmp_path
+):
+    runs = _ancestor_runs(("a", "success"), ("b", "success"), ("c", "failure"))
+    history = {"a": "docs/a.md\0qa/quality_baselines.json", "b": "src/andrey/__init__.py", "c": ""}
+    read = _ancestor_lookup(gate_reuse, monkeypatch, tmp_path, history, runs)
+    assert read == {"output": "reuse=false\n", "summary": ""}
+
+
+@pytest.mark.parametrize(
+    "failure", [subprocess.CalledProcessError(1, "gh"), OSError("no gh"), ValueError("bad json")]
+)
+def test_a_failed_ancestor_lookup_runs_the_gate(gate_reuse, monkeypatch, tmp_path, failure):
+    runs = _ancestor_runs(("docs", "success"))
+    read = _ancestor_lookup(gate_reuse, monkeypatch, tmp_path, {"docs": ""}, runs, failure)
+    assert read == {"output": "reuse=false\n", "summary": ""}
+
+
+def test_the_gate_job_runs_no_step_after_a_reused_run():
+    workflow = _workflow("quality-gate.yml")
+    assert list(workflow["jobs"]) == ["quality-gate"]
+    steps = workflow["jobs"]["quality-gate"]["steps"]
+    assert steps[0]["with"]["fetch-depth"] == "0"  # the lookup needs the earlier commits
+    first = next(i for i, step in enumerate(steps) if step.get("id") == "reuse")
+    lookup = steps[first]
+    assert lookup["continue-on-error"] == "true"  # an empty output runs the gate
+    assert "scripts/gate_reuse.py --ancestor" in lookup["run"]
+    for step in steps[first + 1 :]:
+        assert step["if"] == "steps.reuse.outputs.reuse != 'true'", step
+    assert "qa.quality_gate" in steps[-1]["run"]
+    # A called workflow gets at most what its caller grants.
+    asked = workflow["permissions"]
+    granted = _workflow("publish.yml")["jobs"]["quality-gate"]["permissions"]
+    assert asked["actions"] == "read" and asked.items() <= granted.items()
+
+
 @pytest.mark.parametrize("lane", ["preview", "prod"])
 def test_website_workflows_request_deployment_for_exact_application_commits(lane):
     path = ROOT / ".github" / "workflows" / f"deploy-{lane}.yml"
@@ -320,6 +478,7 @@ def test_website_workflows_request_deployment_for_exact_application_commits(lane
         assert "github.ref == 'refs/heads/main'" in job["if"]
     else:
         assert workflow["on"]["push"]["tags"] == ["v*"]
+        assert job["environment"] == "production-site"  # waits for the owner's approval
         assert set(job["needs"]) == {"ci", "docs"}
         assert workflow["jobs"]["ci"]["uses"] == "./.github/workflows/ci.yml"
         assert workflow["jobs"]["docs"]["uses"] == "./.github/workflows/docs.yml"

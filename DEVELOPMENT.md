@@ -228,8 +228,10 @@ uv run python -m qa.quality_gate <NAME>
 
 On each dataset the method passes when its median SHD is below the empty graph's and within its
 tolerance of the recorded baseline in either direction. The gate runs once per release, on the
-release pull request into `main`, which `main` requires to pass; the publish reuses that run when
-the tagged commit has the same tree and runs the gate itself otherwise.
+release pull request into `main`, which `main` requires to pass; a push that changes only `docs/`,
+`site/`, or top-level Markdown files reuses an earlier passing run, and the publish reuses that run
+when the tagged commit has the same tree and runs the gate itself otherwise. `--jobs N` fits N cells
+at a time.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
 soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
 than the reference package (from 0.8.0, when the paired bootstrap 95% interval of the difference

@@ -95,23 +95,25 @@ def gin(
     incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
-    rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
-    own. With 2 and 3 latents its clusters matched the true ones (median adjusted Rand index 1);
-    with 4 latents (12 indicators) the median index was 0.89, and a median of one latent was missed.
-    The median fit took 0.91 s with 6 indicators, 2.6 s with 9, and 5.3 s with 12, on 4 cores. Given
-    the true clusters and 1,000 rows, over 10 seeds each, the order of a chain of three latents
-    never stopped early and that of a complete three-latent model stopped early once, with no
-    latent put after one it causes; with the benchmark's random weights instead, 2 of 10 complete
-    three-latent models put a latent after one it causes. It tests every group of observed
-    variables of each size, from pairs upward, so the number of tests grows combinatorially with
-    the variable count, and each HSIC test's time and memory grow with the square of the row count;
-    the fit keeps one such kernel matrix per variable, 8 MB each at 1,000 rows. Clusters have at
-    least two variables, so a latent with a single indicator is not found. Each cluster gets one
-    latent, so indicators that share two or more latents appear as one. It assumes every observed
-    variable measures a latent: variables that depend on no other variable pass the cluster test
-    trivially and are grouped into one cluster. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured on simulated linear data with uniform noise from latent variables in a
+    complete DAG, each measured by 3 observed indicators, on 4 cores with a cap of 1 h and 28 GB per
+    fit. The median adjusted Rand index of its clusters, which is 0 for the empty graph, was 0.77 to
+    1 at every size through 16 latents (48 indicators) with 1,000 rows and 1 through 8 latents (24
+    indicators) with 5,000 rows, the largest sizes its fits finished within the caps. The ladder
+    with 1,000 rows ended at the largest planned size, and the one with 5,000 rows when three fits
+    of the next size ran past 1 h. The median fit took 340 s at 16 latents (48 indicators) with
+    1,000 rows. Given the true clusters and 1,000 rows, over 10 seeds each, the order of a chain of
+    three latents never stopped early and that of a complete three-latent model stopped early once,
+    with no latent put after one it causes; with the benchmark's random weights instead, 2 of 10
+    complete three-latent models put a latent after one it causes. It tests every group of observed
+    variables of each size, from pairs upward, so the number of tests grows combinatorially with the
+    variable count, and each HSIC test's time and memory grow with the square of the row count; the
+    fit keeps one such kernel matrix per variable, 8 MB each at 1,000 rows. Clusters have at least
+    two variables, so a latent with a single indicator is not found. Each cluster gets one latent,
+    so indicators that share two or more latents appear as one. It assumes every observed variable
+    measures a latent: variables that depend on no other variable pass the cluster test trivially
+    and are grouped into one cluster. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
