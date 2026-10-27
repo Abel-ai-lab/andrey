@@ -51,7 +51,7 @@ def measured() -> dict[str, tuple[Ladder, ...]]:
 
 
 def past_boundary(method: str, shape: tuple[int, ...]) -> tuple[Ladder, int] | None:
-    """Return the ladder whose size data of ``shape`` pass, and the ladders at its setting.
+    """Return the ladder whose size data of ``shape`` pass, and how many ladders its setting has.
 
     The size is the data's columns, or their rows for a method whose ladders step rows. The
     nearest setting has the rows, or rows per variable, closest to the data's on a log scale;
