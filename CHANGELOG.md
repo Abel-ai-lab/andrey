@@ -148,6 +148,10 @@ change names its pull request.
 - `ica_lingam`'s **Limitations** paragraph says that its causal order depends on the columns'
   scale, as its authors note, with one measurement on standardized data, and points to
   `direct_lingam`. ([#487])
+- The **Limitations** paragraphs of `notears` and `dagma` say that the `robust=True` fit's graph
+  changes when the columns are rescaled, even by powers of two, and that the penalized
+  likelihood's global minimizers keep their graph under rescaling with a small enough penalty.
+  ([#495])
 
 ### Fixed
 
@@ -940,3 +944,4 @@ First alpha release.
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
+[#495]: https://github.com/Abel-ai-lab/andrey/pull/495
