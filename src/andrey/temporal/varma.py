@@ -22,6 +22,7 @@ import numpy as np
 from statsmodels.tsa.statespace.varmax import VARMAX, VARMAXResultsWrapper
 
 from andrey.core.knowledge import KnowledgeError
+from andrey.core.warning_policy import warn_search_limit
 from andrey.lingam.adjacency import estimate, predict_adaptive_lasso, predict_with_required
 from andrey.lingam.direct import direct_lingam
 from andrey.search.hc import tie_ranks
@@ -134,11 +135,19 @@ def _fit_varma(
 
 
 def _fit_varmax(X: np.ndarray, p: int, q: int, max_iter: int) -> VARMAXResultsWrapper:
-    """The state-space VARMA(p, q) fit with a constant trend, skipping the parameter covariance."""
+    """The state-space VARMA(p, q) fit with a constant trend, skipping the parameter covariance.
+
+    statsmodels' own warnings are silenced; a fit that takes ``max_iter`` optimizer iterations
+    without converging warns with :class:`~andrey.SearchLimitWarning`.
+    """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         model = VARMAX(X, order=(p, q), trend="c")
-        return model.fit(maxiter=max_iter, disp=False, cov_type="none")
+        fitted = model.fit(maxiter=max_iter, disp=False, cov_type="none")
+    retvals = fitted.mle_retvals or {}
+    if not retvals.get("converged", True) and retvals.get("iterations", 0) >= max_iter:
+        warn_search_limit("varma_lingam", "max_iter", max_iter, "likelihood iterations")
+    return fitted
 
 
 def _coef_stack(matrices: np.ndarray | None, n_lags: int, n: int) -> np.ndarray:

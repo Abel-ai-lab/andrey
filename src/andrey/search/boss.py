@@ -293,7 +293,8 @@ class _GSTNode:
 
     ``grow_score`` is the negated local score of the node's parent set; ``branches`` are the
     single-variable additions that improve it by more than ``_SCORE_EPS`` (best tie group first,
-    ascending variable index within a group; built lazily by :meth:`_grow`). ``remove`` is the
+    ascending variable index within a group; built lazily by :meth:`_grow`, and empty when the
+    parent set holds the tree's ``max_parents`` members). ``remove`` is the
     shrink sequence -- the variables dropped, best first -- built lazily by :meth:`_shrink`, with
     ``shrink_score`` the negated score after all removals and ``leaf`` the :class:`_Leaf` of the
     parent set it ends at. ``grow_bound`` and ``shrink_bound`` bound each score's distance from the
@@ -471,7 +472,11 @@ class _GSTNode:
         ``available`` variables outside it.
         """
         if self.branches is None:
-            self._grow([u for u in self.tree.available if u not in excluded], parents)
+            cap = self.tree.max_parents
+            if cap is not None and len(parents) >= cap:
+                self.branches = []
+            else:
+                self._grow([u for u in self.tree.available if u not in excluded], parents)
         branches = self.branches or []
         for branch in branches:
             add = branch.add
@@ -499,6 +504,8 @@ class _GrowShrinkTree:
     ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
     ``required`` parents are in every parent set: the root scores them, grow adds to them, and
     shrink never removes them. The caller keeps each required parent in ``prefix``.
+    ``max_parents`` caps every parent set, required parents included: a node whose set holds that
+    many members grows no branches (``None``: no cap).
     """
 
     __slots__ = (
@@ -509,6 +516,7 @@ class _GrowShrinkTree:
         "root",
         "available",
         "required",
+        "max_parents",
         "leaves",
     )
 
@@ -521,6 +529,7 @@ class _GrowShrinkTree:
         *,
         candidates: list[int] | None = None,
         required: list[int] | None = None,
+        max_parents: int | None = None,
     ) -> None:
         self.vertex = vertex
         self.score = score
@@ -530,6 +539,7 @@ class _GrowShrinkTree:
             [i for i in range(n_features) if i != vertex] if candidates is None else candidates
         )
         self.required = [] if required is None else required
+        self.max_parents = max_parents
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
         self.leaves: dict[tuple[int, ...], _Leaf] = {}
@@ -780,6 +790,7 @@ def boss(
     ebic_gamma: float = 1.0,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -804,6 +815,10 @@ def boss(
         category codes (:class:`~andrey.core.score.BDeuScore`,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC
         (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
+    max_parents : int or None
+        Caps each node's parent set, required parents included: the grow step adds no parent to a
+        set that holds ``max_parents`` members. ``None`` sets no cap. With a cap, ``constraints``
+        may not require more than ``max_parents`` parents of a node (``ValueError``).
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; BDeu and the multinomial BIC read
         every column as categorical.
@@ -837,6 +852,14 @@ def boss(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
+    if (
+        max_parents is not None
+        and constraints is not None
+        and (constraints.required.sum(axis=0) > max_parents).any()
+    ):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
     score, ranks = ranked_score(X, score_func, lambda_value, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
@@ -844,7 +867,7 @@ def boss(
     order = list(range(p))
     before = None
     if constraints is None:
-        gsts = [_GrowShrinkTree(v, score, delta, p) for v in order]
+        gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in order]
     else:
         ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
         before = ranked.precedence()
@@ -852,7 +875,15 @@ def boss(
         for v in order:
             candidates, required = parent_knowledge(ranked, v)
             gsts.append(
-                _GrowShrinkTree(v, score, delta, p, candidates=candidates, required=required)
+                _GrowShrinkTree(
+                    v,
+                    score,
+                    delta,
+                    p,
+                    candidates=candidates,
+                    required=required,
+                    max_parents=max_parents,
+                )
             )
         order = precedence_sort(order, before)
     positions = {v: idx for idx, v in enumerate(order)}

@@ -235,7 +235,8 @@ def ica_lingam(
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset. ``metadata["seed"]``
         records the seed used.
     max_iter : int, default=1000
-        Maximum FastICA iterations; at least ``1``.
+        Most FastICA iterations, at least ``1``. Reaching it before FastICA converges warns with
+        :class:`~andrey.SearchLimitWarning`.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The order search reads the unmixing
@@ -271,8 +272,9 @@ def ica_lingam(
 
     Warns
     -----
-    sklearn.exceptions.ConvergenceWarning
-        When FastICA does not converge within ``max_iter`` iterations.
+    SearchLimitWarning
+        When FastICA does not converge within ``max_iter`` iterations, or the adaptive Lasso's LARS
+        path reports that it stopped early (scikit-learn's ``ConvergenceWarning``, raised again).
 
     See Also
     --------
@@ -287,8 +289,8 @@ def ica_lingam(
     recovered most edges. Prefer :func:`~andrey.direct_lingam` unless ICA is needed.
 
     **Choosing seed and max_iter.** Different seeds can give different orders; compare a few when
-    the result matters. If FastICA reaches ``max_iter`` before converging, scikit-learn issues a
-    ``ConvergenceWarning``; then raise ``max_iter``.
+    the result matters. If FastICA reaches ``max_iter`` before converging, the fit warns with
+    :class:`~andrey.SearchLimitWarning`; then raise ``max_iter``.
 
     **Column order and machines.** When several variables can come next in the causal order, the one
     whose column ranks first by its own values goes first. FastICA itself can reach another solution

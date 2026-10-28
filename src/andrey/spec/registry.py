@@ -1568,18 +1568,12 @@ _add(
                 "z-transform.",
                 concept="indep_test",
             ),
-            ParamSpec(
-                name="max_depth",
-                type="int",
-                default=None,
-                doc="The largest number of neighbors a removal step conditions on, at least 0, "
-                "counted beyond the default conditions, the parents of both ends, unlike pc's and "
-                "fci's max_depth, which counts the whole conditioning set; null sets no limit. A "
-                "cap bounds the number of tests and can keep links that a larger conditioning set "
-                "would remove.",
-                nullable=True,
-                minimum=0,
-                concept="max_extra_depth",
+            concept_param(
+                "max_p_global",
+                doc="The most conditions a test takes beyond the default conditions, the parents "
+                "of both ends, at least 0 (tigramite's name); max_depth elsewhere counts the whole "
+                "conditioning set. null sets no limit. A cap bounds the number of tests and can "
+                "keep links that a larger conditioning set would remove.",
             ),
         ),
         references=("Gerhardus & Runge 2020",),
@@ -1792,12 +1786,14 @@ _add(
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         params=(
             ParamSpec(
-                name="max_explanatory_vars",
+                name="max_depth",
                 type="int",
                 default=2,
-                doc="Most variables regressed out together in an ancestor test, at least 1; "
-                "larger values find more ancestors and take longer.",
+                doc="The maximum conditioning-set size of an ancestor test, the most variables "
+                "regressed out together, at least 1; larger values find more ancestors and take "
+                "longer. The default 2 is the setting of Maeda and Shimizu's experiments.",
                 minimum=1,
+                aliases=("max_explanatory_vars",),
                 concept="max_depth",
             ),
             ParamSpec(
@@ -1990,6 +1986,25 @@ for _name, _how in _KNOWLEDGE_HOW.items():
             "knowledge": _KNOWLEDGE_PARTS[_name],
         }
     )
+
+#: The parent cap of the score searches that take it as the concept's template; ges has its own doc.
+_MAX_PARENTS = concept_param(
+    "max_parents",
+    doc="A cap on every node's parents, at least 0: no DAG the returned graph represents gives a "
+    "node more than max_parents parents. A cap can stop the search short of the lowest-scoring "
+    "graph. null sets no cap.",
+)
+# The caps the knowledge loop above leaves out: max_depth on the methods without knowledge, and
+# max_parents, before knowledge where a method has it.
+for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS)):
+    for _name in CONCEPTS[_concept].conforming:
+        _params = REGISTRY[_name].params
+        if any(p.concept == _concept for p in _params):
+            continue
+        _cut = next((i for i, p in enumerate(_params) if p.name == "knowledge"), len(_params))
+        REGISTRY[_name] = REGISTRY[_name].model_copy(
+            update={"params": (*_params[:_cut], _cap, *_params[_cut:])}
+        )
 
 
 def get_spec(name: str) -> MethodSpec:

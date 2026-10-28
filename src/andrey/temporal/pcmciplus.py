@@ -129,9 +129,14 @@ def lagged_parents(
     pc_alpha: float,
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> tuple[tuple[Link, ...], ...]:
-    """Phase 1: the PC1 lagged parents of every variable, strongest first."""
-    return tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints) for j in range(n_vars))
+    """Phase 1: the PC1 lagged parents of every variable, strongest first; ``max_depth`` caps
+    PC1's conditioning sets."""
+    return tuple(
+        pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)
+        for j in range(n_vars)
+    )
 
 
 def _conditions(
@@ -441,6 +446,7 @@ def pcmciplus(
     collider_rule: str = "majority",
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> PCMCIPlusResult:
     """Run the four PCMCI+ phases on a ``(T, n)`` series with the ``indep_test`` test.
 
@@ -459,7 +465,9 @@ def pcmciplus(
     test = design_test(indep_test, data, tau_max)
     ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
-        return run_phases(test, data.shape[1], tau_max, pc_alpha, collider_rule, ranks, constraints)
+        return run_phases(
+            test, data.shape[1], tau_max, pc_alpha, collider_rule, ranks, constraints, max_depth
+        )
 
 
 def run_phases(
@@ -470,6 +478,7 @@ def run_phases(
     collider_rule: str,
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> PCMCIPlusResult:
     """Run the four phases with ``test`` over the columns of the lagged design.
 
@@ -478,10 +487,11 @@ def run_phases(
     out the forbidden lagged links and keeps the required ones, phase 2 starts the lag-0 links
     from the allowed pairs and removes no required link, and phase 3 directs the lag-0 links the
     knowledge decides before the colliders, which do not reverse them. A link no phase tested
-    reports p-value 1 and statistic 0, or 0 and 1 when it is required.
+    reports p-value 1 and statistic 0, or 0 and 1 when it is required. ``max_depth`` caps phase 1's
+    conditioning sets.
     """
     recorder = _Recorder(test)
-    parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints)
+    parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
     adjacency, p_values, statistics, sepsets = skeleton(
         test, n_vars, parents, tau_max, pc_alpha, constraints
     )
