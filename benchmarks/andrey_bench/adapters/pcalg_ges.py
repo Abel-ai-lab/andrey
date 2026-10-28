@@ -2,7 +2,7 @@
 
 `pcalg::ges` maximizes an L0-penalized Gaussian likelihood through `GaussL0penObsScore`, whose
 default penalty `lambda = 0.5 * log(n)` is plain BIC in log-likelihood units - the same objective
-Andrey's GES optimizes at `lambda_value=1.0` in deviance units.
+Andrey's GES optimizes at `penalty_discount=1.0` in deviance units.
 
 pcalg caps vertex degree, which has no setting equivalent to the `max_parents=4` parent limit of
 the Andrey and causal-learn adapters. The adapter declares pcalg's default of no degree cap.

@@ -286,8 +286,8 @@ def test_tetrads_bic_penalty_is_andreys_lambda(penalty: float) -> None:
     tetrad = [float(line.rsplit("score=", 1)[1]) for line in lines]
     for i, (node, parents) in enumerate(cases):
         gain = tetrad[len(cases) + i] - tetrad[i]
-        andrey = local_score_bic(cov, n, node, parents, lambda_value=penalty) - local_score_bic(
-            cov, n, node, [], lambda_value=penalty
+        andrey = local_score_bic(cov, n, node, parents, penalty_discount=penalty) - local_score_bic(
+            cov, n, node, [], penalty_discount=penalty
         )
         assert gain == pytest.approx(-andrey, abs=1e-6)
 
