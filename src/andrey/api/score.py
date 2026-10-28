@@ -344,6 +344,7 @@ def gies(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
@@ -375,6 +376,11 @@ def gies(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. See Notes.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: no DAG the returned graph represents gives a
+        node more than ``max_parents`` parents (every DAG of a class has the same largest number of
+        parents). A step that would give a node more is skipped for the next best step. A cap can
+        stop the search short of the lowest-scoring graph. ``None`` sets no cap. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -405,8 +411,9 @@ def gies(
         1, or leaves a variable fewer than two rows, or one value, without an intervention; or if a
         column repeats another up to scale and shift given more than two rows or, with more rows
         than columns, is a linear function of other columns. One message names every group of copies
-        and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
-        or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        and says to keep one column per group. Also if a given ``max_parents`` is below the parents
+        some graph of the required edges of ``knowledge`` gives a node, or if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -420,13 +427,23 @@ def gies(
 
     **How it works.** The search starts from the empty graph and repeats three phases: adding
     edges, removing edges, and turning one edge around, each while it improves the score, until a
-    round of removing and turning changes nothing. No setting caps a variable's parent count. Each
-    step takes its phase's move that improves the score most, from one equivalence class to a
-    neighboring one; the classes are those of the interventional setting: two graphs are equivalent
-    when they agree on the data from every observed combination of intervened variables. Steps whose
-    score changes are equal after rounding are chosen by each column's rank, as in
-    :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
-    keeps.
+    round of removing and turning changes nothing. Each step takes its phase's move that improves
+    the score most, from one equivalence class to a neighboring one; the classes are those of the
+    interventional setting: two graphs are equivalent when they agree on the data from every
+    observed combination of intervened variables. Steps whose score changes are equal after rounding
+    are chosen by each column's rank, as in :func:`~andrey.hc`; the
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps.
+
+    **Parent cap.** GIES as published has no parent cap; its authors note that the cost of a step
+    grows with the largest set of mutually adjacent variables joined by undirected edges, and that
+    bounding the number of edges at each variable keeps it polynomial in the number of variables
+    [1]_. An addition or a turn builds a graph of the new class that gives its target variable new
+    parents; with ``max_parents``, a step whose graph gives that variable more than ``max_parents``
+    parents is skipped for the next best step. Every graph of a class has the same largest number of
+    parents, so the cap then holds for every graph of the new class, and a removal never breaks it.
+    Under a cap of ``k``, no set of mutually adjacent variables joined by undirected edges holds
+    more than ``k + 1`` variables, since some graph of the class gives one of them all the others
+    as parents.
 
     **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
     parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
@@ -496,6 +513,7 @@ def gies(
             mask,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            max_parents=max_parents,
             constraints=constraints,
         )
     metadata = {"score": json_safe(score)}
@@ -509,6 +527,7 @@ def xges(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     extended_search: bool = True,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -535,6 +554,12 @@ def xges(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. See Notes.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
+        node more than ``max_parents`` parents (every DAG of a class has the same largest number of
+        parents). A move that would give a node more is never taken, in the base or the extended
+        search. A cap can stop the search short of the lowest-scoring graph. ``None`` sets no cap.
+        See Notes.
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
@@ -563,8 +588,10 @@ def xges(
         not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is
         constant, repeats another column up to scale and shift given more than two rows, or, with
         more rows than columns, is a linear function of other columns. One message names every group
-        of copies and says to keep one column per group. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        of copies and says to keep one column per group. Also if a given ``max_parents`` is below
+        the parents some graph of the required edges of ``knowledge`` gives a node, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -580,10 +607,15 @@ def xges(
     else addition; the search stops when no move improves the score [1]_. The extended search then
     deletes each edge of that graph, best score first, forbids adding it back in that direction, and
     reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
-    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit. Moves
-    whose score changes are equal after rounding are taken in the order of each column's rank, as in
-    :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
-    keeps.
+    stops once a fresh pass over the edges keeps nothing. Moves whose score changes are equal after
+    rounding are taken in the order of each column's rank, as in :func:`~andrey.hc`; the
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps.
+
+    **Parent cap.** XGES as published [1]_ has no parent cap. An addition or a reversal builds a
+    graph of the new class that gives its target variable new parents; with ``max_parents``, a move
+    whose graph gives that variable more than ``max_parents`` parents is never taken. Every graph
+    of a class has the same largest number of parents, so the cap then holds for every graph of the
+    new class, and a deletion never breaks it.
 
     **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
     parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
@@ -657,6 +689,7 @@ def xges(
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             extended_search=extended_search,
+            max_parents=max_parents,
             constraints=constraints,
         )
     metadata = {"score": json_safe(score)}

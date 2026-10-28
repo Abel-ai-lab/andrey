@@ -750,6 +750,7 @@ def gfci(
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
@@ -833,6 +834,13 @@ def gfci(
         the adjacency search, the separating sets for the pairs GES leaves non-adjacent, the
         possible-d-separation step, the conservative and majority rules, and the discriminating-path
         rule, but not the GES phase.
+    max_parents : int or None, default=None
+        A cap on every node's parents in the GES phase, at least ``0``: no DAG the GES CPDAG
+        represents gives a node more than ``max_parents`` parents, as :func:`~andrey.ges` applies
+        it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node of the
+        PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
+        orientation rules put at a node. ``None`` sets no cap; the GES phase then keeps its gate of
+        ``n_variables / 2``.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
@@ -865,8 +873,10 @@ def gfci(
         or if ``data`` or ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the
         BIC score, also if a column repeats another up to scale and shift given more than two rows
         or, with more rows than columns, is a linear function of other columns. One message names
-        every group of copies and says to keep one column per group. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        every group of copies and says to keep one column per group. Also if a given
+        ``max_parents`` is below the parents some graph of the required edges of ``knowledge``
+        gives a node, or if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -892,6 +902,10 @@ def gfci(
     ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, such a
     pair's separating set is the first subset found in column order, and ``possible_dsep`` defaults
     to ``"fast"``.
+
+    With ``max_parents``, the GES phase takes no move that gives a node more parents than the cap,
+    as :func:`~andrey.ges` does; the published GFCI [1]_ has no such cap. The test phase only
+    removes edges, but its orientation rules can put more arrowheads at a node than the cap.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -1015,6 +1029,7 @@ def gfci(
             categorical=mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
             max_depth=max_depth,
+            max_parents=max_parents,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,

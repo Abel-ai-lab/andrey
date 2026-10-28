@@ -52,6 +52,7 @@ def gfci(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
+    max_parents: int | None = None,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
@@ -71,6 +72,7 @@ def gfci(
     visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
     of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
+    ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
     ``constraints`` reach the GES phase, and the test phase honors them as FCI does: no step tests
@@ -96,6 +98,7 @@ def gfci(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        max_parents=max_parents,
         categorical=categorical,
         constraints=constraints,
         workers=workers,

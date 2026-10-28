@@ -444,15 +444,6 @@ _CONCEPTS = (
             *_exempt("Parents come from the adaptive Lasso on the order.", *_LINGAM),
             *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
         ),
-        deviations=(
-            *_absent(
-                "0.12.0",
-                "A cap on the represented DAGs interacts with the forward phase's gate.",
-                "gies",
-                "xges",
-                "gfci",
-            ),
-        ),
     ),
     Concept(
         key="max_iter",
