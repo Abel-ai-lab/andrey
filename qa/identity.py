@@ -471,6 +471,10 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, conditions, p)
     ],
     "batched_call": lambda ps, test, x, y, sets: [(x, y, s, p) for s, p in zip(sets, ps)],
+    # The sets answered, up to the first separating one; the sets after it are not queries.
+    "separating_prefix": lambda ps, test, x, y, sets, alpha: [
+        (x, y, s, p) for s, p in zip(sets, ps)
+    ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
     "_canonical_pvalues": lambda ps, test, xs, ys, sets: list(zip(xs, ys, sets, ps)),
     "marginal_pvalues": lambda ps, test: [
@@ -723,6 +727,7 @@ def run(
                     andrey.config(num_workers=workers),
                     _environ("ANDREY_GES_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             base = rows[-1]

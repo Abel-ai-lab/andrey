@@ -76,6 +76,19 @@ change names its pull request.
   `student_t` computing each test's correlations directly from those rows, many tests at once, and
   `metadata["rows_tested"]` giving the fewest and the median rows a test read, while every other
   method refuses them with an error that names it and says what to do instead. ([#443], [#453])
+- With more than one worker, `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` run each
+  large skeleton pass in worker processes, each conditioning set's queries in one worker, and
+  return the same graphs and p-values as with one worker. `ANDREY_RCOT_PARALLEL_MIN_WORK` sets the
+  least work, RCoT tests times rows, a pass needs to use them. The default, 2000000, was measured on
+  an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
+  on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
+  your machine, and `andrey calibrate` now measures it with the others. ([#457])
+- `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
+  the parents of both ends, which also bounds the subsets of the majority vote; unlike the
+  `max_depth` of `pc` and `fci`, it does not count those parents. Its number of tests grows
+  exponentially with the links at one node, so on many strongly related series an uncapped run may
+  not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
+  ([#468])
 - A fit larger than its method was measured to finish warns once per method with
   `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
   the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
@@ -94,12 +107,38 @@ change names its pull request.
   selection is unchanged and the same fits take about 10% less time. ([#391])
 - `andrey.data.latent.marginal(dag, "mag")` returns a graph of kind `"mag"` instead of `"pag"`,
   with the same marks. ([#418])
+- `andrey.data.latent.marginal`, `GraphStructure.to_mag`, and `to_pag` decide each pair of observed
+  nodes by one moral-graph search from each node instead of a d-separation test per pair, and
+  return the same graphs in less time. ([#481])
 - `grasp` tucks only the edges of the current DAG and never takes a chain of tucks back to a DAG it
   has visited, as the GRaSP paper's search does, so it returns a different graph on some data,
   one that scores better about as often as worse. ([#442])
 - `varma_lingam`'s **Limitations** paragraph and the column-order guide say that where its
   likelihood fit stops depends on the BLAS kernels the CPU runs, even when the fit converges, so
   the same series can give a different graph on another type of CPU. ([#451])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="rcot"` return the same graphs and p-values in
+  less time on large samples, because their skeleton search hands RCoT its queries in stacks, which
+  RCoT runs one conditioning set at a time, building each set's random features once per stack.
+  ([#455])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="degen_gauss"` return the same graphs and
+  p-values in less time, because their skeleton search hands the degenerate Gaussian test its
+  queries in stacks, which it runs grouped by shape, with each conditioning set's regression
+  computed once. ([#459])
+- `fci` and `gfci` return the same graphs and p-values in less time, because their
+  possible-d-separation step asks the test for each pair's conditioning sets in runs of 1, 2, 4, and
+  up to 256 sets, cut at the first that separates the pair, when the test is `"fisherz"`,
+  `"student_t"`, `"chisq"`, `"gsq"`, `"degen_gauss"`, or `"cond_gauss"`. ([#461])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"` or `"gsq"` return the same graphs and
+  p-values in less time, because the test's batched counts hold a table only for each conditioning
+  configuration that occurs in the data, not for every possible one. ([#463])
+- `lpcmci` returns the same graphs in less time on long searches, because a removal step builds a
+  batch of conditioning sets as one array of column numbers, records its tests once per batch, and,
+  without missing values, tests sets of more than three neighbors, which rarely repeat, without the
+  result cache. ([#468])
+- `andrey.data.latent.marginal(dag, "pag")` and `GraphStructure.to_pag` return the same graphs in
+  less time on dense graphs with hidden variables, because the orientation rules R9 and R10, which
+  `fci` and `gfci` share, make each of their path searches once per pass instead of once for each
+  pair of nodes that needs it. ([#485])
 
 ### Fixed
 
@@ -878,7 +917,15 @@ First alpha release.
 [#446]: https://github.com/Abel-ai-lab/andrey/pull/446
 [#451]: https://github.com/Abel-ai-lab/andrey/pull/451
 [#453]: https://github.com/Abel-ai-lab/andrey/pull/453
+[#455]: https://github.com/Abel-ai-lab/andrey/pull/455
+[#457]: https://github.com/Abel-ai-lab/andrey/pull/457
+[#459]: https://github.com/Abel-ai-lab/andrey/pull/459
+[#461]: https://github.com/Abel-ai-lab/andrey/pull/461
+[#463]: https://github.com/Abel-ai-lab/andrey/pull/463
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
+[#468]: https://github.com/Abel-ai-lab/andrey/pull/468
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
-[#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#478]: https://github.com/Abel-ai-lab/andrey/pull/478
+[#479]: https://github.com/Abel-ai-lab/andrey/pull/479
+[#481]: https://github.com/Abel-ai-lab/andrey/pull/481
+[#485]: https://github.com/Abel-ai-lab/andrey/pull/485

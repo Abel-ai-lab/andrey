@@ -788,11 +788,16 @@ class GraphStructure(Structure):
         -----
         The construction is Richardson and Spirtes' (2002). Observed ``a`` and ``b`` are adjacent
         exactly when the DAG does not d-separate them given the selection variables and the
-        observed ancestors of ``a``, ``b``, and the selection variables, so one d-separation
-        query decides each pair of observed nodes.
+        observed ancestors of ``a``, ``b``, and the selection variables. By the moralization
+        criterion of Lauritzen et al. (1990), that holds when the moral graph of the ancestors of
+        ``a``, ``b``, and the selection variables joins ``a`` and ``b`` by a path through hidden
+        variables alone, so one search from each observed node decides all its pairs.
 
         References
         ----------
+        Lauritzen, S. L., Dawid, A. P., Larsen, B. N., and Leimer, H.-G. (1990). Independence
+        properties of directed Markov fields. Networks 20(5), 491-505.
+
         Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
         Statistics 30(4), 962-1030.
 

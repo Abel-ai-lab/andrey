@@ -729,6 +729,7 @@ def lpcmci(
     pc_alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
+    max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a time-series partial ancestral graph that allows hidden common causes with LPCMCI.
@@ -759,6 +760,16 @@ def lpcmci(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    max_depth : int or None, default=None
+        The largest number of neighbors a removal step conditions on, at least ``0``, counted
+        beyond the default conditions, the parents of both ends, which every test includes; it
+        also bounds the subsets the majority vote reads. A test can therefore condition on more
+        than ``max_depth`` nodes, while the ``max_depth`` of :func:`~andrey.pc` and
+        :func:`~andrey.fci` counts the whole conditioning set. ``None`` sets no limit, as in the
+        paper. The number of tests grows exponentially with the links at one node, so on many
+        strongly related series an uncapped run may not finish. A cap bounds the number of tests,
+        though a capped run can still take long, and can keep links that a larger conditioning set
+        would remove.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -799,18 +810,18 @@ def lpcmci(
     Raises
     ------
     TypeError
-        If ``tau_max`` or ``n_preliminary_iterations`` is not an int, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``tau_max``, ``n_preliminary_iterations``, or a given ``max_depth`` is not an int, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``tau_max`` is below 1, ``n_preliminary_iterations`` below 0, ``pc_alpha`` not in
-        ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is
-        not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
-        rows, the length at which every test keeps a degree of freedom. Also if a variable repeats
-        another up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart,
-        before any test runs; one message names every group of copies, a lagged value as
-        ``'x' at lag k``, and says to keep one column per group. Also if ``knowledge`` names a
-        column ``data`` lacks, contradicts itself, or requires a link without a lag or beyond
-        ``tau_max``.
+        If ``tau_max`` is below 1, ``n_preliminary_iterations`` or a given ``max_depth`` below 0,
+        ``pc_alpha`` not in ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or
+        if ``data`` is not a usable 2-D matrix with at least
+        ``n_variables * (tau_max + 1) + 2 * tau_max + 1`` rows, the length at which every test
+        keeps a degree of freedom. Also if a variable repeats another up to scale and shift, at the
+        same step or up to ``2 * tau_max`` steps apart, before any test runs; one message names
+        every group of copies, a lagged value as ``'x' at lag k``, and says to keep one column per
+        group. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires
+        a link without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -906,6 +917,7 @@ def lpcmci(
     tau_max = int_in_range(tau_max, "tau_max", 1)
     n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
     pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     X = data_matrix(data, method="lpcmci", missing=True)
     # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
@@ -928,6 +940,7 @@ def lpcmci(
             pc_alpha=pc_alpha,
             n_preliminary_iterations=n_preliminary_iterations,
             indep_test=indep_test,
+            max_depth=max_depth,
             constraints=constraints,
         )
     return with_labels(_adapt_lpcmci(result, rows_metadata(rows)), labels)

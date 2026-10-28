@@ -9,6 +9,7 @@ definitions. Each variable's parser is in :mod:`andrey.core.env`. The human-read
 from __future__ import annotations
 
 from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES as _SKELETON_MIN_WORK
+from andrey.constraint._parallel_skeleton import MIN_POOL_RCOT_WORK as _RCOT_MIN_WORK
 from andrey.core.env import SEED_MAX
 from andrey.search._parallel_ges import _DEFAULT_MIN_WORK as _GES_MIN_WORK
 
@@ -41,8 +42,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         default="1",
         effect=(
             "Worker processes for GES, GFCI (its GES phase), and the skeleton searches of PC, "
-            "FCI, GFCI, and CD-NOD with `fisherz` or `student_t`, and worker threads for the "
-            "regressions of `granger` and the two directions of `pnl`; `0` or `1` runs serially. "
+            "FCI, GFCI, and CD-NOD with `fisherz`, `student_t`, or `rcot`, and worker threads for "
+            "the regressions of `granger` and the two directions of `pnl`; `0` or `1` runs "
+            "serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -74,6 +76,22 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "`ANDREY_NUM_WORKERS`) is above 1. A fit with more than one worker warns once on the "
             "default when a pass reaches a tenth of it; `andrey calibrate --method skeleton` "
             "measures a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_RCOT_PARALLEL_MIN_WORK",
+        values="integer (RCoT tests times rows per conditioning-size pass)",
+        default=str(_RCOT_MIN_WORK),
+        effect=(
+            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, and "
+            "CD-NOD with `rcot`: a conditioning-size pass fans out to the worker pool only when "
+            "its RCoT tests times the data's rows reach this value, else in-process. `0` sends "
+            "every pass to the pool. The default was measured on an Intel Core i7-7820X running "
+            "Linux with 4 workers. No effect unless the worker count (`num_workers` / "
+            "`ANDREY_NUM_WORKERS`) is above 1. A fit with more than one worker warns once on the "
+            "default when a pass reaches a tenth of it; `andrey calibrate --method rcot` measures "
+            "a value for your machine."
         ),
         group="backend",
     ),
