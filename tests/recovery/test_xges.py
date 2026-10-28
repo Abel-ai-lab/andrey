@@ -81,9 +81,9 @@ def test_output_contract():
     x = datagen.generate("gauss_7v")
     out = andrey.xges(x)
     assert out.structure.kind == "cpdag"
-    assert out.metadata["algorithm"] == "XGES"
+    assert out.metadata["algorithm"] == "xges"
     assert np.isfinite(out.metadata["score"])
-    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "XGES"
+    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "xges"
 
 
 # ---- ground truth --------------------------------------------------------------------------------

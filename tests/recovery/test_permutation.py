@@ -83,5 +83,5 @@ def test_boss_equal_scores_are_stable_under_input_rounding():
 
 
 def test_hc_rejects_unknown_score():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.hc(datagen.generate("gauss_5v"), score_func="local_score_CV_general")

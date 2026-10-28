@@ -190,6 +190,17 @@ def test_compare_counts_the_rows_that_differ(changes, status, message, capsys) -
     assert message in capsys.readouterr().out
 
 
+def test_compare_names_the_metadata_keys_that_alone_differ(capsys) -> None:
+    parts = {"graph": "g", "structure": "s", "metadata.algorithm": "a"}
+    before = _manifest(parts=parts)
+    renamed = _manifest(hash="h2", parts={**parts, "metadata.algorithm": "b", "metadata.seed": "c"})
+    assert identity.compare(before, renamed) == 1
+    assert "1 with only different metadata (algorithm, seed)" in capsys.readouterr().out
+    moved = _manifest(hash="h2", parts={**parts, "structure": "t", "metadata.algorithm": "b"})
+    assert identity.compare(before, moved) == 1
+    assert "1 with only different bits, 0 with only different metadata" in capsys.readouterr().out
+
+
 def test_a_fall_in_a_count_passes_only_when_allowed(capsys) -> None:
     fewer = _manifest(ci_queries=9)
     assert identity.compare(_manifest(), fewer) == 1

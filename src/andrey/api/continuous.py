@@ -7,19 +7,16 @@ follows the first fit with the likelihood path of Deng et al. (2024).
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
     column_labels,
     copies_named,
     data_matrix,
-    flag,
-    int_in_range,
     json_safe,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
+from andrey.api._method import method_spec
 from andrey.core.backend import one_blas_thread
 from andrey.core.knowledge import Knowledge, resolve
 
@@ -30,42 +27,7 @@ if TYPE_CHECKING:
     from andrey.search.continuous import ContinuousResult
 
 
-def _positive(value: object, name: str) -> float:
-    """Return ``value`` as a float above zero; raise ``TypeError`` or ``ValueError`` naming it."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"{name} must be a number, got {type(value).__name__}")
-    if not (math.isfinite(value) and value > 0):
-        raise ValueError(f"{name} must be a finite number above 0, got {value}")
-    return float(value)
-
-
-def _non_negative(value: object, name: str) -> float:
-    """Return ``value`` as a float of at least zero; raise ``TypeError`` or ``ValueError``."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"{name} must be a number, got {type(value).__name__}")
-    if not (math.isfinite(value) and value >= 0):
-        raise ValueError(f"{name} must be a finite number of at least 0, got {value}")
-    return float(value)
-
-
-def _path(
-    robust: object, mcp_lambda: object, mcp_delta: object, mcp_decay: object, max_path: object
-) -> tuple[bool, float, float, float, int]:
-    """Check the settings of the likelihood path and return them in the order given."""
-    decay = _positive(mcp_decay, "mcp_decay")
-    if decay >= 1:
-        raise ValueError(f"mcp_decay must be in (0, 1), got {mcp_decay}")
-    return (
-        flag(robust, "robust"),
-        _positive(mcp_lambda, "mcp_lambda"),
-        _positive(mcp_delta, "mcp_delta"),
-        decay,
-        int_in_range(max_path, "max_path", 1),
-    )
-
-
 def _output(
-    name: str,
     result: ContinuousResult,
     labels: tuple[str, ...] | None,
     robust: bool,
@@ -76,7 +38,6 @@ def _output(
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "algorithm": name,
             "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "edges_removed": result.edges_removed,
@@ -86,6 +47,7 @@ def _output(
     )
 
 
+@method_spec("notears")
 def notears(
     data: npt.ArrayLike,
     *,
@@ -147,7 +109,7 @@ def notears(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"NOTEARS"``),
+        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"notears"``),
         ``"n_edges"``, ``"h_final"`` (the acyclicity function of the fit before the threshold),
         ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), ``"robust"``,
         and ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
@@ -155,12 +117,13 @@ def notears(
     Raises
     ------
     TypeError
-        If a setting has the wrong type, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If a setting is outside the range listed for it, if ``data`` is not a finite numeric matrix
-        of two or more rows without a constant column, or if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a finite numeric matrix of two or more rows without a constant column, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -261,18 +224,9 @@ def notears(
     >>> out.structure.kind
     'dag'
     """
-    warn_experimental("notears")
     from andrey.search.continuous import notears as _notears
 
     X = data_matrix(data, method="notears")
-    lambda1 = _non_negative(lambda1, "lambda1")
-    w_threshold = _non_negative(w_threshold, "w_threshold")
-    max_iter = int_in_range(max_iter, "max_iter", 1)
-    h_tol = _positive(h_tol, "h_tol")
-    rho_max = _positive(rho_max, "rho_max")
-    robust, mcp_lambda, mcp_delta, mcp_decay, max_path = _path(
-        robust, mcp_lambda, mcp_delta, mcp_decay, max_path
-    )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="notears")
     with copies_named(labels), one_blas_thread():
@@ -291,9 +245,10 @@ def notears(
             labels=labels,
             constraints=constraints,
         )
-    return _output("NOTEARS", result, labels, robust)
+    return _output(result, labels, robust)
 
 
+@method_spec("dagma")
 def dagma(
     data: npt.ArrayLike,
     *,
@@ -360,7 +315,7 @@ def dagma(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"DAGMA"``),
+        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"dagma"``),
         ``"n_edges"``, ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before
         the threshold), ``"edges_removed"`` (edges the threshold kept that the cycle repair
         dropped), ``"robust"``, and ``"path_steps"`` (accepted steps of the path, ``0`` without
@@ -369,12 +324,13 @@ def dagma(
     Raises
     ------
     TypeError
-        If a setting has the wrong type, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If a setting is outside the range listed for it, if ``data`` is not a finite numeric matrix
-        of two or more rows without a constant column, or if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a finite numeric matrix of two or more rows without a constant column, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -477,19 +433,9 @@ def dagma(
     >>> out.structure.kind
     'dag'
     """
-    warn_experimental("dagma")
     from andrey.search.continuous import dagma as _dagma
 
     X = data_matrix(data, method="dagma")
-    lambda1 = _non_negative(lambda1, "lambda1")
-    w_threshold = _non_negative(w_threshold, "w_threshold")
-    stages = int_in_range(stages, "stages", 1)
-    warm_iter = int_in_range(warm_iter, "warm_iter", 1)
-    max_iter = int_in_range(max_iter, "max_iter", 1)
-    lr = _positive(lr, "lr")
-    robust, mcp_lambda, mcp_delta, mcp_decay, max_path = _path(
-        robust, mcp_lambda, mcp_delta, mcp_decay, max_path
-    )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="dagma")
     with copies_named(labels), one_blas_thread():
@@ -509,4 +455,4 @@ def dagma(
             labels=labels,
             constraints=constraints,
         )
-    return _output("DAGMA", result, labels, robust)
+    return _output(result, labels, robust)

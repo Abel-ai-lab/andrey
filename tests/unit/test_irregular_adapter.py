@@ -97,11 +97,10 @@ def test_anm_decided_graph_and_float_metadata(tmp_path):
     assert g.oriented_edges() == [(1, 0, "directed")]  # the backward model fits better
     assert out.weighted_adjacency is None
     md = out.metadata
-    assert md["algorithm"] == "ANM"
     assert md["pval_forward"] == 0.02
     assert md["pval_backward"] == 0.81
     assert isinstance(md["pval_forward"], float) and isinstance(md["pval_backward"], float)
-    assert set(md) == {"algorithm", "pval_forward", "pval_backward"}
+    assert set(md) == {"pval_forward", "pval_backward"}
     _roundtrips(out, tmp_path, "anm")
 
 
@@ -114,7 +113,6 @@ def test_pnl_coerces_shape_one_arrays(tmp_path):
     assert type(md["pval_forward"]) is float  # not np.float64 (JSON-safe)
     assert out.structure.n_nodes == 2
     assert out.structure.oriented_edges() == [(1, 0, "directed")]
-    assert md["algorithm"] == "PNL"
     _roundtrips(out, tmp_path, "pnl")
 
 
@@ -178,15 +176,3 @@ def test_bottom_up_numpy_int_order_is_json_safe(tmp_path):
     assert out.metadata["causal_order"] == [0, 1]
     assert all(type(x) is int for x in out.metadata["causal_order"])
     _roundtrips(out, tmp_path, "bottom_up_flat")
-
-
-def test_hidden_cause_methods_record_their_name():
-    B = np.array([[0.0, np.nan], [np.nan, 0.0]])
-    named = {
-        "RCD": _adapt_rcd(SimpleNamespace(adjacency_matrix_=B)),
-        "BottomUpParceLiNGAM": _adapt_bottom_up_parce(
-            SimpleNamespace(adjacency_matrix_=B, causal_order_=[[0, 1]])
-        ),
-    }
-    for algorithm, out in named.items():
-        assert out.metadata["algorithm"] == algorithm

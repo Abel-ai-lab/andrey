@@ -74,6 +74,10 @@ class BoundaryWarning(AndreyWarning):
     """
 
 
+class DeprecatedArgumentWarning(AndreyWarning):
+    """A former argument name or value, which works for one more release as the current one."""
+
+
 def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = None) -> None:
     """Warn with ``message`` the first time this process sees it, at the caller's line.
 

@@ -6,8 +6,9 @@ dataset (:data:`LARGER`), on the numpy backend with one worker and one BLAS thre
 covers its whole output: the graph, the edge weights, the causal order, and every metadata value,
 such as a score, a p-value, or a list of nodes. Floats enter as their bytes, never as printed text,
 NaN as one bit pattern, and mappings in key order, so equal hashes mean equal bits. A second hash
-covers only the endpoint marks of the graphs, so a difference reads as a changed graph or as changed
-bits under the same graph.
+covers only the endpoint marks of the graphs, and each part of the output has its own digest
+(:func:`parts`), so a difference reads as a changed graph, as changed bits under the same graph, or
+as changed metadata values alone, named by key.
 
 The manifest holds one row per fit, keyed by method, dataset, seed, permutation, and worker count,
 under a header naming the commit, the imported Andrey package's directory and commit, the Python,
@@ -692,6 +693,7 @@ def row(method: str, dataset: str, seed: int, permutation: int, workers: int, ou
         "workers": workers,
         "hash": digest(out),
         "graph_hash": graph_digest(out),
+        "parts": parts(out),
     }
 
 
@@ -769,6 +771,8 @@ def _counters(r: dict) -> dict[str, int]:
     """Flatten a row's counts: each total, and each set size as ``ci_sets[2]``."""
     out = {}
     for key, value in r.items():
+        if key == "parts":
+            continue
         if isinstance(value, dict):
             out.update({f"{key}[{size}]": n for size, n in value.items()})
         elif key in ("ci_queries", "ci_after_separation", "score_queries"):
@@ -779,20 +783,29 @@ def _counters(r: dict) -> dict[str, int]:
 def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     """Print how manifest ``after`` differs from ``before``; return 1 if a row's hash differs, a row
     is in one only, or a count rose or fell, else 0. A count that fell passes with ``allow_fewer``:
-    it is either a real algorithmic change or a query the counting no longer sees."""
+    it is either a real algorithmic change or a query the counting no longer sees.
+
+    A row whose graph is unchanged differs in its bits, or, when its :func:`parts` show that only
+    metadata values changed, in its metadata, and the compare names the metadata keys."""
     for key in sorted(before["header"].keys() | after["header"].keys()):
         if before["header"].get(key) != after["header"].get(key):
             print(f"header {key}: {before['header'].get(key)} -> {after['header'].get(key)}")
     old = {tuple(r[k] for k in KEY): r for r in before["rows"]}
     new = {tuple(r[k] for k in KEY): r for r in after["rows"]}
-    graph, bits, raised, lowered = [], [], [], []
+    graph, bits, metadata, raised, lowered = [], [], [], [], []
+    keys: set[str] = set()
     for key in sorted(old.keys() & new.keys(), key=str):
         a, b = old[key], new[key]
         label = " ".join(map(str, key))
         if a["graph_hash"] != b["graph_hash"]:
             graph.append(label)
         elif a["hash"] != b["hash"]:
-            bits.append(label)
+            changed = metadata_keys(a.get("parts", {}), b.get("parts", {}))
+            if changed:
+                metadata.append(f"{label} {', '.join(changed)}")
+                keys.update(changed)
+            else:
+                bits.append(label)
         ca, cb = _counters(a), _counters(b)
         for name in sorted(ca.keys() | cb.keys()):
             change = f"{label} {name}: {ca.get(name, 0)} -> {cb.get(name, 0)}"
@@ -804,18 +817,31 @@ def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     for title, lines in (
         ("graph differs", graph),
         ("only bits differ", bits),
+        ("only metadata differs", metadata),
         ("in one manifest only", only),
         ("count rose", raised),
         ("count fell", lowered),
     ):
         for line in lines:
             print(f"{title}: {line}")
+    named = f" ({', '.join(sorted(keys))})" if keys else ""
     print(
         f"\n{len(old.keys() & new.keys())} rows in both: {len(graph)} with a different graph, "
-        f"{len(bits)} with only different bits; {len(only)} in one only; "
+        f"{len(bits)} with only different bits, {len(metadata)} with only different metadata"
+        f"{named}; {len(only)} in one only; "
         f"{len(raised)} counts rose, {len(lowered)} fell."
     )
-    return 1 if graph or bits or only or raised or (lowered and not allow_fewer) else 0
+    differs = graph or bits or metadata or only or raised
+    return 1 if differs or (lowered and not allow_fewer) else 0
+
+
+def metadata_keys(before: Mapping[str, str], after: Mapping[str, str]) -> list[str]:
+    """Return the metadata keys whose digests differ between two rows' :func:`parts`, or ``[]``
+    when another part differs too or the rows record no parts."""
+    changed = {name for name in before.keys() | after.keys() if before.get(name) != after.get(name)}
+    if not changed or any("metadata." not in name for name in changed):
+        return []
+    return sorted({name.split("metadata.", 1)[1] for name in changed})
 
 
 # ==================================================================================================

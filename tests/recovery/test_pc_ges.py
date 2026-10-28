@@ -220,12 +220,12 @@ def test_ges_output_contract():
 
 
 def test_pc_rejects_unknown_indep_test():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.pc(datagen.generate("gauss_5v"), indep_test="no_such_test")
 
 
 def test_ges_rejects_unknown_score():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.ges(datagen.generate("gauss_5v"), score_func="local_score_CV_general")
 
 

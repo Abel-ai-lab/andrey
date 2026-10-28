@@ -16,10 +16,9 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
-    open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
+from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import _node, column_position
@@ -34,7 +33,6 @@ if TYPE_CHECKING:
 
 #: The ``metadata`` key of each method's set, and the ``algorithm`` it reports.
 _SETS = {"iamb": "markov_blanket", "inter_iamb": "markov_blanket", "mmpc": "parents_and_children"}
-_NAMES = {"iamb": "IAMB", "inter_iamb": "InterIAMB", "mmpc": "MMPC"}
 
 
 def _fit(
@@ -59,12 +57,11 @@ def _fit(
         method=method,
         missing=True,
     )
-    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     d = X.shape[1]
     t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
     settings = {"alpha": alpha, "indep_test": indep_test, "categorical": mask}
-    metadata: dict[str, object] = {"algorithm": _NAMES[method]}
+    metadata: dict[str, object] = {}
     with copies_named(labels), rows_tested() as rows:
         if t is None:
             adjacent = local_graph(X, method, **settings)
@@ -79,6 +76,7 @@ def _fit(
     return structure_output(to_structure(marks, kind="cpdag"), labels=labels, metadata=metadata)
 
 
+@method_spec("iamb")
 def iamb(
     data: npt.ArrayLike,
     *,
@@ -123,22 +121,22 @@ def iamb(
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
-        are adjacent in the causal graph. ``metadata["algorithm"]`` is ``"IAMB"``; with
+        are adjacent in the causal graph. ``metadata["algorithm"]`` is ``"iamb"``; with
         ``target``, ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test.
     TypeError
-        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
-        column names and positions, or ``max_categories`` is not an int.
+        If ``target`` is neither a column label nor a position, or ``categorical`` is not a list of
+        column names and positions.
     ValueError
-        If ``target`` names a column ``data`` lacks, if ``alpha`` is not in ``(0, 1)``, or if
-        ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
-        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
+        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
+        another up to scale and shift.
 
     Warns
     -----
@@ -209,7 +207,6 @@ def iamb(
     >>> sorted(out.metadata["markov_blanket"])
     [1, 2]
     """
-    warn_experimental("iamb")
     return _fit(
         "iamb",
         data,
@@ -221,6 +218,7 @@ def iamb(
     )
 
 
+@method_spec("inter_iamb")
 def inter_iamb(
     data: npt.ArrayLike,
     *,
@@ -264,22 +262,22 @@ def inter_iamb(
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
-        are adjacent in the causal graph. ``metadata["algorithm"]`` is ``"InterIAMB"``; with
+        are adjacent in the causal graph. ``metadata["algorithm"]`` is ``"inter_iamb"``; with
         ``target``, ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test.
     TypeError
-        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
-        column names and positions, or ``max_categories`` is not an int.
+        If ``target`` is neither a column label nor a position, or ``categorical`` is not a list of
+        column names and positions.
     ValueError
-        If ``target`` names a column ``data`` lacks, if ``alpha`` is not in ``(0, 1)``, or if
-        ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
-        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
+        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
+        another up to scale and shift.
 
     Warns
     -----
@@ -350,7 +348,6 @@ def inter_iamb(
     >>> sorted(out.metadata["markov_blanket"])
     [1, 2]
     """
-    warn_experimental("inter_iamb")
     return _fit(
         "inter_iamb",
         data,
@@ -362,6 +359,7 @@ def inter_iamb(
     )
 
 
+@method_spec("mmpc")
 def mmpc(
     data: npt.ArrayLike,
     *,
@@ -404,22 +402,22 @@ def mmpc(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
         With ``target``, they join ``target`` to each of its parents and children; without, they
-        form the skeleton: each pair in each other's set. ``metadata["algorithm"]`` is ``"MMPC"``;
+        form the skeleton: each pair in each other's set. ``metadata["algorithm"]`` is ``"mmpc"``;
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``
         lists the members in the order they joined, by column label or 0-based position. Under a
         mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test.
     TypeError
-        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
-        column names and positions, or ``max_categories`` is not an int.
+        If ``target`` is neither a column label nor a position, or ``categorical`` is not a list of
+        column names and positions.
     ValueError
-        If ``target`` names a column ``data`` lacks, if ``alpha`` is not in ``(0, 1)``, or if
-        ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
-        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
+        for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
+        another up to scale and shift.
 
     Warns
     -----
@@ -496,7 +494,6 @@ def mmpc(
     >>> out.metadata["parents_and_children"]
     [2]
     """
-    warn_experimental("mmpc")
     return _fit(
         "mmpc",
         data,

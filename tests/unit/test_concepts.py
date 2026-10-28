@@ -18,7 +18,8 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import warning_policy
+from andrey.api import _method as method_wrapper
+from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS, Concept
@@ -266,6 +267,103 @@ def test_behavior_cell(concept, method):
         assert observed == (
             expected.format(method=method) if isinstance(expected, str) else expected
         )
+
+
+# --- the wrapper every method runs in ------------------------------------------------------------
+
+
+def bad_values(param) -> list[tuple[object, type[Exception]]]:
+    """Values ``param`` refuses, each with its error: another type raises ``TypeError``; each side
+    of the bounds, a non-finite number, and an unknown choice raise ``ValueError``."""
+    if param.choices:
+        return [("unknown", ValueError), (1, TypeError)]
+    values = {
+        "int": [(1.5, TypeError), (True, TypeError)],
+        "float": [("0.5", TypeError), (float("nan"), ValueError)],
+        "bool": [(1, TypeError), ("yes", TypeError)],
+    }.get(param.type, [([1.5, 1], TypeError)] if param.type == "int_pair" else [])
+    step = 1 if param.type in ("int", "int_pair") else 0.5
+    cast = int if param.type in ("int", "int_pair") else float
+    if param.minimum is not None:
+        low = cast(param.minimum if param.exclusive_minimum else param.minimum - step)
+        values.append((low if param.type != "int_pair" else (low, 1), ValueError))
+    if param.maximum is not None:
+        high = cast(param.maximum if param.exclusive_maximum else param.maximum + step)
+        values.append((high if param.type != "int_pair" else (high, 1), ValueError))
+    return values
+
+
+@pytest.mark.parametrize(
+    ("method", "param", "value", "error"),
+    [
+        pytest.param(m, p, v, e, id=f"{m}-{p.name}-{v!r}")
+        for m, spec in REGISTRY.items()
+        for p in spec.params
+        for v, e in bad_values(p)
+    ],
+)
+def test_a_bad_value_raises_one_message_shape(method, param, value, error):
+    """Every parameter of every method refuses a bad value with one message: the method, the
+    parameter, what it accepts, and the value."""
+    with pytest.raises(error, match=rf"^{method}: {param.name} must be .+, got "):
+        getattr(andrey, method)(*inputs(method, codes=False), **{param.name: value})
+
+
+SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
+
+
+@pytest.mark.parametrize("method", SEEDED)
+def test_a_seeded_fit_records_its_seed(method, monkeypatch):
+    seed = tagged(CONCEPTS["seed"], method).name  # ty: ignore[possibly-missing-attribute]
+    out, _ = fit(method, codes=False, **SHORT.get(method, {}), **{seed: 7})
+    assert out.metadata["seed"] == 7
+    monkeypatch.setenv("ANDREY_SEED", "11")
+    out, _ = fit(method, codes=False, **SHORT.get(method, {}))
+    assert out.metadata["seed"] == 11
+
+
+def test_an_unseeded_fit_records_no_seed():
+    assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
+
+
+def renamed(monkeypatch, method: str, name: str, **update) -> None:
+    """Give ``method``'s parameter ``name`` the former names or values in ``update``."""
+    spec = REGISTRY[method]
+    params = tuple(p.model_copy(update=update) if p.name == name else p for p in spec.params)
+    monkeypatch.setattr(
+        method_wrapper, "spec_of", lambda _: spec.model_copy(update={"params": params})
+    )
+
+
+def test_a_former_name_maps_to_the_current_one_with_one_warning(monkeypatch):
+    renamed(monkeypatch, "pc", "alpha", aliases=("significance",))
+    data = inputs("pc", codes=False)
+    expected = andrey.pc(*data, alpha=0.01)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="significance is now alpha"):
+        out = andrey.pc(*data, significance=0.01)
+    assert out.structure.to_numpy().tolist() == expected.structure.to_numpy().tolist()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        andrey.pc(*data, significance=0.01)  # the message warns once
+    with pytest.raises(ValueError, match="pass only alpha"):
+        andrey.pc(*data, alpha=0.01, significance=0.01)
+
+
+def test_a_former_value_maps_to_the_current_one_with_one_warning(monkeypatch):
+    renamed(monkeypatch, "pc", "indep_test", choice_aliases=(("fisher", "fisherz"),))
+    data = inputs("pc", codes=False)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='fisher' is now"):
+        out = andrey.pc(*data, indep_test="fisher")
+    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
+
+
+def test_an_indep_test_takes_the_registered_tests(monkeypatch):
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
+    data = inputs("pc", codes=False)
+    out = andrey.pc(*data, indep_test="fisherz_copy")
+    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
 
 
 # --- surfaces -------------------------------------------------------------------------------------

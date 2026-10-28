@@ -48,7 +48,7 @@ def test_keeps_the_recorded_pag(method, possible_dsep):
 
 @pytest.mark.parametrize(("method", "value"), [("fci", "order-free"), ("gfci", "FAST")])
 def test_unknown_possible_dsep_raises(method, value):
-    with pytest.raises(ValueError, match="possible_dsep must be 'order_free' or 'fast'"):
+    with pytest.raises(ValueError, match="possible_dsep must be one of 'order_free', 'fast'"):
         getattr(andrey, method)(
             np.random.default_rng(0).standard_normal((50, 3)), possible_dsep=value
         )

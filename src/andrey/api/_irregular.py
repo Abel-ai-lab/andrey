@@ -87,7 +87,6 @@ def _pairwise_output(
     pval_forward: Any,
     pval_backward: Any,
     *,
-    algorithm: str,
     stat_forward: Any = None,
     stat_backward: Any = None,
     alpha: float | None = None,
@@ -115,7 +114,6 @@ def _pairwise_output(
         GraphStructure.from_numpy(M, kind="dag"),
         labels=labels,
         metadata={
-            "algorithm": algorithm,
             "pval_forward": forward,
             "pval_backward": backward,
             **stats,
@@ -143,7 +141,6 @@ def _adapt_anm(
     return _pairwise_output(
         pval_forward,
         pval_backward,
-        algorithm="ANM",
         stat_forward=stat_forward,
         stat_backward=stat_backward,
         alpha=alpha,
@@ -172,7 +169,6 @@ def _adapt_pnl(
     return _pairwise_output(
         pval_forward,
         pval_backward,
-        algorithm="PNL",
         stat_forward=stat_forward,
         stat_backward=stat_backward,
         alpha=alpha,
@@ -199,7 +195,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
     return structure_output(
         structure,
         weighted_adjacency=_nan_to_zero(B).T,
-        metadata={"algorithm": "RCD", "confounded_pairs": _nan_pairs(B)},
+        metadata={"confounded_pairs": _nan_pairs(B)},
     )
 
 
@@ -223,7 +219,7 @@ def _adapt_bottom_up_parce(model: Any, arrowheads: np.ndarray | None = None) -> 
     if arrowheads is not None:
         M[arrowheads & (M == CIRCLE)] = ARROW
     structure = GraphStructure.from_numpy(M, kind="pag")
-    metadata: dict[str, Any] = {"algorithm": "BottomUpParceLiNGAM"}
+    metadata: dict[str, Any] = {}
     order = getattr(model, "causal_order_", None)
     if order is not None:
         metadata["causal_order"] = order  # json_safe (via structure_output) coerces the nesting

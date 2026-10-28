@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata
 from andrey.core.knowledge import Knowledge, resolve
 
@@ -19,11 +20,8 @@ from ._adapt import (
     column_labels,
     column_namer,
     data_matrix,
-    int_in_range,
-    open_unit_interval,
     with_labels,
 )
-from ._boundary import warn_past_boundary
 from ._irregular import (
     _adapt_anm,
     _adapt_bottom_up_parce,
@@ -65,6 +63,7 @@ def _complete_pairs(
     return kept, rows_metadata({rows: 2})
 
 
+@method_spec("anm")
 def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the additive noise model (ANM).
 
@@ -87,7 +86,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"ANM"``; ``pval_forward`` is the
+        edge, or no edge. ``metadata["algorithm"]`` is ``"anm"``; ``pval_forward`` is the
         independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
         ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
         divided by its mean under independence.
@@ -95,7 +94,9 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        does not have 2 columns.
 
     Notes
     -----
@@ -176,11 +177,8 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
             f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
     X = data_matrix(data, method="anm", missing=True)
-    if alpha is not None:
-        alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     X, rows = _complete_pairs(X, labels, "anm")
-    warn_past_boundary("anm", X.shape)
     X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
     Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
     pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
@@ -195,6 +193,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     )
 
 
+@method_spec("pnl")
 def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the post-nonlinear (PNL) model.
 
@@ -216,7 +215,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"PNL"``; ``pval_forward`` is the
+        edge, or no edge. ``metadata["algorithm"]`` is ``"pnl"``; ``pval_forward`` is the
         independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
         ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
         divided by its mean under independence.
@@ -224,7 +223,9 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        does not have 2 columns.
 
     Notes
     -----
@@ -317,11 +318,8 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
             f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
     X = data_matrix(data, method="pnl", missing=True)
-    if alpha is not None:
-        alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     X, rows = _complete_pairs(X, labels, "pnl")
-    warn_past_boundary("pnl", X.shape)
     pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
     return _adapt_pnl(
         pval_forward,
@@ -334,6 +332,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     )
 
 
+@method_spec("rcd")
 def rcd(
     data: npt.ArrayLike,
     *,
@@ -377,20 +376,20 @@ def rcd(
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
-        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"RCD"``;
+        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"rcd"``;
         ``metadata["confounded_pairs"]`` lists the ``<->`` pairs as sorted ``[i, j]`` lists;
         ``weighted_adjacency`` holds the edge coefficients.
 
     Raises
     ------
     TypeError
-        If ``max_explanatory_vars`` is not an int, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
-        significance level is not in ``(0, 1)``. Also if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists, or if its required
-        edges close a directed cycle with the parents the search found.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than 6 rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle
+        with the parents the search found.
 
     Notes
     -----
@@ -439,13 +438,8 @@ def rcd(
     from andrey.irregular.rcd import fit_rcd
 
     X = data_matrix(data, min_rows=6, method="rcd")  # HSIC's null variance has (n - 4)(n - 5)
-    max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
     labels = column_labels(data)
-    cor_alpha = open_unit_interval(cor_alpha, "cor_alpha")
-    ind_alpha = open_unit_interval(ind_alpha, "ind_alpha")
-    shapiro_alpha = open_unit_interval(shapiro_alpha, "shapiro_alpha")
     constraints = resolve(knowledge, X.shape[1], labels, method="rcd")
-    warn_past_boundary("rcd", X.shape)
     model = fit_rcd(
         X,
         max_explanatory_num=max_explanatory_vars,
@@ -457,6 +451,7 @@ def rcd(
     return with_labels(_adapt_rcd(model), labels)
 
 
+@method_spec("bottom_up_parce_lingam")
 def bottom_up_parce_lingam(
     data: npt.ArrayLike, *, alpha: float = 0.1, knowledge: Knowledge | None = None
 ) -> StructureOutput:
@@ -489,9 +484,9 @@ def bottom_up_parce_lingam(
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
-        ``metadata["algorithm"]`` is ``"BottomUpParceLiNGAM"``; ``metadata["causal_order"]`` gives
-        the order, with the unordered variables nested in one list; ``weighted_adjacency`` holds
-        the edge coefficients.
+        ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["causal_order"]``
+        gives the order, with the unordered variables nested in one list; ``weighted_adjacency``
+        holds the edge coefficients.
 
     Raises
     ------
@@ -500,9 +495,10 @@ def bottom_up_parce_lingam(
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
-        ``(0, 1)``. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than 6 rows or no more rows than columns. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -572,8 +568,6 @@ def bottom_up_parce_lingam(
         method="bottom_up_parce_lingam",
         honors=("forbidden", "allowed", "tiers"),
     )
-    alpha = open_unit_interval(alpha, "alpha")
-    warn_past_boundary("bottom_up_parce_lingam", X.shape)
     model = _native(X, alpha=alpha, constraints=constraints)
     if constraints is None:
         return with_labels(_adapt_bottom_up_parce(model), labels)

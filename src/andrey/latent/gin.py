@@ -291,7 +291,6 @@ def _structure_from_result(
         marks, kind="dag", labels=all_labels, node_types=node_types
     )
     metadata = {
-        "algorithm": "GIN",
         "n_latents": n_latent,
         "clusters": [list(c) for c in result.clusters],
         "causal_order": [list(c) for c in ordered],
