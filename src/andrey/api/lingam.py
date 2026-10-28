@@ -320,12 +320,22 @@ def ica_lingam(
     at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
     variables), its errors were below the empty graph's (14 against 17). The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    settings, and the machine. Its causal order depends on the columns' scale, as its authors note
+    [2]: matching the rows of the unmixing matrix to the variables, and pruning its coefficients
+    from the smallest, both read the data's units, and the matching assumes every noise term has
+    the same scale [1]. On simulated linear data with uniform noise and weights between 0.5 and 2
+    whose noise terms all have unit variance, at 50 variables, mean degree 4 and 2,000 rows, its
+    errors (SHD) summed over 5 datasets were 9 on the columns as drawn and 1,784 on the same columns
+    standardized, against 500 for the empty graph. `direct_lingam` finds the order in a way that
+    does not depend on the scale [2].
 
     References
     ----------
     .. [1] Shimizu, S., Hoyer, P. O., Hyvarinen, A., and Kerminen, A. (2006). A linear
        non-Gaussian acyclic model for causal discovery. JMLR 7, 2003-2030.
+    .. [2] Shimizu, S., Inazumi, T., Sogawa, Y., Hyvarinen, A., Kawahara, Y., Washio, T., Hoyer,
+       P. O., and Bollen, K. (2011). DirectLiNGAM: A direct method for learning a linear
+       non-Gaussian structural equation model. JMLR 12, 1225-1248.
 
     Examples
     --------
