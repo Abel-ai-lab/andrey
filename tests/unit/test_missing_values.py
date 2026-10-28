@@ -446,7 +446,7 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
-        assert "drop the units that hold one from every dataset of data_list" in str(error.value)
+        assert "drop the units that hold one from every dataset of data" in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
         assert "fill in the missing steps first" in str(error.value)
         assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)

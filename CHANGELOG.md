@@ -41,6 +41,25 @@ change names its pull request.
   a `DeprecatedArgumentWarning`, in this release and stops in the next. scikit-learn's
   `ConvergenceWarning` from FastICA in `ica_lingam` and from the LARS path of the LiNGAM methods'
   adaptive Lasso is raised again as `andrey.SearchLimitWarning`. ([#505])
+- `tau_max` is the largest lag of every lagged method: `granger(maxlag=)` and
+  `longitudinal_lingam(n_lags=)` take `tau_max`, and `granger`'s default lag is 1, as in the other
+  methods, instead of 2; pass `tau_max=2` for the graphs it returned before. The `order=(p, q)` of
+  `varma_lingam` is the ARMA order and keeps its name. The old names still work, with a
+  `DeprecatedArgumentWarning`, in this release and stop in the next. ([#510])
+- The first argument of every method is `data`: `multi_group_direct_lingam(data_groups=)` and
+  `longitudinal_lingam(data_list=)` take `data`, and `andrey run` and `andrey bootstrap` read the
+  datasets of a method that takes several from one repeated `--data` flag. The old keyword names
+  and the `--data-groups` and `--data-list` flags still work in this release and stop in the next.
+  ([#510])
+- Column labels come from a DataFrame's columns for every method: `gin` and `calm` no longer take
+  `labels`, and `andrey run gin` reads the header of the data file. The argument is ignored, with
+  a `DeprecatedArgumentWarning`, in this release and stops in the next; wrap the array in a
+  DataFrame to name its columns. ([#510])
+- `calm` lists its parameters in its signature, with ranges checked in the one shared step, instead
+  of taking `**params`; the names and defaults are the same except that the moral-graph screen's
+  `alpha` is `screen_alpha` and the cap `max_outer` is `max_iter`, as in the other iterative
+  methods. The old names still work, with a `DeprecatedArgumentWarning`, in this release and stop
+  in the next. ([#510])
 - `indep_test=None` and `score_func=None` are the defaults of every method with a test or a score,
   and pick from the column types you declare, with `categorical` or a DataFrame's `category`,
   `bool`, or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when
@@ -62,6 +81,10 @@ change names its pull request.
 
 ### Added
 
+- `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
+  knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
+  others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
+  `longitudinal_lingam` do; `"pwling"` is the only measure. ([#510])
 - Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
   `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
   or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
@@ -1012,3 +1035,4 @@ First alpha release.
 [#500]: https://github.com/Abel-ai-lab/andrey/pull/500
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
+[#510]: https://github.com/Abel-ai-lab/andrey/pull/510

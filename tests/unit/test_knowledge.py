@@ -713,7 +713,7 @@ def _fit_series(name: str, data, lags: int = 2, **kwargs):
     if name == "varma_lingam":
         return andrey.varma_lingam(data, order=(lags, 0), prune=True, **kwargs)
     if name == "longitudinal_lingam":
-        return andrey.longitudinal_lingam(data, n_lags=lags, **kwargs)
+        return andrey.longitudinal_lingam(data, tau_max=lags, **kwargs)
     return getattr(andrey, name)(data, tau_max=lags, **kwargs)
 
 

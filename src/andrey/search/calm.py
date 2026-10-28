@@ -169,7 +169,7 @@ def _optimize_gated_dag(
             break
         rho *= rho_mult
     else:
-        warn_search_limit("calm", "max_outer", max_outer, "penalty rounds")
+        warn_search_limit("calm", "max_iter", max_outer, "penalty rounds")
 
     with torch.no_grad():
         gate_prob = (torch.sigmoid(logit / tau) * mask_t).cpu().numpy()

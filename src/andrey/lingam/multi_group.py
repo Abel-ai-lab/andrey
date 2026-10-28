@@ -25,17 +25,20 @@ if TYPE_CHECKING:
 
 
 def multi_group_direct_lingam(
-    X_list: list[np.ndarray], *, constraints: Constraints | None = None
+    X_list: list[np.ndarray], *, measure: str = "pwling", constraints: Constraints | None = None
 ) -> tuple[list[int], list[np.ndarray]]:
     """Fit MultiGroupDirectLiNGAM: return ``(causal_order, [B_g])``.
 
     ``causal_order`` is the single order shared by all groups; ``B_g`` is group ``g``'s weighted
     adjacency for ``x_i = sum_j B_g[i, j] x_j`` (so ``B_g[i, j]`` weights edge ``j -> i``). Requires
-    ``len(X_list) >= 2`` arrays with matching ``n_features``. With background knowledge
+    ``len(X_list) >= 2`` arrays with matching ``n_features``. ``measure="pwling"`` is the only
+    supported measure, as in :func:`~andrey.lingam.direct.direct_lingam`. With background knowledge
     ``constraints``, the order keeps :meth:`~andrey.core.knowledge.Constraints.precedence`, and each
     group's regression drops forbidden parents and keeps required ones unpenalized, as
     :func:`~andrey.lingam.direct.direct_lingam` does.
     """
+    if measure != "pwling":
+        raise NotImplementedError(f"DirectLiNGAM supports measure='pwling', not {measure!r}")
     groups = [np.asarray(X, dtype=np.float64) for X in X_list]
     n_features = groups[0].shape[1]
 
