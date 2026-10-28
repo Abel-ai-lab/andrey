@@ -88,10 +88,10 @@ def test_the_result_does_not_depend_on_the_variable_order(planted):
 def test_independent_autocorrelated_series_give_only_autodependencies():
     innovations = np.random.default_rng(1).standard_normal((700, 4))
     data = temporal.generate(np.eye(4), 0.9 * np.eye(4)[None], None, innovations, burn_in=200)
-    out = andrey.lpcmci(data, tau_max=2, pc_alpha=0.01)
+    out = andrey.lpcmci(data, tau_max=2, alpha=0.01)
     assert _links(out) == {f"{i}-->{i}@1" for i in range(4)}
 
 
 def test_matches_the_recorded_output():
-    out = andrey.lpcmci(datagen.generate("var_6v_hidden"), tau_max=2)
+    out = andrey.lpcmci(datagen.generate("var_6v_hidden"), tau_max=2, indep_test="student_t")
     assert_recorded_output(out, "LPCMCI", case="var_6v_hidden")

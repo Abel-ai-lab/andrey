@@ -30,40 +30,40 @@ ones you register with `register_indep_test`.
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no infinity, no constant column, and, for a DataFrame, column names that differ as
 text. A `NaN` is a missing value, which only the methods that delete rows per test accept (see
-below). Each column name becomes its node's label as text, `str(name)`, so columns named
-`1` and `"1"` would share the label `"1"`, and the `ValueError` names it with both positions.
-Where an argument names columns, as `Knowledge` and `categorical` do, a string is a label and an
-integer is a 0-based position: the column named `1` is `"1"`, and `1` is the second column.
-A constant column holds no information about the other variables, so one `ValueError` names every
-constant column and asks you to drop them; resampling or subsetting rows can make a column
-constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also need at least
-`n_variables + 1` rows in each dataset, the fewest with which their pruning step can estimate the
-edge weights. That pruning step, an adaptive Lasso in `direct_lingam`, `ica_lingam`,
-`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`,
-picks the edges by BIC over the whole Lasso path, so for a given causal order it keeps the same
-edges in any unit of the data. The steps before it can still depend on the units: the causal order
-of `ica_lingam` reads the magnitudes of its unmixing matrix, and the VARMA fit of `varma_lingam` runs
-on the values as given.
-The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
-`"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
-whole numbers in a column of numbers, each distinct value of a column one category. `ges`, `hc`,
-`tabu`, `boss`, `grasp`, and `exact_search` default to `score_func=None`, which picks the
-linear-Gaussian BIC, `"local_score_BDeu"` when every column is categorical, or
-`"local_score_cond_gauss"` when some are (not for `tabu`), the last two with a `DataTypeWarning`, as
-[Data types](guides/getting-started.md#data-types) describes. The mixed-data
-settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
-`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
-[Data types](guides/getting-started.md#data-types) describes; a categorical column of numbers
-needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
-scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
-one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
-and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
-group's; no option drops or merges the copies for you. `pc`, `fci`, `gfci`, and `cdnod` with a
-partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the same way before any test
-runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that repeats another up
-to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. Other
-data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
-single column gives a one-node graph.
+below). Each column name becomes its node's label as text, `str(name)`, so columns named `1` and
+`"1"` would share the label `"1"`, and the `ValueError` names it with both positions. Where an
+argument names columns, as `Knowledge` and `categorical` do, a string is a label and an integer is a
+0-based position: the column named `1` is `"1"`, and `1` is the second column. A constant column
+holds no information about the other variables, so one `ValueError` names every constant column and
+asks you to drop them; resampling or subsetting rows can make a column constant. `direct_lingam`,
+`ica_lingam`, and `multi_group_direct_lingam` also need at least `n_variables + 1` rows in each
+dataset, the fewest with which their pruning step can estimate the edge weights. That pruning step,
+an adaptive Lasso in `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`longitudinal_lingam`, and `bottom_up_parce_lingam`, picks the edges by BIC over the whole Lasso
+path, so for a given causal order it keeps the same edges in any unit of the data. The steps before
+it can still depend on the units: the causal order of `ica_lingam` reads the magnitudes of its
+unmixing matrix, and the VARMA fit of `varma_lingam` runs on the values as given. The categorical
+settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_bic"`, read text,
+boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
+distinct value of a column one category. Every method defaults to `indep_test=None` and
+`score_func=None`, which pick from the column types you declare, with `categorical` or a DataFrame's
+`category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
+`"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`. Values
+never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
+hold category codes, from every method that reads columns as numbers, as [Data
+types](guides/getting-started.md#data-types) describes. The mixed-data settings,
+`indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
+the categorical columns that `categorical` lists, or infer them when you pass the setting yourself;
+a categorical column of numbers needs whole numbers. Methods that score with BIC also reject a
+column that repeats another up to scale and shift or, given more rows than columns, is a linear
+function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
+every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
+group and read its edges as the group's; no option drops or merges the copies for you. `pc`, `fci`,
+`gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
+same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series
+that repeats another up to `2 * tau_max` steps back and name its lagged value, such as
+`'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
+cell, its row and column. A single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
@@ -80,11 +80,12 @@ why.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
-`indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
+`indep_test` choices: `"fisherz"` and `"student_t"` for continuous data, `"chisq"`
 and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
 nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)). `pcmci`, `pcmciplus`, and
-`lpcmci` take `"student_t"`, their default, and `"fisherz"`.
+([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
+from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
+`lpcmci` take `"fisherz"`, which `None` picks, and `"student_t"`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
@@ -120,6 +121,12 @@ takes `collider_rule` for its same-step colliders, with `"majority"`, its defaul
 % concept: max_parents
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
 gives a node more than that many parents, and some graph reaches each node's count.
+
+% concept: penalty_discount
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of Ramsey et al.
+(2017): larger values give sparser graphs, and `1.0`, the default, with `ebic_gamma=0.0` is the
+standard BIC.
 
 % concept: ebic_gamma
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
@@ -409,7 +416,7 @@ category, such as scikit-learn's `ConvergenceWarning` from `ica_lingam`.
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
 | {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |
-| {py:class}`~andrey.DataTypeWarning` | A score search's default picked BDeu because every column is categorical or the conditional Gaussian score because some are, a mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
+| {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred its categorical columns or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
 the largest number of variables any measured mean degree finished there, since the data's density

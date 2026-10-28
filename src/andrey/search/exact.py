@@ -2,21 +2,22 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
-Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
-log(n)``, plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of ``len(parents)``
-when ``ebic_gamma`` is not 0, where ``resid`` is the residual sum of squares of the centered node on
-its centered parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is
-singular). A parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most
-``ZERO_RESIDUAL`` times the node's sum of squares, scores ``inf`` and is never chosen. The
-categorical scores are :class:`~andrey.core.score.BDeuScore` and
+Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + penalty_discount *
+len(parents) * log(n)``, plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of
+``len(parents)`` when ``ebic_gamma`` is not 0, where ``resid`` is the residual sum of squares of the
+centered node on its centered parents, solved from the Gram matrix (a pseudo-inverse when the
+parents' block is singular). A parent set of more than ``n - 2`` members, or one that leaves
+``resid`` at most ``ZERO_RESIDUAL`` times the node's sum of squares, scores ``inf`` and is never
+chosen. The categorical scores are :class:`~andrey.core.score.BDeuScore` and
 :class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
-:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each BIC with
-``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic program
-(``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest path from the
-empty set to the full set gives each variable its best parent set among the variables before it.
-Every DAG of the optimal DAG's Markov equivalence class has the same score, so the search's choice
-among them follows rounding and column order; :func:`_canonical_member` replaces it by one member
-fixed by the CPDAG and :func:`~andrey.search.hc.tie_ranks`.
+:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, whose BIC penalties
+``penalty_discount`` weighs as well; BDeu ignores it. Both searches, A* (``"astar"``) and the
+subset-lattice dynamic program (``"dp"``), run over the order graph, whose nodes are variable
+subsets: the shortest path from the empty set to the full set gives each variable its best parent
+set among the variables before it. Every DAG of the optimal DAG's Markov equivalence class has the
+same score, so the search's choice among them follows rounding and column order;
+:func:`_canonical_member` replaces it by one member fixed by the CPDAG and
+:func:`~andrey.search.hc.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -120,15 +121,19 @@ class _GramBICScore:
 
     Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
     :meth:`score_many` regresses a node on each parent set through the normal equations on ``S`` to
-    get the residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the
-    centering, a nonzero mean would count as shared signal and link independent variables. A
-    nonzero ``ebic_gamma`` adds the extended-BIC term :func:`~andrey.core.score.ebic_penalty`.
-    Raises ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects, or for an
-    ``ebic_gamma`` that is negative or non-finite.
+    get the residual sum of squares, then applies the BIC penalty weighted by ``penalty_discount``.
+    Without the centering, a nonzero mean would count as shared signal and link independent
+    variables. A nonzero ``ebic_gamma`` adds the extended-BIC term
+    :func:`~andrey.core.score.ebic_penalty`. Raises ``ValueError`` for a column
+    :func:`~andrey.core.score.check_columns` rejects, or for an ``ebic_gamma`` or
+    ``penalty_discount`` that is negative or non-finite.
     """
 
-    def __init__(self, data: np.ndarray, ebic_gamma: float = 0.0) -> None:
+    def __init__(
+        self, data: np.ndarray, ebic_gamma: float = 0.0, penalty_discount: float = 1.0
+    ) -> None:
         self._ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
+        self._penalty_discount = penalty_weight(penalty_discount)
         self._n_vars = data.shape[1]
         data = data - data.mean(axis=0)
         self._gram = data.T @ data
@@ -165,7 +170,7 @@ class _GramBICScore:
             resids = [
                 self._diag[node] - b @ beta for b, beta in zip(gram_node_pa, betas, strict=True)
             ]
-        penalty = size * self._log_n
+        penalty = self._penalty_discount * size * self._log_n
         if self._ebic_gamma:
             penalty += ebic_penalty(size, self._n_vars, self._ebic_gamma)
         values = []
@@ -380,15 +385,16 @@ def exact_search(
     data: np.ndarray,
     *,
     search_method: str = "astar",
-    score_func: str = "local_score_BIC",
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
-    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC (``lambda=1``), on
-    mean-centered data.
+    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC, on mean-centered
+    data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
     ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score. Exponential in the
     number of variables, so intended for small problems.
@@ -407,8 +413,10 @@ def exact_search(
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
     score_func : str
-        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"local_score_BIC"``
-        or ``"local_score_BIC_from_cov"``), a categorical score, or a mixed-data BIC.
+        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"bic"``), a
+        categorical score, or a mixed-data BIC.
+    penalty_discount : float
+        Multiplier on the BIC penalty of ``log(n)`` per parameter; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
         ``2 * ebic_gamma * log C(n_vars - 1, n_parents)`` per node
@@ -437,9 +445,15 @@ def exact_search(
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
     score: Score = (
-        _GramBICScore(X, ebic_gamma)
+        _GramBICScore(X, ebic_gamma, penalty_discount)
         if score_func in LINEAR_SCORES
-        else make_score(score_func, X, ebic_gamma=ebic_gamma, categorical=categorical)
+        else make_score(
+            score_func,
+            X,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            categorical=categorical,
+        )
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES
     parent_graphs = [

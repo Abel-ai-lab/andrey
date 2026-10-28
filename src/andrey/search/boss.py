@@ -42,7 +42,7 @@ _EPS = float(np.finfo(np.float64).eps)
 def ranked_score(
     x: np.ndarray,
     score_func: str,
-    lambda_value: float,
+    penalty_discount: float,
     categorical: npt.ArrayLike | None,
     ebic_gamma: float = 0.0,
 ) -> tuple[LocalScore, np.ndarray]:
@@ -73,7 +73,7 @@ def ranked_score(
         score = make_score(
             score_func,
             np.ascontiguousarray(x[:, by_rank]),
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             categorical=mask[by_rank] if mixed else None,
         )
@@ -82,7 +82,7 @@ def ranked_score(
         make_score(
             score_func,
             x,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             categorical=categorical,
         )
@@ -776,10 +776,10 @@ def _better_mutation(
 def boss(
     data: np.ndarray,
     *,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     random_state: int = 0,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str = "bic",
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -789,7 +789,7 @@ def boss(
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
-    lambda_value : float
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
@@ -800,7 +800,7 @@ def boss(
         Seed for the sweep-order RNG.
     score_func : str
         Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC
-        (``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``), BDeu or the multinomial BIC on
+        (``"bic"``), BDeu or the multinomial BIC on
         category codes (:class:`~andrey.core.score.BDeuScore`,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC
         (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
@@ -837,7 +837,7 @@ def boss(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score, ranks = ranked_score(X, score_func, lambda_value, categorical, ebic_gamma)
+    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
 

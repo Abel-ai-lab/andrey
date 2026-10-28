@@ -368,24 +368,24 @@ def _data_types_section() -> str:
         name for name, spec in REGISTRY.items() if any(p.name == "categorical" for p in spec.params)
     ]
     return (
-        "The default tests read every column as continuous. A score search left at "
-        "`score_func=null` picks `local_score_BDeu` when every column is categorical and "
-        "`local_score_cond_gauss` when some are (`tabu`, with no mixed-data score, keeps the BIC), "
-        "inferring the columns by the rule below and saying so in a `DataTypeWarning`; otherwise "
-        "it picks the linear-Gaussian BIC. For categorical columns "
+        "`indep_test=null` and `score_func=null` pick from the declared column types, a column "
+        "`categorical=[...]` names or a DataFrame's `category`, `bool`, or text column: `gsq` and "
+        "`bdeu` when every column is categorical, `cond_gauss` when some are, else `fisherz` and "
+        "the linear-Gaussian BIC `bic`; values never decide. For categorical columns "
         f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
         f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
         "and name the categorical columns with `categorical=[col,...]` (header names or 0-based "
-        "positions), or `categorical=[]` for none. Without `categorical`, the setting infers them: "
+        "positions), or `categorical=[]` for none. Without `categorical`, a mixed-data setting "
+        "passed explicitly infers them: "
         "a DataFrame's `category`, `bool`, and text columns, and every column of at most "
         f"`max_categories` (default {MAX_CATEGORIES}) distinct whole numbers. `andrey run` reads "
         "numbers only, so its data file codes each category as a whole number. The result's "
         "`metadata.categorical` lists the categorical columns read, and `run.warnings` holds a "
         "`DataTypeWarning` that names the inferred columns, or says that none was found and the "
-        "setting ran as its linear-Gaussian form. Under a continuous setting, a `DataTypeWarning` "
-        "names whole-number columns that may be category codes: check them before reading the "
-        "graph."
+        "setting ran as its linear-Gaussian form. Every method that reads columns as numbers "
+        "raises a `DataTypeWarning` naming whole-number columns that may be category codes: "
+        "declare them, or check them before reading the graph."
     )
 
 

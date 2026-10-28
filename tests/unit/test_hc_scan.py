@@ -144,9 +144,9 @@ def test_no_columns_give_an_empty_graph(search) -> None:
 
 
 _TIED_DATA = {
-    "local_score_BIC_from_cov": lambda seed: _data(seed, 500, 10),
-    "local_score_BDeu": lambda seed: _categorical(seed, 1000, 10),
-    "local_score_BIC_categorical": lambda seed: _categorical(seed, 1000, 10),
+    "bic": lambda seed: _data(seed, 500, 10),
+    "bdeu": lambda seed: _categorical(seed, 1000, 10),
+    "discrete_bic": lambda seed: _categorical(seed, 1000, 10),
 }
 
 
@@ -209,7 +209,7 @@ def test_rounding_in_the_last_bits_keeps_the_graph(search) -> None:
 
     The perturbations model last-bit differences in BLAS output across machines.
     """
-    x = _TIED_DATA["local_score_BIC_from_cov"](1)
+    x = _TIED_DATA["bic"](1)
     rng = np.random.default_rng(0)
     unit = np.finfo(np.float64).eps * np.abs(x).max(axis=0)
     nudged = x + rng.integers(-4, 5, size=x.shape) * unit

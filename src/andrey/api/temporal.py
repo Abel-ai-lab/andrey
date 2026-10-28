@@ -343,8 +343,8 @@ def pcmci(
     *,
     tau_max: int = 1,
     pc_alpha: float = 0.2,
-    alpha_level: float = 0.05,
-    indep_test: str = "student_t",
+    alpha: float = 0.05,
+    indep_test: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged causal links of one multivariate time series with PCMCI.
@@ -366,13 +366,13 @@ def pcmci(
         Significance level of the PC1 step, in ``(0, 1)``: a candidate parent is dropped when a test
         gives it a p-value above ``pc_alpha``. A larger value keeps more parents as conditions for
         the MCI step.
-    alpha_level : float, default=0.05
-        Significance level of the MCI step, in ``(0, 1)``: a link is in the graph when its p-value
-        is at most ``alpha_level``.
-    indep_test : {"student_t", "fisherz"}, default="student_t"
-        The partial-correlation test behind every p-value. Both report the same partial
-        correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
-        ``"fisherz"`` from Fisher's z-transform.
+    alpha : float, default=0.05
+        Significance level of the MCI step, in ``(0, 1)``, the level that decides the returned
+        links: a link is in the graph when its p-value is at most ``alpha``.
+    indep_test : {"student_t", "fisherz"} or None, default=None
+        The conditional-independence test behind every p-value, a partial-correlation test. Both
+        report the same partial correlation; ``"student_t"`` takes its p-value from the Student-t
+        distribution and ``"fisherz"`` from Fisher's z-transform. ``None`` picks ``"fisherz"``.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -414,10 +414,11 @@ def pcmci(
 
     Notes
     -----
-    Every test is a partial-correlation test. The default, ``"student_t"``, takes the p-value from
-    the Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions, as
-    the authors' reference implementation does. ``"fisherz"`` uses Fisher's z-transform instead; its
-    p-values differ slightly, so a link close to ``alpha_level`` can flip. The partial correlation
+    Every test is a partial-correlation test. The default, ``"fisherz"``, takes the p-value from
+    Fisher's z-transform of the partial correlation. ``"student_t"`` takes it from the Student-t
+    distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions, as the authors'
+    reference implementation does; its p-values differ slightly, so a link close to ``alpha`` can
+    flip. The partial correlation
     is the correlation of the least-squares residuals of the two tested values given the
     conditions. It is computed from the correlation matrix, and from the residuals themselves when
     the conditions are collinear to working precision, as lagged copies of a strongly
@@ -477,7 +478,7 @@ def pcmci(
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
-    >>> out = pcmci(np.column_stack([x, y]), tau_max=2, alpha_level=0.01)
+    >>> out = pcmci(np.column_stack([x, y]), tau_max=2, alpha=0.01)
     >>> out.structure.lag(1).oriented_edges()
     [(0, 1, 'directed')]
     >>> out.structure.lag(2).oriented_edges()
@@ -507,8 +508,8 @@ def pcmci(
             X,
             tau_max=tau_max,
             pc_alpha=pc_alpha,
-            alpha_level=alpha_level,
-            indep_test=indep_test,
+            alpha_level=alpha,
+            indep_test="fisherz" if indep_test is None else indep_test,
             constraints=constraints,
         )
     return with_labels(_adapt_pcmci(result, rows_metadata(rows)), labels)
@@ -519,9 +520,9 @@ def pcmciplus(
     data: npt.ArrayLike,
     *,
     tau_max: int = 1,
-    pc_alpha: float = 0.01,
+    alpha: float = 0.01,
     collider_rule: str = "majority",
-    indep_test: str = "student_t",
+    indep_test: str | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged and same-step causal links of one multivariate time series with PCMCI+.
@@ -540,9 +541,10 @@ def pcmciplus(
         column names become the structure's ``labels``.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``0`` to ``tau_max`` are tested.
-    pc_alpha : float, default=0.01
+    alpha : float, default=0.01
         Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
-        p-value above ``pc_alpha``.
+        p-value above ``alpha``. The default is the level of the method's published experiments
+        [1]_.
     collider_rule : {"majority", "conservative", "none"}, default="majority"
         How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a
         collider ``a -> b <- c``. ``"majority"`` and ``"conservative"`` test ``a`` and ``c`` again
@@ -551,10 +553,10 @@ def pcmciplus(
         ``"conservative"`` when none does; a triple neither rule can decide is ambiguous and
         orients nothing. ``"none"`` calls it a collider when ``b`` is not in the one separating
         set the skeleton search found.
-    indep_test : {"student_t", "fisherz"}, default="student_t"
-        The partial-correlation test behind every p-value. Both report the same partial
-        correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
-        ``"fisherz"`` from Fisher's z-transform.
+    indep_test : {"student_t", "fisherz"} or None, default=None
+        The conditional-independence test behind every p-value, a partial-correlation test. Both
+        report the same partial correlation; ``"student_t"`` takes its p-value from the Student-t
+        distribution and ``"fisherz"`` from Fisher's z-transform. ``None`` picks ``"fisherz"``.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -617,7 +619,7 @@ def pcmciplus(
     phase starts from those lagged links and from a link between every two variables at the same
     step. Round ``p = 0, 1, ...`` tests each linked pair given each subset of ``p`` same-step
     neighbors of the later end, with the lagged parents of both ends added, and removes the link
-    at the first p-value above ``pc_alpha``. A same-step pair is tested from both ends, first
+    at the first p-value above ``alpha``. A same-step pair is tested from both ends, first
     given the neighbors of its higher-numbered variable, and the neighbor sets stay fixed during a
     round, so the links found do not depend on the order of the variables. The collider phase
     orients the unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules
@@ -628,8 +630,9 @@ def pcmciplus(
     stored, which can change with the order.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
-    The default test, ``"student_t"``, takes the p-value from the Student-t distribution with ``n -
-    |S| - 2`` degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation
+    The default test, ``"fisherz"``, takes the p-value from Fisher's z-transform of the partial
+    correlation, and ``"student_t"`` from the Student-t distribution with ``n - |S| - 2`` degrees of
+    freedom, for ``|S|`` conditions. The partial correlation is the correlation
     of the least-squares residuals of the two tested values given the conditions. It is computed
     from the correlation matrix, and from the residuals themselves when the conditions are collinear
     to working precision, as lagged copies of a strongly autocorrelated series can be.
@@ -705,9 +708,9 @@ def pcmciplus(
         result = _native(
             X,
             tau_max=tau_max,
-            pc_alpha=pc_alpha,
+            pc_alpha=alpha,
             collider_rule=collider_rule,
-            indep_test=indep_test,
+            indep_test="fisherz" if indep_test is None else indep_test,
             constraints=constraints,
         )
     return with_labels(_adapt_pcmciplus(result, rows_metadata(rows)), labels)
@@ -718,9 +721,9 @@ def lpcmci(
     data: npt.ArrayLike,
     *,
     tau_max: int = 1,
-    pc_alpha: float = 0.05,
+    alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
-    indep_test: str = "student_t",
+    indep_test: str | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -742,16 +745,16 @@ def lpcmci(
     tau_max : int, default=1
         The largest lag, at least ``1``: the graph covers the time steps ``t - tau_max`` to ``t``,
         and links at lags ``0`` to ``tau_max`` are tested.
-    pc_alpha : float, default=0.05
+    alpha : float, default=0.05
         Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
-        p-value above ``pc_alpha``.
+        p-value above ``alpha``.
     n_preliminary_iterations : int, default=1
         How many preliminary rounds run before the final one, at least ``0``. Each round learns
         parents that the next one conditions on from its first test.
-    indep_test : {"student_t", "fisherz"}, default="student_t"
-        The partial-correlation test behind every p-value. Both report the same partial
-        correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
-        ``"fisherz"`` from Fisher's z-transform.
+    indep_test : {"student_t", "fisherz"} or None, default=None
+        The conditional-independence test behind every p-value, a partial-correlation test. Both
+        report the same partial correlation; ``"student_t"`` takes its p-value from the Student-t
+        distribution and ``"fisherz"`` from Fisher's z-transform. ``None`` picks ``"fisherz"``.
     max_depth : int or None, default=None
         The largest number of neighbors a removal step conditions on, at least ``0``, counted
         beyond the default conditions, the parents of both ends, which every test includes; it
@@ -922,9 +925,9 @@ def lpcmci(
         result = _native(
             X,
             tau_max=tau_max,
-            pc_alpha=pc_alpha,
+            pc_alpha=alpha,
             n_preliminary_iterations=n_preliminary_iterations,
-            indep_test=indep_test,
+            indep_test="fisherz" if indep_test is None else indep_test,
             max_depth=max_depth,
             constraints=constraints,
         )

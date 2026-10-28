@@ -487,11 +487,11 @@ def _dfs(
 def grasp(
     data: np.ndarray,
     *,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     depth: int = 3,
     random_state: int = 0,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str = "bic",
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -509,7 +509,7 @@ def grasp(
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
-    lambda_value : float
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
@@ -548,7 +548,7 @@ def grasp(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score, ranks = ranked_score(X, score_func, lambda_value, categorical, ebic_gamma)
+    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     before = None
