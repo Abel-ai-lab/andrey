@@ -179,22 +179,22 @@ def notears(
     threshold act on the weights in data units; rescaling the columns by powers of two, all by one
     factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. The
     optimization is also harder on standardized data, and more so as the number of variables grows
-    [2]_. On standardized columns the default fit's
-    median errors were 7, 18.5, 44.5 and 92 at those sizes, below the empty graph's in 61 of the 80
-    fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 8, 17, 43.5 and 89,
-    below it in 78 of 80. With ``robust=True`` they were 10, 14.5 and 30.5 on standardized columns
-    and 6.5, 14.5 and 32.5 on unitless data at 10, 20 and 50 variables; at 50 variables one graph
-    per combination was fit (four fits), and the one fit tried at 100 variables did not finish
-    within 900 s, so there is no figure for it. On the same data, ``ges`` had median errors of 2, 4,
-    19.5 and 79 on standardized columns and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6,
-    18 and 36, and 4, 12, 31.5 and 55. The default fit's median time was 0.6 s at 10 variables and
-    54 s at 100 on standardized columns (0.4 s and 15.5 s on unitless data), on one core; with
-    ``robust=True`` it was 23 s at 10 variables and 198 s at 50 on standardized columns (5.3 s and
-    69 s on unitless data), because each Adam iteration of a path step computes a matrix
-    exponential. A fit can stop at a local optimum, and only weights that reach ``w_threshold``
-    become edges. Nothing was measured beyond 100 variables, at other densities, row counts or noise
-    types, or on non-linear data. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    [2]_. On standardized columns the default fit's median errors were 7, 18.5, 44.5 and 92 at those
+    sizes, below the empty graph's in 61 of the 80 fits; on ``scale="unitless"`` data of
+    ``andrey.data.sample_scm`` they were 8, 17, 43.5 and 89, below it in 78 of 80. With
+    ``robust=True`` they were 10, 14.5 and 30.5 on standardized columns and 6.5, 14.5 and 32.5 on
+    unitless data at 10, 20 and 50 variables; at 50 variables one graph per combination was fit
+    (four fits), and the one fit tried at 100 variables did not finish within 900 s, so there is no
+    figure for it. On the same data, ``ges`` had median errors of 2, 4, 19.5 and 79 on standardized
+    columns and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6, 18 and 36, and 4, 12, 31.5
+    and 55. The default fit's median time was 0.6 s at 10 variables and 54 s at 100 on standardized
+    columns (0.4 s and 15.5 s on unitless data), on one core; with ``robust=True`` it was 23 s at 10
+    variables and 198 s at 50 on standardized columns (5.3 s and 69 s on unitless data), because
+    each Adam iteration of a path step computes a matrix exponential. A fit can stop at a local
+    optimum, and only weights that reach ``w_threshold`` become edges. Nothing was measured beyond
+    100 variables, at other densities, row counts or noise types, or on non-linear data. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -389,21 +389,20 @@ def dagma(
     threshold act on the weights in data units; rescaling the columns by powers of two, all by one
     factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. The
     optimization is also harder on standardized data, and more so as the number of variables grows
-    [2]_. On standardized columns the default fit's
-    median errors were 12, 25.5, 64 and 129.5 at those sizes, below the empty graph's in 7 of the 80
-    fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 9.5, 19, 49.5 and
-    99.5, below it in 38 of 80. With ``robust=True`` they were 12, 25, 65 and 135.5 on standardized
-    columns (below the empty graph's in 10 of 80 fits) and 9.5, 18, 48 and 98.5 on unitless data (44
-    of 80). On the same data, ``ges`` had median errors of 2, 4, 19.5 and 79 on standardized columns
-    and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6, 18 and 36, and 4, 12, 31.5 and 55.
-    The default fit's median time was 2.2 s at 10 variables and 28 s at 100 on standardized columns
-    (1.8 s and 21 s on unitless data), on one core; with ``robust=True`` it was 21 s at 10 variables
-    and 212 s at 100 on standardized columns (27 s and 310 s on unitless data), because each path
-    step repeats the whole central path. A fit can stop at a local optimum, and only weights that
-    reach ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other
-    densities, row counts or noise types, or on non-linear data. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    [2]_. On standardized columns the default fit's median errors were 12, 25.5, 64 and 129.5 at
+    those sizes, below the empty graph's in 7 of the 80 fits; on ``scale="unitless"`` data of
+    ``andrey.data.sample_scm`` they were 9.5, 19, 49.5 and 99.5, below it in 38 of 80. With
+    ``robust=True`` they were 12, 25, 65 and 135.5 on standardized columns (below the empty graph's
+    in 10 of 80 fits) and 9.5, 18, 48 and 98.5 on unitless data (44 of 80). On the same data,
+    ``ges`` had median errors of 2, 4, 19.5 and 79 on standardized columns and 3, 7.5, 29 and 90 on
+    unitless data, and ``calm`` 3.5, 6, 18 and 36, and 4, 12, 31.5 and 55. The default fit's median
+    time was 2.2 s at 10 variables and 28 s at 100 on standardized columns (1.8 s and 21 s on
+    unitless data), on one core; with ``robust=True`` it was 21 s at 10 variables and 212 s at 100
+    on standardized columns (27 s and 310 s on unitless data), because each path step repeats the
+    whole central path. A fit can stop at a local optimum, and only weights that reach
+    ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other densities, row
+    counts or noise types, or on non-linear data. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
