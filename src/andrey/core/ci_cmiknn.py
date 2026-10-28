@@ -18,7 +18,7 @@ from scipy.special import digamma
 from andrey.search.hc import tie_ranks
 
 from . import backend, env
-from .ci import _canonical_ranked, _checked_data
+from .ci import _canonical_ranked, _checked_data, per_query
 from .seeding import resolve_seed
 
 __all__ = ["CMIknn"]
@@ -366,6 +366,16 @@ class CMIknn:
         """
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         return _cmi_given_yz(self._ranks[:, x_int], self._yz_space(y_int, tuple(cond)), self._k)
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The estimates of :meth:`statistic` and the p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; entry ``i`` holds query ``i``'s estimate and :meth:`__call__`'s p-value.
+        """
+        return per_query(lambda a, b, s: (self.statistic(a, b, s), self(a, b, s)), x, y, conditions)
 
     def _hits(self, x: int, y: int, cond: tuple[int, ...]) -> Iterator[bool]:
         """Whether each shuffle's estimate reaches the observed one, computed as they are read."""

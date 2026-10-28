@@ -555,6 +555,22 @@ class ChiSquare:
         ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
         p-value is independent of argument order. A larger p-value means more independence.
         """
+        return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The chi-square or G-square statistics and p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; entry ``i`` holds query ``i``'s statistic and :meth:`__call__`'s p-value.
+        """
+        return per_query(self._statistic_pvalue, x, y, conditions)
+
+    def _statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int]
+    ) -> tuple[float, float]:
+        """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
         codes = self._codes
         kx = int(self._cardinalities[x_int])
@@ -583,8 +599,8 @@ class ChiSquare:
             statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
         dof = int(np.sum(((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)))
         if dof == 0:
-            return 1.0
-        return float(chdtrc(dof, max(statistic, 0.0)))
+            return statistic, 1.0
+        return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -864,6 +880,22 @@ class DGTest:
         ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
         p-value is independent of argument order. A larger p-value means more independence.
         """
+        return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The likelihood-ratio statistics and p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; entry ``i`` holds query ``i``'s statistic and :meth:`__call__`'s p-value.
+        """
+        return per_query(self._statistic_pvalue, x, y, conditions)
+
+    def _statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int]
+    ) -> tuple[float, float]:
+        """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
         groups = self._dg.groups
         both = np.concatenate([groups[x_int], groups[y_int]])
@@ -873,7 +905,7 @@ class DGTest:
             cs, basis, scale = regression
             cross = self._corr[both[:, None], cs] @ basis
             block = block - (cross / scale) @ cross.T
-        return self._block_pvalue(block, groups[x_int].size)
+        return self._block_statistic_pvalue(block, groups[x_int].size)
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -1009,15 +1041,19 @@ class DGTest:
     def _block_pvalue(self, block: np.ndarray, px: int) -> float:
         """The p-value from the correlation ``block`` of ``x``'s first ``px`` columns and ``y``'s,
         after the regression on the conditioning set."""
+        return self._block_statistic_pvalue(block, px)[1]
+
+    def _block_statistic_pvalue(self, block: np.ndarray, px: int) -> tuple[float, float]:
+        """The statistic and p-value of :meth:`_block_pvalue`."""
         wx = _whitener(block[:px, :px])
         wy = _whitener(block[px:, px:])
         dof = wx.shape[1] * wy.shape[1]
         if dof == 0:
-            return 1.0
+            return 0.0, 1.0
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
         rho = np.minimum(rho, _ONE_MINUS_EPS)
         statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
-        return float(chdtrc(dof, max(statistic, 0.0)))
+        return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
 
 def _whitener(cov: np.ndarray) -> np.ndarray:
@@ -1079,6 +1115,22 @@ class CGTest:
         ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
         p-value is independent of argument order. A larger p-value means more independence.
         """
+        return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The likelihood-ratio statistics and p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; entry ``i`` holds query ``i``'s statistic and :meth:`__call__`'s p-value.
+        """
+        return per_query(self._statistic_pvalue, x, y, conditions)
+
+    def _statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int]
+    ) -> tuple[float, float]:
+        """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
         cg = self._cg
         sets = ([x_int, y_int, *cond], [y_int, *cond], [x_int, *cond], cond)
@@ -1086,7 +1138,7 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
         dof = k[0] - k[1] - k[2] + k[3]
-        return float(chdtrc(dof, max(statistic, 0.0)))
+        return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -1383,3 +1435,24 @@ def _canonical_ranked(
 ) -> tuple[int, int, list[int]]:
     """:func:`_canonical` of a query to a test that holds data column ``j`` at index ``rank[j]``."""
     return _canonical(rank[x], rank[y], [rank[c] for c in condition_set])
+
+
+def per_query(
+    answer: Callable[[int, int, list[int]], tuple[float, float]],
+    x: npt.ArrayLike,
+    y: npt.ArrayLike,
+    conditions: npt.ArrayLike,
+) -> tuple[np.ndarray, np.ndarray]:
+    """The statistics and p-values of many queries, ``answer(x, y, condition_set)`` one at a time.
+
+    ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+    conditioning sets.
+    """
+    xs = np.asarray(x, dtype=np.intp)
+    ys = np.asarray(y, dtype=np.intp)
+    conds = np.asarray(conditions, dtype=np.intp).reshape(len(xs), -1)
+    statistics = np.empty(len(xs), dtype=np.float64)
+    p_values = np.empty(len(xs), dtype=np.float64)
+    for k in range(len(xs)):
+        statistics[k], p_values[k] = answer(int(xs[k]), int(ys[k]), conds[k].tolist())
+    return statistics, p_values

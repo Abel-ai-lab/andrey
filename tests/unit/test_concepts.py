@@ -22,7 +22,7 @@ from andrey.api import _method as method_wrapper
 from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, Concept
+from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, Concept
 from tests.recovery.helpers import datagen
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
@@ -392,7 +392,7 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 #: The settings that make a CI search draw random numbers.
-RANDOMIZED = {m: {"indep_test": "rcot"} for m in CI_SEARCHES}
+RANDOMIZED = {m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY)}
 
 
 @pytest.mark.parametrize("method", SEEDED)
@@ -409,7 +409,7 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     """A method without a seed, and a CI search under a deterministic test, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
-    for method in CI_SEARCHES:
+    for method in (*CI_SEARCHES, *PCMCI_FAMILY):
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
 
@@ -469,11 +469,14 @@ CI_CASES = {
     "mmpc": [{}, {"target": 0}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
+    "pcmci": [{}],
+    "pcmciplus": [{}],
+    "lpcmci": [{}],
 }
 
 
 def test_every_search_with_a_ci_test_has_cases():
-    assert set(CI_CASES) == set(CI_SEARCHES)
+    assert set(CI_CASES) == {*CI_SEARCHES, *PCMCI_FAMILY}
 
 
 @pytest.fixture
@@ -509,14 +512,15 @@ def test_the_seed_reaches_every_randomized_test_a_search_builds(
     assert out.metadata["seed"] == 7
 
 
-@pytest.mark.parametrize("method", CI_SEARCHES)
+@pytest.mark.parametrize("method", (*CI_SEARCHES, *PCMCI_FAMILY))
 def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkeypatch):
     results = []
     for global_seed in ("0", "11"):
         monkeypatch.setenv("ANDREY_SEED", global_seed)
         out, _ = fit(method, codes=False, indep_test="rcot", seed=7)
-        results.append((out.structure.to_numpy().tolist(), out.metadata))
-    assert results[0] == results[1]
+        results.append((out.structure, out.metadata))
+    assert results[0][0] == results[1][0]
+    assert repr(results[0][1]) == repr(results[1][1])
 
 
 def test_a_former_seed_name_maps_to_seed_for_one_release():

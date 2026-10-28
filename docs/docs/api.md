@@ -85,13 +85,16 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
-`indep_test` choices: `"fisherz"` and `"student_t"` for continuous data, `"chisq"`
-and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
-nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"` and `"student_t"` for
+continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
+for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
 from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
-`lpcmci` take `"fisherz"`, which `None` picks, and `"student_t"`.
+`lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
+the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
+likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance
+correlation.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
@@ -149,8 +152,8 @@ many parents. `None`, the default, sets no cap. `hc`, `tabu`, and the score phas
 `exact_search` scores only the parent sets within it.
 
 % concept: seed
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `boss`, `grasp`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
 draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
 The methods that test independence draw random numbers only under `indep_test="rcot"`,
 `"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not

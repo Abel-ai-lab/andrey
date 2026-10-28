@@ -54,6 +54,7 @@ from .ci import (
     SingularCorrelationError,
     StudentT,
     _canonical,
+    per_query,
 )
 from .score import (
     ZERO_RESIDUAL,
@@ -189,6 +190,22 @@ class TestwiseDeletion:
         """
         x_int, y_int, cond = _canonical(x, y, condition_set)
         return float(self._query(lambda test, a, b, s: test(a, b, s), x_int, y_int, cond))
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Statistics and p-values of many queries, each from the test over its own rows.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; entry ``i`` is the block test's ``statistic_pvalues`` of query ``i``.
+        """
+
+        def ask(test: Any, a: int, b: int, s: list[int]) -> tuple[float, float]:
+            cond = np.array([s], dtype=np.intp).reshape(1, len(s))
+            statistics, p_values = test.statistic_pvalues(np.array([a]), np.array([b]), cond)
+            return float(statistics[0]), float(p_values[0])
+
+        return per_query(lambda a, b, s: self._query(ask, *_canonical(a, b, s)), x, y, conditions)
 
     def _query(self, ask: Callable[..., Any], x: int, y: int, cond: list[int]) -> Any:
         """Return ``ask(test, a, b, s)`` for the canonical query ``x``, ``y``, ``cond``.

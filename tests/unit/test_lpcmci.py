@@ -18,7 +18,7 @@ import andrey.temporal.lpcmci as engine
 from andrey.api._temporal import _adapt_lpcmci
 from andrey.core import ARROW, CIRCLE, NULL, TAIL
 from andrey.temporal.lpcmci import CONFLICT, LPCMCIResult, lpcmci, run
-from andrey.temporal.pcmci import INDEP_TESTS, lagged_design
+from andrey.temporal.pcmci import PARTIAL_CORRELATION_TESTS, lagged_design
 
 # A link ``(cause, lag, effect)`` and its weight.
 Links = dict[tuple[int, int, int], float]
@@ -201,8 +201,8 @@ def test_no_preliminary_round_runs_the_final_round_alone():
 
 
 def test_an_unknown_test_name_is_refused():
-    with pytest.raises(ValueError, match="indep_test"):
-        lpcmci(_hidden_cause_series(), indep_test="kci")
+    with pytest.raises(NotImplementedError, match="unknown indep_test 'spearman'"):
+        lpcmci(_hidden_cause_series(), indep_test="spearman")
 
 
 def _result_arrays(result: LPCMCIResult) -> tuple:
@@ -284,7 +284,7 @@ class Counting:
 def _data_search(test_wrapper=lambda test: test) -> engine._Search:
     """A search over four variables of white noise, ``tau_max=1``, with the Student-t test."""
     data = np.random.default_rng(0).standard_normal((300, 4))
-    test = INDEP_TESTS["student_t"](lagged_design(data, 1))
+    test = PARTIAL_CORRELATION_TESTS["student_t"](lagged_design(data, 1))
     return engine._Search(test_wrapper(test), 4, 1, 0.05, range(4))
 
 
