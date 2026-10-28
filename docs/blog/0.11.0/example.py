@@ -12,13 +12,6 @@ COLUMNS = {
     "BMXWAIST": "waist", "BPXSY1": "systolic", "BPXDI1": "diastolic", "BPXPLS": "pulse",
     "LBXGH": "hba1c", "LBXTC": "cholesterol", "LBDHDD": "hdl",
 }  # fmt: skip
-files = ["DEMO_J", "BMX_J", "BPX_J", "GHB_J", "TCHOL_J", "HDL_J"]
-table = pd.read_sas(URL.format(files[0]), format="xport")
-for name in files[1:]:
-    table = table.merge(pd.read_sas(URL.format(name), format="xport"), on="SEQN", how="left")
-data = table[table.RIDAGEYR >= 20][list(COLUMNS)].rename(columns=COLUMNS)
-data["sex"] = data["sex"].map({1: "male", 2: "female"})
-print(f"{len(data):,} adults; {len(data.dropna()):,} with no value missing")
 
 
 def edges(fit):
@@ -26,34 +19,44 @@ def edges(fit):
     return int(((a != 0) | (a.T != 0)).sum() // 2)
 
 
-# Gaps: each test reads the rows where its variables are observed.
-numeric = data.assign(sex=(data["sex"] == "female").astype(float))
-every_row = andrey.pc(numeric)
-complete_rows = andrey.pc(numeric.dropna())
-print(f"gaps: {edges(every_row)} edges from every row, {edges(complete_rows)} from the complete")
-print(f"  rows; they differ in {shd(every_row.structure, complete_rows.structure)} places")
+if __name__ == "__main__":  # worker processes re-import this script
+    files = ["DEMO_J", "BMX_J", "BPX_J", "GHB_J", "TCHOL_J", "HDL_J"]
+    table = pd.read_sas(URL.format(files[0]), format="xport")
+    for name in files[1:]:
+        table = table.merge(pd.read_sas(URL.format(name), format="xport"), on="SEQN", how="left")
+    data = table[table.RIDAGEYR >= 20][list(COLUMNS)].rename(columns=COLUMNS)
+    # Sex is a category, so each test is one for mixed data.
+    data["sex"] = data["sex"].map({1: "male", 2: "female"}).astype("category")
+    print(f"{len(data):,} adults; {len(data.dropna()):,} with no value missing")
 
-# Units: blood pressure in kPa and cholesterol in mmol/L give the same graph.
-metric = numeric.assign(
-    systolic=numeric["systolic"] * 0.133322,
-    diastolic=numeric["diastolic"] * 0.133322,
-    cholesterol=numeric["cholesterol"] * 0.02586,
-    hdl=numeric["hdl"] * 0.02586,
-)
-print(f"units: {shd(andrey.pc(metric).structure, every_row.structure)} differences")
+    # Gaps: each test reads the rows where its variables are observed.
+    every_row = andrey.pc(data)
+    complete_rows = andrey.pc(data.dropna())
+    print(
+        f"gaps: {edges(every_row)} edges from every row, {edges(complete_rows)} from the complete"
+    )
+    print(f"  rows; they differ in {shd(every_row.structure, complete_rows.structure)} places")
 
-# Mixed types and what you already know: sex is a category, and nothing causes age or sex.
-known = andrey.Knowledge(tiers=[["age", "sex"], [c for c in data if c not in ("age", "sex")]])
-settings = dict(categorical=["sex"], indep_test="degen_gauss", knowledge=known)
+    # Units: blood pressure in kPa and cholesterol in mmol/L give the same graph.
+    metric = data.assign(
+        systolic=data["systolic"] * 0.133322,
+        diastolic=data["diastolic"] * 0.133322,
+        cholesterol=data["cholesterol"] * 0.02586,
+        hdl=data["hdl"] * 0.02586,
+    )
+    print(f"units: {shd(andrey.pc(metric).structure, every_row.structure)} differences")
 
-# How sure each edge is: 100 fits on resampled rows, four at a time.
-with andrey.config(num_workers=4):
-    boot = andrey.bootstrap("pc", data, n_boot=100, seed=0, **settings)
-print("edges in at least half the fits:")
-MARK = {"directed": "->", "undirected": "--"}
-for edge in boot.table(min_frequency=0.5):
-    mark = MARK.get(edge["type"], edge["type"])
-    print(f"  {edge['source']} {mark} {edge['target']}: {edge['frequency']:.2f}")
+    # What you already know: nothing causes age or sex.
+    known = andrey.Knowledge(tiers=[["age", "sex"], [c for c in data if c not in ("age", "sex")]])
 
-# Hand it on: the averaged graph as Graphviz DOT, which DoWhy reads.
-print(boot.structure.to_dot().splitlines()[0])
+    # How sure each edge is: 100 fits on resampled rows, four at a time.
+    with andrey.config(num_workers=4):
+        boot = andrey.bootstrap("pc", data, n_boot=100, seed=0, knowledge=known)
+    print("edges in at least half the fits:")
+    MARK = {"directed": "->", "undirected": "--"}
+    for edge in boot.table(min_frequency=0.5):
+        mark = MARK.get(edge["type"], edge["type"])
+        print(f"  {edge['source']} {mark} {edge['target']}: {edge['frequency']:.2f}")
+
+    # Hand it on: the averaged graph as Graphviz DOT, which DoWhy reads.
+    print(boot.structure.to_dot().splitlines()[0])
