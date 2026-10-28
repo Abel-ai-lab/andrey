@@ -66,9 +66,9 @@ function of other columns. Copies of one variable cannot be told apart, so one `
 every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
 group and read its edges as the group's; no option drops or merges the copies for you. `pc`, `fci`,
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
-same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series
-that repeats another up to `2 * tau_max` steps back and name its lagged value, such as
-`'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
+same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
+also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
+such as `'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
 cell, its row and column. A single column gives a one-node graph.
 
 % concept: missing
