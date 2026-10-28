@@ -53,6 +53,7 @@ def pc(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
     _trace: list[dict] | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
@@ -75,8 +76,9 @@ def pc(
     Meek's rules one at a time in column order instead of in order-free rounds
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
     larger conditioning-size passes (:func:`_discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. Returns the CPDAG, or the MPDAG with ``constraints``, as a
-    ``GraphStructure`` of kind ``"cpdag"``.
+    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns the
+    CPDAG, or the MPDAG with ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -99,12 +101,13 @@ def pc(
         warn_expensive=True,
         max_depth=max_depth,
         constraints=constraints,
+        seed=seed,
         _trace=_trace,
     )
     rule4 = constraints is not None
     ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
-        test = make_indep_test(indep_test, X, categorical=categorical)
+        test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
         ambiguous |= vote_colliders(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
@@ -366,6 +369,7 @@ def _discover_skeleton(
     warn_expensive: bool = False,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
+    seed: int | None = None,
     _trace: list[dict] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
     """Learn the undirected skeleton and, for every removed pair, its separating set and p-value.
@@ -379,7 +383,8 @@ def _discover_skeleton(
     separating set is the union of every conditioning set that made it independent, and its p-value
     the largest among those sets' tests; both are keyed ``(x, y)`` with ``x < y``. ``indep_test``
     selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
-    marks the categorical columns for a mixed-data test. With ``record_pvalues`` false, as for the
+    marks the categorical columns for a mixed-data test; ``seed`` fixes the draws of a stochastic
+    test (``None`` uses ``ANDREY_SEED``). With ``record_pvalues`` false, as for the
     column collider order, which ranks nothing, no p-value is compared or kept and the returned
     p-value dict is empty; the skeleton and the separating sets are the same.
 
@@ -411,7 +416,7 @@ def _discover_skeleton(
     trace needs every p-value in this process, so tracing scans serially.
     """
     d = X.shape[1]
-    test = make_indep_test(indep_test, X, categorical=categorical)
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
     keep = None

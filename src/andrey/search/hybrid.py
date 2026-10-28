@@ -47,6 +47,7 @@ def candidate_graph(
     alpha: float,
     indep_test: str,
     categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """The restrict phase: the pairs the maximize phase may join, a symmetric boolean matrix.
 
@@ -54,7 +55,8 @@ def candidate_graph(
     ``"inter_iamb"`` when each is in the other's Markov blanket
     (:mod:`andrey.constraint.blanket`); ``"pc"`` keeps PC's skeleton
     (:func:`~andrey.constraint.pc._discover_skeleton`). Each runs the ``indep_test`` test at level
-    ``alpha``; ``categorical`` marks the categorical columns for a mixed-data test.
+    ``alpha``; ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes
+    the draws of a stochastic test (``None`` uses ``ANDREY_SEED``).
     """
     if restrict == "pc":
         adj, _, _ = _discover_skeleton(
@@ -65,18 +67,21 @@ def candidate_graph(
             record_pvalues=False,
             workers=backend.worker_count(None),
             warn_expensive=True,
+            seed=seed,
         )
         return adj != NULL
-    return local_graph(X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical)
+    return local_graph(
+        X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical, seed=seed
+    )
 
 
 def _ranked_test(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None
+    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None
 ) -> tuple[CITest, list[int]]:
-    """The ``indep_test`` test over ``X`` and each column's :func:`~andrey.search.hc.tie_ranks`,
-    its categorical columns read as categories."""
+    """The ``indep_test`` test, seeded by ``seed``, over ``X`` and each column's
+    :func:`~andrey.search.hc.tie_ranks`, its categorical columns read as categories."""
     d = X.shape[1]
-    test = make_indep_test(indep_test, X, categorical=categorical)
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     if indep_test in DISCRETE_INDEP_TESTS:
         mask = np.ones(d, dtype=bool)
     elif indep_test in MIXED_INDEP_TESTS:
@@ -93,10 +98,12 @@ def local_graph(
     alpha: float,
     indep_test: str,
     categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Every variable's MMPC (``"mmpc"``), IAMB (``"iamb"``), or Inter-IAMB (``"inter_iamb"``) set
-    under the AND rule: MMPC's skeleton or the moral graph, a symmetric boolean matrix."""
-    test, ranks = _ranked_test(X, indep_test, categorical)
+    under the AND rule: MMPC's skeleton or the moral graph, a symmetric boolean matrix. ``seed``
+    fixes the draws of a stochastic test (``None`` uses ``ANDREY_SEED``)."""
+    test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
@@ -112,14 +119,16 @@ def local_set(
     alpha: float,
     indep_test: str,
     categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> list[int]:
     """``target``'s set in the order its members joined, by MMPC (``"mmpc"``), IAMB (``"iamb"``),
     or Inter-IAMB (``"inter_iamb"``).
 
     MMPC keeps the members of ``target``'s parents and children whose own set holds ``target``
-    (the symmetry check); IAMB and Inter-IAMB return the Markov blanket.
+    (the symmetry check); IAMB and Inter-IAMB return the Markov blanket. ``seed`` fixes the draws of
+    a stochastic test (``None`` uses ``ANDREY_SEED``).
     """
-    test, ranks = _ranked_test(X, indep_test, categorical)
+    test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
@@ -159,15 +168,17 @@ def rsmax2(
     max_tabu: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    seed: int | None = None,
 ) -> tuple[GraphStructure, float, np.ndarray]:
     """Run the ``restrict`` phase, then the ``maximize`` score search inside its candidate graph.
 
     Returns the CPDAG, the total score of the DAG found (lower is better), and the candidate graph.
     ``constraints`` reach the maximize phase whole, and the candidate graph as its allowed pairs
-    together with the pairs of the required edges (:func:`restricted`).
+    together with the pairs of the required edges (:func:`restricted`). ``seed`` fixes the draws of
+    a stochastic ``indep_test`` in the restrict phase (``None`` uses ``ANDREY_SEED``).
     """
     candidates = candidate_graph(
-        X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical
+        X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical, seed=seed
     )
     limits = restricted(constraints, candidates)
     if maximize == "hc":

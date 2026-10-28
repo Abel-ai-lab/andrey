@@ -24,7 +24,7 @@ from typing import Any, Literal
 from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
-from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.score import LINEAR_SCORES
 from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
@@ -704,7 +704,9 @@ _CONCEPTS = (
     ),
     Concept(
         key="seed",
-        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset.",
+        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset. A "
+        "method that tests independence takes it for the randomized tests: "
+        f"{', '.join(STOCHASTIC_INDEP_TESTS)}.",
         param=_template(
             "seed",
             "int",
@@ -734,33 +736,6 @@ _CONCEPTS = (
                 *_RESIDUAL,
             ),
         ),
-        deviations=(
-            *_absent(
-                "0.11.0",
-                "indep_test='rcot', 'cmiknn', or 'gpdc' draws random numbers from ANDREY_SEED.",
-                *CI_SEARCHES,
-            ),
-            Deviation(
-                method="ica_lingam",
-                name="random_state",
-                default=None,
-                fixed_in="0.11.0",
-                aliases=("random_state",),
-                reason="scikit-learn's name.",
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="random_state",
-                    default=None,
-                    fixed_in="0.11.0",
-                    aliases=("random_state",),
-                    fragment="",
-                    reason="Deterministic, yet takes a random_state it ignores.",
-                )
-                for m in ("direct_lingam", "multi_group_direct_lingam")
-            ),
-        ),
     ),
     Concept(
         key="num_workers",
@@ -775,16 +750,6 @@ _CONCEPTS = (
         ),
         suitable=(),
         others_exempt="Execution settings come from andrey.config or ANDREY_* only.",
-        deviations=(
-            Deviation(
-                method="bootstrap",
-                name="num_workers",
-                default=None,
-                fixed_in="0.11.0",
-                fragment="",
-                reason="Sizes the outer pool; new in 0.11.0, so no alias.",
-            ),
-        ),
     ),
     Concept(
         key="knowledge",

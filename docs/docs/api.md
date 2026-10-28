@@ -123,6 +123,20 @@ takes `collider_rule` for its same-step colliders, with `"majority"`, its defaul
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
 gives a node more than that many parents, and some graph reaches each node's count.
 
+% concept: seed
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
+The methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not
+set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
+deterministic and takes no seed.
+
+% concept: num_workers
+No method takes the number of workers or the device as an argument. Set them for every call in a
+block with `andrey.config(num_workers=...)`, or with the `ANDREY_*` variables of
+[Configuration](configuration.md); `bootstrap` follows them too.
+
 % concept: ebic_gamma
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
 take `ebic_gamma`, the weight of the extended BIC: their linear-Gaussian BIC adds

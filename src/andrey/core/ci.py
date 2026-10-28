@@ -1155,6 +1155,9 @@ _NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
     "gpdc": ("ci_gpdc", "GPDC"),
 }
 NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(_NONLINEAR_CLASSES)
+#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, and the random
+#: tie keys and permutations of CMIknn and GPDC. The other tests draw none.
+STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
 
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
@@ -1208,12 +1211,19 @@ def available_indep_tests() -> tuple[str, ...]:
 
 
 def make_indep_test(
-    name: str, data: np.ndarray, *, categorical: npt.ArrayLike | None = None, **options: Any
+    name: str,
+    data: np.ndarray,
+    *,
+    categorical: npt.ArrayLike | None = None,
+    seed: int | None = None,
+    **options: Any,
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
 
     ``options`` are keyword settings for the test's class, such as
     ``make_indep_test("cmiknn", data, k_cmi=5)``; a setting the test lacks raises ``TypeError``.
+    ``seed`` reaches the tests that draw random numbers (:data:`STOCHASTIC_INDEP_TESTS`), which
+    otherwise use ``ANDREY_SEED``; the other tests ignore it.
     ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
     (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
     :class:`NotImplementedError` when ``name`` is not registered, listing what is available. A
@@ -1231,6 +1241,8 @@ def make_indep_test(
         raise NotImplementedError(
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
+    if seed is not None and name in STOCHASTIC_INDEP_TESTS:
+        options["seed"] = seed
     mixed = name in MIXED_INDEP_TESTS
     if not mixed and categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
