@@ -96,6 +96,12 @@ change names its pull request.
   exact search does past 24 variables at 2,000 rows. The message names the measured size and its
   setting and points to the method's **Limitations** paragraph and the release card; the sizes are
   generated from the published summary by `scripts/boundary_table.py`. ([#479])
+- `andrey --help --json` gives each parameter its bounds (`minimum`, `maximum`,
+  `exclusiveMinimum`, `exclusiveMaximum`), the package-wide `concept` it implements, and the former
+  names (`aliases`) and values (`choice_aliases`) it accepts, and lists each concept, such as
+  `alpha` or `max_depth`, with the name each method gives it; `andrey config --help --json` lists
+  the concepts too. `andrey run` accepts a former name or value and rejects a value out of range
+  before the fit. ([#492])
 
 ### Changed
 
@@ -139,6 +145,22 @@ change names its pull request.
   less time on dense graphs with hidden variables, because the orientation rules R9 and R10, which
   `fci` and `gfci` share, make each of their path searches once per pass instead of once for each
   pair of nodes that needs it. ([#485])
+- `ica_lingam`'s **Limitations** paragraph says that its causal order depends on the columns'
+  scale, as its authors note, with one measurement on standardized data, and points to
+  `direct_lingam`. ([#487])
+
+### Fixed
+
+- The adaptive Lasso that prunes the edges of `direct_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`
+  keeps the same edges in any unit of the data. scikit-learn's LARS ended the Lasso path once its
+  penalty fell to `2**-23` in the data's units, so data in small units lost edges (14 to 41
+  percent of DirectLiNGAM's true edges at a standard deviation near `1e-3`, all of them near
+  `1e-5`), standardized data could lose a parent of a nearly noiseless variable, and data with a
+  standard deviation near `2**124` raised a LAPACK error. A fit whose path stops before the
+  least-squares fit now runs again on the data divided by a power of two, and BIC picks its point
+  on the whole path; a fit whose path reached the least-squares fit returns the same values as
+  before. ([#478])
 
 ## [0.10.0] - 2026-10-27
 
@@ -912,6 +934,9 @@ First alpha release.
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#468]: https://github.com/Abel-ai-lab/andrey/pull/468
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
+[#478]: https://github.com/Abel-ai-lab/andrey/pull/478
 [#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
+[#487]: https://github.com/Abel-ai-lab/andrey/pull/487
+[#492]: https://github.com/Abel-ai-lab/andrey/pull/492

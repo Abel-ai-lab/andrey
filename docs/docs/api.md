@@ -31,7 +31,12 @@ A constant column holds no information about the other variables, so one `ValueE
 constant column and asks you to drop them; resampling or subsetting rows can make a column
 constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also need at least
 `n_variables + 1` rows in each dataset, the fewest with which their pruning step can estimate the
-edge weights.
+edge weights. That pruning step, an adaptive Lasso in `direct_lingam`, `ica_lingam`,
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`,
+picks the edges by BIC over the whole Lasso path, so for a given causal order it keeps the same
+edges in any unit of the data. The steps before it can still depend on the units: the causal order
+of `ica_lingam` reads the magnitudes of its unmixing matrix, and the VARMA fit of `varma_lingam` runs
+on the values as given.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
 `"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
 whole numbers in a column of numbers, each distinct value of a column one category. `ges`, `hc`,
@@ -53,6 +58,7 @@ to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 rep
 data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
+% concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
 missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
@@ -65,36 +71,50 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 as [Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say
 why.
 
+% concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
 `indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
 and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
 nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)).
+([Conditional-independence tests](#conditional-independence-tests)). `pcmci`, `pcmciplus`, and
+`lpcmci` take `"student_t"`, their default, and `"fisherz"`.
 
+% concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
-`grasp`, `exact_search`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
-`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `rcd`, and
-`bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and
+`grasp`, `exact_search`, `notears`, `dagma`, `direct_lingam`, `ica_lingam`,
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
+`rcd`, and `bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and
 forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
 parameter says how it honors them. `bottom_up_parce_lingam` honors every part but required edges.
 For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time
-`t - lag` to `effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`, the
-maximum conditioning-set size of their conditional-independence tests. `lpcmci`'s `max_depth`
-counts only the neighbors a removal step conditions on beyond the parents of both ends, which every
-test includes.
+`t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
+% concept: max_depth
+`pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the maximum conditioning-set size of their
+conditional-independence tests. `rcd`'s `max_explanatory_vars`, the most variables it regresses out
+together, is the same cap, with a default of 2.
+
+% concept: max_extra_depth
+`lpcmci`'s `max_depth` counts only the neighbors a removal step conditions on beyond the parents
+of both ends, which every test includes.
+
+% concept: collider_rule
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
 an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
 that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"`
 (Colombo and Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors
 and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
 triple the vote cannot decide is ambiguous: no rule orients through it, and
-`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
+`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. `pcmciplus`
+takes `collider_rule` for its same-step colliders, with `"majority"`, its default,
+`"conservative"`, and `"none"`, which reads the one separating set.
 
+% concept: max_parents
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
 gives a node more than that many parents, and some graph reaches each node's count.
 
+% concept: ebic_gamma
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
 take `ebic_gamma`, the weight of the extended BIC: their linear-Gaussian BIC adds
 `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows
@@ -619,6 +639,12 @@ and `rc_params` return plain data and need no import.
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
 | `andrey calibrate` | Measured GES and skeleton worker-pool cutoffs for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
+
+In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or
+`exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the
+former names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json`
+and `andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name
+each method gives it. `andrey run` rejects a value out of range before the fit.
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs
