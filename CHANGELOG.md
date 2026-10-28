@@ -139,6 +139,9 @@ change names its pull request.
   less time on dense graphs with hidden variables, because the orientation rules R9 and R10, which
   `fci` and `gfci` share, make each of their path searches once per pass instead of once for each
   pair of nodes that needs it. ([#485])
+- `ica_lingam`'s **Limitations** paragraph says that its causal order depends on the columns'
+  scale, as its authors note, with one measurement on standardized data, and points to
+  `direct_lingam`. ([#487])
 
 ## [0.10.0] - 2026-10-27
 
@@ -915,3 +918,4 @@ First alpha release.
 [#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
+[#487]: https://github.com/Abel-ai-lab/andrey/pull/487
