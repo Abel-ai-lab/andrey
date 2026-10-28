@@ -236,7 +236,10 @@ class MethodSpec(Spec):
     tie_break: bool = False  # follows andrey.config.tie_break (tie_ranks; collider_order)
     order_note: str = ""  # the column-order guide's note: what still follows the column order
     params: tuple[ParamSpec, ...] = ()
-    seeded: bool = False  # honors a seed / random_state (and so ANDREY_SEED)
+    seeded: bool = False  # takes a seed (the param tagged ``seed``), which ANDREY_SEED fills
+    # Former arguments the method no longer has, ignored with a DeprecatedArgumentWarning for one
+    # release.
+    dropped_args: tuple[str, ...] = ()
     passthrough: bool = False  # accepts extra **params (CALM optimizer knobs)
     references: tuple[str, ...] = ()
     knowledge: tuple[KnowledgePart, ...] = ()  # the Knowledge parts its knowledge= honors

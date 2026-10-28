@@ -119,7 +119,7 @@ FITS: dict[str, Fit] = {
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
     "DirectLiNGAM": Fit(andrey.direct_lingam),
-    "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, random_state=0)),
+    "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, seed=0)),
     "MultiGroupDirectLiNGAM": Fit(
         lambda x: andrey.multi_group_direct_lingam(qg.regime_models.split_groups(x, _GROUPS)),
         blocks=_GROUPS,

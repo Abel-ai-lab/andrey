@@ -46,6 +46,7 @@ def _fit(
     max_tabu: int | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
+    seed: int | None,
     knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the restrict and maximize phases, and wrap the CPDAG."""
@@ -92,6 +93,7 @@ def _fit(
             max_tabu=max_tabu,
             categorical=mask,
             constraints=constraints,
+            seed=seed,
         )
     metadata = {
         "score": json_safe(score),
@@ -114,6 +116,7 @@ def mmhc(
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with max-min hill climbing (MMHC).
@@ -157,6 +160,10 @@ def mmhc(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The score search considers the
@@ -172,6 +179,7 @@ def mmhc(
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` are ``"mmpc"`` and ``"hc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -277,6 +285,7 @@ def mmhc(
         max_tabu=None,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
         knowledge=knowledge,
     )
 
@@ -297,6 +306,7 @@ def rsmax2(
     max_tabu: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with a restrict phase and a maximize phase.
@@ -347,6 +357,10 @@ def rsmax2(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
@@ -362,6 +376,7 @@ def rsmax2(
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -480,5 +495,6 @@ def rsmax2(
         max_tabu=max_tabu,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
         knowledge=knowledge,
     )

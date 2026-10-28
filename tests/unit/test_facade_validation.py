@@ -308,7 +308,7 @@ def test_granger_needs_a_time_step_in_every_fold():
 
 LINGAM_PRUNED = {
     "direct_lingam": andrey.direct_lingam,
-    "ica_lingam": partial(andrey.ica_lingam, random_state=0),
+    "ica_lingam": partial(andrey.ica_lingam, seed=0),
     "multi_group_direct_lingam": lambda x: andrey.multi_group_direct_lingam([x, x]),
 }
 

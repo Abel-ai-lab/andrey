@@ -41,11 +41,12 @@ def spec_of(name: str) -> MethodSpec:
 def method_spec(name: str) -> Callable[[Facade], Facade]:
     """Run the facade of method ``name`` inside the steps its spec defines.
 
-    Before the facade: a former argument name or value becomes the current one, with one
-    :class:`~andrey.DeprecatedArgumentWarning` for each; every argument the call passes is checked
-    and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
-    ``ValueError``; a seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`)
-    and passed on as an int; an experimental method warns :class:`~andrey.ExperimentalWarning`.
+    Before the facade: a former argument name or value becomes the current one, and a dropped
+    argument is removed, with one :class:`~andrey.DeprecatedArgumentWarning` for each; every
+    argument the call passes is checked and converted by
+    :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or ``ValueError``; a
+    seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
+    an int; an experimental method warns :class:`~andrey.ExperimentalWarning`.
     After it: each result's ``metadata["algorithm"]`` is ``name`` and, for a seeded method,
     ``metadata["seed"]`` is the seed used.
     """
@@ -65,8 +66,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                     bound.arguments[key] = param.check(value, name, choices=choices)
             stamp: dict[str, object] = {"algorithm": name}
             if spec.seeded:
-                seed = next(p.name for p in spec.params if p.concept == "seed")
-                stamp["seed"] = bound.arguments[seed] = resolve_seed(bound.arguments.get(seed))
+                stamp["seed"] = bound.arguments["seed"] = resolve_seed(bound.arguments.get("seed"))
             if spec.status == "experimental":
                 warn_experimental(name)
             out = facade(*bound.args, **bound.kwargs)
@@ -91,10 +91,19 @@ def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return ``kwargs`` with each former name and value of ``spec``'s parameters made current.
 
-    Each former name or value warns once at the caller's line. Raises ``ValueError`` when a call
-    passes a parameter under both its former and its current name.
+    Each former name or value warns once at the caller's line, and so does each dropped argument,
+    which is removed. Raises ``ValueError`` when a call passes a parameter under both its former
+    and its current name.
     """
     kwargs = dict(kwargs)
+    for old in spec.dropped_args:
+        if old in kwargs:
+            del kwargs[old]
+            warn_once(
+                f"andrey.{spec.name}: {old} is ignored and stops being accepted in the next "
+                "release; drop it",
+                DeprecatedArgumentWarning,
+            )
     for param in spec.params:
         for old in param.aliases:
             if old not in kwargs:
