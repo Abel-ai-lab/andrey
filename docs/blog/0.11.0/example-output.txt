@@ -1,0 +1,25 @@
+5,569 adults; 3,694 with no value missing
+gaps: 23 edges from every row, 23 from the complete
+  rows; they differ in 7 places
+units: 0 differences
+edges in at least half the fits:
+  age -> systolic: 1.00
+  age -> pulse: 1.00
+  age -> hba1c: 1.00
+  sex -> diastolic: 1.00
+  sex -> pulse: 1.00
+  sex -> hdl: 1.00
+  age -> hdl: 0.96
+  sex -> bmi: 0.85
+  waist -> hdl: 0.78
+  age -> income: 0.68
+  hba1c -> pulse: 0.64
+  waist -> bmi: 0.62
+  cholesterol -> hdl: 0.62
+  hdl -> income: 0.62
+  hba1c -> hdl: 0.61
+  cholesterol -> diastolic: 0.57
+  systolic -> diastolic: 0.53
+  age -> waist: 0.52
+  pulse -> diastolic: 0.51
+digraph {
