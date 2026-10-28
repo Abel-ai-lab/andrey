@@ -8,7 +8,6 @@ display the parameter defaults defined here.
 
 from __future__ import annotations
 
-from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
@@ -20,20 +19,16 @@ from andrey.search.hc import HC_SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 from andrey.search.tabu import TABU_SCORES
 
+from .concepts import CONCEPTS, SEED_MAX, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
-# Shared input + parameter fragments (kept identical where the facades share a contract).
+# Shared inputs and parameters; a parameter that implements a concept comes from its template.
 _DATA_MATRIX = InputSpec(
     name="data",
     kind="matrix",
     doc="Observed data, one row per sample.",
 )
-_ALPHA = ParamSpec(
-    name="alpha",
-    type="float",
-    default=0.05,
-    doc="Significance level of the conditional-independence test.",
-)
+_ALPHA = concept_param("alpha")
 _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
@@ -50,38 +45,11 @@ _INDEP_TEST = ParamSpec(
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
     "order.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
+    concept="indep_test",
 )
-_CATEGORICAL = ParamSpec(
-    name="categorical",
-    type="str_list",
-    default=None,
-    doc="The categorical columns, for a mixed-data test or score: column names from the data "
-    "file's header or 0-based positions, for example, categorical=[smoker,region]; [] marks none. "
-    "null infers them: every column of at most max_categories distinct whole numbers, named in a "
-    "DataTypeWarning; with none, the setting runs as its linear-Gaussian form and warns. Other "
-    "tests and scores take only null or [].",
-    nullable=True,
-)
-_MAX_CATEGORIES = ParamSpec(
-    name="max_categories",
-    type="int",
-    default=10,
-    doc="The most distinct whole numbers a column may hold to be inferred as categorical, at least "
-    "2. With a continuous test or score, such columns get a one-time DataTypeWarning that they may "
-    "be category codes.",
-)
-_COLLIDER_RULE = ParamSpec(
-    name="collider_rule",
-    type="str",
-    default="sepsets",
-    choices=COLLIDER_RULES,
-    doc="How colliders are decided on x - z - y: sepsets = z is a collider when it is not in the "
-    "separating set of x and y; conservative and majority = test x and y given every subset of "
-    "each one's neighbors, and z is a collider when none (conservative) or fewer than half "
-    "(majority) of the separating subsets contain it, a non-collider when all or more than half "
-    "do, and ambiguous otherwise, never oriented through. Both cost up to 2**degree tests per "
-    "pair.",
-)
+_CATEGORICAL = concept_param("categorical")
+_MAX_CATEGORIES = concept_param("max_categories")
+_COLLIDER_RULE = concept_param("collider_rule")
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
@@ -111,15 +79,10 @@ _LAMBDA_VALUE = ParamSpec(
     default=1.0,
     doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values give sparser "
     "graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
+    minimum=0,
+    concept="penalty_discount",
 )
-_EBIC_GAMMA = ParamSpec(
-    name="ebic_gamma",
-    type="float",
-    default=1.0,
-    doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
-    "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
-    "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
-)
+_EBIC_GAMMA = concept_param("ebic_gamma")
 _EBIC_GAMMA_STANDARD = ParamSpec(
     name="ebic_gamma",
     type="float",
@@ -127,13 +90,12 @@ _EBIC_GAMMA_STANDARD = ParamSpec(
     doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
     "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
     "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
+    minimum=0,
+    concept="ebic_gamma",
 )
-_SEED = ParamSpec(
-    name="seed",
-    type="int",
-    default=None,
+_SEED = concept_param(
+    "seed",
     doc="Seed for the search's random orders. null uses ANDREY_SEED, or 0 when it is unset.",
-    nullable=True,
 )
 _RANDOM_STATE = ParamSpec(
     name="random_state",
@@ -142,6 +104,7 @@ _RANDOM_STATE = ParamSpec(
     doc="Ignored: the pwling order search is deterministic. Accepted so that every LiNGAM method "
     "takes random_state.",
     nullable=True,
+    concept="seed",
 )
 
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
@@ -277,6 +240,7 @@ _add(
                 "Gaussian BIC, for mixed data (experimental). The test must read the same kind of "
                 "data.",
                 choices=GES_SCORES,
+                concept="score_func",
             ),
             _LAMBDA_VALUE,
             _EBIC_GAMMA_STANDARD,
@@ -456,20 +420,18 @@ _add(
                 "local_score_BIC.",
                 choices=GES_SCORES,
                 nullable=True,
+                concept="score_func",
             ),
             _LAMBDA_VALUE,
             _EBIC_GAMMA,
-            ParamSpec(
-                name="max_parents",
-                type="int",
-                default=None,
+            concept_param(
+                "max_parents",
                 doc="A cap on every node's parents, at least 0: no DAG the returned CPDAG "
                 "represents gives a node more than max_parents parents, and some DAG reaches each "
                 "node's count. A move whose CPDAG would "
                 "break the cap, in either phase, is skipped for the next best move. A cap can "
                 "stop the search short of the lowest-scoring graph, which GES otherwise finds. "
                 "null sets no cap; the forward phase then keeps its gate of n_variables / 2.",
-                nullable=True,
             ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
@@ -534,14 +496,9 @@ _add(
                 doc="Local score objective: local_score_BIC or local_score_BIC_from_cov = "
                 "linear-Gaussian BIC, the only score XGES supports.",
                 choices=LINEAR_SCORES,
+                concept="score_func",
             ),
-            ParamSpec(
-                name="lambda_value",
-                type="float",
-                default=1.0,
-                doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values "
-                "give sparser graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
-            ),
+            _LAMBDA_VALUE,
             _EBIC_GAMMA,
             ParamSpec(
                 name="extended_search",
@@ -595,12 +552,12 @@ _add(
                 "local_score_BIC_from_cov.",
                 choices=HC_SCORES,
                 nullable=True,
+                concept="score_func",
             ),
             _LAMBDA_VALUE,
             _EBIC_GAMMA,
-            ParamSpec(
-                name="max_iter",
-                type="int",
+            concept_param(
+                "max_iter",
                 default=None,
                 doc="Most moves the search takes, at least 1; null sets no limit (the search still "
                 "ends). Reaching a set limit warns with SearchLimitWarning.",
@@ -645,6 +602,7 @@ _add(
                 "mixed data included: tabu has no mixed-data score.",
                 choices=TABU_SCORES,
                 nullable=True,
+                concept="score_func",
             ),
             _LAMBDA_VALUE,
             _EBIC_GAMMA,
@@ -663,9 +621,8 @@ _add(
                 "from 1 to tabu_length. null uses tabu_length.",
                 nullable=True,
             ),
-            ParamSpec(
-                name="max_iter",
-                type="int",
+            concept_param(
+                "max_iter",
                 default=None,
                 doc="Most moves the search takes, improving or not, at least 1; null sets no limit "
                 "(the search still ends). Reaching a set limit warns with SearchLimitWarning.",
@@ -720,6 +677,7 @@ _add(
                 "local_score_BIC.",
                 choices=EXACT_SCORES,
                 nullable=True,
+                concept="score_func",
             ),
             _EBIC_GAMMA,
             _CATEGORICAL,
@@ -755,13 +713,10 @@ _add(
         seeded=True,
         passthrough=True,
         params=(
-            ParamSpec(
-                name="seed",
-                type="int",
-                default=None,
+            concept_param(
+                "seed",
                 doc="Seed for the torch optimizer. null uses ANDREY_SEED, or 0 when it is unset; "
                 "metadata['seed'] records the seed used.",
-                nullable=True,
             ),
         ),
         references=("Jin, Ng, Zhang & Huang 2026",),
@@ -829,23 +784,20 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="lambda1",
-                type="float",
+            concept_param(
+                "lambda1",
                 default=0.1,
                 doc="Weight of the l1 penalty of the first fit, at least 0.",
             ),
-            ParamSpec(
-                name="w_threshold",
-                type="float",
-                default=0.3,
+            concept_param(
+                "w_threshold",
                 doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
             ),
-            ParamSpec(
-                name="max_iter",
-                type="int",
+            concept_param(
+                "max_iter",
                 default=100,
                 doc="Most dual steps of the augmented Lagrangian, at least 1.",
+                nullable=False,
             ),
             ParamSpec(
                 name="h_tol",
@@ -887,16 +839,13 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="lambda1",
-                type="float",
+            concept_param(
+                "lambda1",
                 default=0.03,
                 doc="Weight of the l1 penalty of the first fit, at least 0.",
             ),
-            ParamSpec(
-                name="w_threshold",
-                type="float",
-                default=0.3,
+            concept_param(
+                "w_threshold",
                 doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
             ),
             ParamSpec(
@@ -911,11 +860,11 @@ _add(
                 default=30000,
                 doc="Most Adam steps of each stage but the last, at least 1.",
             ),
-            ParamSpec(
-                name="max_iter",
-                type="int",
+            concept_param(
+                "max_iter",
                 default=60000,
                 doc="Most Adam steps of the last stage, at least 1.",
+                nullable=False,
             ),
             ParamSpec(name="lr", type="float", default=3e-4, doc="Step size of Adam, above 0."),
             *_CONTINUOUS_PATH_PARAMS,
@@ -940,9 +889,8 @@ _HYBRID_SCORE_DOC = (
     "and conditional Gaussian BIC, for mixed data (not with maximize=tabu). It must read the same "
     "kind of data as indep_test."
 )
-_HYBRID_MAX_ITER = ParamSpec(
-    name="max_iter",
-    type="int",
+_HYBRID_MAX_ITER = concept_param(
+    "max_iter",
     default=None,
     doc="Most moves the score search takes, at least 1; null sets no limit (the search still "
     "ends). Reaching a set limit warns with SearchLimitWarning.",
@@ -978,6 +926,7 @@ _add(
                 default="local_score_BIC_from_cov",
                 doc=_HYBRID_SCORE_DOC,
                 choices=HC_SCORES,
+                concept="score_func",
             ),
             _LAMBDA_VALUE,
             _EBIC_GAMMA,
@@ -1033,6 +982,7 @@ _add(
                 default="local_score_BIC_from_cov",
                 doc=_HYBRID_SCORE_DOC,
                 choices=HC_SCORES,
+                concept="score_func",
             ),
             _LAMBDA_VALUE,
             _EBIC_GAMMA,
@@ -1082,6 +1032,7 @@ _BOSS_SCORE = ParamSpec(
     "local_score_BIC_from_cov.",
     choices=PERMUTATION_SCORES,
     nullable=True,
+    concept="score_func",
 )
 _add(
     MethodSpec(
@@ -1176,13 +1127,10 @@ _add(
         tie_break=True,
         params=(
             _RANDOM_STATE,
-            ParamSpec(
-                name="measure",
-                type="str",
-                default="pwling",
+            concept_param(
+                "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
                 "is the pairwise likelihood-ratio measure.",
-                choices=("pwling",),
             ),
         ),
         references=("Shimizu et al. 2011", "Hyvarinen & Smith 2013"),
@@ -1218,12 +1166,15 @@ _add(
                 doc="Seed for FastICA, from 0 to 2**32 - 1. null uses ANDREY_SEED, or 0 when it is "
                 "unset.",
                 nullable=True,
+                minimum=0,
+                maximum=SEED_MAX,
+                concept="seed",
             ),
-            ParamSpec(
-                name="max_iter",
-                type="int",
+            concept_param(
+                "max_iter",
                 default=1000,
                 doc="Maximum FastICA iterations; at least 1.",
+                nullable=False,
             ),
         ),
         references=("Shimizu et al. 2006",),
@@ -1326,12 +1277,12 @@ _add(
                 doc="Map the moving-average weights onto the independent noise terms. Ignored "
                 "when prune is true.",
             ),
-            ParamSpec(
-                name="max_iter",
-                type="int",
+            concept_param(
+                "max_iter",
                 default=100,
                 doc="Most iterations of the likelihood fit, at least 1. A fit stopped before it "
                 "converges gives no warning; raise this to let it converge.",
+                nullable=False,
             ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
@@ -1369,14 +1320,13 @@ _add(
                 type="int",
                 default=1,
                 doc="Number of past time points regressed out before the instantaneous fit.",
+                minimum=1,
+                concept="tau_max",
             ),
-            ParamSpec(
-                name="measure",
-                type="str",
-                default="pwling",
+            concept_param(
+                "measure",
                 doc="How the instantaneous order search picks the most exogenous variable; "
                 "pwling is the pairwise likelihood-ratio measure.",
-                choices=("pwling",),
             ),
         ),
         references=("Kadowaki, Shimizu & Washio 2013",),
@@ -1410,10 +1360,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="tau_max",
-                type="int",
-                default=1,
+            concept_param(
+                "tau_max",
                 doc="The largest lag tested; links at lags 1 to tau_max are tested.",
             ),
             ParamSpec(
@@ -1422,6 +1370,10 @@ _add(
                 default=0.2,
                 doc="Significance level of the PC1 parent selection; larger keeps more parents as "
                 "conditions.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
             ),
             ParamSpec(
                 name="alpha_level",
@@ -1429,6 +1381,11 @@ _add(
                 default=0.05,
                 doc="Significance level of the MCI test; a link is kept when its p-value is at "
                 "most this.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
             ParamSpec(
                 name="indep_test",
@@ -1438,6 +1395,7 @@ _add(
                 doc="Partial-correlation test behind every p-value: student_t = Student-t "
                 "distribution, as in the authors' reference implementation; fisherz = Fisher's "
                 "z-transform.",
+                concept="indep_test",
             ),
         ),
         references=("Runge et al. 2019",),
@@ -1472,10 +1430,8 @@ _add(
         tie_break=True,
         order_note='With `collider_rule="none"`, the orientations can follow the column order.',
         params=(
-            ParamSpec(
-                name="tau_max",
-                type="int",
-                default=1,
+            concept_param(
+                "tau_max",
                 doc="The largest lag tested; links at lags 0 to tau_max are tested.",
             ),
             ParamSpec(
@@ -1484,6 +1440,11 @@ _add(
                 default=0.01,
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
             ParamSpec(
                 name="collider_rule",
@@ -1493,6 +1454,7 @@ _add(
                 doc="How a same-step collider is judged: majority = fewer than half of the "
                 "separating subsets hold the middle; conservative = none does; none = the middle "
                 "is not in the one separating set found.",
+                concept="collider_rule",
             ),
             ParamSpec(
                 name="indep_test",
@@ -1502,6 +1464,7 @@ _add(
                 doc="Partial-correlation test behind every p-value: student_t = Student-t "
                 "distribution, as in the authors' reference implementation; fisherz = Fisher's "
                 "z-transform.",
+                concept="indep_test",
             ),
         ),
         references=("Runge 2020",),
@@ -1536,10 +1499,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="tau_max",
-                type="int",
-                default=1,
+            concept_param(
+                "tau_max",
                 doc="The largest lag; the graph covers time steps t - tau_max to t.",
             ),
             ParamSpec(
@@ -1548,6 +1509,11 @@ _add(
                 default=0.05,
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
             ParamSpec(
                 name="n_preliminary_iterations",
@@ -1564,6 +1530,7 @@ _add(
                 doc="Partial-correlation test behind every p-value: student_t = Student-t "
                 "distribution, as in the authors' reference implementation; fisherz = Fisher's "
                 "z-transform.",
+                concept="indep_test",
             ),
             ParamSpec(
                 name="max_depth",
@@ -1575,6 +1542,8 @@ _add(
                 "cap bounds the number of tests and can keep links that a larger conditioning set "
                 "would remove.",
                 nullable=True,
+                minimum=0,
+                concept="max_extra_depth",
             ),
         ),
         references=("Gerhardus & Runge 2020",),
@@ -1610,6 +1579,8 @@ _add(
                 type="int",
                 default=2,
                 doc="Number of past time steps each regression uses, at least 1.",
+                minimum=1,
+                concept="tau_max",
             ),
             ParamSpec(
                 name="cv",
@@ -1651,6 +1622,11 @@ _add(
                 "p-value, or with the smaller HSIC statistic when the p-values are equal. A level "
                 "such as 0.05: an edge only when exactly one direction's p-value is above it.",
                 nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
         ),
         output=OutputSpec(
@@ -1693,6 +1669,11 @@ _add(
                 "p-value, or with the smaller HSIC statistic when the p-values are equal. A level "
                 "such as 0.05: an edge only when exactly one direction's p-value is above it.",
                 nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
         ),
         output=OutputSpec(
@@ -1741,10 +1722,8 @@ _add(
             "cluster can change the latents' order."
         ),
         params=(
-            ParamSpec(
-                name="alpha",
-                type="float",
-                default=0.05,
+            concept_param(
+                "alpha",
                 doc="Significance level of the independence test that finds the causal clusters "
                 "and each next latent in the order.",
             ),
@@ -1756,6 +1735,7 @@ _add(
                 "data file's header, else X1..Xn; latents are named L1, L2, ..., skipping a name "
                 "an observed variable has.",
                 nullable=True,
+                concept="labels",
             ),
         ),
         references=("Xie et al. 2020",),
@@ -1780,6 +1760,8 @@ _add(
                 default=2,
                 doc="Most variables regressed out together in an ancestor test, at least 1; "
                 "larger values find more ancestors and take longer.",
+                minimum=1,
+                concept="max_depth",
             ),
             ParamSpec(
                 name="cor_alpha",
@@ -1792,6 +1774,11 @@ _add(
                 type="float",
                 default=0.01,
                 doc="Significance level of the HSIC independence tests.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
             ParamSpec(
                 name="shapiro_alpha",
@@ -1829,6 +1816,11 @@ _add(
                 default=0.1,
                 doc="Significance level of the independence test that accepts a sink, "
                 "Bonferroni-corrected across the remaining variables.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
             ),
         ),
         output=OutputSpec(
@@ -1938,26 +1930,15 @@ _KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     **dict.fromkeys(_KNOWLEDGE_HOW, KNOWLEDGE_PARTS),
     "bottom_up_parce_lingam": ("forbidden", "allowed", "tiers"),
 }
-_MAX_DEPTH = ParamSpec(
-    name="max_depth",
-    type="int",
-    default=None,
-    doc="The maximum conditioning-set size of every conditional-independence test, at least 0: 0 "
-    "runs only unconditional tests, and null sets no limit. A smaller cap runs fewer tests and can "
-    "keep edges that a larger conditioning set would remove.",
-    nullable=True,
-)
+_MAX_DEPTH = concept_param("max_depth")
 
 for _name, _how in _KNOWLEDGE_HOW.items():
-    _knowledge = ParamSpec(
-        name="knowledge",
-        type="knowledge",
-        default=None,
+    _knowledge = concept_param(
+        "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
         f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
-        nullable=True,
     )
-    _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "gfci") else ()
+    _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
         update={
             "params": (*REGISTRY[_name].params, *_depth, _knowledge),

@@ -30,6 +30,7 @@ Edit the spec, not the surfaces.
 |---|---|
 | `src/andrey/spec/models.py` | The frozen Pydantic models: `MethodSpec`, `DataSpec`, `InputSpec`, `ParamSpec`, `OutputSpec`, `EnvVarSpec`. |
 | `src/andrey/spec/registry.py` | One `MethodSpec` per public method; parameter defaults are the source of truth. |
+| `src/andrey/spec/concepts.py` | The package-wide parameter rules: one `Concept` per shared parameter or behavior, with its template `ParamSpec`, the suitable and exempt methods, and each cell that still differs. |
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
 | `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
@@ -67,6 +68,11 @@ repository.
   (positional-or-keyword -> a `DataSpec` input, keyword-only -> a `ParamSpec`, `**params` ->
   `passthrough=True`).
 - Shared concepts stay consistent: `alpha` is a float; seeds are nullable ints.
+- `tests/unit/test_concepts.py` checks every concept in `src/andrey/spec/concepts.py` against
+  every method: a suitable method has the template's name, type, default, and bounds, or the
+  deviation recorded for it, and its docstring entry states the concept; an exempt method lacks
+  it; each recorded deviation still holds; and every paragraph of `docs/docs/api.md` marked
+  `% concept: <key>` names exactly the methods that take the concept.
 - Every `ANDREY_*` variable the source reads has an `EnvVarSpec` and one parser in
   `andrey.core.env`.
 - Every method has a status and a **Limitations.** paragraph; the status checks are listed under
@@ -114,6 +120,9 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    [column-order guide](docs/docs/guides/column-order.md): break ties with
    `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
    `tests/unit/test_column_labels.py` checks both fields on every method.
+   List the method in `src/andrey/spec/concepts.py` under each concept, as suitable (taking the
+   template with `concept_param`, or a recorded deviation) or exempt with the reason;
+   `tests/unit/test_concepts.py` names each concept that does not list it.
 3. Run `uv run pytest tests/unit/test_spec_registry.py`, which names whatever is missing. The CLI,
    the schema, and the skill pick up the method on their own.
 4. Test it as [Test a method](#test-a-method) describes.
@@ -131,7 +140,11 @@ commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#ide
 
 Change the facade **and** its `ParamSpec` in the same commit; the signature-agreement test fails
 when they differ. A new enumerated value goes in `ParamSpec.choices`, so the schema, the CLI's
-`key=value` coercion, and `andrey run <method> --help` all learn it at once.
+`key=value` coercion, and `andrey run <method> --help` all learn it at once. A parameter that
+implements a concept changes in `src/andrey/spec/concepts.py`: bringing a method to the template
+deletes its deviation, and `tests/unit/test_concepts.py` fails until it does. A parameter or a
+choice renamed after a release keeps its former name in `ParamSpec.aliases` or
+`ParamSpec.choice_aliases` for one release; the deviation's `aliases` lists the names that shipped.
 
 ### Publish a boundary lane
 

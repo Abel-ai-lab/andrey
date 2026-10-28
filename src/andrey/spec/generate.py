@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import andrey
 from andrey.core.structure import EDGE_GLYPHS
 
+from .concepts import CONCEPTS
 from .environment import ENV_VARS, PRECEDENCE
 from .registry import REGISTRY, get_spec, list_specs
 
@@ -87,8 +88,30 @@ def _param_schema(p: ParamSpec) -> dict:
     if p.nullable and isinstance(schema.get("type"), str):
         schema["type"] = [schema["type"], "null"]
     schema["default"] = list(p.default) if isinstance(p.default, tuple) else p.default
+    if p.minimum is not None:
+        schema["exclusiveMinimum" if p.exclusive_minimum else "minimum"] = p.minimum
+    if p.maximum is not None:
+        schema["exclusiveMaximum" if p.exclusive_maximum else "maximum"] = p.maximum
     schema["description"] = p.doc
+    schema["concept"] = p.concept
+    schema["aliases"] = list(p.aliases)
+    schema["choice_aliases"] = dict(p.choice_aliases)
     return schema
+
+
+def concepts_dict() -> dict:
+    """The package-wide parameter concepts: each one's meaning and the name each method uses."""
+    return {
+        key: {
+            "parameter": concept.param.name,
+            "description": concept.summary,
+            "methods": {
+                spec.name: p.name for spec in list_specs() for p in spec.params if p.concept == key
+            },
+        }
+        for key, concept in CONCEPTS.items()
+        if concept.param is not None
+    }
 
 
 def grammar_default(p: ParamSpec) -> str:
@@ -295,6 +318,7 @@ def help_schema(name: str | None = None) -> dict:
     }
     if name is None:
         ctx["methods"] = {n: to_json_schema(s) for n, s in REGISTRY.items()}
+        ctx["concepts"] = concepts_dict()
     else:
         ctx["method"] = to_json_schema(get_spec(name))
     return ctx
