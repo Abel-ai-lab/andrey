@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.core.units import least_squares
+from andrey.core.warning_policy import convergence_as_search_limit
 from andrey.lingam.pwling import _COPY_TOL
 
 #: Above this standard deviation of the target, LARS's float32 tiny number (``2**-126``), which
@@ -19,6 +20,8 @@ from andrey.lingam.pwling import _COPY_TOL
 _LARS_MAX_STD = 2.0**64
 #: A refit divides the data so the target's standard deviation lies in ``[2**31, 2**32)``.
 _LARS_STD_EXPONENT = 32
+#: How a scikit-learn ConvergenceWarning from the LARS path names its source.
+_LARS = "the adaptive Lasso's LARS path (scikit-learn's LassoLarsIC)"
 
 
 def _lasso_bic(Z: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -52,11 +55,13 @@ def _lasso_bic(Z: np.ndarray, y: np.ndarray) -> np.ndarray:
     std = float(np.std(y))
     first = None
     if std <= _LARS_MAX_STD:
-        first = LassoLarsIC(criterion="bic").fit(Z, y)
+        first = convergence_as_search_limit(_LARS, lambda: LassoLarsIC(criterion="bic").fit(Z, y))
         if first.alphas_[-1] == 0.0:
             return first.coef_
     unit = float(np.ldexp(1.0, np.frexp(std)[1] - _LARS_STD_EXPONENT))
-    coef = LassoLarsIC(criterion="bic").fit(Z / unit, y / unit).coef_
+    coef = convergence_as_search_limit(
+        _LARS, lambda: LassoLarsIC(criterion="bic").fit(Z / unit, y / unit)
+    ).coef_
     if first is not None and np.array_equal(coef != 0, first.coef_ != 0):
         return first.coef_
     return coef

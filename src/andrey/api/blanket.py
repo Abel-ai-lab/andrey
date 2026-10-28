@@ -45,6 +45,7 @@ def _fit(
     categorical: Sequence[str | int] | None,
     max_categories: int,
     seed: int | None,
+    max_depth: int | None,
 ) -> StructureOutput:
     """Check the settings, run the search, and wrap its sets as undirected edges."""
     from andrey.search.hybrid import local_graph, local_set
@@ -61,7 +62,13 @@ def _fit(
     labels = column_labels(data)
     d = X.shape[1]
     t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
-    settings = {"alpha": alpha, "indep_test": indep_test, "categorical": mask, "seed": seed}
+    settings = {
+        "alpha": alpha,
+        "indep_test": indep_test,
+        "categorical": mask,
+        "seed": seed,
+        "max_depth": max_depth,
+    }
     metadata: dict[str, object] = {}
     with copies_named(labels), rows_tested() as rows:
         if t is None:
@@ -87,6 +94,7 @@ def iamb(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with incremental association (IAMB).
 
@@ -120,6 +128,12 @@ def iamb(
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
         variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
         seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. Every test
+        conditions on the whole current blanket, so the blanket stops growing once it holds more
+        than ``max_depth`` members.
 
     Returns
     -------
@@ -224,6 +238,7 @@ def iamb(
         categorical=categorical,
         max_categories=max_categories,
         seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -237,6 +252,7 @@ def inter_iamb(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with interleaved IAMB (Inter-IAMB).
 
@@ -269,6 +285,12 @@ def inter_iamb(
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
         variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
         seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. Every test
+        conditions on the whole current blanket, so the blanket stops growing once it holds more
+        than ``max_depth`` members.
 
     Returns
     -------
@@ -373,6 +395,7 @@ def inter_iamb(
         categorical=categorical,
         max_categories=max_categories,
         seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -386,6 +409,7 @@ def mmpc(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's parents and children with max-min parents and children (MMPC).
 
@@ -419,6 +443,11 @@ def mmpc(
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
         variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
         seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. A test
+        conditions on a subset of the current set; the set itself may grow larger.
 
     Returns
     -------
@@ -527,4 +556,5 @@ def mmpc(
         categorical=categorical,
         max_categories=max_categories,
         seed=seed,
+        max_depth=max_depth,
     )

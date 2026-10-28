@@ -48,6 +48,7 @@ def candidate_graph(
     indep_test: str,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> np.ndarray:
     """The restrict phase: the pairs the maximize phase may join, a symmetric boolean matrix.
 
@@ -56,7 +57,8 @@ def candidate_graph(
     (:mod:`andrey.constraint.blanket`); ``"pc"`` keeps PC's skeleton
     (:func:`~andrey.constraint.pc._discover_skeleton`). Each runs the ``indep_test`` test at level
     ``alpha``; ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes
-    the draws of a stochastic test (``None`` uses ``ANDREY_SEED``).
+    the draws of a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every
+    test's conditioning set.
     """
     if restrict == "pc":
         adj, _, _ = _discover_skeleton(
@@ -66,12 +68,19 @@ def candidate_graph(
             categorical=categorical,
             record_pvalues=False,
             workers=backend.worker_count(None),
+            max_depth=max_depth,
             warn_expensive=True,
             seed=seed,
         )
         return adj != NULL
     return local_graph(
-        X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical, seed=seed
+        X,
+        restrict,
+        alpha=alpha,
+        indep_test=indep_test,
+        categorical=categorical,
+        seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -99,16 +108,20 @@ def local_graph(
     indep_test: str,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> np.ndarray:
     """Every variable's MMPC (``"mmpc"``), IAMB (``"iamb"``), or Inter-IAMB (``"inter_iamb"``) set
     under the AND rule: MMPC's skeleton or the moral graph, a symmetric boolean matrix. ``seed``
-    fixes the draws of a stochastic test (``None`` uses ``ANDREY_SEED``)."""
+    fixes the draws of a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every
+    test's conditioning set."""
     test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
-            return mmpc_skeleton(test, d, alpha, ranks)
-        return blanket_graph(test, d, alpha, ranks, interleaved=method == "inter_iamb")
+            return mmpc_skeleton(test, d, alpha, ranks, max_depth)
+        return blanket_graph(
+            test, d, alpha, ranks, interleaved=method == "inter_iamb", max_depth=max_depth
+        )
 
 
 def local_set(
@@ -120,21 +133,27 @@ def local_set(
     indep_test: str,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> list[int]:
     """``target``'s set in the order its members joined, by MMPC (``"mmpc"``), IAMB (``"iamb"``),
     or Inter-IAMB (``"inter_iamb"``).
 
     MMPC keeps the members of ``target``'s parents and children whose own set holds ``target``
     (the symmetry check); IAMB and Inter-IAMB return the Markov blanket. ``seed`` fixes the draws of
-    a stochastic test (``None`` uses ``ANDREY_SEED``).
+    a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning
+    set.
     """
     test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
-            found = parents_children(test, target, d, alpha, ranks)
-            return [x for x in found if target in parents_children(test, x, d, alpha, ranks)]
-        return markov_blanket(test, target, d, alpha, ranks, interleaved=method == "inter_iamb")
+            found = parents_children(test, target, d, alpha, ranks, max_depth)
+            return [
+                x for x in found if target in parents_children(test, x, d, alpha, ranks, max_depth)
+            ]
+        return markov_blanket(
+            test, target, d, alpha, ranks, interleaved=method == "inter_iamb", max_depth=max_depth
+        )
 
 
 def restricted(constraints: Constraints | None, candidates: np.ndarray) -> Constraints:
@@ -169,16 +188,26 @@ def rsmax2(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     seed: int | None = None,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
 ) -> tuple[GraphStructure, float, np.ndarray]:
     """Run the ``restrict`` phase, then the ``maximize`` score search inside its candidate graph.
 
     Returns the CPDAG, the total score of the DAG found (lower is better), and the candidate graph.
     ``constraints`` reach the maximize phase whole, and the candidate graph as its allowed pairs
     together with the pairs of the required edges (:func:`restricted`). ``seed`` fixes the draws of
-    a stochastic ``indep_test`` in the restrict phase (``None`` uses ``ANDREY_SEED``).
+    a stochastic ``indep_test`` in the restrict phase (``None`` uses ``ANDREY_SEED``). ``max_depth``
+    caps the restrict phase's conditioning sets and ``max_parents`` each node's parents in the
+    maximize phase.
     """
     candidates = candidate_graph(
-        X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical, seed=seed
+        X,
+        restrict,
+        alpha=alpha,
+        indep_test=indep_test,
+        categorical=categorical,
+        seed=seed,
+        max_depth=max_depth,
     )
     limits = restricted(constraints, candidates)
     if maximize == "hc":
@@ -190,6 +219,7 @@ def rsmax2(
             max_iter=max_iter,
             categorical=categorical,
             constraints=limits,
+            max_parents=max_parents,
         )
     else:
         cpdag, score = tabu(
@@ -201,5 +231,6 @@ def rsmax2(
             max_tabu=max_tabu,
             max_iter=max_iter,
             constraints=limits,
+            max_parents=max_parents,
         )
     return cpdag, score, candidates

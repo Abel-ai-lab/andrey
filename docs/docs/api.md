@@ -100,13 +100,20 @@ For the time-series methods, an edge `(cause, effect, lag)` is the link from `ca
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: max_depth
-`pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the maximum conditioning-set size of their
-conditional-independence tests. `rcd`'s `max_explanatory_vars`, the most variables it regresses out
-together, is the same cap, with a default of 2.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, and `rcd` take `max_depth`, the maximum conditioning-set size of their
+conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2` cap their
+restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and `inter_iamb`
+stop growing at the cap.
+`rcd`'s cap is the most variables it regresses out together, with a default of 2, its paper's
+setting.
 
-% concept: max_extra_depth
-`lpcmci`'s `max_depth` counts only the neighbors a removal step conditions on beyond the parents
-of both ends, which every test includes.
+% concept: max_p_global
+`lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test takes
+beyond the default conditions, the parents of both ends, which every test includes. `lpcmci` caps
+all of its removal phases with it. `pcmciplus` splits its caps by phase: `max_depth` caps the
+lagged phase, whose sets hold no default conditions, and `max_p_global` caps the same-step
+skeleton and collider phases, whose sets add the lagged parents of both ends.
 
 % concept: collider_rule
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
@@ -120,8 +127,11 @@ takes `collider_rule` for its same-step colliders, with `"majority"`, its defaul
 `"conservative"`, and `"none"`, which reads the one separating set.
 
 % concept: max_parents
-`ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
-gives a node more than that many parents, and some graph reaches each node's count.
+`ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, and `rsmax2` take `max_parents`, a
+cap on every node's parents: no DAG the returned graph represents gives a node more than that
+many parents. `None`, the default, sets no cap. `hc`, `tabu`, and the score phase of `mmhc` and
+`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, and
+`exact_search` scores only the parent sets within it.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `boss`, `grasp`,
@@ -414,14 +424,15 @@ environment variables and the order in which the settings apply, and
 Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`. A warning
 never changes a result. Each distinct message warns once per process, at the line in your code that
 made the call; a `BoundaryWarning` warns once per method. A warning from a dependency keeps its own
-category, such as scikit-learn's `ConvergenceWarning` from `ica_lingam`.
+category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, raised again as a
+`SearchLimitWarning`.
 
 | Category | When |
 |---|---|
 | {py:class}`~andrey.ExperimentalWarning` | The first call of an experimental method. |
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
-| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
+| {py:class}`~andrey.SearchLimitWarning` | A fit stopped at its iteration cap, such as `max_iter`, rather than on its own stopping rule, or FastICA or LARS did not converge. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
 | {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |

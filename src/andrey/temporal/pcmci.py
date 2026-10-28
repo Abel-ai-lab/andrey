@@ -223,6 +223,7 @@ def pc1(
     pc_alpha: float,
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
@@ -231,7 +232,8 @@ def pc1(
     ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
     variable's :func:`~andrey.search.hc.tie_ranks`. Each round is one ``test`` call over all
     remaining candidates. With ``constraints``, a forbidden link is no candidate, and a required one
-    is never tested: it stays, with the strength of a partial correlation of ``1``.
+    is never tested: it stays, with the strength of a partial correlation of ``1``. With
+    ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
     """
     columns = np.array(
         [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
@@ -242,7 +244,7 @@ def pc1(
     tie = np.asarray(ranks, dtype=np.intp)[columns % n_vars] * (tau_max + 1) + columns // n_vars
     strength = np.full(len(columns), math.inf)
     p = 0
-    while len(columns) - 1 >= p:
+    while len(columns) - 1 >= p and (max_depth is None or p <= max_depth):
         y = np.full_like(columns, target)
         conditions = _strongest_others(columns, p)
         if constraints is None:
@@ -329,13 +331,14 @@ def pcmci(
     alpha_level: float = 0.05,
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
 
     With ``constraints``, background knowledge over lags ``0`` to ``tau_max``, PC1 and MCI test no
     forbidden or required link (:func:`pc1`, :func:`mci`): a forbidden link is not in the graph and
-    a required one is. Raises :class:`ValueError` when ``indep_test`` is not a key of
-    :data:`INDEP_TESTS`.
+    a required one is. ``max_depth`` caps PC1's conditioning sets. Raises :class:`ValueError`
+    when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
     """
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
@@ -343,7 +346,8 @@ def pcmci(
     ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         parents = tuple(
-            pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints) for j in range(n_vars)
+            pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)
+            for j in range(n_vars)
         )
         statistics, p_values = mci(test, n_vars, parents, tau_max, constraints)
     return PCMCIResult(

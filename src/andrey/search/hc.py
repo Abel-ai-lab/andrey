@@ -22,7 +22,7 @@ from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
-from andrey.core.warning_policy import SearchLimitWarning, warn_once
+from andrey.core.warning_policy import warn_search_limit
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
 # Moves are compared by ``delta / n_samples`` rounded to ``_KEY_DP`` decimal places; ``delta`` is
@@ -146,7 +146,9 @@ class MoveScanner:
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
     legal. ``None`` forbids none. ``required[v, u]`` marks edges ``u -> v`` no move removes or
     reverses; the caller starts from a DAG that has them. ``None`` requires none. ``ranks[u]`` is
-    column ``u``'s place in the tie-break order, :func:`tie_ranks` of the data.
+    column ``u``'s place in the tie-break order, :func:`tie_ranks` of the data. With
+    ``max_parents``, a node holding that many parents gains none: no add into it, and no reverse
+    that turns one of its out-edges into a parent; removes stay legal.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -163,6 +165,7 @@ class MoveScanner:
         ranks: np.ndarray,
         forbidden: np.ndarray | None = None,
         required: np.ndarray | None = None,
+        max_parents: int | None = None,
     ) -> None:
         self._delta = delta
         self._score = delta.score_obj
@@ -187,6 +190,7 @@ class MoveScanner:
         self._forbidden = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden
         # [v, u]: the edge u -> v is never removed, nor reversed.
         self._required = required
+        self._max_parents = max_parents
 
     def best(
         self,
@@ -214,6 +218,8 @@ class MoveScanner:
         rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
         if self._required is not None:
             rev[self._required[heads, tails]] = np.inf
+        if self._max_parents is not None:  # a reverse gives the tail a parent
+            rev[self._parent[tails].sum(axis=1) >= self._max_parents] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:
@@ -280,6 +286,8 @@ class MoveScanner:
             row[self._forbidden[v] & ~self._parent[v]] = np.inf  # forbidden adds; removes stay
             if self._required is not None:
                 row[self._required[v]] = np.inf  # required edges are never removed
+            if self._max_parents is not None and len(parents_of[v]) >= self._max_parents:
+                row[~self._parent[v]] = np.inf  # a full parent set takes no add; removes stay
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
@@ -402,14 +410,24 @@ def _bits(row: int) -> list[int]:
     return out
 
 
-def start_dag(d: int, constraints: Constraints | None) -> tuple[list[int], dict[int, list[int]]]:
-    """The bitset adjacency and sorted parent sets of the start DAG: the required edges, if any."""
+def start_dag(
+    d: int, constraints: Constraints | None, max_parents: int | None = None
+) -> tuple[list[int], dict[int, list[int]]]:
+    """The bitset adjacency and sorted parent sets of the start DAG: the required edges, if any.
+
+    Raises :class:`ValueError` when the required edges give a node more than ``max_parents``
+    parents.
+    """
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
     if constraints is not None:
         for u, v in zip(*np.nonzero(constraints.required)):
             adj_int[u] |= 1 << int(v)
             parents_of[int(v)].append(int(u))  # row-major: each parent list stays sorted
+    if max_parents is not None and any(len(pa) > max_parents for pa in parents_of.values()):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
     return adj_int, parents_of
 
 
@@ -443,6 +461,7 @@ def hc(
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    max_parents: int | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
@@ -485,6 +504,8 @@ def hc(
         one, and never adds a forbidden edge. The CPDAG is then narrowed by the knowledge
         (:func:`~andrey.core.knowledge.mpdag`). Under a mixed-data score, a required edge from a
         continuous into a categorical column raises ``ValueError``.
+    max_parents : int or None
+        Most parents of any node; no move gives a node more. ``None`` sets no cap.
 
     Returns
     -------
@@ -515,12 +536,17 @@ def hc(
         forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
     required = None if constraints is None else constraints.required.T
 
-    adj_int, parents_of = start_dag(d, constraints)
+    adj_int, parents_of = start_dag(d, constraints, max_parents)
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
         scanner = MoveScanner(
-            delta, d, ranks=tie_ranks(X, mask), forbidden=forbidden, required=required
+            delta,
+            d,
+            ranks=tie_ranks(X, mask),
+            forbidden=forbidden,
+            required=required,
+            max_parents=max_parents,
         )
         moves = 0
         while max_iter is None or moves < max_iter:
@@ -530,11 +556,7 @@ def hc(
             _apply_move(adj_int, parents_of, best[4])
             moves += 1
     if max_iter is not None and moves == max_iter:
-        warn_once(
-            f"hc stopped at its limit of max_iter={max_iter} moves; a longer search may find a "
-            "better graph, so raise max_iter",
-            SearchLimitWarning,
-        )
+        warn_search_limit("hc", "max_iter", max_iter, "moves")
 
     # Emit the discovered DAG as an unsigned endpoint-mark matrix (u -> v: TAIL at u, ARROW at v),
     # then reduce it to the CPDAG of its equivalence class.

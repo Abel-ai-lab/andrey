@@ -204,12 +204,17 @@ class _GSTNode:
 
         Descends into the first improving addition whose variable is an allowed predecessor (in
         ``prefix_set``), appending it to ``parents``; variables passed over are added to
-        ``excluded``, and a node grows from the tree's ``available`` variables outside it. When no
-        further addition is allowed, applies the shrink step and returns the higher-is-better local
-        score of the settled parent set.
+        ``excluded``, and a node grows from the tree's ``available`` variables outside it, unless
+        its parent set holds the tree's ``max_parents`` members. When no further addition is
+        allowed, applies the shrink step and returns the higher-is-better local score of the
+        settled parent set.
         """
         if self.branches is None:
-            self.grow([u for u in self.tree.available if u not in excluded], parents)
+            cap = self.tree.max_parents
+            if cap is not None and len(parents) >= cap:
+                self.branches = []
+            else:
+                self.grow([u for u in self.tree.available if u not in excluded], parents)
         branches = self.branches
         assert branches is not None  # grow() above always assigns a list
         for branch in branches:
@@ -237,6 +242,8 @@ class _GST:
     ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
     ``required`` parents are in every parent set: the root scores them, grow adds to them, and
     shrink never removes them. The caller keeps each required parent in ``prefix``.
+    ``max_parents`` caps every parent set, required parents included: a node whose set holds that
+    many members grows no branches (``None``: no cap).
     """
 
     __slots__ = (
@@ -247,6 +254,7 @@ class _GST:
         "root",
         "available",
         "required",
+        "max_parents",
     )
 
     def __init__(
@@ -258,6 +266,7 @@ class _GST:
         *,
         candidates: list[int] | None = None,
         required: list[int] | None = None,
+        max_parents: int | None = None,
     ) -> None:
         self.vertex = vertex
         self.score = score
@@ -266,6 +275,7 @@ class _GST:
             [i for i in range(n_features) if i != vertex] if candidates is None else candidates
         )
         self.required = [] if required is None else required
+        self.max_parents = max_parents
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
 
@@ -492,6 +502,7 @@ def grasp(
     depth: int = 3,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -522,6 +533,10 @@ def grasp(
         Seed for the private RNG that fixes the initial permutation and DFS shuffles.
     score_func : str
         Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
+    max_parents : int or None
+        Caps each node's parent set, required parents included: the grow step adds no parent to a
+        set that holds ``max_parents`` members. ``None`` sets no cap. With a cap, ``constraints``
+        may not require more than ``max_parents`` parents of a node (``ValueError``).
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; BDeu and the multinomial BIC read
         every column as categorical.
@@ -548,19 +563,39 @@ def grasp(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
+    if (
+        max_parents is not None
+        and constraints is not None
+        and (constraints.required.sum(axis=0) > max_parents).any()
+    ):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
     score, ranks = ranked_score(X, score_func, lambda_value, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     before = None
     if constraints is None:
-        gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
+        gsts = [
+            _GST(v, score, delta, n_features, max_parents=max_parents) for v in range(n_features)
+        ]
     else:
         ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
         before = ranked.precedence()
         gsts = []
         for v in range(n_features):
             candidates, required = parent_knowledge(ranked, v)
-            gsts.append(_GST(v, score, delta, n_features, candidates=candidates, required=required))
+            gsts.append(
+                _GST(
+                    v,
+                    score,
+                    delta,
+                    n_features,
+                    candidates=candidates,
+                    required=required,
+                    max_parents=max_parents,
+                )
+            )
 
     order = _Order(n_features, rng, gsts, before)
     prefix: set[int] = set()

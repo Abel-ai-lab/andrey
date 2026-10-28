@@ -192,7 +192,7 @@ def inputs(method: str, *, codes: bool) -> list:
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
 SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
-AT_CAP = {"calm": {"max_outer": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "warm_iter": 1}}
+AT_CAP = {"calm": {"max_outer": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
 def fit(method: str, *, codes: bool, **kwargs):

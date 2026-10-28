@@ -84,8 +84,12 @@ def varma_lingam(
         ``B0`` is the lag-0 weight matrix and ``Theta_j`` the fitted moving-average coefficients.
         Ignored when ``prune=True``.
     max_iter : int, default=100
-        Most iterations of the likelihood fit, at least ``1``. With ``criterion`` set, every fit
-        in the grid gets this limit.
+        Most iterations of the likelihood fit, at least ``1``. The optimizer's function evaluations
+        are limited to 150 per iteration; each iteration spends about one per parameter, so a fit
+        of more than about 150 parameters, such as ``order=(1, 1)`` on 8 variables, can use them up
+        first. With ``criterion`` set, every fit in the grid gets these limits. A fit that reaches
+        either without converging warns with :class:`~andrey.SearchLimitWarning`; raise
+        ``max_iter`` to let it run on.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
@@ -164,9 +168,10 @@ def varma_lingam(
     variables with 100 to 1,000 time steps, with ``order=(1, 1)`` and ``prune=True``, its median
     errors (missing and extra cross-links) stayed below the empty graph's from 300 time steps at
     every size; at 100 time steps they exceeded it from 10 variables on. It assumes linear effects
-    and non-Gaussian noise. The likelihood fit can stop before it converges, and gives no warning; a
-    larger ``max_iter`` does not prevent this. The result then depends on the versions of the
-    numerical libraries. Where the fit stops, even when it converges, also depends on the BLAS
+    and non-Gaussian noise. Besides stopping at ``max_iter``, which warns, the likelihood fit can
+    stop before it converges for another reason, such as a failed line search, and gives no
+    warning; a larger ``max_iter`` does not prevent this. The result then depends on the versions of
+    the numerical libraries. Where the fit stops, even when it converges, also depends on the BLAS
     kernels the CPU runs, so the same series can give a different graph on another type of CPU or in
     another environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid.
     The numbers are a reference, not a hard limit: they change with the data generator, the density,
@@ -349,6 +354,7 @@ def pcmci(
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
     indep_test: str = "student_t",
+    max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged causal links of one multivariate time series with PCMCI.
@@ -377,6 +383,12 @@ def pcmci(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test of the PC1
+        step, at least ``0``: round ``p`` of PC1 conditions on the ``p`` strongest other
+        candidates, and the rounds stop after ``p = max_depth``; ``None`` sets no limit. A smaller
+        cap runs fewer tests and can keep candidate parents that a larger conditioning set would
+        remove. The MCI step conditions on the selected parents of both ends, however many.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -514,6 +526,7 @@ def pcmci(
             alpha_level=alpha_level,
             indep_test=indep_test,
             constraints=constraints,
+            max_depth=max_depth,
         )
     return with_labels(_adapt_pcmci(result, rows_metadata(rows)), labels)
 
@@ -526,6 +539,8 @@ def pcmciplus(
     pc_alpha: float = 0.01,
     collider_rule: str = "majority",
     indep_test: str = "student_t",
+    max_depth: int | None = None,
+    max_p_global: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged and same-step causal links of one multivariate time series with PCMCI+.
@@ -559,6 +574,21 @@ def pcmciplus(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test of the lagged
+        skeleton (phase 1, PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no
+        limit. A smaller cap runs fewer tests and can keep lagged parents that a larger
+        conditioning set would remove. It does not cap the skeleton and collider phases, which
+        add the lagged parents of both ends to every conditioning set; ``max_p_global`` caps those.
+    max_p_global : int or None, default=None
+        The most conditions a test of the skeleton and collider phases takes beyond the default
+        conditions, at least ``0``: every such test conditions on the lagged parents of both ends,
+        the default conditions, and on a subset of at most ``max_p_global`` same-step neighbors;
+        the cap also bounds the subsets the collider vote reads. It is tigramite's name for this
+        cap, as in :func:`~andrey.lpcmci`. Unlike ``max_depth``, it does not count the default
+        conditions, so a test can condition on more than ``max_p_global`` values. ``None`` sets no
+        limit. The number of tests grows exponentially with the same-step links at one variable; a
+        cap bounds it and can keep links that a larger conditioning set would remove.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -713,6 +743,8 @@ def pcmciplus(
             collider_rule=collider_rule,
             indep_test=indep_test,
             constraints=constraints,
+            max_depth=max_depth,
+            max_p_global=max_p_global,
         )
     return with_labels(_adapt_pcmciplus(result, rows_metadata(rows)), labels)
 
@@ -725,7 +757,7 @@ def lpcmci(
     pc_alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
-    max_depth: int | None = None,
+    max_p_global: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a time-series partial ancestral graph that allows hidden common causes with LPCMCI.
@@ -756,12 +788,13 @@ def lpcmci(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
-    max_depth : int or None, default=None
-        The largest number of neighbors a removal step conditions on, at least ``0``, counted
-        beyond the default conditions, the parents of both ends, which every test includes; it
-        also bounds the subsets the majority vote reads. A test can therefore condition on more
-        than ``max_depth`` nodes, while the ``max_depth`` of :func:`~andrey.pc` and
-        :func:`~andrey.fci` counts the whole conditioning set. ``None`` sets no limit, as in the
+    max_p_global : int or None, default=None
+        The most conditions a test takes beyond the default conditions, at least ``0``: every test
+        of the removal phases conditions on the parents of both ends, the default conditions, and
+        on a searched subset of at most ``max_p_global`` neighbors; the cap also bounds the subsets
+        the majority vote reads. It is tigramite's name for this cap. Unlike ``max_depth`` on
+        :func:`~andrey.pc` or :func:`~andrey.pcmci`, it does not count the default conditions, so a
+        test can condition on more than ``max_p_global`` nodes. ``None`` sets no limit, as in the
         paper. The number of tests grows exponentially with the links at one node, so on many
         strongly related series an uncapped run may not finish. A cap bounds the number of tests,
         though a capped run can still take long, and can keep links that a larger conditioning set
@@ -929,7 +962,7 @@ def lpcmci(
             pc_alpha=pc_alpha,
             n_preliminary_iterations=n_preliminary_iterations,
             indep_test=indep_test,
-            max_depth=max_depth,
+            max_p_global=max_p_global,
             constraints=constraints,
         )
     return with_labels(_adapt_lpcmci(result, rows_metadata(rows)), labels)

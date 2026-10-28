@@ -336,7 +336,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 def rcd(
     data: npt.ArrayLike,
     *,
-    max_explanatory_vars: int = 2,
+    max_depth: int = 2,
     cor_alpha: float = 0.01,
     ind_alpha: float = 0.01,
     shapiro_alpha: float = 0.01,
@@ -353,9 +353,12 @@ def rcd(
     data : array-like of shape (n_samples, n_variables)
         Observations, one variable per column. A DataFrame's column names become the structure's
         ``labels``.
-    max_explanatory_vars : int, default=2
-        Most variables regressed out together when testing whether one variable is an ancestor of
-        another, at least 1. Larger values find more ancestors and take longer.
+    max_depth : int, default=2
+        The maximum conditioning-set size of an ancestor test, at least ``1``: the most variables
+        regressed out together when testing whether one variable is an ancestor of another. Larger
+        values find more ancestors and take longer. The default ``2`` is the setting of Maeda and
+        Shimizu's experiments [1]_, who advise a small value when there are fewer rows than
+        variables.
     cor_alpha : float, default=0.01
         Significance level of the Pearson correlation tests, in ``(0, 1)``.
     ind_alpha : float, default=0.01
@@ -413,7 +416,7 @@ def rcd(
     degree 2 with 10,000 rows, where the ladder ended when three fits of the next size ran out of
     the 28 GB, and at mean degree 4 with 10,000 rows, where the ladder ended when three fits of the
     next size ran past 1 h. The median fit took 45 s at 60 variables (mean degree 2, 2,000 rows).
-    The work grows with the number of variables and with ``max_explanatory_vars``. The numbers are a
+    The work grows with the number of variables and with ``max_depth``. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
@@ -442,7 +445,7 @@ def rcd(
     constraints = resolve(knowledge, X.shape[1], labels, method="rcd")
     model = fit_rcd(
         X,
-        max_explanatory_num=max_explanatory_vars,
+        max_explanatory_num=max_depth,
         cor_alpha=cor_alpha,
         ind_alpha=ind_alpha,
         shapiro_alpha=shapiro_alpha,

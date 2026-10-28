@@ -490,7 +490,7 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
-                "max_extra_depth.",
+                "max_p_global.",
                 "lpcmci",
             ),
             *_exempt(
@@ -507,58 +507,38 @@ _CONCEPTS = (
             ),
         ),
         deviations=(
-            *_absent(
-                "0.11.0",
-                "Its tests condition on growing sets; bnlearn exposes the cap as max.sx.",
-                "iamb",
-                "inter_iamb",
-                "mmpc",
-                "mmhc",
-                "rsmax2",
-            ),
-            *_absent(
-                "0.11.0",
-                "PCMCI's PC1 step and PCMCI+'s skeleton phase condition on growing sets.",
-                "pcmci",
-                "pcmciplus",
-            ),
             Deviation(
                 method="rcd",
-                name="max_explanatory_vars",
+                name="max_depth",
                 default=2,
-                fixed_in="0.11.0",
-                aliases=("max_explanatory_vars",),
-                fragment="regressed out together",
-                reason="The same cap under another name; the default 2 stays, for cost.",
+                fixed_in=None,
+                reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
+                "one when there are fewer rows than variables; the minimum is 1, since the "
+                "smallest ancestor test regresses one variable on another.",
             ),
         ),
     ),
     Concept(
-        key="max_extra_depth",
+        key="max_p_global",
         summary="The largest number of conditions beyond the default conditions every test "
-        "includes.",
+        "includes (tigramite's LPCMCI name).",
         param=_template(
-            "max_extra_depth",
+            "max_p_global",
             "int",
             None,
-            "The largest number of neighbors a removal step conditions on beyond the default "
-            "conditions, at least 0; null sets no limit.",
+            "The most conditions a test takes beyond the default conditions, at least 0; null sets "
+            "no limit.",
             nullable=True,
             minimum=0,
         ),
         fragment="beyond the default condition",
-        suitable=("lpcmci",),
-        others_exempt="Its tests include no default conditions to count beyond.",
-        deviations=(
-            Deviation(
-                method="lpcmci",
-                name="max_depth",
-                default=None,
-                fixed_in="0.11.0",
-                reason="max_depth means the whole conditioning set elsewhere; the name is new in "
-                "0.11.0, so no alias.",
-            ),
+        suitable=("lpcmci", "pcmciplus"),
+        exempt=_exempt(
+            "MCI conditions on the default conditions alone, one test per link; PC1 has none "
+            "(max_depth).",
+            "pcmci",
         ),
+        others_exempt="Its tests include no default conditions to count beyond.",
     ),
     Concept(
         key="max_parents",
@@ -590,17 +570,6 @@ _CONCEPTS = (
             *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
         ),
         deviations=(
-            *_absent(
-                "0.11.0",
-                "Adds parents move by move or enumerates parent sets.",
-                "hc",
-                "tabu",
-                "exact_search",
-                "boss",
-                "grasp",
-                "mmhc",
-                "rsmax2",
-            ),
             *_absent(
                 "0.12.0",
                 "A cap on the represented DAGs interacts with the forward phase's gate.",
@@ -651,18 +620,6 @@ _CONCEPTS = (
             "varma_lingam",
         ),
         others_exempt="No iterative loop that a cap stops early.",
-        deviations=(
-            *(
-                Deviation(method=m, observed="", fixed_in="0.11.0", reason="Stops silently.")
-                for m in (*_CONTINUOUS, "calm", "varma_lingam")
-            ),
-            Deviation(
-                method="ica_lingam",
-                observed="ConvergenceWarning",
-                fixed_in="0.11.0",
-                reason="scikit-learn's ConvergenceWarning, which is not an AndreyWarning.",
-            ),
-        ),
     ),
     Concept(
         key="tau_max",
