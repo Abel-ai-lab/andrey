@@ -6,8 +6,11 @@ method specs against live facade signatures. See :mod:`andrey.spec` for the gene
 
 from __future__ import annotations
 
+import math
+import reprlib
 from typing import Any, Literal
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, model_validator
 
 Family = Literal["constraint", "score", "permutation", "lingam", "temporal", "latent", "pairwise"]
@@ -109,6 +112,62 @@ class ParamSpec(Spec):
             return None
         return f"{self.name} must be {self.range_text()}, got {value}"
 
+    def check(
+        self, value: object, method: str, *, choices: tuple[str, ...] | None = None
+    ) -> object:
+        """Return ``value`` as the parameter's type; raise ``TypeError`` when it is another type and
+        ``ValueError`` when it is out of bounds, not a finite number, or not one of the choices.
+
+        Checks the type, the bounds, and the choices: an int is an ``int`` or a NumPy integer, not
+        a ``bool``; a float is any real number but ``NaN`` and infinity; a bool is ``True`` or
+        ``False``. ``None`` passes when the parameter is nullable. Column labels or positions,
+        which only the data can check, pass unchanged: a ``str_list``, a ``knowledge``, and a
+        ``str`` without choices. ``choices`` replaces the spec's choices when the accepted values
+        change at run time. The message names ``method``, the parameter, what it accepts
+        (:meth:`accepted`), and the value.
+        """
+        if choices is not None:
+            return self.model_copy(update={"choices": choices}).check(value, method)
+        if value is None and self.nullable:
+            return None
+        if self.type in ("str_list", "knowledge") or (self.type == "str" and not self.choices):
+            return value
+        typed = _typed(self.type, value)
+        message = f"{method}: {self.name} must be {self.accepted()}, got {reprlib.repr(value)}"
+        nonfinite = (
+            self.type == "float"
+            and isinstance(value, (float, np.floating))
+            and not math.isfinite(value)
+        )
+        if typed is None and not nonfinite:
+            raise TypeError(message)
+        numbers = typed if isinstance(typed, tuple) else (typed,)
+        if (
+            typed is None
+            or (self.choices is not None and typed not in self.choices)
+            or any(isinstance(x, (int, float)) and self.out_of_range(x) for x in numbers)
+        ):
+            raise ValueError(message)
+        return typed
+
+    def accepted(self) -> str:
+        """What the parameter accepts, in words: ``one of 'a', 'b'``, ``an int at least 1``."""
+        if self.choices:
+            text = "one of " + ", ".join(repr(c) for c in self.choices)
+        else:
+            bounded = self.minimum is not None or self.maximum is not None
+            kind = {
+                "int": "an int",
+                "float": "a number"
+                if self.minimum is not None and self.maximum is not None
+                else "a finite number",
+                "bool": "True or False",
+                "str": "a string",
+                "int_pair": "a pair of ints, each",
+            }[self.type]
+            text = f"{kind} {self.range_text()}" if bounded else kind.removesuffix(", each")
+        return f"{text}, or None" if self.nullable else text
+
     def range_text(self) -> str:
         """The bounds in words: ``in (0, 1)``, ``at least 0``, ``from 0 to 4294967295``."""
         low, high = _number(self.minimum), _number(self.maximum)
@@ -123,6 +182,27 @@ class ParamSpec(Spec):
         if self.maximum is not None:
             return f"below {high}" if self.exclusive_maximum else f"at most {high}"
         return "any value"
+
+
+def _typed(kind: ParamType, value: object) -> object:
+    """``value`` as a ``kind`` value (``int``, ``float``, ``bool``, ``str``, or a pair of ints), or
+    ``None`` when it is not one."""
+    if kind == "int_pair":
+        if not isinstance(value, (tuple, list)) or len(value) != 2:
+            return None
+        pair = tuple(_typed("int", x) for x in value)
+        return None if None in pair else pair
+    if kind == "bool":
+        return bool(value) if isinstance(value, (bool, np.bool_)) else None
+    if kind == "str":
+        return str(value) if isinstance(value, str) else None
+    if isinstance(value, (bool, np.bool_)):
+        return None
+    if kind == "int":
+        return int(value) if isinstance(value, (int, np.integer)) else None
+    if isinstance(value, (int, float, np.integer, np.floating)) and math.isfinite(value):
+        return float(value)
+    return None
 
 
 def _number(value: float | None) -> str:

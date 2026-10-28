@@ -529,13 +529,13 @@ def test_cdnod_output_contract():
 
 
 def test_fci_rejects_unknown_indep_test():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.fci(datagen.generate("gauss_5v"), indep_test="no_such_test")
 
 
 def test_cdnod_rejects_unknown_indep_test():
     x, c = datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v")
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.cdnod(x, c, indep_test="no_such_test")
 
 

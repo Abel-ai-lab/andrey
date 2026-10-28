@@ -90,7 +90,7 @@ def test_calm_is_deterministic() -> None:
 def test_calm_output_contract(tree_fit) -> None:
     assert isinstance(tree_fit.structure, GraphStructure)
     assert tree_fit.structure.kind == "dag"
-    assert tree_fit.metadata["algorithm"] == "CALM"
+    assert tree_fit.metadata["algorithm"] == "calm"
     assert tree_fit.metadata["seed"] == 0
     assert tree_fit.weighted_adjacency.shape == (5, 5)
 

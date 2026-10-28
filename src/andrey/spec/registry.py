@@ -306,6 +306,10 @@ _add(
             _MAX_CATEGORIES,
             ParamSpec(
                 name="dependence_threshold",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
                 type="float",
                 default=None,
                 doc="Runs the independent-change step, which orients edges between variables that "
@@ -608,6 +612,7 @@ _add(
             _EBIC_GAMMA,
             ParamSpec(
                 name="tabu_length",
+                minimum=1,
                 type="int",
                 default=10,
                 doc="Length of the tabu list: how many recently visited DAGs a move may not lead "
@@ -615,6 +620,7 @@ _add(
             ),
             ParamSpec(
                 name="max_tabu",
+                minimum=1,
                 type="int",
                 default=None,
                 doc="Non-improving moves allowed without a better DAG before the search stops, "
@@ -736,12 +742,16 @@ _CONTINUOUS_PATH_PARAMS = (
     ),
     ParamSpec(
         name="mcp_lambda",
+        minimum=0,
+        exclusive_minimum=True,
         type="float",
         default=0.4,
         doc="Penalty level of the path's first step, above 0. Used only with robust.",
     ),
     ParamSpec(
         name="mcp_delta",
+        minimum=0,
+        exclusive_minimum=True,
         type="float",
         default=0.2,
         doc="Weight magnitude above which the quasi-MCP stops growing, at the path's first step, "
@@ -749,6 +759,10 @@ _CONTINUOUS_PATH_PARAMS = (
     ),
     ParamSpec(
         name="mcp_decay",
+        minimum=0,
+        maximum=1,
+        exclusive_minimum=True,
+        exclusive_maximum=True,
         type="float",
         default=0.8,
         doc="Factor in (0, 1) by which mcp_lambda and mcp_delta shrink after each accepted step. "
@@ -756,6 +770,7 @@ _CONTINUOUS_PATH_PARAMS = (
     ),
     ParamSpec(
         name="max_path",
+        minimum=1,
         type="int",
         default=50,
         doc="Most accepted steps of the path, at least 1. Used only with robust.",
@@ -801,12 +816,16 @@ _add(
             ),
             ParamSpec(
                 name="h_tol",
+                minimum=0,
+                exclusive_minimum=True,
                 type="float",
                 default=1e-8,
                 doc="The fit stops when the acyclicity function falls to this value, above 0.",
             ),
             ParamSpec(
                 name="rho_max",
+                minimum=0,
+                exclusive_minimum=True,
                 type="float",
                 default=1e16,
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
@@ -850,12 +869,14 @@ _add(
             ),
             ParamSpec(
                 name="stages",
+                minimum=1,
                 type="int",
                 default=5,
                 doc="Stages of the central path, at least 1 (T in the paper).",
             ),
             ParamSpec(
                 name="warm_iter",
+                minimum=1,
                 type="int",
                 default=30000,
                 doc="Most Adam steps of each stage but the last, at least 1.",
@@ -866,7 +887,14 @@ _add(
                 doc="Most Adam steps of the last stage, at least 1.",
                 nullable=False,
             ),
-            ParamSpec(name="lr", type="float", default=3e-4, doc="Step size of Adam, above 0."),
+            ParamSpec(
+                name="lr",
+                type="float",
+                default=3e-4,
+                doc="Step size of Adam, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
             *_CONTINUOUS_PATH_PARAMS,
         ),
         references=(
@@ -989,6 +1017,7 @@ _add(
             _HYBRID_MAX_ITER,
             ParamSpec(
                 name="tabu_length",
+                minimum=1,
                 type="int",
                 default=10,
                 doc="With maximize=tabu, the number of most recently visited DAGs a move may not "
@@ -996,6 +1025,7 @@ _add(
             ),
             ParamSpec(
                 name="max_tabu",
+                minimum=1,
                 type="int",
                 default=None,
                 doc="With maximize=tabu, the non-improving moves allowed without a better DAG, "
@@ -1095,6 +1125,7 @@ _add(
             _EBIC_GAMMA,
             ParamSpec(
                 name="depth",
+                minimum=1,
                 type="int",
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
@@ -1249,6 +1280,7 @@ _add(
         params=(
             ParamSpec(
                 name="order",
+                minimum=0,
                 type="int_pair",
                 default=(1, 1),
                 doc="(p, q): autoregressive and moving-average lag counts.",
@@ -1517,6 +1549,7 @@ _add(
             ),
             ParamSpec(
                 name="n_preliminary_iterations",
+                minimum=0,
                 type="int",
                 default=1,
                 doc="Preliminary rounds before the final one; each passes the parents it found "
@@ -1584,6 +1617,7 @@ _add(
             ),
             ParamSpec(
                 name="cv",
+                minimum=2,
                 type="int",
                 default=5,
                 doc="Cross-validation folds that choose each regression's lasso penalty, at "
@@ -1765,6 +1799,10 @@ _add(
             ),
             ParamSpec(
                 name="cor_alpha",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
                 type="float",
                 default=0.01,
                 doc="Significance level of the Pearson correlation tests.",
@@ -1782,6 +1820,10 @@ _add(
             ),
             ParamSpec(
                 name="shapiro_alpha",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
                 type="float",
                 default=0.01,
                 doc="Significance level of the Shapiro-Wilk non-Gaussianity tests.",

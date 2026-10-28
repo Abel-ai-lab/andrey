@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve_lagged
 
@@ -24,11 +25,9 @@ from ._adapt import (
     copies_named,
     data_matrix,
     int_in_range,
-    open_unit_interval,
     shared_labels,
     with_labels,
 )
-from ._boundary import warn_past_boundary
 from ._temporal import (
     _adapt_granger,
     _adapt_longitudinal_lingam,
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+@method_spec("varma_lingam")
 def varma_lingam(
     data: npt.ArrayLike,
     *,
@@ -111,19 +111,19 @@ def varma_lingam(
         ``k``, lag 0 being instantaneous; ``structure.lag_weights_ma[k]`` holds the moving-average
         weights at lag ``k + 1``, in the same orientation. The lag graphs follow the
         autoregressive weights. ``ordering`` is the instantaneous causal order, and
-        ``metadata["algorithm"]`` is ``"varmalingam"``.
+        ``metadata["algorithm"]`` is ``"varma_lingam"``.
 
     Raises
     ------
     TypeError
-        If ``order`` is not a pair of ints, ``max_iter`` is not an int, or ``knowledge`` is
-        neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
-        holds a negative count or is ``(0, 0)``, if ``max_iter`` is below 1, or if ``data`` has
-        fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks, contradicts
-        itself, requires a link without a lag or beyond ``order[0]``, forbids a lagged link while
-        ``prune=False``, or requires a link at a lag beyond the ``p`` that ``criterion`` selected.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``order`` is
+        ``(0, 0)``, or if ``data`` has fewer than 2 columns. Also if ``knowledge`` names a column
+        ``data`` lacks, contradicts itself, requires a link without a lag or beyond ``order[0]``,
+        forbids a lagged link while ``prune=False``, or requires a link at a lag beyond the ``p``
+        that ``criterion`` selected.
 
     Notes
     -----
@@ -192,15 +192,10 @@ def varma_lingam(
     X = data_matrix(data, method="varma_lingam", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
-    if not isinstance(order, (tuple, list)) or len(order) != 2:
-        raise TypeError(f"order must be a (p, q) pair of ints, got {order!r}")
-    order = (int_in_range(order[0], "order[0]", 0), int_in_range(order[1], "order[1]", 0))
-    if order == (0, 0):
-        raise ValueError("order must have p or q above 0, got (0, 0)")
-    max_iter = int_in_range(max_iter, "max_iter", 1)
+    if tuple(order) == (0, 0):
+        raise ValueError("varma_lingam: order must have p or q above 0, got (0, 0)")
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, order[0], method="varma_lingam")
-    warn_past_boundary("varma_lingam", X.shape)
     causal_order, psis, omegas = _native(
         X,
         order=order,
@@ -215,6 +210,7 @@ def varma_lingam(
     return with_labels(_adapt_varma_lingam(model), labels)
 
 
+@method_spec("longitudinal_lingam")
 def longitudinal_lingam(
     data_list: Sequence[npt.ArrayLike],
     *,
@@ -268,19 +264,18 @@ def longitudinal_lingam(
         Lagged weights are not pruned, so every lagged graph links every pair of variables,
         self-loops included; judge lagged effects by weight size. ``metadata["causal_orders"]``
         holds one causal order per time point, the first one empty; they need not agree, so
-        ``ordering`` is ``None``. ``metadata["algorithm"]`` is ``"longitudinallingam"``.
+        ``ordering`` is ``None``. ``metadata["algorithm"]`` is ``"longitudinal_lingam"``.
 
     Raises
     ------
-    NotImplementedError
-        If ``measure`` is not ``"pwling"``.
     TypeError
-        If ``n_lags`` is not an int, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
-        the per-time arrays differ in shape, or if the DataFrames' column names differ. Also if
-        ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``data_list`` has fewer than two time points, if ``n_lags`` is at least the number of time
+        points, if the per-time arrays differ in shape, or if the DataFrames' column names differ.
+        Also if ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
         without a lag or beyond ``n_lags``.
 
     Notes
@@ -342,6 +337,7 @@ def longitudinal_lingam(
     return with_labels(_adapt_longitudinal_lingam(model), labels)
 
 
+@method_spec("pcmci")
 def pcmci(
     data: npt.ArrayLike,
     *,
@@ -405,17 +401,16 @@ def pcmci(
     Raises
     ------
     TypeError
-        If ``tau_max`` is not an int, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, if
-        ``indep_test`` is neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is not a usable
-        2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the length at which
-        every test keeps a degree of freedom. Also if a variable repeats another up to scale and
-        shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
-        message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks, contradicts
-        itself, or requires a link without a lag or outside lags ``1`` to ``tau_max``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the
+        length at which every test keeps a degree of freedom. Also if a variable repeats another up
+        to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, before any test
+        runs; one message names every group of copies, a lagged value as ``'x' at lag k``, and says
+        to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks,
+        contradicts itself, or requires a link without a lag or outside lags ``1`` to ``tau_max``.
 
     Notes
     -----
@@ -491,9 +486,6 @@ def pcmci(
     from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmci import pcmci as _native
 
-    tau_max = int_in_range(tau_max, "tau_max", 1)
-    pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
-    alpha_level = open_unit_interval(alpha_level, "alpha_level")
     X = data_matrix(data, method="pcmci", missing=True)
     # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
@@ -522,6 +514,7 @@ def pcmci(
     return with_labels(_adapt_pcmci(result, rows_metadata(rows)), labels)
 
 
+@method_spec("pcmciplus")
 def pcmciplus(
     data: npt.ArrayLike,
     *,
@@ -605,18 +598,17 @@ def pcmciplus(
     Raises
     ------
     TypeError
-        If ``tau_max`` is not an int, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``tau_max`` is below 1, if ``pc_alpha`` is not in ``(0, 1)``, if ``collider_rule`` or
-        ``indep_test`` is not one of its choices, or if ``data`` is not a usable 2-D matrix with
-        at least ``2 * tau_max * (n_variables + 1) + n_variables + 1`` rows, the length at which
-        every test keeps a degree of freedom. Also if a variable repeats another up to scale and
-        shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
-        message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks, contradicts
-        itself, requires a link without a lag or beyond ``tau_max``, or directs same-step links
-        into a directed cycle over the links the skeleton phase kept.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + n_variables + 1``
+        rows, the length at which every test keeps a degree of freedom. Also if a variable repeats
+        another up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, before
+        any test runs; one message names every group of copies, a lagged value as ``'x' at lag k``,
+        and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks,
+        contradicts itself, requires a link without a lag or beyond ``tau_max``, or directs
+        same-step links into a directed cycle over the links the skeleton phase kept.
 
     Notes
     -----
@@ -695,8 +687,6 @@ def pcmciplus(
     from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmciplus import pcmciplus as _native
 
-    tau_max = int_in_range(tau_max, "tau_max", 1)
-    pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
     X = data_matrix(data, method="pcmciplus", missing=True)
     # A test conditions on up to 2 * n * tau_max + n - 2 columns of the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
@@ -723,6 +713,7 @@ def pcmciplus(
     return with_labels(_adapt_pcmciplus(result, rows_metadata(rows)), labels)
 
 
+@method_spec("lpcmci")
 def lpcmci(
     data: npt.ArrayLike,
     *,
@@ -811,18 +802,16 @@ def lpcmci(
     Raises
     ------
     TypeError
-        If ``tau_max``, ``n_preliminary_iterations``, or a given ``max_depth`` is not an int, or
-        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``tau_max`` is below 1, ``n_preliminary_iterations`` or a given ``max_depth`` below 0,
-        ``pc_alpha`` not in ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or
-        if ``data`` is not a usable 2-D matrix with at least
-        ``n_variables * (tau_max + 1) + 2 * tau_max + 1`` rows, the length at which every test
-        keeps a degree of freedom. Also if a variable repeats another up to scale and shift, at the
-        same step or up to ``2 * tau_max`` steps apart, before any test runs; one message names
-        every group of copies, a lagged value as ``'x' at lag k``, and says to keep one column per
-        group. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires
-        a link without a lag or beyond ``tau_max``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
+        rows, the length at which every test keeps a degree of freedom. Also if a variable repeats
+        another up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, before
+        any test runs; one message names every group of copies, a lagged value as ``'x' at lag k``,
+        and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks,
+        contradicts itself, or requires a link without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -915,10 +904,6 @@ def lpcmci(
     from andrey.temporal.lpcmci import lpcmci as _native
     from andrey.temporal.pcmci import design_column_name
 
-    tau_max = int_in_range(tau_max, "tau_max", 1)
-    n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
-    pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
-    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     X = data_matrix(data, method="lpcmci", missing=True)
     # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
     # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
@@ -930,7 +915,6 @@ def lpcmci(
         )
     labels = column_labels(data)
     constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
-    warn_past_boundary("lpcmci", X.shape)
     with (
         copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
         rows_tested() as rows,
@@ -947,6 +931,7 @@ def lpcmci(
     return with_labels(_adapt_lpcmci(result, rows_metadata(rows)), labels)
 
 
+@method_spec("granger")
 def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:
     """Learn the lagged causal graph of a multivariate time series by lasso Granger causality.
 
@@ -976,12 +961,11 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
 
     Raises
     ------
-    TypeError
-        If ``maxlag`` or ``cv`` is not an int.
     ValueError
-        If ``maxlag`` is less than 1, if ``cv`` is less than 2, if ``data`` has fewer than
-        ``maxlag + cv`` rows, so that some fold would hold no time step, or if ``data`` has fewer
-        than 2 columns.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than ``maxlag + cv`` rows, so that some fold would hold no time step, or if ``data``
+        has fewer than 2 columns.
 
     Notes
     -----
@@ -1036,8 +1020,6 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     """
     from andrey.temporal.granger import granger_lasso
 
-    maxlag = int_in_range(maxlag, "maxlag", 1)
-    cv = int_in_range(cv, "cv", 2)
     # LassoCV needs a time step in every fold.
     X = data_matrix(data, min_rows=maxlag + cv, method="granger", fix=FILL_STEPS)
     if X.shape[1] < 2:

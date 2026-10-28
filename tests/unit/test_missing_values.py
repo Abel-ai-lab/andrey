@@ -534,7 +534,7 @@ def test_the_cli_reads_na_and_na_with_a_slash_as_missing_values(tmp_path, capsys
     path.write_text("\n".join(rows) + "\n")  # no header: the first row may hold a missing value
     code = main(["run", "pc", "--data", str(path), "--json"])
     out = json.loads(capsys.readouterr().out)
-    assert code == 0 and out["metadata"] == andrey.pc(gappy).metadata | {"algorithm": "PC"}
+    assert code == 0 and out["metadata"] == andrey.pc(gappy).metadata
 
 
 def test_the_cli_reports_a_refusal_as_a_data_error(tmp_path, capsys):

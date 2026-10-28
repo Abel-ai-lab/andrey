@@ -89,7 +89,7 @@ def test_column_order_keeps_the_collider_visited_first():
 def test_an_unknown_collider_order_is_rejected(method):
     x = np.random.default_rng(0).standard_normal((40, 2))
     args = (x, np.repeat([0.0, 1.0], 20)) if method == "cdnod" else (x,)
-    with pytest.raises(ValueError, match="collider_order must be 'p_value' or 'column'"):
+    with pytest.raises(ValueError, match="collider_order must be one of 'p_value', 'column'"):
         getattr(andrey, method)(*args, collider_order="first")
 
 
