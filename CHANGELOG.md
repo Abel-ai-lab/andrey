@@ -86,6 +86,12 @@ change names its pull request.
   give a node more is skipped. `gfci` caps its GES phase; the PAG its tests then orient can put more
   arrowheads at a node. Required edges of `knowledge` above the cap raise `ValueError`. The default,
   `None`, sets no cap and returns the graphs these methods returned before. ([#516])
+- `gies` and `xges` take every score the other score searches take, `"bdeu"` and `"discrete_bic"`
+  for categorical data and `"cond_gauss"` and `"degen_gauss"` for mixed data besides `"bic"`, with
+  `categorical` and `max_categories`, and `score_func=None` picks from the declared column types as
+  in the other score searches; `gies` scores each variable on the rows without an intervention on
+  it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
+  data. ([#520])
 - `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
   knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
   others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
@@ -1047,3 +1053,4 @@ First alpha release.
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
 [#516]: https://github.com/Abel-ai-lab/andrey/pull/516
+[#520]: https://github.com/Abel-ai-lab/andrey/pull/520
