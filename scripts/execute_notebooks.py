@@ -25,6 +25,7 @@ SKIPPED = {"calm.ipynb", "speed_on_your_machine.ipynb"}
 TIMEOUT = 600
 ADDRESS = re.compile(r"0x[0-9a-f]+")
 DECIMAL = re.compile(r"-?\d+\.\d+")
+CPU_TAG = "output-varies-by-cpu"
 
 
 def notebooks() -> list[Path]:
@@ -49,11 +50,12 @@ def execute(path: Path) -> nbformat.NotebookNode:
 def outputs(notebook: nbformat.NotebookNode) -> list[str]:
     """Return each code cell's outputs as text lines, for comparing two runs.
 
-    An object's memory address changes from run to run, so it reads ``0x...``.
+    An object's memory address changes from run to run, so it reads ``0x...``. A cell tagged
+    ``output-varies-by-cpu`` has no lines.
     """
     lines = []
     for index, cell in enumerate(notebook.cells):
-        if cell.cell_type != "code":
+        if cell.cell_type != "code" or CPU_TAG in cell.metadata.get("tags", []):
             continue
         for output in cell.get("outputs", []):
             kind = output.get("name") or output["output_type"]
@@ -80,6 +82,14 @@ def close(stored: str, fresh: str) -> bool:
     return True
 
 
+def differences(stored: nbformat.NotebookNode, fresh: nbformat.NotebookNode) -> list[str]:
+    """Return a unified diff of the outputs of two runs of a notebook, empty when they match."""
+    before, after = outputs(stored), outputs(fresh)
+    if len(before) == len(after) and all(map(close, before, after)):
+        return []
+    return list(difflib.unified_diff(before, after, "stored", "fresh", lineterm=""))
+
+
 def main() -> int:
     """Store the outputs, or with ``--check`` compare them; return the exit status."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -92,13 +102,10 @@ def main() -> int:
             nbformat.write(fresh, path)
             print(f"wrote {path.relative_to(ROOT)}")
             continue
-        stored = outputs(nbformat.read(path, as_version=4))
-        renewed = outputs(fresh)
-        if len(stored) == len(renewed) and all(map(close, stored, renewed)):
-            continue
-        stale.append(path.name)
-        diff = difflib.unified_diff(stored, renewed, "stored", "fresh", lineterm="")
-        print("\n".join(list(diff)[:80]))
+        diff = differences(nbformat.read(path, as_version=4), fresh)
+        if diff:
+            stale.append(path.name)
+            print("\n".join(diff[:80]))
     if stale:
         print(f"Outputs differ in {', '.join(stale)}; run scripts/execute_notebooks.py.")
     return 1 if stale else 0
