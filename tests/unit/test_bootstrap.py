@@ -347,7 +347,7 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
     assert out.metadata["block_length"] == 20
     assert out.frequency("->", lag=1).shape == (3, 3)
     assert {row["lag"] for row in out.table()} == {1}
-    default = bootstrap("granger", series(), n_boot=2, seed=0, maxlag=1)
+    default = bootstrap("granger", series(), n_boot=2, seed=0, tau_max=1)
     assert default.metadata["block_length"] == 7  # ceil(300 ** (1 / 3))
     with pytest.raises(ValueError, match="lag is for a time-series result"):
         bootstrap("pc", lingam_data(), n_boot=2).frequency("->", lag=1)

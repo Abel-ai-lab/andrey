@@ -142,7 +142,7 @@ FITS: dict[str, Fit] = {
     "LongitudinalLiNGAM": Fit(
         lambda x: andrey.longitudinal_lingam(list(x), **qg.AndreyLongitudinalLiNGAM().params())
     ),
-    "Granger": Fit(lambda x: andrey.granger(x, maxlag=qg.GRANGER_LAGS, cv=5)),
+    "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS, cv=5)),
 }
 
 #: The methods that run on ``andrey.config(num_workers=...)``: GES, GFCI's GES phase, and the

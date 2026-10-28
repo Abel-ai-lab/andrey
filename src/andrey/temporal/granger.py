@@ -29,6 +29,7 @@ from sklearn.model_selection import KFold
 from threadpoolctl import ThreadpoolController
 
 from andrey.core import backend
+from andrey.core.units import least_squares
 
 #: ``LassoCV`` defaults: penalties per grid, and the smallest penalty as a fraction of the largest.
 _N_ALPHAS = 100
@@ -109,7 +110,46 @@ def _fit_target(
     return Lasso(alpha=alphas[best], precompute=False).fit(design, y).coef_
 
 
-def granger_lasso(data: np.ndarray, *, maxlag: int = 2, cv: int = 5) -> np.ndarray:
+def _fit_known(
+    design: np.ndarray, y: np.ndarray, cv: int, drop: np.ndarray, force: np.ndarray
+) -> np.ndarray:
+    """One target's coefficients when knowledge removes the ``drop`` columns and requires ``force``.
+
+    The ``force`` columns are partialed out of ``y`` and of every free column by least squares
+    (:func:`~andrey.core.units.least_squares`, with an intercept), so the lasso never penalizes
+    them; the cross-validated lasso runs on the free columns' residuals with their own Gram
+    matrices, and one least-squares fit of what the free columns leave of ``y`` on the ``force``
+    columns gives their coefficients. A ``drop`` column has coefficient 0.
+    """
+    free = ~drop & ~force
+    coefs = np.zeros(design.shape[1], dtype=np.float64)
+    if not free.any() and not force.any():
+        return coefs
+    x = design[:, free]
+    if force.any():
+        forced = design[:, force]
+        coef, intercept = least_squares(forced, np.column_stack([y, x]))
+        residuals = np.column_stack([y, x]) - (forced @ coef.T + intercept)
+        y_free, x = residuals[:, 0], residuals[:, 1:]
+    else:
+        y_free = y
+    if free.any():
+        folds = [_fold(x, train, test) for train, test in KFold(cv).split(x)]
+        coefs[free] = _fit_target(x, np.average(x, axis=0), folds, np.ascontiguousarray(y_free))
+    if force.any():
+        left = y - design[:, free] @ coefs[free]
+        coefs[force] = least_squares(design[:, force], left)[0]
+    return coefs
+
+
+def granger_lasso(
+    data: np.ndarray,
+    *,
+    maxlag: int = 2,
+    cv: int = 5,
+    forbidden: np.ndarray | None = None,
+    required: np.ndarray | None = None,
+) -> np.ndarray:
     """Fit the lasso VAR and return the Granger lag-coefficient matrix.
 
     ``data`` is a ``(n_samples, d)`` time series (row = time step). Returns ``coeff`` of shape
@@ -117,6 +157,11 @@ def granger_lasso(data: np.ndarray, *, maxlag: int = 2, cv: int = 5) -> np.ndarr
     ``k + 1`` on variable ``i``; ``coeff != 0`` is the directed lag adjacency. Each target row is an
     independent ``cv``-fold cross-validated lasso regression on the stacked lagged design, equal to
     ``LassoCV(cv=cv)``. The rows are fitted on up to ``backend.worker_count()`` threads.
+
+    With background knowledge, ``forbidden[k, j, i]`` leaves the lag-``k + 1`` regressor ``j`` out
+    of target ``i``'s regression, and ``required[k, j, i]`` keeps it unpenalized
+    (:func:`_fit_known`); both are boolean arrays of shape ``(maxlag, d, d)``. A target that
+    knowledge leaves alone is fitted as without knowledge.
     """
     data = np.asarray(data, dtype=np.float64)
     n_samples, d = data.shape
@@ -125,9 +170,15 @@ def granger_lasso(data: np.ndarray, *, maxlag: int = 2, cv: int = 5) -> np.ndarr
     design.setflags(write=False)
     column_mean = np.average(design, axis=0)
     folds = [_fold(design, train, test) for train, test in KFold(cv).split(design)]
+    # Column (k - 1) * d + j of the design is variable j at lag k, so [:, :, i] flattens to it.
+    drop = np.zeros((d, d * maxlag), dtype=bool) if forbidden is None else _by_target(forbidden)
+    force = np.zeros((d, d * maxlag), dtype=bool) if required is None else _by_target(required)
 
     def fit(i: int) -> np.ndarray:
-        return _fit_target(design, column_mean, folds, np.ascontiguousarray(targets[:, i]))
+        y = np.ascontiguousarray(targets[:, i])
+        if drop[i].any() or force[i].any():
+            return _fit_known(design, y, cv, drop[i], force[i])
+        return _fit_target(design, column_mean, folds, y)
 
     workers = min(backend.worker_count(), d)
     if workers <= 1:
@@ -136,3 +187,10 @@ def granger_lasso(data: np.ndarray, *, maxlag: int = 2, cv: int = 5) -> np.ndarr
         with _blas().limit(limits=1), ThreadPoolExecutor(max_workers=workers) as pool:
             rows = list(pool.map(fit, range(d)))
     return np.asarray(rows, dtype=np.float64).reshape(d, d * maxlag)
+
+
+def _by_target(links: np.ndarray) -> np.ndarray:
+    """``links[k, j, i]`` (lag ``k + 1``, cause ``j``, effect ``i``) as one row per effect ``i`` of
+    design columns ``k * d + j``."""
+    lags, d, _ = links.shape
+    return np.asarray(links, dtype=bool).transpose(2, 0, 1).reshape(d, lags * d)
