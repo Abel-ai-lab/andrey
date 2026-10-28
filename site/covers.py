@@ -19,6 +19,7 @@ COVERS = {
     "harmonograph": "a harmonograph tracing a figure of cosine curves, one curve amber",
     "rocket": "a rocket climbing out of a bank of clouds, its engine flare amber",
     "ceiling": "a rocket reaching the curved edge of the sky, the edge amber and cracking",
+    "shelf": "a pantry shelf of mixed jars, cartons, and sacks, one jar amber",
     "ground": "the stipple ground",
 }
 
