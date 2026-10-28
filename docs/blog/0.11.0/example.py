@@ -46,8 +46,9 @@ print(f"units: {shd(andrey.pc(metric).structure, every_row.structure)} differenc
 known = andrey.Knowledge(tiers=[["age", "sex"], [c for c in data if c not in ("age", "sex")]])
 settings = dict(categorical=["sex"], indep_test="degen_gauss", knowledge=known)
 
-# How sure each edge is: 100 fits on resampled rows.
-boot = andrey.bootstrap("pc", data, n_boot=100, seed=0, **settings)
+# How sure each edge is: 100 fits on resampled rows, four at a time.
+with andrey.config(num_workers=4):
+    boot = andrey.bootstrap("pc", data, n_boot=100, seed=0, **settings)
 print("edges in at least half the fits:")
 MARK = {"directed": "->", "undirected": "--"}
 for edge in boot.table(min_frequency=0.5):
