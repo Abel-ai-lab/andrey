@@ -167,9 +167,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values=f"integer from 0 to {SEED_MAX} (2**32 - 1)",
         default="0",
         effect=(
-            "Global default seed for every stochastic method (BOSS, GRaSP, ICA-LiNGAM, CALM). An "
-            "explicit `seed=` / `random_state=` overrides it. Deterministic methods (PC, GES, FCI, "
-            "DirectLiNGAM, ...) ignore it."
+            "Global default seed for every method that draws random numbers (BOSS, GRaSP, "
+            "ICA-LiNGAM, CALM, and the searches that test independence, with the rcot, cmiknn, and "
+            "gpdc tests). An explicit `seed=` overrides it. Deterministic methods (GES, "
+            "DirectLiNGAM, ...) and the other tests ignore it."
         ),
         group="reproducibility",
     ),
@@ -213,7 +214,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
 PRECEDENCE: tuple[str, ...] = (
     "Backend: `with andrey.config(backend=...)` > `andrey.config.backend = ...` > "
     "`ANDREY_BACKEND`/`ANDREY_DEVICE` > default (`auto`).",
-    "Seed: explicit `seed=`/`random_state=` argument > `ANDREY_SEED` > `0`.",
+    "Seed: explicit `seed=` argument > `ANDREY_SEED` > `0`.",
     "Tie break: `with andrey.config(tie_break=...)` > `andrey.config.tie_break = ...` > "
     "`ANDREY_TIE_BREAK` > default (`rank`).",
     "GPU threshold: manual `ANDREY_*_GPU_THRESHOLD` > `ANDREY_GPU_CALIBRATE` measurement > "

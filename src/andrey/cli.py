@@ -776,6 +776,9 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
                 {"param": key, "message": f"{key} is a data input / reserved, not a param"}
             )
             return
+        if key in spec.dropped_args:  # the facade ignores it with a DeprecatedArgumentWarning
+            fkwargs[key] = value
+            return
         param = specs.get(key)
         if param is None and not spec.passthrough:
             errors.append(
@@ -806,7 +809,11 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             details=errors,
             next=[f"andrey run {spec.name} --help --json"],
         )
-    resolved = {k: (list(v) if isinstance(v, tuple) else v) for k, v in fkwargs.items()}
+    resolved = {
+        k: (list(v) if isinstance(v, tuple) else v)
+        for k, v in fkwargs.items()
+        if k not in spec.dropped_args
+    }
     return fkwargs, resolved
 
 
@@ -1001,10 +1008,9 @@ def execute_run(
         out = with_labels(out, labels)
 
     run = _run_info(positional, resolved, elapsed, caught)
-    if spec.seeded:  # report the *effective* seed (resolve_seed applies the ANDREY_SEED fallback)
-        from andrey.core.seeding import resolve_seed
-
-        run["seed"] = resolve_seed(resolved.get("seed", resolved.get("random_state")))
+    seed = (out[0] if isinstance(out, list) else out).metadata.get("seed")
+    if seed is not None:  # the effective seed: resolve_seed applied the ANDREY_SEED fallback
+        run["seed"] = seed
     env = envelope(spec, out, run)
     _emit(
         env,

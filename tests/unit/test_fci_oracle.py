@@ -43,7 +43,7 @@ def _oracle_fci(monkeypatch, n_obs, edges, selection=(), removed=None, data=None
 
     data = np.zeros((10, n_obs)) if data is None else data
 
-    def make_test(name, X, categorical=None):
+    def make_test(name, X, categorical=None, seed=None):
         """The d-separation test over ``X``, whose columns are ``data``'s in some order."""
         unused = list(range(n_obs))
         label = []

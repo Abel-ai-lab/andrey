@@ -519,7 +519,7 @@ class _Job:
     seed: int
     unit: str  # "rows", "blocks", "units" (one draw for every array), or "groups" (one each)
     block_length: int | None
-    seed_param: str | None  # the method's own seed, derived per resample
+    seeded: bool  # the method takes a seed, derived per resample
     backend: str
     tie_break: str
 
@@ -554,9 +554,9 @@ def _run_one(job: _Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
         data = _take(job.data, idx[0])
     aligned = {key: _take(x, idx[0]) for key, x in job.aligned.items()}
     kwargs = dict(job.kwargs)
-    if job.seed_param is not None and kwargs.get(job.seed_param) is None:
+    if job.seeded:
         sequence = np.random.SeedSequence(job.seed, spawn_key=(b, 1))
-        kwargs[job.seed_param] = int(sequence.generate_state(1)[0])
+        kwargs["seed"] = int(sequence.generate_state(1)[0])
     fit = getattr(api, job.name)
     try:
         with warnings.catch_warnings(record=True) as caught:
@@ -605,7 +605,8 @@ def _fit_all(job: _Job, n_boot: int, workers: int) -> list[tuple[Any, list]]:
         return [future.result() for future in futures]
     except BrokenProcessPool as exc:
         raise RuntimeError(
-            "a bootstrap worker died, most likely out of memory; rerun with num_workers=1"
+            "a bootstrap worker died, most likely out of memory; rerun with "
+            "andrey.config(num_workers=1)"
         ) from exc
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
@@ -623,7 +624,6 @@ def bootstrap(
     threshold: float = 0.5,
     block_length: int | None = None,
     keep_fits: bool = False,
-    num_workers: int | None = None,
     **method_kwargs: Any,
 ) -> BootstrapOutput | list[BootstrapOutput]:
     """Refit a method on bootstrap resamples; return each edge's frequency and an averaged graph.
@@ -647,9 +647,9 @@ def bootstrap(
         The number of resamples and fits.
     seed : int or None, default=None
         The seed of the resamples, a non-negative integer. ``None`` uses ``ANDREY_SEED``, or 0 when
-        it is unset. Resample ``b`` depends on ``seed`` and ``b`` alone. A method with its own
-        ``seed`` or ``random_state`` fits resample ``b`` with a seed derived from them, unless the
-        call gives ``random_state``.
+        it is unset. Resample ``b`` depends on ``seed`` and ``b`` alone. A method that takes a
+        ``seed`` fits resample ``b`` with a seed derived from this one and ``b``, so the method's
+        own ``seed`` cannot be set here.
     threshold : float, default=0.5
         The share of fits in which a pair must be adjacent to be in the averaged graph, in
         ``(0, 1]``.
@@ -660,11 +660,6 @@ def bootstrap(
         use a block of at least ten times the longest lag. Not for any other method.
     keep_fits : bool, default=False
         Keep every fit in the ``fits`` property.
-    num_workers : int or None, default=None
-        The number of worker processes that fit resamples. ``None`` follows
-        ``andrey.config.num_workers`` and ``ANDREY_NUM_WORKERS``; ``-1`` uses every usable core,
-        and ``0`` or ``1`` fits in this process. Each fit runs on one worker and one BLAS thread,
-        and the result is the same at any worker count.
     **method_kwargs
         The method's other arguments: its keyword parameters, and a row-aligned input such as
         ``domain_index=``.
@@ -700,8 +695,13 @@ def bootstrap(
     fit that raises stops the run, and its row numbers count the rows of the resample. The averaged
     graph can contain a directed cycle.
 
+    **Workers.** The fits run on the worker processes ``andrey.config.num_workers`` and
+    ``ANDREY_NUM_WORKERS`` set, as for every method: ``-1`` uses every usable core, and ``0`` or
+    ``1`` fits in this process. Each fit runs on one worker and one BLAS thread, and the result is
+    the same at any worker count.
+
     **Limitations.** Not benchmarked yet. Refitting is the cost: ``n_boot`` times the method's own,
-    shared across ``num_workers``. A moving block bootstrap weakens a link that spans a block
+    shared across the workers. A moving block bootstrap weakens a link that spans a block
     break and keeps the series' own order, so it understates what a very short series can show.
 
     References
@@ -739,7 +739,7 @@ def bootstrap(
     if root < 0:
         raise ValueError(f"seed must be a non-negative integer, got {root}")
     job = _job(spec, data, method_kwargs, block_length, root)
-    workers = min(_backend.worker_count(num_workers), n_boot)
+    workers = min(_backend.worker_count(None), n_boot)
     results = _fit_all(job, n_boot, workers)
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
@@ -805,9 +805,12 @@ def _job(
         if len(value) != sizes[0]:
             raise ValueError(f"{entry.name} has {len(value)} rows but data has {sizes[0]}")
         aligned[entry.name] = value
-    seed_param = None
-    if spec.seeded:
-        seed_param = "seed" if any(p.name == "seed" for p in spec.params) else "random_state"
+    for param in spec.params:
+        if param.concept == "seed" and set(param.aliases) & set(kwargs):
+            raise ValueError(
+                f"bootstrap derives each fit's seed from its own seed; {spec.name}'s "
+                f"{sorted(set(param.aliases) & set(kwargs))[0]} cannot be set"
+            )
     return _Job(
         name=spec.name,
         data=data,
@@ -816,7 +819,7 @@ def _job(
         seed=seed,
         unit=unit,
         block_length=block_length,
-        seed_param=seed_param,
+        seeded=spec.seeded,
         backend=_backend.config.backend,
         tie_break=_backend.config.tie_break,
     )

@@ -19,7 +19,7 @@ from andrey.search.hc import HC_SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 from andrey.search.tabu import TABU_SCORES
 
-from .concepts import CONCEPTS, SEED_MAX, concept_param
+from .concepts import CONCEPTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -97,16 +97,11 @@ _SEED = concept_param(
     "seed",
     doc="Seed for the search's random orders. null uses ANDREY_SEED, or 0 when it is unset.",
 )
-_RANDOM_STATE = ParamSpec(
-    name="random_state",
-    type="int",
-    default=None,
-    doc="Ignored: the pwling order search is deterministic. Accepted so that every LiNGAM method "
-    "takes random_state.",
-    nullable=True,
-    concept="seed",
+_TEST_SEED = concept_param(
+    "seed",
+    doc="Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc make; the "
+    "other tests ignore it. null uses ANDREY_SEED, or 0 when it is unset.",
 )
-
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 
 REGISTRY: dict[str, MethodSpec] = {}
@@ -135,7 +130,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -144,6 +139,7 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -151,6 +147,7 @@ _add(
             _COLLIDER_RULE,
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=(
             "Spirtes & Glymour 1991",
@@ -176,7 +173,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -185,6 +182,7 @@ _add(
             '`tie_break="position"` fires the orientation rules one at a time in column order, and '
             'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
         ),
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -192,6 +190,7 @@ _add(
             _CATEGORICAL,
             _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
+            _TEST_SEED,
         ),
         references=(
             "Spirtes, Meek & Richardson 1995",
@@ -217,7 +216,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -227,6 +226,7 @@ _add(
             'records the first separating subset found, and it or `possible_dsep="fast"` visits '
             "the possible-d-separation step in column order."
         ),
+        seeded=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -250,6 +250,7 @@ _add(
             _CATEGORICAL,
             _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
+            _TEST_SEED,
         ),
         references=(
             "Ogarrio, Spirtes & Ramsey 2016",
@@ -288,7 +289,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -297,6 +298,7 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -317,6 +319,7 @@ _add(
                 "null skips the step.",
                 nullable=True,
             ),
+            _TEST_SEED,
         ),
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
@@ -373,12 +376,13 @@ for _name, _summary, _key, _refs in (
                 graph_kind="cpdag",
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
-            determinism="deterministic",
+            determinism="stochastic",
             accel="numpy",
             status="experimental",
             column_order="relabels",
             tie_break=True,
-            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+            seeded=True,
+            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES, _TEST_SEED),
             references=_refs,
         )
     )
@@ -940,11 +944,12 @@ _add(
             doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
             "the phases",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -961,6 +966,7 @@ _add(
             _HYBRID_MAX_ITER,
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=("Tsamardinos, Brown & Aliferis 2006",),
     )
@@ -980,11 +986,12 @@ _add(
             doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
             "the phases",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
             ParamSpec(
                 name="restrict",
@@ -1034,6 +1041,7 @@ _add(
             ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=(
             "Friedman, Nachman & Pe'er 1999",
@@ -1156,8 +1164,8 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
+        dropped_args=("random_state",),
         params=(
-            _RANDOM_STATE,
             concept_param(
                 "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
@@ -1190,16 +1198,11 @@ _add(
         ),
         seeded=True,
         params=(
-            ParamSpec(
-                name="random_state",
-                type="int",
-                default=None,
-                doc="Seed for FastICA, from 0 to 2**32 - 1. null uses ANDREY_SEED, or 0 when it is "
+            concept_param(
+                "seed",
+                doc="Seed for FastICA's starting point. null uses ANDREY_SEED, or 0 when it is "
                 "unset.",
-                nullable=True,
-                minimum=0,
-                maximum=SEED_MAX,
-                concept="seed",
+                aliases=("random_state",),
             ),
             concept_param(
                 "max_iter",
@@ -1240,7 +1243,7 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        params=(_RANDOM_STATE,),
+        dropped_args=("random_state",),
         references=("Shimizu 2012",),
     )
 )

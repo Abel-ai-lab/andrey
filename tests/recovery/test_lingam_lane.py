@@ -117,25 +117,23 @@ def test_multi_group_rejects_non_2d_and_nonfinite_groups():
         andrey.multi_group_direct_lingam([good, nan])
 
 
-def test_ica_lingam_random_state_and_max_iter_accepted():
-    # random_state defaults to 0 (via resolve_seed) and is honored; max_iter is accepted. The
+def test_ica_lingam_seed_and_max_iter_accepted():
+    # seed defaults to 0 (via resolve_seed) and is honored; max_iter is accepted. The
     # returned B is the adaptive-Lasso adjacency on the ICA-derived order, so the output is
     # seed-robust on clean data by construction -- this asserts the plumbing (default == explicit-0,
     # reproducible) rather than a seed-dependent output that does not exist.
     X = datagen.generate("lingam_5v_uniform")
     default = andrey.ica_lingam(X)
-    explicit0 = andrey.ica_lingam(X, random_state=0)
+    explicit0 = andrey.ica_lingam(X, seed=0)
     assert list(default.ordering) == list(explicit0.ordering)
     np.testing.assert_array_equal(default.weighted_adjacency, explicit0.weighted_adjacency)
-    other = andrey.ica_lingam(X, random_state=123, max_iter=500)
-    assert list(andrey.ica_lingam(X, random_state=123, max_iter=500).ordering) == list(
-        other.ordering
-    )
+    other = andrey.ica_lingam(X, seed=123, max_iter=500)
+    assert list(andrey.ica_lingam(X, seed=123, max_iter=500).ordering) == list(other.ordering)
 
 
 def _ica_in_original_labels(X: np.ndarray, order: tuple[int, ...]) -> tuple[list[int], np.ndarray]:
     """Fit ``ica_lingam`` on the columns in ``order``; return its ordering and weights relabeled."""
-    out = andrey.ica_lingam(X[:, order], random_state=0)
+    out = andrey.ica_lingam(X[:, order], seed=0)
     weights = np.zeros_like(out.weighted_adjacency)
     weights[np.ix_(order, order)] = out.weighted_adjacency
     return [order[k] for k in out.ordering], weights

@@ -47,7 +47,8 @@ requested backend uses `auto`, without a warning.
   per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
   also use the worker processes for their skeleton search with the `fisherz`, `student_t`, and
   `rcot` tests, and send a conditioning-set size to them only when it has enough tests to repay
-  them; with `rcot` the p-values are the same with any number of workers. `1` (the
+  them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap` fits
+  its resamples on them, one fit per worker, with the same result at any number. `1` (the
   default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
   threads unlimited and with several limits each thread to one, so on a machine with several cores
   its p-values and statistics can differ in the last digits between one worker and several. Each
@@ -103,9 +104,10 @@ already running in the process, so a CPU fit never pays to start a GPU.
 
 ## Reproducibility
 
-- `ANDREY_SEED`: the seed of every stochastic method (BOSS, GRaSP, ICA-LiNGAM, CALM) when the call
-  gives no `seed=` or `random_state=`. The default is `0`; it takes any integer from `0` to
-  `2**32 - 1`. Deterministic methods ignore it.
+- `ANDREY_SEED`: the seed of every method that draws random numbers (BOSS, GRaSP, ICA-LiNGAM, CALM,
+  and the searches that test independence, with the `rcot`, `cmiknn`, and `gpdc` tests) when the
+  call gives no `seed=`. The default is `0`; it takes any integer from `0` to `2**32 - 1`. A call
+  that gives `seed=` does not depend on it. Deterministic methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from each column's own data, so reordering the columns relabels the
   result. `position` orders them by column position, which skips computing the ranks, fires the

@@ -53,6 +53,7 @@ def fci(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
@@ -80,16 +81,17 @@ def fci(
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     ``workers`` worker processes share the adjacency search's larger conditioning-size passes
-    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.num_workers``.
-    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all). The private
-    ``_ambiguous`` sink receives the triples no orientation rule reads as a collider or a
-    non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.num_workers``. ``seed`` fixes
+    the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
+    ``None`` uses ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle
+    marks and all). The private ``_ambiguous`` sink receives the triples no orientation rule reads
+    as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
 
     check_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
-    test = make_indep_test(indep_test, X, categorical=categorical)
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     allowed = keep = apart = None
     if constraints is not None:
         allowed = constraints.support()
@@ -112,7 +114,7 @@ def fci(
     if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
     else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
         _remove_by_possible_dsep(
             marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
         )
@@ -621,17 +623,17 @@ def _remove_by_possible_dsep(
 
 
 def _test_in_rank_order(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None
+    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None = None
 ) -> tuple[np.ndarray, CITest]:
     """The column order that sorts ``X`` by :func:`~andrey.search.hc.tie_ranks`, and the
-    ``indep_test`` test over ``X``'s columns in that order.
+    ``indep_test`` test, seeded by ``seed``, over ``X``'s columns in that order.
 
     Each rank moves with its column, so every column order of ``X`` gives the same test.
     """
     by_rank = np.argsort(tie_ranks(X, categorical))
     mask = None if categorical is None else np.asarray(categorical)[by_rank]
     return by_rank, make_indep_test(
-        indep_test, np.ascontiguousarray(X[:, by_rank]), categorical=mask
+        indep_test, np.ascontiguousarray(X[:, by_rank]), categorical=mask, seed=seed
     )
 
 

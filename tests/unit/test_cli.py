@@ -358,6 +358,15 @@ def test_former_names_and_values_map_to_current_ones():
     assert both.value.code == "invalid_params"
 
 
+def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
+    """A removed argument still runs for one release: the fit warns and the run's params omit it."""
+    code, out, _ = _run(["run", "direct_lingam", "--data", str(csv_path), "random_state=3"], capsys)
+    env = json.loads(out)
+    assert code == 0 and "random_state" not in env["run"]["params"]
+    assert any("random_state" in w["message"] for w in env["run"]["warnings"])
+    assert "random_state" in get_spec("direct_lingam").dropped_args
+
+
 def test_missing_input_error(capsys):
     code, _out, err = _run(["run", "pc"], capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "missing_input"
