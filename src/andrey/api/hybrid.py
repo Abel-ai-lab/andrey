@@ -163,7 +163,8 @@ def mmhc(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The score search considers the
@@ -179,7 +180,7 @@ def mmhc(
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` are ``"mmpc"`` and ``"hc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -360,7 +361,8 @@ def rsmax2(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
@@ -376,7 +378,7 @@ def rsmax2(
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------

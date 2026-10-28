@@ -1008,10 +1008,9 @@ def execute_run(
         out = with_labels(out, labels)
 
     run = _run_info(positional, resolved, elapsed, caught)
-    if spec.seeded:  # report the *effective* seed (resolve_seed applies the ANDREY_SEED fallback)
-        from andrey.core.seeding import resolve_seed
-
-        run["seed"] = resolve_seed(resolved.get("seed"))
+    seed = (out[0] if isinstance(out, list) else out).metadata.get("seed")
+    if seed is not None:  # the effective seed: resolve_seed applied the ANDREY_SEED fallback
+        run["seed"] = seed
     env = envelope(spec, out, run)
     _emit(
         env,

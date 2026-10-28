@@ -107,7 +107,8 @@ def pc(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -134,7 +135,7 @@ def pc(
         ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
         unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
         column positions, the middle node second and ``x < y``, in ascending order.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -472,7 +473,8 @@ def fci(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -501,7 +503,7 @@ def fci(
         ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
         or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
         ``x < y``, in ascending order.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -804,7 +806,8 @@ def gfci(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -830,7 +833,7 @@ def gfci(
         ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
         ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in
         ascending order.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -1082,7 +1085,8 @@ def cdnod(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1116,7 +1120,7 @@ def cdnod(
         reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
         middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
         numbered ``n_variables``.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------

@@ -126,8 +126,8 @@ gives a node more than that many parents, and some graph reaches each node's cou
 `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
 draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
 The methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` still
-records it. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
+`"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not
+set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
 deterministic and takes no seed.
 
 % concept: num_workers

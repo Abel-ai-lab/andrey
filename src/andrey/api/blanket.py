@@ -118,7 +118,8 @@ def iamb(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
 
     Returns
     -------
@@ -131,7 +132,7 @@ def iamb(
         ``target``, ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -266,7 +267,8 @@ def inter_iamb(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
 
     Returns
     -------
@@ -279,7 +281,7 @@ def inter_iamb(
         ``target``, ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -415,7 +417,8 @@ def mmpc(
     seed : int or None, default=None
         Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. ``metadata["seed"]`` records the seed used.
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
 
     Returns
     -------
@@ -426,7 +429,7 @@ def mmpc(
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``
         lists the members in the order they joined, by column label or 0-based position. Under a
         mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read.
-        ``metadata["seed"]`` is the seed used.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------

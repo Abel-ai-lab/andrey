@@ -167,7 +167,7 @@ change names its pull request.
   which they pass to the `rcot`, `cmiknn`, and `gpdc` tests, the only tests that draw random
   numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
   depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
-  seed on every fit. ([#499])
+  seed of a fit that uses one of those tests. ([#499])
 
 ### Fixed
 

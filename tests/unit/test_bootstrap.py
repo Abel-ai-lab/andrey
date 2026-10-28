@@ -258,12 +258,18 @@ def test_workers_do_not_change_the_result(method):
     assert serial.structure == pooled.structure
 
 
-@pytest.mark.parametrize("method", ["pc", "boss", "ica_lingam"])
-def test_a_seeded_method_fits_each_resample_with_a_seed_derived_from_the_bootstraps(method):
+@pytest.mark.parametrize(
+    ("method", "settings"),
+    [("pc", {"indep_test": "rcot"}), ("boss", {}), ("ica_lingam", {})],
+)
+@pytest.mark.filterwarnings("ignore::andrey.SampleSizeWarning")
+def test_a_seeded_method_fits_each_resample_with_a_seed_derived_from_the_bootstraps(
+    method, settings
+):
     data = lingam_data()
 
     def seeds(**kwargs):
-        out = bootstrap(method, data, n_boot=3, keep_fits=True, **kwargs)
+        out = bootstrap(method, data, n_boot=3, keep_fits=True, **settings, **kwargs)
         return [fit.metadata["seed"] for fit in out.fits]
 
     derived = seeds(seed=1)
