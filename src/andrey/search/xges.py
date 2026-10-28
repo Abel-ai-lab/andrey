@@ -1,7 +1,8 @@
 """Extremely Greedy Equivalence Search, the engine behind :func:`andrey.xges`.
 
 The base search applies the best improving Delete, else Reverse, else Insert, and stops when none
-improves the linear-Gaussian BIC. The extended search forces each Delete of the converged CPDAG,
+improves the score: the linear-Gaussian BIC, the categorical BDeu and BIC, or a mixed-data BIC. The
+extended search forces each Delete of the converged CPDAG,
 forbids re-inserting the deleted edge, reruns the base search, and keeps lower-scoring results.
 
 :class:`_Search` keeps candidates in a priority queue per operator type. A popped operator is
@@ -9,10 +10,12 @@ dropped when it no longer applies to the current CPDAG. After a move, only the o
 affect are rescored, and the CPDAG is completed locally. The update rules and the local completion
 follow the authors' reference implementation.
 
-Scores are deltas of the deviance :class:`~andrey.core.score.BICScore` minimizes; a negative delta
-improves it. Insert deltas come from :func:`~andrey.core.score_delta.add_deltas`, which scores every
-candidate parent against one parent set at once. A Delete and the parent removed by a Reverse each
-use the difference of two memoized local scores.
+Scores are deltas of the deviance the local score minimizes; a negative delta improves it. Insert
+deltas come from :func:`~andrey.core.score_delta.add_deltas` under the BIC, which scores every
+candidate parent against one parent set at once by a rank-one update, and from
+:func:`~andrey.core.score_delta.full_add_deltas`, two full scores per candidate, under the other
+scores. A Delete and the parent removed by a Reverse each use the difference of two memoized local
+scores.
 
 References
 ----------
@@ -37,9 +40,17 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
+from andrey.core.mixed import column_mask
 from andrey.core.orient import to_structure
-from andrey.core.score import LINEAR_SCORES, BICScore
-from andrey.core.score_delta import add_deltas
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    MIXED_SCORES,
+    SCORES,
+    BICScore,
+    LocalScore,
+    make_score,
+)
+from andrey.core.score_delta import add_deltas, full_add_deltas
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.ges import _recompute_objective, _reform_cpdag, required_dag
 from andrey.search.hc import tie_ranks
@@ -323,7 +334,7 @@ def _extension_parents(
 
 
 def _extension_scores(
-    pa: list[set[int]], ne: list[set[int]], nodes: Iterable[int], score: BICScore
+    pa: list[set[int]], ne: list[set[int]], nodes: Iterable[int], score: LocalScore
 ) -> dict[int, float]:
     """The memoized local score of each node :func:`_extension_parents` covers.
 
@@ -335,7 +346,7 @@ def _extension_scores(
     return {v: score.score(v, tuple(ps)) for v, ps in _extension_parents(pa, ne, nodes).items()}
 
 
-def _local(score: BICScore, v: int, parents: Iterable[int]) -> float:
+def _local(score: LocalScore, v: int, parents: Iterable[int]) -> float:
     """The local score of ``v`` given a parent set."""
     return score.score(v, sorted(parents))
 
@@ -555,13 +566,17 @@ _ADD_DELTAS_BYTES = 256 * 1024**2
 
 
 class _AddDeltas:
-    """Bounded LRU cache of :func:`~andrey.core.score_delta.add_deltas` per ``(y, E)``.
+    """Bounded LRU cache of the add deltas per ``(y, E)``.
+
+    :func:`~andrey.core.score_delta.add_deltas` gives them under the BIC and
+    :func:`~andrey.core.score_delta.full_add_deltas` under the other scores.
 
     ``self(y, E)[x]`` is the score change of adding ``x`` to ``y``'s parents ``E``.
     """
 
-    def __init__(self, score: BICScore, d: int) -> None:
+    def __init__(self, score: LocalScore, d: int) -> None:
         self.score = score
+        self.d = d
         self.cap = max(1024, _ADD_DELTAS_BYTES // (8 * max(d, 1)))
         self.cache: OrderedDict[tuple[int, frozenset[int]], np.ndarray] = OrderedDict()
 
@@ -569,7 +584,10 @@ class _AddDeltas:
         key = (y, E)
         deltas = self.cache.get(key)
         if deltas is None:
-            deltas = add_deltas(self.score, y, E)
+            if isinstance(self.score, BICScore):
+                deltas = add_deltas(self.score, y, E)
+            else:
+                deltas = full_add_deltas(self.score, y, E, self.d)
             self.cache[key] = deltas
             if len(self.cache) > self.cap:
                 self.cache.popitem(last=False)
@@ -593,7 +611,7 @@ class _Search:
     """
 
     def __init__(
-        self, score: BICScore, d: int, ranks: list[int], constraints: Constraints | None = None
+        self, score: LocalScore, d: int, ranks: list[int], constraints: Constraints | None = None
     ) -> None:
         self.add_deltas = _AddDeltas(score, d)
         self.d = d
@@ -1054,25 +1072,30 @@ def xges(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     extended_search: bool = True,
+    categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Extremely Greedy Equivalence Search over the linear-Gaussian BIC.
+    """Discover a CPDAG by Extremely Greedy Equivalence Search over a decomposable score.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Rows are observations; columns are variables.
     score_func : str
-        Local score: ``"bic"``, the linear-Gaussian
-        BIC, the only score supported.
+        Local score: ``"bic"`` (linear-Gaussian BIC), ``"bdeu"`` or ``"discrete_bic"`` (BDeu or
+        the multinomial BIC on category codes), or a mixed-data BIC, ``"degen_gauss"`` or
+        ``"cond_gauss"`` (:func:`~andrey.core.score.make_score`).
     penalty_discount : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
-        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC.
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     extended_search : bool
         Run the extended search after the base search; ``False`` stops after the base search.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
         Background knowledge. No operator adds a forbidden edge or removes or reverses a required
         one, a move whose class holds no DAG that satisfies the knowledge is undone, and the
@@ -1082,16 +1105,23 @@ def xges(
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and its total BIC score (lower is better).
+        The CPDAG (``kind="cpdag"``) and its total score (lower is better).
     """
-    if score_func not in LINEAR_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {LINEAR_SCORES}"
-        )
+    if score_func not in SCORES:
+        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {SCORES}")
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-    score = BICScore(X, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
-    ranks = tie_ranks(X).tolist()
+    score = make_score(
+        score_func,
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        categorical=categorical,
+    )
+    columns = np.full(d, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:
+        columns = column_mask(categorical, d)
+    ranks = tie_ranks(X, columns).tolist()
     # One BLAS thread for reproducible scores and move ties.
     with backend.one_blas_thread():
         search = _Search(score, d, ranks, constraints)

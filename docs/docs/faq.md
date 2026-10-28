@@ -164,8 +164,8 @@ row names the nodes) or a `.npy` file.
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
 text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, and
-RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI,
-hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
+RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GIES,
+XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
 `score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
 the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
 `score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
@@ -173,8 +173,9 @@ the column types you declare, with `categorical` or a DataFrame's `category` col
 `bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
 numbers that you have not declared reads as numbers, with a warning. The
 [release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
-Tetrad, bnlearn, and pgmpy. [Data types](guides/getting-started.md#data-types) explains the
-settings. The LiNGAM methods assume continuous non-Gaussian noise.
+Tetrad, bnlearn, and pgmpy; GIES and XGES are not benchmarked on those data yet.
+[Data types](guides/getting-started.md#data-types) explains the settings. The LiNGAM methods
+assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
