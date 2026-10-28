@@ -99,11 +99,13 @@ change names its pull request.
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])
-- `lpcmci` takes `max_p_global`, tigramite's name for the most conditions a test takes beyond the
-  default conditions, the parents of both ends, which also bounds the subsets of the majority vote;
-  unlike `max_depth`, it does not count those parents. Its number of tests grows exponentially with
-  the links at one node, so on many strongly related series an uncapped run may not finish; a cap
-  bounds the number of tests. The default, `None`, keeps the uncapped search. ([#468], [#505])
+- `lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test
+  takes beyond the default conditions, the parents of both ends, which also bounds the subsets of
+  the majority vote; unlike `max_depth`, it does not count those parents. On `pcmciplus`,
+  `max_depth` caps the lagged phase and `max_p_global` the same-step skeleton and collider phases.
+  Their number of tests grows exponentially with the links at one node, so on many strongly
+  related series an uncapped run may not finish; a cap bounds the number of tests. The default,
+  `None`, keeps the uncapped search. ([#468], [#505])
 - `max_depth`, the maximum conditioning-set size of every conditional-independence test, on every
   method that grows conditioning sets: `iamb`, `inter_iamb`, and `mmpc`, the restrict phase of
   `mmhc` and `rsmax2`, and the PC1 step of `pcmci` and `pcmciplus`, as on `pc`, `fci`, `gfci`, and
@@ -203,6 +205,11 @@ change names its pull request.
   columns brought to unit scale and map their results back to the data's units. On raw series,
   `varma_lingam`'s weights change, and at times its graph; on standardized data the other methods
   return the same values. ([#500])
+- `varma_lingam`'s `max_iter` is the only cap on the likelihood fit's iterations. The optimizer's
+  own limit of 15,000 function evaluations, which each iteration spends at about one per
+  parameter, ended a long fit without a warning whatever `max_iter` was, so raising `max_iter`
+  could not help; that limit is lifted. A fit that converged, or that stopped at `max_iter`,
+  returns the same values as before. ([#505])
 
 ## [0.10.0] - 2026-10-27
 

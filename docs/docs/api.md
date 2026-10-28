@@ -109,8 +109,11 @@ stop growing at the cap.
 setting.
 
 % concept: max_p_global
-`lpcmci`'s `max_p_global`, tigramite's name, counts only the conditions a test takes beyond the
-default conditions, the parents of both ends, which every test includes.
+`lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test takes
+beyond the default conditions, the parents of both ends, which every test includes. `lpcmci` caps
+all of its removal phases with it. `pcmciplus` splits its caps by phase: `max_depth` caps the
+lagged phase, whose sets hold no default conditions, and `max_p_global` caps the same-step
+skeleton and collider phases, whose sets add the lagged parents of both ends.
 
 % concept: collider_rule
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of

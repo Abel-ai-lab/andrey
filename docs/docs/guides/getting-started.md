@@ -474,9 +474,9 @@ allows for selection and stays sound when no missingness mechanism causally affe
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
 with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
 `ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
-with `max_depth` (`max_p_global` in LPCMCI). A column with no observed value, or with one value
-throughout, raises before the fit, and so does infinity, which is not a missing value. CD-NOD needs
-a complete domain index.
+with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A column with no
+observed value, or with one value throughout, raises before the fit, and so does infinity, which is
+not a missing value. CD-NOD needs a complete domain index.
 
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with

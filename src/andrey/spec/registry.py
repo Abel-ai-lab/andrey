@@ -1501,6 +1501,13 @@ _add(
                 "z-transform.",
                 concept="indep_test",
             ),
+            concept_param(
+                "max_p_global",
+                doc="The most conditions a skeleton or collider test takes beyond the default "
+                "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
+                "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
+                "tests and can keep links that a larger conditioning set would remove.",
+            ),
         ),
         references=("Runge 2020",),
     )

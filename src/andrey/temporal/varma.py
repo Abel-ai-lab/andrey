@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
 
 _CRITERIA = ("aic", "bic", "hqic")
+#: The most steps one iteration's line search takes in the optimizer (scipy's ``maxls``).
+_LINE_SEARCH_STEPS = 20
 
 
 def varma_lingam(
@@ -153,12 +155,17 @@ def _fit_varmax(X: np.ndarray, p: int, q: int, max_iter: int) -> VARMAXResultsWr
     """The state-space VARMA(p, q) fit with a constant trend, skipping the parameter covariance.
 
     statsmodels' own warnings are silenced; a fit that takes ``max_iter`` optimizer iterations
-    without converging warns with :class:`~andrey.SearchLimitWarning`.
+    without converging warns with :class:`~andrey.SearchLimitWarning`. The optimizer's default
+    budget of 15,000 function evaluations would end a longer fit first and without a warning, since
+    its finite-difference gradient spends ``k_params + 1`` evaluations on each step. The budget is
+    set to what ``max_iter`` iterations of at most ``_LINE_SEARCH_STEPS`` steps each can use, so
+    ``max_iter`` is the only cap.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         model = VARMAX(X, order=(p, q), trend="c")
-        fitted = model.fit(maxiter=max_iter, disp=False, cov_type="none")
+        maxfun = _LINE_SEARCH_STEPS * (model.k_params + 1) * max_iter
+        fitted = model.fit(maxiter=max_iter, maxfun=maxfun, disp=False, cov_type="none")
     retvals = fitted.mle_retvals or {}
     if not retvals.get("converged", True) and retvals.get("iterations", 0) >= max_iter:
         warn_search_limit("varma_lingam", "max_iter", max_iter, "likelihood iterations")

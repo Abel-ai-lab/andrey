@@ -19,6 +19,7 @@ from andrey.core import ci, warning_policy
 from andrey.irregular import rcd as rcd_engine
 from andrey.search.operators import max_parents_in_class
 from andrey.spec import REGISTRY
+from andrey.temporal import lpcmci as lpcmci_engine
 from andrey.temporal import pcmci as pcmci_engine
 from andrey.temporal import pcmciplus as pcmciplus_engine
 
@@ -136,6 +137,67 @@ def test_max_depth_caps_every_recorded_conditioning_set(method, monkeypatch):
             continue
         sizes = record(method, cap, monkeypatch)
         assert sizes and max(sizes) <= cap, (method, cap, max(sizes))
+
+
+# --- max_p_global: recorded sizes of the searched subsets ---------------------------------------
+
+
+def same_step_series(seed: int, *, n_vars: int = 6, steps: int = 500) -> np.ndarray:
+    """A lagged process whose noise is mixed along a dense same-step graph, so the same-step
+    neighbor sets stay large."""
+    rng = np.random.default_rng(seed)
+    weights = np.tril(rng.uniform(0.5, 1.0, (n_vars, n_vars)), -1)
+    mixing = np.linalg.inv(np.eye(n_vars) - weights)
+    x = np.zeros((steps, n_vars))
+    for t in range(1, steps):
+        x[t] = 0.3 * x[t - 1] + mixing @ rng.standard_normal(n_vars)
+    return x
+
+
+def subset_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
+    """The size of every subset of same-step neighbors a test searches, in whichever phase."""
+    sizes: list[int] = []
+    if method == "pcmciplus":
+        original = pcmciplus_engine._test_subsets
+
+        def tested(test, n_vars, parents, i, lag, j, subsets):
+            sizes.append(len(subsets[0]))
+            return original(test, n_vars, parents, i, lag, j, subsets)
+
+        monkeypatch.setattr(pcmciplus_engine, "_test_subsets", tested)
+    else:
+        search = lpcmci_engine._Search.separating_subsets
+
+        def searched(self, a, b, found, sdef, p):
+            sizes.append(p)
+            return search(self, a, b, found, sdef, p)
+
+        monkeypatch.setattr(lpcmci_engine._Search, "separating_subsets", searched)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        getattr(andrey, method)(same_step_series(0), tau_max=1, max_p_global=cap)
+    return sizes
+
+
+@pytest.mark.parametrize("method", methods_with("max_p_global"))
+def test_max_p_global_caps_every_searched_subset(method, monkeypatch):
+    assert max(subset_sizes(method, None, monkeypatch)) > max(CAPS)  # the data reach past the caps
+    for cap in CAPS:
+        sizes = subset_sizes(method, cap, monkeypatch)
+        assert sizes and max(sizes) <= cap, (method, cap, max(sizes))
+
+
+def test_a_max_p_global_above_every_search_returns_the_uncapped_pcmciplus_graph():
+    data = same_step_series(1)
+    uncapped = andrey.pcmciplus(data, tau_max=1)
+    capped = andrey.pcmciplus(data, tau_max=1, max_p_global=50)
+    for lag in (0, 1):
+        assert (
+            capped.structure.lag(lag).oriented_edges()
+            == uncapped.structure.lag(lag).oriented_edges()
+        )
+    assert capped.metadata["p_values"] == uncapped.metadata["p_values"]
+    assert capped.metadata["ambiguous_triples"] == uncapped.metadata["ambiguous_triples"]
 
 
 # --- max_parents: the returned graph -----------------------------------------------------------

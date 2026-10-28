@@ -539,12 +539,6 @@ _CONCEPTS = (
             "pcmci",
         ),
         others_exempt="Its tests include no default conditions to count beyond.",
-        deviations=_absent(
-            "0.12.0",
-            "The contemporaneous skeleton tests subsets of lag-0 neighbors beyond the lagged "
-            "parents of both ends; tigramite caps them with max_conds_dim.",
-            "pcmciplus",
-        ),
     ),
     Concept(
         key="max_parents",

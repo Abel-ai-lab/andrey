@@ -533,6 +533,7 @@ def pcmciplus(
     collider_rule: str = "majority",
     indep_test: str = "student_t",
     max_depth: int | None = None,
+    max_p_global: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged and same-step causal links of one multivariate time series with PCMCI+.
@@ -570,8 +571,17 @@ def pcmciplus(
         The maximum conditioning-set size of every conditional-independence test of the lagged
         skeleton (phase 1, PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no
         limit. A smaller cap runs fewer tests and can keep lagged parents that a larger
-        conditioning set would remove. The contemporaneous phases add the lagged parents of
-        both ends to every conditioning set and are not capped.
+        conditioning set would remove. It does not cap the skeleton and collider phases, which
+        add the lagged parents of both ends to every conditioning set; ``max_p_global`` caps those.
+    max_p_global : int or None, default=None
+        The most conditions a test of the skeleton and collider phases takes beyond the default
+        conditions, at least ``0``: every such test conditions on the lagged parents of both ends,
+        the default conditions, and on a subset of at most ``max_p_global`` same-step neighbors;
+        the cap also bounds the subsets the collider vote reads. It is tigramite's name for this
+        cap, as in :func:`~andrey.lpcmci`. Unlike ``max_depth``, it does not count the default
+        conditions, so a test can condition on more than ``max_p_global`` values. ``None`` sets no
+        limit. The number of tests grows exponentially with the same-step links at one variable; a
+        cap bounds it and can keep links that a larger conditioning set would remove.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -727,6 +737,7 @@ def pcmciplus(
             indep_test=indep_test,
             constraints=constraints,
             max_depth=max_depth,
+            max_p_global=max_p_global,
         )
     return with_labels(_adapt_pcmciplus(result, rows_metadata(rows)), labels)
 
