@@ -22,6 +22,7 @@ from andrey.core import warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS, Concept
+from tests.recovery.helpers import datagen
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 #: Public callables outside the registry that a concept may name.
@@ -226,6 +227,79 @@ def non_value_errors(method: str) -> str:
     return ",".join(sorted(raised))
 
 
+#: Each method's data for the units check: the first ``UNIT_ROWS`` rows of a case of
+#: ``tests/recovery/helpers/datagen`` whose model the method fits.
+UNIT_CASES = {
+    **dict.fromkeys(
+        (
+            *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+            *("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+        ),
+        "gauss_5v",
+    ),
+    "direct_lingam": "lingam_5v_uniform",
+    "multi_group_direct_lingam": "mgdl_2groups",
+    "varma_lingam": "varma_3v",
+    "longitudinal_lingam": "panel_4v",
+    "pcmci": "var_3v_lag2",
+    "pcmciplus": "var_4v_stable",
+    "lpcmci": "var_6v_hidden",
+    "granger": "var_4v_stable",
+    "gin": "measurement_chain_9v",
+    "rcd": "confounded_fork_4v",
+    "bottom_up_parce_lingam": "confounded_fork_4v",
+    "anm": "anm_pair_cubic",
+    "pnl": "anm_pair_cubic",
+}
+UNIT_ROWS = 1000
+#: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
+UNIT_EXPONENTS = [np.random.default_rng(seed).integers(-20, 21, size=16) for seed in (9, 22)]
+
+
+def unit_inputs(method: str, exponents: np.ndarray) -> list:
+    """The method's case with variable ``j`` multiplied by ``2**exponents[j]``; a domain index
+    stays as it is."""
+    case = UNIT_CASES[method]
+    factors = np.ldexp(1.0, exponents)
+    args = []
+    for inp in REGISTRY[method].data.inputs:
+        if not inp.required:
+            continue
+        if inp.kind == "panel":
+            groups = datagen.generate_groups(case)
+            args.append([x[:UNIT_ROWS] * factors[: x.shape[1]] for x in groups])
+        elif inp.kind == "matrix":
+            x = datagen.generate(case)[:UNIT_ROWS]
+            args.append(x * factors[: x.shape[1]])
+        else:
+            args.append(datagen.domain_index(case)[:UNIT_ROWS])
+    return args
+
+
+def graphs_and_orders(out) -> list:
+    """The endpoint marks of every graph (each lag, occasion, and group) and every causal order."""
+    if isinstance(out, list):
+        return [graphs_and_orders(o) for o in out]
+    s = out.structure
+    if isinstance(s, andrey.TemporalStructure):
+        graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
+    else:
+        graphs = [s]
+    orders = {k: out.metadata.get(k) for k in ("causal_order", "causal_orders", "unordered")}
+    return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
+
+
+def unit_free(method: str) -> bool:
+    """Whether every graph and order stays the same with each variable in other units."""
+    fits = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
+            out = getattr(andrey, method)(*unit_inputs(method, exponents))
+            fits.append(graphs_and_orders(out))
+    return all(fit == fits[0] for fit in fits[1:])
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
@@ -238,6 +312,7 @@ OBSERVE = {
     ),
     "cap_warning": (stopped_at_cap, "SearchLimitWarning"),
     "invalid_choice": (non_value_errors, ""),
+    "units": (unit_free, True),
 }
 
 
