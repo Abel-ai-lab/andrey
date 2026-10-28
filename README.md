@@ -135,7 +135,7 @@ print({k: round(scores[k], 2) for k in ("shd", "skeleton_precision", "skeleton_r
 ```
 
 ```text
-PC  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
+pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
 
   raf -- mek
   plc -- pip3

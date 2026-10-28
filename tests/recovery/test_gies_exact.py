@@ -415,5 +415,5 @@ def test_gfci_output_contract():
 
 
 def test_gfci_rejects_unknown_indep_test():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.gfci(datagen.generate("gauss_5v"), indep_test="no_such_test")

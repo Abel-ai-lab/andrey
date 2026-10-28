@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
-from andrey.api._boundary import warn_past_boundary
+from andrey.api._adapt import column_labels, data_matrix
+from andrey.api._method import method_spec
 from andrey.core.structure import node_labels
 
 if TYPE_CHECKING:
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+@method_spec("gin")
 def gin(
     data: npt.ArrayLike, *, alpha: float = 0.05, labels: tuple[str, ...] | None = None
 ) -> StructureOutput:
@@ -54,7 +55,7 @@ def gin(
         its cluster. An ordered latent also points to every later latent and to every unordered one,
         and unordered latents have no edge between them: edges between latents follow the order only
         and do not mean a direct effect was found. An observed variable in no cluster has no edges.
-        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as lists
+        ``metadata["algorithm"]`` is ``"gin"``, ``metadata["clusters"]`` lists the clusters as lists
         of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered ones
         earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member, and
         ``metadata["n_latents"]`` is the latent count.
@@ -62,8 +63,9 @@ def gin(
     Raises
     ------
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
-        ``data`` or gives two that are equal as text.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``labels``
+        does not give one name per column of ``data`` or gives two that are equal as text.
 
     Notes
     -----
@@ -140,11 +142,9 @@ def gin(
     from andrey.latent.gin import gin_structure
 
     X = data_matrix(data, method="gin")
-    alpha = open_unit_interval(alpha, "alpha")
     if labels is not None and len(labels) != X.shape[1]:
         raise ValueError(
             f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
         )
     names = node_labels(labels) if labels is not None else column_labels(data)
-    warn_past_boundary("gin", X.shape)
     return gin_structure(X, alpha=alpha, labels=names)

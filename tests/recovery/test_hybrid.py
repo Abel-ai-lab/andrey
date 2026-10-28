@@ -182,7 +182,7 @@ def test_rsmax2_with_pc_gives_the_same_graph_on_more_workers():
     [
         ({"restrict": "gs"}, ValueError),
         ({"maximize": "ges"}, ValueError),
-        ({"maximize": "tabu", "score_func": "local_score_cond_gauss"}, NotImplementedError),
+        ({"maximize": "tabu", "score_func": "local_score_cond_gauss"}, ValueError),
         ({"score_func": "local_score_BDeu"}, ValueError),  # a categorical score with fisherz
     ],
 )

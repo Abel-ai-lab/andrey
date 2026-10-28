@@ -118,7 +118,7 @@ def test_longitudinal_lingam_output_contract():
     out = longitudinal_lingam(_panel(0), n_lags=1)
     assert out.structure.type == "temporal"
     assert out.structure.lag_weights.shape == (2, 4, 4)
-    assert out.metadata["algorithm"] == "longitudinallingam"
+    assert out.metadata["algorithm"] == "longitudinal_lingam"
 
 
 def test_longitudinal_lingam_matches_the_recorded_output():

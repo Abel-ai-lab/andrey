@@ -290,9 +290,9 @@ def test_time_series_methods_need_two_variables(fit):
     ("setting", "value", "error"),
     [
         ("maxlag", 0, ValueError),
-        ("maxlag", 1.5, TypeError),
+        ("maxlag", 1.5, ValueError),
         ("cv", 1, ValueError),
-        ("cv", 2.5, TypeError),
+        ("cv", 2.5, ValueError),
     ],
 )
 def test_granger_checks_maxlag_and_cv(setting, value, error):
@@ -350,7 +350,7 @@ def test_multi_group_direct_lingam_needs_the_same_columns_in_every_group():
         andrey.multi_group_direct_lingam([_data(d=3), _data(d=4)])
 
 
-@pytest.mark.parametrize(("n_lags", "error"), [(0, ValueError), (3, ValueError), (1.5, TypeError)])
+@pytest.mark.parametrize(("n_lags", "error"), [(0, ValueError), (3, ValueError), (1.5, ValueError)])
 def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags, error):
     data = [_data() for _ in range(3)]
     with pytest.raises(error, match="n_lags"):
@@ -360,7 +360,7 @@ def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags
 
 @pytest.mark.parametrize(
     ("order", "error"),
-    [((-1, 1), ValueError), ((0, 0), ValueError), ((1,), TypeError), ((1.0, 1), TypeError)],
+    [((-1, 1), ValueError), ((0, 0), ValueError), ((1,), ValueError), ((1.0, 1), ValueError)],
 )
 def test_varma_lingam_checks_order(order, error):
     with pytest.raises(error, match="order"):
@@ -371,7 +371,7 @@ def test_varma_lingam_checks_order(order, error):
     ("params", "error", "name"),
     [
         ({"tau_max": 0}, ValueError, "tau_max"),
-        ({"tau_max": 1.5}, TypeError, "tau_max"),
+        ({"tau_max": 1.5}, ValueError, "tau_max"),
         ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
         ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
         ({"alpha_level": 0.0}, ValueError, "alpha_level"),
@@ -395,7 +395,7 @@ def test_pcmci_needs_enough_time_steps_for_every_test():
     ("params", "error", "name"),
     [
         ({"tau_max": 0}, ValueError, "tau_max"),
-        ({"tau_max": 1.5}, TypeError, "tau_max"),
+        ({"tau_max": 1.5}, ValueError, "tau_max"),
         ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
         ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
         ({"collider_rule": "vote"}, ValueError, "collider_rule"),
@@ -426,14 +426,14 @@ def test_pcmciplus_takes_one_variable():
     ("params", "error", "name"),
     [
         ({"tau_max": 0}, ValueError, "tau_max"),
-        ({"tau_max": 1.5}, TypeError, "tau_max"),
+        ({"tau_max": 1.5}, ValueError, "tau_max"),
         ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
         ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
         ({"n_preliminary_iterations": -1}, ValueError, "n_preliminary_iterations"),
-        ({"n_preliminary_iterations": 1.5}, TypeError, "n_preliminary_iterations"),
+        ({"n_preliminary_iterations": 1.5}, ValueError, "n_preliminary_iterations"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
         ({"max_depth": -1}, ValueError, "max_depth"),
-        ({"max_depth": 1.5}, TypeError, "max_depth"),
+        ({"max_depth": 1.5}, ValueError, "max_depth"),
     ],
 )
 def test_lpcmci_checks_its_parameters(params, error, name):
@@ -472,7 +472,7 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
     ("fit", "setting", "value", "error"),
     [
         *[(andrey.rcd, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
-        (andrey.rcd, "max_explanatory_vars", 1.5, TypeError),
+        (andrey.rcd, "max_explanatory_vars", 1.5, ValueError),
         *[
             (andrey.rcd, level, bad, ValueError)
             for level in ("cor_alpha", "ind_alpha", "shapiro_alpha")
@@ -495,12 +495,12 @@ def test_gin_labels_name_each_column():
     ("fit", "max_iter", "error"),
     [
         (andrey.hc, 0, ValueError),
-        (andrey.hc, 2.5, TypeError),
-        (andrey.hc, True, TypeError),
+        (andrey.hc, 2.5, ValueError),
+        (andrey.hc, True, ValueError),
         (andrey.tabu, 0, ValueError),
-        (andrey.tabu, 2.5, TypeError),
+        (andrey.tabu, 2.5, ValueError),
         (andrey.ica_lingam, 0, ValueError),
-        (andrey.ica_lingam, 1.5, TypeError),
+        (andrey.ica_lingam, 1.5, ValueError),
     ],
 )
 def test_max_iter_is_a_positive_int(fit, max_iter, error):
@@ -531,13 +531,13 @@ def test_hc_sets_no_move_limit_by_default():
     ("settings", "named", "error"),
     [
         ({"tabu_length": 0}, "tabu_length", ValueError),
-        ({"tabu_length": 2.5}, "tabu_length", TypeError),
+        ({"tabu_length": 2.5}, "tabu_length", ValueError),
         ({"max_tabu": 0}, "max_tabu", ValueError),
         ({"max_tabu": 11}, "max_tabu", ValueError),  # longer than the default tabu list
         ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
-        ({"max_tabu": True}, "max_tabu", TypeError),
+        ({"max_tabu": True}, "max_tabu", ValueError),
         ({"lambda_value": -1.0}, "lambda_value", ValueError),
-        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", NotImplementedError),
+        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", ValueError),
     ],
 )
 def test_tabu_rejects_a_bad_setting(settings, named, error):
@@ -694,11 +694,11 @@ def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [
-        ("extended_search", 1, TypeError),
-        ("extended_search", "yes", TypeError),
+        ("extended_search", 1, ValueError),
+        ("extended_search", "yes", ValueError),
         ("lambda_value", -1.0, ValueError),
         ("lambda_value", float("inf"), ValueError),
-        ("score_func", "local_score_BDeu", NotImplementedError),
+        ("score_func", "local_score_BDeu", ValueError),
     ],
 )
 def test_xges_rejects_a_bad_setting(setting, value, error):
@@ -768,7 +768,9 @@ def test_max_categories_bounds_the_inferred_columns(max_categories, inferred):
     assert out.metadata["categorical"] == inferred
 
 
-@pytest.mark.parametrize(("value", "error"), [(1, ValueError), (2.5, TypeError), (True, TypeError)])
+@pytest.mark.parametrize(
+    ("value", "error"), [(1, ValueError), (2.5, ValueError), (True, ValueError)]
+)
 def test_max_categories_is_an_int_of_at_least_two(value, error):
     with pytest.raises(error, match="max_categories"):
         andrey.pc(_mixed_data(), max_categories=value)

@@ -30,7 +30,7 @@ def test_gin_recovers_the_planted_clusters_and_their_order(fit) -> None:
     _, out = fit
     planted = datagen.clusters(_CASE)  # earliest latent first
 
-    assert out.metadata["algorithm"] == "GIN"
+    assert out.metadata["algorithm"] == "gin"
     assert out.metadata["n_latents"] == 2
     assert {frozenset(c) for c in out.metadata["clusters"]} == {frozenset(c) for c in planted}
     assert [sorted(c) for c in out.metadata["causal_order"]] == planted
