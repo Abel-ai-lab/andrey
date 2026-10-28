@@ -1,5 +1,6 @@
 """The search bounds: ``max_depth`` caps every conditioning set a method tests, ``max_parents``
-every parent set it returns, and stopping on an iteration cap warns ``SearchLimitWarning``.
+every parent set it returns (gfci's: its GES phase's), and stopping on an iteration cap warns
+``SearchLimitWarning``.
 
 Each method that takes a bound is found from the registry, so a method that gains one is checked
 here. A run without the cap first shows that the data make the method exceed it.
@@ -17,6 +18,7 @@ from sklearn.exceptions import ConvergenceWarning
 import andrey
 from andrey.core import ci, warning_policy
 from andrey.irregular import rcd as rcd_engine
+from andrey.search import gfci as gfci_engine
 from andrey.search.operators import max_parents_in_class
 from andrey.spec import REGISTRY
 from andrey.temporal import lpcmci as lpcmci_engine
@@ -204,17 +206,80 @@ def test_a_max_p_global_above_every_search_returns_the_uncapped_pcmciplus_graph(
 # --- max_parents: the returned graph -----------------------------------------------------------
 
 
+def capped_graph(method: str, monkeypatch):
+    """A function that fits ``method`` and returns the marks of the graph its cap bounds: gfci's
+    GES CPDAG, recorded before the tests prune and orient it, else the returned graph."""
+    fit = getattr(andrey, method)
+    if method != "gfci":
+        return lambda data, **kw: fit(data, **kw).structure.to_numpy()
+    found = []
+    ges = gfci_engine.ges
+
+    def recorded(*args, **kwargs):
+        out = ges(*args, **kwargs)
+        found.append(out[0].to_numpy())
+        return out
+
+    monkeypatch.setattr(gfci_engine, "ges", recorded)
+
+    def graph(data, **kw):
+        found.clear()
+        fit(data, **kw)
+        (marks,) = found
+        return marks
+
+    return graph
+
+
 @pytest.mark.parametrize("method", methods_with("max_parents"))
-def test_max_parents_caps_every_dag_the_result_represents(method):
+def test_max_parents_caps_every_dag_the_result_represents(method, monkeypatch):
+    data = linear_data(1, d=7, n=500)
+    graph = capped_graph(method, monkeypatch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        uncapped = max_parents_in_class(graph(data)).max()
+        assert uncapped > max(CAPS)
+        for cap in CAPS:
+            marks = graph(data, max_parents=cap)
+            assert max_parents_in_class(marks).max() <= cap, (method, cap)
+
+
+@pytest.mark.parametrize("method", ["gies", "xges", "gfci"])
+def test_max_parents_holds_from_a_start_of_required_edges(method, monkeypatch):
+    """The equivalence-class searches start from the class of the required edges; the cap holds
+    there and after every move, and the required edges stay."""
+    data = pd.DataFrame(linear_data(3, d=7, n=500), columns=[f"x{i}" for i in range(7)])
+    knowledge = andrey.Knowledge(required=[("x0", "x6"), ("x5", "x6")], forbidden=[("x6", "x1")])
+    graph = capped_graph(method, monkeypatch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for cap in (2, 3):
+            marks = graph(data, max_parents=cap, knowledge=knowledge)
+            assert max_parents_in_class(marks).max() <= cap, (method, cap)
+            assert marks[0, 6] != 0 and marks[5, 6] != 0
+
+
+def test_max_parents_caps_the_interventional_essential_graph():
+    data = linear_data(4, d=7, n=600)
+    interventions = np.zeros(data.shape, dtype=bool)
+    interventions[400:, 2] = True
+    data[400:, 2] = np.random.default_rng(4).standard_normal(200)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        uncapped = andrey.gies(data, interventions).structure.to_numpy()
+        assert max_parents_in_class(uncapped).max() > max(CAPS)
+        for cap in CAPS:
+            marks = andrey.gies(data, interventions, max_parents=cap).structure.to_numpy()
+            assert max_parents_in_class(marks).max() <= cap, cap
+
+
+@pytest.mark.parametrize("method", ["gies", "xges"])
+def test_a_cap_no_graph_can_reach_returns_the_uncapped_graph(method):
     data = linear_data(1, d=7, n=500)
     fit = getattr(andrey, method)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        uncapped = max_parents_in_class(fit(data).structure.to_numpy()).max()
-        assert uncapped > max(CAPS)
-        for cap in CAPS:
-            marks = fit(data, max_parents=cap).structure.to_numpy()
-            assert max_parents_in_class(marks).max() <= cap, (method, cap)
+        assert fit(data, max_parents=6).structure == fit(data).structure
 
 
 @pytest.mark.parametrize("method", methods_with("max_parents"))

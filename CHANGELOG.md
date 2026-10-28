@@ -89,6 +89,11 @@ change names its pull request.
   declared column types. A test registered with `register_indep_test` needs only the single-query
   call, as in every other search with an `indep_test`, under missing values too: the family orders
   its candidates by p-value, smallest first. ([#515])
+- `gies`, `xges`, and `gfci` take `max_parents`, a cap on every node's parents, as `ges` does: no
+  DAG the returned graph represents gives a node more than that many parents, and a move that would
+  give a node more is skipped. `gfci` caps its GES phase; the PAG its tests then orient can put more
+  arrowheads at a node. Required edges of `knowledge` above the cap raise `ValueError`. The default,
+  `None`, sets no cap and returns the graphs these methods returned before. ([#516])
 - `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
   knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
   others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
@@ -1050,3 +1055,4 @@ First alpha release.
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
 [#515]: https://github.com/Abel-ai-lab/andrey/pull/515
+[#516]: https://github.com/Abel-ai-lab/andrey/pull/516
