@@ -710,7 +710,7 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             weighted=True,
-            doc="weighted DAG; no score. Extra optimizer knobs (lambda1, lr, ...) pass through.",
+            doc="weighted DAG; no score.",
         ),
         determinism="stochastic",
         accel="torch",
@@ -722,8 +722,112 @@ _add(
             "can differ."
         ),
         seeded=True,
-        passthrough=True,
+        dropped_args=("labels",),
         params=(
+            concept_param(
+                "lambda1",
+                default=0.005,
+                doc="Weight of the l1 penalty on the sum of the edge gates, which approximate a "
+                "count of edges, at least 0. Larger values give sparser graphs.",
+            ),
+            ParamSpec(
+                name="screen_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of the Fisher-Z tests that estimate the moral graph. Only "
+                "pairs the screen keeps can become edges; smaller values keep fewer.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                aliases=("alpha",),
+            ),
+            ParamSpec(
+                name="use_moral_graph",
+                type="bool",
+                default=True,
+                doc="false makes every pair a candidate edge.",
+            ),
+            ParamSpec(
+                name="standardize",
+                type="bool",
+                default=False,
+                doc="Scale each column to unit variance first.",
+            ),
+            concept_param(
+                "w_threshold",
+                doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
+            ),
+            ParamSpec(
+                name="gate_threshold",
+                type="float",
+                default=0.5,
+                doc="An edge is kept when its gate probability reaches this value.",
+                minimum=0,
+                maximum=1,
+            ),
+            concept_param(
+                "max_iter",
+                default=25,
+                doc="Most quadratic-penalty rounds, at least 1. Stopping on it before the "
+                "acyclicity residual clears h_tol warns; raise it to let the fit run on.",
+                nullable=False,
+                aliases=("max_outer",),
+            ),
+            ParamSpec(
+                name="subproblem_iter",
+                type="int",
+                default=3000,
+                doc="Most Adam steps per round, at least 1.",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="lr",
+                type="float",
+                default=0.01,
+                doc="Adam's learning rate, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="tau",
+                type="float",
+                default=0.5,
+                doc="The gate's Gumbel-sigmoid temperature, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="rho_init",
+                type="float",
+                default=0.001,
+                doc="The acyclicity penalty of the first round, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="rho_mult",
+                type="float",
+                default=3.0,
+                doc="The factor by which the acyclicity penalty grows between rounds, at least 1.",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="rho_max",
+                type="float",
+                default=1e16,
+                doc="The rounds end when the acyclicity penalty reaches this value, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="h_tol",
+                type="float",
+                default=1e-8,
+                doc="The rounds end when the acyclicity residual of the noise-free gates is at "
+                "most this value, at least 0.",
+                minimum=0,
+            ),
             concept_param(
                 "seed",
                 doc="Seed for the torch optimizer. null uses ANDREY_SEED, or 0 when it is unset; "
@@ -1222,9 +1326,10 @@ _add(
         data=DataSpec(
             inputs=(
                 InputSpec(
-                    name="data_groups",
+                    name="data",
                     kind="panel",
                     doc="Two or more datasets over the same d variables (repeat the flag).",
+                    aliases=("data_groups",),
                 ),
             ),
             layout="each group (n_samples, n_variables); all groups share n_variables",
@@ -1243,6 +1348,13 @@ _add(
         column_order="relabels",
         tie_break=True,
         dropped_args=("random_state",),
+        params=(
+            concept_param(
+                "measure",
+                doc="How the order search picks the most exogenous variable at each step; pwling "
+                "is the pairwise likelihood-ratio measure.",
+            ),
+        ),
         references=("Shimizu 2012",),
     )
 )
@@ -1318,6 +1430,11 @@ _add(
                 "converges gives no warning; raise this to let it converge.",
                 nullable=False,
             ),
+            concept_param(
+                "measure",
+                doc="How the order search on the innovations picks the most exogenous variable; "
+                "pwling is the pairwise likelihood-ratio measure.",
+            ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
     )
@@ -1331,9 +1448,10 @@ _add(
         data=DataSpec(
             inputs=(
                 InputSpec(
-                    name="data_list",
+                    name="data",
                     kind="panel",
                     doc="One dataset per time point, same units and shape (repeat the flag).",
+                    aliases=("data_list",),
                 ),
             ),
             layout="each (n_samples, n_variables); one array per time point",
@@ -1349,13 +1467,11 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="n_lags",
-                type="int",
-                default=1,
-                doc="Number of past time points regressed out before the instantaneous fit.",
-                minimum=1,
-                concept="tau_max",
+            concept_param(
+                "tau_max",
+                doc="The largest lag: the number of past time points regressed out before the "
+                "instantaneous fit, at least 1.",
+                aliases=("n_lags",),
             ),
             concept_param(
                 "measure",
@@ -1603,20 +1719,18 @@ _add(
         output=OutputSpec(
             structure_type="temporal",
             graph_kind=None,
-            doc="lag_weights at lags 1..maxlag (the lasso coefficients, no lag 0); no ordering.",
+            doc="lag_weights at lags 1..tau_max (the lasso coefficients, no lag 0); no ordering.",
         ),
         determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         params=(
-            ParamSpec(
-                name="maxlag",
-                type="int",
-                default=2,
-                doc="Number of past time steps each regression uses, at least 1.",
-                minimum=1,
-                concept="tau_max",
+            concept_param(
+                "tau_max",
+                doc="The largest lag: each regression uses the past tau_max time steps, at least "
+                "1.",
+                aliases=("maxlag",),
             ),
             ParamSpec(
                 name="cv",
@@ -1758,21 +1872,12 @@ _add(
             "Reordering whole clusters relabels the result; reordering the columns inside a "
             "cluster can change the latents' order."
         ),
+        dropped_args=("labels",),
         params=(
             concept_param(
                 "alpha",
                 doc="Significance level of the independence test that finds the causal clusters "
                 "and each next latent in the order.",
-            ),
-            ParamSpec(
-                name="labels",
-                type="str_list",
-                default=None,
-                doc="Names for the observed variables, for example, labels=[x1,x2]. null uses the "
-                "data file's header, else X1..Xn; latents are named L1, L2, ..., skipping a name "
-                "an observed variable has.",
-                nullable=True,
-                concept="labels",
             ),
         ),
         references=("Xie et al. 2020",),
@@ -1959,6 +2064,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
     "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
     "prune=false every lagged weight stays, so a forbidden lagged link raises.",
+    "granger": _LINK_RULE + "Lags run from 1 to tau_max; a required link needs its lag, and "
+    "same-step links are not learned. Each regression drops forbidden lagged regressors and keeps "
+    "required ones unpenalized.",
     "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
     "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
     "fit of its effect's lagged weights; every other lagged weight stays.",

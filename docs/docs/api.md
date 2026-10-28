@@ -17,8 +17,10 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
 exceptions: `cdnod` also takes a domain index, `gies` also takes which variables were intervened on
 in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes
-a list of datasets and returns one result per dataset. Each method is either supported or
-experimental; `andrey list` prints the status.
+a list of datasets and returns one result per dataset. The first argument of every method is
+`data`; `andrey run` reads it from `--data`, which a method that takes a list of datasets needs
+once per dataset. Each method is either supported or experimental; `andrey list` prints the
+status.
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
 outside its range or not one of its choices raises `ValueError`, each with a message that names the
@@ -92,12 +94,22 @@ nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
 `grasp`, `exact_search`, `notears`, `dagma`, `direct_lingam`, `ica_lingam`,
 `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
-`rcd`, and `bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and
-forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
-parameter says how it honors them. `bottom_up_parce_lingam` honors every part but required edges.
-For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time
-`t - lag` to `effect` at time `t`.
+`granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
+required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`knowledge` parameter says how it honors them. `bottom_up_parce_lingam` honors every part but
+required edges. For the time-series methods, an edge `(cause, effect, lag)` is the link from
+`cause` at time `t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+
+% concept: tau_max
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, and `longitudinal_lingam` take `tau_max`, the largest
+lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points of the
+panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its name.
+
+% concept: measure
+`direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
+DirectLiNGAM's order search and take `measure`, how it picks the most exogenous variable at each
+step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the only one.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,

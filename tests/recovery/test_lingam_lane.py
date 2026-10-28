@@ -91,7 +91,7 @@ def test_multi_group_requires_at_least_two_groups():
 
 def test_multi_group_rejects_mismatched_features():
     a = datagen.generate("lingam_5v_uniform")
-    with pytest.raises(ValueError, match="data_groups needs the same columns"):
+    with pytest.raises(ValueError, match="data needs the same columns"):
         andrey.multi_group_direct_lingam([a, a[:, :-1]])
 
 
@@ -113,7 +113,7 @@ def test_multi_group_rejects_non_2d_and_nonfinite_groups():
         andrey.multi_group_direct_lingam([good, good[:, 0]])  # a 1-D group
     nan = good.copy()
     nan[0, 0] = np.nan
-    with pytest.raises(ValueError, match=r"data_groups\[1\] holds NaN in 1 cell"):
+    with pytest.raises(ValueError, match=r"data\[1\] holds NaN in 1 cell"):
         andrey.multi_group_direct_lingam([good, nan])
 
 

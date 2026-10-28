@@ -12,7 +12,7 @@ committed baseline.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
     MAX_CATEGORIES,
@@ -1305,7 +1305,25 @@ def exact_search(
 
 
 @method_spec("calm")
-def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> StructureOutput:
+def calm(
+    data: npt.ArrayLike,
+    *,
+    lambda1: float = 0.005,
+    screen_alpha: float = 0.01,
+    use_moral_graph: bool = True,
+    standardize: bool = False,
+    w_threshold: float = 0.3,
+    gate_threshold: float = 0.5,
+    max_iter: int = 25,
+    subproblem_iter: int = 3000,
+    lr: float = 0.01,
+    tau: float = 0.5,
+    rho_init: float = 0.001,
+    rho_mult: float = 3.0,
+    rho_max: float = 1e16,
+    h_tol: float = 1e-8,
+    seed: int | None = None,
+) -> StructureOutput:
     """Learn a weighted DAG with CALM, a continuous-optimization structure learner.
 
     CALM (Continuous and Acyclicity-constrained L0-penalized likelihood with an estimated Moral
@@ -1321,6 +1339,39 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
+    lambda1 : float, default=0.005
+        Weight of the l1 penalty on the sum of the edge gates, at least ``0``. The gates
+        approximate a count of edges, so it prices each edge: larger values give sparser graphs.
+    screen_alpha : float, default=0.01
+        Significance level of the Fisher-Z tests that estimate the moral graph, in ``(0, 1)``.
+        Only pairs the screen keeps can become edges; smaller values keep fewer.
+    use_moral_graph : bool, default=True
+        With ``False`` every pair is a candidate edge, and ``screen_alpha`` has no effect.
+    standardize : bool, default=False
+        Scale each column to unit variance first.
+    w_threshold : float, default=0.3
+        An edge is kept when its weight magnitude reaches this value, at least ``0``.
+    gate_threshold : float, default=0.5
+        An edge is kept when its gate probability reaches this value, in ``[0, 1]``.
+    max_iter : int, default=25
+        Most quadratic-penalty rounds, each an Adam subproblem, at least ``1``. Stopping on this
+        limit before the acyclicity residual clears ``h_tol`` or ``rho`` reaches ``rho_max`` warns
+        with :class:`~andrey.SearchLimitWarning`; raise it to let the fit run on.
+    subproblem_iter : int, default=3000
+        Most Adam steps per round, at least ``1``.
+    lr : float, default=0.01
+        Adam's learning rate, above ``0``.
+    tau : float, default=0.5
+        The gate's Gumbel-sigmoid temperature, above ``0``.
+    rho_init : float, default=0.001
+        The acyclicity penalty ``rho`` of the first round, above ``0``.
+    rho_mult : float, default=3.0
+        The factor by which ``rho`` grows between rounds, at least ``1``.
+    rho_max : float, default=1e16
+        The largest ``rho``: the rounds end when it is reached, above ``0``.
+    h_tol : float, default=1e-8
+        The acyclicity residual of the noise-free gates at or below which the rounds end, at
+        least ``0``.
     seed : int or None, default=None
         Seed for the optimizer's torch random number generator. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so every call is seeded
@@ -1328,22 +1379,6 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc` (the
         :doc:`column-order guide </docs/guides/column-order>`). ``metadata["seed"]`` records the
         seed used.
-    **params : Any
-        Optimizer settings passed to the solver; a name not listed here raises ``TypeError``.
-
-        - ``lambda1`` (default ``0.005``): penalty per edge. Larger values give sparser graphs.
-        - ``alpha`` (default ``0.01``): significance level of the Fisher-Z tests that estimate the
-          moral graph. Only pairs it keeps can become edges; smaller values keep fewer.
-        - ``use_moral_graph`` (default ``True``): ``False`` makes every pair a candidate edge.
-        - ``standardize`` (default ``False``): scale each column to unit variance first.
-        - ``w_threshold`` (default ``0.3``) and ``gate_threshold`` (default ``0.5``): an edge is
-          kept when its weight magnitude and its gate probability reach these values.
-        - ``max_outer`` (default ``25``), ``subproblem_iter`` (default ``3000``), and ``lr``
-          (default ``0.01``): quadratic-penalty rounds, Adam steps per round, and learning rate.
-        - ``tau`` (default ``0.5``), ``rho_init`` (default ``0.001``), ``rho_mult`` (default
-          ``3.0``), ``rho_max`` (default ``1e16``), and ``h_tol`` (default ``1e-8``): gate
-          temperature and the acyclicity-penalty schedule.
-        - ``labels`` (default ``None``): node names; a DataFrame's column names take precedence.
 
     Returns
     -------
@@ -1358,8 +1393,6 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     ------
     ImportError
         If the ``[torch]`` extra is not installed.
-    TypeError
-        If ``params`` holds a name the solver does not accept.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if the fit's
@@ -1369,11 +1402,11 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     Notes
     -----
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
-    the variable most dependent on it given those already added (Fisher-Z at level ``alpha``),
-    then drops any member the others make independent of it. The most dependent variable has the
-    largest absolute partial correlation; equal ones are chosen by each column's rank, as in
-    :func:`~andrey.hc`. A pair is a candidate edge, in either direction, when each is in the other's
-    set.
+    the variable most dependent on it given those already added (Fisher-Z at level
+    ``screen_alpha``), then drops any member the others make independent of it. The most dependent
+    variable has the largest absolute partial correlation; equal ones are chosen by each column's
+    rank, as in :func:`~andrey.hc`. A pair is a candidate edge, in either direction, when each is in
+    the other's set.
 
     Each candidate edge ``i -> j`` has a weight and a gate. During the fit a gate is a
     Gumbel-Softmax sample [3]_, ``sigmoid((logit + noise) / tau)``, so ``lambda1`` times the sum
@@ -1386,7 +1419,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     after 50 steps, the loss changes by less than a ``1e-7`` fraction from one step to the next.
     Between rounds ``rho`` grows by the factor ``rho_mult``, the quadratic penalty method [6]_,
     until ``h`` of the noise-free gates ``sigmoid(logit / tau)`` is at most ``h_tol``, ``rho``
-    reaches ``rho_max``, or ``max_outer`` rounds have run; stopping on ``max_outer`` warns with
+    reaches ``rho_max``, or ``max_iter`` rounds have run; stopping on ``max_iter`` warns with
     :class:`~andrey.SearchLimitWarning`.
 
     If the edges that ``gate_threshold`` and ``w_threshold`` keep still form a cycle, edges are
@@ -1395,7 +1428,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5``,
     runs 40,000 steps per round at learning rate ``0.001``, and keeps every edge whose gate
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
-    larger ``max_outer`` runs that schedule.
+    larger ``max_iter`` runs that schedule.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
     over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
@@ -1412,11 +1445,11 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     three fits of the next size ran past 1 h. The median fit took 3,332 s at 400 variables (mean
     degree 4, 2,000 rows). With mean degree 2 and ten rows per variable, the median fit took 18 s at
     10 variables and 59 s at 50, where its median errors were 15; the paper's schedule
-    (``lr=0.001``, ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
+    (``lr=0.001``, ``max_iter=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
     ``w_threshold=0.0``) took 174 s and 472 s for median errors of 6 and 12. Every optimizer step
     computes a determinant and a matrix power of the full weight matrix, one row and one column per
     variable, so a step's cost grows with the cube of the variable count; the defaults allow up to
-    75,000 steps (``max_outer`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
+    75,000 steps (``max_iter`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
     local optimum: on a collider whose two parents are independent, it can return both edges
     reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
     The numbers are a reference, not a hard limit: they change with the data generator, the density,
@@ -1457,7 +1490,24 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     X = data_matrix(data, method="calm")
     labels = column_labels(data)
     with copies_named(labels):
-        result = _calm(X, seed=seed, **params)  # ty: ignore[invalid-argument-type]  # an int here
+        result = _calm(
+            X,
+            lambda1=lambda1,
+            alpha=screen_alpha,
+            tau=tau,
+            rho_init=rho_init,
+            rho_mult=rho_mult,
+            rho_max=rho_max,
+            h_tol=h_tol,
+            max_outer=max_iter,
+            subproblem_iter=subproblem_iter,
+            lr=lr,
+            w_threshold=w_threshold,
+            gate_threshold=gate_threshold,
+            standardize=standardize,
+            use_moral_graph=use_moral_graph,
+            seed=seed,  # ty: ignore[invalid-argument-type]  # an int here
+        )
     return structure_output(
         result.dag,
         labels=labels,

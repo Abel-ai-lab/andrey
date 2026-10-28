@@ -189,6 +189,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
                     "flag": inp.flag,
                     "kind": inp.kind,
                     "required": inp.required,
+                    "aliases": list(inp.aliases),
                     "description": inp.doc,
                 }
                 for inp in spec.data.inputs
@@ -197,7 +198,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "params": {
             "type": "object",
             "properties": {p.name: _param_schema(p) for p in spec.params},
-            "additionalProperties": spec.passthrough,
+            "additionalProperties": False,
         },
         "output": {
             "structure_type": spec.output.structure_type,

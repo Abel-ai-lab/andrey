@@ -54,6 +54,7 @@ def varma_lingam(
     prune: bool = False,
     structural_ma: bool = False,
     max_iter: int = 100,
+    measure: str = "pwling",
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from one multivariate time series with VARMA-LiNGAM.
@@ -90,6 +91,9 @@ def varma_lingam(
         first. With ``criterion`` set, every fit in the grid gets these limits. A fit that reaches
         either without converging warns with :class:`~andrey.SearchLimitWarning`; raise
         ``max_iter`` to let it run on.
+    measure : {"pwling"}, default="pwling"
+        How the instantaneous order search, DirectLiNGAM on the innovations, picks the most
+        exogenous variable; ``"pwling"`` is DirectLiNGAM's pairwise likelihood-ratio measure.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
@@ -212,6 +216,7 @@ def varma_lingam(
         prune=prune,
         structural_ma=structural_ma,
         max_iter=max_iter,
+        measure=measure,
         constraints=constraints,
         name=column_namer(labels),
     )
@@ -221,34 +226,34 @@ def varma_lingam(
 
 @method_spec("longitudinal_lingam")
 def longitudinal_lingam(
-    data_list: Sequence[npt.ArrayLike],
+    data: Sequence[npt.ArrayLike],
     *,
-    n_lags: int = 1,
+    tau_max: int = 1,
     measure: str = "pwling",
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from panel data with Longitudinal LiNGAM.
 
     Longitudinal LiNGAM [1]_ handles the same units measured at several time points: at each
-    occasion it regresses out the past ``n_lags`` time points, then applies DirectLiNGAM to orient
+    occasion it regresses out the past ``tau_max`` time points, then applies DirectLiNGAM to orient
     the instantaneous effects. Use it for repeated-measures / panel designs rather than one long
     series.
 
     Parameters
     ----------
-    data_list : sequence of array-like, each of shape (n_samples, n_variables)
+    data : sequence of array-like, each of shape (n_samples, n_variables)
         One dataset per time point, over the same units and identical shape. Each is coerced to
         ``float64``. DataFrames must name their columns alike; the names become the structure's
         ``labels``.
-    n_lags : int, default=1
-        Number of past time points regressed out before the instantaneous fit, from ``1`` to the
-        number of time points minus one.
+    tau_max : int, default=1
+        The largest lag: the number of past time points regressed out before the instantaneous
+        fit, from ``1`` to the number of time points minus one.
     measure : {"pwling"}, default="pwling"
         How the instantaneous order search picks the most exogenous variable; ``"pwling"`` is
         DirectLiNGAM's pairwise likelihood-ratio measure.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
-        variables over lags ``0`` to ``n_lags``, the same at every time point: required and
+        variables over lags ``0`` to ``tau_max``, the same at every time point: required and
         forbidden links, the pairs allowed to be linked, and temporal tiers, all honored. A link
         ``(cause, effect, lag)`` is the link from ``cause`` at time point ``t - lag`` to
         ``effect`` at time point ``t``, lag ``0`` being the same time point; a forbidden
@@ -282,10 +287,10 @@ def longitudinal_lingam(
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if
-        ``data_list`` has fewer than two time points, if ``n_lags`` is at least the number of time
+        ``data`` has fewer than two time points, if ``tau_max`` is at least the number of time
         points, if the per-time arrays differ in shape, or if the DataFrames' column names differ.
         Also if ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
-        without a lag or beyond ``n_lags``.
+        without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -324,25 +329,25 @@ def longitudinal_lingam(
     >>> import numpy as np
     >>> from andrey import longitudinal_lingam
     >>> rng = np.random.default_rng(0)
-    >>> data_list = [rng.uniform(-1, 1, (200, 3)) for _ in range(4)]
-    >>> out = longitudinal_lingam(data_list, n_lags=1)
+    >>> panel = [rng.uniform(-1, 1, (200, 3)) for _ in range(4)]
+    >>> out = longitudinal_lingam(panel, tau_max=1)
     >>> out.structure.type
     'temporal'
     """
     from andrey.temporal.longitudinal import LongitudinalLiNGAM
 
     panel = [
-        data_matrix(X, name=f"data_list[{t}]", method="longitudinal_lingam", fix=DROP_UNITS)
-        for t, X in enumerate(data_list)
+        data_matrix(X, name=f"data[{t}]", method="longitudinal_lingam", fix=DROP_UNITS)
+        for t, X in enumerate(data)
     ]
     if len(panel) < 2:
-        raise ValueError(f"data_list must hold at least two time points, got {len(panel)}")
-    n_lags = int_in_range(n_lags, "n_lags", 1, len(panel) - 1)
-    labels = shared_labels(column_labels(X) for X in data_list)
+        raise ValueError(f"data must hold at least two time points, got {len(panel)}")
+    tau_max = int_in_range(tau_max, "tau_max", 1, len(panel) - 1)
+    labels = shared_labels(column_labels(X) for X in data)
     constraints = resolve_lagged(
-        knowledge, panel[0].shape[1], labels, n_lags, method="longitudinal_lingam"
+        knowledge, panel[0].shape[1], labels, tau_max, method="longitudinal_lingam"
     )
-    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure, constraints=constraints).fit(panel)
+    model = LongitudinalLiNGAM(n_lags=tau_max, measure=measure, constraints=constraints).fit(panel)
     return with_labels(_adapt_longitudinal_lingam(model), labels)
 
 
@@ -969,11 +974,13 @@ def lpcmci(
 
 
 @method_spec("granger")
-def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:
+def granger(
+    data: npt.ArrayLike, *, tau_max: int = 1, cv: int = 5, knowledge: Knowledge | None = None
+) -> StructureOutput:
     """Learn the lagged causal graph of a multivariate time series by lasso Granger causality.
 
     A variable Granger-causes another when its past improves the prediction of the other's
-    present [1]_. Each variable is regressed on the past ``maxlag`` steps of every variable by the
+    present [1]_. Each variable is regressed on the past ``tau_max`` steps of every variable by the
     lasso [2]_, with the penalty chosen by cross-validation; a nonzero coefficient is a lagged
     edge. Use it for one multivariate series whose effects take at least one time step.
 
@@ -982,15 +989,28 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     data : array-like of shape (n_samples, n_variables)
         A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
         column names become the structure's ``labels``.
-    maxlag : int, default=2
-        Number of past time steps each regression uses, at least 1.
+    tau_max : int, default=1
+        The largest lag: each regression uses the past ``tau_max`` time steps, at least ``1``.
     cv : int, default=5
         Number of cross-validation folds that choose each regression's penalty, at least 2.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over lags ``1`` to ``tau_max``: required and forbidden links, the pairs allowed
+        to be linked, and temporal tiers, all honored. A link ``(cause, effect, lag)`` is the link
+        from ``cause`` at time ``t - lag`` to ``effect`` at time ``t``; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
+        ``1`` to ``tau_max`` (the method learns no same-step links). Each variable's regression
+        drops its forbidden lagged regressors and keeps its required ones unpenalized: the lasso
+        selects among the other regressors on what the required ones leave of the variable, and a
+        required link's weight is the least-squares weight of what the selected regressors leave of
+        the variable. Tiers forbid every link from a later tier into an earlier one, and a pair
+        left out of ``allowed`` has no link at any lag; a variable's links to its own past stay
+        allowed.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to ``maxlag``
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to ``tau_max``
         and no lag 0. ``structure.lag(k)`` is a ``digraph`` with the edge ``i -> j`` when
         ``x_i(t - k)`` has a nonzero coefficient in the regression of ``x_j(t)``, self-loops
         included; ``structure.lag_weights[k - 1][i, j]`` is that coefficient, in the data's units.
@@ -998,11 +1018,14 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
 
     Raises
     ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than ``maxlag + cv`` rows, so that some fold would hold no time step, or if ``data``
-        has fewer than 2 columns.
+        fewer than ``tau_max + cv`` rows, so that some fold would hold no time step, or if ``data``
+        has fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, or requires a link without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -1027,13 +1050,14 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian VAR(2) series with no same-step links,
-    standardized, from 10 to 160 variables with 1,000 time steps, with ``maxlag=2``. It found most
+    standardized, from 10 to 160 variables with 1,000 time steps, with ``tau_max=2``. It found most
     true lagged edges but returned many false ones, so its median errors (missing and extra lagged
     edges) exceeded the empty graph's at every size: on half the series at 10 variables and on all
     of them from 20 on. It assumes linear effects and tests no same-step effects. Each variable's
-    regression takes ``maxlag`` lags of every variable as inputs, so the work grows with ``maxlag``
-    and with the square of the number of variables. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    regression takes ``tau_max`` lags of every variable as inputs, so the work grows with
+    ``tau_max`` and with the square of the number of variables. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1051,23 +1075,33 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(500)
     >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
-    >>> out = granger(np.column_stack([x, y]), maxlag=1)
+    >>> out = granger(np.column_stack([x, y]))
     >>> round(float(out.structure.lag_weights[0][0, 1]), 1)
     0.8
     """
     from andrey.temporal.granger import granger_lasso
 
     # LassoCV needs a time step in every fold.
-    X = data_matrix(data, min_rows=maxlag + cv, method="granger", fix=FILL_STEPS)
+    X = data_matrix(data, min_rows=tau_max + cv, method="granger", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
+    labels = column_labels(data)
+    constraints = resolve_lagged(
+        knowledge, X.shape[1], labels, tau_max, method="granger", contemporaneous=False
+    )
     peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
     spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
-    coeff = granger_lasso((X / peak - (X / peak).mean(axis=0)) / spread, maxlag=maxlag, cv=cv)
+    coeff = granger_lasso(
+        (X / peak - (X / peak).mean(axis=0)) / spread,
+        maxlag=tau_max,
+        cv=cv,
+        forbidden=None if constraints is None else constraints.forbidden[1:],
+        required=None if constraints is None else constraints.required[1:],
+    )
     scale = spread * peak
     # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units.
     # Units far apart can overflow the ratio; a zero weight stays zero rather than becoming NaN.
     with np.errstate(over="ignore", invalid="ignore"):
-        ratio = scale[:, None] / np.tile(scale, maxlag)[None, :]
+        ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, X.shape[1], maxlag), column_labels(data))
+    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max), labels)

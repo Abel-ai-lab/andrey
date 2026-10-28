@@ -66,7 +66,7 @@ def test_is_a_user_warning():
 
 
 #: Settings that shorten a slow fit; the facade path stays the same.
-SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 
 
 @pytest.mark.parametrize("name", sorted(n for n, s in REGISTRY.items() if s.status == "supported"))

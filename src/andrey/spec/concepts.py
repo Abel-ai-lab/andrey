@@ -455,7 +455,6 @@ _CONCEPTS = (
         default_rule="Each paper's default.",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No continuous objective.",
-        deviations=_absent("0.11.0", "Passed through **params.", "calm"),
     ),
     Concept(
         key="w_threshold",
@@ -470,7 +469,6 @@ _CONCEPTS = (
         fragment="weight magnitude",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No weighted continuous fit to threshold.",
-        deviations=_absent("0.11.0", "Passed through **params.", "calm"),
     ),
     Concept(
         key="max_depth",
@@ -603,7 +601,6 @@ _CONCEPTS = (
             "varma_lingam",
         ),
         others_exempt="No iterative loop that a cap stops early.",
-        deviations=_absent("0.11.0", "The main loop's cap is max_outer, in **params.", "calm"),
     ),
     Concept(
         key="cap_warning",
@@ -636,26 +633,6 @@ _CONCEPTS = (
                     for m in ALL_METHODS
                     if m not in (*PCMCI_FAMILY, "granger", "longitudinal_lingam", "varma_lingam")
                 ),
-            ),
-        ),
-        deviations=(
-            Deviation(
-                method="granger",
-                name="maxlag",
-                default=2,
-                fixed_in="0.11.0",
-                aliases=("maxlag",),
-                fragment="past time steps",
-                reason="Another name, and the default 2 moves to 1.",
-            ),
-            Deviation(
-                method="longitudinal_lingam",
-                name="n_lags",
-                default=1,
-                fixed_in="0.11.0",
-                aliases=("n_lags",),
-                fragment="past time points",
-                reason="Another name.",
             ),
         ),
     ),
@@ -734,11 +711,6 @@ _CONCEPTS = (
                 "mmpc",
             ),
             *_absent("0.12.0", "A mask in the gated objective.", "calm"),
-            *_absent(
-                "0.11.0",
-                "Drop forbidden lagged regressors and keep required ones unpenalized.",
-                "granger",
-            ),
         ),
     ),
     Concept(
@@ -876,38 +848,11 @@ _CONCEPTS = (
         ),
         suitable=(),
         others_exempt="Labels come from a DataFrame's columns.",
-        deviations=(
-            Deviation(
-                method="gin",
-                name="labels",
-                default=None,
-                fixed_in="0.11.0",
-                aliases=("labels",),
-                fragment="",
-                reason="Names the observed columns.",
-            ),
-        ),
     ),
     Concept(
         key="data",
         summary="The first argument is data: a matrix, or a sequence of matrices for a panel.",
         suitable=ALL_METHODS,
-        deviations=(
-            Deviation(
-                method="multi_group_direct_lingam",
-                name="data_groups",
-                fixed_in="0.11.0",
-                aliases=("data_groups",),
-                reason="Another name for a panel.",
-            ),
-            Deviation(
-                method="longitudinal_lingam",
-                name="data_list",
-                fixed_in="0.11.0",
-                aliases=("data_list",),
-                reason="Another name for a panel.",
-            ),
-        ),
     ),
     Concept(
         key="measure",
@@ -927,12 +872,6 @@ _CONCEPTS = (
             "longitudinal_lingam",
         ),
         others_exempt="No DirectLiNGAM order search.",
-        deviations=_absent(
-            "0.11.0",
-            "Runs DirectLiNGAM's order search with one measure.",
-            "multi_group_direct_lingam",
-            "varma_lingam",
-        ),
     ),
     Concept(
         key="collider_rule",

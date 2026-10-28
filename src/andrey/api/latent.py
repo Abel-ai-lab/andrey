@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix
 from andrey.api._method import method_spec
-from andrey.core.structure import node_labels
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -22,9 +21,7 @@ if TYPE_CHECKING:
 
 
 @method_spec("gin")
-def gin(
-    data: npt.ArrayLike, *, alpha: float = 0.05, labels: tuple[str, ...] | None = None
-) -> StructureOutput:
+def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
     """Learn a latent-variable DAG over observed indicators and their hidden latents with GIN.
 
     GIN exploits the Generalized Independent Noise condition in a linear non-Gaussian model to
@@ -35,15 +32,13 @@ def gin(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed indicator data, one row per sample. Coerced to ``float64``.
+        Observed indicator data, one row per sample. Coerced to ``float64``. A DataFrame's column
+        names become the observed variables' labels, else ``X1..Xn``; latents are named ``L1``,
+        ``L2``, and so on, skipping a name an observed variable has.
     alpha : float, default=0.05
         Significance level of the pooled independence test, in ``(0, 1)``. A group of variables
         forms a cluster, and a latent is the next in the order, when the test's p-value is at
         least ``alpha``, so larger values make each test harder to pass.
-    labels : tuple of str or None, default=None
-        Optional names for the observed variables, one per column, each taken as text,
-        ``str(label)``. Defaults to a DataFrame's column names, else ``X1..Xn``. Latents are
-        named ``L1``, ``L2``, and so on, skipping a name an observed variable has.
 
     Returns
     -------
@@ -63,8 +58,8 @@ def gin(
     ------
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``labels``
-        does not give one name per column of ``data`` or gives two that are equal as text.
+        message names the method, the argument, what it accepts, and the value. Also if two of
+        ``data``'s column names are equal as text.
 
     Notes
     -----
@@ -141,9 +136,4 @@ def gin(
     from andrey.latent.gin import gin_structure
 
     X = data_matrix(data, method="gin")
-    if labels is not None and len(labels) != X.shape[1]:
-        raise ValueError(
-            f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
-        )
-    names = node_labels(labels) if labels is not None else column_labels(data)
-    return gin_structure(X, alpha=alpha, labels=names)
+    return gin_structure(X, alpha=alpha, labels=column_labels(data))

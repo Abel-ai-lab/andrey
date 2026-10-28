@@ -191,8 +191,8 @@ def inputs(method: str, *, codes: bool) -> list:
 
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
-SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
-AT_CAP = {"calm": {"max_outer": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
 def fit(method: str, *, codes: bool, **kwargs):
@@ -580,6 +580,40 @@ def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         getattr(andrey, method)(*data, **{arg: 3})  # the message warns once
+
+
+ALIASED = [
+    pytest.param(m, a.name, old, id=f"{m}-{old}")
+    for m, spec in REGISTRY.items()
+    for a in (*spec.data.inputs, *spec.params)
+    for old in a.aliases
+]
+
+
+@pytest.mark.parametrize(("method", "name", "old"), ALIASED)
+def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warning(
+    method, name, old
+):
+    spec = REGISTRY[method]
+    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
+    as_input = argument in spec.data.inputs
+    data = inputs(method, codes=False)
+    settings = dict(SHORT.get(method, {}))
+    value = data[0] if as_input else settings.pop(name, argument.default)
+
+    def call(**named):
+        out = getattr(andrey, method)(*(() if as_input else data), **settings, **named)
+        return [o.structure for o in (out if isinstance(out, list) else [out])]
+
+    expected = call(**{name: value})
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{old} is now {name}"):
+        assert call(**{old: value}) == expected
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        call(**{old: value})  # the message warns once
+    with pytest.raises(ValueError, match=f"pass only {name}"):
+        call(**{old: value, name: value})
 
 
 def renamed(monkeypatch, method: str, name: str, **update) -> None:
