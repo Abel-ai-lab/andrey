@@ -17,7 +17,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from andrey.api._experimental import warn_experimental
-from andrey.core.ci import SHIPPED_INDEP_TESTS, available_indep_tests
+from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
 from andrey.core.seeding import resolve_seed
 from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 
@@ -41,13 +41,14 @@ def spec_of(name: str) -> MethodSpec:
 def method_spec(name: str) -> Callable[[Facade], Facade]:
     """Run the facade of method ``name`` inside the steps its spec defines.
 
-    Before the facade: a former argument name or value becomes the current one, with one
-    :class:`~andrey.DeprecatedArgumentWarning` for each; every argument the call passes is checked
-    and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
-    ``ValueError``; a seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`)
-    and passed on as an int; an experimental method warns :class:`~andrey.ExperimentalWarning`.
-    After it: each result's ``metadata["algorithm"]`` is ``name`` and, for a seeded method,
-    ``metadata["seed"]`` is the seed used.
+    Before the facade: a former argument name or value becomes the current one, and a dropped
+    argument is removed, with one :class:`~andrey.DeprecatedArgumentWarning` for each; every
+    argument the call passes is checked and converted by
+    :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or ``ValueError``; a
+    seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
+    an int; an experimental method warns :class:`~andrey.ExperimentalWarning`.
+    After it: each result's ``metadata["algorithm"]`` is ``name`` and, when the fit draws random
+    numbers (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used.
     """
 
     def decorate(facade: Facade) -> Facade:
@@ -65,8 +66,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                     bound.arguments[key] = param.check(value, name, choices=choices)
             stamp: dict[str, object] = {"algorithm": name}
             if spec.seeded:
-                seed = next(p.name for p in spec.params if p.concept == "seed")
-                stamp["seed"] = bound.arguments[seed] = resolve_seed(bound.arguments.get(seed))
+                seed = bound.arguments["seed"] = resolve_seed(bound.arguments.get("seed"))
+                if draws_random_numbers(spec, bound.arguments):
+                    stamp["seed"] = seed
             if spec.status == "experimental":
                 warn_experimental(name)
             out = facade(*bound.args, **bound.kwargs)
@@ -77,6 +79,16 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
 
     return decorate
+
+
+def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
+    """Whether a fit of the seeded method ``spec`` with ``arguments`` draws random numbers.
+
+    A method with an ``indep_test`` draws them only under a randomized test
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); every other seeded method always does.
+    """
+    test = next((p for p in spec.params if p.name == "indep_test"), None)
+    return test is None or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
 
 
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
@@ -91,10 +103,19 @@ def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return ``kwargs`` with each former name and value of ``spec``'s parameters made current.
 
-    Each former name or value warns once at the caller's line. Raises ``ValueError`` when a call
-    passes a parameter under both its former and its current name.
+    Each former name or value warns once at the caller's line, and so does each dropped argument,
+    which is removed. Raises ``ValueError`` when a call passes a parameter under both its former
+    and its current name.
     """
     kwargs = dict(kwargs)
+    for old in spec.dropped_args:
+        if old in kwargs:
+            del kwargs[old]
+            warn_once(
+                f"andrey.{spec.name}: {old} is ignored and stops being accepted in the next "
+                "release; drop it",
+                DeprecatedArgumentWarning,
+            )
     for param in spec.params:
         for old in param.aliases:
             if old not in kwargs:

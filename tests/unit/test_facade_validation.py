@@ -307,7 +307,7 @@ def test_granger_needs_a_time_step_in_every_fold():
 
 LINGAM_PRUNED = {
     "direct_lingam": andrey.direct_lingam,
-    "ica_lingam": partial(andrey.ica_lingam, random_state=0),
+    "ica_lingam": partial(andrey.ica_lingam, seed=0),
     "multi_group_direct_lingam": lambda x: andrey.multi_group_direct_lingam([x, x]),
 }
 
@@ -431,8 +431,8 @@ def test_pcmciplus_takes_one_variable():
         ({"n_preliminary_iterations": -1}, ValueError, "n_preliminary_iterations"),
         ({"n_preliminary_iterations": 1.5}, TypeError, "n_preliminary_iterations"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
-        ({"max_depth": -1}, ValueError, "max_depth"),
-        ({"max_depth": 1.5}, TypeError, "max_depth"),
+        ({"max_p_global": -1}, ValueError, "max_p_global"),
+        ({"max_p_global": 1.5}, TypeError, "max_p_global"),
     ],
 )
 def test_lpcmci_checks_its_parameters(params, error, name):
@@ -472,8 +472,8 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
 @pytest.mark.parametrize(
     ("fit", "setting", "value", "error"),
     [
-        *[(andrey.rcd, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
-        (andrey.rcd, "max_explanatory_vars", 1.5, TypeError),
+        *[(andrey.rcd, "max_depth", bad, ValueError) for bad in (0, -1)],
+        (andrey.rcd, "max_depth", 1.5, TypeError),
         *[
             (andrey.rcd, level, bad, ValueError)
             for level in ("cor_alpha", "alpha", "shapiro_alpha")

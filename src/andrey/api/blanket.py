@@ -45,6 +45,8 @@ def _fit(
     indep_test: str | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
+    seed: int | None,
+    max_depth: int | None,
 ) -> StructureOutput:
     """Check the settings, run the search, and wrap its sets as undirected edges."""
     from andrey.search.hybrid import local_graph, local_set
@@ -62,7 +64,13 @@ def _fit(
     labels = column_labels(data)
     d = X.shape[1]
     t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
-    settings = {"alpha": alpha, "indep_test": indep_test, "categorical": mask}
+    settings = {
+        "alpha": alpha,
+        "indep_test": indep_test,
+        "categorical": mask,
+        "seed": seed,
+        "max_depth": max_depth,
+    }
     metadata: dict[str, object] = {}
     with copies_named(labels), rows_tested() as rows:
         if t is None:
@@ -87,6 +95,8 @@ def iamb(
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with incremental association (IAMB).
 
@@ -116,6 +126,17 @@ def iamb(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. Every test
+        conditions on the whole current blanket, so the blanket stops growing once it holds more
+        than ``max_depth`` members.
 
     Returns
     -------
@@ -128,6 +149,7 @@ def iamb(
         ``target``, ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -218,6 +240,8 @@ def iamb(
         indep_test=indep_test,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -230,6 +254,8 @@ def inter_iamb(
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with interleaved IAMB (Inter-IAMB).
 
@@ -258,6 +284,17 @@ def inter_iamb(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. Every test
+        conditions on the whole current blanket, so the blanket stops growing once it holds more
+        than ``max_depth`` members.
 
     Returns
     -------
@@ -270,6 +307,7 @@ def inter_iamb(
         ``target``, ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
         members in the order they joined, by column label or 0-based position. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -360,6 +398,8 @@ def inter_iamb(
         indep_test=indep_test,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -372,6 +412,8 @@ def mmpc(
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's parents and children with max-min parents and children (MMPC).
 
@@ -401,6 +443,16 @@ def mmpc(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. A test
+        conditions on a subset of the current set; the set itself may grow larger.
 
     Returns
     -------
@@ -411,6 +463,7 @@ def mmpc(
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``
         lists the members in the order they joined, by column label or 0-based position. Under a
         mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -507,4 +560,6 @@ def mmpc(
         indep_test=indep_test,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
     )

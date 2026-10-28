@@ -24,7 +24,7 @@ from typing import Any, Literal
 from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
-from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.score import LINEAR_SCORES, SCORES
 
 from .models import ParamSpec, ParamType, Spec
@@ -367,7 +367,7 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
-                "max_extra_depth.",
+                "max_p_global.",
                 "lpcmci",
             ),
             *_exempt(
@@ -384,58 +384,38 @@ _CONCEPTS = (
             ),
         ),
         deviations=(
-            *_absent(
-                "0.11.0",
-                "Its tests condition on growing sets; bnlearn exposes the cap as max.sx.",
-                "iamb",
-                "inter_iamb",
-                "mmpc",
-                "mmhc",
-                "rsmax2",
-            ),
-            *_absent(
-                "0.11.0",
-                "PCMCI's PC1 step and PCMCI+'s skeleton phase condition on growing sets.",
-                "pcmci",
-                "pcmciplus",
-            ),
             Deviation(
                 method="rcd",
-                name="max_explanatory_vars",
+                name="max_depth",
                 default=2,
-                fixed_in="0.11.0",
-                aliases=("max_explanatory_vars",),
-                fragment="regressed out together",
-                reason="The same cap under another name; the default 2 stays, for cost.",
+                fixed_in=None,
+                reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
+                "one when there are fewer rows than variables; the minimum is 1, since the "
+                "smallest ancestor test regresses one variable on another.",
             ),
         ),
     ),
     Concept(
-        key="max_extra_depth",
+        key="max_p_global",
         summary="The largest number of conditions beyond the default conditions every test "
-        "includes.",
+        "includes (tigramite's LPCMCI name).",
         param=_template(
-            "max_extra_depth",
+            "max_p_global",
             "int",
             None,
-            "The largest number of neighbors a removal step conditions on beyond the default "
-            "conditions, at least 0; null sets no limit.",
+            "The most conditions a test takes beyond the default conditions, at least 0; null sets "
+            "no limit.",
             nullable=True,
             minimum=0,
         ),
         fragment="beyond the default condition",
-        suitable=("lpcmci",),
-        others_exempt="Its tests include no default conditions to count beyond.",
-        deviations=(
-            Deviation(
-                method="lpcmci",
-                name="max_depth",
-                default=None,
-                fixed_in="0.11.0",
-                reason="max_depth means the whole conditioning set elsewhere; the name is new in "
-                "0.11.0, so no alias.",
-            ),
+        suitable=("lpcmci", "pcmciplus"),
+        exempt=_exempt(
+            "MCI conditions on the default conditions alone, one test per link; PC1 has none "
+            "(max_depth).",
+            "pcmci",
         ),
+        others_exempt="Its tests include no default conditions to count beyond.",
     ),
     Concept(
         key="max_parents",
@@ -467,17 +447,6 @@ _CONCEPTS = (
             *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
         ),
         deviations=(
-            *_absent(
-                "0.11.0",
-                "Adds parents move by move or enumerates parent sets.",
-                "hc",
-                "tabu",
-                "exact_search",
-                "boss",
-                "grasp",
-                "mmhc",
-                "rsmax2",
-            ),
             *_absent(
                 "0.12.0",
                 "A cap on the represented DAGs interacts with the forward phase's gate.",
@@ -528,18 +497,6 @@ _CONCEPTS = (
             "varma_lingam",
         ),
         others_exempt="No iterative loop that a cap stops early.",
-        deviations=(
-            *(
-                Deviation(method=m, observed="", fixed_in="0.11.0", reason="Stops silently.")
-                for m in (*_CONTINUOUS, "calm", "varma_lingam")
-            ),
-            Deviation(
-                method="ica_lingam",
-                observed="ConvergenceWarning",
-                fixed_in="0.11.0",
-                reason="scikit-learn's ConvergenceWarning, which is not an AndreyWarning.",
-            ),
-        ),
     ),
     Concept(
         key="tau_max",
@@ -581,7 +538,9 @@ _CONCEPTS = (
     ),
     Concept(
         key="seed",
-        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset.",
+        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset. A "
+        "method that tests independence takes it for the randomized tests: "
+        f"{', '.join(STOCHASTIC_INDEP_TESTS)}.",
         param=_template(
             "seed",
             "int",
@@ -611,33 +570,6 @@ _CONCEPTS = (
                 *_RESIDUAL,
             ),
         ),
-        deviations=(
-            *_absent(
-                "0.11.0",
-                "indep_test='rcot', 'cmiknn', or 'gpdc' draws random numbers from ANDREY_SEED.",
-                *CI_SEARCHES,
-            ),
-            Deviation(
-                method="ica_lingam",
-                name="random_state",
-                default=None,
-                fixed_in="0.11.0",
-                aliases=("random_state",),
-                reason="scikit-learn's name.",
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="random_state",
-                    default=None,
-                    fixed_in="0.11.0",
-                    aliases=("random_state",),
-                    fragment="",
-                    reason="Deterministic, yet takes a random_state it ignores.",
-                )
-                for m in ("direct_lingam", "multi_group_direct_lingam")
-            ),
-        ),
     ),
     Concept(
         key="num_workers",
@@ -652,16 +584,6 @@ _CONCEPTS = (
         ),
         suitable=(),
         others_exempt="Execution settings come from andrey.config or ANDREY_* only.",
-        deviations=(
-            Deviation(
-                method="bootstrap",
-                name="num_workers",
-                default=None,
-                fixed_in="0.11.0",
-                fragment="",
-                reason="Sizes the outer pool; new in 0.11.0, so no alias.",
-            ),
-        ),
     ),
     Concept(
         key="knowledge",
@@ -802,6 +724,25 @@ _CONCEPTS = (
                 "bottom_up_parce_lingam",
             ),
             *_exempt("A series cannot drop a step.", "granger"),
+        ),
+    ),
+    Concept(
+        key="units",
+        summary="Rescaling a column changes no graph and no order: a numerical step that would "
+        "read the data's units runs on unit-scale columns (andrey.core.units).",
+        suitable=tuple(m for m in ALL_METHODS if m not in ("ica_lingam", *_CONTINUOUS, "calm")),
+        exempt=(
+            *_exempt(
+                "Matching the unmixing rows to the variables by 1/|W| and pruning |B| from the "
+                "smallest read the data's units (Shimizu et al. 2011, Sec. 2.4).",
+                "ica_lingam",
+            ),
+            *_exempt(
+                "The least-squares score with an l1 penalty and a weight threshold reads the "
+                "data's units (Zheng et al. 2018; Bello et al. 2022). robust=True is under review.",
+                *_CONTINUOUS,
+            ),
+            *_exempt("Not measured yet: its fit needs torch.", "calm"),
         ),
     ),
     Concept(

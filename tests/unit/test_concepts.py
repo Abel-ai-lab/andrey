@@ -22,7 +22,8 @@ from andrey.api import _method as method_wrapper
 from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CONCEPTS, Concept
+from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, Concept
+from tests.recovery.helpers import datagen
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 #: Public callables outside the registry that a concept may name.
@@ -118,6 +119,12 @@ def test_utility_cell(concept, deviation):
     assert deviation.name in live and live[deviation.name].default == deviation.default
 
 
+@pytest.mark.parametrize("utility", UTILITIES)
+def test_a_utility_takes_an_execution_setting_only_as_a_recorded_deviation(utility):
+    concept = CONCEPTS["num_workers"]
+    assert (concept.deviation(utility) is not None) == (concept.param.name in signature(utility))  # ty: ignore[possibly-missing-attribute]
+
+
 def docstring_entries(doc: str) -> dict[str, str]:
     """Each ``Parameters`` entry's description, lowercase, with markup and line breaks removed."""
     entries: dict[str, list[str]] = {}
@@ -185,7 +192,7 @@ def inputs(method: str, *, codes: bool) -> list:
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
 SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
-AT_CAP = {"calm": {"max_outer": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "warm_iter": 1}}
+AT_CAP = {"calm": {"max_outer": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
 def fit(method: str, *, codes: bool, **kwargs):
@@ -227,6 +234,79 @@ def non_value_errors(method: str) -> str:
     return ",".join(sorted(raised))
 
 
+#: Each method's data for the units check: the first ``UNIT_ROWS`` rows of a case of
+#: ``tests/recovery/helpers/datagen`` whose model the method fits.
+UNIT_CASES = {
+    **dict.fromkeys(
+        (
+            *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+            *("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+        ),
+        "gauss_5v",
+    ),
+    "direct_lingam": "lingam_5v_uniform",
+    "multi_group_direct_lingam": "mgdl_2groups",
+    "varma_lingam": "varma_3v",
+    "longitudinal_lingam": "panel_4v",
+    "pcmci": "var_3v_lag2",
+    "pcmciplus": "var_4v_stable",
+    "lpcmci": "var_6v_hidden",
+    "granger": "var_4v_stable",
+    "gin": "measurement_chain_9v",
+    "rcd": "confounded_fork_4v",
+    "bottom_up_parce_lingam": "confounded_fork_4v",
+    "anm": "anm_pair_cubic",
+    "pnl": "anm_pair_cubic",
+}
+UNIT_ROWS = 1000
+#: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
+UNIT_EXPONENTS = [np.random.default_rng(seed).integers(-20, 21, size=16) for seed in (9, 22)]
+
+
+def unit_inputs(method: str, exponents: np.ndarray) -> list:
+    """The method's case with variable ``j`` multiplied by ``2**exponents[j]``; a domain index
+    stays as it is."""
+    case = UNIT_CASES[method]
+    factors = np.ldexp(1.0, exponents)
+    args = []
+    for inp in REGISTRY[method].data.inputs:
+        if not inp.required:
+            continue
+        if inp.kind == "panel":
+            groups = datagen.generate_groups(case)
+            args.append([x[:UNIT_ROWS] * factors[: x.shape[1]] for x in groups])
+        elif inp.kind == "matrix":
+            x = datagen.generate(case)[:UNIT_ROWS]
+            args.append(x * factors[: x.shape[1]])
+        else:
+            args.append(datagen.domain_index(case)[:UNIT_ROWS])
+    return args
+
+
+def graphs_and_orders(out) -> list:
+    """The endpoint marks of every graph (each lag, occasion, and group) and every causal order."""
+    if isinstance(out, list):
+        return [graphs_and_orders(o) for o in out]
+    s = out.structure
+    if isinstance(s, andrey.TemporalStructure):
+        graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
+    else:
+        graphs = [s]
+    orders = {k: out.metadata.get(k) for k in ("causal_order", "causal_orders", "unordered")}
+    return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
+
+
+def unit_free(method: str) -> bool:
+    """Whether every graph and order stays the same with each variable in other units."""
+    fits = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
+            out = getattr(andrey, method)(*unit_inputs(method, exponents))
+            fits.append(graphs_and_orders(out))
+    return all(fit == fits[0] for fit in fits[1:])
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
@@ -239,6 +319,7 @@ OBSERVE = {
     ),
     "cap_warning": (stopped_at_cap, "SearchLimitWarning"),
     "invalid_choice": (non_value_errors, ""),
+    "units": (unit_free, True),
 }
 
 
@@ -310,20 +391,160 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
 
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
+#: The settings that make a CI search draw random numbers.
+RANDOMIZED = {m: {"indep_test": "rcot"} for m in CI_SEARCHES}
 
 
 @pytest.mark.parametrize("method", SEEDED)
 def test_a_seeded_fit_records_its_seed(method, monkeypatch):
     seed = tagged(CONCEPTS["seed"], method).name  # ty: ignore[possibly-missing-attribute]
-    out, _ = fit(method, codes=False, **SHORT.get(method, {}), **{seed: 7})
+    settings = {**SHORT.get(method, {}), **RANDOMIZED.get(method, {})}
+    out, _ = fit(method, codes=False, **settings, **{seed: 7})
     assert out.metadata["seed"] == 7
     monkeypatch.setenv("ANDREY_SEED", "11")
-    out, _ = fit(method, codes=False, **SHORT.get(method, {}))
+    out, _ = fit(method, codes=False, **settings)
     assert out.metadata["seed"] == 11
 
 
-def test_an_unseeded_fit_records_no_seed():
+def test_a_fit_that_draws_no_random_numbers_records_no_seed():
+    """A method without a seed, and a CI search under a deterministic test, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
+    for method in CI_SEARCHES:
+        out, _ = fit(method, codes=False, seed=7)
+        assert "seed" not in out.metadata, method
+
+
+# --- randomness -----------------------------------------------------------------------------------
+
+STOCHASTIC = ci.STOCHASTIC_INDEP_TESTS
+
+
+def takes_a_seed(test: str) -> bool:
+    """Whether the shipped test builds with a ``seed`` setting."""
+    codes = np.random.default_rng(0).integers(0, 3, (60, 3)).astype(float)
+    args = (codes, None) if test in ci.MIXED_INDEP_TESTS else (codes,)
+    try:
+        ci._CI_REGISTRY[test](*args, seed=1)
+    except TypeError:
+        return False
+    return True
+
+
+def test_the_stochastic_tests_are_the_ones_that_take_a_seed():
+    assert {t for t in ci.SHIPPED_INDEP_TESTS if takes_a_seed(t)} == set(STOCHASTIC)
+
+
+def test_seeded_stochastic_and_suitable_for_the_seed_concept_agree():
+    suitable = CONCEPTS["seed"].suitable
+    for method, spec in REGISTRY.items():
+        tests = next((p.choices for p in spec.params if p.name == "indep_test"), None) or ()
+        assert spec.seeded == (method in suitable) == (spec.determinism == "stochastic"), method
+        assert not set(tests) & set(STOCHASTIC) or spec.seeded, method
+        names = [p.name for p in spec.params if p.concept == "seed"]
+        assert names == (["seed"] if spec.seeded else []), method
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SampleSizeWarning")
+def test_the_stochastic_tests_give_other_p_values_for_another_seed():
+    data = inputs("pc", codes=False)[0].to_numpy()
+    queries = [(0, 2, ()), (0, 1, ()), (0, 2, (1,)), (1, 2, (0,))]
+    for name in STOCHASTIC:
+        draws = {
+            seed: [ci.make_indep_test(name, data, seed=seed)(*q) for q in queries]
+            for seed in (7, 8)
+        }
+        assert draws[7] == [ci.make_indep_test(name, data, seed=7)(*q) for q in queries], name
+        assert draws[7] != draws[8], name
+
+
+#: Settings that make a CI search build each test it has: the one over the data, the one in rank
+#: order, and the one that votes on colliders.
+CI_CASES = {
+    "pc": [{}, {"collider_rule": "conservative"}],
+    "fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
+    "gfci": [{}, {"possible_dsep": "fast"}],
+    "cdnod": [{}, {"collider_rule": "conservative"}],
+    "iamb": [{}, {"target": 0}],
+    "inter_iamb": [{}],
+    "mmpc": [{}, {"target": 0}],
+    "mmhc": [{}],
+    "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
+}
+
+
+def test_every_search_with_a_ci_test_has_cases():
+    assert set(CI_CASES) == set(CI_SEARCHES)
+
+
+@pytest.fixture
+def built_seeds(monkeypatch):
+    """The seed each randomized test a fit builds receives; ``None`` is none passed."""
+    seeds = []
+    for name in STOCHASTIC:
+
+        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+            seeds.append(options.get("seed"))
+            return _factory(data, *args, **options)
+
+        monkeypatch.setitem(ci._CI_REGISTRY, name, build)
+    return seeds
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "test"),
+    [
+        pytest.param(m, s, t, id=f"{m}-{t}-{'+'.join(s)}")
+        for m, cases in CI_CASES.items()
+        for s in cases
+        for t in STOCHASTIC
+    ],
+)
+def test_the_seed_reaches_every_randomized_test_a_search_builds(
+    method, settings, test, built_seeds, monkeypatch
+):
+    monkeypatch.setenv("ANDREY_SEED", "11")
+    out, _ = fit(method, codes=False, indep_test=test, seed=7, **settings)
+    assert built_seeds
+    assert set(built_seeds) == {7}
+    assert out.metadata["seed"] == 7
+
+
+@pytest.mark.parametrize("method", CI_SEARCHES)
+def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkeypatch):
+    results = []
+    for global_seed in ("0", "11"):
+        monkeypatch.setenv("ANDREY_SEED", global_seed)
+        out, _ = fit(method, codes=False, indep_test="rcot", seed=7)
+        results.append((out.structure.to_numpy().tolist(), out.metadata))
+    assert results[0] == results[1]
+
+
+def test_a_former_seed_name_maps_to_seed_for_one_release():
+    data = inputs("ica_lingam", codes=False)
+    expected = andrey.ica_lingam(*data, seed=3)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="random_state is now seed"):
+        out = andrey.ica_lingam(*data, random_state=3)
+    assert out.metadata["seed"] == 3 and out.ordering == expected.ordering
+
+
+DROPPED = [(m, arg) for m, spec in REGISTRY.items() for arg in spec.dropped_args]
+
+
+@pytest.mark.parametrize(("method", "arg"), DROPPED)
+def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
+    assert arg not in signature(method)
+    assert all(p.name != arg for p in REGISTRY[method].params)
+    data = inputs(method, codes=False)
+    first = lambda out: out[0] if isinstance(out, list) else out  # noqa: E731
+    expected = first(getattr(andrey, method)(*data))
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{arg} is ignored"):
+        out = first(getattr(andrey, method)(*data, **{arg: 3}))
+    assert out.ordering == expected.ordering
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        getattr(andrey, method)(*data, **{arg: 3})  # the message warns once
 
 
 def renamed(monkeypatch, method: str, name: str, **update) -> None:
@@ -398,6 +619,7 @@ def test_schema_carries_bounds_aliases_and_concepts():
 
     schema = help_schema()
     for name, spec in REGISTRY.items():
+        assert schema["methods"][name]["dropped_args"] == list(spec.dropped_args)
         properties = schema["methods"][name]["params"]["properties"]
         for p in spec.params:
             entry = properties[p.name]

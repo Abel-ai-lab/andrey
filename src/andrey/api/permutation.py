@@ -41,6 +41,7 @@ def boss(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     seed: int | None = None,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -78,6 +79,12 @@ def boss(
         Seed for the random order in which the search visits variables. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
         the same graph. Different seeds can reach different graphs.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the grow step of each variable's parent
+        search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
+        CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
+        the same largest number of parents). A cap can stop the search short of the lowest-scoring
+        graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -117,7 +124,8 @@ def boss(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        message names the method, the argument, what it accepts, and the value. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
         ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
         more rows than columns, is a linear function of other columns. One message names every group
@@ -274,6 +282,7 @@ def boss(
             score_func=score_func,
             categorical=mask,
             constraints=constraints,
+            max_parents=max_parents,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -288,6 +297,7 @@ def grasp(
     ebic_gamma: float = 1.0,
     depth: int = 3,
     seed: int | None = None,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -331,6 +341,12 @@ def grasp(
         Seed for the random starting order and the order in which the search visits variables.
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
         repeated calls return the same graph. Different seeds can reach different graphs.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the grow step of each variable's parent
+        search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
+        CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
+        the same largest number of parents). A cap can stop the search short of the lowest-scoring
+        graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -370,7 +386,8 @@ def grasp(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        message names the method, the argument, what it accepts, and the value. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
         ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
         more rows than columns, is a linear function of other columns. One message names every group
@@ -538,6 +555,7 @@ def grasp(
             score_func=score_func,
             categorical=mask,
             constraints=constraints,
+            max_parents=max_parents,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

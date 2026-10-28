@@ -22,6 +22,7 @@ import numpy as np
 from scipy.special import gammainc
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.units import unit_factors
 from andrey.lingam import adjacency
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
@@ -86,7 +87,13 @@ def _fisher_hsic_test(
 
 
 def _residual(X: np.ndarray, cov: np.ndarray, predictors: np.ndarray, target: int) -> np.ndarray:
-    """Least-squares residual of ``target`` on ``predictors``, solved through the covariance."""
+    """Least-squares residual of ``target`` on ``predictors``, solved through the covariance.
+
+    :func:`find_causal_order` passes unit-scale columns (:func:`~andrey.core.units.unit_factors`),
+    so the pseudo-inverse's cutoff, relative to the largest singular value, does not read the
+    predictors' units. The residual is then in the scaled target's units, which the HSIC test, on
+    a median-distance bandwidth, does not read.
+    """
     coef = np.dot(
         np.linalg.pinv(cov[np.ix_(predictors, predictors)]),
         cov[predictors, target].reshape(predictors.shape[0], 1),  # cov symmetric: [pred, target]
@@ -138,11 +145,12 @@ def find_causal_order(
     The returned order is source-first with any order-unknown block (more than one leftover) nested
     as a front sub-list in ``causal_order_``. With ``precedence`` (``precedence[a, b]``: ``a``
     comes before ``b``), a variable is a sink candidate only when no remaining variable must come
-    after it.
+    after it. The residuals are taken on unit-scale columns (:func:`_residual`).
     """
     d = X.shape[1]
     n = X.shape[0]
-    cov = np.cov(X, rowvar=False)
+    unit = X * unit_factors(X)
+    cov = np.cov(unit, rowvar=False)
     col_grams = [gamma_gram(X[:, [j]]) for j in range(d)]  # per-variable HSIC gram, cached once
     ranks = tie_ranks(X).tolist()
     U = np.arange(d)
@@ -154,7 +162,7 @@ def find_causal_order(
             candidates = None
             if precedence is not None:
                 candidates = U[~precedence[np.ix_(U, U)].any(axis=1)]
-            sink, fisher_p = _find_sink(X, cov, U, col_grams, n, ranks, candidates)
+            sink, fisher_p = _find_sink(unit, cov, U, col_grams, n, ranks, candidates)
             if fisher_p < threshold:
                 break
             resolved_sinks.append(sink)

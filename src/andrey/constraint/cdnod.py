@@ -84,6 +84,7 @@ def cdnod(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
@@ -109,7 +110,9 @@ def cdnod(
     step, which orients only undirected edges, so it never orients against them. ``workers``
     worker processes share the skeleton search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions
+    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
+    ``GraphStructure`` tagged ``"cpdag"``: its directions
     include those the index identifies, so it is not an observational CPDAG. The private
     ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
     ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``.
@@ -143,10 +146,11 @@ def cdnod(
             workers=workers,
             max_depth=max_depth,
             constraints=constraints,
+            seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
         if collider_rule != "sepsets":
-            test = make_indep_test(indep_test, X, categorical=categorical)
+            test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
             ambiguous |= vote_colliders(
                 skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
             )
@@ -172,10 +176,11 @@ def cdnod(
             workers=workers,
             max_depth=max_depth,
             constraints=padded,
+            seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
         if collider_rule != "sepsets":
-            test = make_indep_test(indep_test, augmented, categorical=mask)
+            test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()
             through_context = {(a, d, c) for a, c in combinations(sources, 2)}
             ambiguous |= vote_colliders(

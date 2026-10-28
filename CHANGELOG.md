@@ -33,6 +33,14 @@ change names its pull request.
   `score_func`, or `measure` raised `NotImplementedError` before.
   `metadata["algorithm"]` is the method's name, such as `"pc"` or `"ica_lingam"`, instead of a
   display name such as `"PC"` or `"ICALiNGAM"`. ([#496])
+- `ica_lingam` takes `seed` instead of `random_state`, and `direct_lingam` and
+  `multi_group_direct_lingam` no longer have the `random_state` they ignored. The old names still
+  work, with a `DeprecatedArgumentWarning`, in this release and stop in the next. ([#499])
+- `rcd` takes `max_depth` instead of `max_explanatory_vars`, the package-wide name of the cap on a
+  test's conditioning set; the default stays 2, its paper's setting. The old name still works, with
+  a `DeprecatedArgumentWarning`, in this release and stops in the next. scikit-learn's
+  `ConvergenceWarning` from FastICA in `ica_lingam` and from the LARS path of the LiNGAM methods'
+  adaptive Lasso is raised again as `andrey.SearchLimitWarning`. ([#505])
 - `indep_test=None` and `score_func=None` are the defaults of every method with a test or a score,
   and pick from the column types you declare, with `categorical` or a DataFrame's `category`,
   `bool`, or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when
@@ -70,8 +78,9 @@ change names its pull request.
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
   pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
-  time-series method on one series resamples blocks of rows; the result is the same at any
-  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
+  time-series method on one series resamples blocks of rows; the result is the same at any number of
+  workers, which `andrey.config` sets, and a seeded method fits each resample with a seed derived
+  from `seed`. `andrey bootstrap <method>` does the same from the command line. ([#396], [#499])
 - `scale="unitless"` in `andrey.data.sample_scm` and `SCM.sample` draws a linear model's weights
   and noise so that every variable has variance 1 and its parameters depend only on its number of
   parents (Herman et al. 2025), so on average neither the variances nor the share of each variable
@@ -108,12 +117,23 @@ change names its pull request.
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])
-- `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
-  the parents of both ends, which also bounds the subsets of the majority vote; unlike the
-  `max_depth` of `pc` and `fci`, it does not count those parents. Its number of tests grows
-  exponentially with the links at one node, so on many strongly related series an uncapped run may
-  not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
-  ([#468])
+- `lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test
+  takes beyond the default conditions, the parents of both ends, which also bounds the subsets of
+  the majority vote; unlike `max_depth`, it does not count those parents. On `pcmciplus`,
+  `max_depth` caps the lagged phase and `max_p_global` the same-step skeleton and collider phases.
+  Their number of tests grows exponentially with the links at one node, so on many strongly
+  related series an uncapped run may not finish; a cap bounds the number of tests. The default,
+  `None`, keeps the uncapped search. ([#468], [#505])
+- `max_depth`, the maximum conditioning-set size of every conditional-independence test, on every
+  method that grows conditioning sets: `iamb`, `inter_iamb`, and `mmpc`, the restrict phase of
+  `mmhc` and `rsmax2`, and the PC1 step of `pcmci` and `pcmciplus`, as on `pc`, `fci`, `gfci`, and
+  `cdnod`. `max_parents`, a cap on every node's parents in every DAG the result represents, on
+  `hc`, `tabu`, `exact_search`, `boss`, `grasp`, and the score phase of `mmhc` and `rsmax2`, as on
+  `ges`. Both default to `None`, no cap, which returns the graphs these methods returned before.
+  ([#505])
+- `notears`, `dagma`, `calm`, and `varma_lingam` warn once with `andrey.SearchLimitWarning` when
+  they stop on an iteration cap rather than on their own stopping rule, as `hc` and `tabu` do; each
+  docstring names the cap's unit. ([#505])
 - A fit larger than its method was measured to finish warns once per method with
   `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
   the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
@@ -179,6 +199,11 @@ change names its pull request.
   `direct_lingam`. ([#487])
 - `boss`, `grasp`, and `ica_lingam` record the seed they used in `metadata["seed"]`, as `calm`
   does. ([#496])
+- `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take `seed`,
+  which they pass to the `rcot`, `cmiknn`, and `gpdc` tests, the only tests that draw random
+  numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
+  depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
+  seed of a fit that uses one of those tests. ([#499])
 
 ### Fixed
 
@@ -192,6 +217,17 @@ change names its pull request.
   least-squares fit now runs again on the data divided by a power of two, and BIC picks its point
   on the whole path; a fit whose path reached the least-squares fit returns the same values as
   before. ([#478])
+- The LiNGAM methods, `varma_lingam`, and `gin` fit their regressions, covariances, and
+  time-series model on unit-scale columns and map the results back, so the units of the data no
+  longer change their graphs; on standardized data the LiNGAM methods return the same values as
+  before. ([#500])
+- `varma_lingam`'s `max_iter` raises the likelihood fit's evaluation limit with it. The optimizer
+  stopped after 15,000 function evaluations, which each iteration spends at about one per
+  parameter, however large `max_iter` was and without a warning, so raising `max_iter` could not
+  make a long fit converge. The limit is now 150 evaluations per iteration, the same 15,000 at the
+  default `max_iter=100`, and a fit that ends on it without converging warns with
+  `andrey.SearchLimitWarning` like one that ends on `max_iter`. Fits at the default `max_iter`
+  return the same values as before. ([#505])
 
 ## [0.10.0] - 2026-10-27
 
@@ -972,4 +1008,7 @@ First alpha release.
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
 [#496]: https://github.com/Abel-ai-lab/andrey/pull/496
+[#499]: https://github.com/Abel-ai-lab/andrey/pull/499
+[#500]: https://github.com/Abel-ai-lab/andrey/pull/500
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
+[#505]: https://github.com/Abel-ai-lab/andrey/pull/505

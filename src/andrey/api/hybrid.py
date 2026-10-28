@@ -48,6 +48,9 @@ def _fit(
     max_tabu: int | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
+    seed: int | None,
+    max_depth: int | None,
+    max_parents: int | None,
     knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the restrict and maximize phases, and wrap the CPDAG."""
@@ -87,6 +90,9 @@ def _fit(
             max_tabu=max_tabu,
             categorical=mask,
             constraints=constraints,
+            seed=seed,
+            max_depth=max_depth,
+            max_parents=max_parents,
         )
     metadata = {
         "score": json_safe(score),
@@ -109,6 +115,9 @@ def mmhc(
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with max-min hill climbing (MMHC).
@@ -152,6 +161,20 @@ def mmhc(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test in the MMPC phase,
+        at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller
+        cap runs fewer tests and can keep pairs that a larger conditioning set would remove.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the score search takes no move that gives a
+        node more than ``max_parents`` parents, so no DAG the returned CPDAG represents does (every
+        DAG of a class has the same largest number of parents). A cap can stop the search short of
+        the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The score search considers the
@@ -167,6 +190,7 @@ def mmhc(
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` are ``"mmpc"`` and ``"hc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -178,7 +202,8 @@ def mmhc(
         message names the method, the argument, what it accepts, and the value. Also if
         ``score_func`` and ``indep_test`` read different kinds of data, or if ``data`` or
         ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
-        :func:`~andrey.hc`. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
+        ``max_parents`` parents, or if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -272,6 +297,9 @@ def mmhc(
         max_tabu=None,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
+        max_parents=max_parents,
         knowledge=knowledge,
     )
 
@@ -292,6 +320,9 @@ def rsmax2(
     max_tabu: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with a restrict phase and a maximize phase.
@@ -343,6 +374,20 @@ def rsmax2(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test in the restrict
+        phase, at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A
+        smaller cap runs fewer tests and can keep pairs that a larger conditioning set would remove.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the score search takes no move that gives a
+        node more than ``max_parents`` parents, so no DAG the returned CPDAG represents does (every
+        DAG of a class has the same largest number of parents). A cap can stop the search short of
+        the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
@@ -358,6 +403,7 @@ def rsmax2(
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -370,7 +416,8 @@ def rsmax2(
         ``score_func`` is not a score ``maximize`` takes, if ``score_func`` and ``indep_test`` read
         different kinds of data, if ``max_tabu`` is greater than ``tabu_length``, or if ``data`` or
         ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
-        :func:`~andrey.hc`. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
+        ``max_parents`` parents, or if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -476,5 +523,8 @@ def rsmax2(
         max_tabu=max_tabu,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
+        max_parents=max_parents,
         knowledge=knowledge,
     )

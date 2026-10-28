@@ -48,6 +48,7 @@ def pc(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -111,6 +112,11 @@ def pc(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -137,6 +143,7 @@ def pc(
         ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
         unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
         column positions, the middle node second and ``x < y``, in ascending order.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -380,6 +387,7 @@ def pc(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
@@ -412,6 +420,7 @@ def fci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -476,6 +485,11 @@ def fci(
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -504,6 +518,7 @@ def fci(
         ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
         or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
         ``x < y``, in ascending order.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -709,6 +724,7 @@ def fci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
@@ -732,6 +748,7 @@ def gfci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -804,6 +821,11 @@ def gfci(
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -829,6 +851,7 @@ def gfci(
         ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
         ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in
         ascending order.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -994,6 +1017,7 @@ def gfci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
@@ -1015,6 +1039,7 @@ def cdnod(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -1080,6 +1105,11 @@ def cdnod(
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1113,6 +1143,7 @@ def cdnod(
         reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
         middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
         numbered ``n_variables``.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
@@ -1293,6 +1324,7 @@ def cdnod(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {

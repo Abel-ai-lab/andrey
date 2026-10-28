@@ -196,15 +196,18 @@ def _generate_parent_graph(
     n_vars: int,
     constraints: Constraints | None = None,
     tables: bool = True,
+    max_parents: int | None = None,
 ) -> list[_ParentEntry]:
     """Build a variable's parent graph: the maximal-candidate parent sets, sorted by score.
 
-    Enumerates candidate parent sets by increasing size and keeps only *maximal candidates* -- a set
-    is dropped when a subset scores lower, since it can then never be the optimal choice for any
-    available-variable set. The retained entries stay sorted by ascending score, so the first entry
-    within an available-variable set is its optimum (:func:`_subset_lookup`). Each enumerated set
-    records the lowest score of a retained set within it, so a set's subsets are looked up rather
-    than searched for; with ``tables`` false, each subset is found by :func:`_best_subset` instead.
+    Enumerates candidate parent sets by increasing size, up to ``max_parents`` members (required
+    parents included) when it is set, and keeps only *maximal candidates* -- a set is dropped when
+    a subset scores lower, since it can then never be the optimal choice for any available-variable
+    set. The retained entries stay sorted by ascending score, so the first entry within an
+    available-variable set is its optimum among the enumerated sets (:func:`_subset_lookup`). Each
+    enumerated set records the lowest score of a retained set within it, so a set's subsets are
+    looked up rather than searched for; with ``tables`` false, each subset is found by
+    :func:`_best_subset` instead.
 
     With ``constraints``, every set holds the node's required parents and adds parents that are
     neither forbidden nor required, and a set is compared only with its subsets that still hold
@@ -233,7 +236,10 @@ def _generate_parent_graph(
     lowest = np.full(1 << n_vars if tables else 0, np.inf)
     if tables:
         lowest[required_bits] = required_value
-    for size in range(1, len(candidates) + 1):
+    largest = len(candidates)
+    if max_parents is not None:
+        largest = min(largest, max_parents - len(required))
+    for size in range(1, largest + 1):
         level = itertools.combinations(candidates, size)
         while extras := list(itertools.islice(level, _SCORE_BATCH)):
             combos = [tuple(sorted(required + extra)) if required else extra for extra in extras]
@@ -388,6 +394,7 @@ def exact_search(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> GraphStructure:
@@ -422,6 +429,11 @@ def exact_search(
         ``2 * ebic_gamma * log C(n_vars - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    max_parents : int or None
+        Caps each node's parent set, required parents included: only parent sets of at most
+        ``max_parents`` members are scored, so the DAG is the score-optimal one among those within
+        the cap. ``None`` sets no cap. With a cap, ``constraints`` may not require more than
+        ``max_parents`` parents of a node (``ValueError``).
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
     constraints : Constraints or None
@@ -440,6 +452,14 @@ def exact_search(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {EXACT_SCORES}"
         )
+    if (
+        max_parents is not None
+        and constraints is not None
+        and (constraints.required.sum(axis=0) > max_parents).any()
+    ):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
     n_vars = X.shape[1]
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
@@ -457,7 +477,8 @@ def exact_search(
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES
     parent_graphs = [
-        _generate_parent_graph(score, i, n_vars, constraints, tables) for i in range(n_vars)
+        _generate_parent_graph(score, i, n_vars, constraints, tables, max_parents)
+        for i in range(n_vars)
     ]
 
     if search_method == "astar":

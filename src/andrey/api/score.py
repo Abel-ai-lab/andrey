@@ -671,6 +671,7 @@ def hc(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -708,6 +709,11 @@ def hc(
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
         adds at most one edge.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the search takes no move that gives a node
+        more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
+        (every DAG of a class has the same largest number of parents). A cap can stop the search
+        short of the lowest-scoring graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -743,7 +749,8 @@ def hc(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        message names the method, the argument, what it accepts, and the value. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
         ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
         more rows than columns, is a linear function of other columns. One message names every group
@@ -854,6 +861,7 @@ def hc(
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             max_iter=max_iter,
+            max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
         )
@@ -871,6 +879,7 @@ def tabu(
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -914,6 +923,11 @@ def tabu(
         Maximum moves, improving or not, at least ``1``; ``None`` sets no limit. The search still
         terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
         strictly lower.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the search takes no move that gives a node
+        more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
+        (every DAG of a class has the same largest number of parents). A cap can stop the search
+        short of the lowest-scoring graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -947,7 +961,8 @@ def tabu(
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``max_tabu``
-        is greater than ``tabu_length``, or, with a categorical score, if ``data`` holds a number
+        is greater than ``tabu_length``; if the required edges of ``knowledge`` give a node more
+        than ``max_parents`` parents; or, with a categorical score, if ``data`` holds a number
         that is not whole. With the BIC score, also if a column repeats another up to scale and
         shift given more than two rows or, with more rows than columns, is a linear function of
         other columns. One message names every group of copies and says to keep one column per
@@ -1055,6 +1070,7 @@ def tabu(
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
+            max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
         )
@@ -1070,6 +1086,7 @@ def exact_search(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -1108,6 +1125,11 @@ def exact_search(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the search scores only parent sets within it
+        and returns the best-scoring DAG whose every node keeps within it, so no DAG the returned
+        DAG represents gives a node more than ``max_parents`` parents (every DAG of a class has the
+        same largest number of parents). ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -1140,7 +1162,8 @@ def exact_search(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        message names the method, the argument, what it accepts, and the value. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
         ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
         more rows than columns, is a linear function of other columns. One message names every group
@@ -1265,6 +1288,7 @@ def exact_search(
             ebic_gamma=ebic_gamma,
             categorical=mask,
             constraints=constraints,
+            max_parents=max_parents,
         )
     return structure_output(
         dag,
@@ -1355,7 +1379,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     after 50 steps, the loss changes by less than a ``1e-7`` fraction from one step to the next.
     Between rounds ``rho`` grows by the factor ``rho_mult``, the quadratic penalty method [6]_,
     until ``h`` of the noise-free gates ``sigmoid(logit / tau)`` is at most ``h_tol``, ``rho``
-    reaches ``rho_max``, or ``max_outer`` rounds have run.
+    reaches ``rho_max``, or ``max_outer`` rounds have run; stopping on ``max_outer`` warns with
+    :class:`~andrey.SearchLimitWarning`.
 
     If the edges that ``gate_threshold`` and ``w_threshold`` keep still form a cycle, edges are
     removed in order of increasing weight magnitude until none does.

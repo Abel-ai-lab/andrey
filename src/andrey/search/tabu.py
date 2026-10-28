@@ -24,7 +24,7 @@ from andrey.core.score import (
     make_score,
 )
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.core.warning_policy import SearchLimitWarning, warn_once
+from andrey.core.warning_policy import warn_search_limit
 from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search.hc import MoveScanner, StructureKey, _apply_move, start_dag, tie_ranks
 
@@ -42,6 +42,7 @@ def _search(
     max_iter: int | None,
     constraints: Constraints | None = None,
     forbidden: np.ndarray | None = None,
+    max_parents: int | None = None,
 ) -> tuple[StructureKey, int]:
     """Run tabu search from the start DAG; return the best DAG's structure key and moves taken.
 
@@ -53,10 +54,11 @@ def _search(
     unless it is ``None``. ``ranks`` orders tied moves, :func:`~andrey.search.hc.tie_ranks` of the
     data. The start DAG is empty, or with ``constraints`` the required edges; no move then removes
     or reverses one or adds a forbidden edge. ``forbidden[v, u]`` bars the edge ``u -> v`` beside
-    the knowledge: a mixed-data score's edges from a continuous into a categorical column.
+    the knowledge: a mixed-data score's edges from a continuous into a categorical column. With
+    ``max_parents``, no move gives a node more parents.
     """
     d = len(ranks)
-    adj_int, parents_of = start_dag(d, constraints)
+    adj_int, parents_of = start_dag(d, constraints, max_parents)
     local = [score.score(i, parents_of[i]) for i in range(d)]
     best_key: StructureKey = tuple(adj_int)
     best_total = math.fsum(local)
@@ -69,7 +71,9 @@ def _search(
         knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
         forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
         required = constraints.required.T
-    scanner = MoveScanner(delta, d, ranks=ranks, forbidden=forbidden, required=required)
+    scanner = MoveScanner(
+        delta, d, ranks=ranks, forbidden=forbidden, required=required, max_parents=max_parents
+    )
     while max_iter is None or moves < max_iter:
         recent.append(tuple(adj_int))
         tabu = frozenset(recent)
@@ -104,6 +108,7 @@ def tabu(
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    max_parents: int | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by tabu search over a linear-Gaussian, categorical, or mixed-data score.
 
@@ -138,6 +143,8 @@ def tabu(
         Background knowledge: the search starts from the required edges, never removes or reverses
         one, and never adds a forbidden edge. The CPDAG is then narrowed by the knowledge
         (:func:`~andrey.core.knowledge.mpdag`).
+    max_parents : int or None
+        Most parents of any node; no move gives a node more. ``None`` sets no cap.
 
     Returns
     -------
@@ -176,14 +183,10 @@ def tabu(
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
         best_key, moves = _search(
-            score, ranks, tabu_length, max_tabu, max_iter, constraints, forbidden
+            score, ranks, tabu_length, max_tabu, max_iter, constraints, forbidden, max_parents
         )
     if max_iter is not None and moves == max_iter:
-        warn_once(
-            f"tabu stopped at its limit of max_iter={max_iter} moves; a longer search may find a "
-            "better graph, so raise max_iter",
-            SearchLimitWarning,
-        )
+        warn_search_limit("tabu", "max_iter", max_iter, "moves")
 
     # The best DAG as unsigned endpoint marks (u -> v: TAIL at u, ARROW at v), reduced to its CPDAG.
     parents = [[u for u in range(d) if best_key[u] >> v & 1] for v in range(d)]

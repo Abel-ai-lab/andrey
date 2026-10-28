@@ -61,6 +61,7 @@ def gfci(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
@@ -80,8 +81,10 @@ def gfci(
     conditioning-size passes, each above its own work threshold; ``None`` reads
     ``andrey.config.num_workers``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
     the triples the pattern shields by the vote of :func:`~andrey.constraint.fci._vote_sepsets`
-    after the possible-d-sep step. The private ``_ambiguous`` sink receives the triples no
-    orientation rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    after the possible-d-sep step. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. The private
+    ``_ambiguous`` sink receives the triples no orientation rule reads as a collider or a
+    non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
@@ -99,7 +102,7 @@ def gfci(
     )
     pattern = from_structure(cpdag_structure)
 
-    test = make_indep_test(indep_test, X, categorical=categorical)
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     keep = None if constraints is None else constraints.required | constraints.required.T
     support, sepsets = _fast_adjacency_search(
         X, test, alpha, workers=workers, support=pattern != NULL, keep=keep, max_depth=max_depth
@@ -114,7 +117,7 @@ def gfci(
     if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
     else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
         _remove_by_possible_dsep(
             marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
         )

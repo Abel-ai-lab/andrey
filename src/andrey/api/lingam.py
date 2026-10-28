@@ -5,8 +5,8 @@ The LiNGAM coefficient matrix ``B`` follows ``x_i = sum_j B[i, j] x_j``, so ``B[
 ``j -> i`` -- the transpose of a standard adjacency. Andrey exposes one convention:
 ``weighted_adjacency[i, j]`` is the weight of edge ``i -> j`` (row = source), matching
 ``GraphStructure`` and every other adapter -- so the adapter stores ``B.T`` and builds the ``dag``
-from it (:func:`_canonical_weights`). Each estimator takes its own ``random_state``, resolved from
-the explicit argument else the global ``ANDREY_SEED``.
+from it (:func:`_canonical_weights`). ``ica_lingam`` is the one estimator that draws random numbers;
+it takes a ``seed``, resolved from the explicit argument else the global ``ANDREY_SEED``.
 
 ``multi_group_direct_lingam`` is the one multi-output member: joint estimation over a list of
 datasets yields one shared causal order plus a *per-group* weighted adjacency, so it returns a
@@ -71,7 +71,6 @@ def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
 def direct_lingam(
     data: npt.ArrayLike,
     *,
-    random_state: int | None = None,
     measure: str = "pwling",
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -87,9 +86,6 @@ def direct_lingam(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    random_state : int or None, default=None
-        Ignored. DirectLiNGAM with ``measure="pwling"`` is deterministic; the argument exists so
-        that ``direct_lingam`` accepts ``random_state`` as ``ica_lingam`` does.
     measure : {"pwling"}, default="pwling"
         How the order search picks the most exogenous remaining variable at each step. Only
         ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
@@ -217,7 +213,7 @@ def direct_lingam(
 def ica_lingam(
     data: npt.ArrayLike,
     *,
-    random_state: int | None = None,
+    seed: int | None = None,
     max_iter: int = 1000,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -227,18 +223,20 @@ def ica_lingam(
     reorders this matrix into a causal order [1]_. It estimates edge weights by regressing each
     variable on those before it, using adaptive Lasso. Like DirectLiNGAM, it returns one weighted
     DAG (directed acyclic graph) with a total ordering, rather than an equivalence class. FastICA
-    starts from a random point, so the order can change with ``random_state``.
+    starts from a random point, so the order can change with ``seed``.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    random_state : int or None, default=None
+    seed : int or None, default=None
         Seed for FastICA's starting point, from ``0`` to ``2**32 - 1``. ``None`` uses the
-        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset.
+        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset. ``metadata["seed"]``
+        records the seed used.
     max_iter : int, default=1000
-        Maximum FastICA iterations; at least ``1``.
+        Most FastICA iterations, at least ``1``. Reaching it before FastICA converges warns with
+        :class:`~andrey.SearchLimitWarning`.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The order search reads the unmixing
@@ -274,8 +272,9 @@ def ica_lingam(
 
     Warns
     -----
-    sklearn.exceptions.ConvergenceWarning
-        When FastICA does not converge within ``max_iter`` iterations.
+    SearchLimitWarning
+        When FastICA does not converge within ``max_iter`` iterations, or the adaptive Lasso's LARS
+        path reports that it stopped early (scikit-learn's ``ConvergenceWarning``, raised again).
 
     See Also
     --------
@@ -289,9 +288,9 @@ def ica_lingam(
     it scored worse than the empty graph at the benchmarks' sample size, while DirectLiNGAM
     recovered most edges. Prefer :func:`~andrey.direct_lingam` unless ICA is needed.
 
-    **Choosing random_state and max_iter.** Different values of ``random_state`` can give different
-    orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
-    converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
+    **Choosing seed and max_iter.** Different seeds can give different orders; compare a few when
+    the result matters. If FastICA reaches ``max_iter`` before converging, the fit warns with
+    :class:`~andrey.SearchLimitWarning`; then raise ``max_iter``.
 
     **Column order and machines.** When several variables can come next in the causal order, the one
     whose column ranks first by its own values goes first. FastICA itself can reach another solution
@@ -344,7 +343,7 @@ def ica_lingam(
     >>> rng = np.random.default_rng(0)
     >>> x = rng.uniform(-1, 1, 500)
     >>> y = 0.8 * x + rng.uniform(-1, 1, 500)
-    >>> out = ica_lingam(np.column_stack([x, y]), random_state=0)
+    >>> out = ica_lingam(np.column_stack([x, y]), seed=0)
     >>> out.structure.kind
     'dag'
     """
@@ -353,7 +352,7 @@ def ica_lingam(
     X = _pruning_rows(data_matrix(data, method="ica_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
-    order, B = _native(X, random_state=random_state, max_iter=max_iter, constraints=constraints)
+    order, B = _native(X, random_state=seed, max_iter=max_iter, constraints=constraints)
     weighted = _canonical_weights(B)
     edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
     return structure_output(
@@ -368,7 +367,6 @@ def ica_lingam(
 def multi_group_direct_lingam(
     data_groups: Sequence[npt.ArrayLike],
     *,
-    random_state: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> list[StructureOutput]:
     """Jointly learn one fully oriented DAG per group with multi-group DirectLiNGAM.
@@ -384,9 +382,6 @@ def multi_group_direct_lingam(
         Two or more datasets over the same ``d`` variables; sample counts may differ per group.
         Each is coerced to ``float64``. DataFrames must name their columns alike; the names become
         the structures' ``labels``.
-    random_state : int or None, default=None
-        Ignored. The method is deterministic; the argument exists so that
-        ``multi_group_direct_lingam`` accepts ``random_state`` as the other LiNGAM methods do.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. It holds for every group. The

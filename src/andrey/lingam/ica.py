@@ -12,6 +12,7 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.decomposition import FastICA
 
 from andrey.core.seeding import resolve_seed
+from andrey.core.warning_policy import convergence_as_search_limit
 from andrey.lingam.adjacency import estimate
 from andrey.search.hc import tie_ranks
 
@@ -107,7 +108,9 @@ def ica_lingam(
         return [0], np.zeros((1, 1))  # one variable: nothing to order, no edge to weigh
 
     ica = FastICA(max_iter=max_iter, random_state=seed)
-    ica.fit(X)
+    convergence_as_search_limit(
+        f"ica_lingam (max_iter={max_iter} FastICA iterations)", lambda: ica.fit(X)
+    )
     w_ica = ica.components_
 
     _, col_index = linear_sum_assignment(1 / np.abs(w_ica))

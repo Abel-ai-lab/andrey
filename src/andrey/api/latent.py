@@ -70,7 +70,7 @@ def gin(
     Notes
     -----
     A group of observed variables forms a cluster when the linear combination of the group with
-    the smallest covariance with the other variables not yet in a cluster is independent of each of
+    the smallest correlation with the other variables not yet in a cluster is independent of each of
     them; groups grow from pairs upward, and clusters that share a variable merge. The latents are
     then ordered one at a time, given the latents already ordered: the next latent is a root, whose
     cluster passes the independence test at ``alpha`` paired with each other remaining cluster [1]_.
