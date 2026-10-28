@@ -239,12 +239,12 @@ def test_bdeu_search_honors_required_forbidden_and_tiers(name):
     e = rng.integers(0, 2, n)
     frame = pd.DataFrame({"a": a, "b": b, "c": c, "d": d, "e": e}).astype(float)
     knowledge = Knowledge(required=[("b", "e")], forbidden=[("c", "d")], tiers=[["a", "b"], ["c"]])
-    out = getattr(andrey, name)(frame, score_func="local_score_BDeu", knowledge=knowledge)
+    out = getattr(andrey, name)(frame, score_func="bdeu", knowledge=knowledge)
     edges = set(out.structure.oriented_edges())
     assert ("b", "e", "directed") in edges, edges
     assert ("c", "d", "directed") not in edges, edges
     assert not {("c", "a", "directed"), ("c", "b", "directed")} & edges, edges
-    free = getattr(andrey, name)(frame, score_func="local_score_BDeu")
+    free = getattr(andrey, name)(frame, score_func="bdeu")
     assert ("c", "d", "directed") in free.structure.oriented_edges()
 
 

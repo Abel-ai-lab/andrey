@@ -5,7 +5,7 @@ fit one matrix, so the GIES lane hands each fit the samples and the 0/1 interven
 side: :func:`stack` builds that matrix and :func:`unstack` splits it again inside `fit`.
 
 pcalg's `gies` is the counterpart. Both score BIC with a penalty of `log(n) / 2` per parameter in
-log-likelihood units, Andrey's `lambda_value=1.0` in deviance units, with `n` every row of the
+log-likelihood units, Andrey's `penalty_discount=1.0` in deviance units, with `n` every row of the
 data, and both run the forward, backward, and turning phases until none improves, with no degree
 cap.
 """
@@ -71,7 +71,7 @@ class AndreyGIES:
             graph, _score = gies(
                 X,
                 mask,
-                lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
+                penalty_discount=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
                 ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
             )
         return np.asarray(graph.to_numpy())

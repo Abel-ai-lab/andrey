@@ -22,22 +22,22 @@ def test_hc_recovery():
 
 def test_boss_recovery():
     assert_recorded_output(
-        andrey.boss(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA),
+        andrey.boss(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA),
         "BOSS",
         case="gauss_5v",
     )
 
 
 def test_grasp_recovery():
-    out = andrey.grasp(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.grasp(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "GRaSP", case="gauss_5v")
 
 
 def test_grasp_at_depth_2_recovers_the_depth_3_graph():
     # Both depths score with the standard BIC, where the two reach one graph on this case.
     x = datagen.generate("gauss_5v")
-    depth_3 = andrey.grasp(x, lambda_value=_BASELINE_LAMBDA, ebic_gamma=0.0)
-    depth_2 = andrey.grasp(x, lambda_value=_BASELINE_LAMBDA, ebic_gamma=0.0, depth=2)
+    depth_3 = andrey.grasp(x, penalty_discount=_BASELINE_LAMBDA, ebic_gamma=0.0)
+    depth_2 = andrey.grasp(x, penalty_discount=_BASELINE_LAMBDA, ebic_gamma=0.0, depth=2)
     assert depth_2.structure.oriented_edges() == depth_3.structure.oriented_edges()
     assert depth_2.metadata["score"] == pytest.approx(depth_3.metadata["score"], abs=1e-9)
 
@@ -70,10 +70,8 @@ def test_boss_equal_scores_are_stable_under_input_rounding():
     # each column's row-to-row pattern, so its tie rank.
     rng = np.random.default_rng(10_000)
     perturbed = x * (1 + 1e-12 * rng.standard_normal(x.shape[1]))
-    base = andrey.boss(x, seed=0, score_func="local_score_BIC_from_cov", ebic_gamma=0.0).structure
-    moved = andrey.boss(
-        perturbed, seed=0, score_func="local_score_BIC_from_cov", ebic_gamma=0.0
-    ).structure
+    base = andrey.boss(x, seed=0, score_func="bic", ebic_gamma=0.0).structure
+    moved = andrey.boss(perturbed, seed=0, score_func="bic", ebic_gamma=0.0).structure
 
     assert base.kind == moved.kind == "cpdag"
     # Both inputs give the undirected edges 0 -- 2 and 1 -- 2: column 2 has the lowest tie rank.

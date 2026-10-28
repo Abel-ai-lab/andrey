@@ -262,9 +262,9 @@ def test_tests_with_or_without_the_cache_give_the_same_graph(monkeypatch, cached
 def test_missing_values_count_each_query_once_at_any_cached_depth(monkeypatch):
     data = _related_series(n_steps=800)
     data[np.random.default_rng(1).random(data.shape) < 0.1] = np.nan
-    expected = andrey.lpcmci(data, tau_max=2, pc_alpha=0.05).metadata
+    expected = andrey.lpcmci(data, tau_max=2, alpha=0.05).metadata
     monkeypatch.setattr(engine, "CACHED_DEPTH", -1)
-    assert andrey.lpcmci(data, tau_max=2, pc_alpha=0.05).metadata == expected
+    assert andrey.lpcmci(data, tau_max=2, alpha=0.05).metadata == expected
 
 
 # ---- bounded test calls, cache, and vote ------------------------------------------------------

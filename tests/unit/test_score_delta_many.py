@@ -35,7 +35,7 @@ def _well_conditioned(seed: int, n: int, d: int) -> np.ndarray:
 
 def _unchecked(x: np.ndarray) -> BICScore:
     """A score on ``x`` without the column check, which rejects a column this close to a copy."""
-    return BICScore.from_cov(np.cov(x, rowvar=False), len(x), lambda_value=2.0)
+    return BICScore.from_cov(np.cov(x, rowvar=False), len(x), penalty_discount=2.0)
 
 
 def _full_delta(score: BICScore, v: int, base: tuple[int, ...], u: int, op: str) -> float:
@@ -50,7 +50,7 @@ def _full_delta(score: BICScore, v: int, base: tuple[int, ...], u: int, op: str)
 def test_add_deltas_match_two_full_scores(seed: int) -> None:
     """Batched add deltas equal two full scores within 1e-9 relative (well-conditioned)."""
     x = _well_conditioned(seed, 600, 9)
-    score = BICScore(x, lambda_value=2.0)
+    score = BICScore(x, penalty_discount=2.0)
     delta = DeltaBICScore(score)
     v = 0
     for base in [(), (2,), (1, 3), (1, 3, 5, 7)]:
@@ -65,7 +65,7 @@ def test_add_deltas_match_two_full_scores(seed: int) -> None:
 def test_remove_deltas_match_two_full_scores(seed: int) -> None:
     """Batched/scalar remove deltas equal two full scores within 1e-9 relative."""
     x = _well_conditioned(seed, 600, 9)
-    score = BICScore(x, lambda_value=2.0)
+    score = BICScore(x, penalty_discount=2.0)
     delta = DeltaBICScore(score)
     v = 0
     for base in [(2,), (1, 3), (1, 3, 5, 7)]:
@@ -78,7 +78,7 @@ def test_remove_deltas_match_two_full_scores(seed: int) -> None:
 def test_empty_and_ordering_invariance() -> None:
     """Empty batch returns empty; per-candidate delta is independent of batch membership."""
     x = _well_conditioned(3, 500, 6)
-    delta = DeltaBICScore(BICScore(x, lambda_value=2.0))
+    delta = DeltaBICScore(BICScore(x, penalty_discount=2.0))
     assert delta.delta_many_with_base(0, (1, 2), []) == []
     solo = delta.delta_many_with_base(0, (1, 2), [("add", 4)])[0]
     batched = delta.delta_many_with_base(0, (1, 2), [("add", 3), ("add", 4), ("add", 5)])[1]
@@ -143,7 +143,7 @@ def test_bounds_leave_deltas_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
     rng = np.random.default_rng(0)
     cols = rng.standard_normal((400, 6))
     x = np.hstack([cols, cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])  # 6 ~= 0
-    delta = DeltaBICScore(BICScore(x, lambda_value=2.0))
+    delta = DeltaBICScore(BICScore(x, penalty_discount=2.0))
     queries = [
         ((), [("add", 2), ("add", 3), ("add", 6)], "zero"),
         ((0, 6), [("add", 2), ("add", 3)], "zero"),
@@ -173,7 +173,7 @@ def test_purity_survives_chained_cache_pollution() -> None:
     the same query returns byte-identical deltas before and after that pollution.
     """
     x = _well_conditioned(1, 700, 8)
-    score = BICScore(x, lambda_value=2.0)
+    score = BICScore(x, penalty_discount=2.0)
     delta = DeltaBICScore(score)
 
     query = (0, (1, 2, 3), [("add", 4), ("add", 5), ("remove", 2)])
@@ -191,7 +191,7 @@ def test_purity_survives_chained_cache_pollution() -> None:
 def test_purity_repeated_interleaved_query_is_bit_identical() -> None:
     """Interleaving two different pure queries never perturbs either one's bits."""
     x = _well_conditioned(2, 600, 7)
-    delta = DeltaBICScore(BICScore(x, lambda_value=2.0))
+    delta = DeltaBICScore(BICScore(x, penalty_discount=2.0))
     q1 = (0, (1, 2), [("add", 3), ("add", 4)])
     q2 = (5, (1, 6), [("add", 0), ("remove", 6)])
     a1 = delta.delta_many_with_base(*q1)
@@ -205,7 +205,7 @@ def test_purity_repeated_interleaved_query_is_bit_identical() -> None:
 def test_row_deltas_match_two_full_scores(seed: int) -> None:
     """``add_deltas`` and ``remove_deltas`` score every candidate as two full scores do."""
     x = _well_conditioned(seed, 600, 9)
-    score = BICScore(x, lambda_value=2.0)
+    score = BICScore(x, penalty_discount=2.0)
     v = 0
     for base in [(), (2,), (1, 3), (1, 3, 5, 7)]:
         add = score_delta.add_deltas(score, v, base)

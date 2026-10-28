@@ -49,8 +49,8 @@ def test_zero_parents_ignores_lambda(cov):
     # The complexity term scales with the parent count, so a zero-parent score is independent of the
     # penalty discount.
     n = 60
-    assert local_score_bic(cov, n, 0, [], lambda_value=1.0) == local_score_bic(
-        cov, n, 0, [], lambda_value=5.0
+    assert local_score_bic(cov, n, 0, [], penalty_discount=1.0) == local_score_bic(
+        cov, n, 0, [], penalty_discount=5.0
     )
 
 
@@ -61,7 +61,7 @@ def test_single_parent_closed_form(cov):
     node, parent = 2, 0
     residual = cov[node, node] - cov[node, parent] ** 2 / cov[parent, parent]
     expected = n * np.log(residual) + np.log(n) * 1.0
-    assert local_score_bic(cov, n, node, [parent], lambda_value=1.0) == pytest.approx(
+    assert local_score_bic(cov, n, node, [parent], penalty_discount=1.0) == pytest.approx(
         expected, abs=1e-9
     )
 
@@ -74,7 +74,9 @@ def test_two_parent_closed_form(cov):
     XX = cov[np.ix_(pa, pa)]
     residual = cov[node, node] - (yX @ np.linalg.solve(XX, yX.T)).item()
     expected = n * np.log(residual) + np.log(n) * 2 * 1.0
-    assert local_score_bic(cov, n, node, pa, lambda_value=1.0) == pytest.approx(expected, abs=1e-9)
+    assert local_score_bic(cov, n, node, pa, penalty_discount=1.0) == pytest.approx(
+        expected, abs=1e-9
+    )
 
 
 # ---- lambda / penalty term ----------------------------------------------------------------------
@@ -85,8 +87,8 @@ def test_lambda_scales_only_the_penalty(cov, k, pa):
     # Doubling lambda adds exactly ``log(n) * k`` (the extra penalty), leaving the fit term intact.
     n = 60
     node = 4
-    s1 = local_score_bic(cov, n, node, pa, lambda_value=1.0)
-    s2 = local_score_bic(cov, n, node, pa, lambda_value=2.0)
+    s1 = local_score_bic(cov, n, node, pa, penalty_discount=1.0)
+    s2 = local_score_bic(cov, n, node, pa, penalty_discount=2.0)
     assert s2 - s1 == pytest.approx(np.log(n) * k, abs=1e-9)
 
 
@@ -100,7 +102,7 @@ def test_lambda_scales_only_the_penalty(cov, k, pa):
 def test_class_matches_function(data, cov, node, pa):
     n = data.shape[0]
     scorer = BICScore(data)
-    expected = local_score_bic(cov, n, node, pa, lambda_value=1.0)
+    expected = local_score_bic(cov, n, node, pa, penalty_discount=1.0)
     assert scorer.score(node, pa) == pytest.approx(expected, abs=0.0, rel=0.0)
 
 
@@ -112,9 +114,9 @@ def test_class_covariance_is_ddof_one(data):
 
 def test_class_respects_custom_lambda(data, cov):
     n = data.shape[0]
-    scorer = BICScore(data, lambda_value=2.0)
+    scorer = BICScore(data, penalty_discount=2.0)
     assert scorer.score(3, [0, 1]) == pytest.approx(
-        local_score_bic(cov, n, 3, [0, 1], lambda_value=2.0), abs=0.0
+        local_score_bic(cov, n, 3, [0, 1], penalty_discount=2.0), abs=0.0
     )
 
 
@@ -151,9 +153,9 @@ def test_score_many_preserves_request_order(data):
 
 def test_repeated_calls_are_bit_identical(data, cov):
     n = data.shape[0]
-    first = local_score_bic(cov, n, 4, [0, 1, 2], lambda_value=2.0)
+    first = local_score_bic(cov, n, 4, [0, 1, 2], penalty_discount=2.0)
     for _ in range(5):
-        assert local_score_bic(cov, n, 4, [0, 1, 2], lambda_value=2.0) == first
+        assert local_score_bic(cov, n, 4, [0, 1, 2], penalty_discount=2.0) == first
     scorer = BICScore(data)
     cached = scorer.score(4, [0, 1, 2])
     assert BICScore(data).score(4, [0, 1, 2]) == cached
@@ -197,7 +199,7 @@ _BASELINE = {
 def test_baseline_values(data, cov):
     n = data.shape[0]
     for (node, pa), expected in _BASELINE.items():
-        assert local_score_bic(cov, n, node, list(pa), lambda_value=1.0) == pytest.approx(
+        assert local_score_bic(cov, n, node, list(pa), penalty_discount=1.0) == pytest.approx(
             expected, abs=1e-12
         )
 

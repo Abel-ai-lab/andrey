@@ -16,6 +16,7 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
+    default_test,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -41,7 +42,7 @@ def _fit(
     *,
     target: str | int | None,
     alpha: float,
-    indep_test: str,
+    indep_test: str | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
     seed: int | None,
@@ -50,6 +51,7 @@ def _fit(
     """Check the settings, run the search, and wrap its sets as undirected edges."""
     from andrey.search.hybrid import local_graph, local_set
 
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
         data,
         categorical,
@@ -90,7 +92,7 @@ def iamb(
     *,
     target: str | int | None = None,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
@@ -113,10 +115,11 @@ def iamb(
         the other's set.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
-    indep_test : str, default="fisherz"
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or
-        ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
+        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
+        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -248,7 +251,7 @@ def inter_iamb(
     *,
     target: str | int | None = None,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
@@ -270,10 +273,11 @@ def inter_iamb(
         the other's set.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
-    indep_test : str, default="fisherz"
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or
-        ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
+        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
+        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -405,7 +409,7 @@ def mmpc(
     *,
     target: str | int | None = None,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
@@ -428,10 +432,11 @@ def mmpc(
         the other's set.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
-    indep_test : str, default="fisherz"
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or
-        ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
+        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
+        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.

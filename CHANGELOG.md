@@ -60,6 +60,24 @@ change names its pull request.
   `alpha` is `screen_alpha` and the cap `max_outer` is `max_iter`, as in the other iterative
   methods. The old names still work, with a `DeprecatedArgumentWarning`, in this release and stop
   in the next. ([#510])
+- `indep_test=None` and `score_func=None` are the defaults of every method with a test or a score,
+  and pick from the column types you declare, with `categorical` or a DataFrame's `category`,
+  `bool`, or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when
+  some are, else `fisherz` and `bic`. Values never decide: a column of a few whole numbers that you
+  have not declared reads as numbers, where score searches switched to BDeu or the conditional
+  Gaussian score before, and every method that reads columns as numbers warns about such columns
+  with the same `DataTypeWarning`, the LiNGAM, time-series, continuous-optimization, and pairwise
+  methods included. ([#501])
+- `pcmci`, `pcmciplus`, and `lpcmci` default to `indep_test="fisherz"`, the default of every other
+  method with a test; pass `indep_test="student_t"` for the results of before. ([#501])
+- `bottom_up_parce_lingam` defaults to `alpha=0.05`, the level of the method's published
+  experiments (Tashiro et al. 2014), instead of 0.1. ([#501])
+- Renamed, with the former names working for one release behind a `DeprecatedArgumentWarning`:
+  `lambda_value` is `penalty_discount`; the scores are `"bic"`, `"discrete_bic"`, `"bdeu"`,
+  `"cond_gauss"`, and `"degen_gauss"`, and `"local_score_BIC_from_cov"`, a second name of the BIC,
+  maps to `"bic"`; `alpha` is the level that decides the returned edges, so `pcmci`'s
+  `alpha_level`, `pcmciplus`'s and `lpcmci`'s `pc_alpha`, and `rcd`'s `ind_alpha` are `alpha`.
+  ([#501])
 
 ### Added
 
@@ -154,6 +172,8 @@ change names its pull request.
   before the fit. ([#492])
 - `andrey.DeprecatedArgumentWarning`, the warning a renamed argument or value gives while its former
   name or value still works, for one release. ([#496])
+- `tabu` takes `categorical`, `max_categories`, and the mixed-data scores `"cond_gauss"` and
+  `"degen_gauss"`; `exact_search` takes `penalty_discount`; `gies` takes `score_func`. ([#501])
 
 ### Changed
 
@@ -1013,5 +1033,6 @@ First alpha release.
 [#496]: https://github.com/Abel-ai-lab/andrey/pull/496
 [#499]: https://github.com/Abel-ai-lab/andrey/pull/499
 [#500]: https://github.com/Abel-ai-lab/andrey/pull/500
+[#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510

@@ -1050,8 +1050,8 @@ class _Search:
 def xges(
     data: np.ndarray,
     *,
-    score_func: str = "local_score_BIC",
-    lambda_value: float = 1.0,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     extended_search: bool = True,
     constraints: Constraints | None = None,
@@ -1063,9 +1063,9 @@ def xges(
     data : ndarray, shape (n_samples, n_features)
         Rows are observations; columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian
+        Local score: ``"bic"``, the linear-Gaussian
         BIC, the only score supported.
-    lambda_value : float
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
@@ -1090,7 +1090,7 @@ def xges(
         )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-    score = BICScore(X, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
+    score = BICScore(X, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
     ranks = tie_ranks(X).tolist()
     # One BLAS thread for reproducible scores and move ties.
     with backend.one_blas_thread():

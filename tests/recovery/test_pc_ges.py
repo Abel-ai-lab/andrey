@@ -109,7 +109,7 @@ def test_pc_orientations_are_invariant_to_column_order():
 
 def test_ges_recovery():
     assert_recorded_output(
-        andrey.ges(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA),
+        andrey.ges(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA),
         "GES",
         case="gauss_5v",
     )

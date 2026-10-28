@@ -128,7 +128,7 @@ def test_run_pc_envelope(capsys, csv_path):
     assert env["structure"]["labels"] is None  # no header row
     run = env["run"]
     assert run["n_samples"] == 300 and run["n_variables"] == 4
-    assert run["params"]["alpha"] == 0.05 and run["params"]["indep_test"] == "fisherz"  # defaults
+    assert run["params"]["alpha"] == 0.05 and run["params"]["indep_test"] is None  # defaults
     assert set(run["versions"]) == {"andrey", "numpy", "python"}
 
 
