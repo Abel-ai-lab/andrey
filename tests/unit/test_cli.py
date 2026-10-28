@@ -359,7 +359,7 @@ def test_former_names_and_values_map_to_current_ones():
 
 
 def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
-    """A removed argument still runs for one release: the fit warns, and the run's params omit it."""
+    """A removed argument still runs for one release: the fit warns and the run's params omit it."""
     code, out, _ = _run(["run", "direct_lingam", "--data", str(csv_path), "random_state=3"], capsys)
     env = json.loads(out)
     assert code == 0 and "random_state" not in env["run"]["params"]
