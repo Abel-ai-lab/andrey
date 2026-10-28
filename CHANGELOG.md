@@ -81,6 +81,11 @@ change names its pull request.
 
 ### Added
 
+- `gies`, `xges`, and `gfci` take `max_parents`, a cap on every node's parents, as `ges` does: no
+  DAG the returned graph represents gives a node more than that many parents, and a move that would
+  give a node more is skipped. `gfci` caps its GES phase; the PAG its tests then orient can put more
+  arrowheads at a node. Required edges of `knowledge` above the cap raise `ValueError`. The default,
+  `None`, sets no cap and returns the graphs these methods returned before. ([#516])
 - `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
   knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
   others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
@@ -220,6 +225,10 @@ change names its pull request.
 - `ica_lingam`'s **Limitations** paragraph says that its causal order depends on the columns'
   scale, as its authors note, with one measurement on standardized data, and points to
   `direct_lingam`. ([#487])
+- The **Limitations** paragraphs of `notears` and `dagma` say that the `robust=True` fit's graph
+  changes when the columns are rescaled, even by powers of two, and that the penalized
+  likelihood's global minimizers keep their graph under rescaling with a small enough penalty.
+  ([#495])
 - `boss`, `grasp`, and `ica_lingam` record the seed they used in `metadata["seed"]`, as `calm`
   does. ([#496])
 - `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take `seed`,
@@ -1030,9 +1039,11 @@ First alpha release.
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
+[#495]: https://github.com/Abel-ai-lab/andrey/pull/495
 [#496]: https://github.com/Abel-ai-lab/andrey/pull/496
 [#499]: https://github.com/Abel-ai-lab/andrey/pull/499
 [#500]: https://github.com/Abel-ai-lab/andrey/pull/500
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
+[#516]: https://github.com/Abel-ai-lab/andrey/pull/516

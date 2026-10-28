@@ -235,6 +235,13 @@ _add(
             _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
             _TEST_SEED,
+            concept_param(
+                "max_parents",
+                doc="A cap on every node's parents in the GES phase, at least 0: no DAG the GES "
+                "CPDAG represents gives a node more than max_parents parents. The test phase only "
+                "removes edges from that CPDAG; the cap does not bound the arrowheads at a node of "
+                "the PAG. null sets no cap; the GES phase then keeps its gate of n_variables / 2.",
+            ),
         ),
         references=(
             "Ogarrio, Spirtes & Ramsey 2016",

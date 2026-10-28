@@ -431,6 +431,7 @@ def _forward_candidates(
     n: int,
     ranks: Sequence[int],
     forbidden: np.ndarray | None = None,
+    cap: int | None = None,
 ) -> list[tuple[tuple, int, set[int]]]:
     """The improving insertions into ``v`` as ``(key, u, C)``, sorted by ``key``, path unchecked.
 
@@ -438,10 +439,13 @@ def _forward_candidates(
     and (ii)); ``key`` is :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``.
     Insertions that give ``v`` the same other parents are scored together
     (:meth:`InterventionalScore.add_deltas`). With ``forbidden`` (``[i, j]``: no edge
-    ``i -> j``), neither ``u`` nor a member of ``C``'s free part is forbidden into ``v``.
+    ``i -> j``), neither ``u`` nor a member of ``C``'s free part is forbidden into ``v``. With
+    ``cap``, an insertion that gives ``v`` more than ``cap`` parents is left out before scoring.
     """
     row = adj[v]
     pa = np.flatnonzero(row == ARROW)
+    if cap is not None and pa.size >= cap:
+        return []
     ne = np.flatnonzero((row == TAIL) & (adj[:, v] == TAIL))
     sources = np.flatnonzero(row == NULL)
     sources = sources[sources != v]
@@ -467,6 +471,8 @@ def _forward_candidates(
                 C = na | set(T)
                 groups.setdefault(tuple(sorted(pa_set | C)), []).append((u, C))
         for base, moves in groups.items():
+            if cap is not None and len(base) >= cap:
+                continue
             deltas = score.add_deltas(v, base)
             for u, C in moves:
                 delta = float(deltas[u])
@@ -562,6 +568,7 @@ def _turning_best(
     ranks: Sequence[int],
     constraints: Constraints | None = None,
     excluded: Excluded | None = None,
+    cap: int | None = None,
 ) -> tuple[int, int, set[int], bool] | None:
     """The best-improving turn as ``(u, v, C, essential)``: ``v -> u`` (or ``v -- u``) becomes
     ``u -> v`` with ``C`` the parents of ``v`` in its component.
@@ -570,7 +577,8 @@ def _turning_best(
     compared by :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``. With
     ``constraints``, a turn never makes a forbidden ``u -> v`` (the reverse of a required edge
     included) or a forbidden ``c -> v`` for a ``c`` of ``C`` not adjacent to ``u``, which the
-    v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned.
+    v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned. With ``cap``,
+    a turn that gives ``v`` more than ``cap`` parents is left out before scoring.
     """
     pa, nbr, adj_sets = _neighborhoods(adj)
     succ = ops.tail_successor_lists(adj)
@@ -592,6 +600,8 @@ def _turning_best(
             N = nbr[v] & adj_sets[u]
             for _index, T in ops.clique_extensions(adj, (), sorted(nbr[v] - {u})):
                 C = set(T)
+                if cap is not None and len(pa[v] | C) >= cap:
+                    continue
                 if not C - N or not _separated(nbr, nbr[v], N - C, C - N, C & N):
                     continue
                 if forbidden is not None and forbidden[list(C - N), v].any():
@@ -610,6 +620,8 @@ def _turning_best(
             N = nbr[v] & adj_sets[u]
             for _index, T in ops.clique_extensions(adj, N, sorted(nbr[v] - adj_sets[u])):
                 C = N | set(T)
+                if cap is not None and len(pa[v] | C) >= cap:
+                    continue
                 if _reaches(succ, v, u, C | nbr[u]):
                     continue
                 if forbidden is not None and forbidden[list(T), v].any():
@@ -654,8 +666,8 @@ def _turn(
 class _Search:
     """The GIES search state: the essential graph, the cached candidates, and the objective.
 
-    ``constraints`` filters the candidates, and ``start``, an essential graph, replaces the empty
-    graph the search otherwise starts from.
+    ``constraints`` and ``cap``, the most parents a step may give a vertex, filter the candidates,
+    and ``start``, an essential graph, replaces the empty graph the search otherwise starts from.
     """
 
     def __init__(
@@ -665,10 +677,12 @@ class _Search:
         ranks: Sequence[int],
         constraints: Constraints | None = None,
         start: np.ndarray | None = None,
+        cap: int | None = None,
     ) -> None:
         self.score = score
         self.n = n
         self.ranks = ranks
+        self.cap = cap
         self.constraints = constraints
         self.forbidden = None if constraints is None else constraints.forbidden
         self.adj = np.zeros((n, n), dtype=np.int8) if start is None else start
@@ -684,7 +698,7 @@ class _Search:
         for v in range(n):
             if v not in self.forward:
                 self.forward[v] = _forward_candidates(
-                    v, adj, self.score, n, self.ranks, self.forbidden
+                    v, adj, self.score, n, self.ranks, self.forbidden, self.cap
                 )
         heap = [(moves[0][0], v, 0) for v, moves in self.forward.items() if moves]
         if not heap:
@@ -732,7 +746,9 @@ class _Search:
         self, excluded: Excluded | None = None
     ) -> tuple[int, int, set[int], bool] | None:
         """The best-improving turn not in ``excluded`` (:func:`_turning_best`)."""
-        return _turning_best(self.adj, self.score, self.n, self.ranks, self.constraints, excluded)
+        return _turning_best(
+            self.adj, self.score, self.n, self.ranks, self.constraints, excluded, self.cap
+        )
 
     def step(self, best: Callable, move: Callable[..., np.ndarray], cut: np.ndarray) -> bool:
         """Apply the move ``best`` selects, built by ``move``; False when it selects none.
@@ -772,6 +788,7 @@ def gies(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -802,6 +819,12 @@ def gies(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    max_parents : int or None
+        A cap on the most parents any DAG of the class gives a node. An insertion or a turn is
+        skipped when the DAG it builds gives its target more than ``max_parents`` parents; every DAG
+        of a class has the same largest number of parents, so the cap holds for the whole class
+        after every step, and a deletion never breaks it. ``None`` sets no cap. With a cap,
+        ``constraints`` may not require edges that already break it.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
@@ -820,6 +843,8 @@ def gies(
     ------
     NotImplementedError
         If ``score_func`` is not one of :data:`~andrey.core.score.SCORES`.
+    ValueError
+        If the required edges give a node more than ``max_parents`` parents.
     RuntimeError
         If a step does not lower the score, which a correct search never does.
     """
@@ -841,8 +866,13 @@ def gies(
     start = None
     if constraints is not None and constraints.required.any():
         start = replace_unprotected(required_dag(constraints), cut)
+    if max_parents is not None and start is not None and ops.exceeds_parent_cap(start, max_parents):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents "
+            "in some graph of their class"
+        )
     with backend.one_blas_thread():
-        search = _Search(score, n, ranks, constraints, start)
+        search = _Search(score, n, ranks, constraints, start, max_parents)
         while True:
             while search.step(search.forward_best, _insert, cut):
                 pass

@@ -54,6 +54,7 @@ from andrey.core.score_delta import add_deltas, full_add_deltas
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.ges import _recompute_objective, _reform_cpdag, required_dag
 from andrey.search.hc import tie_ranks
+from andrey.search.operators import exceeds_parent_cap
 
 # The extended search keeps a branch when it lowers the deviance by more than this times the sample
 # count (1e-7 times the sample count in log-likelihood units).
@@ -607,14 +608,21 @@ class _Search:
     ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`.
 
     With ``constraints``, no operator adds a forbidden edge or removes or reverses a required one,
-    and a move whose class holds no DAG that satisfies them is undone.
+    and a move whose class holds no DAG that satisfies them is undone. With ``cap``, no Insert or
+    Reverse that gives its target more than ``cap`` parents is queued.
     """
 
     def __init__(
-        self, score: LocalScore, d: int, ranks: list[int], constraints: Constraints | None = None
+        self,
+        score: LocalScore,
+        d: int,
+        ranks: list[int],
+        constraints: Constraints | None = None,
+        cap: int | None = None,
     ) -> None:
         self.add_deltas = _AddDeltas(score, d)
         self.d = d
+        self.cap = cap
         self.n_samples = score.n
         self.tie_gap = score.n * 10.0**-_KEY_DP
         self.ranks = ranks
@@ -637,7 +645,7 @@ class _Search:
         """A copy of the graph and of the path records, each branched from its ``snapshot``, with
         empty queues and the same score cache."""
         out = _Search.__new__(_Search)
-        out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
+        out.add_deltas, out.d, out.seq, out.cap = self.add_deltas, self.d, self.seq, self.cap
         out.n_samples, out.tie_gap, out.ranks = self.n_samples, self.tie_gap, self.ranks
         out.constraints, out.into = self.constraints, self.into
         out.g = self.g.branch(snapshot[0])
@@ -692,8 +700,9 @@ class _Search:
         """Queue each improving Insert into ``y`` (from ``only_x`` alone, when given).
 
         With ``out``, append every Insert from ``only_x`` to ``out`` instead, improving or not.
+        With ``cap``, an Insert whose parent set ``E`` already holds ``cap`` members is left out.
         """
-        g = self.g
+        g, cap = self.g, self.cap
         ne_y = g.ne[y]
         free = ne_y  # the undirected neighbors T may hold
         if self.into is not None:
@@ -711,6 +720,8 @@ class _Search:
             far = np.flatnonzero(outside)
             if far.size:
                 for T, E in self.subsets(sorted(free), set(), frozenset(g.pa[y])):
+                    if cap is not None and len(E) >= cap:
+                        continue
                     deltas = self.add_deltas(y, E)[far]
                     keep = deltas < -_EPS_IMPROVE
                     for x, dl in zip(far[keep].tolist(), deltas[keep].tolist(), strict=True):
@@ -722,6 +733,8 @@ class _Search:
             if not g.is_clique(na):
                 continue
             for T, E in self.subsets(sorted(free - g.ad[x]), na, frozenset(na | g.pa[y])):
+                if cap is not None and len(E) >= cap:
+                    continue
                 delta = float(self.add_deltas(y, E)[x])
                 if out is not None:
                     out.append((delta, x, y, T, E))
@@ -793,7 +806,9 @@ class _Search:
             self.find_inserts_to_y(y)
 
     def inserts_on_empty_graph(self) -> None:
-        """Queue every improving single-edge Insert."""
+        """Queue every improving single-edge Insert; none under a cap of 0."""
+        if self.cap == 0:
+            return
         empty: frozenset[int] = frozenset()
         for y in range(self.d):
             deltas = self.add_deltas(y, empty)
@@ -1072,6 +1087,7 @@ def xges(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     extended_search: bool = True,
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -1094,6 +1110,12 @@ def xges(
         ignore it.
     extended_search : bool
         Run the extended search after the base search; ``False`` stops after the base search.
+    max_parents : int or None
+        A cap on the most parents any DAG of the class gives a node. No Insert or Reverse that
+        gives its target more than ``max_parents`` parents is queued; every DAG of a class has the
+        same largest number of parents, so the cap holds for the whole class after every move, and
+        a Delete never breaks it. ``None`` sets no cap. With a cap, ``constraints`` may not require
+        edges that already break it.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
@@ -1106,6 +1128,13 @@ def xges(
     -------
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) and its total score (lower is better).
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is not one of :data:`~andrey.core.score.SCORES`.
+    ValueError
+        If the required edges give a node more than ``max_parents`` parents.
     """
     if score_func not in SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {SCORES}")
@@ -1123,12 +1152,18 @@ def xges(
         columns = column_mask(categorical, d)
     ranks = tie_ranks(X, columns).tolist()
     # One BLAS thread for reproducible scores and move ties.
+    start = None if constraints is None else _reform_cpdag(required_dag(constraints))
+    if max_parents is not None and start is not None and exceeds_parent_cap(start, max_parents):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents "
+            "in some graph of their class"
+        )
     with backend.one_blas_thread():
-        search = _Search(score, d, ranks, constraints)
-        if constraints is None:
+        search = _Search(score, d, ranks, constraints, max_parents)
+        if start is None:
             search.inserts_on_empty_graph()
         else:
-            search.seed(_reform_cpdag(required_dag(constraints)))
+            search.seed(start)
         search.base_search()
         if extended_search:
             search.extend(X.shape[0])
