@@ -26,6 +26,16 @@ change names its pull request.
   variables and 2,000 rows, GES's errors fell from 211 to 24. `gfci` keeps `ebic_gamma=0.0`: its
   errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
   the graphs the others returned before. ([#445])
+- Every method checks its arguments in one shared step before it reads the data: a value of the
+  wrong type raises `TypeError`, and a value outside its range or not one of its choices raises
+  `ValueError`, each with one message that names the method, the argument, what it accepts, and the
+  value, such as `pc: alpha must be a number in (0, 1), got 1.5`. An unknown `indep_test`,
+  `score_func`, or `measure` raised `NotImplementedError` before.
+  `metadata["algorithm"]` is the method's name, such as `"pc"` or `"ica_lingam"`, instead of a
+  display name such as `"PC"` or `"ICALiNGAM"`. ([#496])
+- `ica_lingam` takes `seed` instead of `random_state`, and `direct_lingam` and
+  `multi_group_direct_lingam` no longer have the `random_state` they ignored. The old names still
+  work, with a `DeprecatedArgumentWarning`, in this release and stop in the next. ([#499])
 
 ### Added
 
@@ -45,8 +55,9 @@ change names its pull request.
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
   pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
-  time-series method on one series resamples blocks of rows; the result is the same at any
-  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
+  time-series method on one series resamples blocks of rows; the result is the same at any number of
+  workers, which `andrey.config` sets, and a seeded method fits each resample with a seed derived
+  from `seed`. `andrey bootstrap <method>` does the same from the command line. ([#396], [#499])
 - `scale="unitless"` in `andrey.data.sample_scm` and `SCM.sample` draws a linear model's weights
   and noise so that every variable has variance 1 and its parameters depend only on its number of
   parents (Herman et al. 2025), so on average neither the variances nor the share of each variable
@@ -102,6 +113,8 @@ change names its pull request.
   `alpha` or `max_depth`, with the name each method gives it; `andrey config --help --json` lists
   the concepts too. `andrey run` accepts a former name or value and rejects a value out of range
   before the fit. ([#492])
+- `andrey.DeprecatedArgumentWarning`, the warning a renamed argument or value gives while its former
+  name or value still works, for one release. ([#496])
 
 ### Changed
 
@@ -148,6 +161,13 @@ change names its pull request.
 - `ica_lingam`'s **Limitations** paragraph says that its causal order depends on the columns'
   scale, as its authors note, with one measurement on standardized data, and points to
   `direct_lingam`. ([#487])
+- `boss`, `grasp`, and `ica_lingam` record the seed they used in `metadata["seed"]`, as `calm`
+  does. ([#496])
+- `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take `seed`,
+  which they pass to the `rcot`, `cmiknn`, and `gpdc` tests, the only tests that draw random
+  numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
+  depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
+  seed of a fit that uses one of those tests. ([#499])
 
 ### Fixed
 
@@ -940,3 +960,5 @@ First alpha release.
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
+[#496]: https://github.com/Abel-ai-lab/andrey/pull/496
+[#499]: https://github.com/Abel-ai-lab/andrey/pull/499

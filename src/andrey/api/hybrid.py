@@ -17,10 +17,9 @@ from andrey.api._adapt import (
     data_kind,
     int_in_range,
     json_safe,
-    open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
+from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -47,22 +46,20 @@ def _fit(
     max_tabu: int | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
+    seed: int | None,
     knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the restrict and maximize phases, and wrap the CPDAG."""
     from andrey.search.hc import HC_SCORES
-    from andrey.search.hybrid import MAXIMIZES, RESTRICTS
     from andrey.search.hybrid import rsmax2 as _rsmax2
     from andrey.search.tabu import TABU_SCORES
 
-    if restrict not in RESTRICTS:
-        raise ValueError(f"restrict must be one of {RESTRICTS}, got {restrict!r}")
-    if maximize not in MAXIMIZES:
-        raise ValueError(f"maximize must be one of {MAXIMIZES}, got {maximize!r}")
     scores = HC_SCORES if maximize == "hc" else TABU_SCORES
     if score_func not in scores:
-        raise NotImplementedError(
-            f"{name} with maximize={maximize!r} supports score_func {scores}, not {score_func!r}"
+        accepted = ", ".join(repr(score) for score in scores)
+        raise ValueError(
+            f"{name}: score_func must be one of {accepted} with maximize={maximize!r}, got "
+            f"{score_func!r}"
         )
     # Both phases read the same data, so the score and the test must agree on its type.
     if data_kind(score_func) != data_kind(indep_test):
@@ -76,9 +73,6 @@ def _fit(
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories, method=name
     )
-    alpha = open_unit_interval(alpha, "alpha")
-    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
-    tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
@@ -99,9 +93,9 @@ def _fit(
             max_tabu=max_tabu,
             categorical=mask,
             constraints=constraints,
+            seed=seed,
         )
     metadata = {
-        "algorithm": name.upper(),
         "score": json_safe(score),
         "restrict": restrict,
         "maximize": maximize,
@@ -110,6 +104,7 @@ def _fit(
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("mmhc")
 def mmhc(
     data: npt.ArrayLike,
     *,
@@ -121,6 +116,7 @@ def mmhc(
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with max-min hill climbing (MMHC).
@@ -164,6 +160,11 @@ def mmhc(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The score search considers the
@@ -175,22 +176,21 @@ def mmhc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"MMHC"``, ``metadata["score"]`` the score of the DAG found, computed as for
+        ``"mmhc"``, ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` are ``"mmpc"`` and ``"hc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` or ``score_func`` names no available test or score.
     TypeError
-        If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
-        positions, or ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None``
-        nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, if ``score_func`` and ``indep_test`` read different
-        kinds of data, if a given ``max_iter`` is less than ``1``, or if ``data`` or
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``score_func`` and ``indep_test`` read different kinds of data, or if ``data`` or
         ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
         :func:`~andrey.hc`. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists.
@@ -271,7 +271,6 @@ def mmhc(
     >>> out.structure.kind
     'cpdag'
     """
-    warn_experimental("mmhc")
     return _fit(
         "mmhc",
         data,
@@ -287,10 +286,12 @@ def mmhc(
         max_tabu=None,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
         knowledge=knowledge,
     )
 
 
+@method_spec("rsmax2")
 def rsmax2(
     data: npt.ArrayLike,
     *,
@@ -306,6 +307,7 @@ def rsmax2(
     max_tabu: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with a restrict phase and a maximize phase.
@@ -356,6 +358,11 @@ def rsmax2(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
@@ -367,26 +374,25 @@ def rsmax2(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"RSMAX2"``, ``metadata["score"]`` the score of the DAG found, computed as for
+        ``"rsmax2"``, ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
         ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test, or ``score_func`` no score ``maximize`` takes.
     TypeError
-        If ``tabu_length``, a given ``max_tabu``, or a given ``max_iter`` is not an int,
-        ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``restrict`` or ``maximize`` is not one of its choices, which the message lists, if
-        ``alpha`` is not in ``(0, 1)``, if ``score_func`` and ``indep_test`` read different kinds
-        of data, if ``tabu_length`` or a given ``max_iter`` is less than ``1``, if ``max_tabu`` is
-        outside ``1..tabu_length``, or if ``data`` or ``categorical`` does not suit the test or
-        score, as for :func:`~andrey.pc` and :func:`~andrey.hc`. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``score_func`` is not a score ``maximize`` takes, if ``score_func`` and ``indep_test`` read
+        different kinds of data, if ``max_tabu`` is greater than ``tabu_length``, or if ``data`` or
+        ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
+        :func:`~andrey.hc`. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -476,7 +482,6 @@ def rsmax2(
     >>> out.metadata["restrict"], out.metadata["maximize"]
     ('pc', 'tabu')
     """
-    warn_experimental("rsmax2")
     return _fit(
         "rsmax2",
         data,
@@ -492,5 +497,6 @@ def rsmax2(
         max_tabu=max_tabu,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
         knowledge=knowledge,
     )

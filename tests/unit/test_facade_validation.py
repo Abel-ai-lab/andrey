@@ -308,7 +308,7 @@ def test_granger_needs_a_time_step_in_every_fold():
 
 LINGAM_PRUNED = {
     "direct_lingam": andrey.direct_lingam,
-    "ica_lingam": partial(andrey.ica_lingam, random_state=0),
+    "ica_lingam": partial(andrey.ica_lingam, seed=0),
     "multi_group_direct_lingam": lambda x: andrey.multi_group_direct_lingam([x, x]),
 }
 
@@ -537,7 +537,7 @@ def test_hc_sets_no_move_limit_by_default():
         ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
         ({"max_tabu": True}, "max_tabu", TypeError),
         ({"lambda_value": -1.0}, "lambda_value", ValueError),
-        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", NotImplementedError),
+        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", ValueError),
     ],
 )
 def test_tabu_rejects_a_bad_setting(settings, named, error):
@@ -698,7 +698,7 @@ def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
         ("extended_search", "yes", TypeError),
         ("lambda_value", -1.0, ValueError),
         ("lambda_value", float("inf"), ValueError),
-        ("score_func", "local_score_BDeu", NotImplementedError),
+        ("score_func", "local_score_BDeu", ValueError),
     ],
 )
 def test_xges_rejects_a_bad_setting(setting, value, error):

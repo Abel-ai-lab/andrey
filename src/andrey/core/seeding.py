@@ -38,8 +38,8 @@ def seed_all(seed: int | None = None) -> int:
     """Seed Python's ``random``, NumPy's global generator, and torch from one number.
 
     Use it to make random draws outside Andrey repeatable, like data simulated with ``np.random``.
-    Andrey's methods with a ``seed`` or ``random_state`` argument seed their own generator from
-    it (else ``ANDREY_SEED``, else ``0``), so ``seed_all`` does not change their results. torch is
+    Andrey's methods with a ``seed`` argument seed their own generator from it (else
+    ``ANDREY_SEED``, else ``0``), so ``seed_all`` does not change their results. torch is
     seeded only when installed, on the CPU and on every CUDA device.
 
     Parameters

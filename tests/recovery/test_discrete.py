@@ -196,7 +196,7 @@ def test_the_searches_order_by_score_on_one_categorical_score(score_func):
 
 
 def test_tabu_takes_no_mixed_data_score():
-    with pytest.raises(NotImplementedError, match="tabu supports"):
+    with pytest.raises(ValueError, match="tabu: score_func must be one of"):
         andrey.tabu(datagen.generate("discrete_5v"), score_func="local_score_cond_gauss")
 
 

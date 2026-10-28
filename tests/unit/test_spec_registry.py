@@ -82,7 +82,7 @@ def test_shared_concepts_are_consistent():
         for p in spec.params:
             if p.name == "alpha":
                 assert p.type == "float"
-            if p.name in ("seed", "random_state"):
+            if p.name == "seed":
                 assert p.type == "int" and p.nullable
 
 
@@ -265,8 +265,7 @@ def test_cmd_run_wires_every_input_flag():
 def test_seeded_methods_expose_a_seed_param():
     for spec in REGISTRY.values():
         if spec.seeded:
-            names = {p.name for p in spec.params}
-            assert names & {"seed", "random_state"}, f"{spec.name} is seeded but has no seed param"
+            assert "seed" in {p.name for p in spec.params}, f"{spec.name} has no seed param"
 
 
 def test_multi_output_only_in_family_that_supports_it():

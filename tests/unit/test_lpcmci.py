@@ -160,7 +160,6 @@ def test_the_adapter_maps_a_conflict_to_a_circle_and_keeps_definite_lagged_cause
     assert (links[1][0][1], links[1][1][2], links[1][2][2]) == ("o->", "<->", "-->")
     assert links[1][1][0] == ""
     assert out.metadata["conflicts"] == [[0, 0, 1]]
-    assert out.metadata["algorithm"] == "lpcmci"
 
 
 def test_an_empty_result_has_no_links():

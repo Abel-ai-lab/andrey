@@ -18,10 +18,11 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import warning_policy
+from andrey.api import _method as method_wrapper
+from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CONCEPTS, Concept
+from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, Concept
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 #: Public callables outside the registry that a concept may name.
@@ -115,6 +116,12 @@ def test_parameter_cell(concept, method):
 def test_utility_cell(concept, deviation):
     live = signature(deviation.method)
     assert deviation.name in live and live[deviation.name].default == deviation.default
+
+
+@pytest.mark.parametrize("utility", UTILITIES)
+def test_a_utility_takes_an_execution_setting_only_as_a_recorded_deviation(utility):
+    concept = CONCEPTS["num_workers"]
+    assert (concept.deviation(utility) is not None) == (concept.param.name in signature(utility))  # ty: ignore[possibly-missing-attribute]
 
 
 def docstring_entries(doc: str) -> dict[str, str]:
@@ -268,6 +275,243 @@ def test_behavior_cell(concept, method):
         )
 
 
+# --- the wrapper every method runs in ------------------------------------------------------------
+
+
+def bad_values(param) -> list[tuple[object, type[Exception]]]:
+    """Values ``param`` refuses, each with its error: another type raises ``TypeError``; each side
+    of the bounds, a non-finite number, and an unknown choice raise ``ValueError``."""
+    if param.choices:
+        return [("unknown", ValueError), (1, TypeError)]
+    values = {
+        "int": [(1.5, TypeError), (True, TypeError)],
+        "float": [("0.5", TypeError), (float("nan"), ValueError)],
+        "bool": [(1, TypeError), ("yes", TypeError)],
+    }.get(param.type, [([1.5, 1], TypeError)] if param.type == "int_pair" else [])
+    step = 1 if param.type in ("int", "int_pair") else 0.5
+    cast = int if param.type in ("int", "int_pair") else float
+    if param.minimum is not None:
+        low = cast(param.minimum if param.exclusive_minimum else param.minimum - step)
+        values.append((low if param.type != "int_pair" else (low, 1), ValueError))
+    if param.maximum is not None:
+        high = cast(param.maximum if param.exclusive_maximum else param.maximum + step)
+        values.append((high if param.type != "int_pair" else (high, 1), ValueError))
+    return values
+
+
+@pytest.mark.parametrize(
+    ("method", "param", "value", "error"),
+    [
+        pytest.param(m, p, v, e, id=f"{m}-{p.name}-{v!r}")
+        for m, spec in REGISTRY.items()
+        for p in spec.params
+        for v, e in bad_values(p)
+    ],
+)
+def test_a_bad_value_raises_one_message_shape(method, param, value, error):
+    """Every parameter of every method refuses a bad value with one message: the method, the
+    parameter, what it accepts, and the value."""
+    with pytest.raises(error, match=rf"^{method}: {param.name} must be .+, got "):
+        getattr(andrey, method)(*inputs(method, codes=False), **{param.name: value})
+
+
+SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
+#: The settings that make a CI search draw random numbers.
+RANDOMIZED = {m: {"indep_test": "rcot"} for m in CI_SEARCHES}
+
+
+@pytest.mark.parametrize("method", SEEDED)
+def test_a_seeded_fit_records_its_seed(method, monkeypatch):
+    seed = tagged(CONCEPTS["seed"], method).name  # ty: ignore[possibly-missing-attribute]
+    settings = {**SHORT.get(method, {}), **RANDOMIZED.get(method, {})}
+    out, _ = fit(method, codes=False, **settings, **{seed: 7})
+    assert out.metadata["seed"] == 7
+    monkeypatch.setenv("ANDREY_SEED", "11")
+    out, _ = fit(method, codes=False, **settings)
+    assert out.metadata["seed"] == 11
+
+
+def test_a_fit_that_draws_no_random_numbers_records_no_seed():
+    """A method without a seed, and a CI search under a deterministic test, record none."""
+    assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
+    for method in CI_SEARCHES:
+        out, _ = fit(method, codes=False, seed=7)
+        assert "seed" not in out.metadata, method
+
+
+# --- randomness -----------------------------------------------------------------------------------
+
+STOCHASTIC = ci.STOCHASTIC_INDEP_TESTS
+
+
+def takes_a_seed(test: str) -> bool:
+    """Whether the shipped test builds with a ``seed`` setting."""
+    codes = np.random.default_rng(0).integers(0, 3, (60, 3)).astype(float)
+    args = (codes, None) if test in ci.MIXED_INDEP_TESTS else (codes,)
+    try:
+        ci._CI_REGISTRY[test](*args, seed=1)
+    except TypeError:
+        return False
+    return True
+
+
+def test_the_stochastic_tests_are_the_ones_that_take_a_seed():
+    assert {t for t in ci.SHIPPED_INDEP_TESTS if takes_a_seed(t)} == set(STOCHASTIC)
+
+
+def test_seeded_stochastic_and_suitable_for_the_seed_concept_agree():
+    suitable = CONCEPTS["seed"].suitable
+    for method, spec in REGISTRY.items():
+        tests = next((p.choices for p in spec.params if p.name == "indep_test"), None) or ()
+        assert spec.seeded == (method in suitable) == (spec.determinism == "stochastic"), method
+        assert not set(tests) & set(STOCHASTIC) or spec.seeded, method
+        names = [p.name for p in spec.params if p.concept == "seed"]
+        assert names == (["seed"] if spec.seeded else []), method
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SampleSizeWarning")
+def test_the_stochastic_tests_give_other_p_values_for_another_seed():
+    data = inputs("pc", codes=False)[0].to_numpy()
+    queries = [(0, 2, ()), (0, 1, ()), (0, 2, (1,)), (1, 2, (0,))]
+    for name in STOCHASTIC:
+        draws = {
+            seed: [ci.make_indep_test(name, data, seed=seed)(*q) for q in queries]
+            for seed in (7, 8)
+        }
+        assert draws[7] == [ci.make_indep_test(name, data, seed=7)(*q) for q in queries], name
+        assert draws[7] != draws[8], name
+
+
+#: Settings that make a CI search build each test it has: the one over the data, the one in rank
+#: order, and the one that votes on colliders.
+CI_CASES = {
+    "pc": [{}, {"collider_rule": "conservative"}],
+    "fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
+    "gfci": [{}, {"possible_dsep": "fast"}],
+    "cdnod": [{}, {"collider_rule": "conservative"}],
+    "iamb": [{}, {"target": 0}],
+    "inter_iamb": [{}],
+    "mmpc": [{}, {"target": 0}],
+    "mmhc": [{}],
+    "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
+}
+
+
+def test_every_search_with_a_ci_test_has_cases():
+    assert set(CI_CASES) == set(CI_SEARCHES)
+
+
+@pytest.fixture
+def built_seeds(monkeypatch):
+    """The seed each randomized test a fit builds receives; ``None`` is none passed."""
+    seeds = []
+    for name in STOCHASTIC:
+
+        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+            seeds.append(options.get("seed"))
+            return _factory(data, *args, **options)
+
+        monkeypatch.setitem(ci._CI_REGISTRY, name, build)
+    return seeds
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "test"),
+    [
+        pytest.param(m, s, t, id=f"{m}-{t}-{'+'.join(s)}")
+        for m, cases in CI_CASES.items()
+        for s in cases
+        for t in STOCHASTIC
+    ],
+)
+def test_the_seed_reaches_every_randomized_test_a_search_builds(
+    method, settings, test, built_seeds, monkeypatch
+):
+    monkeypatch.setenv("ANDREY_SEED", "11")
+    out, _ = fit(method, codes=False, indep_test=test, seed=7, **settings)
+    assert built_seeds
+    assert set(built_seeds) == {7}
+    assert out.metadata["seed"] == 7
+
+
+@pytest.mark.parametrize("method", CI_SEARCHES)
+def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkeypatch):
+    results = []
+    for global_seed in ("0", "11"):
+        monkeypatch.setenv("ANDREY_SEED", global_seed)
+        out, _ = fit(method, codes=False, indep_test="rcot", seed=7)
+        results.append((out.structure.to_numpy().tolist(), out.metadata))
+    assert results[0] == results[1]
+
+
+def test_a_former_seed_name_maps_to_seed_for_one_release():
+    data = inputs("ica_lingam", codes=False)
+    expected = andrey.ica_lingam(*data, seed=3)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="random_state is now seed"):
+        out = andrey.ica_lingam(*data, random_state=3)
+    assert out.metadata["seed"] == 3 and out.ordering == expected.ordering
+
+
+DROPPED = [(m, arg) for m, spec in REGISTRY.items() for arg in spec.dropped_args]
+
+
+@pytest.mark.parametrize(("method", "arg"), DROPPED)
+def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
+    assert arg not in signature(method)
+    assert all(p.name != arg for p in REGISTRY[method].params)
+    data = inputs(method, codes=False)
+    first = lambda out: out[0] if isinstance(out, list) else out  # noqa: E731
+    expected = first(getattr(andrey, method)(*data))
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{arg} is ignored"):
+        out = first(getattr(andrey, method)(*data, **{arg: 3}))
+    assert out.ordering == expected.ordering
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        getattr(andrey, method)(*data, **{arg: 3})  # the message warns once
+
+
+def renamed(monkeypatch, method: str, name: str, **update) -> None:
+    """Give ``method``'s parameter ``name`` the former names or values in ``update``."""
+    spec = REGISTRY[method]
+    params = tuple(p.model_copy(update=update) if p.name == name else p for p in spec.params)
+    monkeypatch.setattr(
+        method_wrapper, "spec_of", lambda _: spec.model_copy(update={"params": params})
+    )
+
+
+def test_a_former_name_maps_to_the_current_one_with_one_warning(monkeypatch):
+    renamed(monkeypatch, "pc", "alpha", aliases=("significance",))
+    data = inputs("pc", codes=False)
+    expected = andrey.pc(*data, alpha=0.01)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="significance is now alpha"):
+        out = andrey.pc(*data, significance=0.01)
+    assert out.structure.to_numpy().tolist() == expected.structure.to_numpy().tolist()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        andrey.pc(*data, significance=0.01)  # the message warns once
+    with pytest.raises(ValueError, match="pass only alpha"):
+        andrey.pc(*data, alpha=0.01, significance=0.01)
+
+
+def test_a_former_value_maps_to_the_current_one_with_one_warning(monkeypatch):
+    renamed(monkeypatch, "pc", "indep_test", choice_aliases=(("fisher", "fisherz"),))
+    data = inputs("pc", codes=False)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='fisher' is now"):
+        out = andrey.pc(*data, indep_test="fisher")
+    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
+
+
+def test_an_indep_test_takes_the_registered_tests(monkeypatch):
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
+    data = inputs("pc", codes=False)
+    out = andrey.pc(*data, indep_test="fisherz_copy")
+    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
+
+
 # --- surfaces -------------------------------------------------------------------------------------
 
 
@@ -300,6 +544,7 @@ def test_schema_carries_bounds_aliases_and_concepts():
 
     schema = help_schema()
     for name, spec in REGISTRY.items():
+        assert schema["methods"][name]["dropped_args"] == list(spec.dropped_args)
         properties = schema["methods"][name]["params"]["properties"]
         for p in spec.params:
             entry = properties[p.name]

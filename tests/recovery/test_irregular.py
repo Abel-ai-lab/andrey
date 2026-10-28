@@ -174,7 +174,7 @@ def test_anm_resolves_the_planted_direction():
     assert out.structure.type == "graph"
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
     keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
-    assert set(out.metadata) == {"algorithm", *keys}
+    assert set(out.metadata) == keys  # the method wrapper adds "algorithm"
 
 
 def test_anm_matches_the_recorded_output():

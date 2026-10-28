@@ -22,11 +22,9 @@ from andrey.api._adapt import (
     column_namer,
     copies_named,
     data_kind,
-    int_in_range,
-    open_unit_interval,
     structure_output,
 )
-from andrey.api._boundary import warn_past_boundary
+from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve
 
@@ -38,6 +36,7 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+@method_spec("pc")
 def pc(
     data: npt.ArrayLike,
     *,
@@ -47,6 +46,7 @@ def pc(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -104,6 +104,11 @@ def pc(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -124,33 +129,30 @@ def pc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"PC"``. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
+        ``"pc"``. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
         equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]`` lists
         the categorical columns it read, by name or 0-based position. With ``collider_rule``
         ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
         unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
         column positions, the middle node second and ``x < y``, in ascending order.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` is not an int.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
-        not in ``(0, 1)``, if ``max_categories`` is less than ``2``, with ``"chisq"`` or ``"gsq"``,
-        if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        too few samples for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``,
+        if ``data`` holds a value that is not a whole number; or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, if ``collider_order`` is not ``"p_value"`` or ``"column"``, or if
-        ``collider_rule`` is not ``"sepsets"``, ``"conservative"``, or ``"majority"``. With
-        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
-        before any test runs; one message names every group of copies and says to keep one column
-        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        with another test. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
+        up to scale and shift, before any test runs; one message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -362,10 +364,8 @@ def pc(
         method="pc",
         missing=True,
     )
-    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
-    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
@@ -378,10 +378,10 @@ def pc(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
-        "algorithm": "PC",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
@@ -401,6 +401,7 @@ def _ambiguous_metadata(
     return {"ambiguous_triples": [list(triple) for triple in sorted(ambiguous)]}
 
 
+@method_spec("fci")
 def fci(
     data: npt.ArrayLike,
     *,
@@ -410,6 +411,7 @@ def fci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -468,6 +470,11 @@ def fci(
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -489,30 +496,29 @@ def fci(
     -------
     StructureOutput
         Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"FCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
+        ``"fci"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
         (``<->``) marks a probable latent common cause. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
         ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
         or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
         ``x < y``, in ascending order.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` is not an int.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
-        not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
-        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
-        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
-        before any test runs; one message names every group of copies and says to keep one column
-        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        too few samples for a test or a singular correlation matrix, or if ``data`` or
+        ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift, before any test
+        runs; one message names every group of copies and says to keep one column per group. Also if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -688,12 +694,9 @@ def fci(
         method="fci",
         missing=True,
     )
-    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="fci")
-    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
-    warn_past_boundary("fci", X.shape)
     with copies_named(labels), rows_tested() as rows:
         pag = _fci(
             X,
@@ -705,10 +708,10 @@ def fci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
-        "algorithm": "FCI",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
@@ -716,6 +719,7 @@ def fci(
     return structure_output(pag, labels=labels, metadata=metadata)
 
 
+@method_spec("gfci")
 def gfci(
     data: npt.ArrayLike,
     *,
@@ -728,6 +732,7 @@ def gfci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -798,6 +803,11 @@ def gfci(
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -816,32 +826,29 @@ def gfci(
     -------
     StructureOutput
         Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GFCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
+        ``"gfci"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
         (``<->``) marks a probable latent common cause. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
         ``metadata["ambiguous_triples"]`` lists the triples the rule left ambiguous, as
         ``[x, z, y]``: 0-based column positions, the middle node second and ``x < y``, in
         ascending order.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score, or ``indep_test`` no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` is not an int.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
-        ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
-        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
-        ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
-        column repeats another up to scale and shift given more than two rows or, with more rows
-        than columns, is a linear function of other columns. One message names every group of copies
-        and says to keep one column per group. Also if a given ``max_depth`` is negative, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``score_func`` and ``indep_test`` read different data (continuous, categorical, or mixed),
+        or if ``data`` or ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the
+        BIC score, also if a column repeats another up to scale and shift given more than two rows
+        or, with more rows than columns, is a linear function of other columns. One message names
+        every group of copies and says to keep one column per group. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -973,12 +980,9 @@ def gfci(
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories, method="gfci"
     )
-    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
-    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     ambiguous: set[tuple[int, int, int]] = set()
-    warn_past_boundary("gfci", X.shape)
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -993,16 +997,17 @@ def gfci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
-        "algorithm": "GFCI",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 
 
+@method_spec("cdnod")
 def cdnod(
     data: npt.ArrayLike,
     domain_index: npt.ArrayLike,
@@ -1014,6 +1019,7 @@ def cdnod(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
+    seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -1076,6 +1082,11 @@ def cdnod(
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1096,7 +1107,7 @@ def cdnod(
     -------
     StructureOutput
         Wraps a :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
-        ``metadata["algorithm"]`` is ``"CDNOD"``. Directed marks (``->``) are oriented edges,
+        ``metadata["algorithm"]`` is ``"cdnod"``. Directed marks (``->``) are oriented edges,
         undirected (``--``) the ones left open. The graph is partially directed, not the CPDAG of
         an observational equivalence class: the index orients edges that the true DAG's CPDAG
         leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
@@ -1109,27 +1120,24 @@ def cdnod(
         reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
         middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
         numbered ``n_variables``.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` is not an int.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` /
-        ``inf``, if ``data`` has too few rows for a test, if ``alpha`` or ``dependence_threshold``
-        is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
-        :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
-        value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
-        ``"column"``, or ``collider_rule`` not ``"sepsets"``, ``"conservative"``, or ``"majority"``.
-        With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or ``domain_index``
-        with more than one domain, repeats another up to scale and shift, before any test runs; one
-        message names every group of copies and says to keep one column per group. Also if a given
-        ``max_depth`` is negative, or if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
+        ``data`` has too few rows for a test, if ``data`` or ``categorical`` does not suit the test,
+        as for :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index``
+        holds a value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a
+        column of ``data``, or ``domain_index`` with more than one domain, repeats another up to
+        scale and shift, before any test runs; one message names every group of copies and says to
+        keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1262,22 +1270,17 @@ def cdnod(
         method="cdnod",
         missing=True,
     )
-    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
-    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
-    if dependence_threshold is not None:
-        dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
-        if np.isnan(X).any():
-            raise ValueError(
-                "cdnod's dependence_threshold step compares kernel measures over every row, so "
-                "it does not accept missing values; leave dependence_threshold=None, whose tests "
-                "delete rows per test, or drop the rows that hold NaN"
-            )
-    warn_past_boundary("cdnod", X.shape)
+    if dependence_threshold is not None and np.isnan(X).any():
+        raise ValueError(
+            "cdnod's dependence_threshold step compares kernel measures over every row, so it "
+            "does not accept missing values; leave dependence_threshold=None, whose tests delete "
+            "rows per test, or drop the rows that hold NaN"
+        )
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
@@ -1297,10 +1300,10 @@ def cdnod(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
+            seed=seed,
             _ambiguous=ambiguous,
         )
     metadata = {
-        "algorithm": "CDNOD",
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),

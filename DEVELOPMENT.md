@@ -106,15 +106,19 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 
 ### Add a method
 
-1. Implement the facade in `src/andrey/api/<family>.py` and add its name to `andrey.api.__all__`.
+1. Implement the facade in `src/andrey/api/<family>.py`, decorated with `@method_spec("<name>")`,
+   and add its name to `andrey.api.__all__`. The wrapper (`src/andrey/api/_method.py`) checks every
+   argument against the method's `ParamSpec`, resolves a seeded method's seed, gives the
+   experimental warning, and sets `metadata["algorithm"]` and `metadata["seed"]`, so the facade
+   holds only the method's own logic.
    End the docstring's Notes with a **Limitations.** paragraph: "Not benchmarked yet.", the largest
    problem its tests run it on (variables, and rows where they matter), and any known structural
    limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
-   identical to the signature), with `status="experimental"`, and call
-   `warn_experimental("<name>")` first in the facade until the method is supported. A method whose
-   tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True` to its data
-   check; every other method passes its name as `method=`, so its refusal of `NaN` names it.
+   identical to the signature), with `status="experimental"` until the method is supported. A
+   method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`
+   to its data check. Every data check passes the method's name as `method=`, so a refusal of
+   `NaN` names it and data past the measured boundary warn.
    `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
@@ -144,15 +148,25 @@ when they differ. A new enumerated value goes in `ParamSpec.choices`, so the sch
 implements a concept changes in `src/andrey/spec/concepts.py`: bringing a method to the template
 deletes its deviation, and `tests/unit/test_concepts.py` fails until it does. A parameter or a
 choice renamed after a release keeps its former name in `ParamSpec.aliases` or
-`ParamSpec.choice_aliases` for one release; the deviation's `aliases` lists the names that shipped.
+`ParamSpec.choice_aliases` for one release, which `method_spec` maps with a
+`DeprecatedArgumentWarning`; the deviation's `aliases` lists the names that shipped. A parameter
+removed after a release goes in `MethodSpec.dropped_args` for one release: the wrapper drops it
+with the same warning. Bounds go in the `ParamSpec`, which the wrapper checks; a facade checks only
+what depends on the data or on another parameter.
+
+A method that draws random numbers sets `seeded=True` and takes `seed` (`concept_param("seed")`),
+and the wrapper resolves it and records `metadata["seed"]`. A search that tests independence
+passes the seed to `make_indep_test`, which gives it to the tests in `STOCHASTIC_INDEP_TESTS` and
+only to them, at every place the search builds a test. A method takes no execution setting such as
+`num_workers`; it reads them from `andrey.config`.
 
 ### Publish a boundary lane
 
 A release summary with `boundary.ladders` sets where each method's `BoundaryWarning` starts:
 regenerate its table with `uv run python scripts/boundary_table.py`, which writes
 `src/andrey/api/_boundary_table.py` from the newest such summary. `tests/unit/test_boundary.py`
-fails until the table matches it, and names a method whose ladder newly ended on the time or memory
-cap until its facade calls `warn_past_boundary`, after the input checks and before the fit.
+fails until the table matches it. Every method's data check applies the table, after the input
+checks and before the fit.
 
 ### Add an environment variable
 
@@ -281,8 +295,8 @@ One pull request switches the method to supported, since the checks tie these ch
 (the quality gate covers exactly the supported methods, and the published summaries list exactly
 them):
 
-- `status="supported"` in its `MethodSpec`, with the `warn_experimental` call and the docstring's
-  `ExperimentalWarning` entry removed;
+- `status="supported"` in its `MethodSpec`, with the docstring's `ExperimentalWarning` entry
+  removed;
 - a **Limitations.** paragraph from the campaign: the data and sizes measured, the sizes where its
   median errors reach the empty graph's, its fit times with the core count, and the size where it
   stops being practical, if the report shows one;

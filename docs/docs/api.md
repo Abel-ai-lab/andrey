@@ -20,6 +20,13 @@ in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_di
 a list of datasets and returns one result per dataset. Each method is either supported or
 experimental; `andrey list` prints the status.
 
+Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
+outside its range or not one of its choices raises `ValueError`, each with a message that names the
+method, the argument, what it accepts, and the value, such as
+`pc: alpha must be a number in (0, 1), got 1.5`. `andrey --help --json` lists each
+argument's type, range, and choices. Where `indep_test` takes the shipped tests, it also takes the
+ones you register with `register_indep_test`.
+
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no infinity, no constant column, and, for a DataFrame, column names that differ as
 text. A `NaN` is a missing value, which only the methods that delete rows per test accept (see
@@ -113,6 +120,20 @@ takes `collider_rule` for its same-step colliders, with `"majority"`, its defaul
 % concept: max_parents
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
 gives a node more than that many parents, and some graph reaches each node's count.
+
+% concept: seed
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
+The methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not
+set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
+deterministic and takes no seed.
+
+% concept: num_workers
+No method takes the number of workers or the device as an argument. Set them for every call in a
+block with `andrey.config(num_workers=...)`, or with the `ANDREY_*` variables of
+[Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: ebic_gamma
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
@@ -401,6 +422,7 @@ category, such as scikit-learn's `ConvergenceWarning` from `ica_lingam`.
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
+| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |
 | {py:class}`~andrey.DataTypeWarning` | A score search's default picked BDeu because every column is categorical or the conditional Gaussian score because some are, a mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
@@ -448,6 +470,7 @@ name.
    SampleSizeWarning
    DataTypeWarning
    BoundaryWarning
+   DeprecatedArgumentWarning
 ```
 
 ## Datasets

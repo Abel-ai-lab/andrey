@@ -23,15 +23,13 @@ from andrey.api._adapt import (
     data_kind,
     data_matrix,
     default_score,
-    flag,
     int_in_range,
     json_safe,
     structure_output,
 )
-from andrey.api._boundary import warn_past_boundary
+from andrey.api._method import method_spec
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
-from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -41,6 +39,7 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+@method_spec("ges")
 def ges(
     data: npt.ArrayLike,
     *,
@@ -113,7 +112,7 @@ def ges(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
+        ``"ges"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
         the sum over variables of ``n * log(residual variance) + lambda_value * log(n) * n_parents
         + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``; for BDeu, ``-2`` times the log of
         the structure prior times the marginal likelihood; for the multinomial BIC and the
@@ -124,23 +123,21 @@ def ges(
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_parents`` is not an int.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if a given ``max_parents`` is negative or
-        below the parents some graph of the required edges of ``knowledge`` gives a node, if
-        ``max_categories`` is less than ``2``, with a categorical score, if ``data`` holds a number
-        that is not whole, or, with a mixed-data score, if ``categorical`` names a column ``data``
-        lacks, or if a categorical column holds a number that is not whole or a missing value. Also
-        if ``categorical`` is given with another score. With the BIC score, also if a column
-        repeats another up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if a given
+        ``max_parents`` is below the parents some graph of the required edges of ``knowledge`` gives
+        a node; with a categorical score, if ``data`` holds a number that is not whole; or, with a
+        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
+        with another score. With the BIC score, also if a column repeats another up to scale and
+        shift given more than two rows or, with more rows than columns, is a linear function of
+        other columns. One message names every group of copies and says to keep one column per
+        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -319,7 +316,6 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
-    max_parents = None if max_parents is None else int_in_range(max_parents, "max_parents", 0)
     score_func, categorical = default_score(
         data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
     )
@@ -342,13 +338,13 @@ def ges(
         cpdag,
         labels=labels,
         metadata={
-            "algorithm": "GES",
             "score": json_safe(score),
             **categorical_metadata(mask, data),
         },
     )
 
 
+@method_spec("gies")
 def gies(
     data: npt.ArrayLike,
     interventions: npt.ArrayLike | None = None,
@@ -395,7 +391,7 @@ def gies(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
         graph: directed marks (``->``) are edges every graph in the class orients alike,
-        undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"GIES"`` and
+        undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"gies"`` and
         ``metadata["score"]`` the BIC score of the result, the sum over variables of
         ``n_v * log(residual variance) + lambda_value * log(n_samples) * n_parents + 2 *
         ebic_gamma * log C(n_variables - 1, n_parents)``, where ``n_v`` counts the rows without an
@@ -406,14 +402,15 @@ def gies(
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
-        no constant column; if ``interventions`` does not have ``data``'s shape, holds a value
-        other than 0 or 1, or leaves a variable fewer than two rows, or one value, without an
-        intervention; if ``lambda_value`` is negative or non-finite; or if a column repeats another
-        up to scale and shift given more than two rows or, with more rows than columns, is a linear
-        function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
+        column; if ``interventions`` does not have ``data``'s shape, holds a value other than 0 or
+        1, or leaves a variable fewer than two rows, or one value, without an intervention; or if a
+        column repeats another up to scale and shift given more than two rows or, with more rows
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
+        or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -497,15 +494,15 @@ def gies(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
-    warn_past_boundary("gies", X.shape)
     with copies_named(labels):
         graph, score = _gies(
             X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma, constraints=constraints
         )
-    metadata = {"algorithm": "GIES", "score": json_safe(score)}
+    metadata = {"score": json_safe(score)}
     return structure_output(graph, labels=labels, metadata=metadata)
 
 
+@method_spec("xges")
 def xges(
     data: npt.ArrayLike,
     *,
@@ -551,24 +548,22 @@ def xges(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"XGES"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
+        ``"xges"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
         lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
         the equivalence class leaves open.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC"``.
     TypeError
-        If ``extended_search`` is not a bool. Also if ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
-        ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift given more than two rows, or, with more rows than columns, is a
-        linear function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is
+        constant, repeats another column up to scale and shift given more than two rows, or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -651,7 +646,6 @@ def xges(
     from andrey.search.xges import xges as _xges
 
     X = data_matrix(data, method="xges")
-    extended_search = flag(extended_search, "extended_search")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="xges")
     with copies_named(labels):
@@ -663,10 +657,11 @@ def xges(
             extended_search=extended_search,
             constraints=constraints,
         )
-    metadata = {"algorithm": "XGES", "score": json_safe(score)}
+    metadata = {"score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("hc")
 def hc(
     data: npt.ArrayLike,
     *,
@@ -737,7 +732,7 @@ def hc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"HC"`` and ``metadata["score"]`` the score of the DAG found, computed as for
+        ``"hc"`` and ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
@@ -745,20 +740,18 @@ def hc(
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
-        positions, or ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None``
-        nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
-        or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With
-        the BIC score, also if a column repeats another up to scale and shift given more than two
-        rows or, with more rows than columns, is a linear function of other columns. One message
-        names every group of copies and says to keep one column per group. Also if ``knowledge``
-        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists,
-        or, under a mixed-data score, requires an edge from a continuous into a categorical column.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a
+        mixed-data score, requires an edge from a continuous into a categorical column.
 
     Warns
     -----
@@ -857,7 +850,6 @@ def hc(
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories, method="hc"
     )
-    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="hc")
     with copies_named(labels):
@@ -870,10 +862,11 @@ def hc(
             categorical=mask,
             constraints=constraints,
         )
-    metadata = {"algorithm": "HC", "score": json_safe(score), **categorical_metadata(mask, data)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("tabu")
 def tabu(
     data: npt.ArrayLike,
     *,
@@ -937,25 +930,23 @@ def tabu(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"Tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
+        ``"tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no score tabu search takes.
     TypeError
-        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int. Also if
-        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
-        less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
-        score, if ``data`` holds a number that is not whole. With the BIC score, also if a column
-        repeats another up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``max_tabu``
+        is greater than ``tabu_length``, or, with a categorical score, if ``data`` holds a number
+        that is not whole. With the BIC score, also if a column repeats another up to scale and
+        shift given more than two rows or, with more rows than columns, is a linear function of
+        other columns. One message names every group of copies and says to keep one column per
+        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1036,21 +1027,16 @@ def tabu(
     >>> tabu(np.column_stack([x, y])).structure.kind
     'cpdag'
     """
-    from andrey.search.tabu import TABU_SCORES
     from andrey.search.tabu import tabu as _tabu
 
     score_func, _ = default_score(data, score_func, "local_score_BIC_from_cov", mixed=False)
-    if score_func not in TABU_SCORES:
-        raise NotImplementedError(f"tabu supports {TABU_SCORES}, not {score_func!r}")
     if data_kind(score_func) == "categorical":
         X, _ = checked_data(data, None, "score_func", score_func, method="tabu")
     else:
         X = data_matrix(data, method="tabu")
-    tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
-    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
     with copies_named(labels):
@@ -1064,10 +1050,11 @@ def tabu(
             max_iter=max_iter,
             constraints=constraints,
         )
-    metadata = {"algorithm": "Tabu", "score": json_safe(score)}
+    metadata = {"score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("exact_search")
 def exact_search(
     data: npt.ArrayLike,
     *,
@@ -1131,24 +1118,23 @@ def exact_search(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` (one DAG of the optimal equivalence
-        class); ``metadata["algorithm"]`` is ``"ExactSearch"``. Under a mixed-data
+        class); ``metadata["algorithm"]`` is ``"exact_search"``. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
         0-based position.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical`` does
-        not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
-        another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1248,14 +1234,11 @@ def exact_search(
     >>> exact_search(np.column_stack([x, y, z])).structure.kind
     'dag'
     """
-    from andrey.search.exact import EXACT_SCORES
     from andrey.search.exact import exact_search as _exact
 
     score_func, categorical = default_score(
         data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
     )
-    if score_func not in EXACT_SCORES:
-        raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
     X, mask = checked_data(
         data,
         categorical,
@@ -1266,7 +1249,6 @@ def exact_search(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
-    warn_past_boundary("exact_search", X.shape)
     with copies_named(labels):
         dag = _exact(
             X,
@@ -1279,10 +1261,11 @@ def exact_search(
     return structure_output(
         dag,
         labels=labels,
-        metadata={"algorithm": "ExactSearch", **categorical_metadata(mask, data)},
+        metadata={**categorical_metadata(mask, data)},
     )
 
 
+@method_spec("calm")
 def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> StructureOutput:
     """Learn a weighted DAG with CALM, a continuous-optimization structure learner.
 
@@ -1327,7 +1310,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"CALM"``), the
+        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"calm"``), the
         ``"seed"`` used, ``"n_edges"``, ``"objective"`` (half the sum of the log residual
         variances plus ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the
         acyclicity residual of the returned graph, ``0`` when it is acyclic).
@@ -1339,8 +1322,10 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     TypeError
         If ``params`` holds a name the solver does not accept.
     ValueError
-        If the fit's loss or weights stop being finite, for example when the data's scale
-        overflows its covariance; ``standardize=True`` rescales the columns.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if the fit's
+        loss or weights stop being finite, for example when the data's scale overflows its
+        covariance; ``standardize=True`` rescales the columns.
 
     Notes
     -----
@@ -1431,17 +1416,13 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
 
     X = data_matrix(data, method="calm")
     labels = column_labels(data)
-    used_seed = resolve_seed(seed)
-    warn_past_boundary("calm", X.shape)
     with copies_named(labels):
-        result = _calm(X, seed=used_seed, **params)
+        result = _calm(X, seed=seed, **params)  # ty: ignore[invalid-argument-type]  # an int here
     return structure_output(
         result.dag,
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "algorithm": "CALM",
-            "seed": used_seed,
             "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "objective": json_safe(result.objective),

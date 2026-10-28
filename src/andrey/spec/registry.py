@@ -19,7 +19,7 @@ from andrey.search.hc import HC_SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 from andrey.search.tabu import TABU_SCORES
 
-from .concepts import CONCEPTS, SEED_MAX, concept_param
+from .concepts import CONCEPTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -97,16 +97,11 @@ _SEED = concept_param(
     "seed",
     doc="Seed for the search's random orders. null uses ANDREY_SEED, or 0 when it is unset.",
 )
-_RANDOM_STATE = ParamSpec(
-    name="random_state",
-    type="int",
-    default=None,
-    doc="Ignored: the pwling order search is deterministic. Accepted so that every LiNGAM method "
-    "takes random_state.",
-    nullable=True,
-    concept="seed",
+_TEST_SEED = concept_param(
+    "seed",
+    doc="Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc make; the "
+    "other tests ignore it. null uses ANDREY_SEED, or 0 when it is unset.",
 )
-
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 
 REGISTRY: dict[str, MethodSpec] = {}
@@ -135,7 +130,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -144,6 +139,7 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -151,6 +147,7 @@ _add(
             _COLLIDER_RULE,
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=(
             "Spirtes & Glymour 1991",
@@ -176,7 +173,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -185,6 +182,7 @@ _add(
             '`tie_break="position"` fires the orientation rules one at a time in column order, and '
             'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
         ),
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -192,6 +190,7 @@ _add(
             _CATEGORICAL,
             _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
+            _TEST_SEED,
         ),
         references=(
             "Spirtes, Meek & Richardson 1995",
@@ -217,7 +216,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -227,6 +226,7 @@ _add(
             'records the first separating subset found, and it or `possible_dsep="fast"` visits '
             "the possible-d-separation step in column order."
         ),
+        seeded=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -250,6 +250,7 @@ _add(
             _CATEGORICAL,
             _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
+            _TEST_SEED,
         ),
         references=(
             "Ogarrio, Spirtes & Ramsey 2016",
@@ -288,7 +289,7 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -297,6 +298,7 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -306,6 +308,10 @@ _add(
             _MAX_CATEGORIES,
             ParamSpec(
                 name="dependence_threshold",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
                 type="float",
                 default=None,
                 doc="Runs the independent-change step, which orients edges between variables that "
@@ -313,6 +319,7 @@ _add(
                 "null skips the step.",
                 nullable=True,
             ),
+            _TEST_SEED,
         ),
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
@@ -369,12 +376,13 @@ for _name, _summary, _key, _refs in (
                 graph_kind="cpdag",
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
-            determinism="deterministic",
+            determinism="stochastic",
             accel="numpy",
             status="experimental",
             column_order="relabels",
             tie_break=True,
-            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+            seeded=True,
+            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES, _TEST_SEED),
             references=_refs,
         )
     )
@@ -608,6 +616,7 @@ _add(
             _EBIC_GAMMA,
             ParamSpec(
                 name="tabu_length",
+                minimum=1,
                 type="int",
                 default=10,
                 doc="Length of the tabu list: how many recently visited DAGs a move may not lead "
@@ -615,6 +624,7 @@ _add(
             ),
             ParamSpec(
                 name="max_tabu",
+                minimum=1,
                 type="int",
                 default=None,
                 doc="Non-improving moves allowed without a better DAG before the search stops, "
@@ -736,12 +746,16 @@ _CONTINUOUS_PATH_PARAMS = (
     ),
     ParamSpec(
         name="mcp_lambda",
+        minimum=0,
+        exclusive_minimum=True,
         type="float",
         default=0.4,
         doc="Penalty level of the path's first step, above 0. Used only with robust.",
     ),
     ParamSpec(
         name="mcp_delta",
+        minimum=0,
+        exclusive_minimum=True,
         type="float",
         default=0.2,
         doc="Weight magnitude above which the quasi-MCP stops growing, at the path's first step, "
@@ -749,6 +763,10 @@ _CONTINUOUS_PATH_PARAMS = (
     ),
     ParamSpec(
         name="mcp_decay",
+        minimum=0,
+        maximum=1,
+        exclusive_minimum=True,
+        exclusive_maximum=True,
         type="float",
         default=0.8,
         doc="Factor in (0, 1) by which mcp_lambda and mcp_delta shrink after each accepted step. "
@@ -756,6 +774,7 @@ _CONTINUOUS_PATH_PARAMS = (
     ),
     ParamSpec(
         name="max_path",
+        minimum=1,
         type="int",
         default=50,
         doc="Most accepted steps of the path, at least 1. Used only with robust.",
@@ -801,12 +820,16 @@ _add(
             ),
             ParamSpec(
                 name="h_tol",
+                minimum=0,
+                exclusive_minimum=True,
                 type="float",
                 default=1e-8,
                 doc="The fit stops when the acyclicity function falls to this value, above 0.",
             ),
             ParamSpec(
                 name="rho_max",
+                minimum=0,
+                exclusive_minimum=True,
                 type="float",
                 default=1e16,
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
@@ -850,12 +873,14 @@ _add(
             ),
             ParamSpec(
                 name="stages",
+                minimum=1,
                 type="int",
                 default=5,
                 doc="Stages of the central path, at least 1 (T in the paper).",
             ),
             ParamSpec(
                 name="warm_iter",
+                minimum=1,
                 type="int",
                 default=30000,
                 doc="Most Adam steps of each stage but the last, at least 1.",
@@ -866,7 +891,14 @@ _add(
                 doc="Most Adam steps of the last stage, at least 1.",
                 nullable=False,
             ),
-            ParamSpec(name="lr", type="float", default=3e-4, doc="Step size of Adam, above 0."),
+            ParamSpec(
+                name="lr",
+                type="float",
+                default=3e-4,
+                doc="Step size of Adam, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
             *_CONTINUOUS_PATH_PARAMS,
         ),
         references=(
@@ -912,11 +944,12 @@ _add(
             doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
             "the phases",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -933,6 +966,7 @@ _add(
             _HYBRID_MAX_ITER,
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=("Tsamardinos, Brown & Aliferis 2006",),
     )
@@ -952,11 +986,12 @@ _add(
             doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
             "the phases",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
             ParamSpec(
                 name="restrict",
@@ -989,6 +1024,7 @@ _add(
             _HYBRID_MAX_ITER,
             ParamSpec(
                 name="tabu_length",
+                minimum=1,
                 type="int",
                 default=10,
                 doc="With maximize=tabu, the number of most recently visited DAGs a move may not "
@@ -996,6 +1032,7 @@ _add(
             ),
             ParamSpec(
                 name="max_tabu",
+                minimum=1,
                 type="int",
                 default=None,
                 doc="With maximize=tabu, the non-improving moves allowed without a better DAG, "
@@ -1004,6 +1041,7 @@ _add(
             ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=(
             "Friedman, Nachman & Pe'er 1999",
@@ -1095,6 +1133,7 @@ _add(
             _EBIC_GAMMA,
             ParamSpec(
                 name="depth",
+                minimum=1,
                 type="int",
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
@@ -1125,8 +1164,8 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
+        dropped_args=("random_state",),
         params=(
-            _RANDOM_STATE,
             concept_param(
                 "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
@@ -1159,16 +1198,11 @@ _add(
         ),
         seeded=True,
         params=(
-            ParamSpec(
-                name="random_state",
-                type="int",
-                default=None,
-                doc="Seed for FastICA, from 0 to 2**32 - 1. null uses ANDREY_SEED, or 0 when it is "
+            concept_param(
+                "seed",
+                doc="Seed for FastICA's starting point. null uses ANDREY_SEED, or 0 when it is "
                 "unset.",
-                nullable=True,
-                minimum=0,
-                maximum=SEED_MAX,
-                concept="seed",
+                aliases=("random_state",),
             ),
             concept_param(
                 "max_iter",
@@ -1209,7 +1243,7 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        params=(_RANDOM_STATE,),
+        dropped_args=("random_state",),
         references=("Shimizu 2012",),
     )
 )
@@ -1249,6 +1283,7 @@ _add(
         params=(
             ParamSpec(
                 name="order",
+                minimum=0,
                 type="int_pair",
                 default=(1, 1),
                 doc="(p, q): autoregressive and moving-average lag counts.",
@@ -1517,6 +1552,7 @@ _add(
             ),
             ParamSpec(
                 name="n_preliminary_iterations",
+                minimum=0,
                 type="int",
                 default=1,
                 doc="Preliminary rounds before the final one; each passes the parents it found "
@@ -1584,6 +1620,7 @@ _add(
             ),
             ParamSpec(
                 name="cv",
+                minimum=2,
                 type="int",
                 default=5,
                 doc="Cross-validation folds that choose each regression's lasso penalty, at "
@@ -1765,6 +1802,10 @@ _add(
             ),
             ParamSpec(
                 name="cor_alpha",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
                 type="float",
                 default=0.01,
                 doc="Significance level of the Pearson correlation tests.",
@@ -1782,6 +1823,10 @@ _add(
             ),
             ParamSpec(
                 name="shapiro_alpha",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
                 type="float",
                 default=0.01,
                 doc="Significance level of the Shapiro-Wilk non-Gaussianity tests.",

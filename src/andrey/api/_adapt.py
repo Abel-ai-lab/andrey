@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
 from andrey.core.knowledge import column_position
@@ -68,6 +69,9 @@ def data_matrix(
     constant on its observed values, or with none, raises. Without it, a missing value raises,
     naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
     :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
+
+    Checked data larger than ``method``'s measured boundary warn once per method
+    (:func:`~andrey.api._boundary.warn_past_boundary`), before the fit.
     """
     column_labels(data)
     try:
@@ -102,6 +106,8 @@ def data_matrix(
             f"{name} {columns} {verb} constant; a constant column holds no information about "
             f"the other variables, so drop {pronoun} before the fit"
         )
+    if method is not None:
+        warn_past_boundary(method, X.shape)
     return X
 
 
@@ -232,12 +238,11 @@ def default_score(
     ``linear`` on mixed data. Inferring keeps ``linear`` for data that is not a numeric table apart
     from its typed columns, ``NaN`` allowed, so that :func:`checked_data` reports it.
 
-    Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
-    as :func:`mixed_matrix` does when ``categorical`` is not a list of the columns ``data`` has.
+    Raises as :func:`mixed_matrix` does when ``categorical`` is not a list of the columns ``data``
+    has.
     """
     if score_func is not None:
         return score_func, categorical
-    max_categories = int_in_range(max_categories, "max_categories", 2)
     given = categorical is not None
     if given:
         mask = _listed_mask(data, categorical)
@@ -373,14 +378,12 @@ def checked_data(
     mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method`` and ``missing`` to
     :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
 
-    Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
-    ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical`` lists a
-    column for a setting that reads no column types; ``None`` and ``[]`` list none.
+    Raises ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical``
+    lists a column for a setting that reads no column types; ``None`` and ``[]`` list none.
     """
     column_labels(data)
     setting = f"{option}={value!r}"
     kind = data_kind(value)
-    max_categories = int_in_range(max_categories, "max_categories", 2)
     if kind == "mixed":
         return mixed_matrix(
             data,
@@ -698,16 +701,6 @@ def flag(value: object, name: str) -> bool:
     if not isinstance(value, (bool, np.bool_)):
         raise TypeError(f"{name} must be True or False, got {type(value).__name__}")
     return bool(value)
-
-
-def open_unit_interval(value: float, name: str) -> float:
-    """Return ``value`` as a ``float`` in the open interval ``(0, 1)``.
-
-    Raises ``ValueError``, naming ``name``, outside it.
-    """
-    if not 0 < value < 1:
-        raise ValueError(f"{name} must lie in the open interval (0, 1), got {value}")
-    return float(value)
 
 
 def dag_from_adjacency(adjacency: npt.ArrayLike) -> GraphStructure:

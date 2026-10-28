@@ -19,13 +19,11 @@ from andrey.api._adapt import (
     column_labels,
     copies_named,
     default_score,
-    int_in_range,
     json_safe,
     structure_output,
 )
-from andrey.api._boundary import warn_past_boundary
+from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
-from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -35,6 +33,7 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+@method_spec("boss")
 def boss(
     data: npt.ArrayLike,
     *,
@@ -106,29 +105,28 @@ def boss(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"BOSS"`` and ``metadata["score"]`` the score of the DAG read off the final order; for the
-        BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``, for BDeu, ``-2`` times the
-        log of the structure prior times the marginal likelihood, and for the multinomial BIC,
-        ``-2`` times the log-likelihood plus the penalty; lower is better. Directed marks (``->``)
-        are oriented edges, undirected (``--``) the ones the equivalence class leaves open. Under a
-        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read, by
-        name or 0-based position.
+        ``"boss"``, ``metadata["seed"]`` the seed used, and ``metadata["score"]`` the score of the
+        DAG read off the final order; for the BIC, the sum over variables of ``n * log(residual
+        variance) + lambda_value * log(n) * n_parents + 2 * ebic_gamma * log C(n_variables - 1,
+        n_parents)``, for BDeu, ``-2`` times the log of the structure prior times the marginal
+        likelihood, and for the multinomial BIC, ``-2`` times the log-likelihood plus the penalty;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]``
+        lists the categorical columns it read, by name or 0-based position.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
-        suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
-        another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -261,7 +259,6 @@ def boss(
     >>> boss(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
-    from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.boss import boss as _boss
 
     score_func, categorical = default_score(
@@ -271,28 +268,26 @@ def boss(
         categorical=categorical,
         max_categories=max_categories,
     )
-    if score_func not in PERMUTATION_SCORES:
-        raise NotImplementedError(f"BOSS supports {PERMUTATION_SCORES}, not {score_func!r}")
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories, method="boss"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="boss")
-    warn_past_boundary("boss", X.shape)
     with copies_named(labels):
         cpdag, score = _boss(
             X,
             lambda_value=lambda_value,
             ebic_gamma=ebic_gamma,
-            random_state=resolve_seed(seed),
+            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
             score_func=score_func,
             categorical=mask,
             constraints=constraints,
         )
-    metadata = {"algorithm": "BOSS", "score": json_safe(score), **categorical_metadata(mask, data)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("grasp")
 def grasp(
     data: npt.ArrayLike,
     *,
@@ -371,29 +366,27 @@ def grasp(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GRaSP"`` and ``metadata["score"]`` the score of the DAG read off the final order; for the
-        BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``, for BDeu, ``-2`` times the
-        log of the structure prior times the marginal likelihood, and for the multinomial BIC,
-        ``-2`` times the log-likelihood plus the penalty; lower is better. Directed marks (``->``)
-        are oriented edges, undirected (``--``) the ones the equivalence class leaves open. Under a
-        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read, by
-        name or 0-based position.
+        ``"grasp"``, ``metadata["seed"]`` the seed used, and ``metadata["score"]`` the score of the
+        DAG read off the final order; for the BIC, the sum over variables of ``n * log(residual
+        variance) + lambda_value * log(n) * n_parents + 2 * ebic_gamma * log C(n_variables - 1,
+        n_parents)``, for BDeu, ``-2`` times the log of the structure prior times the marginal
+        likelihood, and for the multinomial BIC, ``-2`` times the log-likelihood plus the penalty;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]``
+        lists the categorical columns it read, by name or 0-based position.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If ``depth`` is not an int, ``categorical`` is not a list of column names and positions, or
-        ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``depth`` is less than ``1``, ``lambda_value`` is negative or non-finite, or if ``data``
-        or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` or
+        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
-        more rows than columns, is a linear function of other columns. One message names every
-        group of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
         ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -537,7 +530,6 @@ def grasp(
     >>> grasp(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
-    from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.grasp import grasp as _grasp
 
     score_func, categorical = default_score(
@@ -547,25 +539,21 @@ def grasp(
         categorical=categorical,
         max_categories=max_categories,
     )
-    if score_func not in PERMUTATION_SCORES:
-        raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
-    depth = int_in_range(depth, "depth", 1)
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories, method="grasp"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="grasp")
-    warn_past_boundary("grasp", X.shape)
     with copies_named(labels):
         cpdag, score = _grasp(
             X,
             lambda_value=lambda_value,
             ebic_gamma=ebic_gamma,
             depth=depth,
-            random_state=resolve_seed(seed),
+            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
             score_func=score_func,
             categorical=mask,
             constraints=constraints,
         )
-    metadata = {"algorithm": "GRaSP", "score": json_safe(score), **categorical_metadata(mask, data)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

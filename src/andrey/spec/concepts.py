@@ -24,7 +24,7 @@ from typing import Any, Literal
 from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
-from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.score import LINEAR_SCORES
 from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
@@ -149,46 +149,6 @@ ALL_METHODS = (
     *_RESIDUAL,
 )
 
-_ALGORITHM_NAMES = {
-    "pc": "PC",
-    "fci": "FCI",
-    "gfci": "GFCI",
-    "cdnod": "CDNOD",
-    "iamb": "IAMB",
-    "inter_iamb": "InterIAMB",
-    "mmpc": "MMPC",
-    "ges": "GES",
-    "gies": "GIES",
-    "xges": "XGES",
-    "hc": "HC",
-    "tabu": "Tabu",
-    "exact_search": "ExactSearch",
-    "calm": "CALM",
-    "notears": "NOTEARS",
-    "dagma": "DAGMA",
-    "mmhc": "MMHC",
-    "rsmax2": "RSMAX2",
-    "boss": "BOSS",
-    "grasp": "GRaSP",
-    "direct_lingam": "DirectLiNGAM",
-    "ica_lingam": "ICALiNGAM",
-    "multi_group_direct_lingam": "MultiGroupDirectLiNGAM",
-    "varma_lingam": "varmalingam",
-    "longitudinal_lingam": "longitudinallingam",
-    "anm": "ANM",
-    "pnl": "PNL",
-    "gin": "GIN",
-    "rcd": "RCD",
-    "bottom_up_parce_lingam": "BottomUpParceLiNGAM",
-}
-# The methods that raise NotImplementedError, not ValueError, for an unknown value.
-_NOT_IMPLEMENTED_CHOICES = {
-    **dict.fromkeys(("pc", "fci", "cdnod", "iamb", "inter_iamb", "mmpc"), "indep_test"),
-    **dict.fromkeys(("gfci", "mmhc", "rsmax2"), "indep_test,score_func"),
-    **dict.fromkeys(_PURE_SCORE, "score_func"),
-    **dict.fromkeys(("direct_lingam", "longitudinal_lingam"), "measure"),
-}
-_NOT_IMPLEMENTED_CHOICES.pop("gies")
 # The methods that read an integer-coded column as numbers without a DataTypeWarning.
 _SILENT_ON_CODES = (
     "gies",
@@ -744,7 +704,9 @@ _CONCEPTS = (
     ),
     Concept(
         key="seed",
-        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset.",
+        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset. A "
+        "method that tests independence takes it for the randomized tests: "
+        f"{', '.join(STOCHASTIC_INDEP_TESTS)}.",
         param=_template(
             "seed",
             "int",
@@ -774,33 +736,6 @@ _CONCEPTS = (
                 *_RESIDUAL,
             ),
         ),
-        deviations=(
-            *_absent(
-                "0.11.0",
-                "indep_test='rcot', 'cmiknn', or 'gpdc' draws random numbers from ANDREY_SEED.",
-                *CI_SEARCHES,
-            ),
-            Deviation(
-                method="ica_lingam",
-                name="random_state",
-                default=None,
-                fixed_in="0.11.0",
-                aliases=("random_state",),
-                reason="scikit-learn's name.",
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="random_state",
-                    default=None,
-                    fixed_in="0.11.0",
-                    aliases=("random_state",),
-                    fragment="",
-                    reason="Deterministic, yet takes a random_state it ignores.",
-                )
-                for m in ("direct_lingam", "multi_group_direct_lingam")
-            ),
-        ),
     ),
     Concept(
         key="num_workers",
@@ -815,16 +750,6 @@ _CONCEPTS = (
         ),
         suitable=(),
         others_exempt="Execution settings come from andrey.config or ANDREY_* only.",
-        deviations=(
-            Deviation(
-                method="bootstrap",
-                name="num_workers",
-                default=None,
-                fixed_in="0.11.0",
-                fragment="",
-                reason="Sizes the outer pool; new in 0.11.0, so no alias.",
-            ),
-        ),
     ),
     Concept(
         key="knowledge",
@@ -1111,21 +1036,11 @@ _CONCEPTS = (
         key="algorithm",
         summary="metadata['algorithm'] is the method's public name.",
         suitable=ALL_METHODS,
-        deviations=tuple(
-            Deviation(method=m, observed=name, fixed_in="0.11.0", reason="A display name.")
-            for m, name in _ALGORITHM_NAMES.items()
-        ),
     ),
     Concept(
         key="invalid_choice",
         summary="A value outside a parameter's choices raises ValueError.",
         suitable=ALL_METHODS,
-        deviations=tuple(
-            Deviation(
-                method=m, observed=params, fixed_in="0.11.0", reason="Raises NotImplementedError."
-            )
-            for m, params in _NOT_IMPLEMENTED_CHOICES.items()
-        ),
     ),
 )
 

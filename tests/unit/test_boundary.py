@@ -14,6 +14,7 @@ import scripts.boundary_table as generator
 from andrey.api import _boundary, _boundary_table
 from andrey.api._boundary import CAP_STOPS, Ladder, measured, past_boundary, warn_past_boundary
 from andrey.core import backend
+from andrey.spec import REGISTRY
 
 ROOT = Path(__file__).resolve().parents[2]
 PAIRS = ("anm", "pnl")
@@ -124,11 +125,17 @@ class _Checked(Exception):
     """Raised by the check, so the fit does not run."""
 
 
-CALLS = {"cdnod": lambda data: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2)}
+def _call(method: str, data: np.ndarray) -> object:
+    """Fit ``method`` on ``data``: a domain index for cdnod, two or three copies for a panel."""
+    if method == "cdnod":
+        return andrey.cdnod(data, domain_index=np.arange(len(data)) % 2)
+    if method in ("multi_group_direct_lingam", "longitudinal_lingam"):
+        return getattr(andrey, method)([data, data + 1, data * 2])
+    return getattr(andrey, method)(data)
 
 
-@pytest.mark.parametrize("method", _capped())
-def test_a_facade_checks_its_data(method, monkeypatch):
+@pytest.mark.parametrize("method", sorted(REGISTRY))
+def test_every_method_checks_its_data_against_the_boundary(method, monkeypatch):
     if method == "calm" and backend.torch() is None:
         pytest.skip("calm needs torch")
     checked = []
@@ -140,5 +147,9 @@ def test_a_facade_checks_its_data(method, monkeypatch):
     monkeypatch.setattr(_boundary, "past_boundary", check)
     data = np.random.default_rng(0).standard_normal((60, 2 if method in PAIRS else 4))
     with pytest.raises(_Checked):
-        CALLS.get(method, getattr(andrey, method))(data)
+        _call(method, data)
     assert checked == [(method, data.shape)]
+    data[:, 1] = 1.0
+    with pytest.raises(ValueError, match="constant"):
+        _call(method, data)
+    assert len(checked) == 1
