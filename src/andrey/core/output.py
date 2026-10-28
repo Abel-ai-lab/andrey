@@ -599,9 +599,12 @@ def _check_json_safe(obj: object, path: str) -> None:
 
 
 def _brief(key: str, value: object) -> str:
-    """A metadata value as summary text: a float to 4 digits, a list too long for a line by size."""
+    """A metadata value as summary text: a float to 4 digits, a mapping as ``name value`` pairs,
+    and a list too long for a line by size."""
     if isinstance(value, float):
         return f"{value:.4g}"
+    if isinstance(value, Mapping):
+        return ", ".join(f"{name} {_brief(key, item)}" for name, item in value.items())
     text = str(value)
     if isinstance(value, list) and len(text) > SUMMARY_WIDTH:
         return f"a list of {len(value)}, too long to print; read metadata[{key!r}]"

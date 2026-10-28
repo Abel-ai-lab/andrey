@@ -100,6 +100,7 @@ def test_anm_decided_graph_and_float_metadata(tmp_path):
     assert md["p_values"] == {"forward": 0.02, "backward": 0.81}
     assert all(isinstance(p, float) for p in md["p_values"].values())
     assert set(md) == {"p_values"}
+    assert "p_values: forward 0.02, backward 0.81" in repr(out)
     _roundtrips(out, tmp_path, "anm")
 
 
