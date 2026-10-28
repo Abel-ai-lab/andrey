@@ -29,7 +29,7 @@ coefficient `0.8` is an illustration, not an estimate from data.
 :file: ../../_static/graph-comparison.html
 ```
 
-## At a glance
+## Compared with other packages
 
 | Representation | Object or array | Meaning of cell `[i, j]` for `i -> j` |
 |---|---|---|
