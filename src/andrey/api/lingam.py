@@ -24,11 +24,10 @@ from andrey.api._adapt import (
     column_labels,
     dag_from_adjacency,
     data_matrix,
-    int_in_range,
     shared_labels,
     structure_output,
 )
-from andrey.api._boundary import warn_past_boundary
+from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -68,6 +67,7 @@ def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
     return X
 
 
+@method_spec("direct_lingam")
 def direct_lingam(
     data: npt.ArrayLike,
     *,
@@ -105,7 +105,7 @@ def direct_lingam(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"DirectLiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
+        ``"direct_lingam"``. ``ordering`` is the causal order as a tuple of column indices, causes
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
         adaptive Lasso, or by least squares for a copy (see Notes) and for a variable with a
         required parent; the DAG has an edge where the coefficient is nonzero and at every required
@@ -113,15 +113,15 @@ def direct_lingam(
 
     Raises
     ------
-    NotImplementedError
-        If ``measure`` is not ``"pwling"``.
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` is not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a
-        constant column, named in the message. Also if it has fewer than ``n_variables + 1`` rows,
-        the fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
-        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
+        named in the message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with
+        which the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -202,7 +202,6 @@ def direct_lingam(
     X = _pruning_rows(data_matrix(data, method="direct_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
-    warn_past_boundary("direct_lingam", X.shape)
     order, B = _native(X, measure=measure, constraints=constraints)
     weighted = _canonical_weights(B)
     edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
@@ -211,10 +210,10 @@ def direct_lingam(
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,
-        metadata={"algorithm": "DirectLiNGAM"},
     )
 
 
+@method_spec("ica_lingam")
 def ica_lingam(
     data: npt.ArrayLike,
     *,
@@ -254,23 +253,24 @@ def ica_lingam(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"ICALiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
-        first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
-        adaptive Lasso, or by least squares for a variable with a required parent; the DAG has an
-        edge where the coefficient is nonzero and at every required edge.
+        ``"ica_lingam"`` and ``metadata["seed"]`` the seed used. ``ordering`` is the causal order as
+        a tuple of column indices, causes first. ``weighted_adjacency[i, j]`` is the coefficient of
+        edge ``i -> j``, estimated by adaptive Lasso, or by least squares for a variable with a
+        required parent; the DAG has an edge where the coefficient is nonzero and at every required
+        edge.
 
     Raises
     ------
     RuntimeError
         If no causal order can be read from the FastICA result.
     TypeError
-        If ``max_iter`` is not an int, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0`` to
-        ``2**32 - 1``, or if ``data`` has fewer than ``n_variables + 1`` rows, the fewest with which
-        the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the
+        edge weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -351,10 +351,8 @@ def ica_lingam(
     from andrey.lingam.ica import ica_lingam as _native
 
     X = _pruning_rows(data_matrix(data, method="ica_lingam"))
-    max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
-    warn_past_boundary("ica_lingam", X.shape)
     order, B = _native(X, random_state=random_state, max_iter=max_iter, constraints=constraints)
     weighted = _canonical_weights(B)
     edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
@@ -363,10 +361,10 @@ def ica_lingam(
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,
-        metadata={"algorithm": "ICALiNGAM"},
     )
 
 
+@method_spec("multi_group_direct_lingam")
 def multi_group_direct_lingam(
     data_groups: Sequence[npt.ArrayLike],
     *,
@@ -403,20 +401,21 @@ def multi_group_direct_lingam(
     list[StructureOutput]
         One envelope per group, in input order. Each wraps a ``dag``
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
-        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights
-        ``i -> j``). ``metadata["algorithm"]`` is ``"MultiGroupDirectLiNGAM"``, with ``group_index``
-        and ``n_groups``.
+        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
+        j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, with ``group_index`` and
+        ``n_groups``.
 
     Raises
     ------
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If fewer than two groups are given, if the groups disagree on the variable count or on
-        their column names, or if a group is not a usable 2-D matrix or has fewer than
-        ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
-        weights. Also if ``knowledge`` names a column the groups lack or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if fewer than
+        two groups are given, if the groups disagree on the variable count or on their column names,
+        or if a group is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the
+        fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
+        names a column the groups lack or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -489,7 +488,6 @@ def multi_group_direct_lingam(
                 ordering=order,
                 weighted_adjacency=weighted,
                 metadata={
-                    "algorithm": "MultiGroupDirectLiNGAM",
                     "group_index": k,
                     "n_groups": n_groups,
                 },

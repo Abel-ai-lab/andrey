@@ -63,7 +63,7 @@ def test_direct_lingam_output_contract():
 
 
 def test_direct_lingam_rejects_kernel():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.direct_lingam(datagen.generate("lingam_5v_uniform"), measure="kernel")
 
 

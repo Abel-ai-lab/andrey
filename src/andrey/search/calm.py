@@ -267,7 +267,6 @@ def calm(
         dag,
         weighted_adjacency=weighted,
         metadata={
-            "algorithm": "calm",
             "n_edges": int(support.sum()),
             "h_final": h_final,
             "objective": objective,

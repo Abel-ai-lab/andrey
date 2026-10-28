@@ -419,7 +419,7 @@ def test_example_prints_the_recovered_edges():
     source, printed, svg = build.run_example()
     assert "andrey.pc(df)" in source
     assert printed.splitlines() == [
-        "PC  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)",
+        "pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)",
         "",
         "  raf -- mek",
         "  plc -- pip3",
