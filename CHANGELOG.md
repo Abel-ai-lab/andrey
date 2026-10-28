@@ -96,6 +96,12 @@ change names its pull request.
   exact search does past 24 variables at 2,000 rows. The message names the measured size and its
   setting and points to the method's **Limitations** paragraph and the release card; the sizes are
   generated from the published summary by `scripts/boundary_table.py`. ([#479])
+- `andrey --help --json` gives each parameter its bounds (`minimum`, `maximum`,
+  `exclusiveMinimum`, `exclusiveMaximum`), the package-wide `concept` it implements, and the former
+  names (`aliases`) and values (`choice_aliases`) it accepts, and lists each concept, such as
+  `alpha` or `max_depth`, with the name each method gives it; `andrey config --help --json` lists
+  the concepts too. `andrey run` accepts a former name or value and rejects a value out of range
+  before the fit. ([#492])
 
 ### Changed
 
@@ -933,3 +939,4 @@ First alpha release.
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
+[#492]: https://github.com/Abel-ai-lab/andrey/pull/492
