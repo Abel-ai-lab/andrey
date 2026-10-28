@@ -153,9 +153,9 @@ def notears(
     its cycles repaired, and the step is accepted when the likelihood of that graph is lower than
     the last accepted one's by more than a ``1e-6`` fraction. ``lam`` and ``delta`` then shrink by
     ``mcp_decay``, and the path ends at the first step that does not lower the likelihood. [2]_
-    shows that the global minimizers of the penalized likelihood have the same DAG structures for
-    the raw and the standardized data; the path finds a local solution, and the cost of a step is
-    the number of its Adam iterations times a matrix exponential.
+    shows that, with a small enough penalty, the global minimizers of the penalized likelihood have
+    the same DAG structures for the raw and the standardized data; the path finds a local solution,
+    and the cost of a step is the number of its Adam iterations times a matrix exponential.
 
     Ties between equal weights go to the column whose rank, computed from its own data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
@@ -363,10 +363,10 @@ def dagma(
     above it. The result of a step is thresholded at ``w_threshold`` and its cycles repaired, and
     the step is accepted when the likelihood of that graph is lower than the last accepted one's by
     more than a ``1e-6`` fraction. ``lam`` and ``delta`` then shrink by ``mcp_decay``, and the path
-    ends at the first step that does not lower the likelihood. [2]_ shows that the global
-    minimizers of the penalized likelihood have the same DAG structures for the raw and the
-    standardized data; the path finds a local solution, and each step repeats the whole central
-    path.
+    ends at the first step that does not lower the likelihood. [2]_ shows that, with a small enough
+    penalty, the global minimizers of the penalized likelihood have the same DAG structures for the
+    raw and the standardized data; the path finds a local solution, and each step repeats the whole
+    central path.
 
     Ties between equal weights go to the column whose rank, computed from its own data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
