@@ -7,10 +7,10 @@ on:
     # Draft PRs skip the build; ready_for_review runs it once the PR is marked ready.
     # converted_to_draft starts a skipped run, and the concurrency group cancels one in progress.
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
-    paths: [docs/**, site/**, apps/**, benchmarks/published/**, src/andrey/**, examples/**, scripts/execute_notebooks.py, tests/unit/test_site.py, tests/unit/test_launch_material.py, tests/unit/test_examples_gallery.py, tests/unit/test_why_fast.py, tests/unit/test_compare_example.py, README.md, .github/readme/**, pyproject.toml, uv.lock, CONTRIBUTING.md, .github/workflows/docs.yml]
+    paths: [docs/**, site/**, apps/**, benchmarks/published/**, src/andrey/**, examples/**, scripts/execute_notebooks.py, tests/unit/test_execute_notebooks.py, tests/unit/test_site.py, tests/unit/test_launch_material.py, tests/unit/test_examples_gallery.py, tests/unit/test_why_fast.py, tests/unit/test_compare_example.py, README.md, .github/readme/**, pyproject.toml, uv.lock, CONTRIBUTING.md, .github/workflows/docs.yml]
   push:
     branches: [main]
-    paths: [docs/**, site/**, apps/**, benchmarks/published/**, src/andrey/**, examples/**, scripts/execute_notebooks.py, tests/unit/test_site.py, tests/unit/test_launch_material.py, tests/unit/test_examples_gallery.py, tests/unit/test_why_fast.py, tests/unit/test_compare_example.py, README.md, .github/readme/**, pyproject.toml, uv.lock, CONTRIBUTING.md, .github/workflows/docs.yml]
+    paths: [docs/**, site/**, apps/**, benchmarks/published/**, src/andrey/**, examples/**, scripts/execute_notebooks.py, tests/unit/test_execute_notebooks.py, tests/unit/test_site.py, tests/unit/test_launch_material.py, tests/unit/test_examples_gallery.py, tests/unit/test_why_fast.py, tests/unit/test_compare_example.py, README.md, .github/readme/**, pyproject.toml, uv.lock, CONTRIBUTING.md, .github/workflows/docs.yml]
   workflow_dispatch:
   workflow_call:
 
@@ -48,6 +48,7 @@ jobs:
           uv run --group docs python -m pytest -q tests/unit/test_site.py
           tests/unit/test_launch_material.py tests/unit/test_examples_gallery.py
           tests/unit/test_why_fast.py tests/unit/test_compare_example.py tests/unit/test_discovery.py
+          tests/unit/test_execute_notebooks.py
       - name: Stored notebook outputs match a fresh run
         run: uv run --group docs python scripts/execute_notebooks.py --check
       - name: Built-site checks (-W build, API coverage, no unicode math, built pages)
