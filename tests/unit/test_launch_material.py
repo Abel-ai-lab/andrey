@@ -11,8 +11,6 @@ import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pytest
-
 import andrey
 import andrey.viz
 
@@ -94,40 +92,23 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
     assert capsys.readouterr().out == printed
 
 
-def test_readme_chart_is_one_card_per_panel_method():
-    # The README shows both themes' charts from .github/readme/: a card per PANEL method, two rows
-    # of three at most, and an alt text that lists them.
+def test_the_readme_package_card_counts_the_registry_in_both_themes(monkeypatch):
+    # The README shows both themes' cards from .github/readme/, each self-contained, with the
+    # registry's method count and every row in its alt text, and the release cards link below.
+    monkeypatch.syspath_prepend(str(ROOT / "apps"))
+    launch = runpy.run_path(str(ROOT / "apps" / "build_launch.py"))
     readme = README.read_text()
-    summary = build.load_summary(SUMMARY)
-    summaries = build.release_summaries(summary)
-    slides = build.readme_slides(summary)
-    assert slides == build.speedup_slides(summaries)
-    assert sorted(name for name, _, _ in slides) == sorted(method for _, method in build.PANEL)
-    assert len(slides) == 6 == build.README_COLUMNS * build.README_ROWS
-    for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
-        name = build.README_CHART.format(theme=theme)
+    count = len(andrey.spec.list_specs())
+    for name, card in launch["readme_cards"]().items():
         assert f'"{IMAGES}/{name}"' in readme
-        chart = build.readme_chart(summary, palette)
-        assert (ROOT / IMAGES / name).read_text() == chart
-        assert ET.fromstring(chart).tag == "{http://www.w3.org/2000/svg}svg"
-        assert not re.search(r"href=|url\(|@import", chart)
-        names = re.findall(r'font-size="1[46]" font-weight="600"[^>]*>([^<]+)</text>', chart)
-        assert names == [name for name, _, _ in slides]
-        labels = re.findall(r'font-weight="600"[^>]*>([^<]+x)</text>', chart)
-        assert labels == [build.escape(label) for _, _, bars in slides for _, _, label in bars]
-    alt = " ".join(readme.split("<img alt=\"Andrey's speedup", 1)[1].split('"', 1)[0].split())
-    for name, size, bars in slides:
-        ours = next(label for package, _, label in bars if package == "Andrey")
-        assert f"{name} {ours} at {size}" in alt
+        assert ET.fromstring(card).tag == "{http://www.w3.org/2000/svg}svg"
+        assert not re.search(r"href=|url\(|@import", card)
+        assert f">{count}</text>" in card
+    alt = launch["card_alt"]()
+    assert f'alt="{alt}"' in " ".join(readme.split())
+    assert f"{count} methods" in alt
+    assert all(f"{label}: {line}" in alt for label, line in launch["CARD_ROWS"])
     assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
-
-
-def test_the_readme_chart_refuses_a_seventh_card(monkeypatch):
-    summary = build.load_summary(SUMMARY)
-    slides = build.speedup_slides(build.release_summaries(summary))
-    monkeypatch.setattr(build, "speedup_slides", lambda summaries: [*slides, slides[0]])
-    with pytest.raises(ValueError, match="2 rows of 3 cards"):
-        build.readme_slides(summary)
 
 
 def test_the_launch_post_is_a_published_page():

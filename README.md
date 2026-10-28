@@ -58,23 +58,25 @@ You install andrey-core and then `import andrey`.
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
 
-<!-- CHART:START -->
-<!-- Generated from the release summaries by apps/build_launch.py; do not edit. -->
+<!-- CARD:START -->
+<!-- Generated from andrey.spec by apps/build_launch.py; do not edit. -->
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)"
-      srcset=".github/readme/benchmark-chart-dark.svg">
-    <img alt="Andrey's speedup over the slowest package on the same data: PC 941x at 400 variables,
-      Tabu search 561x at 800 variables, GES 325x at 150 variables, XGES 140x at 200
-      variables, DirectLiNGAM 8.9x at 100 variables, FCI 8.7x at 800 variables"
-      src=".github/readme/benchmark-chart-light.svg" width="100%">
+      srcset=".github/readme/package-card-dark.svg">
+    <img alt="Andrey: accelerated, accurate, agentic. 34 methods. Data types: continuous, categorical,
+      mixed, time series, nonlinear. Real data processing: missing values, background
+      knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden confounders.
+      Acceleration: parallel CPU; GPU with PyTorch (CUDA, MPS). Portability: NetworkX, pcalg,
+      Graphviz DOT, NumPy. Interface: Python, CLI, skill."
+      src=".github/readme/package-card-light.svg" width="100%">
   </picture>
 </p>
 
 <p align="center"><a href="https://andrey.abel.ai/docs/benchmarks.html">Release cards</a></p>
 
-<!-- CHART:END -->
+<!-- CARD:END -->
 
 <!-- WHY_FAST:START -->
 <!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->
