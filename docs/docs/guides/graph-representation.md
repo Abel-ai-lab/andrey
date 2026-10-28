@@ -60,8 +60,8 @@ the edge between `i` and `j`, so every edge fills two cells. The codes are expor
 
 | Edge | `M[i, j]` | `M[j, i]` | Valid in |
 |---|---|---|---|
-| `i -> j` | `TAIL` | `ARROW` | every kind |
-| `i -- j` | `TAIL` | `TAIL` | `cpdag`, `pag`, `mag` |
+| `i -> j` | `TAIL` | `ARROW` | every kind but `undirected` |
+| `i -- j` | `TAIL` | `TAIL` | `cpdag`, `pag`, `mag`, `undirected` |
 | `i <-> j` | `ARROW` | `ARROW` | `pag`, `mag` (bidirected edge); the same codes mean a 2-cycle in `digraph` |
 | `i o-> j` | `CIRCLE` | `ARROW` | `pag` |
 | `i -o j` | `TAIL` | `CIRCLE` | `pag` |
@@ -70,8 +70,8 @@ the edge between `i` and `j`, so every edge fills two cells. The codes are expor
 The codes are nonnegative, with `0` as the only empty value. The store is a CSR matrix of the
 nonzero marks (`int64` row pointers, `int32` columns, `int8` marks), so memory grows with the number
 of edges, not with $n^2$. The graph's `kind` states which edge types are valid; `validate()`
-rejects a `CIRCLE` outside a `pag`, a double arrowhead in a `dag` or `cpdag`, and an undirected edge
-in a `dag` or `digraph`.
+rejects a `CIRCLE` outside a `pag`, a double arrowhead in a `dag` or `cpdag`, an undirected edge
+in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
 
 ## Run extras
 

@@ -195,10 +195,24 @@ def test_compare_names_the_metadata_keys_that_alone_differ(capsys) -> None:
     before = _manifest(parts=parts)
     renamed = _manifest(hash="h2", parts={**parts, "metadata.algorithm": "b", "metadata.seed": "c"})
     assert identity.compare(before, renamed) == 1
-    assert "1 with only different metadata (algorithm, seed)" in capsys.readouterr().out
+    assert "1 with only different metadata, 0 with only a different kind (algorithm, seed)" in (
+        capsys.readouterr().out
+    )
     moved = _manifest(hash="h2", parts={**parts, "structure": "t", "metadata.algorithm": "b"})
     assert identity.compare(before, moved) == 1
     assert "1 with only different bits, 0 with only different metadata" in capsys.readouterr().out
+
+
+def test_compare_tells_a_new_kind_from_new_edges(capsys) -> None:
+    parts = {"graph": "g", "kind": "k", "edges": "e", "structure": "s", "metadata.dag": "d"}
+    before = _manifest(parts=parts)
+    kind = {**parts, "graph": "g2", "kind": "k2", "structure": "s2", "metadata.dag": "d2"}
+    assert identity.compare(before, _manifest(hash="h2", graph_hash="g2", parts=kind)) == 1
+    assert "1 with only a different kind (dag)" in capsys.readouterr().out
+    edges = {**kind, "edges": "e2"}
+    assert identity.compare(before, _manifest(hash="h2", graph_hash="g2", parts=edges)) == 1
+    out = capsys.readouterr().out
+    assert "1 with a different graph" in out and "0 with only a different kind" in out
 
 
 def test_a_fall_in_a_count_passes_only_when_allowed(capsys) -> None:

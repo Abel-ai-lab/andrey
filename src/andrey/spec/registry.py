@@ -373,7 +373,7 @@ for _name, _summary, _key, _refs in (
             data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
             output=OutputSpec(
                 structure_type="graph",
-                graph_kind="cpdag",
+                graph_kind="undirected",
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             determinism="stochastic",
@@ -647,7 +647,7 @@ _add(
         name="exact_search",
         family="score",
         summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
-        "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
+        "exponential in the number of variables; keep to about 20 or fewer. Returns the CPDAG of "
         "the best-scoring equivalence class. BIC by default, BDeu when every column is "
         "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
         "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
@@ -655,8 +655,9 @@ _add(
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
-            graph_kind="dag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            graph_kind="cpdag",
+            doc="metadata['dag'] lists the edges [i, j] of the optimal DAG the search found; "
+            "metadata['categorical'] lists the categorical columns a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",

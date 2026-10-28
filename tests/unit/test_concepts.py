@@ -307,11 +307,17 @@ def unit_free(method: str) -> bool:
     return all(fit == fits[0] for fit in fits[1:])
 
 
+def declared_kind(out, method: str) -> bool:
+    """Whether a fit's graph has the kind its spec declares, ``None`` for a time-series result."""
+    kind = getattr(out.structure, "kind", None)
+    return kind == REGISTRY[method].output.graph_kind
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
     "data": (lambda m: REGISTRY[m].data.inputs[0].name, "data"),
-    "graph_kind": (lambda m: REGISTRY[m].output.graph_kind, None),
+    "graph_kind": (lambda m: declared_kind(coded_fit(m)[0], m), True),
     "algorithm": (lambda m: coded_fit(m)[0].metadata["algorithm"], "{method}"),
     "category_codes": (
         lambda m: "DataTypeWarning" * any(c is andrey.DataTypeWarning for c in coded_fit(m)[1]),

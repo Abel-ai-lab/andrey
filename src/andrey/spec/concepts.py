@@ -988,25 +988,10 @@ _CONCEPTS = (
     ),
     Concept(
         key="graph_kind",
-        summary="The graph kind names what an edge means.",
+        summary="The graph kind names what an edge means: a search identified up to its "
+        "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
+        "direction is undirected. A fit returns the kind its spec declares.",
         suitable=ALL_METHODS,
-        deviations=(
-            Deviation(
-                method="exact_search",
-                observed="dag",
-                fixed_in="0.11.0",
-                reason="One DAG of the equivalence class; the CPDAG is what the data determine.",
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    observed="cpdag",
-                    fixed_in="0.11.0",
-                    reason="An undirected Markov-blanket or moral graph, not a CPDAG.",
-                )
-                for m in ("iamb", "inter_iamb", "mmpc")
-            ),
-        ),
     ),
     Concept(
         key="algorithm",

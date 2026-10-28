@@ -81,7 +81,9 @@ def _fit(
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
     marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
     metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
-    return structure_output(to_structure(marks, kind="cpdag"), labels=labels, metadata=metadata)
+    return structure_output(
+        to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
+    )
 
 
 @method_spec("iamb")
@@ -138,7 +140,7 @@ def iamb(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -295,7 +297,7 @@ def inter_iamb(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -452,7 +454,7 @@ def mmpc(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each of its parents and children; without, they
         form the skeleton: each pair in each other's set. ``metadata["algorithm"]`` is ``"mmpc"``;
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``

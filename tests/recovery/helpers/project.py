@@ -26,6 +26,11 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 
 def project_output(out: Any, algorithm: str) -> dict:
     """Project a ``StructureOutput`` (or a list for multi-group) to the baseline field layout."""
+    if algorithm == "ExactSearch":  # the recorded graph is the DAG the search found
+        dag = np.zeros((out.structure.n_nodes,) * 2, dtype=np.int8)
+        for i, j in out.metadata["dag"]:
+            dag[i, j], dag[j, i] = 1, 2
+        return {"graph": dag}
     if algorithm in _GRAPH:
         candidate: dict = {"graph": out.structure.to_numpy()}
         if algorithm in _SCORE_GRAPH:

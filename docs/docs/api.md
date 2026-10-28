@@ -251,8 +251,8 @@ its first call in a process.
 ```
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they return every variable's set as undirected edges, joining a pair when
-each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
+`target`; without one, they return every variable's set as an `undirected` graph, joining a pair
+when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
 runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
 keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
 its maximize phase runs hill climbing or tabu search among them.
@@ -583,6 +583,7 @@ a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
 
 | `family` | When | `score` returns |
 |---|---|---|
+| `undirected` | either graph is `undirected` | the skeleton scores and `shd`, the skeleton SHD: the pairs adjacent in one graph and not in the other |
 | `dag` | both graphs are DAGs | skeleton and arrowhead precision, recall, and F1; `shd`; `mec_shd` and `mec_arrowhead_f1`, scored through the CPDAGs; the causal-order scores when the result has an ordering; `coefficient_mae` when both carry weights |
 | `cpdag` | either graph is a CPDAG | the skeleton and arrowhead scores and `shd`, with a DAG converted to its CPDAG first |
 | `pag` | either graph is a PAG or a MAG | the skeleton and arrowhead scores and `shd`, plus `shd_endpoint` and the scores for bidirected pairs |

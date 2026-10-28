@@ -198,6 +198,11 @@ def test_from_fits_rejects_what_cannot_be_counted(counted):
     other = [graph(2, [directed(0, 1)]), StructureOutput.new(lagged)]
     with pytest.raises(ValueError, match="digraph"):
         BootstrapOutput.from_fits(other)
+    joined = np.array([[0, TAIL], [TAIL, 0]], dtype=np.int8)
+    undirected = StructureOutput.new(GraphStructure.from_numpy(joined, kind="undirected"))
+    with pytest.raises(ValueError, match="undirected"):
+        BootstrapOutput.from_fits([graph(2, [directed(0, 1)]), undirected])
+    assert BootstrapOutput.from_fits([undirected, undirected]).structure.kind == "undirected"
 
 
 def test_the_labels_of_the_fits_name_the_nodes():
