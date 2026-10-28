@@ -140,6 +140,19 @@ change names its pull request.
   `fci` and `gfci` share, make each of their path searches once per pass instead of once for each
   pair of nodes that needs it. ([#485])
 
+### Fixed
+
+- The adaptive Lasso that prunes the edges of `direct_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`
+  keeps the same edges in any unit of the data. scikit-learn's LARS ended the Lasso path once its
+  penalty fell to `2**-23` in the data's units, so data in small units lost edges (14 to 41
+  percent of DirectLiNGAM's true edges at a standard deviation near `1e-3`, all of them near
+  `1e-5`), standardized data could lose a parent of a nearly noiseless variable, and data with a
+  standard deviation near `2**124` raised a LAPACK error. A fit whose path stops before the
+  least-squares fit now runs again on the data divided by a power of two, and BIC picks its point
+  on the whole path; a fit whose path reached the least-squares fit returns the same values as
+  before. ([#478])
+
 ## [0.10.0] - 2026-10-27
 
 ### Highlights
@@ -912,6 +925,7 @@ First alpha release.
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#468]: https://github.com/Abel-ai-lab/andrey/pull/468
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
+[#478]: https://github.com/Abel-ai-lab/andrey/pull/478
 [#479]: https://github.com/Abel-ai-lab/andrey/pull/479
 [#481]: https://github.com/Abel-ai-lab/andrey/pull/481
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
