@@ -41,8 +41,25 @@ change names its pull request.
   a `DeprecatedArgumentWarning`, in this release and stops in the next. scikit-learn's
   `ConvergenceWarning` from FastICA in `ica_lingam` and from the LARS path of the LiNGAM methods'
   adaptive Lasso is raised again as `andrey.SearchLimitWarning`. ([#505])
+- `exact_search` returns the CPDAG of the optimal equivalence class, as the other score searches
+  do; `metadata["dag"]` keeps the DAG it found. `iamb`, `inter_iamb`, and `mmpc` return the new
+  graph kind `undirected` instead of `cpdag`, with the same edges: their edges claim no direction,
+  and a moral graph's do not even claim adjacency. `andrey.metrics` scores an undirected graph on
+  its skeleton, so its `shd` is the skeleton SHD, and refuses to orient or convert it. ([#509])
+- Metadata keys share one name and shape across methods, and each method's spec lists its keys
+  (`output.metadata` in `andrey --help --json`): `anm` and `pnl` report `p_values` and `statistics`,
+  each with `forward` and `backward`, instead of `pval_forward`, `pval_backward`, `stat_forward`,
+  and `stat_backward`; `bottom_up_parce_lingam` reports `partial_order` and `gin` `cluster_order`
+  instead of `causal_order`; `pcmciplus` lists `conflicts` as `[i, 0, j]` links, the shape
+  `lpcmci`'s take. `n_edges` (`calm`, `notears`, `dagma`), `robust` (`notears`, `dagma`),
+  `restrict` and `maximize` (`mmhc`, `rsmax2`), `n_groups` (`multi_group_direct_lingam`), and
+  `n_latents` (`gin`) are gone: each repeated an argument or a count of the result. ([#509])
 
 ### Added
+
+- `pc` and `cdnod` report `metadata["conflicts"]`, the edges two colliders ask to orient both ways.
+  `bottom_up_parce_lingam` honors required edges in its `knowledge`, as the other LiNGAM methods
+  do. ([#509])
 
 - Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
   `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
@@ -991,3 +1008,4 @@ First alpha release.
 [#499]: https://github.com/Abel-ai-lab/andrey/pull/499
 [#500]: https://github.com/Abel-ai-lab/andrey/pull/500
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
+[#509]: https://github.com/Abel-ai-lab/andrey/pull/509

@@ -80,16 +80,22 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
 - `weighted_adjacency` - dense `float64` weights from `calm` and the static LiNGAM methods.
   `W[i, j]` is the weight of `i -> j`, so rows are causes. This is the transpose of lingam's
   `adjacency_matrix_`, where `B[i, j]` is the effect of $x_j$ on $x_i$ in $x = Bx + e$.
-- `metadata` - JSON-safe, method-specific values. GES, GIES, XGES, HC, BOSS, and GRaSP report
-  `score`; CALM reports `objective`. ExactSearch does not report a score. ANM and PNL report their
-  two directional p-values and HSIC statistics; each two-node graph holds the direction they
-  decide, by the rule the method's `alpha` parameter selects. PCMCI reports each lagged link's MCI
-  `p_values` and `statistics`, and the `parents` its first step selected; PCMCI+ reports the same
-  for every lag from 0, plus the same-step `conflicts` and `ambiguous_triples`. PC, CD-NOD, FCI,
-  and GFCI with `collider_rule="conservative"` or `"majority"` report `ambiguous_triples`, the
-  `[x, z, y]` triples, by column position, whose middle node the vote left undecided. LPCMCI reports
-  every link with all its marks as `links`, plus `p_values`, `statistics`, its preliminary
-  `parents`, and the links with a conflicting mark as `conflicts`.
+- `metadata` - JSON-safe, method-specific values; `andrey --help --json` lists each method's keys
+  under `output.metadata`, and a key means the same thing in every method. GES, GIES, XGES, HC,
+  Tabu, BOSS, GRaSP, MMHC, and RSMAX2 report `score`; CALM reports `objective`. ExactSearch reports
+  the DAG it found as `dag`, its `[i, j]` edges for `i -> j`. ANM and PNL report `p_values` and
+  `statistics`, each with the test of `x -> y` under `forward` and of `y -> x` under `backward`;
+  each two-node graph holds the direction they decide, by the rule the method's `alpha` parameter
+  selects. PCMCI reports each lagged link's MCI `p_values` and `statistics`, and the `parents` its
+  first step selected; PCMCI+ reports the same for every lag from 0, plus `conflicts` and
+  `ambiguous_triples`. PC, CD-NOD, FCI, and GFCI with `collider_rule="conservative"` or
+  `"majority"` report `ambiguous_triples`, the `[x, z, y]` triples, by column position, whose
+  middle node the vote left undecided. `conflicts` lists the links two colliders ask to orient both
+  ways: `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]` links (variable `i` at lag `k`, and `j`)
+  in PCMCI+ and LPCMCI, which also reports every link with all its marks as `links`, plus
+  `p_values`, `statistics`, and its preliminary `parents`. An order that is not a total order of the
+  variables has its own key: BottomUpParceLiNGAM's `partial_order` nests the unordered variables in
+  a list, and GIN's `cluster_order` orders its latent clusters.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results

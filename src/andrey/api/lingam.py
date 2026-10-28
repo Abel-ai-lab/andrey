@@ -397,8 +397,8 @@ def multi_group_direct_lingam(
         One envelope per group, in input order. Each wraps a ``dag``
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
         order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
-        j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, with ``group_index`` and
-        ``n_groups``.
+        j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
+        ``metadata["group_index"]`` is the group's position in ``data_groups``.
 
     Raises
     ------
@@ -471,7 +471,6 @@ def multi_group_direct_lingam(
     labels = shared_labels(column_labels(X) for X in data_groups)
     constraints = resolve(knowledge, groups[0].shape[1], labels, method="multi_group_direct_lingam")
     order, adjacency_matrices = _native(groups, constraints=constraints)
-    n_groups = len(groups)
     outputs = []
     for k, B in enumerate(adjacency_matrices):
         weighted = _canonical_weights(B)
@@ -482,10 +481,7 @@ def multi_group_direct_lingam(
                 labels=labels,
                 ordering=order,
                 weighted_adjacency=weighted,
-                metadata={
-                    "group_index": k,
-                    "n_groups": n_groups,
-                },
+                metadata={"group_index": k},
             )
         )
     return outputs

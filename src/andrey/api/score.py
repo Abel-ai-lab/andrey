@@ -1350,7 +1350,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"calm"``), the
-        ``"seed"`` used, ``"n_edges"``, ``"objective"`` (half the sum of the log residual
+        ``"seed"`` used, ``"objective"`` (half the sum of the log residual
         variances plus ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the
         acyclicity residual of the returned graph, ``0`` when it is acyclic).
 
@@ -1463,7 +1463,6 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "objective": json_safe(result.objective),
         },

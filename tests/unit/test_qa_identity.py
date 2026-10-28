@@ -97,11 +97,11 @@ def test_a_swapped_pair_trades_its_directions() -> None:
     marks = np.array([[0, 1], [2, 0]], dtype=np.int8)  # 0 -> 1
     fitted = StructureOutput.new(  # 1 -> 0 on the swapped columns
         GraphStructure.from_numpy(marks.T, kind="dag"),
-        metadata={"pval_forward": 0.5, "pval_backward": 0.01},
+        metadata={"p_values": {"forward": 0.5, "backward": 0.01}},
     )
     back = identity.unpermute(fitted, np.array([1, 0]))
     assert back.structure.to_numpy().tolist() == marks.tolist()
-    assert dict(back.metadata) == {"pval_forward": 0.01, "pval_backward": 0.5}
+    assert dict(back.metadata) == {"p_values": {"forward": 0.01, "backward": 0.5}}
 
 
 def test_permuted_moves_each_block_of_variables_alike() -> None:

@@ -18,7 +18,13 @@ _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
 _PAIRWISE = frozenset({"ANM", "PNL"})
-_PAIRWISE_FIELDS = ("pval_forward", "pval_backward", "stat_forward", "stat_backward")
+# The recorded fields of the pairwise tests, by metadata key and direction.
+_PAIRWISE_FIELDS = {
+    "pval_forward": ("p_values", "forward"),
+    "pval_backward": ("p_values", "backward"),
+    "stat_forward": ("statistics", "forward"),
+    "stat_backward": ("statistics", "backward"),
+}
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
@@ -47,12 +53,15 @@ def project_output(out: Any, algorithm: str) -> dict:
             "weighted_adjacency": np.asarray(out.weighted_adjacency),
         }
         if algorithm == "BottomUpParceLiNGAM":  # the order, unordered variables nested in a list
-            candidate["causal_order"] = out.metadata["causal_order"]
+            candidate["causal_order"] = out.metadata["partial_order"]
         return candidate
     if algorithm in _PAIRWISE:
-        return {"graph": out.structure.to_numpy()} | {k: out.metadata[k] for k in _PAIRWISE_FIELDS}
+        md = out.metadata
+        return {"graph": out.structure.to_numpy()} | {
+            field: md[key][direction] for field, (key, direction) in _PAIRWISE_FIELDS.items()
+        }
     if algorithm == "GIN":  # the graph over indicators and latents, and the clusters in order
-        return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["causal_order"]}
+        return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["cluster_order"]}
     if algorithm in _PCMCI:
         s = out.structure
         candidate = {

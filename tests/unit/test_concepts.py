@@ -292,7 +292,8 @@ def graphs_and_orders(out) -> list:
         graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
     else:
         graphs = [s]
-    orders = {k: out.metadata.get(k) for k in ("causal_order", "causal_orders", "unordered")}
+    keys = ("partial_order", "cluster_order", "causal_orders", "unordered")
+    orders = {k: out.metadata.get(k) for k in keys}
     return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
 
 
@@ -313,6 +314,32 @@ def declared_kind(out, method: str) -> bool:
     return kind == REGISTRY[method].output.graph_kind
 
 
+#: Settings that bring out the metadata keys a default fit leaves out.
+METADATA_FITS = {
+    **dict.fromkeys(("pc", "fci", "gfci", "cdnod"), {"collider_rule": "majority"}),
+    **dict.fromkeys(("iamb", "inter_iamb", "mmpc"), {"target": "y"}),
+}
+
+
+def declared_metadata(method: str) -> bool:
+    """Whether every key of a default fit, and of a fit with ``METADATA_FITS``, is declared."""
+    outs = [coded_fit(method)[0]]
+    if method in METADATA_FITS:
+        outs.append(fit(method, codes=False, **METADATA_FITS[method])[0])
+    keys = {key for out in outs for key in out.metadata}
+    return keys <= set(REGISTRY[method].output.metadata)
+
+
+def andrey_warnings(method: str) -> bool:
+    """Whether every warning of the coded fit and of the fit stopped at its cap is an
+    ``AndreyWarning``."""
+    caught = list(coded_fit(method)[1])
+    if method in CONCEPTS["cap_warning"].suitable:
+        cap = AT_CAP.get(method, {"max_iter": 1})
+        caught += fit(method, codes=False, **{**SHORT.get(method, {}), **cap})[1]
+    return all(issubclass(category, andrey.AndreyWarning) for category in caught)
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
@@ -325,6 +352,8 @@ OBSERVE = {
     ),
     "cap_warning": (stopped_at_cap, "SearchLimitWarning"),
     "invalid_choice": (non_value_errors, ""),
+    "metadata": (declared_metadata, True),
+    "warnings": (andrey_warnings, True),
     "units": (unit_free, True),
 }
 
@@ -596,6 +625,37 @@ def test_an_indep_test_takes_the_registered_tests(monkeypatch):
 # --- surfaces -------------------------------------------------------------------------------------
 
 
+#: The calls whose category is a variable, keyed by file: ``warn_once`` itself, and the calls that
+#: raise again a warning another call raised (a worker's warnings in the parent process, and the
+#: warnings scikit-learn raises other than its ConvergenceWarning).
+REWARNED = {"resample.py": {"category"}, "warning_policy.py": {"category", "item.category"}}
+
+
+def test_every_warning_the_package_raises_is_an_andrey_warning():
+    """Each ``warnings.warn``, ``warn_explicit``, and ``warn_once`` call names an AndreyWarning
+    subclass as its category, or raises again a warning it caught."""
+    import ast
+
+    package = pathlib.Path(andrey.__file__).parent
+    calls = 0
+    for path in sorted(package.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            func = getattr(node, "func", None)
+            name = getattr(func, "attr", None) or getattr(func, "id", None)
+            if name not in ("warn", "warn_explicit", "warn_once"):
+                continue
+            calls += 1
+            args = [*node.args, *(k.value for k in node.keywords if k.arg == "category")]
+            category = ast.unparse(args[1]) if len(args) > 1 else "UserWarning"
+            if category in REWARNED.get(path.name, ()):
+                continue
+            found = getattr(warning_policy, category.rsplit(".", 1)[-1], None)
+            assert isinstance(found, type) and issubclass(found, andrey.AndreyWarning), (
+                f"{path.name}:{node.lineno} warns {category}"
+            )
+    assert calls > 10
+
+
 def test_documented_method_lists_match_the_table():
     """A paragraph of docs/docs/api.md marked ``% concept: <key>`` names exactly the methods that
     take the concept today, under any name."""
@@ -620,12 +680,48 @@ def test_documented_method_lists_match_the_table():
         assert named == takes, f"{key}: documented {sorted(named)}, table {sorted(takes)}"
 
 
+def test_the_graph_types_guide_lists_each_method_under_its_kind():
+    """The guide's "Which methods return each type?" table names each method under the kind its
+    spec declares, ``TemporalStructure`` for a time-series result."""
+    guide = API_MD.parent / "guides" / "graph-types.md"
+    table = guide.read_text(encoding="utf-8").split("## Which methods return each type?", 1)[1]
+    rows = re.findall(r"^\| `(\w+)` \| (.+) \|$", table.split("\n\n", 2)[1], re.MULTILINE)
+    listed = {kind: set(re.findall(r"`(\w+)`", methods)) for kind, methods in rows}
+    declared: dict[str, set[str]] = {}
+    for name, spec in REGISTRY.items():
+        declared.setdefault(spec.output.graph_kind or "TemporalStructure", set()).add(name)
+    assert listed == declared
+
+
+def test_each_cli_input_flag_names_the_methods_that_take_the_input():
+    """The help of a CLI flag for an input other than ``data`` starts with the methods whose spec
+    has that input, ``<methods> only:``."""
+    import typing
+
+    from andrey import cli
+
+    helps = {}
+    for value in vars(cli).values():
+        if typing.get_origin(value) is typing.Annotated:
+            info = typing.get_args(value)[1]
+            helps[getattr(info, "default", None)] = getattr(info, "help", "") or ""
+    takes: dict[str, list[str]] = {}
+    for name, spec in REGISTRY.items():
+        for inp in spec.data.inputs:
+            if inp.name != "data":
+                takes.setdefault(inp.flag, []).append(name)
+    assert takes
+    for flag, methods in takes.items():
+        assert helps[flag].startswith(f"{', '.join(methods)} only:"), flag
+
+
 def test_schema_carries_bounds_aliases_and_concepts():
     from andrey.spec import help_schema
 
     schema = help_schema()
     for name, spec in REGISTRY.items():
         assert schema["methods"][name]["dropped_args"] == list(spec.dropped_args)
+        assert schema["methods"][name]["output"]["metadata"] == list(spec.output.metadata)
         properties = schema["methods"][name]["params"]["properties"]
         for p in spec.params:
             entry = properties[p.name]

@@ -56,9 +56,8 @@ def gin(
         and unordered latents have no edge between them: edges between latents follow the order only
         and do not mean a direct effect was found. An observed variable in no cluster has no edges.
         ``metadata["algorithm"]`` is ``"gin"``, ``metadata["clusters"]`` lists the clusters as lists
-        of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered ones
-        earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member, and
-        ``metadata["n_latents"]`` is the latent count.
+        of column indices, by smallest member, ``metadata["cluster_order"]`` lists the ordered ones
+        earliest latent first, and ``metadata["unordered"]`` lists the rest by smallest member.
 
     Raises
     ------

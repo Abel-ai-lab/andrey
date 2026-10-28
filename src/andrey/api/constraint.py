@@ -135,6 +135,9 @@ def pc(
         ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
         unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
         column positions, the middle node second and ``x < y``, in ascending order.
+        ``metadata["conflicts"]`` lists the edges two colliders ask to orient both ways, as
+        ``[x, y]`` pairs of 0-based column positions with ``x < y``, in ascending order; Notes say
+        which orientation each keeps.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
@@ -367,6 +370,7 @@ def pc(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     ambiguous: set[tuple[int, int, int]] = set()
+    conflicts: set[tuple[int, int]] = set()
     with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
@@ -380,8 +384,10 @@ def pc(
             in_column_order=resolve_in_column_order(),
             seed=seed,
             _ambiguous=ambiguous,
+            _conflicts=conflicts,
         )
     metadata = {
+        "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
@@ -1119,7 +1125,9 @@ def cdnod(
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
         reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
         middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
-        numbered ``n_variables``.
+        numbered ``n_variables``. ``metadata["conflicts"]`` lists the edges between variables that
+        two colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based column positions with
+        ``x < y``, in ascending order, decided as in :func:`~andrey.pc`.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
@@ -1284,6 +1292,7 @@ def cdnod(
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
+    conflicts: set[tuple[int, int]] = set()
     with (
         copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
         rows_tested() as rows,
@@ -1302,8 +1311,10 @@ def cdnod(
             in_column_order=resolve_in_column_order(),
             seed=seed,
             _ambiguous=ambiguous,
+            _conflicts=conflicts,
         )
     metadata = {
+        "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),

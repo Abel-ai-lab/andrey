@@ -86,10 +86,10 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"anm"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-        divided by its mean under independence.
+        edge, or no edge. ``metadata["algorithm"]`` is ``"anm"``. ``metadata["p_values"]`` holds
+        the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``; ``metadata["statistics"]`` holds the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
 
     Raises
     ------
@@ -167,7 +167,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out = anm(np.column_stack([x, y]))
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
-    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    >>> out.metadata["p_values"]["forward"] > 0.05 >= out.metadata["p_values"]["backward"]
     True
     """
     from andrey.irregular.anm import anm as _native
@@ -215,10 +215,10 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"pnl"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-        divided by its mean under independence.
+        edge, or no edge. ``metadata["algorithm"]`` is ``"pnl"``. ``metadata["p_values"]`` holds
+        the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``; ``metadata["statistics"]`` holds the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
 
     Raises
     ------
@@ -308,7 +308,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out = pnl(np.column_stack([x, y]))
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
-    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    >>> out.metadata["p_values"]["forward"] > 0.05 >= out.metadata["p_values"]["backward"]
     True
     """
     from andrey.irregular.pnl import pnl as _native
@@ -473,28 +473,27 @@ def bottom_up_parce_lingam(
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
         across the remaining variables, in ``(0, 1)``.
     knowledge : Knowledge or None, default=None
-        Background knowledge, a :class:`~andrey.Knowledge`; honors forbidden, allowed, tiers:
-        forbidden edges, the pairs allowed to be adjacent, and temporal tiers. Required edges are
-        not honored (see Notes). A variable
-        is taken as a sink only when no remaining variable belongs to a later tier, so the order
-        keeps the tiers, and each regression drops the parents the knowledge forbids, an edge
-        into an earlier tier and a pair outside ``allowed`` included. In the unordered block, a
-        pair forbidden in both directions is not adjacent, and an ``o-o`` pair forbidden in one
-        direction gets an arrowhead at the cause, as in :func:`~andrey.fci`.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is taken as a sink only
+        when no remaining variable belongs to a later tier or is the effect of one of its required
+        edges, so the order keeps the tiers and the required edges, and each regression drops the
+        parents the knowledge forbids, an edge into an earlier tier and a pair outside ``allowed``
+        included, and keeps the required ones unpenalized. In the unordered block, a pair
+        forbidden in both directions is not adjacent, an ``o-o`` pair forbidden in one direction
+        gets an arrowhead at the cause, as in :func:`~andrey.fci`, and a required edge is directed
+        (see Notes).
 
     Returns
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
-        ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["causal_order"]``
+        ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["partial_order"]``
         gives the order, with the unordered variables nested in one list; ``weighted_adjacency``
         holds the edge coefficients.
 
     Raises
     ------
-    NotImplementedError
-        If ``knowledge`` requires an edge.
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
@@ -514,9 +513,12 @@ def bottom_up_parce_lingam(
     weights come from an adaptive-Lasso regression of each variable on those before it, which needs
     more rows than columns.
 
-    **Knowledge.** ``knowledge`` honors forbidden edges, ``allowed``, and tiers. It does not honor
-    required edges: the two ends of a required edge can both end in the unordered block, where no
-    edge is directed, so a required edge raises ``NotImplementedError`` rather than be dropped.
+    **Knowledge.** ``knowledge`` honors required and forbidden edges, ``allowed``, and tiers. The
+    order puts each required edge's cause first and keeps the tiers, and each regression drops the
+    forbidden parents and keeps the required ones unpenalized, so a required parent's weight is
+    estimated and can be ``0``. A required edge whose two ends both stay in the unordered block is
+    directed there, with the least-squares weight of the child on its required parents in the
+    block, while the block's other pairs stay ``o-o``. Every required edge is in the graph.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
@@ -552,7 +554,7 @@ def bottom_up_parce_lingam(
     >>> x0, x1 = 1.5 * h + u(), 1.5 * h + u()
     >>> data = np.column_stack([x0, x1, x1 + u(), x0 + u()])
     >>> out = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    >>> out.metadata["causal_order"]
+    >>> out.metadata["partial_order"]
     [[0, 1], 2, 3]
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
@@ -564,15 +566,11 @@ def bottom_up_parce_lingam(
             f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"
         )
     labels = column_labels(data)
-    constraints = resolve(
-        knowledge,
-        X.shape[1],
-        labels,
-        method="bottom_up_parce_lingam",
-        honors=("forbidden", "allowed", "tiers"),
-    )
+    constraints = resolve(knowledge, X.shape[1], labels, method="bottom_up_parce_lingam")
     model = _native(X, alpha=alpha, constraints=constraints)
     if constraints is None:
         return with_labels(_adapt_bottom_up_parce(model), labels)
     one_way = constraints.forbidden & ~constraints.forbidden.T
-    return with_labels(_adapt_bottom_up_parce(model, one_way), labels)
+    return with_labels(
+        _adapt_bottom_up_parce(model, one_way, required=constraints.required), labels
+    )

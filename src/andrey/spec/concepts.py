@@ -739,14 +739,6 @@ _CONCEPTS = (
                 "Drop forbidden lagged regressors and keep required ones unpenalized.",
                 "granger",
             ),
-            Deviation(
-                method="bottom_up_parce_lingam",
-                name="knowledge",
-                default=None,
-                observed="forbidden,allowed,tiers",
-                fixed_in="0.11.0",
-                reason="Required edges raise.",
-            ),
         ),
     ),
     Concept(
@@ -996,6 +988,22 @@ _CONCEPTS = (
     Concept(
         key="algorithm",
         summary="metadata['algorithm'] is the method's public name.",
+        suitable=ALL_METHODS,
+    ),
+    Concept(
+        key="metadata",
+        summary="A fit's metadata holds only the keys its OutputSpec declares, and a key means one "
+        "thing with one shape in every method: p_values and statistics for test results, "
+        "conflicts for the links colliders ask to orient both ways, score for a score search's "
+        "score. An order that is not a total order of the variables has its own name "
+        "(partial_order, cluster_order), and no key repeats an argument.",
+        suitable=ALL_METHODS,
+    ),
+    Concept(
+        key="warnings",
+        summary="Every warning a fit raises is an AndreyWarning, one class per situation: "
+        "ExperimentalWarning, BoundaryWarning, SearchLimitWarning, DataTypeWarning, "
+        "SampleSizeWarning, PerformanceWarning, BackendFallbackWarning, DeprecatedArgumentWarning.",
         suitable=ALL_METHODS,
     ),
     Concept(

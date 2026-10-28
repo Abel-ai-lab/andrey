@@ -182,7 +182,7 @@ def test_a_conflict_is_an_undirected_lag_0_link_listed_in_the_metadata():
     assert out.structure.lag(0).kind == "cpdag"
     assert out.structure.lag(0).oriented_edges() == [(0, 1, "undirected"), (1, 2, "directed")]
     assert out.structure.lag(1).oriented_edges() == [(2, 0, "directed")]
-    assert out.metadata["conflicts"] == [[0, 1]]
+    assert out.metadata["conflicts"] == [[0, 0, 1]]
 
 
 @pytest.mark.parametrize(

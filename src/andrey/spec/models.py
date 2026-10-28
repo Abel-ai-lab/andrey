@@ -218,6 +218,8 @@ class OutputSpec(Spec):
     has_ordering: bool = False  # carries a discovered causal order
     has_latents: bool = False  # flags latent nodes via node_types (GIN)
     multi: bool = False  # returns list[StructureOutput], one per group
+    # Every key a fit's metadata can hold; a fit holds a subset (some keys depend on the settings).
+    metadata: tuple[str, ...] = ()
     doc: str = ""
 
 

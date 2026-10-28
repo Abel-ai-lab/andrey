@@ -57,7 +57,6 @@ def test_mmhc_reaches_the_score_optimum_on_gauss_5v():
     out = andrey.mmhc(x)
     assert out.structure.kind == "cpdag"
     assert markov_equivalent(out.structure, to_cpdag(andrey.exact_search(x).structure))
-    assert out.metadata["restrict"] == "mmpc" and out.metadata["maximize"] == "hc"
     assert_recorded_output(out, "MMHC", case="gauss_5v")
 
 

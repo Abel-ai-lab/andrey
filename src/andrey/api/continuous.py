@@ -27,21 +27,15 @@ if TYPE_CHECKING:
     from andrey.search.continuous import ContinuousResult
 
 
-def _output(
-    result: ContinuousResult,
-    labels: tuple[str, ...] | None,
-    robust: bool,
-) -> StructureOutput:
+def _output(result: ContinuousResult, labels: tuple[str, ...] | None) -> StructureOutput:
     """Wrap a fit as a weighted DAG with its bookkeeping."""
     return structure_output(
         result.dag,
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "edges_removed": result.edges_removed,
-            "robust": robust,
             "path_steps": result.path_steps,
         },
     )
@@ -112,9 +106,9 @@ def notears(
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"notears"``),
-        ``"n_edges"``, ``"h_final"`` (the acyclicity function of the fit before the threshold),
-        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), ``"robust"``,
-        and ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
+        ``"h_final"`` (the acyclicity function of the fit before the threshold),
+        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
+        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
 
     Raises
     ------
@@ -243,7 +237,7 @@ def notears(
             labels=labels,
             constraints=constraints,
         )
-    return _output(result, labels, robust)
+    return _output(result, labels)
 
 
 @method_spec("dagma")
@@ -316,10 +310,9 @@ def dagma(
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"dagma"``),
-        ``"n_edges"``, ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before
-        the threshold), ``"edges_removed"`` (edges the threshold kept that the cycle repair
-        dropped), ``"robust"``, and ``"path_steps"`` (accepted steps of the path, ``0`` without
-        ``robust``).
+        ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before the threshold),
+        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
+        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
 
     Raises
     ------
@@ -451,4 +444,4 @@ def dagma(
             labels=labels,
             constraints=constraints,
         )
-    return _output(result, labels, robust)
+    return _output(result, labels)

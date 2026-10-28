@@ -337,16 +337,18 @@ LAG_MATRICES = ("p_values", "statistics", "links")
 #: out: each method lays out its lists in its own way.
 NODE_LISTS = (
     "ambiguous_triples",
-    "causal_order",
     "causal_orders",
+    "cluster_order",
     "clusters",
     "confounded_pairs",
     "conflicts",
+    "dag",
     "parents",
+    "partial_order",
     "unordered",
 )
-#: Metadata of a pair's two directions, first column to second and back, which a swap exchanges.
-DIRECTIONS = (("pval_forward", "pval_backward"), ("stat_forward", "stat_backward"))
+#: The keys of a pair's two directions, first column to second and back, which a swap exchanges.
+DIRECTIONS = ("forward", "backward")
 
 
 def permuted(x: np.ndarray, order: np.ndarray, blocks: int) -> np.ndarray:
@@ -367,15 +369,17 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
     back = np.argsort(order)
     weights = out.weighted_adjacency
-    metadata = {
-        key: np.asarray(value)[:, back][:, :, back].tolist() if key in LAG_MATRICES else value
-        for key, value in out.metadata.items()
-        if key not in NODE_LISTS
-    }
-    if len(order) == 2 and order[0] == 1:
-        for forward, backward in DIRECTIONS:
-            if forward in metadata:
-                metadata[forward], metadata[backward] = metadata[backward], metadata[forward]
+    swapped = len(order) == 2 and order[0] == 1
+    metadata = {}
+    for key, value in out.metadata.items():
+        if key in NODE_LISTS:
+            continue
+        if isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
+            forward, backward = DIRECTIONS
+            value = {forward: value[backward], backward: value[forward]} if swapped else value
+        elif key in LAG_MATRICES:
+            value = np.asarray(value)[:, back][:, :, back].tolist()
+        metadata[key] = value
     return StructureOutput.new(
         _moved(out.structure, back),
         ordering=None if out.ordering is None else [int(order[i]) for i in out.ordering],
