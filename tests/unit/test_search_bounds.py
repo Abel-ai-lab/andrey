@@ -22,6 +22,7 @@ from andrey.spec import REGISTRY
 from andrey.temporal import lpcmci as lpcmci_engine
 from andrey.temporal import pcmci as pcmci_engine
 from andrey.temporal import pcmciplus as pcmciplus_engine
+from andrey.temporal import varma as varma_engine
 
 CAPS = (0, 1, 2)
 
@@ -225,6 +226,16 @@ def test_required_edges_above_the_parent_cap_are_refused(method):
 
 
 # --- iteration caps --------------------------------------------------------------------------
+
+
+def test_a_varma_fit_that_exhausts_the_evaluation_limit_warns_as_a_search_limit(monkeypatch):
+    """The optimizer's evaluation limit grows with ``max_iter``; a fit that ends on it is a cap."""
+    monkeypatch.setattr(varma_engine, "_EVALUATIONS_PER_ITERATION", 1)
+    warning_policy._warned.clear()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        andrey.varma_lingam(series(0, n_vars=3), max_iter=100)
+    assert andrey.SearchLimitWarning in {w.category for w in caught}
 
 
 def test_a_scikit_learn_convergence_warning_is_raised_again_as_a_search_limit():

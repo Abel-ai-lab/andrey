@@ -205,11 +205,13 @@ change names its pull request.
   columns brought to unit scale and map their results back to the data's units. On raw series,
   `varma_lingam`'s weights change, and at times its graph; on standardized data the other methods
   return the same values. ([#500])
-- `varma_lingam`'s `max_iter` is the only cap on the likelihood fit's iterations. The optimizer's
-  own limit of 15,000 function evaluations, which each iteration spends at about one per
-  parameter, ended a long fit without a warning whatever `max_iter` was, so raising `max_iter`
-  could not help; that limit is lifted. A fit that converged, or that stopped at `max_iter`,
-  returns the same values as before. ([#505])
+- `varma_lingam`'s `max_iter` raises the likelihood fit's evaluation limit with it. The optimizer
+  stopped after 15,000 function evaluations, which each iteration spends at about one per
+  parameter, however large `max_iter` was and without a warning, so raising `max_iter` could not
+  make a long fit converge. The limit is now 150 evaluations per iteration, the same 15,000 at the
+  default `max_iter=100`, and a fit that ends on it without converging warns with
+  `andrey.SearchLimitWarning` like one that ends on `max_iter`. Fits at the default `max_iter`
+  return the same values as before. ([#505])
 
 ## [0.10.0] - 2026-10-27
 

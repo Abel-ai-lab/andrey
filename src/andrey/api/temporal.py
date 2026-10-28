@@ -84,9 +84,12 @@ def varma_lingam(
         ``B0`` is the lag-0 weight matrix and ``Theta_j`` the fitted moving-average coefficients.
         Ignored when ``prune=True``.
     max_iter : int, default=100
-        Most iterations of the likelihood fit, at least ``1``. With ``criterion`` set, every fit in
-        the grid gets this limit. A fit that reaches it without converging warns with
-        :class:`~andrey.SearchLimitWarning`.
+        Most iterations of the likelihood fit, at least ``1``. The optimizer's function evaluations
+        are limited to 150 per iteration; each iteration spends about one per parameter, so a fit
+        of more than about 150 parameters, such as ``order=(1, 1)`` on 8 variables, can use them up
+        first. With ``criterion`` set, every fit in the grid gets these limits. A fit that reaches
+        either without converging warns with :class:`~andrey.SearchLimitWarning`; raise
+        ``max_iter`` to let it run on.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
