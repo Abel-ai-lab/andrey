@@ -81,6 +81,12 @@ change names its pull request.
 
 ### Added
 
+- `pcmci`, `pcmciplus`, and `lpcmci` take every `indep_test` the other conditional-independence
+  searches take: `"chisq"` and `"gsq"` for categorical series, `"degen_gauss"` and `"cond_gauss"`
+  for mixed ones, and the nonlinear `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`, each on the lagged
+  values under test-wise deletion, with `categorical`, `max_categories`, and `seed`. Candidate
+  conditions are ordered by each test's statistic, as in tigramite. `None` still picks from the
+  declared column types. ([#515])
 - `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
   knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
   others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
@@ -1036,3 +1042,4 @@ First alpha release.
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
+[#515]: https://github.com/Abel-ai-lab/andrey/pull/515
