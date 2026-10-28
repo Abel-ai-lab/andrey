@@ -711,7 +711,8 @@ _CONCEPTS = (
             ),
             *_exempt(
                 "The least-squares score with an l1 penalty and a weight threshold reads the "
-                "data's units (Zheng et al. 2018; Bello et al. 2022). robust=True is under review.",
+                "data's units (Zheng et al. 2018; Bello et al. 2022), and so do the quasi-MCP "
+                "penalty and the weight threshold of robust=True (Deng et al. 2024).",
                 *_CONTINUOUS,
             ),
             *_exempt("Not measured yet: its fit needs torch.", "calm"),
