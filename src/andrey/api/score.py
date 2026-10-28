@@ -461,13 +461,14 @@ def gies(
     intervened on, as the likelihood of interventional data does [1]_, and every BIC charges
     ``log(n_samples)`` per parameter, with ``n_samples`` counting every row. BDeu and the
     multinomial BIC count each column's categories over every row, so a category seen only under
-    an intervention stays one of the variable's categories; with BDeu this is the score of Cooper
-    and Yoo [3]_ for a mix of experimental and observational data. The mixed-data scores read the
-    categories, and the conditional Gaussian score its cells, from those rows alone; their
-    interventional form follows the same rule and has no published reference. Under every score,
-    two graphs of one interventional class get the same score: they differ only in how the edges
-    the class leaves undirected are directed [1]_, the two ends of such an edge are intervened on in
-    the same rows, and on any set of rows each score gives Markov equivalent graphs the same score.
+    an intervention stays one of the variable's categories; BDeu is then the score of Cooper and Yoo
+    [3]_ for a mix of experimental and observational data, with its uniform prior. The mixed-data
+    scores read the categories, and the conditional Gaussian score its cells, from those rows alone;
+    their interventional form follows the same rule and has no published reference. Under every
+    score, two graphs of one interventional class get the same score: they differ only in how the
+    edges the class leaves undirected are directed [1]_, the two ends of such an edge are intervened
+    on in the same rows, and on any set of rows each score gives Markov equivalent graphs the same
+    score.
 
     **How it works.** The search starts from the empty graph and repeats three phases: adding
     edges, removing edges, and turning one edge around, each while it improves the score, until a

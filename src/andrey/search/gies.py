@@ -105,11 +105,12 @@ class InterventionalScore:
     :func:`~andrey.core.score.make_score`. Variables left alone in the same rows share one score
     over those rows: the linear-Gaussian BIC over the rows' covariance; BDeu and the multinomial BIC
     over the rows' counts, with each column's categories those of every row
-    (:meth:`~andrey.core.score.BDeuScore.on_rows`), which for BDeu is the score of Cooper and Yoo
-    (1999) for a mix of experimental and observational data; and the mixed-data BICs over the rows
-    alone, their categories and cells those of the rows. Every BIC charges its penalty with
-    ``log(n)``, ``n`` counting every row, as the BIC of all the data does (Hauser and Buhlmann 2012,
-    Sec. 5). With no interventions each score equals the one ``make_score`` builds over the data.
+    (:meth:`~andrey.core.score.BDeuScore.on_rows`), which makes BDeu the score of Cooper and Yoo
+    (1999) for a mix of experimental and observational data, with its uniform prior; and the
+    mixed-data BICs over the rows alone, their categories and cells those of the rows. Every BIC
+    charges its penalty with ``log(n)``, ``n`` counting every row, as the BIC of all the data does
+    (Hauser and Buhlmann 2012, Sec. 5). With no interventions each score equals the one
+    ``make_score`` builds over the data.
 
     Under ``"bic"``, a variable's local score is ``n_v * log(R) + penalty_discount * log(n) *
     len(parents)`` plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of
