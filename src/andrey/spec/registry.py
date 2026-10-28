@@ -552,7 +552,12 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            _SCORE_FUNC_RENAMED,
+            concept_param(
+                "score_func",
+                doc=_SCORE_DOC,
+                # Before 0.11.0 tabu took the linear and the categorical scores, not the mixed ones.
+                choice_aliases=SCORE_ALIASES[:4],
+            ),
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             ParamSpec(
