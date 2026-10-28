@@ -6,6 +6,9 @@ from typing import Any
 
 import numpy as np
 
+from andrey.core import ARROW, TAIL
+from andrey.core.structure import GraphStructure
+
 # A graph candidate also carries the scalar objective score (from metadata).
 _SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
@@ -30,13 +33,19 @@ _PAIRWISE_FIELDS = {
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 
 
+def found_dag(out: Any) -> GraphStructure:
+    """The DAG an exact search found, which ``metadata["dag"]`` lists as ``[i, j]`` for ``i -> j``;
+    the output's own structure is the DAG's CPDAG."""
+    marks = np.zeros((out.structure.n_nodes,) * 2, dtype=np.int8)
+    for i, j in out.metadata["dag"]:
+        marks[i, j], marks[j, i] = TAIL, ARROW
+    return GraphStructure.from_numpy(marks, kind="dag", labels=out.structure.labels)
+
+
 def project_output(out: Any, algorithm: str) -> dict:
     """Project a ``StructureOutput`` (or a list for multi-group) to the baseline field layout."""
     if algorithm == "ExactSearch":  # the recorded graph is the DAG the search found
-        dag = np.zeros((out.structure.n_nodes,) * 2, dtype=np.int8)
-        for i, j in out.metadata["dag"]:
-            dag[i, j], dag[j, i] = 1, 2
-        return {"graph": dag}
+        return {"graph": found_dag(out).to_numpy()}
     if algorithm in _GRAPH:
         candidate: dict = {"graph": out.structure.to_numpy()}
         if algorithm in _SCORE_GRAPH:

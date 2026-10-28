@@ -100,7 +100,7 @@ Four ideas make it fast; each is animated in
 
 | Family | Methods | Returns |
 |---|---|---|
-| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html)\*, [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html)\*, [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html)\* | CPDAG, PAG |
+| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html)\*, [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html)\*, [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html)\* | CPDAG, PAG, UNDIRECTED |
 | Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html)\*, [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html)\*, [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html)\*, [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html)\* | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html) | CPDAG |
 | Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html) | DAG |
@@ -145,6 +145,8 @@ pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
   akt -- pka
   p38 -> pkc
   jnk -> pkc
+
+  conflicts: []
 {'shd': 11, 'skeleton_precision': 1.0, 'skeleton_recall': 0.47}
 ```
 

@@ -21,6 +21,7 @@ from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.project import found_dag
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 # The extended-BIC weight that tabu search and exact search score with by default.
@@ -55,10 +56,12 @@ def test_tabu_reaches_the_score_optimum_on_gauss_5v():
     DAG's score. The graph and score match the recorded output."""
     x = datagen.generate("gauss_5v")
     out = andrey.tabu(x)
-    optimum = andrey.exact_search(x).structure
+    optimum = andrey.exact_search(x)
     assert out.structure.kind == "cpdag"
-    assert out.structure.oriented_edges() == to_cpdag(optimum).oriented_edges()
-    assert math.isclose(out.metadata["score"], _bic(x, optimum), rel_tol=0.0, abs_tol=1e-6)
+    assert out.structure.oriented_edges() == optimum.structure.oriented_edges()
+    assert math.isclose(
+        out.metadata["score"], _bic(x, found_dag(optimum)), rel_tol=0.0, abs_tol=1e-6
+    )
     assert_recorded_output(out, "Tabu", case="gauss_5v")
 
 
@@ -74,7 +77,7 @@ def test_tabu_finds_no_edges_between_independent_columns():
 def test_tabu_score_lies_between_the_optimum_and_hill_climbing(seed):
     x = _er_sample(8, seed).data
     found = andrey.tabu(x).metadata["score"]
-    optimum = _bic(x, andrey.exact_search(x).structure)
+    optimum = _bic(x, found_dag(andrey.exact_search(x)))
     assert optimum <= found + 1e-6 * abs(optimum)
     assert found <= andrey.hc(x).metadata["score"]
 
