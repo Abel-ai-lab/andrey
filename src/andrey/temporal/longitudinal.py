@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.units import unit_factors
 from andrey.lingam.direct import direct_lingam
 from andrey.search.hc import tie_ranks
 
@@ -46,16 +47,21 @@ def _regress_out_lags(X_predictors: np.ndarray, X_target: np.ndarray) -> np.ndar
     """Ordinary least squares of each target column on ``X_predictors`` (intercept via centering).
 
     Returns coefficients of shape ``(n_targets, n_predictors)``; the intercept is absorbed by
-    mean-centering both sides, matching a fit-intercept linear regression.
+    mean-centering both sides, matching a fit-intercept linear regression. The fit runs on
+    unit-scale predictors (:func:`~andrey.core.units.unit_factors`), so ``lstsq``'s rank cutoff,
+    relative to the largest singular value, does not read their units, and the coefficients are
+    mapped back.
     """
     n_targets = X_target.shape[1]
     n_predictors = X_predictors.shape[1]
     coefs = np.empty((n_targets, n_predictors), dtype=np.float64)
-    Xc = X_predictors - X_predictors.mean(axis=0)
+    factors = unit_factors(X_predictors)
+    scaled = X_predictors * factors
+    Xc = scaled - scaled.mean(axis=0)
     for i in range(n_targets):
         y = X_target[:, i] - X_target[:, i].mean()
         coef, *_ = np.linalg.lstsq(Xc, y, rcond=None)
-        coefs[i] = coef
+        coefs[i] = coef * factors
     return coefs
 
 

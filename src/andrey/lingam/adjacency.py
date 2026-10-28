@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from andrey.core.units import least_squares
 from andrey.core.warning_policy import convergence_as_search_limit
 from andrey.lingam.pwling import _COPY_TOL
 
@@ -74,12 +75,11 @@ def predict_adaptive_lasso(
     The Lasso runs on the predictors scaled by their least-squares weights, and BIC picks its
     point on the whole path (:func:`_lasso_bic`), so the same predictors are selected for the data
     in any unit. Returns the shrunk Lasso weights, or with ``refit=True`` an ordinary least-squares
-    fit (with an intercept) of ``target`` on the selected predictors, zero for the rest.
+    fit (with an intercept) of ``target`` on the selected predictors, zero for the rest. Every
+    least-squares fit runs on unit-scale predictors (:func:`~andrey.core.units.least_squares`).
     """
-    from sklearn.linear_model import LinearRegression
-
-    ols = LinearRegression().fit(X[:, predictors], X[:, target])
-    return _adaptive_lasso(X, predictors, target, ols.coef_, gamma, refit=refit)
+    ols_coef, _ = least_squares(X[:, predictors], X[:, target])
+    return _adaptive_lasso(X, predictors, target, ols_coef, gamma, refit=refit)
 
 
 def _adaptive_lasso(
@@ -92,8 +92,6 @@ def _adaptive_lasso(
     refit: bool = False,
 ) -> np.ndarray:
     """:func:`predict_adaptive_lasso` from the least-squares weights ``ols_coef``."""
-    from sklearn.linear_model import LinearRegression
-
     weight = np.power(np.abs(ols_coef), gamma)
     lasso = _lasso_bic(X[:, predictors] * weight, X[:, target])
     if not refit:
@@ -102,7 +100,7 @@ def _adaptive_lasso(
     coef = np.zeros(len(predictors), dtype=np.float64)
     if selected.any():
         columns = np.asarray(predictors)[selected]
-        coef[selected] = LinearRegression().fit(X[:, columns], X[:, target]).coef_
+        coef[selected] = least_squares(X[:, columns], X[:, target])[0]
     return coef
 
 
@@ -118,19 +116,17 @@ def predict_with_required(
     every coefficient: a required coefficient is estimated, not fixed, and can be ``0``. Returns
     the coefficients of ``required`` and of ``predictors``, zero for an unselected one.
     """
-    from sklearn.linear_model import LinearRegression
-
     coef = np.zeros(len(predictors), dtype=np.float64)
     if predictors:
         columns = [target, *predictors]
-        fitted = LinearRegression().fit(X[:, required], X[:, columns])
-        residuals = X[:, columns] - fitted.predict(X[:, required])
+        partial, intercept = least_squares(X[:, required], X[:, columns])
+        residuals = X[:, columns] - (X[:, required] @ partial.T + intercept)
         lasso = predict_adaptive_lasso(residuals, list(range(1, len(columns))), 0, gamma)
         selected = np.abs(lasso) > 0.0
     else:
         selected = np.zeros(0, dtype=bool)
     chosen = [*required, *np.asarray(predictors, dtype=np.intp)[selected].tolist()]
-    weights = LinearRegression().fit(X[:, chosen], X[:, target]).coef_
+    weights, _ = least_squares(X[:, chosen], X[:, target])
     coef[selected] = weights[len(required) :]
     return weights[: len(required)], coef
 
@@ -156,8 +152,6 @@ def estimate(
     penalized (:func:`predict_with_required`, least-squares weights for every predictor) and not
     dropped as rounding-sized. The order must put each required parent before its child.
     """
-    from sklearn.linear_model import LinearRegression
-
     d = X.shape[1]
     B = np.zeros((d, d), dtype=np.float64)
     kept = list(order[:1])
@@ -176,16 +170,16 @@ def estimate(
             kept.append(target)
             continue
         y, P = X[:, target], X[:, columns]
-        ols = LinearRegression().fit(P, y)
-        residual = y - ols.intercept_ - P @ ols.coef_
+        ols_coef, intercept = least_squares(P, y)
+        residual = y - intercept - P @ ols_coef
         if np.var(residual) > _COPY_TOL * np.var(y):
             if forced:
                 B[target, forced], B[target, free] = predict_with_required(X, forced, free, target)
             else:
-                B[target, free] = _adaptive_lasso(X, free, target, ols.coef_, refit=refit)
+                B[target, free] = _adaptive_lasso(X, free, target, ols_coef, refit=refit)
             kept.append(target)
         else:
-            coef = ols.coef_.copy()
+            coef = ols_coef
             small = np.abs(coef) * P.std(axis=0) <= _COPY_TOL**0.5 * y.std()
             small[: len(forced)] = False
             coef[small] = 0.0
