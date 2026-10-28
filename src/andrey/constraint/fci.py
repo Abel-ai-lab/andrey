@@ -308,7 +308,7 @@ def _neighbor_lists(marks: np.ndarray) -> list[list[int]]:
 
 def _into(marks: np.ndarray, b: int, mark: int) -> list[int]:
     """Ascending nodes ``a`` whose endpoint at ``b`` (on edge ``a-b``) equals ``mark``."""
-    return [a for a in range(marks.shape[0]) if marks[b, a] == mark]
+    return np.flatnonzero(marks[b] == mark).tolist()
 
 
 def _sepset(
@@ -1273,6 +1273,8 @@ def _exists_uncovered_pd_path(
     target: int,
     neighbors: list[list[int]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    reaching: dict[tuple[int, int], set[int]] | None = None,
 ) -> bool:
     """True when an uncovered possibly-directed simple path ``a, first, ..., target`` exists.
 
@@ -1280,11 +1282,16 @@ def _exists_uncovered_pd_path(
     to each path: reaching a node through one predecessor must not block a different route.
     Reverse reachability prunes branches with no p.d. walk to the target avoiding ``a``.
     Ambiguity checks cover interior triples of the open path, with no wraparound at its target.
-    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``. ``reaching``, when given, keeps
+    each reverse reachability set by ``(target, a)`` for later calls on the same marks.
     """
     if marks[a, first] not in (TAIL, CIRCLE) or marks[first, a] == TAIL:
         return False
-    reachable = _pd_reaches_target(marks, target, a, neighbors)
+    reachable = None if reaching is None else reaching.get((target, a))
+    if reachable is None:
+        reachable = _pd_reaches_target(marks, target, a, neighbors)
+        if reaching is not None:
+            reaching[target, a] = reachable
     if first not in reachable:
         return False
     stack = [[a, first]]
@@ -1317,21 +1324,24 @@ def _rule_r9(
     *,
     out: np.ndarray | _Implied | None = None,
 ) -> bool:
-    """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``."""
+    """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``.
+
+    One reverse reachability set from ``c`` avoiding ``a`` serves every ``b``.
+    """
     out = marks if out is None else out
-    n = marks.shape[0]
     neighbors = _neighbor_lists(marks)
-    for c in range(n):
+    for c in range(marks.shape[0]):
         for a in _into(marks, c, ARROW):
             if marks[a, c] != CIRCLE:  # need a o-> c
                 continue
-            candidates = [
-                v for v in range(n) if v not in (a, c) and _is_possible_child(marks, a, v)
-            ]
+            candidates = [v for v in neighbors[a] if v != c and _is_possible_child(marks, a, v)]
+            reaching: dict[tuple[int, int], set[int]] = {}
             for b in candidates:
                 if _adjacent(marks, b, c):
                     continue
-                if _exists_uncovered_pd_path(marks, a, b, c, neighbors, ambiguous):
+                if _exists_uncovered_pd_path(
+                    marks, a, b, c, neighbors, ambiguous, reaching=reaching
+                ):
                     out[a, c] = TAIL
                     out[c, a] = ARROW
                     change = True
@@ -1356,59 +1366,66 @@ def _rule_r10(
     """R10: complete ``a o-> c`` via two uncovered possibly-directed paths into ``b -> c <- d``.
 
     The paths reach the tails ``b`` and ``d`` from two non-adjacent possible children of ``a``.
+    A path search depends on ``a``, the child, and the tail, not on ``c``, so each runs once per
+    call, until a mark R10 sets on ``marks`` directly clears the answers.
     """
     out = marks if out is None else out
-    n = marks.shape[0]
     neighbors = _neighbor_lists(marks)
-    for c in range(n):
+    searched: dict[tuple[int, int, int], bool] = {}
+    reaching: dict[tuple[int, int], set[int]] = {}
+
+    def reach(a: int, child: int, tail: int) -> bool:
+        if (a, child, tail) not in searched:
+            searched[a, child, tail] = _exists_uncovered_pd_path(
+                marks, a, child, tail, neighbors, ambiguous, reaching=reaching
+            )
+        return searched[a, child, tail]
+
+    for c in range(marks.shape[0]):
         into_arrows = _into(marks, c, ARROW)
         if len(into_arrows) < 2:
             continue
         a_nodes = [a for a in into_arrows if marks[a, c] == CIRCLE]  # a o-> c
         for a in a_nodes:
-            children = [
-                node for node in range(n) if node != c and _is_possible_child(marks, a, node)
-            ]
+            children = [v for v in neighbors[a] if v != c and _is_possible_child(marks, a, v)]
             if len(children) < 2:
                 continue
-            for i in range(len(into_arrows)):
-                for k in range(i + 1, len(into_arrows)):
-                    b, d = into_arrows[i], into_arrows[k]
-                    if marks[b, c] != TAIL or marks[d, c] != TAIL:  # need b -> c <- d
-                        continue
-                    if _r10_connects(marks, children, b, d, a, neighbors, ambiguous):
-                        out[a, c] = TAIL
-                        out[c, a] = ARROW
-                        change = True
+            tails = [t for t in into_arrows if marks[t, c] == TAIL]  # t -> c
+            if _r10_connects(marks, children, tails, a, reach, ambiguous):
+                out[a, c] = TAIL
+                out[c, a] = ARROW
+                change = True
+                if out is marks:
+                    searched.clear()
+                    reaching.clear()
     return change
 
 
 def _r10_connects(
     marks: np.ndarray,
     children: list[int],
-    b: int,
-    d: int,
+    tails: list[int],
     a: int,
-    neighbors: list[list[int]],
+    reach: Callable[[int, int, int], bool],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
 ) -> bool:
-    """True when uncovered p.d. paths from ``a`` reach ``b``/``d`` via non-adjacent children.
+    """True when uncovered p.d. paths from ``a`` reach two of ``tails`` via non-adjacent children.
 
-    Either child of a pair may lead to either tail. Each child is searched at most once per tail.
-    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``.
+    Either child of a pair may lead to either tail. ``reach(a, child, tail)`` tells whether an
+    uncovered p.d. path ``a, child, ..., tail`` exists; only children in such a pair are searched.
     """
-    reaches: dict[tuple[int, int], bool] = {}
-
-    def reach(child: int, target: int) -> bool:
-        if (child, target) not in reaches:
-            reaches[child, target] = _exists_uncovered_pd_path(
-                marks, a, child, target, neighbors, ambiguous
-            )
-        return reaches[child, target]
-
-    for one, two in combinations(children, 2):
-        if _adjacent(marks, one, two) or _triple(one, a, two) in ambiguous:
-            continue
-        if (reach(one, b) and reach(two, d)) or (reach(one, d) and reach(two, b)):
-            return True
-    return False
+    if len(tails) < 2:
+        return False
+    pairs = [
+        (one, two)
+        for one, two in combinations(children, 2)
+        if not _adjacent(marks, one, two) and _triple(one, a, two) not in ambiguous
+    ]
+    paired = sorted({child for pair in pairs for child in pair})
+    reached = [{child for child in paired if reach(a, child, tail)} for tail in tails]
+    reached = [hits for hits in reached if hits]
+    return any(
+        (one in to_b and two in to_d) or (one in to_d and two in to_b)
+        for to_b, to_d in combinations(reached, 2)
+        for one, two in pairs
+    )
