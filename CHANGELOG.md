@@ -36,6 +36,11 @@ change names its pull request.
 - `ica_lingam` takes `seed` instead of `random_state`, and `direct_lingam` and
   `multi_group_direct_lingam` no longer have the `random_state` they ignored. The old names still
   work, with a `DeprecatedArgumentWarning`, in this release and stop in the next. ([#499])
+- `rcd` takes `max_depth` instead of `max_explanatory_vars`, the package-wide name of the cap on a
+  test's conditioning set; the default stays 2, its paper's setting. The old name still works, with
+  a `DeprecatedArgumentWarning`, in this release and stops in the next. scikit-learn's
+  `ConvergenceWarning` from FastICA in `ica_lingam` and from the LARS path of the LiNGAM methods'
+  adaptive Lasso is raised again as `andrey.SearchLimitWarning`. ([#505])
 
 ### Added
 
@@ -94,12 +99,21 @@ change names its pull request.
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])
-- `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
-  the parents of both ends, which also bounds the subsets of the majority vote; unlike the
-  `max_depth` of `pc` and `fci`, it does not count those parents. Its number of tests grows
-  exponentially with the links at one node, so on many strongly related series an uncapped run may
-  not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
-  ([#468])
+- `lpcmci` takes `max_p_global`, tigramite's name for the most conditions a test takes beyond the
+  default conditions, the parents of both ends, which also bounds the subsets of the majority vote;
+  unlike `max_depth`, it does not count those parents. Its number of tests grows exponentially with
+  the links at one node, so on many strongly related series an uncapped run may not finish; a cap
+  bounds the number of tests. The default, `None`, keeps the uncapped search. ([#468], [#505])
+- `max_depth`, the maximum conditioning-set size of every conditional-independence test, on every
+  method that grows conditioning sets: `iamb`, `inter_iamb`, and `mmpc`, the restrict phase of
+  `mmhc` and `rsmax2`, and the PC1 step of `pcmci` and `pcmciplus`, as on `pc`, `fci`, `gfci`, and
+  `cdnod`. `max_parents`, a cap on every node's parents in every DAG the result represents, on
+  `hc`, `tabu`, `exact_search`, `boss`, `grasp`, and the score phase of `mmhc` and `rsmax2`, as on
+  `ges`. Both default to `None`, no cap, which returns the graphs these methods returned before.
+  ([#505])
+- `notears`, `dagma`, `calm`, and `varma_lingam` warn once with `andrey.SearchLimitWarning` when
+  they stop on an iteration cap rather than on their own stopping rule, as `hc` and `tabu` do; each
+  docstring names the cap's unit. ([#505])
 - A fit larger than its method was measured to finish warns once per method with
   `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
   the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
@@ -962,3 +976,4 @@ First alpha release.
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
 [#496]: https://github.com/Abel-ai-lab/andrey/pull/496
 [#499]: https://github.com/Abel-ai-lab/andrey/pull/499
+[#505]: https://github.com/Abel-ai-lab/andrey/pull/505
