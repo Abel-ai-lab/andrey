@@ -94,7 +94,8 @@ from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmci
 `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
 the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
 likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance
-correlation.
+correlation. A test you register that reports only p-values is ordered by its p-value, smallest
+first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,

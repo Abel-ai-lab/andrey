@@ -9,6 +9,7 @@ import pytest
 
 import andrey
 from andrey.core import ARROW, ci
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 METHODS = ("pcmci", "pcmciplus", "lpcmci")
 
@@ -129,3 +130,33 @@ def test_a_randomized_test_moves_with_the_seed_only(method):
     assert first.metadata["p_values"] == again.metadata["p_values"]
     assert first.metadata["p_values"] != other.metadata["p_values"]
     assert (first.metadata["seed"], other.metadata["seed"]) == (3, 4)
+
+
+def _linear_var(n: int = 400) -> np.ndarray:
+    """A VAR(1) with the links 0 -> 0, 0 -> 1, and 1 -> 2 at lag 1."""
+    rng = np.random.default_rng(0)
+    noise = rng.standard_normal((n, 3))
+    x = np.zeros((n, 3))
+    for t in range(1, n):
+        x[t] = noise[t] + np.array([0.5 * x[t - 1, 0], 0.6 * x[t - 1, 0], 0.6 * x[t - 1, 1]])
+    return x
+
+
+@pytest.mark.parametrize("missing", [False, True])
+@pytest.mark.parametrize("method", METHODS)
+def test_a_registered_p_value_only_test_gives_the_graph_of_fisherz(method, missing, monkeypatch):
+    """A registered test with the single-query call alone runs the family, under test-wise deletion
+    too, and ranks candidates by its p-value: the p-values of Fisher's z-test give its graph."""
+    monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    data = _linear_var()
+    if missing:
+        data[np.random.default_rng(1).random(data.shape) < 0.05] = np.nan
+    expected = _fit(method, data)
+    out = _fit(method, data, indep_test="p_value_only")
+    assert {(0, 0, 1), (0, 1, 1), (1, 2, 1)} <= _links(out)
+    assert _links(out) == _links(expected)
+    assert [out.structure.lag(k).to_numpy().tolist() for k in out.structure.lags] == [
+        expected.structure.lag(k).to_numpy().tolist() for k in expected.structure.lags
+    ]
+    if missing:
+        assert out.metadata["rows_tested"]["min"] < len(data) - 2

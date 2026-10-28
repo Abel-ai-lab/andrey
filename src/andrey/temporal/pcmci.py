@@ -27,7 +27,8 @@ can drive :func:`pc1` and :func:`mci`: a candidate's strength is its test statis
 reference implementation, tigramite: the partial correlation, the chi-square or G-square
 statistic, the likelihood ratio of the mixed-data tests, CMIknn's estimate of the conditional
 mutual information, GPDC's squared distance correlation, RCoT's statistic, or KCI's relative to
-its mean under independence.
+its mean under independence. A registered test that reports only p-values is asked one query at a
+time and its candidates are ranked by p-value, smallest first (:class:`~andrey.core.ci.PValueTest`).
 
 A partial correlation is the correlation of the residuals of ``x`` and ``y`` after a least-squares
 fit on the conditioning columns. The partial-correlation tests, ``"student_t"``
@@ -56,6 +57,7 @@ from andrey.core import backend
 from andrey.core.ci import (
     FisherZ,
     PartialCorrelationTest,
+    PValueTest,
     SingularCorrelationError,
     StudentT,
     make_indep_test,
@@ -165,13 +167,14 @@ def design_test(
     A partial-correlation test (:data:`PARTIAL_CORRELATION_TESTS`) comes as a :class:`DesignTest`.
     Any other name is built by :func:`~andrey.core.ci.make_indep_test` over the design, with
     ``categorical``, the mask of the categorical columns of ``data``, repeated for every lag, and
-    ``seed``, which the randomized tests take. Raises :class:`NotImplementedError` when
-    ``indep_test`` is not registered, :class:`ValueError` when its test reports no statistics
-    (``statistic_pvalues``), and, for a partial-correlation test,
-    :class:`~andrey.core.score.CopiedColumnsError` when design columns repeat others up to scale
-    and shift: a variable that copies another, at the same step or some lags apart. A copy at one
-    step repeats at every lag of the design, so the error names each group that holds a lag-0
-    column, by :func:`design_column_name`.
+    ``seed``, which the randomized tests take. A registered test that reports no statistics, one
+    without ``statistic_pvalues``, is asked one query at a time
+    (:class:`~andrey.core.ci.PValueTest`) and ranks the candidates by p-value, smallest first.
+    Raises :class:`NotImplementedError` when ``indep_test`` is not registered and, for a
+    partial-correlation test, :class:`~andrey.core.score.CopiedColumnsError` when design columns
+    repeat others up to scale and shift: a variable that copies another, at the same step or some
+    lags apart. A copy at one step repeats at every lag of the design, so the error names each
+    group that holds a lag-0 column, by :func:`design_column_name`.
 
     A series with ``NaN`` gets a design with ``NaN`` in every row that reads a missing value, and
     the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
@@ -183,11 +186,7 @@ def design_test(
         mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
         built = make_indep_test(indep_test, design, categorical=mask, seed=seed)
         if not callable(getattr(built, "statistic_pvalues", None)):
-            raise ValueError(
-                f"indep_test={indep_test!r} reports no statistics: the PCMCI family orders the "
-                "conditions by the test statistic, so its test objects need a "
-                "statistic_pvalues(x, y, conditions) method"
-            )
+            built = PValueTest(built)
         return cast("LinkTest", built)
     test: PartialCorrelationTest | PartialCorrelationDeletion
     if np.isnan(design).any():

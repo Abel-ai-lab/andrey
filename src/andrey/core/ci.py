@@ -1253,6 +1253,13 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     ``test(x, y, condition_set) -> p-value``), and takes the keyword settings
     :func:`make_indep_test` passes, if any. Overwrites any existing entry for ``name``. A variant
     of a shipped test with other settings is ``partial(make_indep_test, "cmiknn", k_cmi=5)``.
+
+    That call alone is enough for every search with an ``indep_test``, the PCMCI family included.
+    The family also reads each query's statistic, to order its candidate conditions. A test with a
+    many-query ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)``, as the shipped
+    tests have, reports its own; for a test without one the family asks the call one query at a
+    time and ranks the candidates by p-value, smallest first (:class:`PValueTest`), which it
+    reports as the statistic ``-log10(p)``.
     """
     _CI_REGISTRY[name] = factory
 
@@ -1456,3 +1463,60 @@ def per_query(
     for k in range(len(xs)):
         statistics[k], p_values[k] = answer(int(xs[k]), int(ys[k]), conds[k].tolist())
     return statistics, p_values
+
+
+_TINY = float(np.finfo(np.float64).tiny)
+
+
+def p_value_statistic(p_values: npt.ArrayLike) -> np.ndarray:
+    """The statistic of a test that reports only p-values: ``-log10`` of the p-value.
+
+    It is ``0`` for a p-value of ``1`` and grows as the p-value shrinks, so a search that ranks
+    candidates by the absolute statistic, largest first, ranks them by p-value, smallest first. A
+    p-value below the smallest normal float reads as that float, which keeps the statistic finite.
+    """
+    return np.abs(np.log10(np.clip(np.asarray(p_values, dtype=np.float64), _TINY, 1.0)))
+
+
+def p_value_statistics(
+    test: CITest, x: npt.ArrayLike, y: npt.ArrayLike, conditions: npt.ArrayLike
+) -> tuple[np.ndarray, np.ndarray]:
+    """The statistics and p-values of many queries to a test that reports only p-values.
+
+    Each query is asked alone as ``test(x, y, condition_set)``, and its statistic is
+    :func:`p_value_statistic` of the p-value. ``x`` and ``y`` are ``(N,)`` int arrays and
+    ``conditions`` the ``(N, m)`` int array of conditioning sets.
+    """
+
+    def answer(a: int, b: int, condition_set: list[int]) -> tuple[float, float]:
+        p = float(test(a, b, condition_set))
+        return float(p_value_statistic(p)), p
+
+    return per_query(answer, x, y, conditions)
+
+
+class PValueTest:
+    """A test that reports only p-values, with the many-query ``statistic_pvalues`` of the shipped
+    tests.
+
+    The PCMCI family asks ``statistic_pvalues(x, y, conditions)`` for the statistics and p-values
+    of many queries at once and orders its candidate conditions by the statistic. This adapter
+    answers that call from ``test(x, y, condition_set)`` one query at a time
+    (:func:`p_value_statistics`), so a test registered with :func:`register_indep_test` that
+    implements the :class:`CITest` call alone works there; the family then ranks candidates by
+    p-value, smallest first.
+    """
+
+    def __init__(self, test: CITest) -> None:
+        self.test = test
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the wrapped test's p-value for ``x`` independent of ``y`` given
+        ``condition_set``."""
+        return self.test(x, y, condition_set)
+
+    def statistic_pvalues(
+        self, x: npt.ArrayLike, y: npt.ArrayLike, conditions: npt.ArrayLike
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Statistics and p-values of many queries, as :func:`p_value_statistics` gives them."""
+        return p_value_statistics(self.test, x, y, conditions)

@@ -1,7 +1,8 @@
 """The nonlinear conditional-independence tests as the recovery tests and recorded outputs run them.
 
 CMIknn and GPDC draw fewer permutations than their defaults, which keeps the suite fast: a
-permutation p-value is calibrated at any number of draws, only coarser.
+permutation p-value is calibrated at any number of draws, only coarser. :class:`PValueOnly` is the
+smallest registered test: the one call, nothing else.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from functools import partial
 
 import numpy as np
 
+from andrey.core.ci import FisherZ
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_gpdc import GPDC
 from andrey.core.ci_kernel import KCI, RCoT
@@ -22,6 +24,16 @@ CI_TESTS = {
     "CMIknn": ("cmiknn", partial(CMIknn, n_permutations=100, seed=0)),
     "GPDC": ("gpdc", partial(GPDC, n_null=300, seed=0)),
 }
+
+
+class PValueOnly:
+    """A registered test with the single-query call alone: the p-value of Fisher's z-test."""
+
+    def __init__(self, data: np.ndarray) -> None:
+        self._test = FisherZ(data)
+
+    def __call__(self, x: int, y: int, condition_set=()) -> float:
+        return float(self._test(x, y, condition_set))
 
 
 def recorded_pvalues(algorithm: str, data: np.ndarray, case: str) -> dict:

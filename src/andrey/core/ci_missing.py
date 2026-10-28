@@ -54,6 +54,7 @@ from .ci import (
     SingularCorrelationError,
     StudentT,
     _canonical,
+    p_value_statistics,
     per_query,
 )
 from .score import (
@@ -197,12 +198,15 @@ class TestwiseDeletion:
         """Statistics and p-values of many queries, each from the test over its own rows.
 
         ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
-        conditioning sets; entry ``i`` is the block test's ``statistic_pvalues`` of query ``i``.
+        conditioning sets; entry ``i`` is the block test's ``statistic_pvalues`` of query ``i``. A
+        block test without that method reports only p-values: its statistic is
+        :func:`~andrey.core.ci.p_value_statistic` of the p-value.
         """
 
         def ask(test: Any, a: int, b: int, s: list[int]) -> tuple[float, float]:
             cond = np.array([s], dtype=np.intp).reshape(1, len(s))
-            statistics, p_values = test.statistic_pvalues(np.array([a]), np.array([b]), cond)
+            batch = getattr(test, "statistic_pvalues", None) or partial(p_value_statistics, test)
+            statistics, p_values = batch(np.array([a]), np.array([b]), cond)
             return float(statistics[0]), float(p_values[0])
 
         return per_query(lambda a, b, s: self._query(ask, *_canonical(a, b, s)), x, y, conditions)

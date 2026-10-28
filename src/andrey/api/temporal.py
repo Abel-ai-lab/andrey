@@ -483,7 +483,10 @@ def pcmci(
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
     ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
     independence. A candidate's strength is the smallest absolute statistic it has had, as in the
-    authors' reference implementation, tigramite; strengths compare within one test only.
+    authors' reference implementation, tigramite; strengths compare within one test only. A test
+    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is
+    asked one query at a time, its candidates are ranked by p-value, smallest first, and its
+    statistic reads ``-log10(p)``.
     The default, ``"fisherz"``, takes the p-value from Fisher's z-transform of the partial
     correlation. ``"student_t"`` takes it from the Student-t
     distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions, as the authors'
@@ -775,7 +778,10 @@ def pcmciplus(
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
     ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
     independence. A candidate's strength is the smallest absolute statistic it has had, as in the
-    authors' reference implementation, tigramite; strengths compare within one test only.
+    authors' reference implementation, tigramite; strengths compare within one test only. A test
+    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is
+    asked one query at a time, its candidates are ranked by p-value, smallest first, and its
+    statistic reads ``-log10(p)``.
     The default test, ``"fisherz"``, takes the p-value from Fisher's z-transform of the partial
     correlation, and ``"student_t"`` from the Student-t distribution with ``n - |S| - 2`` degrees of
     freedom, for ``|S|`` conditions. The partial correlation is the correlation
@@ -1049,7 +1055,10 @@ def lpcmci(
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
     ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
     independence. A candidate's strength is the smallest absolute statistic it has had, as in the
-    authors' reference implementation, tigramite; strengths compare within one test only.
+    authors' reference implementation, tigramite; strengths compare within one test only. A test
+    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is
+    asked one query at a time, its candidates are ranked by p-value, smallest first, and its
+    statistic reads ``-log10(p)``.
     A test's partial correlation is computed from the correlation matrix, and from the least-squares
     residuals when the conditions are collinear to working precision. The defaults are the authors'
     published defaults. The earlier end of a lagged link is searched with the empty set only, since
