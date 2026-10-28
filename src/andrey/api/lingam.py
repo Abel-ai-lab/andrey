@@ -365,8 +365,9 @@ def ica_lingam(
 
 @method_spec("multi_group_direct_lingam")
 def multi_group_direct_lingam(
-    data_groups: Sequence[npt.ArrayLike],
+    data: Sequence[npt.ArrayLike],
     *,
+    measure: str = "pwling",
     knowledge: Knowledge | None = None,
 ) -> list[StructureOutput]:
     """Jointly learn one fully oriented DAG per group with multi-group DirectLiNGAM.
@@ -378,10 +379,14 @@ def multi_group_direct_lingam(
 
     Parameters
     ----------
-    data_groups : sequence of array-like, each of shape (n_samples, n_variables)
+    data : sequence of array-like, each of shape (n_samples, n_variables)
         Two or more datasets over the same ``d`` variables; sample counts may differ per group.
         Each is coerced to ``float64``. DataFrames must name their columns alike; the names become
         the structures' ``labels``.
+    measure : {"pwling"}, default="pwling"
+        How the order search picks the most exogenous variable at each step; ``"pwling"`` is
+        DirectLiNGAM's pairwise likelihood-ratio measure, with the groups' scores weighted by their
+        share of the samples.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. It holds for every group. The
@@ -458,19 +463,19 @@ def multi_group_direct_lingam(
 
     groups = [
         _pruning_rows(
-            data_matrix(X, name=f"data_groups[{k}]", method="multi_group_direct_lingam"),
-            name=f"data_groups[{k}]",
+            data_matrix(X, name=f"data[{k}]", method="multi_group_direct_lingam"),
+            name=f"data[{k}]",
         )
-        for k, X in enumerate(data_groups)
+        for k, X in enumerate(data)
     ]
     if len(groups) < 2:
-        raise ValueError(f"data_groups must hold at least two datasets, got {len(groups)}")
+        raise ValueError(f"data must hold at least two datasets, got {len(groups)}")
     if len({X.shape[1] for X in groups}) > 1:
         widths = [X.shape[1] for X in groups]
-        raise ValueError(f"every dataset in data_groups needs the same columns, got {widths}")
-    labels = shared_labels(column_labels(X) for X in data_groups)
+        raise ValueError(f"every dataset in data needs the same columns, got {widths}")
+    labels = shared_labels(column_labels(X) for X in data)
     constraints = resolve(knowledge, groups[0].shape[1], labels, method="multi_group_direct_lingam")
-    order, adjacency_matrices = _native(groups, constraints=constraints)
+    order, adjacency_matrices = _native(groups, measure=measure, constraints=constraints)
     n_groups = len(groups)
     outputs = []
     for k, B in enumerate(adjacency_matrices):

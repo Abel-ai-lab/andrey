@@ -46,6 +46,7 @@ def varma_lingam(
     prune: bool = False,
     max_iter: int = 100,
     structural_ma: bool = False,
+    measure: str = "pwling",
     constraints: LaggedConstraints | None = None,
     name: Callable[[int], str] = str,
 ) -> tuple[list[int], np.ndarray, np.ndarray]:
@@ -56,7 +57,8 @@ def varma_lingam(
     over ``0 <= p <= order[0]``, ``0 <= q <= order[1]`` (excluding ``(0, 0)``) is selected by that
     information criterion of the fitted model (``criterion=None`` uses ``order`` directly).
 
-    ``causal_order`` is the instantaneous DirectLiNGAM ordering. ``psis`` has shape
+    ``causal_order`` is the instantaneous DirectLiNGAM ordering, found with the independence
+    ``measure`` (:func:`~andrey.lingam.direct.direct_lingam`). ``psis`` has shape
     ``(1 + p, n, n)``: index 0 is the instantaneous ``B0`` and index ``tau`` in ``1..p`` is the
     structural lag-``tau`` autoregressive matrix. ``omegas`` has shape ``(q, n, n)``: index ``j`` is
     the structural moving-average matrix for innovation lag ``j + 1``. In both, entry ``[i, j]`` is
@@ -102,7 +104,7 @@ def varma_lingam(
         p, q, phis, thetas, residuals = _select_order(X, order, criterion, max_iter)
 
     if constraints is None:
-        causal_order, b0 = direct_lingam(residuals)
+        causal_order, b0 = direct_lingam(residuals, measure=measure)
     else:
         beyond = np.argwhere(constraints.required[p + 1 :])
         if len(beyond):
@@ -111,7 +113,9 @@ def varma_lingam(
                 f"knowledge requires the link {name(int(by_rank[i]))} -> {name(int(by_rank[j]))} "
                 f"at lag {lag + p + 1}, but criterion={criterion!r} selected p={p}"
             )
-        causal_order, b0 = direct_lingam(residuals, constraints=constraints.contemporaneous())
+        causal_order, b0 = direct_lingam(
+            residuals, measure=measure, constraints=constraints.contemporaneous()
+        )
 
     if prune:
         psis, omegas = _prune(X, residuals, causal_order, p, q, constraints)

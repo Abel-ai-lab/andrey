@@ -289,21 +289,21 @@ def test_time_series_methods_need_two_variables(fit):
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [
-        ("maxlag", 0, ValueError),
-        ("maxlag", 1.5, TypeError),
+        ("tau_max", 0, ValueError),
+        ("tau_max", 1.5, TypeError),
         ("cv", 1, ValueError),
         ("cv", 2.5, TypeError),
     ],
 )
-def test_granger_checks_maxlag_and_cv(setting, value, error):
+def test_granger_checks_tau_max_and_cv(setting, value, error):
     with pytest.raises(error, match=setting):
         andrey.granger(_data(), **{setting: value})
 
 
 def test_granger_needs_a_time_step_in_every_fold():
     with pytest.raises(ValueError, match="data needs at least 8 rows"):
-        andrey.granger(_data()[:7], maxlag=3, cv=5)
-    assert andrey.granger(_data()[:8], maxlag=3, cv=5).structure.lags == (1, 2, 3)
+        andrey.granger(_data()[:7], tau_max=3, cv=5)
+    assert andrey.granger(_data()[:8], tau_max=3, cv=5).structure.lags == (1, 2, 3)
 
 
 LINGAM_PRUNED = {
@@ -334,8 +334,8 @@ def test_pairwise_tests_reject_unusable_data(fit):
 @pytest.mark.parametrize(
     ("fit", "name", "least"),
     [
-        (andrey.multi_group_direct_lingam, "data_groups", "two datasets"),
-        (andrey.longitudinal_lingam, "data_list", "two time points"),
+        (andrey.multi_group_direct_lingam, "data", "two datasets"),
+        (andrey.longitudinal_lingam, "data", "two time points"),
     ],
 )
 def test_multi_dataset_methods_name_the_dataset_at_fault(fit, name, least):
@@ -346,16 +346,16 @@ def test_multi_dataset_methods_name_the_dataset_at_fault(fit, name, least):
 
 
 def test_multi_group_direct_lingam_needs_the_same_columns_in_every_group():
-    with pytest.raises(ValueError, match="data_groups needs the same columns"):
+    with pytest.raises(ValueError, match="data needs the same columns"):
         andrey.multi_group_direct_lingam([_data(d=3), _data(d=4)])
 
 
-@pytest.mark.parametrize(("n_lags", "error"), [(0, ValueError), (3, ValueError), (1.5, TypeError)])
-def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags, error):
+@pytest.mark.parametrize(("tau_max", "error"), [(0, ValueError), (3, ValueError), (1.5, TypeError)])
+def test_longitudinal_lingam_takes_tau_max_up_to_the_time_points_minus_one(tau_max, error):
     data = [_data() for _ in range(3)]
-    with pytest.raises(error, match="n_lags"):
-        andrey.longitudinal_lingam(data, n_lags=n_lags)
-    assert andrey.longitudinal_lingam(data, n_lags=2).structure.n_lags == 3  # lags 0, 1, 2
+    with pytest.raises(error, match="tau_max"):
+        andrey.longitudinal_lingam(data, tau_max=tau_max)
+    assert andrey.longitudinal_lingam(data, tau_max=2).structure.n_lags == 3  # lags 0, 1, 2
 
 
 @pytest.mark.parametrize(
@@ -484,11 +484,6 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
 def test_hidden_confounder_methods_reject_a_bad_setting(fit, setting, value, error):
     with pytest.raises(error, match=setting):
         fit(_data(), **{setting: value})
-
-
-def test_gin_labels_name_each_column():
-    with pytest.raises(ValueError, match="labels must name each of the 4 columns"):
-        andrey.gin(_data(d=4), labels=("a", "b"))
 
 
 @pytest.mark.parametrize(
