@@ -33,6 +33,9 @@ change names its pull request.
   `score_func`, or `measure` raised `NotImplementedError` before.
   `metadata["algorithm"]` is the method's name, such as `"pc"` or `"ica_lingam"`, instead of a
   display name such as `"PC"` or `"ICALiNGAM"`. ([#496])
+- `ica_lingam` takes `seed` instead of `random_state`, and `direct_lingam` and
+  `multi_group_direct_lingam` no longer have the `random_state` they ignored. The old names still
+  work, with a `DeprecatedArgumentWarning`, in this release and stop in the next. ([#499])
 
 ### Added
 
@@ -52,8 +55,9 @@ change names its pull request.
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
   pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
-  time-series method on one series resamples blocks of rows; the result is the same at any
-  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
+  time-series method on one series resamples blocks of rows; the result is the same at any number of
+  workers, which `andrey.config` sets, and a seeded method fits each resample with a seed derived
+  from `seed`. `andrey bootstrap <method>` does the same from the command line. ([#396], [#499])
 - `scale="unitless"` in `andrey.data.sample_scm` and `SCM.sample` draws a linear model's weights
   and noise so that every variable has variance 1 and its parameters depend only on its number of
   parents (Herman et al. 2025), so on average neither the variances nor the share of each variable
@@ -159,6 +163,11 @@ change names its pull request.
   `direct_lingam`. ([#487])
 - `boss`, `grasp`, and `ica_lingam` record the seed they used in `metadata["seed"]`, as `calm`
   does. ([#496])
+- `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take `seed`,
+  which they pass to the `rcot`, `cmiknn`, and `gpdc` tests, the only tests that draw random
+  numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
+  depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
+  seed on every fit. ([#499])
 
 ### Fixed
 
@@ -952,3 +961,4 @@ First alpha release.
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
 [#496]: https://github.com/Abel-ai-lab/andrey/pull/496
+[#499]: https://github.com/Abel-ai-lab/andrey/pull/499
