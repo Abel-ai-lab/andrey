@@ -16,7 +16,7 @@ import pytest
 
 import andrey
 from andrey.cli import graph_view, main, render_method_help
-from andrey.spec import REGISTRY, SCHEMA_VERSION
+from andrey.spec import REGISTRY, SCHEMA_VERSION, get_spec
 
 
 @pytest.fixture
@@ -325,6 +325,37 @@ def test_stale_flag_gets_did_you_mean(capsys, csv_path):
 def test_repeated_key_is_error(capsys, csv_path):
     code, _out, err = _run(["run", "pc", "--data", str(csv_path), "alpha=0.1", "alpha=0.2"], capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+
+
+@pytest.mark.parametrize("layer", ["cli", "config"])
+def test_out_of_range_value_is_a_usage_error(capsys, tmp_path, csv_path, layer):
+    if layer == "cli":
+        argv = ["alpha=1.5"]
+    else:
+        cfg = tmp_path / "pc.yaml"
+        cfg.write_text("max_depth: -1\n")
+        argv = ["--config", str(cfg)]
+    code, _out, err = _run(["run", "pc", "--data", str(csv_path), *argv], capsys)
+    payload = json.loads(err)["error"]
+    assert code == 2 and payload["code"] == "invalid_params"
+
+
+def test_former_names_and_values_map_to_current_ones():
+    """A renamed parameter, or a renamed choice, is accepted under its former name."""
+    from andrey.cli import CliError, _resolve_params
+
+    spec = get_spec("pc")
+    renamed = {
+        "alpha": {"aliases": ("level",)},
+        "collider_rule": {"choice_aliases": (("votes", "majority"),)},
+    }
+    params = tuple(p.model_copy(update=renamed.get(p.name, {})) for p in spec.params)
+    spec = spec.model_copy(update={"params": params})
+    fkwargs, _ = _resolve_params(spec, {"level": 0.2}, ["collider_rule=votes"])
+    assert fkwargs["alpha"] == 0.2 and fkwargs["collider_rule"] == "majority"
+    with pytest.raises(CliError) as both:
+        _resolve_params(spec, {}, ["alpha=0.1", "level=0.2"])
+    assert both.value.code == "invalid_params"
 
 
 def test_missing_input_error(capsys):

@@ -239,7 +239,8 @@ def longitudinal_lingam(
         Number of past time points regressed out before the instantaneous fit, from ``1`` to the
         number of time points minus one.
     measure : {"pwling"}, default="pwling"
-        DirectLiNGAM pairwise independence measure for the instantaneous fit.
+        How the instantaneous order search picks the most exogenous variable; ``"pwling"`` is
+        DirectLiNGAM's pairwise likelihood-ratio measure.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``0`` to ``n_lags``, the same at every time point: required and

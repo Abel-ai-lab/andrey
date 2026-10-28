@@ -38,6 +38,7 @@ from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES, node_labels
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.generate import (
+    concepts_dict,
     env_dict,
     grammar_default,
     grammar_example,
@@ -494,7 +495,9 @@ def _bracket_items(value: str, key: str) -> list[str]:
 
 
 def _check_choice(value: str, param: ParamSpec) -> str:
-    """A string value must be one of the param's choices, when it enumerates any."""
+    """A string value must be one of the param's choices, when it enumerates any; a former value
+    maps to its current one."""
+    value = dict(param.choice_aliases).get(value, value)
     if param.choices and value not in param.choices:
         raise CliError(
             "unsupported_value",
@@ -502,6 +505,14 @@ def _check_choice(value: str, param: ParamSpec) -> str:
             EXIT_USAGE,
             valid_options=list(param.choices),
         )
+    return value
+
+
+def _check_range(value: float, param: ParamSpec) -> float:
+    """A number must lie within the param's bounds."""
+    reason = param.out_of_range(value)
+    if reason is not None:
+        raise CliError("bad_value", reason, EXIT_USAGE)
     return value
 
 
@@ -534,14 +545,14 @@ def _coerce(raw: str, param: ParamSpec) -> object:
         )
     if kind == "int":
         try:
-            return int(value)
+            return _check_range(int(value), param)
         except ValueError:
             raise CliError(
                 "bad_value", f"{param.name} expects an integer, got {value!r}", EXIT_USAGE
             ) from None
     if kind == "float":
         try:
-            return float(value)
+            return _check_range(float(value), param)
         except ValueError:
             raise CliError(
                 "bad_value", f"{param.name} expects a number, got {value!r}", EXIT_USAGE
@@ -653,13 +664,10 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         raise CliError(
             "bad_value", f"{param.name} in --config is not a valid {param.type}", EXIT_USAGE
         )
-    if param.type == "str" and param.choices and value not in param.choices:
-        raise CliError(
-            "unsupported_value",
-            f"{param.name} must be one of: {', '.join(param.choices)}",
-            EXIT_USAGE,
-            valid_options=list(param.choices),
-        )
+    if param.type == "str":
+        return _check_choice(value, param)  # ty: ignore[invalid-argument-type]  # a str above
+    if param.type in ("int", "float"):
+        return _check_range(value, param)  # ty: ignore[invalid-argument-type]  # a number above
     if param.type in ("int_pair", "str_list"):
         return tuple(value)  # ty: ignore[invalid-argument-type]  # validated list/tuple above
     return value
@@ -734,13 +742,31 @@ def _load_config(path: str) -> dict:
     return data
 
 
+def _current_names(layer: dict, former: dict[str, str], errors: list[dict]) -> dict:
+    """One layer's keys with each former name replaced by its current one; a layer that sets both
+    names of one param is an error."""
+    renamed: dict = {}
+    for key, value in layer.items():
+        name = former.get(key, key)
+        if name in renamed:
+            errors.append(
+                {"param": key, "message": f"{key} and {name} name one param; set it once"}
+            )
+        else:
+            renamed[name] = value
+    return renamed
+
+
 def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tuple[dict, dict]:
     """Layer spec defaults < --config < key=value overrides; coerce / validate against the spec. All
     problems collect into one `invalid_params` envelope (a `details` list)."""
     specs = {p.name: p for p in spec.params}
+    former = {alias: p.name for p in spec.params for alias in p.aliases}
     input_names = {i.name for i in spec.data.inputs}
     raw_overrides, errors = _parse_overrides(tokens)
     fkwargs: dict = {p.name: p.default for p in spec.params}  # manifest = defaults + config + CLI
+    config = _current_names(config, former, errors)
+    raw_overrides = _current_names(raw_overrides, former, errors)
 
     def _assign(key: str, value: object, *, from_config: bool) -> None:
         # A data array or `method` reaches the facade positionally; letting it also arrive as a
@@ -1448,6 +1474,7 @@ def cmd_config(
                         "schema_version": SCHEMA_VERSION,
                         "andrey_version": andrey.__version__,
                         "environment": env_dict(),
+                        "concepts": concepts_dict(),
                     },
                     indent=2,
                 )

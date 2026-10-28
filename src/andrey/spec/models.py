@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 Family = Literal["constraint", "score", "permutation", "lingam", "temporal", "latent", "pairwise"]
 Determinism = Literal["deterministic", "stochastic"]
@@ -74,11 +74,59 @@ class ParamSpec(Spec):
     doc: str
     choices: tuple[str, ...] | None = None  # the supported values, when enumerable
     nullable: bool = False  # accepts ``None`` (for example, seed, criterion, labels)
+    # Bounds of an int or float value; an exclusive bound is itself out of range.
+    minimum: float | None = None
+    maximum: float | None = None
+    exclusive_minimum: bool = False
+    exclusive_maximum: bool = False
+    # Former names, accepted for one release after a rename.
+    aliases: tuple[str, ...] = ()
+    # Former values, accepted for one release: (old value, current value) pairs.
+    choice_aliases: tuple[tuple[str, str], ...] = ()
+    # The package-wide concept this parameter implements (andrey.spec.concepts), if any.
+    concept: str | None = None
+
+    @model_validator(mode="after")
+    def _check_aliases(self) -> ParamSpec:
+        if self.name in self.aliases:
+            raise ValueError(f"{self.name}: a parameter is not its own alias")
+        for old, new in self.choice_aliases:
+            if not self.choices or new not in self.choices or old in self.choices:
+                raise ValueError(f"{self.name}: choice alias {old!r} -> {new!r} is not a rename")
+        return self
 
     @property
     def flag(self) -> str:
         """The CLI flag for this parameter (``max_iter`` -> ``--max-iter``)."""
         return "--" + self.name.replace("_", "-")
+
+    def out_of_range(self, value: float) -> str | None:
+        """Why ``value`` is outside the bounds, or ``None`` when it is inside them."""
+        low, high = self.minimum, self.maximum
+        below = low is not None and (value <= low if self.exclusive_minimum else value < low)
+        above = high is not None and (value >= high if self.exclusive_maximum else value > high)
+        if not (below or above):
+            return None
+        return f"{self.name} must be {self.range_text()}, got {value}"
+
+    def range_text(self) -> str:
+        """The bounds in words: ``in (0, 1)``, ``at least 0``, ``from 0 to 4294967295``."""
+        low, high = _number(self.minimum), _number(self.maximum)
+        if self.minimum is not None and self.maximum is not None:
+            if not (self.exclusive_minimum or self.exclusive_maximum):
+                return f"from {low} to {high}"
+            left = "(" if self.exclusive_minimum else "["
+            right = ")" if self.exclusive_maximum else "]"
+            return f"in {left}{low}, {high}{right}"
+        if self.minimum is not None:
+            return f"above {low}" if self.exclusive_minimum else f"at least {low}"
+        if self.maximum is not None:
+            return f"below {high}" if self.exclusive_maximum else f"at most {high}"
+        return "any value"
+
+
+def _number(value: float | None) -> str:
+    return str(int(value)) if value is not None and float(value).is_integer() else str(value)
 
 
 class OutputSpec(Spec):
