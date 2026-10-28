@@ -897,6 +897,25 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="units",
+        summary="Rescaling a column changes no graph and no order: a numerical step that would "
+        "read the data's units runs on unit-scale columns (andrey.core.units).",
+        suitable=tuple(m for m in ALL_METHODS if m not in ("ica_lingam", *_CONTINUOUS, "calm")),
+        exempt=(
+            *_exempt(
+                "Matching the unmixing rows to the variables by 1/|W| and pruning |B| from the "
+                "smallest read the data's units (Shimizu et al. 2011, Sec. 2.4).",
+                "ica_lingam",
+            ),
+            *_exempt(
+                "The least-squares score with an l1 penalty and a weight threshold reads the "
+                "data's units (Zheng et al. 2018; Bello et al. 2022). robust=True is under review.",
+                *_CONTINUOUS,
+            ),
+            *_exempt("Not measured yet: its fit needs torch.", "calm"),
+        ),
+    ),
+    Concept(
         key="labels",
         summary="Node labels come from a DataFrame's columns, never from an argument.",
         param=_template(
