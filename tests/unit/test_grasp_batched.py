@@ -37,7 +37,7 @@ def _shrink_tie_sample() -> tuple[np.ndarray, float]:
     independent = np.column_stack([bits, bits[:, 0] * bits[:, 1]])
     coefficients = np.array([[1.2, 1, 1, 1], [1, 0, 0, 0], [0, 1, 0, 0], [1, -3, 1, 0]])
     x = independent @ coefficients.T * np.sqrt(7 / 8)
-    raw = BICScore(x, lambda_value=0.0)
+    raw = BICScore(x, penalty_discount=0.0)
     lam = (raw.score(0, [2, 3]) - raw.score(0, [1, 2, 3])) / raw.log_n
     for _ in range(4):
         lam = np.nextafter(lam, np.inf)
@@ -82,11 +82,11 @@ def test_grow_matches_full_scores_at_inclusion_threshold(seed, parents, steps) -
     a = np.random.default_rng(seed).standard_normal((4, 4))
     cov = a @ a.T
     available = [i for i in range(1, 4) if i not in parents]
-    raw = BICScore.from_cov(cov, 100, lambda_value=0.0)
+    raw = BICScore.from_cov(cov, 100, penalty_discount=0.0)
     lam = (raw.score(0, parents) - raw.score(0, [*parents, available[0]])) / raw.log_n
     for _ in range(steps):
         lam = np.nextafter(lam, -np.inf)
-    score = BICScore.from_cov(cov, 100, lambda_value=lam)
+    score = BICScore.from_cov(cov, 100, penalty_discount=lam)
     tree = grasp_mod._GST(0, score, DeltaBICScore(score), 4)
     base = -score.score(0, parents)
     node = grasp_mod._GSTNode(tree, score=base)
@@ -111,9 +111,9 @@ def test_grow_rechecks_both_sides_of_near_ties(
     monkeypatch: pytest.MonkeyPatch, gain: float, candidate_error: float, base_error: float
 ) -> None:
     parents = [1]
-    raw = BICScore(_sample(4), lambda_value=0.0)
+    raw = BICScore(_sample(4), penalty_discount=0.0)
     lam = (raw.score(0, parents) - raw.score(0, [1, 2]) - gain) / raw.log_n
-    score = BICScore.from_cov(raw.cov, raw.n, lambda_value=lam)
+    score = BICScore.from_cov(raw.cov, raw.n, penalty_discount=lam)
     delta = DeltaBICScore(score)
     tree = grasp_mod._GST(0, score, delta, 4)
     base = -score.score(0, parents)
@@ -164,11 +164,11 @@ def test_grow_preserves_input_order_for_tied_siblings(monkeypatch, available) ->
 def test_shrink_rechecks_base_when_no_grow_candidates_remain() -> None:
     coefficients = np.array([[1.3, 1, 1, 1], [1, 0, 0, 0], [0, 1, 0, 0], [1, -3, 1, 0]])
     cov = coefficients @ coefficients.T
-    raw = BICScore.from_cov(cov, 100, lambda_value=0.0)
+    raw = BICScore.from_cov(cov, 100, penalty_discount=0.0)
     lam = (raw.score(0, [2, 3]) - raw.score(0, [1, 2, 3])) / raw.log_n
     for _ in range(4):
         lam = np.nextafter(lam, -np.inf)
-    score = BICScore.from_cov(cov, 100, lambda_value=lam)
+    score = BICScore.from_cov(cov, 100, penalty_discount=lam)
     parents = [1, 2, 3]
     exact = -score.score(0, parents)
     assert all(-score.score(0, [p for p in parents if p != drop]) <= exact for drop in parents)
@@ -208,7 +208,7 @@ def test_grasp_matches_per_candidate_order_and_graph(
 
     monkeypatch.setattr(grasp_mod._Order, "__init__", capture_order)
     monkeypatch.setattr(DeltaBICScore, "score_many_with_base", capture_batch)
-    batched_graph, batched_score = grasp_mod.grasp(x, lambda_value=lam, random_state=seed)
+    batched_graph, batched_score = grasp_mod.grasp(x, penalty_discount=lam, random_state=seed)
     batched_requests = batches.copy()
     batches.clear()
 
@@ -219,7 +219,7 @@ def test_grasp_matches_per_candidate_order_and_graph(
         return [self.score_obj.score(vertex, [*parents, add]) for _, add in deltas]
 
     monkeypatch.setattr(DeltaBICScore, "score_many_with_base", per_candidate)
-    scalar_graph, scalar_score = grasp_mod.grasp(x, lambda_value=lam, random_state=seed)
+    scalar_graph, scalar_score = grasp_mod.grasp(x, penalty_discount=lam, random_state=seed)
 
     assert any(len(deltas) > 1 for _, _, deltas in batched_requests)
     if x.shape[1] == 4:

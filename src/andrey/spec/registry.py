@@ -9,17 +9,11 @@ display the parameter defaults defined here.
 from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
-from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
 from andrey.core.score import LINEAR_SCORES
-from andrey.search.boss import PERMUTATION_SCORES
-from andrey.search.exact import EXACT_SCORES
-from andrey.search.ges import GES_SCORES
-from andrey.search.hc import HC_SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
-from andrey.search.tabu import TABU_SCORES
 
-from .concepts import CONCEPTS, concept_param
+from .concepts import CONCEPTS, SCORE_ALIASES, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -29,10 +23,14 @@ _DATA_MATRIX = InputSpec(
     doc="Observed data, one row per sample.",
 )
 _ALPHA = concept_param("alpha")
-_INDEP_TEST = ParamSpec(
-    name="indep_test",
-    type="str",
-    default="fisherz",
+#: How a null test or score picks from the declared column types.
+_DECLARED = (
+    "null picks from the declared column types: {every} when every column is categorical, "
+    "cond_gauss when some are, else {fallback}. A column is declared categorical by categorical "
+    "or a DataFrame category, bool, or text type, never by its values."
+)
+_INDEP_TEST = concept_param(
+    "indep_test",
     doc="Conditional-independence test. For continuous data, on the partial correlation: "
     "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
     "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
@@ -43,9 +41,7 @@ _INDEP_TEST = ParamSpec(
     "cmiknn = nearest-neighbor conditional mutual information; "
     "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
-    "order.",
-    choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
-    concept="indep_test",
+    "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
 )
 _CATEGORICAL = concept_param("categorical")
 _MAX_CATEGORIES = concept_param("max_categories")
@@ -73,15 +69,17 @@ _COLLIDER_ORDER = ParamSpec(
     "column under position.",
     nullable=True,
 )
-_LAMBDA_VALUE = ParamSpec(
-    name="lambda_value",
-    type="float",
-    default=1.0,
-    doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values give sparser "
-    "graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
-    minimum=0,
-    concept="penalty_discount",
+_PENALTY_DISCOUNT = concept_param("penalty_discount")
+#: The same, for the methods that shipped it as lambda_value.
+_PENALTY_DISCOUNT_RENAMED = concept_param("penalty_discount", aliases=("lambda_value",))
+_SCORE_DOC = (
+    "Local score: bic = linear-Gaussian BIC; bdeu = BDeu and discrete_bic = multinomial BIC, "
+    "for categorical data coded by whole numbers; degen_gauss and cond_gauss = degenerate and "
+    "conditional Gaussian BIC, for mixed data. " + _DECLARED.format(every="bdeu", fallback="bic")
 )
+_SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
+#: The same, for the methods whose score names shipped as local_score_*.
+_SCORE_FUNC_RENAMED = concept_param("score_func", doc=_SCORE_DOC, choice_aliases=SCORE_ALIASES)
 _EBIC_GAMMA = concept_param("ebic_gamma")
 _EBIC_GAMMA_STANDARD = ParamSpec(
     name="ebic_gamma",
@@ -228,21 +226,8 @@ _add(
         ),
         seeded=True,
         params=(
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default="local_score_BIC",
-                doc="Local score for the GES phase: local_score_BIC or local_score_BIC_from_cov = "
-                "linear-Gaussian BIC; "
-                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
-                "categorical data coded by whole numbers; "
-                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
-                "Gaussian BIC, for mixed data (experimental). The test must read the same kind of "
-                "data.",
-                choices=GES_SCORES,
-                concept="score_func",
-            ),
-            _LAMBDA_VALUE,
+            _SCORE_FUNC_RENAMED,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA_STANDARD,
             _INDEP_TEST,
             _ALPHA,
@@ -394,9 +379,9 @@ _add(
         name="ges",
         family="score",
         summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
-        "accurate on linear-Gaussian data with the BIC; local_score_BDeu, the default when every "
-        "column is categorical, or local_score_BIC_categorical for categorical data, "
-        "local_score_cond_gauss, the default when some columns are, or local_score_degen_gauss for "
+        "accurate on linear-Gaussian data with the BIC; bdeu, the default when every "
+        "column is categorical, or discrete_bic for categorical data, "
+        "cond_gauss, the default when some columns are, or degen_gauss for "
         "mixed data. The score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -411,26 +396,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default=None,
-                doc="Local score objective: local_score_BIC or local_score_BIC_from_cov = "
-                "linear-Gaussian BIC; "
-                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
-                "categorical data coded by whole numbers; "
-                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
-                "Gaussian BIC, for mixed data; "
-                "null picks local_score_BDeu when every column is categorical (a category, bool, "
-                "or text column, or at most max_categories distinct whole numbers, or a column "
-                "categorical lists) and "
-                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
-                "local_score_BIC.",
-                choices=GES_SCORES,
-                nullable=True,
-                concept="score_func",
-            ),
-            _LAMBDA_VALUE,
+            _SCORE_FUNC_RENAMED,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             concept_param(
                 "max_parents",
@@ -476,7 +443,16 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        params=(_LAMBDA_VALUE, _EBIC_GAMMA),
+        params=(
+            concept_param(
+                "score_func",
+                doc="Local score: bic = linear-Gaussian BIC, the only score GIES supports; null "
+                "picks it.",
+                choices=LINEAR_SCORES,
+            ),
+            _PENALTY_DISCOUNT_RENAMED,
+            _EBIC_GAMMA,
+        ),
         references=("Hauser & Buhlmann 2012",),
     )
 )
@@ -497,16 +473,14 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default="local_score_BIC",
-                doc="Local score objective: local_score_BIC or local_score_BIC_from_cov = "
-                "linear-Gaussian BIC, the only score XGES supports.",
+            concept_param(
+                "score_func",
+                doc="Local score: bic = linear-Gaussian BIC, the only score XGES supports; null "
+                "picks it.",
                 choices=LINEAR_SCORES,
-                concept="score_func",
+                choice_aliases=SCORE_ALIASES[:2],
             ),
-            _LAMBDA_VALUE,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             ParamSpec(
                 name="extended_search",
@@ -526,9 +500,9 @@ _add(
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
         "score improves; a simple greedy baseline. BIC by default, BDeu when every column is "
-        "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
-        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
-        "local_score_cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
+        "categorical, conditional Gaussian when some are; score_func=bdeu or "
+        "discrete_bic for categorical data, degen_gauss or "
+        "cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
         "when set. Returns the CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -543,26 +517,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default=None,
-                doc="Local score objective: local_score_BIC_from_cov or local_score_BIC = "
-                "covariance-based BIC; "
-                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
-                "categorical data coded by whole numbers; "
-                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
-                "Gaussian BIC, for mixed data; "
-                "null picks local_score_BDeu when every column is categorical (a category, bool, "
-                "or text column, or at most max_categories distinct whole numbers, or a column "
-                "categorical lists) and "
-                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
-                "local_score_BIC_from_cov.",
-                choices=HC_SCORES,
-                nullable=True,
-                concept="score_func",
-            ),
-            _LAMBDA_VALUE,
+            _SCORE_FUNC_RENAMED,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             concept_param(
                 "max_iter",
@@ -584,12 +540,15 @@ _add(
         summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
         "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
         "seen. With the same settings its score is never worse than hc's. BIC by default, BDeu "
-        "when every column is categorical; score_func=local_score_BDeu or "
-        "local_score_BIC_categorical for categorical data. Returns "
+        "when every column is categorical, conditional Gaussian when some are; score_func=bdeu or "
+        "discrete_bic for categorical data, degen_gauss or cond_gauss for mixed data. Returns "
         "the CPDAG of that DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -597,22 +556,13 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default=None,
-                doc="Local score objective: local_score_BIC_from_cov or local_score_BIC = "
-                "covariance-based BIC; "
-                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
-                "categorical data coded by whole numbers; "
-                "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
-                "categorical (at most 10 distinct whole numbers), else local_score_BIC_from_cov, "
-                "mixed data included: tabu has no mixed-data score.",
-                choices=TABU_SCORES,
-                nullable=True,
-                concept="score_func",
+            concept_param(
+                "score_func",
+                doc=_SCORE_DOC,
+                # Before 0.11.0 tabu took the linear and the categorical scores, not the mixed ones.
+                choice_aliases=SCORE_ALIASES[:4],
             ),
-            _LAMBDA_VALUE,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             ParamSpec(
                 name="tabu_length",
@@ -638,6 +588,8 @@ _add(
                 "(the search still ends). Reaching a set limit warns with SearchLimitWarning.",
                 nullable=True,
             ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Glover 1986", "Russell & Norvig 2009", "Scutari 2010"),
     )
@@ -649,9 +601,9 @@ _add(
         summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
         "the best-scoring equivalence class. BIC by default, BDeu when every column is "
-        "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
-        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
-        "local_score_cond_gauss for mixed data.",
+        "categorical, conditional Gaussian when some are; score_func=bdeu or "
+        "discrete_bic for categorical data, degen_gauss or "
+        "cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -671,24 +623,8 @@ _add(
                 doc="Exact search strategy: A* or dynamic programming.",
                 choices=("astar", "dp"),
             ),
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default=None,
-                doc="Local score: local_score_BIC or local_score_BIC_from_cov = linear-Gaussian "
-                "BIC; local_score_BDeu = BDeu "
-                "and local_score_BIC_categorical = multinomial BIC, for categorical data coded by "
-                "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
-                "and conditional Gaussian BIC, for mixed data; "
-                "null picks local_score_BDeu when every column is categorical (a category, bool, "
-                "or text column, or at most max_categories distinct whole numbers, or a column "
-                "categorical lists) and "
-                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
-                "local_score_BIC.",
-                choices=EXACT_SCORES,
-                nullable=True,
-                concept="score_func",
-            ),
+            _SCORE_FUNC_RENAMED,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _CATEGORICAL,
             _MAX_CATEGORIES,
@@ -709,7 +645,7 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             weighted=True,
-            doc="weighted DAG; no score. Extra optimizer knobs (lambda1, lr, ...) pass through.",
+            doc="weighted DAG; no score.",
         ),
         determinism="stochastic",
         accel="torch",
@@ -721,8 +657,112 @@ _add(
             "can differ."
         ),
         seeded=True,
-        passthrough=True,
+        dropped_args=("labels",),
         params=(
+            concept_param(
+                "lambda1",
+                default=0.005,
+                doc="Weight of the l1 penalty on the sum of the edge gates, which approximate a "
+                "count of edges, at least 0. Larger values give sparser graphs.",
+            ),
+            ParamSpec(
+                name="screen_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of the Fisher-Z tests that estimate the moral graph. Only "
+                "pairs the screen keeps can become edges; smaller values keep fewer.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                aliases=("alpha",),
+            ),
+            ParamSpec(
+                name="use_moral_graph",
+                type="bool",
+                default=True,
+                doc="false makes every pair a candidate edge.",
+            ),
+            ParamSpec(
+                name="standardize",
+                type="bool",
+                default=False,
+                doc="Scale each column to unit variance first.",
+            ),
+            concept_param(
+                "w_threshold",
+                doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
+            ),
+            ParamSpec(
+                name="gate_threshold",
+                type="float",
+                default=0.5,
+                doc="An edge is kept when its gate probability reaches this value.",
+                minimum=0,
+                maximum=1,
+            ),
+            concept_param(
+                "max_iter",
+                default=25,
+                doc="Most quadratic-penalty rounds, at least 1. Stopping on it before the "
+                "acyclicity residual clears h_tol warns; raise it to let the fit run on.",
+                nullable=False,
+                aliases=("max_outer",),
+            ),
+            ParamSpec(
+                name="subproblem_iter",
+                type="int",
+                default=3000,
+                doc="Most Adam steps per round, at least 1.",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="lr",
+                type="float",
+                default=0.01,
+                doc="Adam's learning rate, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="tau",
+                type="float",
+                default=0.5,
+                doc="The gate's Gumbel-sigmoid temperature, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="rho_init",
+                type="float",
+                default=0.001,
+                doc="The acyclicity penalty of the first round, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="rho_mult",
+                type="float",
+                default=3.0,
+                doc="The factor by which the acyclicity penalty grows between rounds, at least 1.",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="rho_max",
+                type="float",
+                default=1e16,
+                doc="The rounds end when the acyclicity penalty reaches this value, above 0.",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+            ParamSpec(
+                name="h_tol",
+                type="float",
+                default=1e-8,
+                doc="The rounds end when the acyclicity residual of the noise-free gates is at "
+                "most this value, at least 0.",
+                minimum=0,
+            ),
             concept_param(
                 "seed",
                 doc="Seed for the torch optimizer. null uses ANDREY_SEED, or 0 when it is unset; "
@@ -913,14 +953,6 @@ _add(
 
 # --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
 
-_HYBRID_SCORE_DOC = (
-    "Local score of the maximize phase: local_score_BIC_from_cov or local_score_BIC = "
-    "covariance-based BIC; "
-    "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
-    "data coded by whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
-    "and conditional Gaussian BIC, for mixed data (not with maximize=tabu). It must read the same "
-    "kind of data as indep_test."
-)
 _HYBRID_MAX_ITER = concept_param(
     "max_iter",
     default=None,
@@ -935,7 +967,7 @@ _add(
         summary="Max-min hill climbing: MMPC's conditional-independence tests learn a skeleton, "
         "then hill climbing searches DAGs whose edges join only its pairs. Faster than hc on "
         "sparse graphs with many variables. BIC with Fisher-z tests by default; "
-        "indep_test=chisq with score_func=local_score_BDeu for categorical data. Returns the "
+        "indep_test=chisq with score_func=bdeu for categorical data. Returns the "
         "CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -953,15 +985,8 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default="local_score_BIC_from_cov",
-                doc=_HYBRID_SCORE_DOC,
-                choices=HC_SCORES,
-                concept="score_func",
-            ),
-            _LAMBDA_VALUE,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _HYBRID_MAX_ITER,
             _CATEGORICAL,
@@ -1011,15 +1036,8 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
-            ParamSpec(
-                name="score_func",
-                type="str",
-                default="local_score_BIC_from_cov",
-                doc=_HYBRID_SCORE_DOC,
-                choices=HC_SCORES,
-                concept="score_func",
-            ),
-            _LAMBDA_VALUE,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _HYBRID_MAX_ITER,
             ParamSpec(
@@ -1054,32 +1072,14 @@ _add(
 
 # --- permutation-based ----------------------------------------------------------------------------
 
-_BOSS_SCORE = ParamSpec(
-    name="score_func",
-    type="str",
-    default=None,
-    doc="Local score objective: local_score_BIC_from_cov or local_score_BIC = covariance-based "
-    "BIC; "
-    "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
-    "data coded by whole numbers; "
-    "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
-    "for mixed data (experimental); "
-    "null picks local_score_BDeu when every column is categorical (a category, bool, or text "
-    "column, or at most max_categories distinct whole numbers, or a column categorical lists) "
-    "and local_score_cond_gauss when some are, each with a DataTypeWarning, else "
-    "local_score_BIC_from_cov.",
-    choices=PERMUTATION_SCORES,
-    nullable=True,
-    concept="score_func",
-)
 _add(
     MethodSpec(
         name="boss",
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
-        "and accurate on linear-Gaussian data; local_score_BDeu, the default when every column is "
-        "categorical, or local_score_BIC_categorical for categorical data, local_score_cond_gauss, "
-        "the default when some columns are, or local_score_degen_gauss for mixed data. Returns a "
+        "and accurate on linear-Gaussian data; bdeu, the default when every column is "
+        "categorical, or discrete_bic for categorical data, cond_gauss, "
+        "the default when some columns are, or degen_gauss for mixed data. Returns a "
         "CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -1095,8 +1095,8 @@ _add(
         tie_break=True,
         seeded=True,
         params=(
-            _BOSS_SCORE,
-            _LAMBDA_VALUE,
+            _SCORE_FUNC_RENAMED,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             _SEED,
             _CATEGORICAL,
@@ -1110,10 +1110,10 @@ _add(
         name="grasp",
         family="permutation",
         summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
-        "linear-Gaussian BIC, like BOSS with a different move (tucks); local_score_BDeu, the "
-        "default when every column is categorical, or local_score_BIC_categorical for categorical "
-        "data, local_score_cond_gauss, the default when some columns are, or "
-        "local_score_degen_gauss for mixed data. Returns a CPDAG + score.",
+        "linear-Gaussian BIC, like BOSS with a different move (tucks); bdeu, the "
+        "default when every column is categorical, or discrete_bic for categorical "
+        "data, cond_gauss, the default when some columns are, or "
+        "degen_gauss for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -1128,8 +1128,8 @@ _add(
         tie_break=True,
         seeded=True,
         params=(
-            _BOSS_SCORE,
-            _LAMBDA_VALUE,
+            _SCORE_FUNC_RENAMED,
+            _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             ParamSpec(
                 name="depth",
@@ -1223,9 +1223,10 @@ _add(
         data=DataSpec(
             inputs=(
                 InputSpec(
-                    name="data_groups",
+                    name="data",
                     kind="panel",
                     doc="Two or more datasets over the same d variables (repeat the flag).",
+                    aliases=("data_groups",),
                 ),
             ),
             layout="each group (n_samples, n_variables); all groups share n_variables",
@@ -1244,6 +1245,13 @@ _add(
         column_order="relabels",
         tie_break=True,
         dropped_args=("random_state",),
+        params=(
+            concept_param(
+                "measure",
+                doc="How the order search picks the most exogenous variable at each step; pwling "
+                "is the pairwise likelihood-ratio measure.",
+            ),
+        ),
         references=("Shimizu 2012",),
     )
 )
@@ -1319,6 +1327,11 @@ _add(
                 "converges gives no warning; raise this to let it converge.",
                 nullable=False,
             ),
+            concept_param(
+                "measure",
+                doc="How the order search on the innovations picks the most exogenous variable; "
+                "pwling is the pairwise likelihood-ratio measure.",
+            ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
     )
@@ -1332,9 +1345,10 @@ _add(
         data=DataSpec(
             inputs=(
                 InputSpec(
-                    name="data_list",
+                    name="data",
                     kind="panel",
                     doc="One dataset per time point, same units and shape (repeat the flag).",
+                    aliases=("data_list",),
                 ),
             ),
             layout="each (n_samples, n_variables); one array per time point",
@@ -1350,13 +1364,11 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            ParamSpec(
-                name="n_lags",
-                type="int",
-                default=1,
-                doc="Number of past time points regressed out before the instantaneous fit.",
-                minimum=1,
-                concept="tau_max",
+            concept_param(
+                "tau_max",
+                doc="The largest lag: the number of past time points regressed out before the "
+                "instantaneous fit, at least 1.",
+                aliases=("n_lags",),
             ),
             concept_param(
                 "measure",
@@ -1366,6 +1378,13 @@ _add(
         ),
         references=("Kadowaki, Shimizu & Washio 2013",),
     )
+)
+_SERIES_TEST = concept_param(
+    "indep_test",
+    doc="Conditional-independence test behind every p-value, a partial-correlation test: "
+    "fisherz = Fisher's z-transform; student_t = Student-t distribution, as in the authors' "
+    "reference implementation. null picks fisherz.",
+    choices=("student_t", "fisherz"),
 )
 _add(
     MethodSpec(
@@ -1410,28 +1429,13 @@ _add(
                 exclusive_minimum=True,
                 exclusive_maximum=True,
             ),
-            ParamSpec(
-                name="alpha_level",
-                type="float",
-                default=0.05,
-                doc="Significance level of the MCI test; a link is kept when its p-value is at "
-                "most this.",
-                minimum=0,
-                maximum=1,
-                exclusive_minimum=True,
-                exclusive_maximum=True,
-                concept="alpha",
+            concept_param(
+                "alpha",
+                doc="Significance level of the MCI test, the level that decides the returned "
+                "links; a link is kept when its p-value is at most this.",
+                aliases=("alpha_level",),
             ),
-            ParamSpec(
-                name="indep_test",
-                type="str",
-                default="student_t",
-                choices=("student_t", "fisherz"),
-                doc="Partial-correlation test behind every p-value: student_t = Student-t "
-                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
-                "z-transform.",
-                concept="indep_test",
-            ),
+            _SERIES_TEST,
         ),
         references=("Runge et al. 2019",),
     )
@@ -1469,17 +1473,13 @@ _add(
                 "tau_max",
                 doc="The largest lag tested; links at lags 0 to tau_max are tested.",
             ),
-            ParamSpec(
-                name="pc_alpha",
-                type="float",
+            concept_param(
+                "alpha",
                 default=0.01,
                 doc="Significance level of every test; a link is removed when a test gives it a "
-                "p-value above this.",
-                minimum=0,
-                maximum=1,
-                exclusive_minimum=True,
-                exclusive_maximum=True,
-                concept="alpha",
+                "p-value above this. The default is the level of the published experiments "
+                "(Runge 2020).",
+                aliases=("pc_alpha",),
             ),
             ParamSpec(
                 name="collider_rule",
@@ -1491,15 +1491,13 @@ _add(
                 "is not in the one separating set found.",
                 concept="collider_rule",
             ),
-            ParamSpec(
-                name="indep_test",
-                type="str",
-                default="student_t",
-                choices=("student_t", "fisherz"),
-                doc="Partial-correlation test behind every p-value: student_t = Student-t "
-                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
-                "z-transform.",
-                concept="indep_test",
+            _SERIES_TEST,
+            concept_param(
+                "max_p_global",
+                doc="The most conditions a skeleton or collider test takes beyond the default "
+                "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
+                "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
+                "tests and can keep links that a larger conditioning set would remove.",
             ),
         ),
         references=("Runge 2020",),
@@ -1538,17 +1536,11 @@ _add(
                 "tau_max",
                 doc="The largest lag; the graph covers time steps t - tau_max to t.",
             ),
-            ParamSpec(
-                name="pc_alpha",
-                type="float",
-                default=0.05,
+            concept_param(
+                "alpha",
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this.",
-                minimum=0,
-                maximum=1,
-                exclusive_minimum=True,
-                exclusive_maximum=True,
-                concept="alpha",
+                aliases=("pc_alpha",),
             ),
             ParamSpec(
                 name="n_preliminary_iterations",
@@ -1558,28 +1550,13 @@ _add(
                 doc="Preliminary rounds before the final one; each passes the parents it found "
                 "to the next as conditions.",
             ),
-            ParamSpec(
-                name="indep_test",
-                type="str",
-                default="student_t",
-                choices=("student_t", "fisherz"),
-                doc="Partial-correlation test behind every p-value: student_t = Student-t "
-                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
-                "z-transform.",
-                concept="indep_test",
-            ),
-            ParamSpec(
-                name="max_depth",
-                type="int",
-                default=None,
-                doc="The largest number of neighbors a removal step conditions on, at least 0, "
-                "counted beyond the default conditions, the parents of both ends, unlike pc's and "
-                "fci's max_depth, which counts the whole conditioning set; null sets no limit. A "
-                "cap bounds the number of tests and can keep links that a larger conditioning set "
-                "would remove.",
-                nullable=True,
-                minimum=0,
-                concept="max_extra_depth",
+            _SERIES_TEST,
+            concept_param(
+                "max_p_global",
+                doc="The most conditions a test takes beyond the default conditions, the parents "
+                "of both ends, at least 0 (tigramite's name); max_depth elsewhere counts the whole "
+                "conditioning set. null sets no limit. A cap bounds the number of tests and can "
+                "keep links that a larger conditioning set would remove.",
             ),
         ),
         references=("Gerhardus & Runge 2020",),
@@ -1603,20 +1580,18 @@ _add(
         output=OutputSpec(
             structure_type="temporal",
             graph_kind=None,
-            doc="lag_weights at lags 1..maxlag (the lasso coefficients, no lag 0); no ordering.",
+            doc="lag_weights at lags 1..tau_max (the lasso coefficients, no lag 0); no ordering.",
         ),
         determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         params=(
-            ParamSpec(
-                name="maxlag",
-                type="int",
-                default=2,
-                doc="Number of past time steps each regression uses, at least 1.",
-                minimum=1,
-                concept="tau_max",
+            concept_param(
+                "tau_max",
+                doc="The largest lag: each regression uses the past tau_max time steps, at least "
+                "1.",
+                aliases=("maxlag",),
             ),
             ParamSpec(
                 name="cv",
@@ -1758,21 +1733,12 @@ _add(
             "Reordering whole clusters relabels the result; reordering the columns inside a "
             "cluster can change the latents' order."
         ),
+        dropped_args=("labels",),
         params=(
             concept_param(
                 "alpha",
                 doc="Significance level of the independence test that finds the causal clusters "
                 "and each next latent in the order.",
-            ),
-            ParamSpec(
-                name="labels",
-                type="str_list",
-                default=None,
-                doc="Names for the observed variables, for example, labels=[x1,x2]. null uses the "
-                "data file's header, else X1..Xn; latents are named L1, L2, ..., skipping a name "
-                "an observed variable has.",
-                nullable=True,
-                concept="labels",
             ),
         ),
         references=("Xie et al. 2020",),
@@ -1792,12 +1758,14 @@ _add(
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         params=(
             ParamSpec(
-                name="max_explanatory_vars",
+                name="max_depth",
                 type="int",
                 default=2,
-                doc="Most variables regressed out together in an ancestor test, at least 1; "
-                "larger values find more ancestors and take longer.",
+                doc="The maximum conditioning-set size of an ancestor test, the most variables "
+                "regressed out together, at least 1; larger values find more ancestors and take "
+                "longer. The default 2 is the setting of Maeda and Shimizu's experiments.",
                 minimum=1,
+                aliases=("max_explanatory_vars",),
                 concept="max_depth",
             ),
             ParamSpec(
@@ -1810,16 +1778,13 @@ _add(
                 default=0.01,
                 doc="Significance level of the Pearson correlation tests.",
             ),
-            ParamSpec(
-                name="ind_alpha",
-                type="float",
+            concept_param(
+                "alpha",
                 default=0.01,
-                doc="Significance level of the HSIC independence tests.",
-                minimum=0,
-                maximum=1,
-                exclusive_minimum=True,
-                exclusive_maximum=True,
-                concept="alpha",
+                doc="Significance level of the HSIC independence tests, which decide the ancestors "
+                "and so the returned edges. The default is the level of the published experiments "
+                "(Maeda & Shimizu 2020).",
+                aliases=("ind_alpha",),
             ),
             ParamSpec(
                 name="shapiro_alpha",
@@ -1855,17 +1820,11 @@ _add(
         "causal order that leaves confounded variables unordered (o-o).",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         params=(
-            ParamSpec(
-                name="alpha",
-                type="float",
-                default=0.1,
+            concept_param(
+                "alpha",
                 doc="Significance level of the independence test that accepts a sink, "
-                "Bonferroni-corrected across the remaining variables.",
-                minimum=0,
-                maximum=1,
-                exclusive_minimum=True,
-                exclusive_maximum=True,
-                concept="alpha",
+                "Bonferroni-corrected across the remaining variables. The default is the level of "
+                "the published experiments (Tashiro et al. 2014).",
             ),
         ),
         output=OutputSpec(
@@ -1957,6 +1916,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
     "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
     "prune=false every lagged weight stays, so a forbidden lagged link raises.",
+    "granger": _LINK_RULE + "Lags run from 1 to tau_max; a required link needs its lag, and "
+    "same-step links are not learned. Each regression drops forbidden lagged regressors and keeps "
+    "required ones unpenalized.",
     "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
     "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
     "fit of its effect's lagged weights; every other lagged weight stays.",
@@ -1990,6 +1952,25 @@ for _name, _how in _KNOWLEDGE_HOW.items():
             "knowledge": _KNOWLEDGE_PARTS[_name],
         }
     )
+
+#: The parent cap of the score searches that take it as the concept's template; ges has its own doc.
+_MAX_PARENTS = concept_param(
+    "max_parents",
+    doc="A cap on every node's parents, at least 0: no DAG the returned graph represents gives a "
+    "node more than max_parents parents. A cap can stop the search short of the lowest-scoring "
+    "graph. null sets no cap.",
+)
+# The caps the knowledge loop above leaves out: max_depth on the methods without knowledge, and
+# max_parents, before knowledge where a method has it.
+for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS)):
+    for _name in CONCEPTS[_concept].conforming:
+        _params = REGISTRY[_name].params
+        if any(p.concept == _concept for p in _params):
+            continue
+        _cut = next((i for i, p in enumerate(_params) if p.name == "knowledge"), len(_params))
+        REGISTRY[_name] = REGISTRY[_name].model_copy(
+            update={"params": (*_params[:_cut], _cap, *_params[_cut:])}
+        )
 
 
 def get_spec(name: str) -> MethodSpec:

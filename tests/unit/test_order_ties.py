@@ -159,7 +159,7 @@ def test_pcmciplus_ties() -> None:
     _assert_lag_one_tie(x)
 
     def fit(data: np.ndarray) -> np.ndarray:
-        graph = andrey.pcmciplus(data, tau_max=2, pc_alpha=0.2).structure
+        graph = andrey.pcmciplus(data, tau_max=2, alpha=0.2).structure
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
     _assert_order_free(fit, x)
@@ -190,7 +190,7 @@ def test_lpcmci_ties() -> None:
     _assert_lag_one_tie(x)
 
     def fit(data: np.ndarray) -> np.ndarray:
-        graph = andrey.lpcmci(data, tau_max=2, pc_alpha=0.2).structure
+        graph = andrey.lpcmci(data, tau_max=2, alpha=0.2).structure
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
     _assert_order_free(fit, x)
@@ -338,7 +338,7 @@ def test_calm_fit_order() -> None:
     z[:, 3] += z[:, 0] - z[:, 2]
 
     def fit(data: np.ndarray) -> np.ndarray:
-        return andrey.calm(data, seed=0, max_outer=4, subproblem_iter=300).structure.to_numpy()
+        return andrey.calm(data, seed=0, max_iter=4, subproblem_iter=300).structure.to_numpy()
 
     want = fit(z)
     for order in ([3, 2, 1, 0], [1, 3, 0, 2], [2, 0, 3, 1]):

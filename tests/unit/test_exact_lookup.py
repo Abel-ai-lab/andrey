@@ -30,21 +30,21 @@ def _relabeled() -> np.ndarray:
     return np.column_stack([a, 1 - a, c, np.where(rng.random(300) < 0.8, c, 1 - c)])
 
 
-BDEU = "local_score_BDeu"
+BDEU = "bdeu"
 # (data, knowledge, score): a chain; the chain with required and forbidden edges; and tied scores.
 CASES = {
-    "plain": (_chain(0, 400), None, "local_score_BIC"),
+    "plain": (_chain(0, 400), None, "bic"),
     "knowledge": (
         _chain(1, 400),
         Knowledge(required=[(0, 2)], forbidden=[(3, 4), (5, 1)]),
-        "local_score_BIC",
+        "bic",
     ),
     "ties": (_relabeled(), None, BDEU),
 }
 
 
 def _graphs(x: np.ndarray, knowledge: Knowledge | None, score_func: str, tables: bool) -> list:
-    score = exact._GramBICScore(x) if score_func == "local_score_BIC" else make_score(score_func, x)
+    score = exact._GramBICScore(x) if score_func == "bic" else make_score(score_func, x)
     d = x.shape[1]
     constraints = resolve(knowledge, d, None, method="exact_search")
     return [exact._generate_parent_graph(score, i, d, constraints, tables) for i in range(d)]

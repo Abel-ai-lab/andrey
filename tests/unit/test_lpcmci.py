@@ -232,13 +232,13 @@ def _related_series(n_vars: int = 6, n_steps: int = 600, seed: int = 0) -> np.nd
 def test_a_depth_above_every_search_returns_the_uncapped_graph():
     data = _related_series()
     uncapped = lpcmci(data, tau_max=2, pc_alpha=0.01)
-    assert _result_arrays(lpcmci(data, tau_max=2, pc_alpha=0.01, max_depth=50)) == _result_arrays(
-        uncapped
-    )
+    assert _result_arrays(
+        lpcmci(data, tau_max=2, pc_alpha=0.01, max_p_global=50)
+    ) == _result_arrays(uncapped)
 
 
-@pytest.mark.parametrize("max_depth", [0, 1, 2])
-def test_a_depth_cap_bounds_every_removal_search(monkeypatch, max_depth):
+@pytest.mark.parametrize("max_p_global", [0, 1, 2])
+def test_a_depth_cap_bounds_every_removal_search(monkeypatch, max_p_global):
     sizes = []
     searched = engine._Search.separating_subsets
 
@@ -247,8 +247,8 @@ def test_a_depth_cap_bounds_every_removal_search(monkeypatch, max_depth):
         return searched(self, a, b, search, sdef, p)
 
     monkeypatch.setattr(engine._Search, "separating_subsets", recorded)
-    lpcmci(_related_series(), tau_max=1, pc_alpha=0.05, max_depth=max_depth)
-    assert sizes and max(sizes) == max_depth
+    lpcmci(_related_series(), tau_max=1, pc_alpha=0.05, max_p_global=max_p_global)
+    assert sizes and max(sizes) == max_p_global
 
 
 @pytest.mark.parametrize("cached_depth", [-1, 100])
@@ -262,9 +262,9 @@ def test_tests_with_or_without_the_cache_give_the_same_graph(monkeypatch, cached
 def test_missing_values_count_each_query_once_at_any_cached_depth(monkeypatch):
     data = _related_series(n_steps=800)
     data[np.random.default_rng(1).random(data.shape) < 0.1] = np.nan
-    expected = andrey.lpcmci(data, tau_max=2, pc_alpha=0.05).metadata
+    expected = andrey.lpcmci(data, tau_max=2, alpha=0.05).metadata
     monkeypatch.setattr(engine, "CACHED_DEPTH", -1)
-    assert andrey.lpcmci(data, tau_max=2, pc_alpha=0.05).metadata == expected
+    assert andrey.lpcmci(data, tau_max=2, alpha=0.05).metadata == expected
 
 
 # ---- bounded test calls, cache, and vote ------------------------------------------------------

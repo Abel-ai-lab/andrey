@@ -26,10 +26,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.special import betaincc
 from scipy.stats import pearsonr, shapiro
-from sklearn.linear_model import LinearRegression
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.knowledge import KnowledgeError, _has_cycle
+from andrey.core.units import least_squares
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -76,18 +76,18 @@ def _resid_and_coef(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Ordinary-least-squares residual and coefficients of ``X[:, endog]`` on ``X[:, exog]``.
 
-    An intercept is fitted and discarded; the returned coefficients align with ``exog``. When
-    ``memo`` is given (the matrix is the fixed data), the ``(endog, exog)`` result is stored and
-    reused; the key keeps the ``exog`` order so a cached coefficient vector aligns with its request.
+    An intercept is fitted and discarded; the returned coefficients align with ``exog``. The fit
+    runs on unit-scale predictors (:func:`~andrey.core.units.least_squares`). When ``memo`` is
+    given (the matrix is the fixed data), the ``(endog, exog)`` result is stored and reused; the
+    key keeps the ``exog`` order so a cached coefficient vector aligns with its request.
     """
     key = (endog, tuple(exog))
     if memo is not None:
         cached = memo.get(key)
         if cached is not None:
             return cached
-    regressor = LinearRegression()
-    regressor.fit(X[:, exog], X[:, endog])
-    result = (X[:, endog] - regressor.predict(X[:, exog]), regressor.coef_)
+    coef, intercept = least_squares(X[:, exog], X[:, endog])
+    result = (X[:, endog] - (X[:, exog] @ coef + intercept), coef)
     if memo is not None:
         memo[key] = result
     return result

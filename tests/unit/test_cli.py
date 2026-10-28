@@ -128,7 +128,7 @@ def test_run_pc_envelope(capsys, csv_path):
     assert env["structure"]["labels"] is None  # no header row
     run = env["run"]
     assert run["n_samples"] == 300 and run["n_variables"] == 4
-    assert run["params"]["alpha"] == 0.05 and run["params"]["indep_test"] == "fisherz"  # defaults
+    assert run["params"]["alpha"] == 0.05 and run["params"]["indep_test"] is None  # defaults
     assert set(run["versions"]) == {"andrey", "numpy", "python"}
 
 
@@ -179,9 +179,9 @@ def test_run_multi_group(capsys, nongaussian_path):
         [
             "run",
             "multi_group_direct_lingam",
-            "--data-groups",
+            "--data",
             str(nongaussian_path),
-            "--data-groups",
+            "--data",
             str(nongaussian_path),
         ],
         capsys,
@@ -189,6 +189,36 @@ def test_run_multi_group(capsys, nongaussian_path):
     env = json.loads(out)
     assert code == 0 and env["multi"] is True
     assert len(env["results"]) == 2
+
+
+@pytest.mark.parametrize(
+    ("method", "former"),
+    [("multi_group_direct_lingam", "--data-groups"), ("longitudinal_lingam", "--data-list")],
+)
+def test_a_former_panel_flag_reads_the_datasets_like_data(capsys, nongaussian_path, method, former):
+    path = str(nongaussian_path)
+    _, out, _ = _run(["run", method, "--data", path, "--data", path], capsys)
+    code, former_out, _ = _run(["run", method, former, path, former, path], capsys)
+    assert code == 0
+    drop = ("run",)  # the timing differs
+    assert {k: v for k, v in json.loads(former_out).items() if k not in drop} == {
+        k: v for k, v in json.loads(out).items() if k not in drop
+    }
+    code, _, err = _run(["run", method, "--data", path, former, path, former, path], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "bad_input"
+
+
+def test_a_former_panel_flag_is_refused_by_a_method_that_takes_one_matrix(capsys, csv_path):
+    code, _, err = _run(["run", "pc", "--data-groups", str(csv_path)], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
+
+
+def test_the_panel_flag_is_data_in_the_help(capsys):
+    for method in ("multi_group_direct_lingam", "longitudinal_lingam"):
+        _, out, _ = _run(["run", method, "--help", "--json"], capsys)
+        (entry,) = json.loads(out)["method"]["data"]["inputs"]
+        assert entry["flag"] == "--data" and entry["kind"] == "panel"
+        assert entry["aliases"] and entry["flag"] != "--" + entry["aliases"][0].replace("_", "-")
 
 
 # --- run: the error contract ----------------------------------------------------------------------
@@ -209,7 +239,7 @@ def test_unknown_method_enumerates_valid_options(capsys):
 
 def test_too_few_groups_is_usage_error(capsys, nongaussian_path):
     code, _, err = _run(
-        ["run", "multi_group_direct_lingam", "--data-groups", str(nongaussian_path)], capsys
+        ["run", "multi_group_direct_lingam", "--data", str(nongaussian_path)], capsys
     )
     assert code == 2 and json.loads(err)["error"]["code"] == "too_few_groups"
 
@@ -245,7 +275,7 @@ def test_coerce_bool_pair_list_and_null():
     from andrey.spec import get_spec
 
     varma = {p.name: p for p in get_spec("varma_lingam").params}
-    labels = next(p for p in get_spec("gin").params if p.name == "labels")
+    labels = next(p for p in get_spec("pc").params if p.name == "categorical")
     assert _coerce("true", varma["prune"]) is True
     assert _coerce("false", varma["prune"]) is False
     with pytest.raises(CliError):  # bool is true/false only
@@ -268,23 +298,6 @@ def test_coerce_quoted_is_literal_string():
     assert _coerce('"fisherz"', pc["indep_test"]) == "fisherz"  # quoted -> literal str
     with pytest.raises(CliError):  # a quoted value is not valid for a non-str param
         _coerce('"0.05"', pc["alpha"])
-
-
-def test_coerce_passthrough_sniffs():
-    from andrey.cli import CliError, _coerce_passthrough
-
-    assert _coerce_passthrough("0.1") == 0.1
-    assert _coerce_passthrough("5") == 5
-    assert _coerce_passthrough("true") is True
-    assert _coerce_passthrough("null") is None
-    assert _coerce_passthrough("foo") == "foo"
-    assert _coerce_passthrough('"true"') == "true"  # quoted stays a string
-    assert _coerce_passthrough("[1,2]") == [1, 2]
-    with pytest.raises(CliError):  # an empty passthrough value is an error, not ""
-        _coerce_passthrough("")
-
-
-# --- run grammar: overrides, config, self-healing (integration) -----------------------------------
 
 
 def test_run_key_value_override(capsys, csv_path):
@@ -390,10 +403,13 @@ def test_method_help_defaults_are_grammar_not_repr():
 
 
 def test_input_name_override_is_usage_error(capsys, csv_path):
-    """A `data=...` override on a passthrough method is caught in validation (exit 2), not passed to
-    the facade positionally where it would raise a raw TypeError (exit 1)."""
-    code, _out, err = _run(["run", "calm", "--data", str(csv_path), "data=other.csv"], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+    """A `data=...` override, or one under a former input name, is caught in validation (exit 2),
+    not passed to the facade positionally where it would raise a raw TypeError (exit 1)."""
+    for name in ("data", "data_groups"):
+        code, _out, err = _run(
+            ["run", "calm", "--data", str(csv_path), f"{name}=other.csv"], capsys
+        )
+        assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
 
 
 def test_param_error_precedes_input_load(capsys):
@@ -767,23 +783,25 @@ def test_header_names_the_nodes(capsys, monkeypatch, named_path):
         assert f"  {'abcd'[e['source']]} {EDGE_GLYPHS[e['type']]} {'abcd'[e['target']]}\n" in out
 
 
-def test_header_names_gin_observed_nodes_unless_labels_given(capsys, named_path):
+def test_header_names_gin_observed_nodes(capsys, named_path):
     code, out, _ = _run(["run", "gin", "--data", str(named_path)], capsys)
     env = json.loads(out)
     assert code == 0 and env["structure"]["labels"][:4] == ["a", "b", "c", "d"]
-    assert env["run"]["params"]["labels"] == ["a", "b", "c", "d"]  # the params the run used
+    assert "labels" not in env["run"]["params"]
     code, out, _ = _run(["run", "gin", "--data", str(named_path), "labels=[w,x,y,z]"], capsys)
-    assert code == 0 and json.loads(out)["structure"]["labels"][:4] == ["w", "x", "y", "z"]
+    env = json.loads(out)  # the former labels argument is ignored with a warning
+    assert code == 0 and env["structure"]["labels"][:4] == ["a", "b", "c", "d"]
+    assert "DeprecatedArgumentWarning" in {w["category"] for w in env["run"]["warnings"]}
 
 
 def test_panel_headers_name_every_group(capsys, tmp_path, named_path):
-    argv = ["run", "multi_group_direct_lingam", "--data-groups", str(named_path)]
-    code, out, _ = _run([*argv, "--data-groups", str(named_path)], capsys)
+    argv = ["run", "multi_group_direct_lingam", "--data", str(named_path)]
+    code, out, _ = _run([*argv, "--data", str(named_path)], capsys)
     results = json.loads(out)["results"]
     assert code == 0 and [r["structure"]["labels"] for r in results] == [["a", "b", "c", "d"]] * 2
     other = tmp_path / "other.csv"
     other.write_text(named_path.read_text().replace("a,b,c,d", "a,b,c,e", 1))
-    code, _out, err = _run([*argv, "--data-groups", str(other)], capsys)
+    code, _out, err = _run([*argv, "--data", str(other)], capsys)
     assert code == 3 and json.loads(err)["error"]["code"] == "bad_data"
 
 

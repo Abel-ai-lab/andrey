@@ -28,7 +28,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.adapters.andrey_hc import _andrey_version
-from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, andrey_score
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: Deviance units, bnlearn's `bic-g` at `k = log(n)/2` up to its residual variance, which
@@ -82,8 +82,8 @@ class AndreyTabu:
         with andrey.config(backend=self.backend):
             cpdag, _score = _tabu(
                 X,
-                score_func=params.get("score_func", _DEFAULT_SCORE_FUNC),
-                lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
+                score_func=andrey_score(params.get("score_func", _DEFAULT_SCORE_FUNC)),
+                penalty_discount=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
                 ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
                 tabu_length=int(params.get("tabu_length", _DEFAULT_TABU_LENGTH)),
                 max_tabu=int(params.get("max_tabu", _DEFAULT_MAX_TABU)),

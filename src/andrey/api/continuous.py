@@ -81,7 +81,8 @@ def notears(
     w_threshold : float, default=0.3
         An edge is kept when its weight magnitude reaches this value, at least ``0``.
     max_iter : int, default=100
-        Most dual steps of the augmented Lagrangian, at least ``1``.
+        Most dual steps of the augmented Lagrangian, at least ``1``. Stopping on it rather than on
+        ``h_tol`` or ``rho_max`` warns with :class:`~andrey.SearchLimitWarning`.
     h_tol : float, default=1e-8
         The fit stops when the acyclicity function falls to this value, above ``0``.
     rho_max : float, default=1e16
@@ -98,7 +99,8 @@ def notears(
         The factor, in ``(0, 1)``, by which ``mcp_lambda`` and ``mcp_delta`` shrink after each
         accepted step. Used only with ``robust``.
     max_path : int, default=50
-        Most accepted steps of the path, at least ``1``. Used only with ``robust``.
+        Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
+        warns with :class:`~andrey.SearchLimitWarning`.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -286,7 +288,8 @@ def dagma(
     warm_iter : int, default=30000
         Most Adam steps of each stage but the last, at least ``1``.
     max_iter : int, default=60000
-        Most Adam steps of the last stage, at least ``1``.
+        Most Adam steps of the last stage, at least ``1``. A last stage that takes them all
+        without converging warns with :class:`~andrey.SearchLimitWarning`.
     lr : float, default=3e-4
         Step size of Adam, above ``0``.
     robust : bool, default=False
@@ -300,7 +303,8 @@ def dagma(
         The factor, in ``(0, 1)``, by which ``mcp_lambda`` and ``mcp_delta`` shrink after each
         accepted step. Used only with ``robust``.
     max_path : int, default=50
-        Most accepted steps of the path, at least ``1``. Used only with ``robust``.
+        Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
+        warns with :class:`~andrey.SearchLimitWarning`.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an

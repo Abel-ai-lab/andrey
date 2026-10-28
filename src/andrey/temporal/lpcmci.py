@@ -203,10 +203,10 @@ class _Search:
         alpha: float,
         ranks: Sequence[int],
         constraints: LaggedConstraints | None = None,
-        max_depth: int | None = None,
+        max_p_global: int | None = None,
     ) -> None:
         self.test, self.n, self.tau_max, self.alpha = test, n_vars, tau_max, alpha
-        self.max_depth = max_depth
+        self.max_p_global = max_p_global
         # A test that deletes rows counts every query it answers in rows_tested, so a repeated
         # query of any size comes from the cache.
         self.cache_every_size = isinstance(getattr(test, "test", None), PartialCorrelationDeletion)
@@ -745,12 +745,12 @@ class _Search:
         self.apply_rules(self.full_rules(), lagged_only=False)
 
     def _past_depth(self, p: int) -> bool:
-        """Whether ``p`` is above ``max_depth``: a search of that size is not run."""
-        return self.max_depth is not None and p > self.max_depth
+        """Whether ``p`` is above ``max_p_global``: a search of that size is not run."""
+        return self.max_p_global is not None and p > self.max_p_global
 
     def _depth(self, n_candidates: int) -> int:
-        """The largest search-set size among ``n_candidates`` that ``max_depth`` allows."""
-        return n_candidates if self.max_depth is None else min(n_candidates, self.max_depth)
+        """The largest search-set size among ``n_candidates`` that ``max_p_global`` allows."""
+        return n_candidates if self.max_p_global is None else min(n_candidates, self.max_p_global)
 
     def napds(self, b: Node, a: Node) -> set[Node]:
         """``napds_t(b, a)``: candidates for a separating set of ``a`` and ``b``, neither ancestral.
@@ -1326,12 +1326,12 @@ def lpcmci(
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
-    max_depth: int | None = None,
+    max_p_global: int | None = None,
 ) -> LPCMCIResult:
     """Run LPCMCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
 
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach :func:`run`.
-    ``max_depth`` caps the size of the searched subsets ``S`` in both removal phases and in the
+    ``max_p_global`` caps the size of the searched subsets ``S`` in both removal phases and in the
     majority vote; the default conditions ``S_def`` come on top. ``None`` sets no cap.
 
     Raises :class:`ValueError` when ``indep_test`` is not a key of
@@ -1351,7 +1351,7 @@ def lpcmci(
             n_preliminary_iterations,
             ranks,
             constraints,
-            max_depth,
+            max_p_global,
         )
 
 
@@ -1363,7 +1363,7 @@ def run(
     n_preliminary_iterations: int,
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
-    max_depth: int | None = None,
+    max_p_global: int | None = None,
 ) -> LPCMCIResult:
     """Run Algorithm 1 with ``test`` over the columns of the lagged design.
 
@@ -1371,10 +1371,10 @@ def run(
     forbidden lagged link and a lag-0 pair forbidden both ways are never linked; a lag-0 link
     forbidden one way carries an arrowhead at its cause; a required link is directed, with the
     empty middle mark, so no removal phase or rule tests or removes it. No rule changes a mark
-    the knowledge sets. Every re-initialization applies the knowledge again. ``max_depth`` caps
+    the knowledge sets. Every re-initialization applies the knowledge again. ``max_p_global`` caps
     the searched subset size (see :func:`lpcmci`).
     """
-    search = _Search(test, n_vars, tau_max, alpha, ranks, constraints, max_depth)
+    search = _Search(test, n_vars, tau_max, alpha, ranks, constraints, max_p_global)
     search.initialize()
     kept: list[tuple[Key, bool]] = []
     for _ in range(n_preliminary_iterations):

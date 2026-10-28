@@ -25,19 +25,23 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
-from andrey.core.score import LINEAR_SCORES
-from andrey.search.boss import PERMUTATION_SCORES
-from andrey.search.exact import EXACT_SCORES
-from andrey.search.ges import GES_SCORES
-from andrey.search.hc import HC_SCORES
-from andrey.search.tabu import TABU_SCORES
+from andrey.core.score import LINEAR_SCORES, SCORES
 
 from .models import ParamSpec, ParamType, Spec
 
 Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
-SCORE_NAMES = ("bic", "bdeu", "bic_categorical", "cond_gauss", "degen_gauss")
+SCORE_NAMES = SCORES
+#: The score names that shipped before 0.11.0, each with its current name, kept for one release.
+SCORE_ALIASES = (
+    ("local_score_BIC", "bic"),
+    ("local_score_BIC_from_cov", "bic"),
+    ("local_score_BDeu", "bdeu"),
+    ("local_score_BIC_categorical", "discrete_bic"),
+    ("local_score_cond_gauss", "cond_gauss"),
+    ("local_score_degen_gauss", "degen_gauss"),
+)
 #: The largest seed NumPy and torch accept.
 SEED_MAX = 2**32 - 1
 
@@ -149,21 +153,6 @@ ALL_METHODS = (
     *_RESIDUAL,
 )
 
-# The methods that read an integer-coded column as numbers without a DataTypeWarning.
-_SILENT_ON_CODES = (
-    "gies",
-    "xges",
-    "tabu",
-    "calm",
-    *_CONTINUOUS,
-    *_LINGAM,
-    *PCMCI_FAMILY,
-    "granger",
-    *_RESIDUAL,
-)
-
-_LOCAL_SCORE = "The local_score_* names, not the short ones, and a default other than None."
-
 _CONCEPTS = (
     Concept(
         key="alpha",
@@ -198,44 +187,20 @@ _CONCEPTS = (
         ),
         deviations=(
             Deviation(
-                method="pcmci",
-                name="alpha_level",
-                default=0.05,
-                fixed_in="0.11.0",
-                aliases=("alpha_level",),
-                reason="The MCI step's level is the one that decides the edges.",
-            ),
-            Deviation(
                 method="pcmciplus",
-                name="pc_alpha",
+                name="alpha",
                 default=0.01,
-                fixed_in="0.11.0",
-                aliases=("pc_alpha",),
-                reason="Its only level; 0.01 needs a stated source or moves to 0.05.",
-            ),
-            Deviation(
-                method="lpcmci",
-                name="pc_alpha",
-                default=0.05,
-                fixed_in="0.11.0",
-                aliases=("pc_alpha",),
-                reason="Its only level.",
+                fixed_in=None,
+                reason="0.01 is the level of the method's published experiments (Runge 2020: "
+                "tau_max = 5 and alpha = 0.01).",
             ),
             Deviation(
                 method="rcd",
-                name="ind_alpha",
-                default=0.01,
-                fixed_in="0.11.0",
-                aliases=("ind_alpha",),
-                reason="The level of the independence test that decides ancestors; 0.01 needs a "
-                "stated source or moves to 0.05.",
-            ),
-            Deviation(
-                method="bottom_up_parce_lingam",
                 name="alpha",
-                default=0.1,
-                fixed_in="0.11.0",
-                reason="0.1 needs a stated source or moves to 0.05.",
+                default=0.01,
+                fixed_in=None,
+                reason="0.01 is the level of the method's published experiments (Maeda and Shimizu "
+                "2020 set every level to 0.01).",
             ),
             *(
                 Deviation(
@@ -271,30 +236,17 @@ _CONCEPTS = (
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger"),
         ),
-        deviations=(
-            *(
-                Deviation(
-                    method=m,
-                    name="indep_test",
-                    default="fisherz",
-                    choices=SHIPPED_INDEP_TESTS,
-                    fixed_in="0.11.0",
-                    reason="An explicit default; None picks the test from the declared types.",
-                )
-                for m in CI_SEARCHES
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="indep_test",
-                    default="student_t",
-                    choices=("student_t", "fisherz"),
-                    fixed_in="0.11.0",
-                    fragment="partial-correlation test",
-                    reason="Default student_t; the other shipped tests come in 0.12.0.",
-                )
-                for m in PCMCI_FAMILY
-            ),
+        deviations=tuple(
+            Deviation(
+                method=m,
+                name="indep_test",
+                default=None,
+                choices=("student_t", "fisherz"),
+                fixed_in="0.12.0",
+                reason="The partial-correlation tests only; the categorical and nonlinear tests "
+                "come in 0.12.0.",
+            )
+            for m in PCMCI_FAMILY
         ),
     ),
     Concept(
@@ -311,67 +263,17 @@ _CONCEPTS = (
         fragment="score",
         suitable=SCORE_SEARCHES,
         others_exempt="Not a search over parent sets scored by a decomposable score.",
-        deviations=(
+        deviations=tuple(
             Deviation(
-                method="gfci",
-                name="score_func",
-                default="local_score_BIC",
-                choices=GES_SCORES,
-                fixed_in="0.11.0",
-                aliases=GES_SCORES,
-                reason=_LOCAL_SCORE,
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="score_func",
-                    default=None,
-                    choices=choices,
-                    fixed_in="0.11.0",
-                    aliases=choices,
-                    reason=_LOCAL_SCORE,
-                )
-                for m, choices in (
-                    ("ges", GES_SCORES),
-                    ("hc", HC_SCORES),
-                    ("exact_search", EXACT_SCORES),
-                    ("boss", PERMUTATION_SCORES),
-                    ("grasp", PERMUTATION_SCORES),
-                )
-            ),
-            Deviation(
-                method="tabu",
+                method=m,
                 name="score_func",
                 default=None,
-                choices=TABU_SCORES,
-                fixed_in="0.11.0",
-                aliases=TABU_SCORES,
-                reason=_LOCAL_SCORE + " It lacks the mixed-data scores.",
-            ),
-            Deviation(
-                method="xges",
-                name="score_func",
-                default="local_score_BIC",
                 choices=LINEAR_SCORES,
-                fixed_in="0.11.0",
-                aliases=LINEAR_SCORES,
-                reason=_LOCAL_SCORE
-                + " It has only the BIC; the categorical scores come in 0.12.0.",
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="score_func",
-                    default="local_score_BIC_from_cov",
-                    choices=HC_SCORES,
-                    fixed_in="0.11.0",
-                    reason=_LOCAL_SCORE + " The method is new in 0.11.0, so no aliases.",
-                )
-                for m in ("mmhc", "rsmax2")
-            ),
-            *_absent(
-                "0.11.0", "BIC is its only score; it takes the parameter all the same.", "gies"
-            ),
+                fixed_in="0.12.0",
+                reason="The linear-Gaussian BIC only; the categorical scores are published and "
+                "come in 0.12.0.",
+            )
+            for m in ("gies", "xges")
         ),
     ),
     Concept(
@@ -388,31 +290,6 @@ _CONCEPTS = (
         fragment="BIC penalty",
         suitable=SCORE_SEARCHES,
         others_exempt="Does not score with BIC.",
-        deviations=(
-            *(
-                Deviation(
-                    method=m,
-                    name="lambda_value",
-                    default=1.0,
-                    fixed_in="0.11.0",
-                    aliases=("lambda_value",),
-                    reason="Named lambda_value; penalty_discount is the literature's term.",
-                )
-                for m in ("gfci", *_PURE_SCORE)
-                if m != "exact_search"
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    name="lambda_value",
-                    default=1.0,
-                    fixed_in="0.11.0",
-                    reason="Named lambda_value, new in 0.11.0, so no alias.",
-                )
-                for m in ("mmhc", "rsmax2")
-            ),
-            *_absent("0.11.0", "Scores with BIC and has no penalty multiplier.", "exact_search"),
-        ),
     ),
     Concept(
         key="ebic_gamma",
@@ -455,7 +332,6 @@ _CONCEPTS = (
         default_rule="Each paper's default.",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No continuous objective.",
-        deviations=_absent("0.11.0", "Passed through **params.", "calm"),
     ),
     Concept(
         key="w_threshold",
@@ -470,7 +346,6 @@ _CONCEPTS = (
         fragment="weight magnitude",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No weighted continuous fit to threshold.",
-        deviations=_absent("0.11.0", "Passed through **params.", "calm"),
     ),
     Concept(
         key="max_depth",
@@ -490,7 +365,7 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
-                "max_extra_depth.",
+                "max_p_global.",
                 "lpcmci",
             ),
             *_exempt(
@@ -507,58 +382,38 @@ _CONCEPTS = (
             ),
         ),
         deviations=(
-            *_absent(
-                "0.11.0",
-                "Its tests condition on growing sets; bnlearn exposes the cap as max.sx.",
-                "iamb",
-                "inter_iamb",
-                "mmpc",
-                "mmhc",
-                "rsmax2",
-            ),
-            *_absent(
-                "0.11.0",
-                "PCMCI's PC1 step and PCMCI+'s skeleton phase condition on growing sets.",
-                "pcmci",
-                "pcmciplus",
-            ),
             Deviation(
                 method="rcd",
-                name="max_explanatory_vars",
+                name="max_depth",
                 default=2,
-                fixed_in="0.11.0",
-                aliases=("max_explanatory_vars",),
-                fragment="regressed out together",
-                reason="The same cap under another name; the default 2 stays, for cost.",
+                fixed_in=None,
+                reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
+                "one when there are fewer rows than variables; the minimum is 1, since the "
+                "smallest ancestor test regresses one variable on another.",
             ),
         ),
     ),
     Concept(
-        key="max_extra_depth",
+        key="max_p_global",
         summary="The largest number of conditions beyond the default conditions every test "
-        "includes.",
+        "includes (tigramite's LPCMCI name).",
         param=_template(
-            "max_extra_depth",
+            "max_p_global",
             "int",
             None,
-            "The largest number of neighbors a removal step conditions on beyond the default "
-            "conditions, at least 0; null sets no limit.",
+            "The most conditions a test takes beyond the default conditions, at least 0; null sets "
+            "no limit.",
             nullable=True,
             minimum=0,
         ),
         fragment="beyond the default condition",
-        suitable=("lpcmci",),
-        others_exempt="Its tests include no default conditions to count beyond.",
-        deviations=(
-            Deviation(
-                method="lpcmci",
-                name="max_depth",
-                default=None,
-                fixed_in="0.11.0",
-                reason="max_depth means the whole conditioning set elsewhere; the name is new in "
-                "0.11.0, so no alias.",
-            ),
+        suitable=("lpcmci", "pcmciplus"),
+        exempt=_exempt(
+            "MCI conditions on the default conditions alone, one test per link; PC1 has none "
+            "(max_depth).",
+            "pcmci",
         ),
+        others_exempt="Its tests include no default conditions to count beyond.",
     ),
     Concept(
         key="max_parents",
@@ -590,17 +445,6 @@ _CONCEPTS = (
             *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
         ),
         deviations=(
-            *_absent(
-                "0.11.0",
-                "Adds parents move by move or enumerates parent sets.",
-                "hc",
-                "tabu",
-                "exact_search",
-                "boss",
-                "grasp",
-                "mmhc",
-                "rsmax2",
-            ),
             *_absent(
                 "0.12.0",
                 "A cap on the represented DAGs interacts with the forward phase's gate.",
@@ -634,7 +478,6 @@ _CONCEPTS = (
             "varma_lingam",
         ),
         others_exempt="No iterative loop that a cap stops early.",
-        deviations=_absent("0.11.0", "The main loop's cap is max_outer, in **params.", "calm"),
     ),
     Concept(
         key="cap_warning",
@@ -651,18 +494,6 @@ _CONCEPTS = (
             "varma_lingam",
         ),
         others_exempt="No iterative loop that a cap stops early.",
-        deviations=(
-            *(
-                Deviation(method=m, observed="", fixed_in="0.11.0", reason="Stops silently.")
-                for m in (*_CONTINUOUS, "calm", "varma_lingam")
-            ),
-            Deviation(
-                method="ica_lingam",
-                observed="ConvergenceWarning",
-                fixed_in="0.11.0",
-                reason="scikit-learn's ConvergenceWarning, which is not an AndreyWarning.",
-            ),
-        ),
     ),
     Concept(
         key="tau_max",
@@ -679,26 +510,6 @@ _CONCEPTS = (
                     for m in ALL_METHODS
                     if m not in (*PCMCI_FAMILY, "granger", "longitudinal_lingam", "varma_lingam")
                 ),
-            ),
-        ),
-        deviations=(
-            Deviation(
-                method="granger",
-                name="maxlag",
-                default=2,
-                fixed_in="0.11.0",
-                aliases=("maxlag",),
-                fragment="past time steps",
-                reason="Another name, and the default 2 moves to 1.",
-            ),
-            Deviation(
-                method="longitudinal_lingam",
-                name="n_lags",
-                default=1,
-                fixed_in="0.11.0",
-                aliases=("n_lags",),
-                fragment="past time points",
-                reason="Another name.",
             ),
         ),
     ),
@@ -777,11 +588,6 @@ _CONCEPTS = (
                 "mmpc",
             ),
             *_absent("0.12.0", "A mask in the gated objective.", "calm"),
-            *_absent(
-                "0.11.0",
-                "Drop forbidden lagged regressors and keep required ones unpenalized.",
-                "granger",
-            ),
             Deviation(
                 method="bottom_up_parce_lingam",
                 name="knowledge",
@@ -801,8 +607,10 @@ _CONCEPTS = (
             None,
             "The categorical columns, for a mixed-data test or score: column names from the data "
             "file's header or 0-based positions, for example, categorical=[smoker,region]; [] "
-            "marks none. null infers them: every column of at most max_categories distinct whole "
-            "numbers, named in a DataTypeWarning; with none, the setting runs as its "
+            "marks none. With a null test or score they declare the column types the default "
+            "picks from. null takes a DataFrame's category, bool, and text columns; a mixed-data "
+            "setting passed explicitly also infers every column of at most max_categories distinct "
+            "whole numbers, named in a DataTypeWarning; with none, the setting runs as its "
             "linear-Gaussian form and warns. Other tests and scores take only null or [].",
             nullable=True,
         ),
@@ -821,7 +629,6 @@ _CONCEPTS = (
         ),
         others_exempt="A continuous model.",
         deviations=(
-            *_absent("0.11.0", "Offers BDeu and the categorical BIC.", "tabu"),
             *_absent("0.12.0", "Categorical scores are published; engine work.", "gies", "xges"),
             *_absent("0.12.0", "Discrete conditional-independence tests.", *PCMCI_FAMILY),
         ),
@@ -853,7 +660,6 @@ _CONCEPTS = (
         ),
         others_exempt="A continuous model.",
         deviations=(
-            *_absent("0.11.0", "Offers BDeu and the categorical BIC.", "tabu"),
             *_absent("0.12.0", "Categorical scores are published; engine work.", "gies", "xges"),
             *_absent("0.12.0", "Discrete conditional-independence tests.", *PCMCI_FAMILY),
         ),
@@ -862,10 +668,6 @@ _CONCEPTS = (
         key="category_codes",
         summary="Columns that look like category codes get a DataTypeWarning.",
         suitable=ALL_METHODS,
-        deviations=tuple(
-            Deviation(method=m, observed="", fixed_in="0.11.0", reason="Silent.")
-            for m in _SILENT_ON_CODES
-        ),
     ),
     Concept(
         key="missing",
@@ -897,6 +699,25 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="units",
+        summary="Rescaling a column changes no graph and no order: a numerical step that would "
+        "read the data's units runs on unit-scale columns (andrey.core.units).",
+        suitable=tuple(m for m in ALL_METHODS if m not in ("ica_lingam", *_CONTINUOUS, "calm")),
+        exempt=(
+            *_exempt(
+                "Matching the unmixing rows to the variables by 1/|W| and pruning |B| from the "
+                "smallest read the data's units (Shimizu et al. 2011, Sec. 2.4).",
+                "ica_lingam",
+            ),
+            *_exempt(
+                "The least-squares score with an l1 penalty and a weight threshold reads the "
+                "data's units (Zheng et al. 2018; Bello et al. 2022). robust=True is under review.",
+                *_CONTINUOUS,
+            ),
+            *_exempt("Not measured yet: its fit needs torch.", "calm"),
+        ),
+    ),
+    Concept(
         key="labels",
         summary="Node labels come from a DataFrame's columns, never from an argument.",
         param=_template(
@@ -908,38 +729,11 @@ _CONCEPTS = (
         ),
         suitable=(),
         others_exempt="Labels come from a DataFrame's columns.",
-        deviations=(
-            Deviation(
-                method="gin",
-                name="labels",
-                default=None,
-                fixed_in="0.11.0",
-                aliases=("labels",),
-                fragment="",
-                reason="Names the observed columns.",
-            ),
-        ),
     ),
     Concept(
         key="data",
         summary="The first argument is data: a matrix, or a sequence of matrices for a panel.",
         suitable=ALL_METHODS,
-        deviations=(
-            Deviation(
-                method="multi_group_direct_lingam",
-                name="data_groups",
-                fixed_in="0.11.0",
-                aliases=("data_groups",),
-                reason="Another name for a panel.",
-            ),
-            Deviation(
-                method="longitudinal_lingam",
-                name="data_list",
-                fixed_in="0.11.0",
-                aliases=("data_list",),
-                reason="Another name for a panel.",
-            ),
-        ),
     ),
     Concept(
         key="measure",
@@ -959,12 +753,6 @@ _CONCEPTS = (
             "longitudinal_lingam",
         ),
         others_exempt="No DirectLiNGAM order search.",
-        deviations=_absent(
-            "0.11.0",
-            "Runs DirectLiNGAM's order search with one measure.",
-            "multi_group_direct_lingam",
-            "varma_lingam",
-        ),
     ),
     Concept(
         key="collider_rule",

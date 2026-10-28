@@ -30,6 +30,7 @@ from andrey.search.hc import hc
 from andrey_bench import datasets, rsession
 from andrey_bench.adapters import andrey_hc
 from andrey_bench.adapters.andrey_pc import AndreyPC
+from andrey_bench.adapters.bic_penalty import andrey_score
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.scoring import structure_hash
@@ -202,7 +203,7 @@ def test_a_hill_climbing_fit_runs_its_score_and_beats_the_empty_graph(adapter) -
     native = np.asarray(adapter.fit(data, adapter.params()))
     structure = adapter.to_structure(native)
     assert structure.kind == "cpdag" and structure.n_nodes == 6
-    cpdag, total = hc(data, score_func=adapter.score_func)
+    cpdag, total = hc(data, score_func=andrey_score(adapter.score_func))
     assert np.array_equal(native, cpdag.to_numpy())
     score = (
         BDeuScore(data) if adapter.score_func == "local_score_BDeu" else CategoricalBICScore(data)
@@ -218,8 +219,8 @@ def test_the_declared_settings_are_the_ones_andreys_hill_climbing_runs_with() ->
     assert declared["sample_prior"] == bdeu["sample_prior"].default
     assert declared["structure_prior"] == bdeu["structure_prior"].default
     accepted = inspect.signature(hc).parameters
-    assert discrete_cpu._HC_BIC.params()["lambda_value"] == accepted["lambda_value"].default
-    assert "max_parents" not in accepted and "maxP" not in accepted  # no parent cap
+    assert discrete_cpu._HC_BIC.params()["lambda_value"] == accepted["penalty_discount"].default
+    assert accepted["max_parents"].default is None  # no parent cap
     assert all(a.params()["max_parents"] is None for a in ANDREY_HC)
     assert "lambda_value" not in discrete_cpu._HC_BDEU.params()  # BDeu has no weight
 

@@ -23,6 +23,7 @@ import scipy.optimize
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
+from andrey.core.warning_policy import warn_search_limit
 from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
@@ -206,6 +207,8 @@ def augmented_lagrangian(
         alpha += rho * h
         if h <= h_tol or rho >= rho_max:
             break
+    else:
+        warn_search_limit("notears", "max_iter", max_iter, "dual steps")
     return split_to_weights(w_est)
 
 
@@ -283,6 +286,8 @@ def adam_augmented_lagrangian(
         alpha += rho * h
         if h <= h_tol or rho >= rho_max:
             break
+    else:
+        warn_search_limit("notears", "max_iter", max_iter, "dual steps")
     return w_est
 
 
@@ -347,11 +352,11 @@ def central_path(
             inverse = np.linalg.inv(s * identity - weights * weights) + 1e-16
             while (inverse < 0).any():
                 if step == 1 or s <= 0.9:
-                    return weights, False
+                    return weights, False, False
                 weights = weights + rate * direction
                 rate *= 0.5
                 if rate <= 1e-16:
-                    return weights, True
+                    return weights, True, False
                 weights = weights - rate * direction
                 inverse = np.linalg.inv(s * identity - weights * weights) + 1e-16
             _, grad_loss = loss(cov, weights)
@@ -366,21 +371,23 @@ def central_path(
             if step % 1000 == 0 or step == steps:
                 value = objective(weights, mu, s)
                 if abs(previous - value) <= 1e-6 * max(abs(previous), 1e-300):
-                    break
+                    return weights, True, False
                 previous = value
-        return weights, True
+        return weights, True, True
 
     weights, mu = np.where(free, start, 0.0), 1.0
     for t in range(stages):
-        rate, ok = lr, False
+        rate, ok, capped = lr, False, False
         while not ok:
-            candidate, ok = stage(
+            candidate, ok, capped = stage(
                 weights.copy(), mu, schedule[t], rate, max_iter if t == stages - 1 else warm_iter
             )
             if not ok:
                 rate *= 0.5
                 schedule[t] += 0.1
         weights, mu = candidate, mu * 0.1
+    if capped:
+        warn_search_limit("dagma", "max_iter", max_iter, "Adam steps of the last stage")
     return weights
 
 
@@ -595,6 +602,8 @@ def notears(
             decay=mcp_decay,
             max_steps=max_path,
         )
+        if steps == max_path:
+            warn_search_limit("notears", "max_path", max_path, "path steps")
     h_final, _ = trace_exponential(weights)
     return finish(
         weights, canonical, threshold=w_threshold, labels=labels, h_final=h_final, path_steps=steps
@@ -655,6 +664,8 @@ def dagma(
             decay=mcp_decay,
             max_steps=max_path,
         )
+        if steps == max_path:
+            warn_search_limit("dagma", "max_path", max_path, "path steps")
     return finish(
         weights,
         canonical,

@@ -6,7 +6,12 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, ANDREY_LAMBDA, SEARCH_SEED
+from andrey_bench.adapters.bic_penalty import (
+    ANDREY_EBIC_GAMMA,
+    ANDREY_LAMBDA,
+    SEARCH_SEED,
+    andrey_score,
+)
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: causal-learn's default tuck-relaxation depth, and Andrey's.
@@ -74,8 +79,8 @@ class AndreyGRaSP:
         with andrey.config(backend=self.backend, num_workers=1):
             out = andrey.grasp(
                 X,
-                score_func=score_func,
-                lambda_value=lambda_value,
+                score_func=andrey_score(score_func),
+                penalty_discount=lambda_value,
                 ebic_gamma=ebic_gamma,
                 depth=depth,
                 seed=seed,
@@ -141,8 +146,8 @@ class AndreyGRaSPDegenGauss(AndreyGRaSP):
         with andrey.config(backend=self.backend, num_workers=1):
             out = andrey.grasp(
                 X,
-                score_func=str(params["score_func"]),
-                lambda_value=float(params["lambda_value"]),
+                score_func=andrey_score(str(params["score_func"])),
+                penalty_discount=float(params["lambda_value"]),
                 depth=int(params["depth"]),
                 seed=int(params["seed"]),
                 categorical=list(range(X.shape[1])),
