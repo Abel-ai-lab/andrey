@@ -43,11 +43,11 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
 
     Before the facade: a former argument name or value becomes the current one, with one
     :class:`~andrey.DeprecatedArgumentWarning` for each; every argument the call passes is checked
-    and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``ValueError``;
-    a seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
-    an int; an experimental method warns :class:`~andrey.ExperimentalWarning`. After it: each
-    result's ``metadata["algorithm"]`` is ``name`` and, for a seeded method, ``metadata["seed"]``
-    is the seed used.
+    and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
+    ``ValueError``; a seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`)
+    and passed on as an int; an experimental method warns :class:`~andrey.ExperimentalWarning`.
+    After it: each result's ``metadata["algorithm"]`` is ``name`` and, for a seeded method,
+    ``metadata["seed"]`` is the seed used.
     """
 
     def decorate(facade: Facade) -> Facade:

@@ -27,10 +27,10 @@ change names its pull request.
   errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
   the graphs the others returned before. ([#445])
 - Every method checks its arguments in one shared step before it reads the data: a value of the
-  wrong type, outside its range, or not one of its choices raises `ValueError`, whose message names
-  the method, the argument, what it accepts, and the value, such as
-  `pc: alpha must be a number in (0, 1), got 1.5`. An unknown `indep_test`, `score_func`, or
-  `measure` raised `NotImplementedError` before, and an argument of the wrong type `TypeError`.
+  wrong type raises `TypeError`, and a value outside its range or not one of its choices raises
+  `ValueError`, each with one message that names the method, the argument, what it accepts, and the
+  value, such as `pc: alpha must be a number in (0, 1), got 1.5`. An unknown `indep_test`,
+  `score_func`, or `measure` raised `NotImplementedError` before.
   `metadata["algorithm"]` is the method's name, such as `"pc"` or `"ica_lingam"`, instead of a
   display name such as `"PC"` or `"ICALiNGAM"`. ([#496])
 

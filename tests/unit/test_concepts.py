@@ -272,36 +272,40 @@ def test_behavior_cell(concept, method):
 # --- the wrapper every method runs in ------------------------------------------------------------
 
 
-def bad_values(param) -> list:
-    """Values ``param`` refuses: another type, each side of its bounds, an unknown choice."""
+def bad_values(param) -> list[tuple[object, type[Exception]]]:
+    """Values ``param`` refuses, each with its error: another type raises ``TypeError``; each side
+    of the bounds, a non-finite number, and an unknown choice raise ``ValueError``."""
     if param.choices:
-        return ["unknown", 1]
-    values = {"int": [1.5, True], "float": ["0.5", float("nan")], "bool": [1, "yes"]}.get(
-        param.type, [[1.5, 1]] if param.type == "int_pair" else []
-    )
+        return [("unknown", ValueError), (1, TypeError)]
+    values = {
+        "int": [(1.5, TypeError), (True, TypeError)],
+        "float": [("0.5", TypeError), (float("nan"), ValueError)],
+        "bool": [(1, TypeError), ("yes", TypeError)],
+    }.get(param.type, [([1.5, 1], TypeError)] if param.type == "int_pair" else [])
     step = 1 if param.type in ("int", "int_pair") else 0.5
+    cast = int if param.type in ("int", "int_pair") else float
     if param.minimum is not None:
-        low = param.minimum if param.exclusive_minimum else param.minimum - step
-        values.append(low if param.type != "int_pair" else (int(low), 1))
+        low = cast(param.minimum if param.exclusive_minimum else param.minimum - step)
+        values.append((low if param.type != "int_pair" else (low, 1), ValueError))
     if param.maximum is not None:
-        high = param.maximum if param.exclusive_maximum else param.maximum + step
-        values.append(high)
+        high = cast(param.maximum if param.exclusive_maximum else param.maximum + step)
+        values.append((high if param.type != "int_pair" else (high, 1), ValueError))
     return values
 
 
 @pytest.mark.parametrize(
-    ("method", "param", "value"),
+    ("method", "param", "value", "error"),
     [
-        pytest.param(m, p, v, id=f"{m}-{p.name}-{v!r}")
+        pytest.param(m, p, v, e, id=f"{m}-{p.name}-{v!r}")
         for m, spec in REGISTRY.items()
         for p in spec.params
-        for v in bad_values(p)
+        for v, e in bad_values(p)
     ],
 )
-def test_a_bad_value_raises_one_value_error_shape(method, param, value):
+def test_a_bad_value_raises_one_message_shape(method, param, value, error):
     """Every parameter of every method refuses a bad value with one message: the method, the
     parameter, what it accepts, and the value."""
-    with pytest.raises(ValueError, match=rf"^{method}: {param.name} must be .+, got "):
+    with pytest.raises(error, match=rf"^{method}: {param.name} must be .+, got "):
         getattr(andrey, method)(*inputs(method, codes=False), **{param.name: value})
 
 

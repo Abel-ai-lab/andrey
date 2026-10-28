@@ -20,9 +20,10 @@ in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_di
 a list of datasets and returns one result per dataset. Each method is either supported or
 experimental; `andrey list` prints the status.
 
-Every method checks its arguments first: a value of the wrong type, outside its range, or not one
-of its choices raises a `ValueError` that names the method, the argument, what it accepts, and the
-value, such as `pc: alpha must be a number in (0, 1), got 1.5`. `andrey --help --json` lists each
+Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
+outside its range or not one of its choices raises `ValueError`, each with a message that names the
+method, the argument, what it accepts, and the value, such as
+`pc: alpha must be a number in (0, 1), got 1.5`. `andrey --help --json` lists each
 argument's type, range, and choices. Where `indep_test` takes the shipped tests, it also takes the
 ones you register with `register_indep_test`.
 

@@ -115,7 +115,8 @@ class ParamSpec(Spec):
     def check(
         self, value: object, method: str, *, choices: tuple[str, ...] | None = None
     ) -> object:
-        """Return ``value`` as the parameter's type, or raise ``ValueError`` if it is not accepted.
+        """Return ``value`` as the parameter's type; raise ``TypeError`` when it is another type and
+        ``ValueError`` when it is out of bounds, not a finite number, or not one of the choices.
 
         Checks the type, the bounds, and the choices: an int is an ``int`` or a NumPy integer, not
         a ``bool``; a float is any real number but ``NaN`` and infinity; a bool is ``True`` or
@@ -132,15 +133,21 @@ class ParamSpec(Spec):
         if self.type in ("str_list", "knowledge") or (self.type == "str" and not self.choices):
             return value
         typed = _typed(self.type, value)
+        message = f"{method}: {self.name} must be {self.accepted()}, got {reprlib.repr(value)}"
+        nonfinite = (
+            self.type == "float"
+            and isinstance(value, (float, np.floating))
+            and not math.isfinite(value)
+        )
+        if typed is None and not nonfinite:
+            raise TypeError(message)
         numbers = typed if isinstance(typed, tuple) else (typed,)
         if (
             typed is None
             or (self.choices is not None and typed not in self.choices)
             or any(isinstance(x, (int, float)) and self.out_of_range(x) for x in numbers)
         ):
-            raise ValueError(
-                f"{method}: {self.name} must be {self.accepted()}, got {reprlib.repr(value)}"
-            )
+            raise ValueError(message)
         return typed
 
     def accepted(self) -> str:
