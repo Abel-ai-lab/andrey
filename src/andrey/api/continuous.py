@@ -210,9 +210,13 @@ def notears(
     variables, five graphs for each combination, at the default settings. Errors are SHD against the
     true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
     least-squares fit changes when the columns are rescaled or standardized [4]_ [5]_, and [6]_
-    traces this to the score. The global minimizers of the penalized likelihood that ``robust=True``
-    uses do not change under rescaling [2]_, but the optimization is harder on standardized data,
-    and more so as the number of variables grows [2]_. On standardized columns the default fit's
+    traces this to the score. With a small enough penalty, the global minimizers of the penalized
+    likelihood that ``robust=True`` uses have the same graph on raw and standardized columns [2]_.
+    The robust fit, though, starts from the weights of the least-squares fit, and its penalty and
+    threshold act on the weights in data units; rescaling the columns by powers of two, all by one
+    factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. The
+    optimization is also harder on standardized data, and more so as the number of variables grows
+    [2]_. On standardized columns the default fit's
     median errors were 7, 18.5, 44.5 and 92 at those sizes, below the empty graph's in 61 of the 80
     fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 8, 17, 43.5 and 89,
     below it in 78 of 80. With ``robust=True`` they were 10, 14.5 and 30.5 on standardized columns
@@ -423,9 +427,13 @@ def dagma(
     variables, five graphs for each combination, at the default settings. Errors are SHD against the
     true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
     least-squares fit changes when the columns are rescaled or standardized [4]_ [5]_, and [6]_
-    traces this to the score. The global minimizers of the penalized likelihood that ``robust=True``
-    uses do not change under rescaling [2]_, but the optimization is harder on standardized data,
-    and more so as the number of variables grows [2]_. On standardized columns the default fit's
+    traces this to the score. With a small enough penalty, the global minimizers of the penalized
+    likelihood that ``robust=True`` uses have the same graph on raw and standardized columns [2]_.
+    The robust fit, though, starts from the weights of the least-squares fit, and its penalty and
+    threshold act on the weights in data units; rescaling the columns by powers of two, all by one
+    factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. The
+    optimization is also harder on standardized data, and more so as the number of variables grows
+    [2]_. On standardized columns the default fit's
     median errors were 12, 25.5, 64 and 129.5 at those sizes, below the empty graph's in 7 of the 80
     fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 9.5, 19, 49.5 and
     99.5, below it in 38 of 80. With ``robust=True`` they were 12, 25, 65 and 135.5 on standardized
