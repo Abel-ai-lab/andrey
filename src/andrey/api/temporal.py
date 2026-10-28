@@ -131,6 +131,10 @@ def varma_lingam(
 
     Notes
     -----
+    The likelihood fit runs on the series with each column divided by its standard deviation, and
+    its matrices and residuals are mapped back to the data's units, so rescaling a column changes
+    the fit only through rounding.
+
     DirectLiNGAM orders the innovations of the fitted model. Each pairwise regression in its
     ordering takes the least-squares slope, so every residual it scores is uncorrelated with its
     regressor in the sample.

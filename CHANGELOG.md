@@ -197,14 +197,10 @@ change names its pull request.
   least-squares fit now runs again on the data divided by a power of two, and BIC picks its point
   on the whole path; a fit whose path reached the least-squares fit returns the same values as
   before. ([#478])
-- `direct_lingam`, `multi_group_direct_lingam`, `longitudinal_lingam`, `varma_lingam`, `rcd`,
-  `bottom_up_parce_lingam`, and `gin` return the same graph and causal order when you rescale a
-  column. Their least-squares fits, pseudo-inverse, VARMA likelihood fit, and GIN's linear
-  combination read the units through numerical cutoffs and the optimizer, so a column in units far
-  from another's, such as micrometers beside meters, could lose its edges; these steps now run on
-  columns brought to unit scale and map their results back to the data's units. On raw series,
-  `varma_lingam`'s weights change, and at times its graph; on standardized data the other methods
-  return the same values. ([#500])
+- The LiNGAM methods, `varma_lingam`, and `gin` fit their regressions, covariances, and
+  time-series model on unit-scale columns and map the results back, so the units of the data no
+  longer change their graphs; on standardized data the LiNGAM methods return the same values as
+  before. ([#500])
 - `varma_lingam`'s `max_iter` raises the likelihood fit's evaluation limit with it. The optimizer
   stopped after 15,000 function evaluations, which each iteration spends at about one per
   parameter, however large `max_iter` was and without a warning, so raising `max_iter` could not
