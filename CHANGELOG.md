@@ -12,6 +12,9 @@ names its pull request.
 
 ### Added
 
+- `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
+  random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
+  graphs these methods returned before. ([#PRNUM])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
   searches do: a required edge is always in the result, a pair forbidden both ways or outside
   `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier

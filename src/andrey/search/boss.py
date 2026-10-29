@@ -90,6 +90,19 @@ def ranked_score(
     return score, ranks
 
 
+def start_rng(random_state: int, start: int) -> random.Random:
+    """The private RNG of start ``start`` of a permutation search seeded by ``random_state``.
+
+    Start ``0`` draws from ``random_state`` itself, so a one-start search draws what it drew before
+    starts existed. Start ``k > 0`` draws from a child seed of ``SeedSequence(random_state,
+    spawn_key=(k,))``, so each start depends on ``random_state`` and ``k`` only.
+    """
+    if start == 0:
+        return random.Random(random_state)
+    child = np.random.SeedSequence(random_state, spawn_key=(start,))
+    return random.Random(int(child.generate_state(1)[0]))
+
+
 def precedence_sort(order: Sequence[int], before: np.ndarray) -> list[int]:
     """``order`` rearranged so that ``a`` precedes ``b`` wherever ``before[a, b]`` (acyclic).
 
@@ -783,12 +796,85 @@ def _better_mutation(
     return True
 
 
+def _search_state(
+    X: np.ndarray,
+    score_func: str,
+    penalty_discount: float,
+    ebic_gamma: float,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    max_parents: int | None,
+) -> tuple[LocalScore, np.ndarray, list[_GrowShrinkTree], np.ndarray | None]:
+    """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
+
+    The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
+    """
+    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    p = X.shape[1]
+    if constraints is None:
+        gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        return score, ranks, gsts, None
+    ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
+    gsts = []
+    for v in range(p):
+        candidates, required = parent_knowledge(ranked, v)
+        gsts.append(
+            _GrowShrinkTree(
+                v,
+                score,
+                delta,
+                p,
+                candidates=candidates,
+                required=required,
+                max_parents=max_parents,
+            )
+        )
+    return score, ranks, gsts, ranked.precedence()
+
+
+def _search_from(
+    order: list[int],
+    rng: random.Random,
+    gsts: list[_GrowShrinkTree],
+    score: LocalScore,
+    before: np.ndarray | None,
+) -> tuple[dict[int, list[int]], float]:
+    """Sweep ``order`` (mutated) until no move improves it; return its parent sets and score.
+
+    Each sweep visits the variables in an order ``rng`` shuffles. The score is the sum of the
+    full local scores of the parent sets, lower is better.
+    """
+    positions = {v: idx for idx, v in enumerate(order)}
+    variables = list(order)
+    while True:
+        improved = False
+        rng.shuffle(variables)
+        for v in variables:
+            improved |= _better_mutation(v, order, gsts, positions, before)
+        if not improved:
+            break
+
+    parents: dict[int, list[int]] = {}
+    prefix: set[int] = set()
+    for v in order:
+        pa: list[int] = []
+        gsts[v].trace(prefix, pa)
+        parents[v] = pa
+        prefix.add(v)
+    total = 0.0
+    for child in range(len(order)):
+        total += score.score(child, parents[child])
+    return parents, total
+
+
 def boss(
     data: np.ndarray,
     *,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     random_state: int = 0,
+    n_starts: int = 1,
     score_func: str = "bic",
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
@@ -808,7 +894,12 @@ def boss(
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
     random_state : int
-        Seed for the sweep-order RNG.
+        Seed for the sweep-order RNG of every start and the start orders after the first
+        (:func:`start_rng`).
+    n_starts : int
+        Number of searches, at least ``1``: the first from the tie-rank order, each later one from
+        an order its own RNG shuffles. The returned order is the best-scoring one; a later start
+        replaces an earlier one only when it scores better by more than ``_SCORE_EPS``.
     score_func : str
         Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC
         (``"bic"``), BDeu or the multinomial BIC on
@@ -860,57 +951,29 @@ def boss(
         raise ValueError(
             f"the required edges give a node more than max_parents={max_parents} parents"
         )
-    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
-    rng = random.Random(random_state)
-
-    order = list(range(p))
-    before = None
-    if constraints is None:
-        gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in order]
-    else:
-        ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
-        before = ranked.precedence()
-        gsts = []
-        for v in order:
-            candidates, required = parent_knowledge(ranked, v)
-            gsts.append(
-                _GrowShrinkTree(
-                    v,
-                    score,
-                    delta,
-                    p,
-                    candidates=candidates,
-                    required=required,
-                    max_parents=max_parents,
-                )
-            )
-        order = precedence_sort(order, before)
-    positions = {v: idx for idx, v in enumerate(order)}
-    variables = list(order)
-
-    while True:
-        improved = False
-        rng.shuffle(variables)
-        for v in variables:
-            improved |= _better_mutation(v, order, gsts, positions, before)
-        if not improved:
-            break
-
-    parents: dict[int, list[int]] = {}
-    prefix: set[int] = set()
-    for v in order:
-        pa: list[int] = []
-        gsts[v].trace(prefix, pa)
-        parents[v] = pa
-        prefix.add(v)
+    best: tuple[dict[int, list[int]], float] | None = None
+    for start in range(n_starts):
+        # Each start builds its own score, caches, and trees, so a search of many starts holds
+        # one start's state at a time.
+        score, ranks, gsts, before = _search_state(
+            X, score_func, penalty_discount, ebic_gamma, categorical, constraints, max_parents
+        )
+        rng = start_rng(random_state, start)
+        order = list(range(p))
+        if start > 0:
+            rng.shuffle(order)
+        if before is not None:
+            order = precedence_sort(order, before)
+        parents, total = _search_from(order, rng, gsts, score, before)
+        if best is None or total < best[1] - _SCORE_EPS:
+            best = (parents, total)
+        del score, gsts
+    assert best is not None  # n_starts >= 1
+    parents, total = best
 
     adj = np.zeros((p, p), dtype=np.int8)
-    total = 0.0
     for child in range(p):
-        pa = parents[child]
-        total += score.score(child, pa)
-        for parent in pa:
+        for parent in parents[child]:
             adj[parent, child] = TAIL
             adj[child, parent] = ARROW
 
