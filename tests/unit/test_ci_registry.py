@@ -14,6 +14,7 @@ import pytest
 
 import andrey
 from andrey.core import ci
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 
 @pytest.fixture
@@ -84,6 +85,25 @@ def test_minimal_protocol_is_the_guaranteed_floor(clean_registry):
     ci.register_indep_test("only_call", OnlyCall)
     out = andrey.pc(_chain_data(), indep_test="only_call")
     assert out.structure.kind == "cpdag"
+
+
+def test_the_statistic_of_a_p_value_grows_as_it_shrinks():
+    p_values = np.array([1.0, 0.5, 0.05, 1e-10, 1e-300])
+    statistics = ci.p_value_statistic(p_values)
+    assert statistics[0] == 0.0
+    assert (np.diff(statistics) > 0).all()
+    assert np.isfinite(ci.p_value_statistic(0.0))  # an underflowed p-value stays finite
+
+
+def test_a_test_with_p_values_only_answers_a_batch_query_by_query():
+    """The adapter the PCMCI family wraps such a test in gives the test's p-values exactly, and
+    statistics that order the queries by p-value, smallest first."""
+    test = PValueOnly(_chain_data(d=5))
+    x, y = np.array([0, 0, 0, 1, 3]), np.array([4, 3, 2, 4, 4])
+    conditions = np.array([[1], [1], [1], [2], [0]])
+    statistics, p_values = ci.PValueTest(test).statistic_pvalues(x, y, conditions)
+    assert p_values.tolist() == [test(a, b, c) for a, b, c in zip(x, y, conditions.tolist())]
+    assert np.array_equal(np.argsort(-statistics), np.argsort(p_values))
 
 
 def test_unknown_indep_test_raises():

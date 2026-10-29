@@ -19,8 +19,8 @@ from scipy.stats import qmc
 from andrey.search.hc import tie_ranks
 
 from . import backend, env
-from .ci import _canonical_ranked, _checked_data
-from .independence import hsic_test
+from .ci import _canonical_ranked, _checked_data, per_query
+from .independence import hsic_statistic_test
 from .seeding import resolve_seed
 from .warning_policy import SampleSizeWarning, warn_once
 
@@ -211,26 +211,46 @@ class KCI:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the KCI p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The statistics and p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets. A statistic is relative to its mean under independence, as
+        :func:`~andrey.core.independence.hsic_statistic_test` reports it: near 1 for independent
+        variables and larger the more dependent they are; ``0`` for a constant variable.
+        """
+        return per_query(self._statistic_pvalue, x, y, conditions)
+
+    def _statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int]
+    ) -> tuple[float, float]:
+        """The statistic relative to its null mean, and the p-value, of one query."""
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         data, n = self._data, self._n
         if not (np.ptp(data[:, x_int]) > 0.0 and np.ptp(data[:, y_int]) > 0.0):
-            return 1.0  # a constant variable: no variation to depend on
+            return 0.0, 1.0  # a constant variable: no variation to depend on
         if not cond:
-            return hsic_test(data[:, x_int], data[:, y_int])
+            return hsic_statistic_test(data[:, x_int], data[:, y_int])
 
         width = self._width(len(cond))
         z = data[:, cond]
         if self._rank is not None:
-            return self._low_rank_pvalue(data[:, x_int], data[:, y_int], z, width, self._rank)
-        xs = np.column_stack([data[:, x_int], 0.5 * z])
-        dev = _kci_backend(n)
-        if dev != "numpy":
-            return _gamma_pvalue(
-                *_kci_moments_torch(xs, data[:, [y_int]], z, width, self._ridge, dev)
-            )
-        resid = self._resid(tuple(cond))
-        kxs = _centered_gaussian_kernel(xs, width)
-        return _gamma_pvalue(*_kci_moments(resid @ kxs @ resid, self._resid_y(y_int, tuple(cond))))
+            moments = self._low_rank_moments(data[:, x_int], data[:, y_int], z, width, self._rank)
+        else:
+            xs = np.column_stack([data[:, x_int], 0.5 * z])
+            dev = _kci_backend(n)
+            if dev != "numpy":
+                moments = _kci_moments_torch(xs, data[:, [y_int]], z, width, self._ridge, dev)
+            else:
+                resid = self._resid(tuple(cond))
+                kxs = _centered_gaussian_kernel(xs, width)
+                moments = _kci_moments(resid @ kxs @ resid, self._resid_y(y_int, tuple(cond)))
+        p_value = _gamma_pvalue(*moments)
+        return moments[0] / moments[1], p_value
 
     def _width(self, size: int) -> float:
         """The Gaussian kernels' width with ``size`` conditioning variables."""
@@ -250,10 +270,11 @@ class KCI:
         ky = _centered_gaussian_kernel(self._data[:, [y]], self._width(len(cond)))
         return resid @ ky @ resid
 
-    def _low_rank_pvalue(
+    def _low_rank_moments(
         self, x: np.ndarray, y: np.ndarray, z: np.ndarray, width: float, rank: int
-    ) -> float:
-        """The p-value with each kernel replaced by its centered incomplete Cholesky factors.
+    ) -> tuple[float, float, float]:
+        """The statistic and null moments with each kernel replaced by its centered incomplete
+        Cholesky factors.
 
         With ``Ks ~ Ls Ls'``, ``R = ridge (Ks + ridge I)^-1 = I - Ls (Ls' Ls + ridge I)^-1 Ls'``,
         so ``A = R Kxs R = P P'`` with ``P = R Lxs``, and ``B = Q Q'`` with ``Q = R Ly``.
@@ -264,7 +285,7 @@ class KCI:
         inner = ls.T @ ls + self._ridge * np.eye(ls.shape[1])
         p = lxs - ls @ np.linalg.solve(inner, ls.T @ lxs)
         q = ly - ls @ np.linalg.solve(inner, ls.T @ ly)
-        return _gamma_pvalue(*_kci_moments(p @ p.T, q @ q.T))
+        return _kci_moments(p @ p.T, q @ q.T)
 
 
 def _kci_backend(n: int) -> str:
@@ -560,6 +581,23 @@ class RCoT:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The statistics and p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; the statistic is ``n`` times the squared Frobenius norm of the residual
+        features' cross-covariance.
+        """
+        return per_query(self._statistic_pvalue, x, y, conditions)
+
+    def _statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int]
+    ) -> tuple[float, float]:
+        """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         if cond:
             self._warn_few_rows()
@@ -569,7 +607,7 @@ class RCoT:
         statistic = n * float(np.sum(cross_cov**2))
         products = (a[:, :, None] * b[:, None, :]).reshape(n, -1)
         weights = np.clip(np.linalg.eigvalsh(products.T @ products / n), 0.0, None)
-        return _hall_buckley_eagleson_pvalue(statistic, weights)
+        return statistic, _hall_buckley_eagleson_pvalue(statistic, weights)
 
     def _canonical_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray

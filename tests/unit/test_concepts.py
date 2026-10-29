@@ -22,8 +22,9 @@ from andrey.api import _method as method_wrapper
 from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, Concept
+from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, Concept
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 #: Public callables outside the registry that a concept may name.
@@ -165,18 +166,23 @@ def test_docstring_entry_states_the_concept(concept, method):
 N = 200
 
 
-def frame(seed: int, *, codes: bool) -> pd.DataFrame:
-    """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories."""
+def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
+    """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories,
+    and with ``gaps``, a few values of x and y are missing."""
     rng = np.random.default_rng(seed)
     u = rng.uniform(-1, 1, size=(N, 3)) ** 3
     x = rng.integers(0, 4, N).astype(float) if codes else u[:, 0]
     y = 0.8 * x + u[:, 1]
-    return pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
+    data = pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
+    if gaps:
+        data.iloc[::13, 0] = np.nan
+        data.iloc[5::11, 1] = np.nan
+    return data
 
 
-def inputs(method: str, *, codes: bool) -> list:
+def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
-    frames = [frame(seed, codes=codes) for seed in range(3)]
+    frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
         if not inp.required:
@@ -195,13 +201,13 @@ SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
-def fit(method: str, *, codes: bool, **kwargs):
+def fit(method: str, *, codes: bool, gaps: bool = False, **kwargs):
     if method == "calm":
         pytest.importorskip("torch")
     warning_policy._warned.clear()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        out = getattr(andrey, method)(*inputs(method, codes=codes), **kwargs)
+        out = getattr(andrey, method)(*inputs(method, codes=codes, gaps=gaps), **kwargs)
     return (out[0] if isinstance(out, list) else out), [w.category for w in caught]
 
 
@@ -392,7 +398,7 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 #: The settings that make a CI search draw random numbers.
-RANDOMIZED = {m: {"indep_test": "rcot"} for m in CI_SEARCHES}
+RANDOMIZED = {m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY)}
 
 
 @pytest.mark.parametrize("method", SEEDED)
@@ -409,7 +415,7 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     """A method without a seed, and a CI search under a deterministic test, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
-    for method in CI_SEARCHES:
+    for method in (*CI_SEARCHES, *PCMCI_FAMILY):
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
 
@@ -469,11 +475,34 @@ CI_CASES = {
     "mmpc": [{}, {"target": 0}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
+    "pcmci": [{}],
+    "pcmciplus": [{}],
+    "lpcmci": [{}],
 }
 
 
 def test_every_search_with_a_ci_test_has_cases():
-    assert set(CI_CASES) == set(CI_SEARCHES)
+    assert set(CI_CASES) == {*CI_SEARCHES, *PCMCI_FAMILY}
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "gaps"),
+    [
+        pytest.param(m, s, g, id=f"{m}-{'+'.join(s) or 'default'}-{'gaps' if g else 'complete'}")
+        for m, cases in CI_CASES.items()
+        for s in cases
+        for g in (False, True)
+        if not g or REGISTRY[m].data.missing
+    ],
+)
+def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings, gaps, monkeypatch):
+    """A test registered with the single-query call alone runs every search that takes
+    ``indep_test``, on complete data and, where the method takes missing values, on data with gaps,
+    and gives the graph of Fisher's z-test it wraps."""
+    expected, _ = fit(method, codes=False, gaps=gaps, **settings)
+    monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    out, _ = fit(method, codes=False, gaps=gaps, indep_test="p_value_only", **settings)
+    assert out.structure == expected.structure
 
 
 @pytest.fixture
@@ -509,14 +538,15 @@ def test_the_seed_reaches_every_randomized_test_a_search_builds(
     assert out.metadata["seed"] == 7
 
 
-@pytest.mark.parametrize("method", CI_SEARCHES)
+@pytest.mark.parametrize("method", (*CI_SEARCHES, *PCMCI_FAMILY))
 def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkeypatch):
     results = []
     for global_seed in ("0", "11"):
         monkeypatch.setenv("ANDREY_SEED", global_seed)
         out, _ = fit(method, codes=False, indep_test="rcot", seed=7)
-        results.append((out.structure.to_numpy().tolist(), out.metadata))
-    assert results[0] == results[1]
+        results.append((out.structure, out.metadata))
+    assert results[0][0] == results[1][0]
+    assert repr(results[0][1]) == repr(results[1][1])
 
 
 def test_a_former_seed_name_maps_to_seed_for_one_release():

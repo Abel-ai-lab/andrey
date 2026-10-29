@@ -92,7 +92,7 @@ from andrey.core.ci_missing import PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
-from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, design_test
+from andrey.temporal.pcmci import DesignTest, LinkTest, design_test
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -207,9 +207,12 @@ class _Search:
     ) -> None:
         self.test, self.n, self.tau_max, self.alpha = test, n_vars, tau_max, alpha
         self.max_p_global = max_p_global
-        # A test that deletes rows counts every query it answers in rows_tested, so a repeated
-        # query of any size comes from the cache.
-        self.cache_every_size = isinstance(getattr(test, "test", None), PartialCorrelationDeletion)
+        # A test that deletes rows counts every query it answers in rows_tested, and a test other
+        # than a partial correlation over complete data is slow, so a repeated query of any size
+        # comes from the cache.
+        self.cache_every_size = not isinstance(test, DesignTest) or isinstance(
+            test.test, PartialCorrelationDeletion
+        )
         self.ranks = ranks
         self.absent, self.required, self.arrowheads = self._knowledge(constraints)
         self.locked = {(key, at_start) for key in self.required for at_start in (True, False)}
@@ -1327,21 +1330,20 @@ def lpcmci(
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> LPCMCIResult:
-    """Run LPCMCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
+    """Run LPCMCI on a ``(T, n)`` series with the ``indep_test`` test.
 
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach :func:`run`.
     ``max_p_global`` caps the size of the searched subsets ``S`` in both removal phases and in the
     majority vote; the default conditions ``S_def`` come on top. ``None`` sets no cap.
-
-    Raises :class:`ValueError` when ``indep_test`` is not a key of
-    :data:`~andrey.temporal.pcmci.INDEP_TESTS`.
+    ``categorical`` and ``seed`` reach :func:`~andrey.temporal.pcmci.design_test`, which raises on
+    an ``indep_test`` it cannot build.
     """
-    if indep_test not in INDEP_TESTS:
-        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(indep_test, data, tau_max)
-    ranks = tie_ranks(data).tolist()
+    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():
         return run(
             test,
