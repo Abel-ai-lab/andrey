@@ -36,6 +36,7 @@ from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES, node_labels
+from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS
 from andrey.spec.generate import (
@@ -333,7 +334,7 @@ def bootstrap_envelope(
     first = outs[0]
     env: dict = {"schema_version": SCHEMA_VERSION, "method": spec.name, "status": spec.status}
     env["bootstrap"] = {
-        "n_boot": first.n_boot,
+        "n_resamples": first.n_resamples,
         "threshold": first.threshold,
         "seed": first.metadata["seed"],
         "resampling": first.metadata["resampling"],
@@ -1035,7 +1036,8 @@ def execute_bootstrap(
     resolved: dict,
     *,
     labels: tuple[str, ...] | None = None,
-    n_boot: int,
+    n_resamples: int,
+    n_boot: int | None = None,
     seed: int | None,
     threshold: float,
     resampling: str,
@@ -1048,6 +1050,7 @@ def execute_bootstrap(
     """Refit the method on resamples of the rows, then emit the edge frequencies (shell-aware).
 
     The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
+    ``n_boot`` is the former ``--n-boot`` flag, which replaces ``n_resamples`` and warns.
     """
     import time
 
@@ -1056,10 +1059,11 @@ def execute_bootstrap(
             "bad_value", "the bootstrap seeds each fit itself; set --seed, not seed=", EXIT_USAGE
         )
     panel = spec.data.inputs[0].kind == "panel"
+    n_resamples = n_resamples if n_boot is None else n_boot
     bad = [
         message
         for ok, message in (
-            (n_boot >= 1, f"--n-boot must be at least 1, got {n_boot}"),
+            (n_resamples >= 1, f"--n-resamples must be at least 1, got {n_resamples}"),
             (0 < threshold <= 1, f"--threshold must lie in (0, 1], got {threshold}"),
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),
@@ -1095,10 +1099,16 @@ def execute_bootstrap(
     with _fit_errors():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            if n_boot is not None:
+                warn_once(
+                    "andrey bootstrap: --n-boot is now --n-resamples; the former flag stops "
+                    "working in the next release",
+                    DeprecatedArgumentWarning,
+                )
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
-                n_boot=n_boot,
+                n_resamples=n_resamples,
                 seed=seed,
                 threshold=threshold,
                 resampling=resampling,
@@ -1172,7 +1182,7 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
     if command == "bootstrap":
         lines += [
             "",
-            "Bootstrap flags: --n-boot <n> (default 100), --seed <int>, --threshold <share> "
+            "Bootstrap flags: --n-resamples <n> (default 100), --seed <int>, --threshold <share> "
             "(default 0.5),",
             "  --resampling subsample|bootstrap (default subsample), --sample-fraction <share> "
             "(default 0.5, a subsample's rows),",
@@ -1781,7 +1791,12 @@ def cmd_bootstrap(
     interventions: _InterventionsOption = None,
     data_groups: _DataGroupsOption = None,
     data_list: _DataListOption = None,
-    n_boot: int = typer.Option(100, "--n-boot", metavar="N", help="Number of resamples and fits."),
+    n_resamples: Optional[int] = typer.Option(
+        None, "--n-resamples", metavar="N", help="Number of resamples and fits. Default 100."
+    ),
+    n_boot: Optional[int] = typer.Option(
+        None, "--n-boot", metavar="N", hidden=True, help="Former name of --n-resamples."
+    ),
     seed: Optional[int] = typer.Option(
         None,
         "--seed",
@@ -1836,6 +1851,12 @@ def cmd_bootstrap(
         "data_list": data_list,
     }
     _merge_former_inputs(spec, provided)
+    if n_boot is not None and n_resamples is not None:
+        raise CliError(
+            "bad_value",
+            "--n-boot is the former name of --n-resamples; pass only --n-resamples",
+            EXIT_USAGE,
+        )
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
@@ -1846,6 +1867,7 @@ def cmd_bootstrap(
         fkwargs,
         resolved,
         labels=labels,
+        n_resamples=100 if n_resamples is None else n_resamples,
         n_boot=n_boot,
         seed=seed,
         threshold=threshold,

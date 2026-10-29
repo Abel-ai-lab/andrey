@@ -81,7 +81,7 @@ def edge_set(structure):
 
 def test_frequencies_are_shares_of_the_fits_with_each_edge(counted):
     out = BootstrapOutput.from_fits(counted)
-    assert out.n_boot == 10
+    assert out.n_resamples == 10
     assert out.frequency("->")[0, 1] == 0.6 and out.frequency("<-")[1, 0] == 0.6
     assert out.frequency("<-")[0, 1] == 0.2 and out.frequency("->")[1, 0] == 0.2
     assert out.frequency("absent")[0, 1] == out.frequency("absent")[1, 0] == pytest.approx(0.2)
@@ -195,7 +195,7 @@ def test_from_fits_rejects_what_cannot_be_counted(counted):
         np.array([[0, ARROW], [TAIL, 0]], dtype=np.int8), kind="digraph"
     )
     mixed = [counted[0], StructureOutput.new(GraphStructure.from_numpy(np.zeros((4, 4))))]
-    assert BootstrapOutput.from_fits(mixed).n_boot == 2
+    assert BootstrapOutput.from_fits(mixed).n_resamples == 2
     other = [graph(2, [directed(0, 1)]), StructureOutput.new(lagged)]
     with pytest.raises(ValueError, match="digraph"):
         BootstrapOutput.from_fits(other)
@@ -211,7 +211,7 @@ def test_the_labels_of_the_fits_name_the_nodes():
         np.random.default_rng(0).standard_normal((200, 3)), columns=["a", "b", "c"]
     )
     frame["b"] += frame["a"]
-    out = bootstrap("hc", frame, n_boot=3, seed=0)
+    out = bootstrap("hc", frame, n_resamples=3, seed=0)
     assert out.structure.labels == ("a", "b", "c")
     assert {row["source"] for row in out.table()} <= {"a", "b", "c"}
     assert {row["source"] for row in out.table(index=True)} <= {0, 1, 2}
@@ -231,10 +231,10 @@ def lingam_data(n=200, seed=0):
 
 def test_a_seed_gives_the_same_resamples_whatever_the_number_of_fits():
     data = lingam_data()
-    short = bootstrap("direct_lingam", data, n_boot=4, seed=7, keep_fits=True)
-    longer = bootstrap("direct_lingam", data, n_boot=6, seed=7, keep_fits=True)
-    again = bootstrap(andrey.direct_lingam, data, n_boot=4, seed=7, keep_fits=True)
-    other = bootstrap("direct_lingam", data, n_boot=4, seed=8, keep_fits=True)
+    short = bootstrap("direct_lingam", data, n_resamples=4, seed=7, keep_fits=True)
+    longer = bootstrap("direct_lingam", data, n_resamples=6, seed=7, keep_fits=True)
+    again = bootstrap(andrey.direct_lingam, data, n_resamples=4, seed=7, keep_fits=True)
+    other = bootstrap("direct_lingam", data, n_resamples=4, seed=8, keep_fits=True)
     assert short.fits == again.fits == longer.fits[:4]
     assert short.table() == again.table()
     weights = [fit.weighted_adjacency for fit in short.fits]
@@ -248,24 +248,36 @@ def test_a_seed_gives_the_same_resamples_whatever_the_number_of_fits():
         "sample_fraction": 0.5,
         "block_length": None,
     }
-    assert short.fits is not None and bootstrap("hc", data, n_boot=2).fits is None
+    assert short.fits is not None and bootstrap("hc", data, n_resamples=2).fits is None
+
+
+def test_the_former_n_boot_still_sets_the_number_of_resamples_with_a_warning():
+    data = lingam_data()
+    current = bootstrap("hc", data, n_resamples=3, seed=1)
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="n_boot is now n_resamples"):
+        former = bootstrap("hc", data, n_boot=3, seed=1)
+    assert former.n_resamples == 3 and former.table() == current.table()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="BootstrapOutput.n_boot is now"):
+        assert former.n_boot == former.n_resamples
+    with pytest.raises(ValueError, match="n_boot is the former name of n_resamples"):
+        bootstrap("hc", data, n_boot=3, n_resamples=4)
 
 
 def test_the_default_seed_follows_andrey_seed(monkeypatch):
     data = lingam_data()
     monkeypatch.setenv("ANDREY_SEED", "5")
-    from_env = bootstrap("direct_lingam", data, n_boot=3, keep_fits=True)
-    explicit = bootstrap("direct_lingam", data, n_boot=3, seed=5, keep_fits=True)
+    from_env = bootstrap("direct_lingam", data, n_resamples=3, keep_fits=True)
+    explicit = bootstrap("direct_lingam", data, n_resamples=3, seed=5, keep_fits=True)
     assert from_env.fits == explicit.fits and from_env.metadata["seed"] == 5
     monkeypatch.delenv("ANDREY_SEED")
-    assert bootstrap("hc", data, n_boot=2).metadata["seed"] == 0
+    assert bootstrap("hc", data, n_resamples=2).metadata["seed"] == 0
 
 
 @pytest.mark.parametrize("method", ["pc", "direct_lingam", "boss"])
 def test_workers_do_not_change_the_result(method):
     data = lingam_data()
-    serial = with_workers(1, method, data, n_boot=6, seed=3, keep_fits=True)
-    pooled = with_workers(2, method, data, n_boot=6, seed=3, keep_fits=True)
+    serial = with_workers(1, method, data, n_resamples=6, seed=3, keep_fits=True)
+    pooled = with_workers(2, method, data, n_resamples=6, seed=3, keep_fits=True)
     assert serial.fits == pooled.fits and serial.table() == pooled.table()
     assert serial.structure == pooled.structure
 
@@ -281,7 +293,7 @@ def test_a_seeded_method_fits_each_resample_with_a_seed_derived_from_the_bootstr
     data = lingam_data()
 
     def seeds(**kwargs):
-        out = bootstrap(method, data, n_boot=3, keep_fits=True, **settings, **kwargs)
+        out = bootstrap(method, data, n_resamples=3, keep_fits=True, **settings, **kwargs)
         return [fit.metadata["seed"] for fit in out.fits]
 
     derived = seeds(seed=1)
@@ -292,7 +304,7 @@ def test_a_seeded_method_fits_each_resample_with_a_seed_derived_from_the_bootstr
 
 def test_the_bootstrap_does_not_take_a_seed_the_method_has_renamed():
     with pytest.raises(ValueError, match="random_state cannot be set"):
-        bootstrap("ica_lingam", lingam_data(), n_boot=2, random_state=4)
+        bootstrap("ica_lingam", lingam_data(), n_resamples=2, random_state=4)
 
 
 @pytest.mark.parametrize("method", ["pc", "fci", "ges", "boss", "direct_lingam"])
@@ -306,8 +318,8 @@ def test_the_frequencies_do_not_depend_on_the_column_order(method):
     x5 = rng.uniform(-1, 1, n)
     frame = pd.DataFrame(dict(x1=x1, x2=x2, x3=x3, x4=x4, x5=x5))
     perm = [3, 0, 4, 2, 1]
-    plain = bootstrap(method, frame, n_boot=8, seed=2)
-    shuffled = bootstrap(method, frame.iloc[:, perm], n_boot=8, seed=2)
+    plain = bootstrap(method, frame, n_resamples=8, seed=2)
+    shuffled = bootstrap(method, frame.iloc[:, perm], n_resamples=8, seed=2)
     for edge in (*EDGES, "absent"):
         assert np.array_equal(
             shuffled.frequency(edge), plain.frequency(edge)[np.ix_(perm, perm)]
@@ -321,26 +333,26 @@ def test_the_frequencies_do_not_depend_on_the_column_order(method):
 def test_a_row_aligned_input_is_resampled_with_the_rows():
     data = lingam_data(300)
     domain = np.repeat([0, 1, 2], 100)
-    out = bootstrap("cdnod", data, n_boot=3, seed=0, domain_index=domain, keep_fits=True)
-    assert out.n_boot == 3 and out.structure.n_nodes == 4
+    out = bootstrap("cdnod", data, n_resamples=3, seed=0, domain_index=domain, keep_fits=True)
+    assert out.n_resamples == 3 and out.structure.n_nodes == 4
     with pytest.raises(ValueError, match="domain_index has 299 rows but data has 300"):
-        bootstrap("cdnod", data, n_boot=3, domain_index=domain[:-1])
+        bootstrap("cdnod", data, n_resamples=3, domain_index=domain[:-1])
     with pytest.raises(ValueError, match="needs domain_index"):
-        bootstrap("cdnod", data, n_boot=3)
+        bootstrap("cdnod", data, n_resamples=3)
     ints = (np.random.default_rng(0).random((300, 4)) < 0.1).astype(int)
-    assert bootstrap("gies", data, n_boot=2, interventions=ints).n_boot == 2
-    assert bootstrap("gies", data, n_boot=2).n_boot == 2
+    assert bootstrap("gies", data, n_resamples=2, interventions=ints).n_resamples == 2
+    assert bootstrap("gies", data, n_resamples=2).n_resamples == 2
 
 
 def test_a_method_with_a_group_per_dataset_returns_one_result_per_group():
     groups = [lingam_data(150, seed) for seed in range(3)]
-    out = bootstrap("multi_group_direct_lingam", groups, n_boot=3, seed=1, keep_fits=True)
+    out = bootstrap("multi_group_direct_lingam", groups, n_resamples=3, seed=1, keep_fits=True)
     assert isinstance(out, list) and len(out) == 3
-    assert all(o.n_boot == 3 and o.structure.n_nodes == 4 for o in out)
+    assert all(o.n_resamples == 3 and o.structure.n_nodes == 4 for o in out)
     assert all(len(o.fits) == 3 for o in out)
     # the groups are resampled on their own, so groups of different sizes work
     sizes = [lingam_data(120, 4), lingam_data(180, 5)]
-    assert len(bootstrap("multi_group_direct_lingam", sizes, n_boot=2, seed=1)) == 2
+    assert len(bootstrap("multi_group_direct_lingam", sizes, n_resamples=2, seed=1)) == 2
 
 
 def series(n=300, seed=0):
@@ -355,16 +367,18 @@ def series(n=300, seed=0):
 
 def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
     out = bootstrap(
-        "pcmci", series(), n_boot=4, seed=0, resampling="bootstrap", block_length=20, tau_max=1
+        "pcmci", series(), n_resamples=4, seed=0, resampling="bootstrap", block_length=20, tau_max=1
     )
     assert isinstance(out.structure, TemporalStructure) and out.structure.lags == (1,)
     assert out.metadata["block_length"] == 20
     assert out.frequency("->", lag=1).shape == (3, 3)
     assert {row["lag"] for row in out.table()} == {1}
-    default = bootstrap("granger", series(), n_boot=2, seed=0, resampling="bootstrap", tau_max=1)
+    default = bootstrap(
+        "granger", series(), n_resamples=2, seed=0, resampling="bootstrap", tau_max=1
+    )
     assert default.metadata["block_length"] == 10  # 10 * tau_max, above ceil(300 ** (1 / 3))
     with pytest.raises(ValueError, match="lag is for a time-series result"):
-        bootstrap("pc", lingam_data(), n_boot=2).frequency("->", lag=1)
+        bootstrap("pc", lingam_data(), n_resamples=2).frequency("->", lag=1)
 
 
 def job_of(name, data, unit, resampling, fraction=0.5, *, seed=0, block_length=None):
@@ -384,7 +398,7 @@ def test_the_blocks_are_consecutive_rows_of_the_series():
     assert not np.array_equal(_draw(job, 0)[0], _draw(job, 1)[0])
     assert np.array_equal(_draw(job, 3)[0], _draw(job, 3)[0])
     with pytest.raises(ValueError, match="block_length must be an int from 1 to 50"):
-        bootstrap("pcmci", series(50), n_boot=2, resampling="bootstrap", block_length=51)
+        bootstrap("pcmci", series(50), n_resamples=2, resampling="bootstrap", block_length=51)
 
 
 def test_the_default_block_is_at_most_the_series():
@@ -393,10 +407,10 @@ def test_the_default_block_is_at_most_the_series():
 
 def test_a_panel_of_time_points_resamples_the_units():
     panel = [lingam_data(120, seed) for seed in range(3)]
-    out = bootstrap("longitudinal_lingam", panel, n_boot=2, seed=0)
+    out = bootstrap("longitudinal_lingam", panel, n_resamples=2, seed=0)
     assert isinstance(out.structure, TemporalStructure)
     with pytest.raises(ValueError, match="same units"):
-        bootstrap("longitudinal_lingam", [panel[0], panel[1].iloc[:100]], n_boot=2)
+        bootstrap("longitudinal_lingam", [panel[0], panel[1].iloc[:100]], n_resamples=2)
 
 
 # ---- resampling ----------------------------------------------------------------------------------
@@ -425,7 +439,7 @@ def test_a_bootstrap_resample_is_n_rows_drawn_with_replacement_from_the_seed():
 @pytest.mark.parametrize("resampling", ["bootstrap", "subsample"])
 def test_each_fit_is_the_method_on_the_rows_its_resample_draws(resampling):
     data = lingam_data(150)
-    out = bootstrap("hc", data, n_boot=4, seed=5, resampling=resampling, keep_fits=True)
+    out = bootstrap("hc", data, n_resamples=4, seed=5, resampling=resampling, keep_fits=True)
     job = job_of("hc", data, "rows", resampling, seed=5)
     assert out.fits is not None
     for b, fit in enumerate(out.fits):
@@ -461,19 +475,23 @@ def test_a_panel_subsample_keeps_the_same_units_in_every_dataset_and_each_groups
 
 def test_resampling_defaults_to_a_subsample_for_every_method():
     data = lingam_data()
-    default = bootstrap("hc", data, n_boot=2)
+    default = bootstrap("hc", data, n_resamples=2)
     assert (default.metadata["resampling"], default.metadata["sample_fraction"]) == (
         "subsample",
         0.5,
     )
-    drawn = bootstrap("hc", data, n_boot=2, resampling="bootstrap", sample_fraction=0.2)
+    drawn = bootstrap("hc", data, n_resamples=2, resampling="bootstrap", sample_fraction=0.2)
     assert drawn.metadata["resampling"] == "bootstrap" and drawn.metadata["sample_fraction"] is None
-    assert bootstrap("hc", data, n_boot=2, sample_fraction=0.2).metadata["sample_fraction"] == 0.2
-    stretch = bootstrap("pcmci", series(), n_boot=2, tau_max=1)
+    assert (
+        bootstrap("hc", data, n_resamples=2, sample_fraction=0.2).metadata["sample_fraction"] == 0.2
+    )
+    stretch = bootstrap("pcmci", series(), n_resamples=2, tau_max=1)
     assert stretch.metadata["resampling"] == "subsample"
     assert stretch.metadata["sample_fraction"] == 0.5 and stretch.metadata["block_length"] is None
     panel = [lingam_data(120, seed) for seed in range(3)]
-    assert bootstrap("longitudinal_lingam", panel, n_boot=2).metadata["resampling"] == "subsample"
+    assert (
+        bootstrap("longitudinal_lingam", panel, n_resamples=2).metadata["resampling"] == "subsample"
+    )
 
 
 @pytest.mark.parametrize(
@@ -491,13 +509,15 @@ def test_the_default_block_is_ten_times_the_longest_lag_or_the_cube_root_of_the_
 ):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        out = bootstrap(method, series(n), n_boot=1, resampling="bootstrap", **settings)
+        out = bootstrap(method, series(n), n_resamples=1, resampling="bootstrap", **settings)
     assert out.metadata["block_length"] == block
 
 
 def test_a_subsample_of_every_row_gives_every_fit_the_fit_on_the_data():
     data = lingam_data(200)
-    out = bootstrap("direct_lingam", data, n_boot=3, seed=0, sample_fraction=1.0, keep_fits=True)
+    out = bootstrap(
+        "direct_lingam", data, n_resamples=3, seed=0, sample_fraction=1.0, keep_fits=True
+    )
     assert out.fits is not None
     for fit in out.fits:
         assert np.array_equal(fit.weighted_adjacency, andrey.direct_lingam(data).weighted_adjacency)
@@ -508,46 +528,46 @@ def test_a_subsample_of_every_row_gives_every_fit_the_fit_on_the_data():
 
 def test_the_method_is_a_name_or_a_facade_and_nothing_else():
     data = lingam_data()
-    by_name = bootstrap("hc", data, n_boot=2, seed=0)
-    assert bootstrap(andrey.hc, data, n_boot=2, seed=0).table() == by_name.table()
+    by_name = bootstrap("hc", data, n_resamples=2, seed=0)
+    assert bootstrap(andrey.hc, data, n_resamples=2, seed=0).table() == by_name.table()
     for bad in ("nope", lambda x: x, len, "BootstrapOutput"):
         with pytest.raises(ValueError, match="method must be one of"):
-            bootstrap(bad, data, n_boot=2)
+            bootstrap(bad, data, n_resamples=2)
     with pytest.raises(NotImplementedError, match="gin"):
-        bootstrap("gin", data, n_boot=2)
+        bootstrap("gin", data, n_resamples=2)
 
 
 def test_the_arguments_are_checked_before_any_fit():
     data = lingam_data()
-    with pytest.raises(ValueError, match="n_boot"):
-        bootstrap("hc", data, n_boot=0)
-    with pytest.raises(TypeError, match="n_boot"):
-        bootstrap("hc", data, n_boot=2.5)
+    with pytest.raises(ValueError, match="n_resamples"):
+        bootstrap("hc", data, n_resamples=0)
+    with pytest.raises(TypeError, match="n_resamples"):
+        bootstrap("hc", data, n_resamples=2.5)
     with pytest.raises(ValueError, match="threshold"):
-        bootstrap("hc", data, n_boot=2, threshold=0.0)
+        bootstrap("hc", data, n_resamples=2, threshold=0.0)
     with pytest.raises(ValueError, match="seed"):
-        bootstrap("hc", data, n_boot=2, seed=-1)
+        bootstrap("hc", data, n_resamples=2, seed=-1)
     with pytest.raises(ValueError, match="block_length is for a time-series method"):
-        bootstrap("hc", data, n_boot=2, block_length=5)
+        bootstrap("hc", data, n_resamples=2, block_length=5)
     with pytest.raises(TypeError, match="keep_fits"):
-        bootstrap("hc", data, n_boot=2, keep_fits=1)
+        bootstrap("hc", data, n_resamples=2, keep_fits=1)
     with pytest.raises(ValueError, match="resampling must be one of"):
-        bootstrap("hc", data, n_boot=2, resampling="jackknife")
+        bootstrap("hc", data, n_resamples=2, resampling="jackknife")
     for fraction in (0, -0.5, 1.5, float("nan")):
         with pytest.raises(ValueError, match="sample_fraction must be a number in"):
-            bootstrap("hc", data, n_boot=2, sample_fraction=fraction)
+            bootstrap("hc", data, n_resamples=2, sample_fraction=fraction)
     with pytest.raises(TypeError, match="sample_fraction"):
-        bootstrap("hc", data, n_boot=2, sample_fraction="half")
+        bootstrap("hc", data, n_resamples=2, sample_fraction="half")
     with pytest.raises(ValueError, match="at least 2 rows"):
-        bootstrap("hc", data.iloc[:20], n_boot=2, sample_fraction=0.05)
+        bootstrap("hc", data.iloc[:20], n_resamples=2, sample_fraction=0.05)
     with pytest.raises(ValueError, match="block_length is for resampling='bootstrap'"):
-        bootstrap("pcmci", series(), n_boot=2, resampling="subsample", block_length=5)
+        bootstrap("pcmci", series(), n_resamples=2, resampling="subsample", block_length=5)
 
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_a_failed_fit_stops_the_run_and_names_its_resample(workers):
     with pytest.raises(TypeError, match="bogus") as raised:
-        with_workers(workers, "hc", lingam_data(), n_boot=3, bogus=1)
+        with_workers(workers, "hc", lingam_data(), n_resamples=3, bogus=1)
     assert any("bootstrap resample 0" in note for note in raised.value.__notes__)
 
 
@@ -557,7 +577,7 @@ def test_each_warning_of_the_fits_is_raised_once():
     for workers in (1, 2):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            with_workers(workers, "ges", codes, n_boot=4, seed=0)
+            with_workers(workers, "ges", codes, n_resamples=4, seed=0)
         kinds = [w for w in caught if issubclass(w.category, andrey.DataTypeWarning)]
         assert len(kinds) == 1, workers
 
@@ -565,8 +585,8 @@ def test_each_warning_of_the_fits_is_raised_once():
 def test_the_workers_follow_the_configured_count_and_never_nest():
     data = lingam_data()
     with andrey.config(n_jobs=2):
-        configured = bootstrap("pc", data, n_boot=4, seed=0, keep_fits=True)
-    serial = with_workers(1, "pc", data, n_boot=4, seed=0, keep_fits=True)
+        configured = bootstrap("pc", data, n_resamples=4, seed=0, keep_fits=True)
+    serial = with_workers(1, "pc", data, n_resamples=4, seed=0, keep_fits=True)
     assert configured.fits == serial.fits
     assert andrey.config.n_jobs == 1 or "ANDREY_N_JOBS" in os.environ
 
@@ -574,7 +594,7 @@ def test_the_workers_follow_the_configured_count_and_never_nest():
 def test_knowledge_travels_to_the_workers():
     data = lingam_data()
     knowledge = andrey.Knowledge(required=[("c", "d")])
-    serial = with_workers(1, "pc", data, n_boot=3, seed=0, knowledge=knowledge)
-    pooled = with_workers(2, "pc", data, n_boot=3, seed=0, knowledge=knowledge)
+    serial = with_workers(1, "pc", data, n_resamples=3, seed=0, knowledge=knowledge)
+    pooled = with_workers(2, "pc", data, n_resamples=3, seed=0, knowledge=knowledge)
     assert serial.table() == pooled.table()
     assert serial.frequency("->")[2, 3] == 1.0  # the required edge is in every fit

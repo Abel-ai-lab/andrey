@@ -734,7 +734,7 @@ configuration file and never executes the method, while `andrey run hc --data da
 HC. Configuration reports list detected backends, not the backend an operation will use.
 
 `andrey bootstrap <method>` takes the inputs, parameters, and options of `andrey run`, and
-`--n-boot`, `--seed`, `--threshold`, `--resampling`, `--sample-fraction`, and `--block-length`.
+`--n-resamples`, `--seed`, `--threshold`, `--resampling`, `--sample-fraction`, and `--block-length`.
 Its result is a run's, with the averaged graph as `structure`, plus `bootstrap` (the settings) and
 `frequencies` (each edge that appeared in a fit, most frequent first); see
 [Bootstrap](#bootstrap).

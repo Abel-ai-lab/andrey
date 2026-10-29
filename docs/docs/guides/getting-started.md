@@ -275,7 +275,7 @@ refits PC on subsamples, each a random half of the cells, and counts how often e
 `seed` fixes the subsamples, so a rerun gives the same counts:
 
 ```{code-cell} ipython3
-boot = andrey.bootstrap("pc", sachs.data, n_boot=100, seed=0)
+boot = andrey.bootstrap("pc", sachs.data, n_resamples=100, seed=0)
 pd.DataFrame(boot.table()[:8]).round(2)
 ```
 

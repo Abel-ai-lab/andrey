@@ -26,8 +26,8 @@ warnings.simplefilter("error", andrey.DeprecatedArgumentWarning)
 
 ## From 0.11 to 0.12
 
-Andrey 0.12.0 renames four settings and reads a column's type only from what you declare. A former
-name in the table below still works in 0.12, with an `andrey.DeprecatedArgumentWarning`, and stops
+Andrey 0.12.0 renames the arguments below and reads a column's type only from what you declare. A
+former name in the table still works in 0.12, with an `andrey.DeprecatedArgumentWarning`, and stops
 working in the next release:
 
 | Method | Former name | Name now |
@@ -53,6 +53,10 @@ out = andrey.pcmci(series, pc1_alpha=0.1)
 with andrey.config(n_jobs=8):
     boot = andrey.bootstrap(andrey.pc, data, n_resamples=200)
 ```
+
+A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` still works for
+one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now
+`bootstrap.n_resamples`, with no former name.
 
 ### Column types
 

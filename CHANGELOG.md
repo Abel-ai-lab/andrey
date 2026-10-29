@@ -48,6 +48,10 @@ names its pull request.
   extended-BIC term, any but `"bic"`, raises `ValueError`, where the score ignored it. ([#551])
 - `andrey config --json` and `andrey.describe()` report the worker count as `n_jobs`,
   and `andrey calibrate` exports `ANDREY_N_JOBS`. ([#551])
+- `andrey bootstrap --json` reports the number of resamples as `bootstrap.n_resamples`, where it
+  reported `bootstrap.n_boot`. `BootstrapOutput.n_resamples` replaces `BootstrapOutput.n_boot`,
+  which still works with an `andrey.DeprecatedArgumentWarning` and stops working in the next
+  release. ([#551])
 - `bootstrap` draws each resample as a subsample by default: `sample_fraction=0.5` of the rows,
   without replacement, instead of all the rows with replacement, so every default result changes
   (frequencies and averaged graph). A bootstrap resample repeats rows, so a test or a score sees

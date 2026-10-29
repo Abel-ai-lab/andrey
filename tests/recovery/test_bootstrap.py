@@ -37,7 +37,7 @@ def adjacent(i, j):
 
 
 def test_pc_bootstrap_recovers_the_cpdag():
-    out = andrey.bootstrap("pc", simulate(gaussian), n_boot=N_BOOT, seed=0)
+    out = andrey.bootstrap("pc", simulate(gaussian), n_resamples=N_BOOT, seed=0)
     graph = out.structure
     assert graph.kind == "cpdag" and graph.n_nodes == 6
     absent = out.frequency("absent")
@@ -67,14 +67,14 @@ def test_score_and_permutation_searches_recover_the_cpdag(method):
         return {tuple(sorted(pair)) for pair in zip(*np.nonzero(graph.to_numpy()))}
 
     assert adjacencies(getattr(andrey, method)(data).structure) == truth
-    out = andrey.bootstrap(method, data, n_boot=N_BOOT, seed=0)
+    out = andrey.bootstrap(method, data, n_resamples=N_BOOT, seed=0)
     present = 1 - out.frequency("absent")
     assert all(present[i, j] >= 0.9 for i, j in EDGES)
     assert adjacencies(out.structure) == truth
 
 
 def test_lingam_bootstrap_recovers_the_dag_and_its_directions():
-    out = andrey.bootstrap("direct_lingam", simulate(uniform), n_boot=N_BOOT, seed=0)
+    out = andrey.bootstrap("direct_lingam", simulate(uniform), n_resamples=N_BOOT, seed=0)
     assert out.structure.kind == "dag"
     assert {(s, t) for s, t, _ in out.structure.oriented_edges(index=True)} == set(EDGES)
     assert all(out.frequency("->")[s, t] >= 0.9 for s, t in EDGES)
@@ -91,7 +91,7 @@ def test_a_block_bootstrap_of_pcmci_recovers_the_lagged_links():
     out = andrey.bootstrap(
         "pcmci",
         pd.DataFrame(x),
-        n_boot=N_BOOT,
+        n_resamples=N_BOOT,
         seed=0,
         resampling="bootstrap",
         block_length=40,

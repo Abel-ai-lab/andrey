@@ -34,6 +34,7 @@ from andrey.core.structure import (
     TemporalStructure,
     is_ancestral_kind,
 )
+from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.search._parallel import pick_context
 
 if TYPE_CHECKING:
@@ -100,7 +101,7 @@ class BootstrapOutput:
     """
 
     _structure: Structure
-    _n_boot: int
+    _n_resamples: int
     _threshold: float
     _lags: tuple[int, ...] | None
     _slices: tuple[_Slice, ...]
@@ -190,7 +191,7 @@ class BootstrapOutput:
             slices.append(_Slice(_widest(kinds[k]), codes, counts.astype(np.int64)))
         return cls(
             _structure=_average(slices, len(fits), threshold, lags, n, labels),
-            _n_boot=len(fits),
+            _n_resamples=len(fits),
             _threshold=threshold,
             _lags=lags,
             _slices=tuple(slices),
@@ -209,9 +210,19 @@ class BootstrapOutput:
         return self._structure
 
     @property
-    def n_boot(self) -> int:
+    def n_resamples(self) -> int:
         """The number of fits counted."""
-        return self._n_boot
+        return self._n_resamples
+
+    @property
+    def n_boot(self) -> int:
+        """The former name of ``n_resamples``, which stops working in the next release."""
+        warn_once(
+            "andrey.BootstrapOutput.n_boot is now n_resamples; the former name stops working in "
+            "the next release",
+            DeprecatedArgumentWarning,
+        )
+        return self._n_resamples
 
     @property
     def threshold(self) -> float:
@@ -249,7 +260,7 @@ class BootstrapOutput:
         structure = self._structure
         return _average(
             self._slices,
-            self._n_boot,
+            self._n_resamples,
             _check_threshold(threshold),
             self._lags,
             structure.n_nodes,
@@ -285,7 +296,7 @@ class BootstrapOutput:
         if edge != _ABSENT and edge not in _GLYPH_MARKS:
             raise ValueError(f"edge must be one of {(*EDGES, _ABSENT)}, got {edge!r}")
         s = self._slices[self._slice_of(lag)]
-        n, b = self._structure.n_nodes, self._n_boot
+        n, b = self._structure.n_nodes, self._n_resamples
         out = np.zeros((n, n))
         if s.kind == "digraph":
             src, dst = np.divmod(s.codes, n)
@@ -329,7 +340,7 @@ class BootstrapOutput:
             can have several rows, one per edge it had in some fit.
         """
         labels = None if index else self._structure.labels
-        n, b = self._structure.n_nodes, self._n_boot
+        n, b = self._structure.n_nodes, self._n_resamples
         rows = []
         for k, s in enumerate(self._slices):
             lag = None if self._lags is None else self._lags[k]
@@ -371,7 +382,9 @@ class BootstrapOutput:
         """
         method = self._metadata.get("method")
         name = name if name is not None else (str(method) if method else "bootstrap")
-        head = f"{name}  |  {self._n_boot} fits  |  averaged graph at threshold {self._threshold}"
+        head = (
+            f"{name}  |  {self._n_resamples} fits  |  averaged graph at threshold {self._threshold}"
+        )
         lines = [head, "", *self._structure._summary()]
         rows = self.table()
         if rows:
@@ -405,27 +418,27 @@ class BootstrapOutput:
 
 def _average(
     slices: Sequence[_Slice],
-    n_boot: int,
+    n_resamples: int,
     threshold: float,
     lags: tuple[int, ...] | None,
     n: int,
     labels: tuple[str, ...] | None,
 ) -> Structure:
     """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``."""
-    graphs = [_average_slice(s, n_boot, threshold, n, labels) for s in slices]
+    graphs = [_average_slice(s, n_resamples, threshold, n, labels) for s in slices]
     if lags is None:
         return graphs[0]
     return TemporalStructure.from_lag_graphs(graphs, lags=lags, labels=labels)
 
 
 def _average_slice(
-    s: _Slice, n_boot: int, threshold: float, n: int, labels: tuple[str, ...] | None
+    s: _Slice, n_resamples: int, threshold: float, n: int, labels: tuple[str, ...] | None
 ) -> GraphStructure:
     """Build one graph from one slice's counts."""
     marks = np.zeros((n, n), dtype=np.int8)
     if s.kind == "digraph":
         src, dst = np.divmod(s.codes, n)
-        keep = s.counts / n_boot >= threshold
+        keep = s.counts / n_resamples >= threshold
         edge = np.zeros((n, n), dtype=bool)
         edge[src[keep], dst[keep]] = True
         marks[edge] = TAIL
@@ -438,7 +451,7 @@ def _average_slice(
     kind = s.kind
     for lo, hi in zip([0, *breaks], [*breaks, len(pair)]):
         counts = s.counts[lo:hi]
-        if counts.sum() / n_boot < threshold:
+        if counts.sum() / n_resamples < threshold:
             continue
         top = np.flatnonzero(counts == counts.max())
         near, far = divmod(int(state[lo + top[0]]), 4) if len(top) == 1 else _TIE_EDGE[kind]
@@ -621,16 +634,16 @@ def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
     return _run_one(_JOB, b)
 
 
-def _fit_all(job: _Job, n_boot: int, workers: int) -> list[tuple[Any, list]]:
+def _fit_all(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes."""
     if workers <= 1:
         with _backend.one_blas_thread(), _backend.config(n_jobs=1):
-            return [_run_one(job, b) for b in range(n_boot)]
+            return [_run_one(job, b) for b in range(n_resamples)]
     pool = ProcessPoolExecutor(
         max_workers=workers, mp_context=pick_context(), initializer=_init_worker, initargs=(job,)
     )
     try:
-        futures = [pool.submit(_task, b) for b in range(n_boot)]
+        futures = [pool.submit(_task, b) for b in range(n_resamples)]
         return [future.result() for future in futures]
     except BrokenProcessPool as exc:
         raise RuntimeError(
@@ -643,11 +656,14 @@ def _fit_all(job: _Job, n_boot: int, workers: int) -> list[tuple[Any, list]]:
 # ---- the public function ------------------------------------------------------------------------
 
 
+_N_RESAMPLES_DEFAULT = 100
+
+
 def bootstrap(
     method: str | Callable[..., Any],
     data: npt.ArrayLike | Sequence[npt.ArrayLike],
     *,
-    n_boot: int = 100,
+    n_resamples: int = _N_RESAMPLES_DEFAULT,
     seed: int | None = None,
     threshold: float = 0.5,
     resampling: str = "subsample",
@@ -675,8 +691,9 @@ def bootstrap(
     data : array-like of shape (n_samples, n_variables), or a sequence of them
         The data, as the method takes it. ``multi_group_direct_lingam`` and
         ``longitudinal_lingam`` take a sequence of arrays.
-    n_boot : int, default=100
-        The number of resamples and fits.
+    n_resamples : int, default=100
+        The number of resamples and fits. ``n_boot``, the former name, works with a
+        ``DeprecatedArgumentWarning`` for one more release.
     seed : int or None, default=None
         The seed of the resamples, a non-negative integer. ``None`` uses ``ANDREY_SEED``, or 0 when
         it is unset. Resample ``b`` depends on ``seed`` and ``b`` alone. A method that takes a
@@ -775,8 +792,8 @@ def bootstrap(
     ``1`` fits in this process. Each fit runs on one worker and one BLAS thread, and the result is
     the same at any worker count.
 
-    **Limitations.** Not benchmarked yet. Refitting is the cost: ``n_boot`` times the method's own,
-    shared across the workers. A moving block bootstrap weakens a link that spans a block
+    **Limitations.** Not benchmarked yet. Refitting is the cost: ``n_resamples`` times the method's
+    own, shared across the workers. A moving block bootstrap weakens a link that spans a block
     break, and a stretch holds only ``sample_fraction`` of the series, so each understates what a
     very short series can show.
 
@@ -801,8 +818,8 @@ def bootstrap(
     >>> rng = np.random.default_rng(0)
     >>> x = rng.standard_normal(300)
     >>> data = np.column_stack([x, x + rng.standard_normal(300), rng.standard_normal(300)])
-    >>> out = bootstrap("pc", data, n_boot=10, seed=0)
-    >>> out.n_boot
+    >>> out = bootstrap("pc", data, n_resamples=10, seed=0)
+    >>> out.n_resamples
     10
     >>> bool(out.frequency("absent")[0, 1] < 0.5)
     True
@@ -811,8 +828,19 @@ def bootstrap(
     """
     from andrey.core.seeding import resolve_seed
 
+    if "n_boot" in method_kwargs:
+        if n_resamples != _N_RESAMPLES_DEFAULT:
+            raise ValueError(
+                "bootstrap: n_boot is the former name of n_resamples; pass only n_resamples"
+            )
+        n_resamples = method_kwargs.pop("n_boot")
+        warn_once(
+            "andrey.bootstrap: n_boot is now n_resamples; the former name stops working in the "
+            "next release",
+            DeprecatedArgumentWarning,
+        )
     spec = _method_spec(method)
-    n_boot = int_in_range(n_boot, "n_boot", 1)
+    n_resamples = int_in_range(n_resamples, "n_resamples", 1)
     threshold = _check_threshold(threshold)
     resampling, sample_fraction = _check_resampling(resampling, sample_fraction)
     keep_fits = flag(keep_fits, "keep_fits")
@@ -824,8 +852,8 @@ def bootstrap(
     if root < 0:
         raise ValueError(f"seed must be a non-negative integer, got {root}")
     job = _job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
-    workers = min(_backend.worker_count(None), n_boot)
-    results = _fit_all(job, n_boot, workers)
+    workers = min(_backend.worker_count(None), n_resamples)
+    results = _fit_all(job, n_resamples, workers)
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
     metadata: dict[str, JSONValue] = {

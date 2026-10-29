@@ -284,7 +284,7 @@ def cli_meta() -> dict:
         },
         "bootstrap": {
             "invocation": (
-                "andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] "
+                "andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] "
                 "[--threshold T] [--resampling subsample|bootstrap] [--sample-fraction F] "
                 "[--block-length ROWS] [key=value ...]"
             ),
@@ -301,8 +301,9 @@ def cli_meta() -> dict:
             "parameters": {name: _param_schema(param) for name, param in BOOTSTRAP_PARAMS.items()},
             "envelope": (
                 "the result envelope of `run`, with `structure` the averaged graph, plus "
-                "bootstrap (n_boot, threshold, seed, resampling, sample_fraction, block_length) "
-                "and frequencies[] (source, target, type, count, and frequency for each edge "
+                "bootstrap (n_resamples, threshold, seed, resampling, sample_fraction, "
+                "block_length) and frequencies[] (source, target, type, count, and frequency for "
+                "each edge "
                 "that appeared in a fit, most frequent first, and lag for a time-series method); "
                 "capped at 1000 (frequencies_truncated)"
             ),
@@ -469,13 +470,13 @@ def render_skill() -> str:
     a("## How stable an edge is")
     a("")
     a(
-        "`andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] [--threshold T] "
+        "`andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] [--threshold T] "
         "[--resampling subsample|bootstrap] [--sample-fraction F] [key=value ...]` refits the "
         "method on resamples of the rows and answers how often each edge appears. It takes the "
         "inputs and `key=value` params of `andrey run`, and not `gin`. Its envelope is a run's, "
         "with `structure` the averaged graph: a pair is in it when it is adjacent in at least "
         "`--threshold` of the fits (default 0.5), with the edge it has most often. `bootstrap` "
-        "gives `n_boot`, `threshold`, `seed`, `resampling`, `sample_fraction`, and "
+        "gives `n_resamples`, `threshold`, `seed`, `resampling`, `sample_fraction`, and "
         "`block_length`, and `frequencies` lists each edge that appeared in some fit, most "
         "frequent first, with its `source`, `target`, `type`, `count`, and `frequency` (a "
         "time-series method adds `lag`). Report an edge with its frequency: 0.95 is stable, 0.3 "

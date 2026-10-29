@@ -35,14 +35,24 @@ def csv_path(tmp_path):
 
 
 def test_the_envelope_is_the_runs_with_the_averaged_graph_and_the_frequencies(csv_path, capsys):
-    argv = ["bootstrap", "pc", "--data", str(csv_path), "--n-boot", "6", "--seed", "3", "--json"]
+    argv = [
+        "bootstrap",
+        "pc",
+        "--data",
+        str(csv_path),
+        "--n-resamples",
+        "6",
+        "--seed",
+        "3",
+        "--json",
+    ]
     code, out, _ = _run([*argv, "alpha=0.01"], capsys)
     env = json.loads(out)
     assert code == 0
     assert env["schema_version"] == SCHEMA_VERSION
     assert (env["method"], env["status"]) == ("pc", "supported")
     assert env["bootstrap"] == {
-        "n_boot": 6,
+        "n_resamples": 6,
         "threshold": 0.5,
         "seed": 3,
         "resampling": "subsample",
@@ -52,7 +62,7 @@ def test_the_envelope_is_the_runs_with_the_averaged_graph_and_the_frequencies(cs
     assert env["structure"]["labels"] == ["a", "b", "c", "d"]
     assert env["structure"]["kind"] == "cpdag" and env["structure"]["n_edges"] == 2
     assert env["run"]["params"]["alpha"] == 0.01 and "seed" not in env["run"]["params"]
-    api = andrey.bootstrap("pc", pd.read_csv(csv_path), n_boot=6, seed=3, alpha=0.01)
+    api = andrey.bootstrap("pc", pd.read_csv(csv_path), n_resamples=6, seed=3, alpha=0.01)
     assert env["frequencies"] == api.table(index=True)
     assert {"source", "target", "type", "count", "frequency"} == set(env["frequencies"][0])
     freqs = [row["frequency"] for row in env["frequencies"]]
@@ -64,7 +74,17 @@ def test_the_envelope_is_the_runs_with_the_averaged_graph_and_the_frequencies(cs
 
 
 def test_the_threshold_flag_sets_the_averaged_graph(csv_path, capsys):
-    base = ["bootstrap", "hc", "--data", str(csv_path), "--n-boot", "5", "--seed", "1", "--json"]
+    base = [
+        "bootstrap",
+        "hc",
+        "--data",
+        str(csv_path),
+        "--n-resamples",
+        "5",
+        "--seed",
+        "1",
+        "--json",
+    ]
     _, loose, _ = _run([*base, "--threshold", "0.2"], capsys)
     _, strict, _ = _run([*base, "--threshold", "1"], capsys)
     loose, strict = json.loads(loose), json.loads(strict)
@@ -74,7 +94,17 @@ def test_the_threshold_flag_sets_the_averaged_graph(csv_path, capsys):
 
 
 def test_the_resampling_flags_reach_the_fits_and_the_envelope(csv_path, capsys):
-    base = ["bootstrap", "hc", "--data", str(csv_path), "--n-boot", "5", "--seed", "1", "--json"]
+    base = [
+        "bootstrap",
+        "hc",
+        "--data",
+        str(csv_path),
+        "--n-resamples",
+        "5",
+        "--seed",
+        "1",
+        "--json",
+    ]
     data = pd.read_csv(csv_path)
     for flags, kwargs in (
         ([], {}),
@@ -83,14 +113,14 @@ def test_the_resampling_flags_reach_the_fits_and_the_envelope(csv_path, capsys):
     ):
         code, out, _ = _run([*base, *flags], capsys)
         env = json.loads(out)
-        api = andrey.bootstrap("hc", data, n_boot=5, seed=1, **kwargs)
+        api = andrey.bootstrap("hc", data, n_resamples=5, seed=1, **kwargs)
         assert code == 0 and env["frequencies"] == api.table(index=True)
         assert env["bootstrap"]["resampling"] == api.metadata["resampling"]
         assert env["bootstrap"]["sample_fraction"] == api.metadata["sample_fraction"]
 
 
 def test_the_bootstrap_seeds_a_seeded_method_and_rejects_its_own_seed(csv_path, capsys):
-    base = ["bootstrap", "boss", "--data", str(csv_path), "--n-boot", "3", "--json"]
+    base = ["bootstrap", "boss", "--data", str(csv_path), "--n-resamples", "3", "--json"]
     code, _out, err = _run([*base, "seed=2"], capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
     code, out, _ = _run([*base, "--seed", "2"], capsys)
@@ -100,7 +130,7 @@ def test_the_bootstrap_seeds_a_seeded_method_and_rejects_its_own_seed(csv_path, 
 @pytest.mark.parametrize(
     "flags",
     [
-        ["--n-boot", "0"],
+        ["--n-resamples", "0"],
         ["--threshold", "0"],
         ["--threshold", "1.5"],
         ["--seed", "-1"],
@@ -111,6 +141,19 @@ def test_the_bootstrap_seeds_a_seeded_method_and_rejects_its_own_seed(csv_path, 
 )
 def test_a_flag_out_of_range_is_a_usage_error(csv_path, capsys, flags):
     code, _out, err = _run(["bootstrap", "pc", "--data", str(csv_path), *flags], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
+
+
+def test_the_former_n_boot_flag_sets_the_resamples_with_a_warning(csv_path, capsys):
+    base = ["bootstrap", "hc", "--data", str(csv_path), "--seed", "1", "--json"]
+    code, out, _ = _run([*base, "--n-resamples", "3"], capsys)
+    current = json.loads(out)
+    code_former, out, _ = _run([*base, "--n-boot", "3"], capsys)
+    former = json.loads(out)
+    assert code == code_former == 0 and former["bootstrap"]["n_resamples"] == 3
+    assert former["frequencies"] == current["frequencies"]
+    assert "DeprecatedArgumentWarning" in {w["category"] for w in former["run"]["warnings"]}
+    code, _out, err = _run([*base, "--n-boot", "3", "--n-resamples", "4"], capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
 
 
@@ -139,7 +182,7 @@ def test_a_time_series_names_the_lag_of_each_frequency(tmp_path, capsys):
         x[t, 1] += 0.9 * x[t - 1, 0]
     path = tmp_path / "series.csv"
     pd.DataFrame(x, columns=["u", "v"]).to_csv(path, index=False)
-    argv = ["bootstrap", "pcmci", "--data", str(path), "--n-boot", "3", "--json"]
+    argv = ["bootstrap", "pcmci", "--data", str(path), "--n-resamples", "3", "--json"]
     code, out, _ = _run(argv, capsys)
     env = json.loads(out)
     assert code == 0 and env["structure"]["type"] == "temporal"
@@ -160,7 +203,7 @@ def test_a_method_with_a_result_per_group_gives_a_result_per_group(tmp_path, cap
     for k in range(2):
         paths.append(tmp_path / f"g{k}.csv")
         chain(150, k).to_csv(paths[-1], index=False)
-    argv = ["bootstrap", "multi_group_direct_lingam", "--n-boot", "2", "--json"]
+    argv = ["bootstrap", "multi_group_direct_lingam", "--n-resamples", "2", "--json"]
     for path in paths:
         argv += ["--data", str(path)]
     code, out, _ = _run(argv, capsys)
@@ -174,7 +217,7 @@ def test_a_context_input_is_read_from_its_flag(tmp_path, capsys):
     chain(150).to_csv(data, index=False)
     pd.DataFrame({"domain": np.repeat([0, 1, 2], 50)}).to_csv(domain, index=False)
     argv = ["bootstrap", "cdnod", "--data", str(data), "--domain-index", str(domain)]
-    code, out, _ = _run([*argv, "--n-boot", "2", "--json"], capsys)
+    code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["a", "b", "c", "d"]
 
 
@@ -182,7 +225,17 @@ def test_a_long_table_is_capped_on_stdout_and_whole_in_a_file(
     csv_path, tmp_path, capsys, monkeypatch
 ):
     monkeypatch.setattr("andrey.cli.EDGE_LIMIT", 1)
-    argv = ["bootstrap", "pc", "--data", str(csv_path), "--n-boot", "6", "--seed", "3", "--json"]
+    argv = [
+        "bootstrap",
+        "pc",
+        "--data",
+        str(csv_path),
+        "--n-resamples",
+        "6",
+        "--seed",
+        "3",
+        "--json",
+    ]
     _, out, _ = _run(argv, capsys)
     env = json.loads(out)
     assert len(env["frequencies"]) == 1 and env["frequencies_truncated"] is True
@@ -201,7 +254,7 @@ def test_a_terminal_gets_the_averaged_graph_and_its_most_frequent_edges(
     csv_path, capsys, monkeypatch
 ):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
-    argv = ["bootstrap", "pc", "--data", str(csv_path), "--n-boot", "4", "--seed", "1"]
+    argv = ["bootstrap", "pc", "--data", str(csv_path), "--n-resamples", "4", "--seed", "1"]
     code, out, _ = _run(argv, capsys)
     assert code == 0 and out.startswith("pc  |  4 fits  |  averaged graph at threshold 0.5")
     assert "most frequent edges:" in out and "a -- b  1.00" in out and "200 samples" in out
@@ -210,7 +263,7 @@ def test_a_terminal_gets_the_averaged_graph_and_its_most_frequent_edges(
 def test_the_help_and_the_contract_describe_the_command(capsys):
     code, out, _ = _run(["bootstrap", "pc", "--help"], capsys)
     assert code == 0 and out.startswith("andrey bootstrap pc -- ")
-    assert "--n-boot" in out and "andrey bootstrap pc --data data.csv" in out
+    assert "--n-resamples" in out and "andrey bootstrap pc --data data.csv" in out
     assert out == render_method_help(REGISTRY["pc"], command="bootstrap") + "\n"
     code, out, _ = _run(["bootstrap", "pc", "--help", "--json"], capsys)
     assert json.loads(out)["method"]["name"] == "pc"

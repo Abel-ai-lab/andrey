@@ -524,8 +524,8 @@ def test_a_pair_test_with_too_few_rows_raises(name):
 @pytest.mark.parametrize("name", ["pc", "fci"])
 def test_bootstrap_resamples_rows_with_missing_values(name):
     x = _gaps(_continuous(300), 0.1)
-    boot = andrey.bootstrap(name, x, n_boot=4, seed=0)
-    assert boot.n_boot == 4
+    boot = andrey.bootstrap(name, x, n_resamples=4, seed=0)
+    assert boot.n_resamples == 4
 
 
 # --- the command line -----------------------------------------------------------------------------
