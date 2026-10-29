@@ -181,7 +181,7 @@ def markov_check(
     alpha : float, default=0.05
         The level of the uniformity test, in ``(0, 1)``, and the level at which
         ``share_dependent`` counts a p-value as small.
-    categorical : list of str or int or None, default=None
+    categorical : sequence of str or int or None, default=None
         The categorical columns, by label or 0-based position, as the methods take them; ``None``
         reads them from a DataFrame's ``category``, ``bool``, and text columns, and ``[]`` declares
         none.
