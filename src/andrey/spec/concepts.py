@@ -25,6 +25,7 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.fdr import FDR_METHODS
 from andrey.core.score import SCORES
 
 from .models import ParamSpec, ParamType, Spec
@@ -346,6 +347,33 @@ _CONCEPTS = (
         fragment="weight magnitude",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No weighted continuous fit to threshold.",
+    ),
+    Concept(
+        key="fdr_method",
+        summary="The correction of the lagged links' p-values for the number of links tested "
+        "(tigramite's name): none leaves them as tested, and fdr_bh replaces them with their "
+        "Benjamini-Hochberg adjusted values over all the lagged links together. A method whose "
+        "graph is thresholded on those p-values (pcmci) thresholds the adjusted ones; a method "
+        "that decides its links before it reports them (pcmciplus) reports the adjusted values "
+        "and keeps its links.",
+        param=_template(
+            "fdr_method",
+            "str",
+            "none",
+            "How the p-values of the lagged links are corrected for the number of links tested: "
+            "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+            "adjusted values over all the lagged links together.",
+            choices=FDR_METHODS,
+        ),
+        fragment="benjamini-hochberg",
+        suitable=("pcmci", "pcmciplus"),
+        exempt=_exempt(
+            "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
+            "The marks come from the removal phases and the orientation rules at alpha, not from "
+            "a threshold on the p-values the method reports.",
+            "lpcmci",
+        ),
+        others_exempt="Reports no p-values of a family of lagged links.",
     ),
     Concept(
         key="max_depth",

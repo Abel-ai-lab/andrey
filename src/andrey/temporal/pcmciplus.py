@@ -53,6 +53,7 @@ import numpy as np
 from andrey.constraint._skeleton import collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
+from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
 from andrey.search.hc import tie_ranks
@@ -450,6 +451,7 @@ def pcmciplus(
     *,
     tau_max: int = 1,
     pc_alpha: float = 0.01,
+    fdr_method: str = "none",
     collider_rule: str = "majority",
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
@@ -459,6 +461,10 @@ def pcmciplus(
     seed: int | None = None,
 ) -> PCMCIPlusResult:
     """Run the four PCMCI+ phases on a ``(T, n)`` series with the ``indep_test`` test.
+
+    ``fdr_method`` corrects the reported p-values of the lagged links
+    (:func:`~andrey.core.fdr.corrected_pvalues`); the links themselves are decided by the
+    phases at ``pc_alpha``, so ``adjacency`` and ``marks`` do not depend on it.
 
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach every phase
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
@@ -470,6 +476,7 @@ def pcmciplus(
         raise ValueError(
             f"collider_rule must be one of {list(COLLIDER_RULES)}, got {collider_rule!r}"
         )
+    check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
     ranks = tie_ranks(data, categorical).tolist()
@@ -484,6 +491,7 @@ def pcmciplus(
             constraints,
             max_depth,
             max_p_global,
+            fdr_method,
         )
 
 
@@ -497,6 +505,7 @@ def run_phases(
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
+    fdr_method: str = "none",
 ) -> PCMCIPlusResult:
     """Run the four phases with ``test`` over the columns of the lagged design.
 
@@ -508,6 +517,8 @@ def run_phases(
     reports p-value 1 and statistic 0, or 0 and 1 when it is required. ``max_depth`` caps phase 1's
     conditioning sets; ``max_p_global`` caps the subsets of lag-0 neighbors that phase 2 conditions
     on beyond the lagged parents of both ends, and the subsets the collider votes of phase 3 read.
+    ``fdr_method`` corrects the lagged ``p_values`` once the phases have recorded them, and only
+    them: lag 0 is left as tested, and the corrected values decide no link.
     """
     recorder = _Recorder(test)
     parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
@@ -523,6 +534,10 @@ def run_phases(
         required = constraints.required.copy()
         required[0] |= required[0].T
         p_values[required], statistics[required] = 0.0, 1.0
+    if fdr_method != "none":
+        p_values[1:] = corrected_pvalues(
+            p_values[1:], fdr_method, None if constraints is None else constraints.forbidden[1:]
+        )
     marks, ambiguous = colliders(
         test,
         n_vars,
