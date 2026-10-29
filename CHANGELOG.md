@@ -55,7 +55,8 @@ change names its pull request.
   | Method | Argument | Before | Now | For the former results |
   | --- | --- | --- | --- | --- |
   | `pc`, `fci`, `gfci`, `cdnod` | `indep_test` | `"fisherz"` | `None`: `gsq` when every column is declared categorical, `cond_gauss` when some are, else `fisherz` | `indep_test="fisherz"` |
-  | `gfci`, `xges` | `score_func` | `"local_score_BIC"` | `None`: `bdeu` when every column is declared categorical, `cond_gauss` when some are, else `bic` | `score_func="bic"` |
+  | `gfci` | `score_func` | `"local_score_BIC"` | `None`: `bdeu` when every column is declared categorical, `cond_gauss` when some are, else `bic` | `score_func="bic"` |
+  | `xges` | `score_func` | `"local_score_BIC"` | `None`, which is `bic` | `score_func="bic"` |
   | `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func` | `None`, which read a column of a few whole numbers as categorical | `None`, which reads only the declared column types | the score by name, or `categorical` |
   | `pcmci`, `pcmciplus`, `lpcmci` | `indep_test` | `"student_t"` | `None`: `fisherz` on numeric columns | `indep_test="student_t"` |
   | `granger` | `tau_max` (`maxlag`) | 2 | 1 | `tau_max=2` |

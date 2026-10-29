@@ -81,8 +81,8 @@ out = andrey.ica_lingam(data, seed=0)
 
 ### Lags
 
-`tau_max` is the largest lag of every time-series method, and `granger`'s default is 1, as in the
-others, where `maxlag` defaulted to 2:
+`granger` and `longitudinal_lingam` take `tau_max`, the largest lag, as `pcmci`, `pcmciplus`, and
+`lpcmci` do, and `granger`'s default is 1, as theirs is, where `maxlag` defaulted to 2:
 
 ```python
 # 0.10
@@ -92,8 +92,8 @@ out = andrey.granger(series, maxlag=2)
 out = andrey.granger(series, tau_max=2)
 ```
 
-`longitudinal_lingam` takes `tau_max` for `n_lags`, and it and `multi_group_direct_lingam` take
-their list of datasets as `data`.
+`longitudinal_lingam` and `multi_group_direct_lingam` take their list of datasets as `data`, for
+`data_list` and `data_groups`.
 
 ### Workers
 
