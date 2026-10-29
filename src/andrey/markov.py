@@ -468,13 +468,19 @@ def _warn_sparse(
 def anderson_darling_uniform(p_values: npt.ArrayLike) -> tuple[float, float]:
     """Return the Anderson-Darling statistic of ``p_values`` against U(0, 1) and its p-value.
 
-    The p-value is one minus the distribution function of Marsaglia and Marsaglia (2004): their
-    asymptotic ``ADinf``, corrected for the number of values by ``errfix``.
+    The p-value is exact for one value. For two or more it is one minus the distribution function of
+    Marsaglia and Marsaglia (2004): their asymptotic ``ADinf``, corrected for the number of values
+    by ``errfix``. That approximation is close where a verdict is made: the share of null statistics
+    with a p-value at most 0.01, 0.05, and 0.2 was within 0.002 of those levels for 2 to 400 values
+    (200,000 or more simulated samples each). Its middle is looser, off by up to 0.017 at two values
+    and 0.003 at twenty.
     """
     u = np.sort(np.clip(np.asarray(p_values, dtype=np.float64), 1e-300, 1 - 1e-16))
     n = u.size
     i = np.arange(1, n + 1)
     a2 = float(-n - np.sum((2 * i - 1) * (np.log(u) + np.log1p(-u[::-1]))) / n)
+    if n == 1:  # A^2 = -1 - ln(u (1 - u)) >= ln 4 - 1, so P(A^2 >= a) = 1 - sqrt(1 - 4 e^(-1-a))
+        return a2, 1.0 - math.sqrt(max(0.0, 1.0 - 4.0 * math.exp(-1.0 - a2)))
     if a2 <= 0:
         return a2, 1.0
     x = _adinf(a2)

@@ -15,6 +15,10 @@ from andrey import GraphStructure, SampleSizeWarning, markov_check
 from andrey.markov import anderson_darling_uniform
 from andrey.metrics import to_cpdag
 
+#: A count is accepted when the rate it should follow lies inside its 99.9% binomial interval, so a
+#: sound result fails 1 time in 1,000. The seeds are fixed, so a run is the same every time.
+LEVEL = 1e-3
+
 
 def _sample(d: int, n: int, seed: int, avg_degree: float = 2.0):
     scm = ad.SCM(
@@ -32,13 +36,20 @@ def _without_edge(graph: GraphStructure, k: int) -> GraphStructure:
     return GraphStructure.from_numpy(M, kind="dag")
 
 
-@pytest.mark.parametrize(("m", "tolerance"), [(1, 0.1), (5, 0.03), (150, 0.03)])
-def test_uniformity_p_values_of_uniform_draws_are_uniform(m, tolerance):
-    """Marsaglia and Marsaglia's p-value is the null distribution of the statistic at each size,
-    to the accuracy of their approximation (loosest at one value)."""
-    rng = np.random.default_rng(m)
-    p = [anderson_darling_uniform(rng.uniform(size=m))[1] for _ in range(3000)]
-    assert stats.kstest(p, "uniform").statistic < tolerance
+def test_the_uniformity_p_value_is_exact_for_one_p_value():
+    """At one value the statistic is -1 - ln(u (1 - u)), whose distribution is known."""
+    p = [anderson_darling_uniform(u)[1] for u in np.random.default_rng(1).uniform(size=(5000, 1))]
+    assert stats.kstest(p, "uniform").pvalue > LEVEL
+
+
+@pytest.mark.parametrize("m", [1, 2, 5, 150])
+@pytest.mark.parametrize("level", [0.01, 0.05, 0.2])
+def test_uniform_p_values_are_rejected_at_the_level(m, level):
+    """The share of uniform p-value sets that the test rejects at ``level`` is ``level``, to the
+    binomial error of the number of sets (the verdict is made at these levels)."""
+    sets = np.random.default_rng(m).uniform(size=(10_000, m))
+    rejected = sum(anderson_darling_uniform(u)[1] <= level for u in sets)
+    assert stats.binomtest(int(rejected), len(sets), level).pvalue > LEVEL
 
 
 def test_the_statistic_is_the_definition():
@@ -58,8 +69,10 @@ def test_the_tests_are_the_non_parent_pairs_given_the_parents_whatever_the_colum
     named = GraphStructure.from_numpy(dag.to_numpy(), kind="dag", labels=labels)
     frame = pd.DataFrame(sample.data, columns=list(labels))
     check = markov_check(named, frame, sample_fraction=1.0)
-    assert check.n_tests == 8 * 7 // 2 - dag.n_edges
-    parents = {x: set(named.parents(x)) for x in labels}
+    assert check.n_tests == 8 * 7 // 2 - len(dag.oriented_edges())
+    parents = {x: set() for x in labels}
+    for source, target, _ in named.oriented_edges():
+        parents[target].add(source)
     for row in check.table():
         assert set(row["given"]) == parents[row["x"]] and row["y"] not in parents[row["x"]]
     shuffled = frame[list(np.random.default_rng(1).permutation(labels))]
@@ -70,21 +83,26 @@ def test_the_tests_are_the_non_parent_pairs_given_the_parents_whatever_the_colum
     assert again.uniformity_p_value == pytest.approx(check.uniformity_p_value)
 
 
-def test_a_true_graph_is_rejected_about_as_often_as_alpha_with_the_default():
+@pytest.mark.parametrize("alpha", [0.05, 0.2])
+def test_a_true_graph_is_rejected_about_as_often_as_alpha_with_the_default(alpha):
+    fits = 200
     rejected = 0
-    for seed in range(200):
+    for seed in range(fits):
         sample = _sample(10, 500, seed)
-        rejected += not markov_check(sample.graph, sample.data, seed=seed).passed
-    assert rejected / 200 < 0.15  # the level is 5%; the default measured 6% to 9%
+        rejected += not markov_check(sample.graph, sample.data, alpha=alpha, seed=seed).passed
+    assert stats.binomtest(rejected, fits, alpha).pvalue > LEVEL
 
 
-def test_a_removed_edge_is_rejected():
+def test_a_graph_with_an_edge_removed_is_rejected_at_the_documented_rate():
+    """One missing edge was rejected in 96% to 99% of the documented simulations at 1,000 rows, so
+    the count must not be significantly below 96%."""
+    fits = 100
     rejected = 0
-    for seed in range(50):
+    for seed in range(fits):
         sample = _sample(10, 1000, seed)
         broken = _without_edge(sample.graph, seed)
         rejected += not markov_check(broken, sample.data, seed=seed).passed
-    assert rejected / 50 > 0.9
+    assert stats.binomtest(rejected, fits, 0.96, alternative="less").pvalue > LEVEL
 
 
 def test_a_cpdag_is_checked_through_a_dag_of_its_class():

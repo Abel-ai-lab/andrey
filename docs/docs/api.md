@@ -481,6 +481,47 @@ the edges, not as a probability. `andrey bootstrap` runs the same from the shell
    BootstrapOutput
 ```
 
+## Markov check
+
+`andrey.markov_check` asks whether data are consistent with a graph. A DAG implies independences:
+in a topological order, each variable is independent of every earlier variable that is not its
+parent, given its parents (the ordered local Markov property of Ramsey, Andrews, and Spirtes 2024).
+A CPDAG is checked through a DAG of its class, which implies the same independences. The check runs
+one conditional-independence test for each implied independence, `indep_test` as `pc` takes it, and
+asks whether the p-values are uniform on (0, 1), as they are when every tested independence holds.
+The graph is rejected when the Anderson-Darling test of uniformity gives a p-value of at most
+`alpha`.
+
+{py:class}`~andrey.MarkovCheckOutput` holds the verdict (`passed`, `verdict`), the test
+(`uniformity_statistic`, `uniformity_p_value`), the `share_dependent` of p-values below `alpha`
+(about `alpha` when the graph is right), and every tested independence with its p-value in
+`table()`. A graph that implies no independence, a complete DAG, cannot be rejected. A PAG, a MAG,
+an undirected graph, and a time-series result raise `ValueError`.
+
+Check on rows the graph was not learned from: a graph fitted to the same rows can pass because the
+fit made its independences true there. Split the rows, learn on one half, and check on the other.
+Each test reads `sample_fraction` (0.5) of the rows, drawn at random for that test alone, so that
+the tests do not all read the same rows; `seed` fixes the draws. In 1,000 simulated linear datasets
+per cell, the check rejected the true graph at `alpha=0.05` in 6% to 9% of the datasets with the
+default, and in 9% to 21% with `sample_fraction=1.0`, where the tests share every row. A graph with
+one edge missing was rejected in 96% to 99% of the datasets at 1,000 rows and 72% to 82% at 200 rows
+(98% to 100% and 89% to 93% on all rows). The `markov_check` docstring gives the measurements.
+
+A pass does not show that the edges are right: a graph with extra edges also passes, because an
+added edge removes an implied independence without making another false. Read the check with the
+number of edges. To choose among graphs of the same data, take the one with the fewest edges among
+those that pass, for example across a method's `alpha` values (the
+[example notebook](examples/markov_check)). `andrey markov-check` runs the same from the shell
+([Command-line interface](#command-line-interface)).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: api
+
+   markov_check
+   MarkovCheckOutput
+```
+
 ## Utilities
 
 ```{eval-rst}
@@ -752,6 +793,7 @@ and `rc_params` return plain data and need no import.
 | `andrey run hc --help` | Readable inputs, parameters, defaults, and examples |
 | `andrey run hc --help --json` | One versioned method contract, without execution |
 | `andrey bootstrap hc --data data.csv` | Edge frequencies over refits on resamples, and the averaged graph |
+| `andrey markov-check pc.json data.csv` | The p-values of the independences a DAG or CPDAG implies, and whether they pass |
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
@@ -774,6 +816,13 @@ HC. Configuration reports list detected backends, not the backend an operation w
 Its result is a run's, with the averaged graph as `structure`, plus `bootstrap` (the settings) and
 `frequencies` (each edge that appeared in a fit, most frequent first); see
 [Bootstrap](#bootstrap).
+
+`andrey markov-check <graph> <data>` takes a DAG or CPDAG from `andrey run <method> -o <file>` or
+from a saved result, the data to check it against, and `--indep-test`, `--alpha`, `--categorical`,
+`--sample-fraction`, and `--seed`. Its result has `markov_check` (`passed`, `verdict`, the
+uniformity test, and `tests`, each independence with its p-value, capped at the 1,000 smallest) and
+`run`; `status` is the run's, and the verdict is `markov_check.passed`. See
+[Markov check](#markov-check).
 
 Structured help, configuration and calibration reports, and run results carry
 `schema_version: "2"`, which versions the command line's JSON separately from the `format_version`
