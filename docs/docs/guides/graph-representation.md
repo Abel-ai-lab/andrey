@@ -117,8 +117,8 @@ can create cycles.
 ## Reading and converting
 
 `print(out)`, or `out` alone in a notebook, shows the algorithm, the graph kind, the node and
-edge counts, and the first 30 edges, then the causal order and metadata values: the text
-`andrey run` prints in a terminal. `print(out.structure)` shows the graph part alone.
+edge counts, and the first 30 edges, then the causal order and the metadata values that are not
+empty: the text `andrey run` prints in a terminal. `print(out.structure)` shows the graph part alone.
 
 ```python
 import numpy as np

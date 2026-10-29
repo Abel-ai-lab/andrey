@@ -1310,11 +1310,10 @@ def run_example() -> tuple[str, str, str]:
     return code, printed, drawing(structure, label, parts_layout(structure), size=(360, 260))
 
 
-# The four graphs site/interface.py draws from one table, in the order the page shows them: each
+# The three graphs site/interface.py draws from one table, in the order the page shows them: each
 # method's name, the kind of graph it returns, and what that kind says about the sprinkler network.
-# DirectLiNGAM, PC, and FCI answer differently only on season-rain and season-sprinkler, and the
-# drawings' edge colors (undirected, circle, directed) carry the difference; MMPC draws every edge
-# undirected.
+# The methods answer differently only on season-rain and season-sprinkler, and the drawings' edge
+# colors (undirected, circle, directed) carry the difference.
 INTERFACE_CAPTIONS = {
     "direct_lingam": (
         "DirectLiNGAM",
@@ -1331,11 +1330,6 @@ INTERFACE_CAPTIONS = {
         "PAG",
         "Circles on both ends: either direction, or a hidden common cause, fits the data.",
     ),
-    "mmpc": (
-        "MMPC",
-        "Undirected graph",
-        "Only which variables are linked: every edge is a plain line, with no direction.",
-    ),
 }
 # The two drawings of VARMA-LiNGAM's graph over the lawn's days, after the three.
 TEMPORAL_CAPTIONS = (
@@ -1350,24 +1344,27 @@ TEMPORAL_CAPTIONS = (
         "every arrow over time points forward.",
     ),
 )
-# Every kind a method returns as a GraphStructure (andrey.core.structure.Kind), in the homepage's
-# words, then the graphs over time a TemporalStructure holds. A MAG comes from a conversion,
-# GraphStructure.to_mag, never from a method.
-GRAPH_KINDS = {
-    "dag": "DAGs",
-    "cpdag": "CPDAGs",
-    "pag": "PAGs",
-    "digraph": "cyclic graphs",
-    "undirected": "undirected graphs",
-}
+# Every kind a supported method returns as a GraphStructure (andrey.core.structure.Kind), in the
+# homepage's words, then the graphs over time a TemporalStructure holds. A MAG comes from a
+# conversion, GraphStructure.to_mag, never from a method. The homepage shows supported methods only,
+# so a kind that only experimental methods return is not on it.
+GRAPH_KINDS = {"dag": "DAGs", "cpdag": "CPDAGs", "pag": "PAGs", "digraph": "cyclic graphs"}
 CONVERSION_KINDS = {"mag"}
 TEMPORAL_KIND = "graphs over time"
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 
 
+def experimental_kinds() -> set[str]:
+    """The graph kinds that only experimental methods return."""
+    specs = list_specs()
+    supported = {spec.output.graph_kind for spec in specs if spec.status == "supported"}
+    return {spec.output.graph_kind for spec in specs if spec.status == "experimental"} - supported
+
+
 def graph_kinds() -> list[str]:
-    """Every kind of causal graph the package returns, in the homepage's words."""
-    kinds = [kind for kind in get_args(Kind) if kind not in CONVERSION_KINDS]
+    """Every kind of causal graph the supported methods return, in the homepage's words."""
+    skipped = CONVERSION_KINDS | experimental_kinds()
+    kinds = [kind for kind in get_args(Kind) if kind not in skipped]
     if set(kinds) != GRAPH_KINDS.keys():
         raise ValueError(f"name every graph kind in GRAPH_KINDS: {sorted(kinds)}")
     return [GRAPH_KINDS[kind] for kind in kinds] + [TEMPORAL_KIND]
@@ -1415,7 +1412,7 @@ def run_interface() -> tuple[str, str, str]:
     kind of causal graph: one per method on the lawn's table, then the graph over the lawn's days
     and the same graph with time collapsed."""
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)  # MMPC, VARMA-LiNGAM
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)  # VARMA-LiNGAM is experimental
         source, printed, namespace = run_script("interface.py")
     graphs = namespace["graphs"]
     if graphs.keys() != INTERFACE_CAPTIONS.keys():
@@ -1423,10 +1420,10 @@ def run_interface() -> tuple[str, str, str]:
     # The page shows the loop; the line that keeps each graph for the drawings is the build's.
     loop = source[source.index("for learn in") : source.index("\n\n", source.index("for learn in"))]
     shown = "\n".join(line for line in loop.splitlines() if "graphs[" not in line)
-    # One layout for all four, from the DAG, so the drawings differ only in their edge marks.
+    # One layout for all three, from the DAG, so the drawings differ only in their edge marks.
     positions = andrey.viz.layout(graphs["direct_lingam"])
     for key, (name, kind, _) in INTERFACE_CAPTIONS.items():
-        if graphs[key].kind != kind.split()[0].lower():
+        if graphs[key].kind != kind.lower():
             raise ValueError(f"{name} returns a {graphs[key].kind}, not the captioned {kind}")
     over_time = namespace["over_time"]
     days, day_positions = two_days(over_time)

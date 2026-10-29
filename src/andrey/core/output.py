@@ -47,8 +47,9 @@ class StructureOutput:
     holds the graph, a ``GraphStructure`` or ``TemporalStructure``. The other fields depend on the
     method, and each method's Returns section lists them: ``ordering`` is a causal order,
     ``weighted_adjacency`` holds edge weights, and ``metadata`` holds values such as the algorithm
-    name and score. ``print(out)`` shows the graph kind, the edges, the order, and the metadata.
-    ``save`` writes the result to a file and ``load`` reads it back. The result is read-only.
+    name and score. ``print(out)`` shows the graph kind, the edges, the order, and the metadata,
+    leaving out an entry whose value is empty. ``save`` writes the result to a file and ``load``
+    reads it back. The result is read-only.
     """
 
     _structure: Structure
@@ -170,7 +171,10 @@ class StructureOutput:
         return W
 
     def __repr__(self) -> str:
-        """Return the structure summary with the algorithm, causal order, and metadata."""
+        """Return the structure summary with the algorithm, causal order, and metadata.
+
+        A metadata entry whose value is an empty list, tuple, dict, or set is left out.
+        """
         return "\n".join(self._summary())
 
     def _summary(
@@ -191,7 +195,11 @@ class StructureOutput:
             labels = s.labels
             order = " -> ".join(labels[i] if labels else str(i) for i in self._ordering)
             lines += ["", f"  order: {order}"]
-        meta = [f"  {k}: {_brief(k, v)}" for k, v in self._metadata.items() if k != "algorithm"]
+        meta = [
+            f"  {k}: {_brief(k, v)}"
+            for k, v in self._metadata.items()
+            if k != "algorithm" and not (isinstance(v, (list, tuple, dict, set)) and not v)
+        ]
         if meta:
             lines += ["", *meta]
         return lines

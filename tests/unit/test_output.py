@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -214,6 +216,23 @@ def test_repr_shows_a_long_metadata_list_by_its_length():
         "  orders: [0, 1]",
         "  p_values: a list of 2, too long to print; read metadata['p_values']",
     ]
+
+
+@pytest.mark.parametrize("empty", [[], (), {}, set()], ids=["list", "tuple", "dict", "set"])
+def test_repr_leaves_out_an_empty_metadata_value_but_keeps_it_in_metadata(empty):
+    g = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+    out = StructureOutput.new(g, metadata={"algorithm": "pc", "kept": [[0, 1]], "score": 0.0})
+    out = dataclasses.replace(out, _metadata={**out.metadata, "conflicts": empty, "groups": {}})
+    shown = repr(out).splitlines()
+    assert "  kept: [[0, 1]]" in shown and "  score: 0" in shown
+    assert not any(line.lstrip().startswith(("conflicts", "groups")) for line in shown)
+    assert out.metadata["conflicts"] == empty and out.metadata["groups"] == {}
+
+
+def test_repr_has_no_metadata_block_when_every_value_is_empty():
+    g = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+    out = StructureOutput.new(g, metadata={"algorithm": "pc", "conflicts": []})
+    assert repr(out) == "pc  dag  |  2 nodes  |  0 edges (no edges)"
 
 
 def test_repr_two_cycles_use_each_direction_weight():

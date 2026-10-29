@@ -17,10 +17,10 @@ X = pd.DataFrame(
 )
 
 graphs = {}
-for learn in (andrey.pc, andrey.fci, andrey.direct_lingam, andrey.mmpc):
+for learn in (andrey.pc, andrey.fci, andrey.direct_lingam):
     graph = learn(X).structure  # a GraphStructure, whichever method ran
     edges = len(graph.to_edges())
-    print(f"{learn.__name__:<15}{graph.kind:<11}{edges} edges")
+    print(f"{learn.__name__:<15}{graph.kind:<7}{edges} edges")
     graphs[learn.__name__] = graph
 
 # The same lawn, day by day: the rain wets it that day, the sprinkler the next day, and a lawn

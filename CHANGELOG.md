@@ -247,6 +247,8 @@ change names its pull request.
   numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
   depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
   seed of a fit that uses one of those tests. ([#499])
+- `print(out)` leaves out a metadata entry whose value is an empty list or dict, such as
+  `conflicts: []`; the entry stays in `output.metadata`. ([#509])
 
 ### Fixed
 
