@@ -619,13 +619,13 @@ def pcmciplus(
         Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
         ``tau_max``. ``structure.lag(0)`` is a ``cpdag`` of the same-step links: ``i -> j`` is
         oriented, and ``i -- j`` is a link whose direction the data cannot tell or whose
-        orientations conflict; ``metadata["conflicts"]`` lists the latter as ``[i, j]`` pairs,
-        ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a ``digraph`` whose edge ``i -> j`` is
-        the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a
-        self-loop is a variable's dependence on its own past. The structure has no
-        ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value among the
-        skeleton-phase tests of the link between variable ``i`` at ``t - k`` and variable ``j``
-        at ``t`` (the first step's tests for a lagged link that step removed), and
+        orientations conflict; ``metadata["conflicts"]`` lists the latter as ``[i, 0, j]`` links
+        (variable ``i`` at lag ``0`` and ``j``), ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a
+        ``digraph`` whose edge ``i -> j`` is the link from variable ``i`` at time ``t - k`` to
+        variable ``j`` at time ``t``; a self-loop is a variable's dependence on its own past. The
+        structure has no ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value
+        among the skeleton-phase tests of the link between variable ``i`` at ``t - k`` and
+        variable ``j`` at ``t`` (the first step's tests for a lagged link that step removed), and
         ``metadata["statistics"][k][i][j]`` the partial correlation of that test; lag ``0`` is
         symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never
         tested, reads p-value 1 and statistic 0, and a required one reads 0 and 1.

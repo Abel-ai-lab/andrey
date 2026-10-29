@@ -1125,15 +1125,16 @@ def test_code_and_its_output_sit_in_windows_named_for_the_file(placeholder_page)
 
 
 def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
-    # Every kind a method returns has the homepage's name for it, and the tile lists them all,
-    # with graphs over time, and draws each one; its dialog draws them with captions, and leads to
-    # the guide that explains them. A conversion's kind (a MAG) is not on the tile.
-    from typing import get_args
-
-    from andrey.core.structure import Kind
-
-    assert set(get_args(Kind)) == build.GRAPH_KINDS.keys() | build.CONVERSION_KINDS
+    # Every kind a supported method returns has the homepage's name for it, and the tile lists them
+    # all, with graphs over time, and draws each one; its dialog draws them with captions, and
+    # leads to the guide that explains them. The homepage shows supported methods only, so a kind
+    # that only experimental methods return is not on the tile, and neither is a conversion's kind
+    # (a MAG).
+    supported = {s.output.graph_kind for s in list_specs() if s.status == "supported"}
+    experimental = {s.output.graph_kind for s in list_specs() if s.status == "experimental"}
     kinds = build.graph_kinds()
+    assert {build.GRAPH_KINDS[kind] for kind in supported - {None}} <= set(kinds)
+    assert not (experimental - supported) & build.GRAPH_KINDS.keys()
     tile = placeholder_page[placeholder_page.index('data-tile="graphs"') :]
     tile = tile[: tile.index("</li>")]
     assert f">{build.graph_title()}<" in tile and f"{build.listed(kinds)}." in tile

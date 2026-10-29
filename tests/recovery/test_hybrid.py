@@ -56,8 +56,7 @@ def test_mmhc_reaches_the_score_optimum_on_gauss_5v():
     x = datagen.generate("gauss_5v")
     out = andrey.mmhc(x)
     assert out.structure.kind == "cpdag"
-    assert markov_equivalent(out.structure, to_cpdag(andrey.exact_search(x).structure))
-    assert out.metadata["restrict"] == "mmpc" and out.metadata["maximize"] == "hc"
+    assert markov_equivalent(out.structure, andrey.exact_search(x).structure)
     assert_recorded_output(out, "MMHC", case="gauss_5v")
 
 
@@ -118,7 +117,7 @@ def test_mmhc_is_rsmax2_with_mmpc_and_hill_climbing():
 def test_rsmax2_reaches_the_score_optimum_on_gauss_5v():
     x = datagen.generate("gauss_5v")
     out = andrey.rsmax2(x, restrict="pc", maximize="tabu")
-    assert markov_equivalent(out.structure, to_cpdag(andrey.exact_search(x).structure))
+    assert markov_equivalent(out.structure, andrey.exact_search(x).structure)
     assert_recorded_output(out, "RSMAX2", case="gauss_5v")
 
 

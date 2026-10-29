@@ -358,7 +358,7 @@ for _name, _summary, _key, _refs in (
             data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
             output=OutputSpec(
                 structure_type="graph",
-                graph_kind="cpdag",
+                graph_kind="undirected",
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             determinism="stochastic",
@@ -599,7 +599,7 @@ _add(
         name="exact_search",
         family="score",
         summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
-        "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
+        "exponential in the number of variables; keep to about 20 or fewer. Returns the CPDAG of "
         "the best-scoring equivalence class. BIC by default, BDeu when every column is "
         "categorical, conditional Gaussian when some are; score_func=bdeu or "
         "discrete_bic for categorical data, degen_gauss or "
@@ -607,8 +607,9 @@ _add(
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
-            graph_kind="dag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            graph_kind="cpdag",
+            doc="metadata['dag'] lists the edges [i, j] of the optimal DAG the search found; "
+            "metadata['categorical'] lists the categorical columns a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -973,8 +974,7 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
-            "the phases",
+            doc="score in metadata['score']",
         ),
         determinism="stochastic",
         accel="numpy",
@@ -1008,8 +1008,7 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
-            "the phases",
+            doc="score in metadata['score']",
         ),
         determinism="stochastic",
         accel="numpy",
@@ -1644,9 +1643,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="dag",
-            doc="two-node graph with the decided edge, or none; metadata pval_forward (x->y) "
-            "and pval_backward (y->x), and stat_forward and stat_backward, each HSIC statistic "
-            "divided by its mean under independence.",
+            doc="two-node graph with the decided edge, or none; metadata p_values and "
+            "statistics map forward (x->y) and backward (y->x) to the p-value and the HSIC "
+            "statistic, divided by its mean under independence, of each test.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1691,9 +1690,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="dag",
-            doc="two-node graph with the decided edge, or none; metadata pval_forward (x->y) "
-            "and pval_backward (y->x), and stat_forward and stat_backward, each HSIC statistic "
-            "divided by its mean under independence.",
+            doc="two-node graph with the decided edge, or none; metadata p_values and "
+            "statistics map forward (x->y) and backward (y->x) to the p-value and the HSIC "
+            "statistic, divided by its mean under independence, of each test.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1722,7 +1721,7 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             has_latents=True,
-            doc="observed + latent nodes; metadata clusters, causal_order + unordered.",
+            doc="observed + latent nodes; metadata clusters, cluster_order + unordered.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1832,7 +1831,7 @@ _add(
             graph_kind="pag",
             weighted=True,
             doc="PAG over the observed variables; o-o joins the variables a hidden common "
-            "cause leaves unordered, and metadata causal_order nests them.",
+            "cause leaves unordered, and metadata partial_order nests them.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1925,18 +1924,19 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "rcd": "The ancestor search runs as without knowledge; the parent sets then drop forbidden "
     "parents and gain required ones, and a pair forbidden both ways is never marked <->.",
     "bottom_up_parce_lingam": "A sink is taken only when no remaining variable is in a later "
-    "tier, and each regression drops forbidden parents. In the unordered block, a pair forbidden "
-    "both ways is not adjacent and a pair forbidden one way has an arrowhead at the cause. "
-    "Required edges raise.",
+    "tier or is the effect of a required edge out of it, and each regression drops forbidden "
+    "parents and keeps "
+    "required ones unpenalized. In the unordered block, a pair forbidden both ways is not "
+    "adjacent, a pair forbidden one way has an arrowhead at the cause, and a required edge is "
+    "directed.",
     "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors: every part, but for BottomUpParceLiNGAM.
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
-    **dict.fromkeys(_KNOWLEDGE_HOW, KNOWLEDGE_PARTS),
-    "bottom_up_parce_lingam": ("forbidden", "allowed", "tiers"),
-}
+#: The Knowledge parts each method honors: every part.
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
+    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
+)
 _MAX_DEPTH = concept_param("max_depth")
 
 for _name, _how in _KNOWLEDGE_HOW.items():
@@ -1971,6 +1971,44 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
         REGISTRY[_name] = REGISTRY[_name].model_copy(
             update={"params": (*_params[:_cut], _cap, *_params[_cut:])}
         )
+
+
+#: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
+_METADATA: dict[str, tuple[str, ...]] = {
+    "pc": ("conflicts",),
+    "cdnod": ("conflicts",),
+    "iamb": ("target", "markov_blanket"),
+    "inter_iamb": ("target", "markov_blanket"),
+    "mmpc": ("target", "parents_and_children"),
+    **dict.fromkeys(
+        ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
+    ),
+    "exact_search": ("dag",),
+    "calm": ("h_final", "objective"),
+    **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),
+    "multi_group_direct_lingam": ("group_index",),
+    "longitudinal_lingam": ("causal_orders",),
+    "pcmci": ("p_values", "statistics", "parents"),
+    "pcmciplus": ("p_values", "statistics", "parents", "conflicts"),
+    "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
+    **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
+    "gin": ("clusters", "cluster_order", "unordered"),
+    "rcd": ("confounded_pairs",),
+    "bottom_up_parce_lingam": ("partial_order",),
+}
+# The shared keys: the name, the seed of a seeded fit, the column types a mixed-data setting read,
+# the fewest rows a test used, and the triples a collider vote left ambiguous.
+for _name, _spec in REGISTRY.items():
+    _concepts = {p.concept for p in _spec.params}
+    _shared = (
+        "algorithm",
+        *(("seed",) if _spec.seeded else ()),
+        *(("categorical",) if "categorical" in _concepts else ()),
+        *(("rows_tested",) if _spec.data.missing else ()),
+        *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
+    )
+    _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
+    REGISTRY[_name] = _spec.model_copy(update={"output": _output})
 
 
 def get_spec(name: str) -> MethodSpec:

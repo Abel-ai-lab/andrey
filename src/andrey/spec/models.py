@@ -215,11 +215,13 @@ class OutputSpec(Spec):
     """The shape of the returned ``StructureOutput`` (what the result envelope carries)."""
 
     structure_type: Literal["graph", "temporal"]
-    graph_kind: Literal["dag", "cpdag", "pag", "mag"] | None  # None for temporal
+    graph_kind: Literal["dag", "cpdag", "pag", "mag", "undirected"] | None  # None for temporal
     weighted: bool = False  # carries a weighted_adjacency
     has_ordering: bool = False  # carries a discovered causal order
     has_latents: bool = False  # flags latent nodes via node_types (GIN)
     multi: bool = False  # returns list[StructureOutput], one per group
+    # Every key a fit's metadata can hold; a fit holds a subset (some keys depend on the settings).
+    metadata: tuple[str, ...] = ()
     doc: str = ""
 
 

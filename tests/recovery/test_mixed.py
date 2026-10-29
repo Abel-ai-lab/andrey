@@ -16,6 +16,7 @@ import andrey
 from andrey.core import ARROW
 from andrey.data import sample_mixed
 from andrey.metrics import shd, to_cpdag
+from tests.recovery.helpers.project import found_dag
 
 CATEGORICAL = [0, 4]
 DIRECTED = {(0, 2), (1, 2), (2, 3)}
@@ -99,8 +100,9 @@ def test_pag_methods_find_the_skeleton_and_the_collider(fit):
 @pytest.mark.parametrize("score_func", ["degen_gauss", "cond_gauss"])
 def test_exact_search_finds_a_dag_in_the_true_class(score_func):
     out = andrey.exact_search(_network(), score_func=score_func, categorical=CATEGORICAL)
-    assert out.structure.kind == "dag"
-    cpdag = to_cpdag(out.structure)
+    assert out.structure.kind == "cpdag"
+    assert out.structure.oriented_edges() == to_cpdag(found_dag(out)).oriented_edges()
+    cpdag = out.structure
     assert {(a, b) for a, b, k in cpdag.oriented_edges() if k == "directed"} == DIRECTED
     assert {(a, b) for a, b, k in cpdag.oriented_edges() if k == "undirected"} == UNDIRECTED
 

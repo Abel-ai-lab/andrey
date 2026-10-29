@@ -516,7 +516,7 @@ def test_run_pnl_on_a_named_pair(capsys, tmp_path):
     assert code == 0 and env["run"]["n_variables"] == 2 and env["run"]["params"]["alpha"] is None
     assert s["labels"] == ["cause", "effect"]
     assert s["edges"] == [{"source": 0, "target": 1, "type": "directed"}]
-    assert {"pval_forward", "pval_backward"} <= set(env["metadata"])
+    assert {"p_values", "statistics"} <= set(env["metadata"])
     code, out, _ = _run(["run", "pnl", "--data", str(pair), "alpha=0.05"], capsys)
     assert code == 0 and json.loads(out)["run"]["params"]["alpha"] == 0.05
 

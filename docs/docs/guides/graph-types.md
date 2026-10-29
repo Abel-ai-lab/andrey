@@ -116,6 +116,15 @@ In the PAG fragment, one edge has two arrowheads. In the directed graph, `X -> Y
 are separate directed edges. The endpoint matrix alone cannot distinguish them; retain `kind`
 when saving or converting a graph.
 
+## Undirected graphs: adjacency without direction
+
+`kind="undirected"` holds `(TAIL, TAIL)` pairs only. Its edges claim no direction, and a moral
+graph's edges also join spouses, two parents of one child that need not be adjacent. `iamb` and
+`inter_iamb` return the moral graph of their Markov blankets, and `mmpc` the skeleton of its
+parents-and-children sets. An undirected graph has no CPDAG or DAG, so `andrey.metrics.score`
+scores it on its skeleton alone: `shd` counts the pairs adjacent in one graph and not in the
+other, and no arrowhead metric is reported.
+
 ## Temporal graphs
 
 A `TemporalStructure` stores a graph for each lag. An edge `X -> Y` in `lag(k)` means
@@ -156,8 +165,9 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `notears`, `dagma`, `gin`, `anm`, `pnl` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`; `iamb`, `inter_iamb`, `mmpc` (undirected edges only) |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `gin`, `anm`, `pnl` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp` |
+| `undirected` | `iamb`, `inter_iamb`, `mmpc` |
 | `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger` |
 

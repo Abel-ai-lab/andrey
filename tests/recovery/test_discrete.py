@@ -23,6 +23,7 @@ from andrey.core.score import make_score
 from andrey.data import sample_discrete
 from andrey.metrics import shd, to_cpdag
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.project import found_dag
 
 CASE = "discrete_5v"
 COLUMN = datagen.column_of(CASE)  # the column of each variable
@@ -169,8 +170,9 @@ def test_a_fractional_value_is_refused_by_the_categorical_bic():
 def test_exact_search_returns_the_categorical_network(fit):
     """Every edge of the network's CPDAG is oriented, so its class has the network alone."""
     out = DAG_FITS[fit](datagen.generate("discrete_5v"))
-    assert out.structure.kind == "dag"
+    assert out.structure.kind == "cpdag"
     assert _edges(out, {"directed"}) == TRUTH
+    assert {(a, b) for a, b, _ in found_dag(out).oriented_edges()} == TRUTH
 
 
 @pytest.mark.parametrize("score_func", ["bdeu", "discrete_bic"])
@@ -189,8 +191,8 @@ def test_the_searches_order_by_score_on_one_categorical_score(score_func):
     exact = andrey.exact_search(data, score_func=score_func)
     assert hc.metadata["score"] == pytest.approx(total(hc.structure), rel=1e-12)
     assert tabu.metadata["score"] <= hc.metadata["score"]
-    assert total(exact.structure) <= tabu.metadata["score"] + 1e-9
-    assert total(exact.structure) < hc.metadata["score"] - 1.0
+    assert total(found_dag(exact)) <= tabu.metadata["score"] + 1e-9
+    assert total(found_dag(exact)) < hc.metadata["score"] - 1.0
 
 
 # Draws of sample_discrete, as (d, n, seed), whose optimal class is unique under BDeu and under the
@@ -208,7 +210,7 @@ def test_the_permutation_searches_find_the_exact_optimum(fit, draw):
     score_func = _SCORES[fit.split("-")[1]]
     data = sample_discrete(d=d, n=n, seed=seed).data
     score = make_score(score_func, data)
-    exact = andrey.exact_search(data, score_func=score_func).structure
+    exact = found_dag(andrey.exact_search(data, score_func=score_func))
     optimum = sum(
         score.score(v, np.flatnonzero(exact.to_numpy()[:, v] == TAIL).tolist()) for v in range(d)
     )
