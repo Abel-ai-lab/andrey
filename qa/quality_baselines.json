@@ -143,8 +143,8 @@
         "pnl_pair_n1000": {"median_shd": 0.0, "empty_median_shd": 1.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
       },
       "PCMCI": {
-        "pcmci_paper_d10_n500": {"median_shd": 8.0, "empty_median_shd": 20.0, "shd": [6, 8, 14, 7, 9, 7, 11, 3, 8, 9]},
-        "pcmci_paper_d10_n1000": {"median_shd": 9.5, "empty_median_shd": 20.0, "shd": [4, 9, 12, 7, 5, 6, 12, 10, 14, 12]}
+        "pcmci_paper_d10_n500": {"median_shd": 2.0, "empty_median_shd": 20.0, "shd": [0, 4, 3, 3, 1, 2, 1, 2, 3, 2]},
+        "pcmci_paper_d10_n1000": {"median_shd": 0.5, "empty_median_shd": 20.0, "shd": [0, 2, 2, 0, 2, 0, 1, 0, 2, 0]}
       },
       "PCMCIplus": {
         "pcmciplus_paper_d10_n500": {"median_shd": 12.0, "empty_median_shd": 50.0, "shd": [10, 12, 4, 12, 16, 18, 5, 14, 8, 16]},
@@ -163,8 +163,8 @@
         "longitudinal_lingam_paper_d5_n20_m500": {"median_shd": 3.0, "empty_median_shd": 570.0, "shd": [0, 7, 4, 1, 4, 0, 5, 0, 2, 4]}
       },
       "Granger": {
-        "var2_lagged_d5_n1000": {"median_shd": 5.5, "empty_median_shd": 28.5, "shd": [3, 8, 10, 11, 7, 2, 2, 4, 0, 11]},
-        "var2_lagged_d5_n2000": {"median_shd": 3.5, "empty_median_shd": 28.5, "shd": [1, 4, 5, 8, 4, 1, 1, 3, 0, 8]}
+        "var2_lagged_d5_n1000": {"median_shd": 6.5, "empty_median_shd": 28.5, "shd": [3, 8, 10, 11, 8, 5, 3, 5, 1, 14]},
+        "var2_lagged_d5_n2000": {"median_shd": 4.0, "empty_median_shd": 28.5, "shd": [1, 5, 7, 7, 5, 1, 2, 3, 0, 11]}
       },
       "KCI": {
         "anm_er_d5": {"median_shd": 1.0, "empty_median_shd": 5.0, "shd": [0, 0, 0, 1, 1, 1, 1, 3, 0, 2]},

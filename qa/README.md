@@ -200,8 +200,9 @@ CMIknn, and GPDC, on nonlinear data:
   error is below the empty graph's: PCMCI's only at `d = 10`, and VARMA-LiNGAM's the two smallest,
   as its fit takes seconds. `longitudinal_lingam_paper` draws `m` units at `n` time points.
   Granger's published median error is above the empty graph's at every published size, so its
-  gate draws 5 variables, where it is below. A test keeps the Granger draws in step with the
-  benchmark driver and the regime names with the harness.
+  gate draws 5 variables, where it is below. PCMCI and Granger run at their default
+  `fdr_method`, `"fdr_bh"`. A test keeps the Granger draws in step with the benchmark driver and
+  the regime names with the harness.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.

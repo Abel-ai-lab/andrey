@@ -364,7 +364,7 @@ def pcmci(
     tau_max: int = 1,
     pc1_alpha: float = 0.2,
     alpha: float = 0.05,
-    fdr_method: str = "none",
+    fdr_method: str = "fdr_bh",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     seed: int | None = None,
@@ -393,17 +393,18 @@ def pcmci(
     alpha : float, default=0.05
         Significance level of the MCI step, in ``(0, 1)``, the level that decides the returned
         links: a link is in the graph when its p-value is at most ``alpha``.
-    fdr_method : {"none", "fdr_bh"}, default="none"
-        How the MCI p-values are corrected for the number of links tested. ``"none"`` keeps each
-        p-value as tested. ``"fdr_bh"`` replaces them with their Benjamini-Hochberg adjusted
-        values [4]_ over all the links together, every lag and every ordered pair of variables, a
-        variable's link to its own past included. A link is then in the graph when its adjusted
-        p-value is at most ``alpha``, which holds the false discovery rate, the expected share of
-        false links among the returned links, at or below ``alpha`` when the tests are independent
-        or positively dependent. The adjusted p-value is never below the tested one, so ``"fdr_bh"``
-        can remove links and never adds one. ``metadata["p_values"]`` holds the adjusted values. A
-        link the knowledge forbids is no test: it is not counted and keeps p-value ``1``; a
-        required link is counted with p-value ``0``. See Notes.
+    fdr_method : {"none", "fdr_bh"}, default="fdr_bh"
+        How the MCI p-values are corrected for the number of links tested. ``"fdr_bh"`` replaces
+        them with their Benjamini-Hochberg adjusted values [4]_ over all the links together, every
+        lag and every ordered pair of variables, a variable's link to its own past included. A link
+        is then in the graph when its adjusted p-value is at most ``alpha``, which holds the false
+        discovery rate, the expected share of false links among the returned links, at or below
+        ``alpha`` when the tests are independent or positively dependent. The adjusted p-value is
+        never below the tested one, so ``"fdr_bh"`` can remove links and never adds one, and
+        ``metadata["p_values"]`` holds the adjusted values. ``"none"`` keeps each p-value as
+        tested, so about ``alpha`` of the absent links are in the graph. A link the knowledge
+        forbids is no test: it is not counted and keeps p-value ``1``; a required link is counted
+        with p-value ``0``. See Notes.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -509,14 +510,16 @@ def pcmci(
     autocorrelated series can be.
 
     **Choosing fdr_method.** The MCI step tests ``n_variables ** 2 * tau_max`` links, each at level
-    ``alpha``, so absent links are returned by chance, more of them as the number of variables
-    grows. ``"fdr_bh"`` [4]_ sorts the ``m`` p-values of the links and gives the one of rank ``k``
-    the smallest value, over its rank and every higher one, of ``p * m / rank``, at most ``1``;
-    equal p-values get equal results. The authors' reference implementation, tigramite, corrects
-    the MCI p-values of the same links in the same way with ``fdr_method="fdr_bh"`` and thresholds
-    the adjusted values at ``alpha_level``, as ``alpha`` does here. The PC1 step is not corrected.
-    The guarantee of [4]_ needs independent or positively dependent tests, which the MCI tests of
-    one series are not shown to be.
+    ``alpha``. With ``"none"`` about ``alpha`` of the absent links are returned by chance, so the
+    extra links grow with the number of variables (see Limitations). ``"fdr_bh"`` [4]_ sorts the
+    ``m`` p-values of the links and gives the one of rank ``k`` the smallest value, over its rank
+    and every higher one, of ``p * m / rank``, at most ``1``; equal p-values get equal results. It
+    returns fewer links than ``"none"``: the false ones, and also true ones whose p-value is not
+    small enough for the number of tests. The authors' reference implementation, tigramite,
+    corrects the MCI p-values of the same links in the same way with ``fdr_method="fdr_bh"`` and
+    thresholds the adjusted values at ``alpha_level``, as ``alpha`` does here. The PC1 step is not
+    corrected. The guarantee of [4]_ needs independent or positively dependent tests, which the
+    MCI tests of one series are not shown to be.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
     where every lag a test can condition on exists: the MCI test of a link at lag ``k`` conditions
@@ -536,25 +539,37 @@ def pcmci(
     test with fewer than ``2``, or a test with a continuous column constant on its rows raises
     ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
 
-    **Limitations.** Measured on simulated linear-Gaussian time series with lagged links, of
-    ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five times as many, with
-    ``tau_max=2``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
-    its median errors (lag-resolved SHD) stayed below the empty graph's, and through which its fits
-    finished within the caps, were 20 and 80 variables with the shorter series or the series five
-    times as long. Every ladder ended after two sizes in a row did not beat the empty graph. The
-    median fit took 0.87 s at 80 variables with the series five times as long. On series with an
-    autodependency in every variable and one cross-link per variable at lag 1 or 2, from 10 to 160
-    variables with 500 to 2,000 time steps, it found nearly every true link at every size, but its
-    false links grew with the number of variables. With a partial-correlation test it assumes linear
-    effects; ``"cmiknn"`` and ``"gpdc"`` lift that assumption at a far higher cost per test and are
-    not benchmarked yet. It assumes a stationary series and no hidden common causes. It does not
-    test same-step (lag 0) links: an effect within one time step is missed and can show up as a
-    false lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged
-    values, so the series needs many more time steps than that. The MCI step alone runs
-    ``n_variables ** 2 * tau_max`` tests. Missing values are not benchmarked yet; the tests run them
-    on up to 5 variables with up to a fifth of the values missing completely at random. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** Measured with ``fdr_method="none"`` on simulated linear-Gaussian time series
+    with lagged links, of ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five
+    times as many, with ``tau_max=2``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest
+    sizes through which its median errors (lag-resolved SHD) stayed below the empty graph's, and
+    through which its fits finished within the caps, were 20 and 80 variables with the shorter
+    series or the series five times as long. Every ladder ended after two sizes in a row did not
+    beat the empty graph. The median fit took 0.87 s at 80 variables with the series five times as
+    long. On series with an autodependency in every variable and one cross-link per variable at lag
+    1 or 2, from 10 to 160 variables with 500 to 2,000 time steps, it found nearly every true link
+    at every size, but its false links grew with the number of variables. On 20 simulated
+    linear-Gaussian VAR series per cell, with 2 expected parents of each variable at each lag, no
+    same-step links, from 5 to 80 variables, with 500 and 1,000 time steps, and ``tau_max`` of 1 and
+    2 (20 cells), the default ``fdr_method="fdr_bh"`` had fewer mean errors (missing plus extra
+    lagged links) than ``"none"`` in 16 cells, by the paired 95% bootstrap interval of the
+    difference, the same in 3, and more in 1: 12.5 against 11.7 with 5 variables, 500 steps, and
+    ``tau_max=2``. From 20 variables on it was better in every cell. At 80 variables, 1,000 steps,
+    and ``tau_max=2``, ``"none"`` had 779 errors, above the empty graph's 481, with 616 extra links
+    and 163 missed true links on average; ``"fdr_bh"`` had 252, with 13 extra and 239 missed. The
+    mean errors were above the empty graph's in 5 of the 20 cells with ``"none"``, in none with
+    ``"fdr_bh"``. ``"fdr_bh"`` trades missed true links for far fewer extra ones: with 5 to 10
+    variables the two differ by at most 2.8 errors, and with 5 variables and ``tau_max=2``
+    ``"fdr_bh"`` removed the extra links (1.2 to 0.4 at 500 steps) and missed more true ones (10.4
+    to 12.1). With a partial-correlation test it assumes linear effects; ``"cmiknn"`` and ``"gpdc"``
+    lift that assumption at a far higher cost per test and are not benchmarked yet. It assumes a
+    stationary series and no hidden common causes. It does not test same-step (lag 0) links: an
+    effect within one time step is missed and can show up as a false lagged link. An MCI test
+    conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so the series needs many
+    more time steps than that. The MCI step alone runs ``n_variables ** 2 * tau_max`` tests. Missing
+    values are not benchmarked yet; the tests run them on up to 5 variables with up to a fifth of
+    the values missing completely at random. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -634,7 +649,7 @@ def pcmciplus(
     *,
     tau_max: int = 1,
     alpha: float = 0.01,
-    fdr_method: str = "none",
+    fdr_method: str = "fdr_bh",
     collider_rule: str = "majority",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -663,17 +678,17 @@ def pcmciplus(
         Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
         p-value above ``alpha``. The default is the level of the method's published experiments
         [1]_.
-    fdr_method : {"none", "fdr_bh"}, default="none"
+    fdr_method : {"none", "fdr_bh"}, default="fdr_bh"
         How the p-values of the lagged links are corrected for the number of links tested.
-        ``"none"`` keeps each p-value as tested. ``"fdr_bh"`` replaces the p-values of lags ``1`` to
-        ``tau_max`` with their Benjamini-Hochberg adjusted values [4]_ over all those links
-        together, every lag and every ordered pair of variables, a variable's link to its own past
-        included; the same-step p-values stay as tested. The adjusted p-value is never below the
-        tested one. The links themselves do not change: the skeleton phase decides them at
-        ``alpha``, so ``"fdr_bh"`` only changes ``metadata["p_values"]``, and a lagged link of the
-        graph whose adjusted p-value is above ``alpha`` is one the correction would not keep. A
-        link the knowledge forbids is no test: it is not counted and keeps p-value ``1``; a
-        required link is counted with p-value ``0``. See Notes.
+        ``"fdr_bh"`` replaces the p-values of lags ``1`` to ``tau_max`` with their
+        Benjamini-Hochberg adjusted values [4]_ over all those links together, every lag and every
+        ordered pair of variables, a variable's link to its own past included; the same-step
+        p-values stay as tested. The adjusted p-value is never below the tested one. ``"none"``
+        keeps each p-value as tested. The links themselves do not change with either: the skeleton
+        phase decides them at ``alpha``, so ``fdr_method`` only changes ``metadata["p_values"]``,
+        and under ``"fdr_bh"`` a lagged link of the graph whose adjusted p-value is above ``alpha``
+        is one the correction would not keep. A link the knowledge forbids is no test: it is not
+        counted and keeps p-value ``1``; a required link is counted with p-value ``0``. See Notes.
     collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
         How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a
         collider ``a -> b <- c``. ``"sepsets"`` calls it a collider when ``b`` is not in the one
@@ -808,13 +823,14 @@ def pcmciplus(
 
     **Choosing fdr_method.** The skeleton phase tests each lagged link at level ``alpha`` and keeps
     the links whose tests all stay at or below it, so absent links are kept by chance, more of them
-    as the number of variables grows. ``"fdr_bh"`` [4]_ sorts the ``m`` lagged-link p-values and
-    gives the one of rank ``k`` the smallest value, over its rank and every higher one, of ``p * m
-    / rank``, at most ``1``; equal p-values get equal results. The authors' reference
-    implementation, tigramite, corrects the lagged p-values it returns in the same way with
-    ``fdr_method="fdr_bh"`` and leaves the graph as the skeleton phase decided it, as this method
-    does. The guarantee of [4]_ needs independent or positively dependent tests, which these tests
-    are not shown to be.
+    as the number of variables grows, whatever ``fdr_method`` is. ``"fdr_bh"`` [4]_ sorts the ``m``
+    lagged-link p-values and gives the one of rank ``k`` the smallest value, over its rank and
+    every higher one, of ``p * m / rank``, at most ``1``; equal p-values get equal results. The
+    reported p-values then show which lagged links of the graph the correction would keep, where
+    ``"none"`` reports them as tested. The authors' reference implementation, tigramite, corrects
+    the lagged p-values it returns in the same way with ``fdr_method="fdr_bh"`` and leaves the
+    graph as the skeleton phase decided it, as this method does. The guarantee of [4]_ needs
+    independent or positively dependent tests, which these tests are not shown to be.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
     Every test reads the lagged values as the columns of one design. ``"fisherz"`` and
@@ -1214,7 +1230,7 @@ def granger(
     *,
     tau_max: int = 1,
     alpha: float = 0.05,
-    fdr_method: str = "none",
+    fdr_method: str = "fdr_bh",
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged causal graph of a multivariate time series by Granger causality.
@@ -1237,17 +1253,18 @@ def granger(
     alpha : float, default=0.05
         Significance level of the test of each lagged coefficient, in the open interval (0, 1): a
         larger value returns more edges.
-    fdr_method : {"none", "fdr_bh"}, default="none"
-        How the p-values are corrected for the number of links tested. ``"none"`` keeps each
-        p-value as tested. ``"fdr_bh"`` replaces them with their Benjamini-Hochberg adjusted values
-        [3]_ over all the links together, every lag and every ordered pair of variables, a
-        variable's link to its own past included. A link is then an edge when its adjusted p-value
-        is at most ``alpha``, which holds the false discovery rate, the expected share of false
-        edges among the returned edges, at or below ``alpha`` when the tests are independent or
-        positively dependent. The adjusted p-value is never below the tested one, so ``"fdr_bh"``
-        can remove edges and never adds one. ``metadata["p_values"]`` holds the adjusted values. A
-        link the knowledge forbids is no test: it is not counted and keeps p-value ``1``; a
-        required link is counted with p-value ``0``. See Notes.
+    fdr_method : {"none", "fdr_bh"}, default="fdr_bh"
+        How the p-values are corrected for the number of links tested. ``"fdr_bh"`` replaces them
+        with their Benjamini-Hochberg adjusted values [3]_ over all the links together, every lag
+        and every ordered pair of variables, a variable's link to its own past included. A link is
+        then an edge when its adjusted p-value is at most ``alpha``, which holds the false
+        discovery rate, the expected share of false edges among the returned edges, at or below
+        ``alpha`` when the tests are independent or positively dependent. The adjusted p-value is
+        never below the tested one, so ``"fdr_bh"`` can remove edges and never adds one, and
+        ``metadata["p_values"]`` holds the adjusted values. ``"none"`` keeps each p-value as
+        tested, so about ``alpha`` of the absent links are edges. A link the knowledge forbids is
+        no test: it is not counted and keeps p-value ``1``; a required link is counted with
+        p-value ``0``. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``1`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -1295,22 +1312,24 @@ def granger(
     test a vector autoregression reports for a coefficient [2]_. Its p-value takes the coefficient's
     t-ratio against the Student ``t`` distribution with the regression's residual degrees of
     freedom, which is exact for Gaussian noise; statsmodels' ``VARResults.pvalues`` takes the same
-    t-ratio against the normal distribution, which gives the same p-values as the series grows.
-    Each link is tested at ``alpha``, and ``fdr_method="none"`` makes no correction for the
+    t-ratio against the normal distribution, which gives the same p-values as the series grows. Each
+    link is tested at ``alpha``, and ``fdr_method="none"`` makes no correction for the
     ``n_variables**2 * tau_max`` tests, so on a series with many variables about ``alpha`` of the
-    absent links appear as edges: set ``fdr_method="fdr_bh"``, lower ``alpha``, or judge the edges
-    by their p-values and weights. The regressions are fitted on standardized variables, so the
-    edges do not depend on the units of any variable; the coefficients are converted back to the
-    data's units. The fit is deterministic and has no random component.
+    absent links appear as edges, which the default ``"fdr_bh"`` avoids; with ``"none"``, lower
+    ``alpha`` or judge the edges by their p-values and weights. The regressions are fitted on
+    standardized variables, so the edges do not depend on the units of any variable; the
+    coefficients are converted back to the data's units. The fit is deterministic and has no random
+    component.
 
     **Choosing fdr_method.** The method tests ``n_variables ** 2 * tau_max`` links, each at level
-    ``alpha``, so absent links are returned by chance, more of them as the number of variables
-    grows. ``"fdr_bh"`` [3]_ sorts the ``m`` p-values of the links and gives the one of rank ``k``
-    the smallest value, over its rank and every higher one, of ``p * m / rank``, at most ``1``;
-    equal p-values get equal results. It returns fewer edges than ``"none"``: the false ones, and
-    also true ones whose p-value is not small enough for the number of tests (see Limitations).
-    The guarantee of [3]_ needs independent or positively dependent tests, which the coefficient
-    tests of one vector autoregression are not shown to be.
+    ``alpha``. With ``"none"`` about ``alpha`` of the absent links are returned by chance, so the
+    extra edges grow with the number of variables (see Limitations). ``"fdr_bh"`` [3]_ sorts the
+    ``m`` p-values of the links and gives the one of rank ``k`` the smallest value, over its rank
+    and every higher one, of ``p * m / rank``, at most ``1``; equal p-values get equal results. It
+    returns fewer edges than ``"none"``: the false ones, and also true ones whose p-value is not
+    small enough for the number of tests (see Limitations). The guarantee of [3]_ needs independent
+    or positively dependent tests, which the coefficient tests of one vector autoregression are not
+    shown to be.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's regression
     reads every row of the lagged design, so a step with a missing value has no place in it. Fill
@@ -1318,20 +1337,24 @@ def granger(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
     rows per test.
 
-    **Limitations.** Measured on 10 simulated linear-Gaussian VAR(2) series per size, with no
-    same-step links, standardized, with 1,000 time steps, ``tau_max=2``, and the default
-    ``alpha``. With the default ``fdr_method="none"``, the median errors (missing and extra lagged
-    edges) were below the empty graph's at 10 and 20 variables (24 against 56.5, and 69 against
-    124), above it on half the series at 40 variables, and above it on all of them at 80 and 160
-    (762.5 against 494, and 2,855 against 973), where the many uncorrected tests add false edges:
-    about ``alpha`` of the ``2 * n_variables**2`` absent links. With ``fdr_method="fdr_bh"`` they
-    were below the empty graph's on every series at 40, 80, and 160 variables (123.5 against
-    246.5, 266.5 against 494, and 546 against 973): the mean number of extra edges fell from 148,
-    595, and 2,530 to 5.8, 11.5, and 22.9, and the mean number of missed true edges rose from 84,
-    175, and 347 to 115, 253, and 526. It assumes linear effects and tests no same-step effects.
-    The work grows with ``tau_max`` and with the square of the number of variables. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On 20 simulated linear-Gaussian VAR series per cell, with 2 expected parents of
+    each variable at each lag, no same-step links, and standardized, from 5 to 80 variables, with
+    500 and 1,000 time steps, and ``tau_max`` of 1 and 2 (20 cells), the default
+    ``fdr_method="fdr_bh"`` had fewer mean errors (missing plus extra lagged edges) than ``"none"``
+    in 15 cells, by the paired 95% bootstrap interval of the difference, the same in 4, and more in
+    1: 11.9 against 10.9 with 5 variables, 500 steps, and ``tau_max=2``. From 20 variables on it was
+    better in every cell. At 80 variables, 1,000 steps, and ``tau_max=2``, ``"none"`` had 768
+    errors, above the empty graph's 481, with 603 extra edges and 165 missed true edges on average;
+    ``"fdr_bh"`` had 256, with 13 extra and 243 missed. The mean errors were above the empty graph's
+    in 5 of the 20 cells with ``"none"``, in none with ``"fdr_bh"``. ``"fdr_bh"`` trades missed true
+    edges for far fewer extra ones: with 5 to 10 variables the two differ by at most 2.7 errors, and
+    with 5 variables and ``tau_max=2`` ``"fdr_bh"`` removed the extra edges (1.1 to 0.4 at 500
+    steps) and missed more true ones (9.8 to 11.5). On 10 series of 160 variables with 1,000 steps
+    and ``tau_max=2``, the median errors were 2,855 with ``"none"``, above the empty graph's 973,
+    and 546 with ``"fdr_bh"``. It assumes linear effects and tests no same-step effects. The work
+    grows with ``tau_max`` and with the square of the number of variables. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
