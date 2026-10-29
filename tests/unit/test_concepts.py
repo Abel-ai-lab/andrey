@@ -23,7 +23,14 @@ from andrey.api import _method as method_wrapper
 from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, SCORE_ALIASES, Concept
+from andrey.spec.concepts import (
+    BOOTSTRAP_PARAMS,
+    CI_SEARCHES,
+    CONCEPTS,
+    PCMCI_FAMILY,
+    SCORE_ALIASES,
+    Concept,
+)
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
 
@@ -120,6 +127,17 @@ def test_parameter_cell(concept, method):
 def test_utility_cell(concept, deviation):
     live = signature(deviation.method)
     assert deviation.name in live and live[deviation.name].default == deviation.default
+
+
+@pytest.mark.parametrize("key", ["resampling", "sample_fraction"])
+def test_bootstrap_takes_each_resampling_concept_as_its_spec_and_template_say(key):
+    concept, spec = CONCEPTS[key], BOOTSTRAP_PARAMS[key]
+    deviation = concept.deviation("bootstrap")
+    assert spec.concept == key and signature("bootstrap")[key].default == spec.default
+    assert spec.default == (concept.param.default if deviation is None else deviation.default)  # ty: ignore[possibly-missing-attribute]
+    bounds = ("type", "minimum", "maximum", "exclusive_minimum", "exclusive_maximum")
+    assert {f: getattr(spec, f) for f in bounds} == {f: getattr(concept.param, f) for f in bounds}
+    assert spec.choices == (deviation.choices if deviation else concept.param.choices)  # ty: ignore[possibly-missing-attribute]
 
 
 @pytest.mark.parametrize("utility", UTILITIES)

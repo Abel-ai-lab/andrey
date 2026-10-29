@@ -80,7 +80,7 @@ __all__ = [
     "StructureOutput",
     # Background knowledge every search takes as knowledge=.
     "Knowledge",
-    # Refit a method on bootstrap resamples: edge frequencies and an averaged graph.
+    # Refit a method on resamples of the rows: edge frequencies and an averaged graph.
     "bootstrap",
     "BootstrapOutput",
     # Seeds random, NumPy's global generator, and torch for the caller's own draws.

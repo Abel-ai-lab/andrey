@@ -543,6 +543,38 @@ _CONCEPTS = (
         others_exempt="Execution settings come from andrey.config or ANDREY_* only.",
     ),
     Concept(
+        key="resampling",
+        summary="How andrey.bootstrap draws a resample of the rows: a subsample, sample_fraction "
+        "of the rows without replacement, or a bootstrap resample, as many rows with "
+        "replacement. An argument of the bootstrap function, not of a method.",
+        param=_template(
+            "resampling",
+            "str",
+            "subsample",
+            "How a resample is drawn: subsample (sample_fraction of the rows, without "
+            "replacement) or bootstrap (as many rows, with replacement).",
+            choices=("subsample", "bootstrap"),
+        ),
+        suitable=(),
+        others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
+        key="sample_fraction",
+        summary="The share of the rows in a subsample of andrey.bootstrap, drawn without "
+        "replacement; not used by the bootstrap resampling.",
+        param=_template(
+            "sample_fraction",
+            "float",
+            0.5,
+            "The share of the rows in a subsample, in (0, 1].",
+            minimum=0,
+            maximum=1,
+            exclusive_minimum=True,
+        ),
+        suitable=(),
+        others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
         key="knowledge",
         summary="Background knowledge, an andrey.Knowledge, every part honored.",
         param=_template(
@@ -820,3 +852,10 @@ def concept_param(key: str, **update: Any) -> ParamSpec:
     if param is None:
         raise KeyError(f"{key} is a behavior, not a parameter")
     return param.model_copy(update=update)
+
+
+#: The resampling arguments of ``andrey.bootstrap``, the "bootstrap spec" its wrapper checks.
+BOOTSTRAP_PARAMS: dict[str, ParamSpec] = {
+    "resampling": concept_param("resampling"),
+    "sample_fraction": concept_param("sample_fraction"),
+}
