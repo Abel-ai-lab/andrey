@@ -525,8 +525,8 @@ def test_the_method_schema_carries_the_mag_kind():
     assert schema["output"]["graph_kind"] == "mag"
 
 
-def test_an_averaged_mag_reads_as_a_pag():
+def test_an_averaged_mag_reads_as_a_pag_the_pag_of_the_mag():
     mag = _hidden_cause_mag()
     average = BootstrapOutput.from_fits([andrey.StructureOutput.new(mag)] * 2).structure
     assert average.kind == "pag"
-    assert average.to_numpy().tolist() == mag.to_numpy().tolist()
+    assert average.to_numpy().tolist() == mag.to_pag().to_numpy().tolist()
