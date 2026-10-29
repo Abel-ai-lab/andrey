@@ -11,9 +11,11 @@ import pytest
 
 import andrey
 from andrey import BootstrapOutput, bootstrap
+from andrey.constraint.fci import _fci_orient
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
-from andrey.core._convert import mag_of_pag
+from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
 from andrey.core.orient import _cpdag_of_pdag, dag2cpdag, pdag2dag
+from andrey.data.latent import DSepOracle, _AncestorSepsets, _observed_ancestors
 from andrey.resample import EDGES, _default_block_length, _draw, _Job
 from andrey.spec import REGISTRY
 
@@ -695,6 +697,53 @@ def test_an_edge_the_knowledge_directs_stays_directed_in_the_averaged_graph(meth
     out = bootstrap(method, lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
     assert out.metadata["averaged_graph"] == "vote"
     assert out.structure.endpoints(2, 3) == (TAIL, ARROW)
+
+
+def linear_data(n, parents, seed=0):
+    """Linear data over the columns of ``parents``: 0.8 times the sum of the parents, plus noise."""
+    rng = np.random.default_rng(seed)
+    columns = {}
+    for name, causes in parents.items():
+        columns[name] = sum(0.8 * columns[c] for c in causes) + rng.normal(size=n)
+    return pd.DataFrame(columns)
+
+
+def mag_oracle(pag):
+    """The d-separation test and separating sets of a MAG of ``pag``'s class, as ``to_pag`` uses."""
+    mag = GraphStructure.from_numpy(mag_of_pag(np.asarray(pag.to_numpy())), kind="mag")
+    digraph, selection = _canonical_dag(mag)
+    nodes = list(range(mag.n_nodes))
+    sepsets = _AncestorSepsets(
+        np.asarray(mag.to_numpy()) != 0,
+        nodes,
+        _observed_ancestors(digraph, nodes),
+        _observed_ancestors_of(digraph, nodes, selection),
+    )
+    return DSepOracle(digraph, nodes, selection), sepsets
+
+
+@pytest.mark.parametrize("method", ["fci", "gfci"])
+def test_an_averaged_pag_under_knowledge_is_closed_under_the_orientation_rules(method):
+    # Tiers put an arrowhead at c on b - c, from which the rules orient c -> d and c -> e.
+    data = linear_data(500, {"a": [], "b": ["a"], "c": ["b"], "d": ["c"], "e": ["c"]})
+    knowledge = andrey.Knowledge(tiers=[["a", "b"], ["c", "d", "e"]])
+    out = bootstrap(method, data, n_resamples=8, seed=0, knowledge=knowledge, keep_fits=True)
+    test, sepsets = mag_oracle(BootstrapOutput.from_fits(out.fits).structure)
+    marks = np.array(out.structure.to_numpy(), dtype=np.int8)
+    _fci_orient(marks, test, 0.5, sepsets)
+    assert np.array_equal(marks, out.structure.to_numpy())
+
+
+@pytest.mark.parametrize("method", ["fci", "gfci"])
+def test_an_averaged_pag_under_knowledge_equals_the_fit_every_resample_agrees_on(method):
+    # The required a -> b orients the chain a -> b -> c -> d to its end.
+    data = linear_data(1000, {"a": [], "b": ["a"], "c": ["b"], "d": ["c"]})
+    knowledge = andrey.Knowledge(required=[("a", "b")])
+    fit = getattr(andrey, method)(data, knowledge=knowledge)
+    out = bootstrap(method, data, n_resamples=5, seed=0, knowledge=knowledge, keep_fits=True)
+    assert not (fit.structure.to_numpy() == CIRCLE).any()
+    assert all(resample.structure == fit.structure for resample in out.fits)
+    assert out.structure == fit.structure
 
 
 def tie_data(n, seed):
