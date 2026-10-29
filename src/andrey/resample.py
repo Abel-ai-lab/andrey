@@ -2,7 +2,7 @@
 
 :func:`bootstrap` refits one method on resamples of the rows and counts, for every pair of
 variables, how often each endpoint-mark pair appears. :class:`BootstrapOutput` holds those counts
-and the graph that takes each pair's most frequent edge.
+and the averaged graph: the vote of the fits, made a valid graph of the method's kind.
 
 Resample ``b`` draws from ``SeedSequence(seed, spawn_key=(b, 0))``, and a seeded method fits with
 a seed from ``spawn_key=(b, 1)``, so a resample depends on ``seed`` and ``b`` only: the result is
@@ -854,8 +854,9 @@ def bootstrap(
     Each resample is a subsample, ``sample_fraction`` of the rows of ``data`` drawn without
     replacement, or a bootstrap resample, as many rows drawn with replacement (``resampling``), and
     ``method`` is fitted on it. The result counts, for every pair of variables, the fits that give
-    each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds one graph
-    from the pairs that are adjacent often enough [1]_ [2]_ [3]_. A method with a row-aligned input
+    each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds the averaged
+    graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
+    with a row-aligned input
     (``cdnod``'s ``domain_index``, ``gies``'s ``interventions``) resamples that input with the
     rows. A time-series method on one series subsamples one stretch of consecutive rows (and
     bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
@@ -877,8 +878,13 @@ def bootstrap(
         ``seed`` fits resample ``b`` with a seed derived from this one and ``b``, so the method's
         own ``seed`` cannot be set here.
     threshold : float, default=0.5
-        The share of fits in which a pair must be adjacent to be in the averaged graph, in
-        ``(0, 1]``.
+        A pair of the averaged graph must be adjacent in more than this share of the fits, or in
+        all of them, in ``[0.5, 1]``. Its most frequent edge must also be in more fits than no edge
+        is, which needs more than half of them, so a value below 0.5 would change nothing.
+    strict : bool, default=False
+        What happens when the vote of the fits has no valid graph of the method's kind: ``False``
+        returns the resample graph nearest the others with a warning, and ``True`` raises
+        ``ValueError``.
     resampling : {"subsample", "bootstrap"}, default="subsample"
         How a resample is drawn. ``"subsample"`` draws ``round(sample_fraction * n_samples)``
         distinct rows, kept in their original order; for a time-series method on one series it is
@@ -907,15 +913,17 @@ def bootstrap(
     -------
     BootstrapOutput or list[BootstrapOutput]
         The frequencies and the averaged graph; for ``multi_group_direct_lingam``, one per group.
-        ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, and the
-        ``block_length`` of a block bootstrap.
+        ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, the
+        ``block_length`` of a block bootstrap, and ``averaged_graph``: ``"vote"``, or
+        ``"nearest_resample"`` when the averaged graph is the resample graph nearest the others.
 
     Raises
     ------
     ValueError
         If ``method`` is not a method of Andrey, an argument is out of range, a row-aligned input
         has a different number of rows from ``data``, ``block_length`` is given for a resampling
-        that does not use blocks, or a fit raises it: the error then names the resample in a note.
+        that does not use blocks, ``strict=True`` and the vote has no valid graph of the method's
+        kind, or a fit raises it: the error then names the resample in a note.
     NotImplementedError
         For ``gin``, whose number of latent nodes varies from fit to fit.
     RuntimeError
@@ -924,7 +932,9 @@ def bootstrap(
     Warns
     -----
     AndreyWarning
-        Each distinct warning the fits raised, once.
+        Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
+        no valid graph of the method's kind, so the averaged graph is the resample graph nearest the
+        others.
 
     Notes
     -----
@@ -959,10 +969,48 @@ def bootstrap(
     9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter
     than ten times the longest lag.
 
+    **The averaged graph.** Each pair of variables takes its most frequent state in the fits, no
+    edge counted as one of the states: the pair gets its most frequent edge when more fits have
+    that edge than have no edge, which needs the pair adjacent in more than half of them, and
+    ``threshold`` can ask for more. When two edges tie, the pair takes the least committal one,
+    ``--``, or ``o-o`` for a ``pag``. This vote is the graph with the least mean structural Hamming
+    distance to the fits. It is the ``Highest`` ensemble of Tetrad [6]_, with a tie between an edge
+    and no edge going to no edge, as in tigramite's majority vote [7]_.
+
+    A vote of CPDAGs or PAGs is often not a valid CPDAG or PAG: it can direct an edge that no
+    v-structure compels. So the vote is then made a valid graph of the method's kind by the
+    published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
+    v-structures, and directed edges [8]_: the vote itself when it has no directed cycle, with a
+    tie edge oriented as the node labels decide. A ``cpdag`` becomes the CPDAG [9]_ of a
+    consistent extension, so an edge that no v-structure compels is undirected. A ``pag`` becomes
+    the PAG of the MAG that Zhang's construction builds from it [10]_. With ``knowledge``, the
+    edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
+    gets the endpoints the knowledge sets, as ``fci`` sets them. A time-series result's lag graphs
+    keep the vote, as tigramite's does [7]_: a lag-0 graph is oriented with the lagged edges, which
+    the steps for one graph do not see.
+
+    The vote has no consistent extension or MAG when, for example, its directed edges form a
+    cycle or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``,
+    the averaged graph is then the resample graph nearest the others, a graph the method returned:
+    the fit whose state of each pair the most fits share, summed over the pairs, which is the fit
+    with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). A
+    warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is
+    ``"vote"`` otherwise. ``strict=True`` raises instead, as bnlearn's ``cextend`` does by default
+    [11]_. Either way, ``frequency`` and ``table`` keep the whole vote.
+
+    On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
+    ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with
+    ``resampling="bootstrap"``), the averaged graph had fewer errors (SHD) than the rule of 0.11.0
+    (a pair adjacent in at least half the fits takes its most frequent edge) in 11 of the 24
+    cells, by an interval below 0, and more in none. It had fewer errors than the fit on all the
+    rows in 14 cells and more in one, ``ges`` with 20 variables and 1,000 rows. The vote had a
+    valid graph of the method's kind in 111 of the 120 datasets of ``pc``, 114 of ``fci``, and all
+    of ``ges`` and ``direct_lingam``; the rule of 0.11.0 gave a valid CPDAG or PAG in 0 to 13 of
+    the 20 datasets of a cell.
+
     A frequency is a ranking of the edges, not a probability, and no error bound comes with the
     averaged graph. Resampling can also make a column constant; a fit that raises stops the run,
-    and its row numbers count the rows of the resample. The averaged graph can contain a directed
-    cycle.
+    and its row numbers count the rows of the resample.
 
     **Workers.** The fits run on the worker processes ``andrey.config.n_jobs`` and
     ``ANDREY_N_JOBS`` set, as for every method: ``-1`` uses every usable core, and ``0`` or
@@ -987,6 +1035,21 @@ def bootstrap(
     .. [4] Meinshausen, N., and Buhlmann, P. (2010). Stability selection. Journal of the Royal
        Statistical Society: Series B, 72(4), 417-473.
     .. [5] Politis, D. N., Romano, J. P., and Wolf, M. (1999). Subsampling. Springer.
+    .. [6] Tetrad, ``edu.pitt.dbmi.algo.resampling.ResamplingEdgeEnsemble`` and
+       ``edu.cmu.tetrad.util.GraphSampling``, github.com/cmu-phil/tetrad, development branch,
+       2026-08-13. ``Median`` is not in release 7.6.10.
+    .. [7] Debeire, K., Gerhardus, A., Runge, J., and Eyring, V. (2024). Bootstrap aggregation and
+       confidence measures to improve time series causal discovery. Proceedings of the Third
+       Conference on Causal Learning and Reasoning, PMLR 236.
+    .. [8] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension
+       of a partially oriented graph. Technical Report R-185, Cognitive Systems Laboratory, UCLA.
+    .. [9] Chickering, D. M. (2002). Learning equivalence classes of Bayesian-network structures.
+       Journal of Machine Learning Research, 2, 445-498.
+    .. [10] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence, 172(16-17),
+       1873-1896.
+    .. [11] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
+       Statistical Software, 35(3), 1-22.
 
     Examples
     --------
