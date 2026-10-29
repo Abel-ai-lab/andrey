@@ -86,14 +86,14 @@ names its pull request.
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
   least squares and returns the links whose coefficient has a p-value of at most `alpha` (default
   0.05), after the correction `fdr_method` names: the F-test of that regressor (Granger 1969), the
-  coefficient test of a vector autoregression. `lag_weights` hold the regression coefficients of the returned links, and
-  `metadata["p_values"]` holds the p-value of every link, as `pcmci` does. On the quality gate's
-  simulated series of 5 variables with 2 lags, the median errors (missing and extra lagged edges;
-  the empty graph's is 28.5) fall from 13.5 to 6.5 at 1,000 steps and from 12.5 to 4 at 2,000. With
-  `fdr_method="none"`, at 80 or more variables with 1,000 steps the uncorrected tests return more
-  errors than the empty graph, as the docstring's Limitations say. The lasso, its `cv` argument, and its worker threads
-  are gone: `cv` is ignored with an `andrey.DeprecatedArgumentWarning` and stops being accepted in
-  the next release. ([#556])
+  coefficient test of a vector autoregression. `lag_weights` hold the regression coefficients of the
+  returned links, and `metadata["p_values"]` holds the p-value of every link, as `pcmci` does. On
+  the quality gate's simulated series of 5 variables with 2 lags, the median errors (missing and
+  extra lagged edges; the empty graph's is 28.5) fall from 13.5 to 6.5 at 1,000 steps and from 12.5
+  to 4 at 2,000. With `fdr_method="none"`, at 80 or more variables with 1,000 steps the uncorrected
+  tests return more errors than the empty graph, as the docstring's Limitations say. The lasso, its
+  `cv` argument, and its worker threads are gone: `cv` is ignored with an
+  `andrey.DeprecatedArgumentWarning` and stops being accepted in the next release. ([#556])
 
   | Method | Former argument | Now |
   | --- | --- | --- |
