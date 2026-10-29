@@ -129,8 +129,8 @@ def test_utility_cell(concept, deviation):
     assert deviation.name in live and live[deviation.name].default == deviation.default
 
 
-@pytest.mark.parametrize("key", ["resampling", "sample_fraction"])
-def test_bootstrap_takes_each_resampling_concept_as_its_spec_and_template_say(key):
+@pytest.mark.parametrize("key", list(BOOTSTRAP_PARAMS))
+def test_bootstrap_takes_each_of_its_concepts_as_its_spec_and_template_say(key):
     concept, spec = CONCEPTS[key], BOOTSTRAP_PARAMS[key]
     deviation = concept.deviation("bootstrap")
     assert spec.concept == key and signature("bootstrap")[key].default == spec.default
@@ -521,6 +521,7 @@ OBSERVE = {
     "required_edges": (keeps_the_required_edge, True),
     "warnings": (andrey_warnings, True),
     "units": (unit_free, True),
+    "averaged_graph": (lambda m: "averaged_graph" in coded_fit(m)[0].metadata, None),
 }
 
 

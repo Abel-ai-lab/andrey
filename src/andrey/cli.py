@@ -336,6 +336,8 @@ def bootstrap_envelope(
     env["bootstrap"] = {
         "n_resamples": first.n_resamples,
         "threshold": first.threshold,
+        "strict": first.strict,
+        "averaged_graph": first.metadata["averaged_graph"],
         "seed": first.metadata["seed"],
         "resampling": first.metadata["resampling"],
         "sample_fraction": first.metadata["sample_fraction"],
@@ -1040,6 +1042,7 @@ def execute_bootstrap(
     n_boot: int | None = None,
     seed: int | None,
     threshold: float,
+    strict: bool,
     resampling: str,
     sample_fraction: float,
     block_length: int | None,
@@ -1064,7 +1067,6 @@ def execute_bootstrap(
         message
         for ok, message in (
             (n_resamples >= 1, f"--n-resamples must be at least 1, got {n_resamples}"),
-            (0 < threshold <= 1, f"--threshold must lie in (0, 1], got {threshold}"),
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),
             (
@@ -1079,6 +1081,7 @@ def execute_bootstrap(
         if not ok
     ]
     for flag_, param, value in (
+        ("--threshold", BOOTSTRAP_PARAMS["threshold"], threshold),
         ("--resampling", BOOTSTRAP_PARAMS["resampling"], resampling),
         ("--sample-fraction", BOOTSTRAP_PARAMS["sample_fraction"], sample_fraction),
     ):
@@ -1111,6 +1114,7 @@ def execute_bootstrap(
                 n_resamples=n_resamples,
                 seed=seed,
                 threshold=threshold,
+                strict=strict,
                 resampling=resampling,
                 sample_fraction=sample_fraction,
                 block_length=block_length,
@@ -1183,7 +1187,7 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
         lines += [
             "",
             "Bootstrap flags: --n-resamples <n> (default 100), --seed <int>, --threshold <share> "
-            "(default 0.5),",
+            "(default 0.5, in [0.5, 1]), --strict,",
             "  --resampling subsample|bootstrap (default subsample), --sample-fraction <share> "
             "(default 0.5, a subsample's rows),",
             "  --block-length <rows> (--resampling bootstrap of a time-series method on one "
@@ -1805,7 +1809,14 @@ def cmd_bootstrap(
     threshold: float = typer.Option(
         0.5,
         "--threshold",
-        help="Share of fits in which a pair must be adjacent to be in the averaged graph (0, 1].",
+        help="A pair of the averaged graph must be adjacent in more than this share of the fits, "
+        "or in all of them, in [0.5, 1].",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Fail when the vote of the fits has no valid graph of the method's kind, instead of "
+        "returning the resample graph nearest the others with a warning.",
     ),
     resampling: str = typer.Option(
         "subsample",
@@ -1871,6 +1882,7 @@ def cmd_bootstrap(
         n_boot=n_boot,
         seed=seed,
         threshold=threshold,
+        strict=strict,
         resampling=resampling,
         sample_fraction=sample_fraction,
         block_length=block_length,

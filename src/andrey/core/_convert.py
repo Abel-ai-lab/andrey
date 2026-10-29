@@ -91,6 +91,28 @@ def pag_of(
     )
 
 
+def mag_of_pag(pag: np.ndarray) -> np.ndarray:
+    """Return the MAG that Zhang's construction (2008, Theorem 2) builds from a PAG's mark matrix.
+
+    A circle opposite an arrowhead becomes a tail (``o->`` to ``->``), and the ``o-o`` edges are
+    oriented into a DAG with no unshielded collider, a consistent extension (Dor and Tarsi) of
+    them as an undirected graph. For a PAG, the result is a MAG of its equivalence class. A circle
+    opposite a tail, which a PAG without selection variables does not have, becomes an arrowhead,
+    as pcalg's ``pag2magAM`` does. Raises ``ValueError`` when the ``o-o`` edges have no such
+    orientation, which happens when they hold a chordless cycle of four or more nodes, so the input
+    is not a PAG.
+    """
+    mag = pag.copy()
+    circle = pag == CIRCLE
+    both = circle & circle.T
+    mag[circle & (pag.T == ARROW)] = TAIL
+    mag[circle & (pag.T == TAIL)] = ARROW
+    if both.any():
+        dag = pdag2dag(np.where(both, TAIL, 0).astype(np.int8))
+        mag[both] = dag[both]
+    return mag
+
+
 def _causal_dag(structure: GraphStructure) -> networkx.DiGraph:
     """Return the ``networkx.DiGraph`` of a ``dag``, each edge from tail to arrowhead.
 
