@@ -145,6 +145,17 @@ PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, and longitudinal LiNGAM on data ov
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Background knowledge
+:link: knowledge
+:link-type: doc
+:img-top: /_generated/thumbs/knowledge.svg
+:img-alt: The graph PC recovers with tiers in this notebook
+
+Pass what you already know to a search: tiers in time, and required or forbidden edges.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -172,5 +183,6 @@ rcd
 bottom_up_parce_lingam
 pairwise
 time_series
+knowledge
 viz
 ```

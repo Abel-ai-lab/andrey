@@ -70,6 +70,8 @@ def ges(
         categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared
         categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
         never by its values. See Notes.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
@@ -376,6 +378,8 @@ def gies(
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. Every score reads a variable on the rows without an
         intervention on it; see Notes.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. ``n_samples`` counts every row. Larger values give sparser graphs;
@@ -628,6 +632,8 @@ def xges(
         column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
@@ -854,6 +860,8 @@ def hc(
         the declared column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"``
         when some are, else ``"bic"``. A column is declared categorical by ``categorical`` or by a
         DataFrame's ``category``, ``bool``, or text type, never by its values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
@@ -1063,6 +1071,8 @@ def tabu(
         ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
@@ -1275,6 +1285,8 @@ def exact_search(
         ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is

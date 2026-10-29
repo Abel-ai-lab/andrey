@@ -5,7 +5,7 @@
     its own folds them under its row, its toggle at the row's end. -#}
 {%- from "nav-icons.html" import icon, logo %}
 {%- macro page(item) -%}
-<a href="{{ pathto(item.doc) }}"{% if item.doc == pagename %} aria-current="page"{% endif %}>{% if item.mark %}{{ icon(item.mark) }}{% endif %}{{ item.title }}</a>
+<a href="{{ pathto(item.doc) }}"{% if item.doc == pagename and not item.all %} aria-current="page"{% endif %}>{% if item.mark %}{{ icon(item.mark) }}{% endif %}{{ item.title }}</a>
 {%- endmacro %}
 {%- macro fold(label, items, open) -%}
 <details{% if open %} open{% endif %}><summary aria-label="{{ label }}">{{ icon("chevron") }}</summary>{{ rows(items) }}</details>
@@ -13,7 +13,7 @@
 {%- macro rows(items) -%}
 <ul>
   {%- for item in items %}
-  <li{% if item.doc == pagename %} class="active"{% endif %}>{{ page(item) }}
+  <li{% if item.doc == pagename and not item.all %} class="active"{% endif %}>{{ page(item) }}
     {%- if item.kids %}{{ fold(_("Pages under %(title)s") | format(title=item.title), item.kids, pagename in item.pages) }}{% endif %}</li>
   {%- endfor %}
 </ul>

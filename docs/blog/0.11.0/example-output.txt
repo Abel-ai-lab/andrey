@@ -1,0 +1,32 @@
+5,569 adults; 3,694 with no value missing
+gaps: 25 edges from every adult, 25 from the
+  adults with no value missing; the two differ in 6 places
+test: cond_gauss
+units: 0 differences
+arrows into age or sex: 10 without it, 0 with it
+edges in at least half the fits:
+  age -> systolic: 1.00
+  age -> pulse: 1.00
+  age -> hba1c: 1.00
+  sex -> bmi: 1.00
+  sex -> systolic: 1.00
+  sex -> diastolic: 1.00
+  sex -> pulse: 1.00
+  sex -> hdl: 1.00
+  age -> hdl: 0.95
+  waist -> hdl: 0.86
+  sex -> cholesterol: 0.71
+  cholesterol -> hdl: 0.71
+  hba1c -> hdl: 0.70
+  age -> income: 0.66
+  sex -> waist: 0.63
+  hdl -> income: 0.58
+  sex -> hba1c: 0.57
+  bmi -> systolic: 0.56
+  waist -> hba1c: 0.54
+  systolic -> diastolic: 0.54
+  age -> waist: 0.53
+  bmi -> waist: 0.52
+  hba1c -> pulse: 0.51
+  pulse -> diastolic: 0.50
+digraph {

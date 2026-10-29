@@ -17,41 +17,71 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.10.0
+:link: benchmarks/0.11.0
 :link-type: doc
-:link-alt: The 0.10.0 release card: the boundary
-:class-card: release-cover release-art release-art-0-10-0
+:link-alt: The 0.11.0 release card: ready for real data
+:class-card: release-cover release-art release-art-0-11-0
 :shadow: none
 :margin: 0
 
 Release card
 
-The boundary
+Ready for real data
 
-0.10.0
+0.11.0
 :::
 
 ::::{div} release-tldr
 
-0.10.0 is here: how far each method goes. For 26 methods, the card maps the problems each finishes
-within the time and memory caps and solves with fewer errors than the empty graph, by variables,
-samples, and density. At 2,000 samples and a mean degree of 2, BOSS stays more accurate than the
-empty graph up to 1,600 variables, GRaSP to 800, and PC to 400.
+0.11.0 is here: ready for real data. The card measures the extended BIC, now the default penalty of
+ten score searches, test-wise deletion under missing values, and how often the bootstrap's
+frequent edges are true.
 
 :::{div} release-stats
 
-- **1,600 variables** BOSS stays more accurate than the empty graph, at 2,000 samples
-- **800 variables** GRaSP stays more accurate than the empty graph, at 2,000 samples
-- **26 methods** mapped by variables, samples, and density
+- **87 to 25** GES's median errors with the extended BIC, over 299 simulated datasets
+- **98% to 100%** of the edges in more than nine bootstrap fits in ten are true
+- **11 methods** accept missing values
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.10.0.md)
+[Read the release card](benchmarks/0.11.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.10.0
+:link-type: doc
+:link-alt: The 0.10.0 release card: the boundary
+:class-card: release-tile release-art-0-10-0
+:shadow: none
+:margin: 0
+
+0.10.0
+:::
+
+:::{div} release-body
+<h3>The boundary</h3>
+
+How far each method goes: for 26 methods, the problems each finishes within the time and memory
+caps with fewer errors than the empty graph, by variables, samples, and density.
+
+- BOSS more accurate than the empty graph up to **1,600 variables**, at 2,000 samples
+- GRaSP up to **800 variables**, PC up to **400**
+:::
+
+:::{div} release-meta
+Released October 27, 2026
+
+- [Release card<span class="visually-hidden"> 0.10.0</span>](benchmarks/0.10.0.md)
+- [Post: The boundary](../blog/20261027-andrey-0-10-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -335,6 +365,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.11.0: ready for real data <benchmarks/0.11.0>
 0.10.0: the boundary <benchmarks/0.10.0>
 0.9.0: acceleration <benchmarks/0.9.0>
 0.8.0: nonlinear tests <benchmarks/0.8.0>

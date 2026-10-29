@@ -1,8 +1,7 @@
 """The homepage's content, generated from the release summaries and the method registry.
 
 ``docs/conf.py`` fills the homepage template (``site/homepage.html``) with
-:func:`homepage_context`, and ``apps/build_launch.py`` draws the README's chart with
-:func:`readme_chart`. ``docs/DEVELOPMENT.md`` has the build command.
+:func:`homepage_context`. ``docs/DEVELOPMENT.md`` has the build command.
 
 Every number on the homepage comes from a release's published benchmark summary (``RELEASES``) or
 from the method registry. A method measured against the same package in two summaries shows the
@@ -10,9 +9,8 @@ newer summary's rows (:func:`newest`). The speed and accuracy sections cover eve
 another package whose method the registry supports; each family's tile shows its largest ratio
 rounded down to one digit. The README, the live demo, and the homepage's description state
 ``CLAIM``, which carries no number; :func:`claim_sentence` words the first summary's headline.
-The README chart shows one card per method in ``PANEL``. The method list comes from the method
-registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
-page as not for release. Links are relative to the site root.
+The method list comes from the method registry. A summary outside ``benchmarks/published/`` loads
+only as a placeholder, which marks the page as not for release. Links are relative to the site root.
 """
 
 from __future__ import annotations
@@ -63,6 +61,7 @@ RELEASES = (
     "0.8.0",
     "0.9.0",
     "0.10.0",
+    "0.11.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -528,90 +527,6 @@ def fastest(summary: dict) -> tuple[dict, dict]:
             f"{ratio_text(row['ratio'])})"
         )
     return method, row
-
-
-def ratio_label(row: dict) -> str:
-    """A row's speedup as the page prints it, with "≥" before a lower bound."""
-    return ("≥" if row["at_least"] else "") + ratio_text(row["ratio"])
-
-
-# ---- the README's speedup cards --------------------------------------------------------------
-# The methods the README chart shows, each from a release's summary: (folder in RELEASES,
-# method). The chart orders them by speedup.
-PANEL = (
-    ("0.1.0", "PC"),
-    ("0.1.0", "FCI"),
-    ("0.7.0", "GES"),
-    ("0.3.0", "XGES"),
-    ("0.3.0", "Tabu search"),
-    ("0.4.1", "DirectLiNGAM"),
-)
-
-
-# A PANEL method's slide size where its largest measured one is not it: GES's errors reach the
-# empty graph's at 200 variables in 0.7.0, so its slide shows 150.
-PANEL_SIZES = {("0.7.0", "GES"): 150}
-
-
-def speedup_text(speed: float) -> str:
-    """A speedup as the README chart prints it: the slowest package is 1x."""
-    return "1x" if speed == 1 else ratio_text(speed)
-
-
-def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str, float, str]]]]:
-    """Each ``PANEL`` method's speedups at its largest size with a published ratio, or at the size
-    ``PANEL_SIZES`` names, fastest first.
-
-    A slide is the method, its size as it prints, and its bars: each package, its speed relative
-    to the slowest package (1x), and the label it prints. The slides go by Andrey's speed, largest
-    first. ``summaries`` are in ``RELEASES`` order, and each method comes from its own release's
-    summary, rows at ``MEAN_DEGREE``.
-
-    The packages at that size come from the comparisons run with the same data, hardware, and
-    build as the one with the ratio. Every bar comes from Andrey's paired ratios: Andrey's is its
-    ratio against the slowest; another package's is that ratio divided by Andrey's ratio against
-    it. No run pairs two other packages, so theirs is a quotient of medians. Every package timed
-    at that size must have a ratio. A ratio published as a lower bound prints with "≥"; a bound
-    divides into no other package's bar, so its slide has one other package. Every method must be
-    supported by the registry.
-    """
-    by_release = dict(zip(RELEASES, summaries, strict=True))
-    keys = ("regime", "hardware", "build")
-    slides = []
-    for release, name in PANEL:
-        found = [m for m in comparisons(by_release[release]) if m["method"] == name]
-        size = PANEL_SIZES.get((release, name))
-        if not found:
-            raise ValueError(f"the README chart needs {name} in {release}")
-        if found[0]["status"] != "supported":
-            raise ValueError(f"the README chart shows supported methods; {name} is not")
-        claimed = [
-            (row["d"], m)
-            for m in found
-            for row in m["rows"]
-            if row["ratio"] and size in (None, row["d"])
-        ]
-        if not claimed:
-            raise ValueError(f"the README chart needs a published {name} ratio")
-        d, lead = max(claimed, key=lambda item: item[0])
-        runs = [m for m in found if all(m[k] == lead[k] for k in keys)]
-        rows = {m["comparator"]: r for m in runs for r in m["rows"] if r["d"] == d}
-        andrey = {r["andrey_s"] for r in rows.values()}
-        if len(andrey) != 1:
-            raise ValueError(f"{name} d = {d}: Andrey's time differs between comparisons")
-        timed = {p: r for p, r in rows.items() if r["comparator_s"] is not None}
-        if unpaired := [p for p, r in timed.items() if r["ratio"] is None]:
-            raise ValueError(f"{name} d = {d}: no published ratio against {', '.join(unpaired)}")
-        if len(timed) > 1 and any(r["at_least"] for r in timed.values()):
-            raise ValueError(f"{name} d = {d}: a lower bound divides into no other package's bar")
-        slowest = max(timed, key=lambda p: timed[p]["ratio"])
-        ours = timed[slowest]["ratio"]
-        bars = [("Andrey", ours, ratio_label(timed[slowest]))]
-        for package, row in timed.items():
-            speed = ours / row["ratio"]
-            bars.append((package, speed, speedup_text(speed)))
-        slides.append((name, f"{d:,} {lead['unit']}", sorted(bars, key=lambda bar: -bar[1])))
-    return sorted(slides, key=lambda slide: -next(s for p, s, _ in slide[2] if p == "Andrey"))
 
 
 def slug(name: str) -> str:
@@ -1143,100 +1058,6 @@ def lede() -> str:
         "Andrey is a Python package for learning causal graphs from observational data, with "
         f"{listed(terms)} methods."
     )
-
-
-# ---- the README chart ------------------------------------------------------------------------
-README_CHART = "benchmark-chart-{theme}.svg"  # in .github/readme/; the README links both themes
-# The README chart is one card per ``PANEL`` method: two rows of three, never more.
-README_COLUMNS, README_ROWS = 3, 2
-CHART_FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
-
-
-def readme_slides(summary: dict) -> list[tuple[str, str, list[tuple[str, float, str]]]]:
-    """The README chart's cards, from ``summary`` and the later releases' summaries."""
-    slides = speedup_slides(release_summaries(summary))
-    if len(slides) > README_COLUMNS * README_ROWS:
-        raise ValueError(
-            f"the README chart holds {README_ROWS} rows of {README_COLUMNS} cards, and PANEL "
-            f"has {len(slides)} methods; replace a method in PANEL instead of adding one"
-        )
-    return slides
-
-
-def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
-    """The speedup of each ``PANEL`` method as a standalone SVG: one card per method, Andrey
-    accented, from :func:`speedup_slides`. A README can show only an image. Each card is as tall as
-    its own bars; a row of cards starts below the tallest card of the row above. The chart sits on
-    an opaque card, so it stays legible where a renderer shows the light file on a dark page.
-    """
-    slides = readme_slides(summary)
-    width, pad, gap, columns = 960, 24, 16, README_COLUMNS
-    card_w = (width - 2 * pad - gap * (columns - 1)) / columns
-    top = pad + 44
-
-    def card_h(bars: list) -> int:
-        return 70 + len(bars) * 30
-
-    row_tops, y_row = [], top
-    for start in range(0, len(slides), columns):
-        row_tops.append(y_row)
-        y_row += max(card_h(bars) for _, _, bars in slides[start : start + columns]) + gap
-    height = y_row - gap + pad
-    ink, muted, line, accent = palette.ink, palette.muted, palette.line, palette.accent
-
-    def text(x: float, y: float, content: str, *, size=13, fill=ink, weight=400, anchor="start"):
-        return (
-            f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" font-weight="{weight}" '
-            f'fill="{fill}" text-anchor="{anchor}" dominant-baseline="middle">'
-            f"{escape(content)}</text>"
-        )
-
-    parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height:.0f}" '
-        f'viewBox="0 0 {width} {height:.0f}" font-family="{escape(CHART_FONT)}" role="img" '
-        'aria-labelledby="chart-title chart-desc">',
-        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1:.0f}" rx="16" '
-        f'fill="{palette.paper}" stroke="{line}"/>',
-        '<title id="chart-title">Speedup on the same data</title>',
-        f'<desc id="chart-desc">{escape(readme_chart_alt(summary))}</desc>',
-        text(pad, pad + 16, "Speedup on the same data", size=20, weight=600),
-    ]
-    for i, (name, size, bars) in enumerate(slides):
-        x = pad + (i % columns) * (card_w + gap)
-        y = row_tops[i // columns]
-        parts.append(
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{card_w:.1f}" height="{card_h(bars)}" rx="12" '
-            f'fill="{palette.surface}" stroke="{line}"/>'
-        )
-        # A long name steps down a size so it clears the size label on the right.
-        parts.append(text(x + 18, y + 26, name, size=16 if len(name) <= 14 else 14, weight=600))
-        parts.append(text(x + card_w - 18, y + 26, size, size=12.5, fill=muted, anchor="end"))
-        top_speed = bars[0][1]
-        track_x, track_w = x + 112, card_w - 112 - 70
-        for j, (package, speed, label) in enumerate(bars):
-            cy = y + 62 + j * 30
-            ours = package == "Andrey"
-            parts.append(
-                text(x + 18, cy, package, fill=ink if ours else muted, weight=600 if ours else 400)
-            )
-            bar = max(track_w * speed / top_speed, 6)
-            fill = f'fill="{accent}"' if ours else f'fill="{muted}" fill-opacity="0.45"'
-            parts.append(
-                f'<rect x="{track_x:.1f}" y="{cy - 5:.1f}" width="{bar:.1f}" height="10" '
-                f'rx="5" {fill}/>'
-            )
-            parts.append(text(track_x + bar + 10, cy, label, weight=600))
-    parts.append("</svg>")
-    return "".join(parts) + "\n"
-
-
-def readme_chart_alt(summary: dict) -> str:
-    """The README chart's alt text: each method's speedup, as its card shows it."""
-    parts = [
-        f"{name} {next(label for package, _, label in bars if package == 'Andrey')} at {size}"
-        for name, size, bars in readme_slides(summary)
-    ]
-    return "Andrey's speedup over the slowest package on the same data: " + ", ".join(parts)
 
 
 # ---- the example, the wordmark, and the page --------------------------------------------------
@@ -2429,7 +2250,8 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 # (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1). Hooks for
 # custom tests or scores do not count as implementations. Features only on a development branch
 # do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
-# benchmarks use each package's README, documentation, and release notes.
+# benchmarks use each package's README, documentation, and release notes. A real-data feature is
+# a yes when the package's main learners have it, and partly when only some do.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -2439,7 +2261,7 @@ MARKS = {
     "no": ("x", "No", "\u2717"),
 }
 # Table sections in order, each with measured rows (``measured_rows``) followed by feature marks.
-SECTIONS = ("Coverage", "Speed", "Agentic")
+SECTIONS = ("Coverage", "Real data", "Speed", "Agentic")
 # Each entry holds a section, an attribute, marks in PEERS order, and notes keyed by package
 # for every "part" mark. Attribute labels are brief; the notes give details.
 COMPARISON = (
@@ -2454,6 +2276,28 @@ COMPARISON = (
         },
     ),
     ("Coverage", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Real data",
+        "Missing values",
+        ("yes", "part", "yes", "no", "yes"),
+        {"causal-learn": "PC and CD-NOD only, with the Fisher-z test."},
+    ),
+    (
+        "Real data",
+        "Background knowledge",
+        ("yes", "part", "yes", "part", "yes"),
+        {
+            "causal-learn": "PC, FCI, CD-NOD, the LiNGAM methods, and exact search; GES, BOSS, "
+            "and GRaSP take none.",
+            "pcalg": "Fixed adjacencies only, with no directions or tiers.",
+        },
+    ),
+    (
+        "Real data",
+        "Edge confidence",
+        ("yes", "part", "yes", "no", "yes"),
+        {"causal-learn": "Bootstrap edge probabilities for the LiNGAM methods only."},
+    ),
     (
         "Speed",
         "CPU parallelization",
