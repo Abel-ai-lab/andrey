@@ -27,6 +27,7 @@ from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, SCORE_ALIA
 from tests.recovery.helpers import datagen
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
+CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
 #: Public callables outside the registry that a concept may name.
 UTILITIES = ("bootstrap",)
 
@@ -783,6 +784,53 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
         call(**{old: value})  # the message warns once
     with pytest.raises(ValueError, match=f"pass only {name}"):
         call(**{old: value, name: value})
+
+
+#: (method, former words, current words) for each former name and value the registry accepts and
+#: each argument it drops.
+FORMER = [
+    *(
+        pytest.param(m, {old}, {a.name}, id=f"{m}-{old}")
+        for m, spec in REGISTRY.items()
+        for a in (*spec.data.inputs, *spec.params)
+        for old in a.aliases
+    ),
+    *(
+        pytest.param(m, {p.name, old}, {p.name, new}, id=f"{m}-{old}")
+        for m, spec in REGISTRY.items()
+        for p in spec.params
+        for old, new in p.choice_aliases
+    ),
+    *(
+        pytest.param(m, {arg}, set(), id=f"{m}-{arg}")
+        for m, spec in REGISTRY.items()
+        for arg in spec.dropped_args
+    ),
+]
+
+
+@functools.cache
+def changelog_rows() -> list[list[set[str]]]:
+    """Each CHANGELOG table row, as the words in each cell's code spans."""
+    rows = []
+    for line in CHANGELOG.read_text(encoding="utf-8").splitlines():
+        if line.lstrip().startswith("|"):
+            cells = line.strip().strip("|").split("|")
+            rows.append(
+                [set(re.findall(r"\w+", " ".join(re.findall(r"`([^`]*)`", c)))) for c in cells]
+            )
+    return rows
+
+
+@pytest.mark.parametrize(("method", "former", "current"), FORMER)
+def test_each_former_name_is_in_a_changelog_table(method, former, current):
+    """A CHANGELOG table row names the method, the former name or value, and the current one, so
+    the upgrade tables list everything the registry still maps or drops. Released sections keep
+    their tables, so the rows of a later release's renames sit in its own section."""
+    assert any(
+        len(cells) >= 3 and method in cells[0] and former <= cells[1] and current <= cells[2]
+        for cells in changelog_rows()
+    ), f"{method}: {sorted(former)} -> {sorted(current)} has no CHANGELOG table row"
 
 
 def renamed(monkeypatch, method: str, name: str, **update) -> None:
