@@ -9,6 +9,7 @@ score; lower is better.
 from __future__ import annotations
 
 import hashlib
+import random
 from collections import Counter
 from collections.abc import Collection
 from itertools import compress
@@ -20,8 +21,16 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, BICScore, make_score
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    MIXED_SCORES,
+    SCORES,
+    BICScore,
+    LocalScore,
+    make_score,
+)
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
+from andrey.core.seeding import start_rng
 from andrey.core.warning_policy import warn_search_limit
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
@@ -42,6 +51,9 @@ __all__ = ["hc"]
 
 #: The local scores :func:`hc` accepts.
 HC_SCORES: tuple[str, ...] = SCORES
+
+#: A later start replaces the best DAG so far only when its total score is lower by more than this.
+START_EPS = 1e-6
 
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
@@ -452,6 +464,151 @@ def _apply_move(
         parents_of[u] = sorted(parents_of[u] + [v])
 
 
+def _reaches(adj_int: list[int], a: int, b: int) -> bool:
+    """Whether a directed path leads from ``a`` to ``b`` in the bitset adjacency."""
+    seen = 1 << a
+    frontier = [a]
+    while frontier:
+        row = adj_int[frontier.pop()] & ~seen
+        if row >> b & 1:
+            return True
+        seen |= row
+        frontier += _bits(row)
+    return False
+
+
+#: Uniform tries at an edge an operation can apply to, before :func:`perturb` lists all of them.
+_TRIES = 32
+
+
+def perturb(
+    adj_int: list[int],
+    parents_of: dict[int, list[int]],
+    changes: int,
+    rng: random.Random,
+    *,
+    ranks: np.ndarray,
+    forbidden: np.ndarray | None = None,
+    required: np.ndarray | None = None,
+    max_parents: int | None = None,
+) -> None:
+    """Make ``changes`` random edge changes to the DAG in place, in at most ``3 * changes`` draws.
+
+    Each draw takes an operation uniformly from add, remove, and reverse, then one of the edges it
+    can apply to uniformly, as bnlearn's restarts do. An add joins two non-adjacent nodes. No add or
+    reverse makes an edge ``u -> v`` that ``forbidden[v, u]`` bars or gives a node more than
+    ``max_parents`` parents, and no remove or reverse touches an edge that ``required[v, u]`` holds;
+    a draw whose add or reverse would close a cycle changes nothing. Nodes are indexed by their
+    place in the order of ``ranks`` (:func:`tie_ranks`), so the draws move with the columns. A draw
+    tries up to ``_TRIES`` uniform candidates and lists the legal ones only when all of them fail,
+    which keeps the pick uniform and its cost independent of the number of nodes while most
+    candidates are legal.
+    """
+    d = len(adj_int)
+    by_rank = np.argsort(ranks, kind="stable")  # place -> column
+    place = np.empty(d, dtype=np.intp)
+    place[by_rank] = np.arange(d)  # column -> place
+    in_rank_order = np.ix_(by_rank, by_rank)
+    # [i, j] by place: no i -> j; i -> j stays.
+    barred = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden.T[in_rank_order]
+    held = np.zeros((d, d), dtype=bool) if required is None else required.T[in_rank_order]
+    cap = d if max_parents is None else max_parents  # a node with fewer parents can gain one
+    edge = np.zeros((d, d), dtype=bool)  # [i, j]: i -> j
+    n_parents = np.zeros(d, dtype=np.intp)
+    edges = sorted((int(place[u]), int(place[v])) for v, pa in parents_of.items() for u in pa)
+    for i, j in edges:
+        edge[i, j] = True
+        n_parents[j] += 1
+    slot = {e: k for k, e in enumerate(edges)}
+
+    def can_add(i: int, j: int) -> bool:
+        return not (i == j or edge[i, j] or edge[j, i] or barred[i, j]) and n_parents[j] < cap
+
+    def can_remove(i: int, j: int) -> bool:
+        return not held[i, j]
+
+    def can_reverse(i: int, j: int) -> bool:
+        return not (held[i, j] or barred[j, i]) and n_parents[i] < cap
+
+    def draw(op: str) -> tuple[int, int] | None:
+        """A uniformly drawn pair ``(i, j)`` that ``op`` applies to, or ``None`` if none."""
+        if op == "add":
+            for _ in range(_TRIES):
+                i, j = rng.randrange(d), rng.randrange(d)
+                if can_add(i, j):
+                    return i, j
+            legal = ~(edge | edge.T | barred)
+            np.fill_diagonal(legal, False)
+            legal[:, n_parents >= cap] = False
+            cells = np.flatnonzero(legal)
+            return divmod(int(cells[rng.randrange(cells.size)]), d) if cells.size else None
+        allowed = can_remove if op == "remove" else can_reverse
+        if not edges:
+            return None
+        for _ in range(_TRIES):
+            pair = edges[rng.randrange(len(edges))]
+            if allowed(*pair):
+                return pair
+        legal_edges = [pair for pair in edges if allowed(*pair)]
+        return legal_edges[rng.randrange(len(legal_edges))] if legal_edges else None
+
+    made = 0
+    for _ in range(3 * changes):
+        if made == changes:
+            break
+        op = rng.choice(("add", "remove", "reverse"))
+        pair = draw(op)
+        if pair is None:
+            continue
+        i, j = pair
+        u, v = int(by_rank[i]), int(by_rank[j])
+        if op == "add" and _reaches(adj_int, v, u):
+            continue
+        if op == "reverse":
+            rest = list(adj_int)
+            rest[u] &= ~(1 << v)
+            if _reaches(rest, u, v):
+                continue
+        _apply_move(adj_int, parents_of, (op, u, v))
+        made += 1
+        if op == "add":
+            edge[i, j] = True
+            n_parents[j] += 1
+            slot[i, j] = len(edges)
+            edges.append((i, j))
+            continue
+        edge[i, j] = False
+        n_parents[j] -= 1
+        k = slot.pop((i, j))
+        if op == "reverse":
+            edge[j, i] = True
+            n_parents[i] += 1
+            edges[k] = (j, i)
+            slot[j, i] = k
+        else:  # the last edge takes the removed one's slot
+            last = edges.pop()
+            if k < len(edges):
+                edges[k] = last
+                slot[last] = k
+
+
+def _climb(
+    scanner: MoveScanner,
+    adj_int: list[int],
+    parents_of: dict[int, list[int]],
+    max_iter: int | None,
+) -> int:
+    """Take the best improving move until none is left or ``max_iter`` are taken; count them."""
+    moves = 0
+    while max_iter is None or moves < max_iter:
+        best = scanner.best(adj_int, parents_of)
+        if best is None:
+            break
+        _apply_move(adj_int, parents_of, best[4])
+        moves += 1
+    return moves
+
+
 def hc(
     data: np.ndarray,
     *,
@@ -463,6 +620,9 @@ def hc(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     max_parents: int | None = None,
+    n_starts: int = 1,
+    n_perturbations: int = 1,
+    random_state: int = 0,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
@@ -475,6 +635,10 @@ def hc(
     linear Gaussian network: no move gives a categorical node a continuous parent. Returns the
     CPDAG and the DAG's total objective (lower is better), the sum of the final per-node local
     scores.
+
+    Each start after the first climbs again from the best DAG so far after :func:`perturb` makes
+    ``n_perturbations`` random changes to it, which keep the moves' rules, and replaces it only
+    when its DAG scores lower by more than :data:`START_EPS`.
 
     Parameters
     ----------
@@ -499,8 +663,8 @@ def hc(
         Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
         (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     max_iter : int or None
-        Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
-        ``SearchLimitWarning``.
+        Maximum moves of each start; ``None`` sets no limit. A start that takes ``max_iter`` moves
+        warns with ``SearchLimitWarning``, once per call.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
@@ -510,6 +674,12 @@ def hc(
         continuous into a categorical column raises ``ValueError``.
     max_parents : int or None
         Most parents of any node; no move gives a node more. ``None`` sets no cap.
+    n_starts : int
+        Number of climbs, at least ``1``.
+    n_perturbations : int
+        Random changes to the best DAG so far before each start after the first, at least ``1``.
+    random_state : int
+        Seed of the changes; start ``k`` draws from :func:`~andrey.core.seeding.start_rng`.
 
     Returns
     -------
@@ -521,15 +691,18 @@ def hc(
 
     if score_func not in HC_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
-    score = make_score(
-        score_func,
-        X,
-        penalty_discount=penalty_discount,
-        ebic_gamma=ebic_gamma,
-        equivalent_sample_size=equivalent_sample_size,
-        categorical=categorical,
-    )
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+
+    def new_score() -> LocalScore:
+        return make_score(
+            score_func,
+            X,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
+            categorical=categorical,
+        )
+
+    score = new_score()
     forbidden = None
     mask = np.full(d, score_func in DISCRETE_SCORES)
     if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
@@ -545,27 +718,49 @@ def hc(
         forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
     required = None if constraints is None else constraints.required.T
 
-    adj_int, parents_of = start_dag(d, constraints, max_parents)
-
-    # One BLAS thread keeps the Schur updates reproducible across thread counts.
-    with backend.one_blas_thread():
-        scanner = MoveScanner(
-            delta,
-            d,
-            ranks=tie_ranks(X, mask),
-            forbidden=forbidden,
-            required=required,
-            max_parents=max_parents,
-        )
-        moves = 0
-        while max_iter is None or moves < max_iter:
-            best = scanner.best(adj_int, parents_of)
-            if best is None:
-                break
-            _apply_move(adj_int, parents_of, best[4])
-            moves += 1
-    if max_iter is not None and moves == max_iter:
+    start_adj, start_parents = start_dag(d, constraints, max_parents)
+    ranks = tie_ranks(X, mask)
+    best: tuple[list[int], dict[int, list[int]], float] | None = None
+    capped = False
+    for start in range(n_starts):
+        if start == 0:
+            adj_int, parents_of = start_adj, start_parents
+        else:
+            assert best is not None  # set by start 0
+            # Each start builds its own score, deltas, and tables; the last start's are dropped.
+            score = new_score()
+            adj_int, parents_of = list(best[0]), {v: list(pa) for v, pa in best[1].items()}
+            perturb(
+                adj_int,
+                parents_of,
+                n_perturbations,
+                start_rng(random_state, start),
+                ranks=ranks,
+                forbidden=forbidden,
+                required=required,
+                max_parents=max_parents,
+            )
+        delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+        # One BLAS thread keeps the Schur updates reproducible across thread counts.
+        with backend.one_blas_thread():
+            scanner = MoveScanner(
+                delta,
+                d,
+                ranks=ranks,
+                forbidden=forbidden,
+                required=required,
+                max_parents=max_parents,
+            )
+            moves = _climb(scanner, adj_int, parents_of, max_iter)
+        capped |= max_iter is not None and moves == max_iter
+        total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
+        if best is None or total < best[2] - START_EPS:
+            best = (adj_int, parents_of, total)
+        del scanner, delta
+    if capped and max_iter is not None:
         warn_search_limit("hc", "max_iter", max_iter, "moves")
+    assert best is not None  # n_starts >= 1
+    _, parents_of, total = best
 
     # Emit the discovered DAG as an unsigned endpoint-mark matrix (u -> v: TAIL at u, ARROW at v),
     # then reduce it to the CPDAG of its equivalence class.
@@ -577,6 +772,4 @@ def hc(
     cpdag = dag2cpdag(dag)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
-
-    total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
     return to_structure(cpdag, kind="cpdag"), total

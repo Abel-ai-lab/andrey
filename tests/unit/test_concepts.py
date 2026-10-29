@@ -596,8 +596,12 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
 
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
-#: The settings that make a CI search draw random numbers.
-RANDOMIZED = {m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY)}
+#: The settings that make a fit draw random numbers: a randomized test, or a later start of a search
+#: that changes the best DAG at random.
+RANDOMIZED = {
+    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY)},
+    **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
+}
 
 
 @pytest.mark.parametrize("method", SEEDED)
@@ -612,9 +616,10 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 
 
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
-    """A method without a seed, and a CI search under a deterministic test, record none."""
+    """A method without a seed, a CI search under a deterministic test, and a search that changes
+    the best DAG at random only before a later start, run with one start, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
-    for method in (*CI_SEARCHES, *PCMCI_FAMILY):
+    for method in (*CI_SEARCHES, *PCMCI_FAMILY, *CONCEPTS["n_perturbations"].suitable):
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
 
