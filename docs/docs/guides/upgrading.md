@@ -61,6 +61,10 @@ Benjamini-Hochberg adjusted p-value of at most `alpha`, 0.05 by default, over al
 (`fdr_method="fdr_bh"`; `"none"` tests each link at `alpha`); `metadata["p_values"]` holds the
 adjusted p-values. `cv` is ignored, with the warning.
 
+`pcmci` keeps a link when its Benjamini-Hochberg adjusted p-value over all the links is at most
+`alpha` (`fdr_method="fdr_bh"`, the default), so it returns fewer links than in 0.11, mostly the
+false ones. `fdr_method="none"` returns the links of 0.11.
+
 A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` still works for
 one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now
 `bootstrap.n_resamples`, with no former name.
