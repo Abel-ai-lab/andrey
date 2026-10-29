@@ -239,12 +239,12 @@ def test_bdeu_search_honors_required_forbidden_and_tiers(name):
     e = rng.integers(0, 2, n)
     frame = pd.DataFrame({"a": a, "b": b, "c": c, "d": d, "e": e}).astype(float)
     knowledge = Knowledge(required=[("b", "e")], forbidden=[("c", "d")], tiers=[["a", "b"], ["c"]])
-    out = getattr(andrey, name)(frame, score_func="local_score_BDeu", knowledge=knowledge)
+    out = getattr(andrey, name)(frame, score_func="bdeu", knowledge=knowledge)
     edges = set(out.structure.oriented_edges())
     assert ("b", "e", "directed") in edges, edges
     assert ("c", "d", "directed") not in edges, edges
     assert not {("c", "a", "directed"), ("c", "b", "directed")} & edges, edges
-    free = getattr(andrey, name)(frame, score_func="local_score_BDeu")
+    free = getattr(andrey, name)(frame, score_func="bdeu")
     assert ("c", "d", "directed") in free.structure.oriented_edges()
 
 
@@ -369,11 +369,6 @@ def test_resolve_rejects_contradictions(knowledge, message):
 def test_names_need_column_labels():
     with pytest.raises(ValueError, match="no column names"):
         resolve(Knowledge(required=[("a", "b")]), 3, None, method="pc")
-
-
-def test_bottom_up_parce_lingam_rejects_required_edges(data):
-    with pytest.raises(NotImplementedError, match="required"):
-        andrey.bottom_up_parce_lingam(data, knowledge=Knowledge(required=[("a", "c")]))
 
 
 def test_a_part_a_method_does_not_honor_raises():
@@ -602,13 +597,25 @@ def test_rcd_raises_on_required_edges_that_close_a_cycle():
 def test_bottom_up_parce_lingam_reads_the_knowledge_in_the_unordered_block(forbidden):
     data = _confounded()
     plain = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    assert plain.metadata["causal_order"] == [[0, 1], 2, 3]
+    assert plain.metadata["partial_order"] == [[0, 1], 2, 3]
     out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(forbidden=forbidden))
     marks = from_structure(out.structure)
     if len(forbidden) == 2:
         assert marks[0, 1] == NULL and marks[1, 0] == NULL
     else:  # an arrowhead at the cause of the forbidden edge, a circle at its effect
         assert marks[0, 1] == ARROW and marks[1, 0] == CIRCLE
+
+
+@pytest.mark.parametrize(
+    "edge", [(0, 1), (1, 0), (1, 3)], ids=["in the block", "reversed", "resolved"]
+)
+def test_bottom_up_parce_lingam_keeps_every_required_edge(edge):
+    data = _confounded()  # the unordered block holds 0 and 1, then 2 and 3 follow
+    out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(required=[edge]))
+    i, j = edge
+    marks = from_structure(out.structure)
+    assert (marks[i, j], marks[j, i]) == (TAIL, ARROW)
+    assert out.metadata["partial_order"][0] == [0, 1]  # the order keeps the block
 
 
 def test_every_group_honors_the_knowledge(data):
@@ -713,7 +720,7 @@ def _fit_series(name: str, data, lags: int = 2, **kwargs):
     if name == "varma_lingam":
         return andrey.varma_lingam(data, order=(lags, 0), prune=True, **kwargs)
     if name == "longitudinal_lingam":
-        return andrey.longitudinal_lingam(data, n_lags=lags, **kwargs)
+        return andrey.longitudinal_lingam(data, tau_max=lags, **kwargs)
     return getattr(andrey, name)(data, tau_max=lags, **kwargs)
 
 

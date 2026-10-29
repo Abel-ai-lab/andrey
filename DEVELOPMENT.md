@@ -65,8 +65,8 @@ repository.
 
 - The registry and `andrey.api.__all__` name the same methods.
 - Each spec's data inputs, keyword parameters, and **defaults** match `inspect.signature`
-  (positional-or-keyword -> a `DataSpec` input, keyword-only -> a `ParamSpec`, `**params` ->
-  `passthrough=True`).
+  (positional-or-keyword -> a `DataSpec` input, keyword-only -> a `ParamSpec`; no facade takes
+  `**params`).
 - Shared concepts stay consistent: `alpha` is a float; seeds are nullable ints.
 - `tests/unit/test_concepts.py` checks every concept in `src/andrey/spec/concepts.py` against
   every method: a suitable method has the template's name, type, default, and bounds, or the

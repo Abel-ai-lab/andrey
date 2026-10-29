@@ -2,10 +2,10 @@
 
 :func:`method_spec` wraps a facade so that each call maps a former argument name or value to the
 current one, checks every argument against its :class:`~andrey.spec.models.ParamSpec`, resolves
-the seed, warns that an experimental method is experimental, and names the method and the seed in
-the result's metadata. The data check that follows, in :func:`andrey.api._adapt.data_matrix`, warns
-when the data are larger than the method's measured boundary. A facade keeps only its method's own
-logic.
+the seed, warns that an experimental method is experimental, and names the method, the seed, and
+the test and score the fit used in the result's metadata. The data check that follows, in
+:func:`andrey.api._adapt.data_matrix`, warns when the data are larger than the method's measured
+boundary. A facade keeps only its method's own logic.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from andrey.api._adapt import default_score, default_test
 from andrey.api._experimental import warn_experimental
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
 from andrey.core.seeding import resolve_seed
@@ -47,8 +48,10 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or ``ValueError``; a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
     an int; an experimental method warns :class:`~andrey.ExperimentalWarning`.
-    After it: each result's ``metadata["algorithm"]`` is ``name`` and, when the fit draws random
-    numbers (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used.
+    After it: each result's ``metadata["algorithm"]`` is ``name``, ``metadata["indep_test"]`` and
+    ``metadata["score_func"]`` are the test and the score the fit used, for a method that takes
+    them (:func:`chosen_settings`), and, when the fit draws random numbers
+    (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used.
     """
 
     def decorate(facade: Facade) -> Facade:
@@ -72,6 +75,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             if spec.status == "experimental":
                 warn_experimental(name)
             out = facade(*bound.args, **bound.kwargs)
+            stamp.update(chosen_settings(spec, bound.arguments))
             if isinstance(out, list):
                 return [stamped(o, stamp) for o in out]
             return stamped(out, stamp)
@@ -91,6 +95,34 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     return test is None or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
 
 
+#: The concepts of the arguments that name a test or a score, each with the function that picks it
+#: from the declared column types when the call passes none.
+CHOSEN = {"indep_test": default_test, "score_func": default_score}
+
+
+def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, str]:
+    """Return the test and the score a fit of ``spec`` with ``arguments`` used, by argument name.
+
+    A method with an ``indep_test`` or a ``score_func`` has it in the result: the name the call
+    passed, or, for ``None``, the one picked from the declared column types among the method's
+    choices, as the facade picks it (:func:`~andrey.api._adapt.default_test`,
+    :func:`~andrey.api._adapt.default_score`). A registered test is its registered name.
+    """
+    chosen: dict[str, str] = {}
+    for param in spec.params:
+        pick = CHOSEN.get(param.concept or "")
+        if pick is None:
+            continue
+        name = arguments.get(param.name)
+        if name is None:
+            data = arguments[spec.data.inputs[0].name]
+            name, _ = pick(
+                data, None, categorical=arguments.get("categorical"), choices=param.choices
+            )
+        chosen[param.name] = name
+    return chosen
+
+
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
     """Return the values ``param`` takes at run time where they differ from its spec, else ``None``.
 
@@ -101,11 +133,11 @@ def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
 
 
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Return ``kwargs`` with each former name and value of ``spec``'s parameters made current.
+    """Return ``kwargs`` with the former names and values of ``spec``'s arguments made current.
 
-    Each former name or value warns once at the caller's line, and so does each dropped argument,
-    which is removed. Raises ``ValueError`` when a call passes a parameter under both its former
-    and its current name.
+    The arguments are the data inputs and the parameters. Each former name or value warns once at
+    the caller's line, and so does each dropped argument, which is removed. Raises ``ValueError``
+    when a call passes an argument under both its former and its current name.
     """
     kwargs = dict(kwargs)
     for old in spec.dropped_args:
@@ -116,20 +148,22 @@ def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
                 "release; drop it",
                 DeprecatedArgumentWarning,
             )
-    for param in spec.params:
-        for old in param.aliases:
+    for argument in (*spec.data.inputs, *spec.params):
+        for old in argument.aliases:
             if old not in kwargs:
                 continue
-            if param.name in kwargs:
+            if argument.name in kwargs:
                 raise ValueError(
-                    f"{spec.name}: {old} is the former name of {param.name}; pass only {param.name}"
+                    f"{spec.name}: {old} is the former name of {argument.name}; pass only "
+                    f"{argument.name}"
                 )
-            kwargs[param.name] = kwargs.pop(old)
+            kwargs[argument.name] = kwargs.pop(old)
             warn_once(
-                f"andrey.{spec.name}: {old} is now {param.name}; the former name stops working "
+                f"andrey.{spec.name}: {old} is now {argument.name}; the former name stops working "
                 "in the next release",
                 DeprecatedArgumentWarning,
             )
+    for param in spec.params:
         value = kwargs.get(param.name)
         for old, new in param.choice_aliases:
             if isinstance(value, str) and value == old:

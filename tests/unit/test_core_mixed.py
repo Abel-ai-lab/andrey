@@ -204,7 +204,7 @@ def test_cg_counts_parameters_for_every_joint_category():
 
 def test_cg_score_is_the_family_likelihood_over_the_parents_likelihood():
     x, mask = _mixed()
-    score = CGScore(x, mask, lambda_value=2.0)
+    score = CGScore(x, mask, penalty_discount=2.0)
     for node, parents in [(3, (1, 2)), (0, (1,)), (2, ()), (1, (0, 2, 3))]:
         family = [*parents, node]
         loglik = _cg_loglik(x, mask, family) - _cg_loglik(x, mask, list(parents))
@@ -253,7 +253,7 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
     x = rng.standard_normal((300, 4))
     x[:, 1] += x[:, 0]
     x[:, 3] += x[:, 1] - x[:, 2]
-    bic, dg = BICScore(x, lambda_value=1.5), DGScore(x, lambda_value=1.5)
+    bic, dg = BICScore(x, penalty_discount=1.5), DGScore(x, penalty_discount=1.5)
     for node, parents in [(1, ()), (1, (0,)), (3, (1, 2)), (3, (0, 1, 2)), (0, (3,))]:
         assert dg.score(node, parents) == bic.score(node, parents)
 
@@ -261,15 +261,15 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
 @pytest.mark.parametrize(
     ("search", "bic"),
     [
-        (ges, "local_score_BIC"),
-        (hc, "local_score_BIC_from_cov"),
-        (boss, "local_score_BIC_from_cov"),
-        (grasp, "local_score_BIC_from_cov"),
+        (ges, "bic"),
+        (hc, "bic"),
+        (boss, "bic"),
+        (grasp, "bic"),
     ],
 )
 def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
     x = sample_scm(d=8, n=1000, seed=0, density=2.0, scale="raw").data
-    dg_graph, dg_score = search(x, score_func="local_score_degen_gauss")
+    dg_graph, dg_score = search(x, score_func="degen_gauss")
     # The degenerate Gaussian score has no extended-BIC term, so the BIC side is the standard BIC.
     bic_graph, bic_score = search(x, score_func=bic, ebic_gamma=0.0)
     assert np.array_equal(dg_graph.to_numpy(), bic_graph.to_numpy())
@@ -278,7 +278,7 @@ def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
 
 def test_exact_search_with_dg_on_continuous_columns_finds_the_bic_equivalence_class():
     x = sample_scm(d=5, n=1000, seed=0, density=2.0, scale="raw").data
-    dg = to_cpdag(exact_search(x, score_func="local_score_degen_gauss"))
+    dg = to_cpdag(exact_search(x, score_func="degen_gauss"))
     assert np.array_equal(dg.to_numpy(), to_cpdag(exact_search(x)).to_numpy())
 
 
@@ -321,7 +321,7 @@ def test_dg_score_of_a_node_its_parents_determine_is_inf():
 @pytest.mark.parametrize("search", [ges, hc, boss, grasp])
 def test_a_dg_search_never_selects_a_family_its_parents_determine(search):
     x, mask = _determined()
-    _, total = search(x, score_func="local_score_degen_gauss", categorical=mask)
+    _, total = search(x, score_func="degen_gauss", categorical=mask)
     assert math.isfinite(total)
 
 

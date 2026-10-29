@@ -16,7 +16,6 @@ import pytest
 
 import andrey
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
-from andrey.core.score import LINEAR_SCORES
 from andrey.data import sample_scm
 from andrey.spec import REGISTRY
 
@@ -289,21 +288,21 @@ def test_time_series_methods_need_two_variables(fit):
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [
-        ("maxlag", 0, ValueError),
-        ("maxlag", 1.5, TypeError),
+        ("tau_max", 0, ValueError),
+        ("tau_max", 1.5, TypeError),
         ("cv", 1, ValueError),
         ("cv", 2.5, TypeError),
     ],
 )
-def test_granger_checks_maxlag_and_cv(setting, value, error):
+def test_granger_checks_tau_max_and_cv(setting, value, error):
     with pytest.raises(error, match=setting):
         andrey.granger(_data(), **{setting: value})
 
 
 def test_granger_needs_a_time_step_in_every_fold():
     with pytest.raises(ValueError, match="data needs at least 8 rows"):
-        andrey.granger(_data()[:7], maxlag=3, cv=5)
-    assert andrey.granger(_data()[:8], maxlag=3, cv=5).structure.lags == (1, 2, 3)
+        andrey.granger(_data()[:7], tau_max=3, cv=5)
+    assert andrey.granger(_data()[:8], tau_max=3, cv=5).structure.lags == (1, 2, 3)
 
 
 LINGAM_PRUNED = {
@@ -334,8 +333,8 @@ def test_pairwise_tests_reject_unusable_data(fit):
 @pytest.mark.parametrize(
     ("fit", "name", "least"),
     [
-        (andrey.multi_group_direct_lingam, "data_groups", "two datasets"),
-        (andrey.longitudinal_lingam, "data_list", "two time points"),
+        (andrey.multi_group_direct_lingam, "data", "two datasets"),
+        (andrey.longitudinal_lingam, "data", "two time points"),
     ],
 )
 def test_multi_dataset_methods_name_the_dataset_at_fault(fit, name, least):
@@ -346,16 +345,16 @@ def test_multi_dataset_methods_name_the_dataset_at_fault(fit, name, least):
 
 
 def test_multi_group_direct_lingam_needs_the_same_columns_in_every_group():
-    with pytest.raises(ValueError, match="data_groups needs the same columns"):
+    with pytest.raises(ValueError, match="data needs the same columns"):
         andrey.multi_group_direct_lingam([_data(d=3), _data(d=4)])
 
 
-@pytest.mark.parametrize(("n_lags", "error"), [(0, ValueError), (3, ValueError), (1.5, TypeError)])
-def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags, error):
+@pytest.mark.parametrize(("tau_max", "error"), [(0, ValueError), (3, ValueError), (1.5, TypeError)])
+def test_longitudinal_lingam_takes_tau_max_up_to_the_time_points_minus_one(tau_max, error):
     data = [_data() for _ in range(3)]
-    with pytest.raises(error, match="n_lags"):
-        andrey.longitudinal_lingam(data, n_lags=n_lags)
-    assert andrey.longitudinal_lingam(data, n_lags=2).structure.n_lags == 3  # lags 0, 1, 2
+    with pytest.raises(error, match="tau_max"):
+        andrey.longitudinal_lingam(data, tau_max=tau_max)
+    assert andrey.longitudinal_lingam(data, tau_max=2).structure.n_lags == 3  # lags 0, 1, 2
 
 
 @pytest.mark.parametrize(
@@ -374,8 +373,8 @@ def test_varma_lingam_checks_order(order, error):
         ({"tau_max": 1.5}, TypeError, "tau_max"),
         ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
         ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
-        ({"alpha_level": 0.0}, ValueError, "alpha_level"),
-        ({"alpha_level": 1.5}, ValueError, "alpha_level"),
+        ({"alpha": 0.0}, ValueError, "alpha"),
+        ({"alpha": 1.5}, ValueError, "alpha"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
     ],
 )
@@ -396,8 +395,8 @@ def test_pcmci_needs_enough_time_steps_for_every_test():
     [
         ({"tau_max": 0}, ValueError, "tau_max"),
         ({"tau_max": 1.5}, TypeError, "tau_max"),
-        ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
-        ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
+        ({"alpha": 0.0}, ValueError, "alpha"),
+        ({"alpha": 1.0}, ValueError, "alpha"),
         ({"collider_rule": "vote"}, ValueError, "collider_rule"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
     ],
@@ -410,8 +409,8 @@ def test_pcmciplus_checks_its_parameters(params, error, name):
 def test_pcmciplus_needs_enough_time_steps_for_every_test():
     # 2 * tau_max * (n_variables + 1) + n_variables + 1 = 28 rows for tau_max=3 over 3 variables.
     with pytest.raises(ValueError, match="data needs at least 28 rows"):
-        andrey.pcmciplus(_data(n=27), tau_max=3, pc_alpha=0.99)
-    out = andrey.pcmciplus(_data(n=28), tau_max=3, pc_alpha=0.99)
+        andrey.pcmciplus(_data(n=27), tau_max=3, alpha=0.99)
+    out = andrey.pcmciplus(_data(n=28), tau_max=3, alpha=0.99)
     assert out.structure.lags == (0, 1, 2, 3)
     assert len(out.structure.lag(0).oriented_edges()) == 3  # nothing removed: the largest tests ran
 
@@ -427,13 +426,13 @@ def test_pcmciplus_takes_one_variable():
     [
         ({"tau_max": 0}, ValueError, "tau_max"),
         ({"tau_max": 1.5}, TypeError, "tau_max"),
-        ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
-        ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
+        ({"alpha": 0.0}, ValueError, "alpha"),
+        ({"alpha": 1.0}, ValueError, "alpha"),
         ({"n_preliminary_iterations": -1}, ValueError, "n_preliminary_iterations"),
         ({"n_preliminary_iterations": 1.5}, TypeError, "n_preliminary_iterations"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
-        ({"max_depth": -1}, ValueError, "max_depth"),
-        ({"max_depth": 1.5}, TypeError, "max_depth"),
+        ({"max_p_global": -1}, ValueError, "max_p_global"),
+        ({"max_p_global": 1.5}, TypeError, "max_p_global"),
     ],
 )
 def test_lpcmci_checks_its_parameters(params, error, name):
@@ -444,8 +443,10 @@ def test_lpcmci_checks_its_parameters(params, error, name):
 def test_lpcmci_needs_enough_time_steps_for_every_test():
     # n_variables * (tau_max + 1) + 2 * tau_max + 1 = 19 rows for tau_max=3 over 3 variables.
     with pytest.raises(ValueError, match="data needs at least 19 rows"):
-        andrey.lpcmci(_data(n=18), tau_max=3, pc_alpha=0.99)
-    out = andrey.lpcmci(_data(n=19), tau_max=3, pc_alpha=0.99)  # keeps links: large tests run
+        andrey.lpcmci(_data(n=18), tau_max=3, alpha=0.99)
+    out = andrey.lpcmci(
+        _data(n=19), tau_max=3, alpha=0.99, indep_test="student_t"
+    )  # keeps links: large tests run
     assert out.structure.lags == (0, 1, 2, 3)
     assert len(out.structure.lag(0).oriented_edges()) == 3
 
@@ -471,11 +472,11 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
 @pytest.mark.parametrize(
     ("fit", "setting", "value", "error"),
     [
-        *[(andrey.rcd, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
-        (andrey.rcd, "max_explanatory_vars", 1.5, TypeError),
+        *[(andrey.rcd, "max_depth", bad, ValueError) for bad in (0, -1)],
+        (andrey.rcd, "max_depth", 1.5, TypeError),
         *[
             (andrey.rcd, level, bad, ValueError)
-            for level in ("cor_alpha", "ind_alpha", "shapiro_alpha")
+            for level in ("cor_alpha", "alpha", "shapiro_alpha")
             for bad in (0.0, 1.0, 2.0)
         ],
         *[(andrey.bottom_up_parce_lingam, "alpha", bad, ValueError) for bad in (0.0, 1.0, 2.0)],
@@ -484,11 +485,6 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
 def test_hidden_confounder_methods_reject_a_bad_setting(fit, setting, value, error):
     with pytest.raises(error, match=setting):
         fit(_data(), **{setting: value})
-
-
-def test_gin_labels_name_each_column():
-    with pytest.raises(ValueError, match="labels must name each of the 4 columns"):
-        andrey.gin(_data(d=4), labels=("a", "b"))
 
 
 @pytest.mark.parametrize(
@@ -536,8 +532,8 @@ def test_hc_sets_no_move_limit_by_default():
         ({"max_tabu": 11}, "max_tabu", ValueError),  # longer than the default tabu list
         ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
         ({"max_tabu": True}, "max_tabu", TypeError),
-        ({"lambda_value": -1.0}, "lambda_value", ValueError),
-        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", ValueError),
+        ({"penalty_discount": -1.0}, "penalty_discount", ValueError),
+        ({"score_func": "unknown"}, "unknown", ValueError),
     ],
 )
 def test_tabu_rejects_a_bad_setting(settings, named, error):
@@ -575,32 +571,20 @@ CATEGORICAL = {
         x, np.arange(len(x)) % 2, indep_test="gsq"
     ),
     ("gfci", "indep_test", "chisq"): lambda x: andrey.gfci(
-        x, indep_test="chisq", score_func="local_score_BDeu"
+        x, indep_test="chisq", score_func="bdeu"
     ),
-    ("ges", "score_func", "local_score_BDeu"): lambda x: andrey.ges(
-        x, score_func="local_score_BDeu"
-    ),
-    ("hc", "score_func", "local_score_BDeu"): lambda x: andrey.hc(x, score_func="local_score_BDeu"),
+    ("ges", "score_func", "bdeu"): lambda x: andrey.ges(x, score_func="bdeu"),
+    ("hc", "score_func", "bdeu"): lambda x: andrey.hc(x, score_func="bdeu"),
     ("gfci", "indep_test", "gsq"): lambda x: andrey.gfci(
-        x, indep_test="gsq", score_func="local_score_BIC_categorical"
+        x, indep_test="gsq", score_func="discrete_bic"
     ),
-    ("ges", "score_func", "local_score_BIC_categorical"): lambda x: andrey.ges(
-        x, score_func="local_score_BIC_categorical"
-    ),
-    ("hc", "score_func", "local_score_BIC_categorical"): lambda x: andrey.hc(
-        x, score_func="local_score_BIC_categorical"
-    ),
-    ("tabu", "score_func", "local_score_BDeu"): lambda x: andrey.tabu(
-        x, score_func="local_score_BDeu"
-    ),
-    ("tabu", "score_func", "local_score_BIC_categorical"): lambda x: andrey.tabu(
-        x, score_func="local_score_BIC_categorical"
-    ),
-    ("exact_search", "score_func", "local_score_BDeu"): lambda x: andrey.exact_search(
-        x, score_func="local_score_BDeu"
-    ),
-    ("exact_search", "score_func", "local_score_BIC_categorical"): lambda x: andrey.exact_search(
-        x, score_func="local_score_BIC_categorical"
+    ("ges", "score_func", "discrete_bic"): lambda x: andrey.ges(x, score_func="discrete_bic"),
+    ("hc", "score_func", "discrete_bic"): lambda x: andrey.hc(x, score_func="discrete_bic"),
+    ("tabu", "score_func", "bdeu"): lambda x: andrey.tabu(x, score_func="bdeu"),
+    ("tabu", "score_func", "discrete_bic"): lambda x: andrey.tabu(x, score_func="discrete_bic"),
+    ("exact_search", "score_func", "bdeu"): lambda x: andrey.exact_search(x, score_func="bdeu"),
+    ("exact_search", "score_func", "discrete_bic"): lambda x: andrey.exact_search(
+        x, score_func="discrete_bic"
     ),
 }
 
@@ -655,9 +639,7 @@ def test_a_categorical_setting_reads_or_names_a_missing_category(setting):
         CATEGORICAL[setting](frame)
 
 
-@pytest.mark.parametrize(
-    ("score_func", "indep_test"), [("local_score_BDeu", "fisherz"), ("local_score_BIC", "chisq")]
-)
+@pytest.mark.parametrize(("score_func", "indep_test"), [("bdeu", "fisherz"), ("bic", "chisq")])
 def test_gfci_rejects_a_score_and_test_that_read_the_data_differently(score_func, indep_test):
     with pytest.raises(ValueError, match="score and test must read the data alike"):
         andrey.gfci(_categories(), score_func=score_func, indep_test=indep_test)
@@ -679,10 +661,10 @@ def test_a_categorical_error_names_the_dataframe_column():
 @pytest.mark.parametrize(
     "fit", [andrey.ges, andrey.hc, andrey.tabu, partial(andrey.gfci, indep_test="chisq")]
 )
-def test_bdeu_still_checks_lambda_value(fit):
+def test_bdeu_still_checks_penalty_discount(fit):
     """BDeu has no penalty weight, but a setting outside its range is an error under any score."""
-    with pytest.raises(ValueError, match="lambda_value"):
-        fit(_categories(), score_func="local_score_BDeu", lambda_value=-1.0)
+    with pytest.raises(ValueError, match="penalty_discount"):
+        fit(_categories(), score_func="bdeu", penalty_discount=-1.0)
 
 
 def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
@@ -696,9 +678,9 @@ def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
     [
         ("extended_search", 1, TypeError),
         ("extended_search", "yes", TypeError),
-        ("lambda_value", -1.0, ValueError),
-        ("lambda_value", float("inf"), ValueError),
-        ("score_func", "local_score_BDeu", ValueError),
+        ("penalty_discount", -1.0, ValueError),
+        ("penalty_discount", float("inf"), ValueError),
+        ("score_func", "bdeu", ValueError),
     ],
 )
 def test_xges_rejects_a_bad_setting(setting, value, error):
@@ -711,22 +693,14 @@ MIXED = {
     ("pc", "degen_gauss"): lambda x, **kw: andrey.pc(x, indep_test="degen_gauss", **kw),
     ("fci", "cond_gauss"): lambda x, **kw: andrey.fci(x, indep_test="cond_gauss", **kw),
     ("gfci", "degen_gauss"): lambda x, **kw: andrey.gfci(
-        x, score_func="local_score_degen_gauss", indep_test="degen_gauss", **kw
+        x, score_func="degen_gauss", indep_test="degen_gauss", **kw
     ),
-    ("ges", "local_score_cond_gauss"): lambda x, **kw: andrey.ges(
-        x, score_func="local_score_cond_gauss", **kw
-    ),
-    ("hc", "local_score_degen_gauss"): lambda x, **kw: andrey.hc(
-        x, score_func="local_score_degen_gauss", **kw
-    ),
-    ("boss", "local_score_cond_gauss"): lambda x, **kw: andrey.boss(
-        x, score_func="local_score_cond_gauss", **kw
-    ),
-    ("grasp", "local_score_degen_gauss"): lambda x, **kw: andrey.grasp(
-        x, score_func="local_score_degen_gauss", **kw
-    ),
-    ("exact_search", "local_score_cond_gauss"): lambda x, **kw: andrey.exact_search(
-        x, score_func="local_score_cond_gauss", **kw
+    ("ges", "cond_gauss"): lambda x, **kw: andrey.ges(x, score_func="cond_gauss", **kw),
+    ("hc", "degen_gauss"): lambda x, **kw: andrey.hc(x, score_func="degen_gauss", **kw),
+    ("boss", "cond_gauss"): lambda x, **kw: andrey.boss(x, score_func="cond_gauss", **kw),
+    ("grasp", "degen_gauss"): lambda x, **kw: andrey.grasp(x, score_func="degen_gauss", **kw),
+    ("exact_search", "cond_gauss"): lambda x, **kw: andrey.exact_search(
+        x, score_func="cond_gauss", **kw
     ),
 }
 
@@ -784,10 +758,11 @@ def test_inference_reads_every_row():
     assert "column 0" not in str(caught[0].message) and "0 (" not in str(caught[0].message)
 
 
-def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
+def _typed_frame():
+    """Columns: a ``category``, a continuous one, a ``bool``, and a text column."""
     pd = pytest.importorskip("pandas")
     x = _mixed_data()
-    frame = pd.DataFrame(
+    return pd.DataFrame(
         {
             "group": pd.Categorical(x[:, 0].astype(int)),
             "u": x[:, 1],
@@ -795,20 +770,36 @@ def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
             "label": np.array(["p", "q"])[x[:, 2].astype(int)],
         }
     )
-    with pytest.warns(andrey.DataTypeWarning) as caught:
-        out = andrey.ges(frame, score_func="local_score_cond_gauss")
-    message = str(caught[0].message)
-    assert "'group' (category)" in message and "'flag' (bool)" in message
-    assert "'label' (text)" in message
+
+
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_dataframe_type_declares_a_column_so_a_mixed_setting_does_not_warn(setting):
+    """A ``category``, ``bool``, or text column is declared, so reading it as categorical, as the
+    setting named by the call does, is no guess to warn of."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.DataTypeWarning)
+        out = MIXED[setting](_typed_frame())
     assert out.metadata["categorical"] == ["group", "flag", "label"]
+
+
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_warns_of_the_undeclared_columns_it_infers_only(setting):
+    """Next to the declared columns, a column of whole numbers without a type is a guess."""
+    frame = _typed_frame().assign(count=_mixed_data()[:, 0])
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        out = MIXED[setting](frame)
+    [message] = [str(w.message) for w in caught]
+    assert "'count' (3 values)" in message
+    assert not any(f"'{declared}'" in message for declared in ("group", "flag", "label"))
+    assert out.metadata["categorical"] == ["group", "flag", "label", "count"]
 
 
 @pytest.mark.parametrize(
     "fit",
     [
         lambda x: andrey.pc(x),
-        lambda x: andrey.ges(x, score_func="local_score_BIC"),
-        lambda x: andrey.boss(x, score_func="local_score_BIC_from_cov"),
+        lambda x: andrey.ges(x, score_func="bic"),
+        lambda x: andrey.boss(x, score_func="bic"),
     ],
     ids=["pc", "ges", "boss"],
 )
@@ -822,12 +813,12 @@ def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
 #: tabu, the conditional Gaussian BIC on mixed data: each one's facade, the module and name of the
 #: search it calls, and the linear-Gaussian BIC it picks otherwise.
 SCORE_SEARCHES = {
-    "ges": (andrey.ges, "andrey.search.ges", "ges", "local_score_BIC"),
-    "hc": (andrey.hc, "andrey.search.hc", "hc", "local_score_BIC_from_cov"),
-    "tabu": (andrey.tabu, "andrey.search.tabu", "tabu", "local_score_BIC_from_cov"),
-    "exact_search": (andrey.exact_search, "andrey.search.exact", "exact_search", "local_score_BIC"),
-    "boss": (andrey.boss, "andrey.search.boss", "boss", "local_score_BIC_from_cov"),
-    "grasp": (andrey.grasp, "andrey.search.grasp", "grasp", "local_score_BIC_from_cov"),
+    "ges": (andrey.ges, "andrey.search.ges", "ges", "bic"),
+    "hc": (andrey.hc, "andrey.search.hc", "hc", "bic"),
+    "tabu": (andrey.tabu, "andrey.search.tabu", "tabu", "bic"),
+    "exact_search": (andrey.exact_search, "andrey.search.exact", "exact_search", "bic"),
+    "boss": (andrey.boss, "andrey.search.boss", "boss", "bic"),
+    "grasp": (andrey.grasp, "andrey.search.grasp", "grasp", "bic"),
 }
 
 
@@ -874,10 +865,6 @@ def _same_fit(a, b):
     )
 
 
-def _switch_warnings(caught):
-    return [w for w in caught if "the score defaults to" in str(w.message)]
-
-
 def _mixed_frame():
     """The columns of :func:`_mixed_data` as a category, a float, and a bool column."""
     pd = pytest.importorskip("pandas")
@@ -887,80 +874,71 @@ def _mixed_frame():
     )
 
 
-#: The score searches with a mixed-data score, so a default that switches on mixed data.
-MIXED_DEFAULTS = [name for name in SCORE_SEARCHES if name != "tabu"]
-
-
 @pytest.mark.parametrize("name", [*SCORE_SEARCHES, "xges", "gfci"])
-def test_every_score_search_takes_both_names_of_the_linear_gaussian_bic(name):
+def test_a_former_score_name_maps_to_the_current_one_with_one_warning(name):
     fit = getattr(andrey, name)
-    rng = np.random.default_rng(0)
-    a = rng.standard_normal(300)
-    b = a + rng.standard_normal(300)
-    x = np.column_stack([a, b, b + rng.standard_normal(300), rng.standard_normal(300)])
-    fits = [fit(x, score_func=score_func) for score_func in LINEAR_SCORES]
-    assert fits[0].structure.to_numpy().any()
-    assert _same_fit(*fits)
+    x = _normal_data()
+    current = fit(x, score_func="bic")
+    for former in ("local_score_BIC", "local_score_BIC_from_cov"):
+        with pytest.warns(andrey.DeprecatedArgumentWarning, match=former):
+            assert _same_fit(fit(x, score_func=former), current)
+    assert current.structure.to_numpy().any()
 
 
-@pytest.mark.parametrize("data", [_categorical_data, _categorical_frame], ids=["codes", "frame"])
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))
-def test_all_categorical_data_defaults_to_bdeu_with_one_warning(name, data, monkeypatch):
-    fit, _, _, linear = SCORE_SEARCHES[name]
-    x = data()
+def test_declared_categorical_columns_default_to_bdeu_without_a_warning(name, monkeypatch):
+    """A DataFrame's bool, category, and text columns declare every column categorical."""
+    fit, *_ = SCORE_SEARCHES[name]
+    x = _categorical_frame()
     used = _scores_used(monkeypatch, name)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         out = fit(x)
+    assert used == ["bdeu"]
+    assert [w for w in caught if w.category is andrey.DataTypeWarning] == []
+    assert _same_fit(out, fit(x, score_func="bdeu"))
+
+
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_undeclared_codes_keep_the_linear_bic_with_one_warning(name, monkeypatch):
+    """Whole numbers never switch the score: they read as numbers, with the category-code
+    warning."""
+    fit, _, _, linear = SCORE_SEARCHES[name]
+    x = _categorical_data()
+    used = _scores_used(monkeypatch, name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         fit(x)
-    assert used == ["local_score_BDeu"] * 2
+        fit(x)
+    assert used == [linear] * 2
     assert [w.category for w in caught] == [andrey.DataTypeWarning]
-    assert linear in str(caught[0].message)
-    assert _same_fit(out, fit(x, score_func="local_score_BDeu"))
+    assert "may be category codes" in str(caught[0].message)
 
 
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))
 def test_an_explicit_score_func_wins_on_categorical_and_mixed_data(name, monkeypatch):
     fit, _, _, linear = SCORE_SEARCHES[name]
     used = _scores_used(monkeypatch, name)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
         fit(_categorical_data(), score_func=linear)
-        fit(_categorical_data(), score_func="local_score_BIC_categorical")
+        fit(_categorical_data(), score_func="discrete_bic")
         fit(_mixed_data(), score_func=linear)
-    assert used == [linear, "local_score_BIC_categorical", linear]
-    assert _switch_warnings(caught) == []
+    assert used == [linear, "discrete_bic", linear]
 
 
-@pytest.mark.parametrize("data", [_mixed_data, _mixed_frame], ids=["codes", "frame"])
-@pytest.mark.parametrize("name", MIXED_DEFAULTS)
-def test_mixed_data_defaults_to_the_conditional_gaussian_with_one_warning(name, data, monkeypatch):
-    fit, _, _, linear = SCORE_SEARCHES[name]
-    x = data()
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_declared_mixed_columns_default_to_the_conditional_gaussian(name, monkeypatch):
+    fit, *_ = SCORE_SEARCHES[name]
+    x = _mixed_frame()
     used = _scores_used(monkeypatch, name)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         out = fit(x)
-        fit(x)
-    assert used == ["local_score_cond_gauss"] * 2
-    assert [w.category for w in caught] == [andrey.DataTypeWarning]
-    message = str(caught[0].message)
-    assert "local_score_cond_gauss" in message and linear in message
-    named = fit(x, score_func="local_score_cond_gauss", categorical=[0, 2])
-    assert _same_fit(out, named)
-    assert len(out.metadata["categorical"]) == 2
-
-
-def test_tabu_keeps_the_linear_bic_on_mixed_data(monkeypatch):
-    """Tabu search has no mixed-data score, so mixed data keep the linear-Gaussian BIC."""
-    used = _scores_used(monkeypatch, "tabu")
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        out = andrey.tabu(_mixed_data())
-        explicit = andrey.tabu(_mixed_data(), score_func="local_score_BIC_from_cov")
-    assert used == ["local_score_BIC_from_cov"] * 2
-    assert _same_fit(out, explicit)
-    assert _switch_warnings(caught) == []
+    assert used == ["cond_gauss"]
+    assert [w for w in caught if w.category is andrey.DataTypeWarning] == []
+    assert out.metadata["categorical"] == ["group", "flag"]
+    assert _same_fit(out, fit(x, score_func="cond_gauss", categorical=["group", "flag"]))
 
 
 def _many_levels_data(n=500):
@@ -980,21 +958,17 @@ def _many_levels_data(n=500):
     ],
     ids=["positions", "names", "beyond-max-categories"],
 )
-@pytest.mark.parametrize("name", MIXED_DEFAULTS)
-def test_categorical_naming_every_column_defaults_to_bdeu_with_one_warning(
-    name, data, categorical, monkeypatch
-):
-    fit, _, _, linear = SCORE_SEARCHES[name]
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_categorical_naming_every_column_defaults_to_bdeu(name, data, categorical, monkeypatch):
+    fit, *_ = SCORE_SEARCHES[name]
     x = data()
     used = _scores_used(monkeypatch, name)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         out = fit(x, categorical=categorical)
-        fit(x, categorical=categorical)
-    assert used == ["local_score_BDeu"] * 2
-    assert [w.category for w in caught] == [andrey.DataTypeWarning]
-    assert linear in str(caught[0].message)
-    assert _same_fit(out, fit(x, score_func="local_score_BDeu"))
+    assert used == ["bdeu"]
+    assert [w for w in caught if w.category is andrey.DataTypeWarning] == []
+    assert _same_fit(out, fit(x, score_func="bdeu"))
 
 
 @pytest.mark.parametrize(
@@ -1002,51 +976,44 @@ def test_categorical_naming_every_column_defaults_to_bdeu_with_one_warning(
     [(_mixed_data, [0]), (_mixed_frame, ["group"]), (_mixed_data, [2])],
     ids=["positions", "names", "other-column"],
 )
-@pytest.mark.parametrize("name", MIXED_DEFAULTS)
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
 def test_categorical_naming_some_columns_defaults_to_the_conditional_gaussian(
     name, data, categorical, monkeypatch
 ):
-    """The named columns are the categorical ones, not the ones the inference would find."""
-    fit, _, _, linear = SCORE_SEARCHES[name]
+    """The named columns are the categorical ones, whatever the values or the other types."""
+    fit, *_ = SCORE_SEARCHES[name]
     x = data()
     used = _scores_used(monkeypatch, name)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        out = fit(x, categorical=categorical)
-        fit(x, categorical=categorical)
-    assert used == ["local_score_cond_gauss"] * 2
-    assert [w.category for w in caught] == [andrey.DataTypeWarning]
-    assert linear in str(caught[0].message)
+    out = fit(x, categorical=categorical)
+    assert used == ["cond_gauss"]
     assert out.metadata["categorical"] == categorical
-    named = fit(x, score_func="local_score_cond_gauss", categorical=categorical)
+    named = fit(x, score_func="cond_gauss", categorical=categorical)
     assert _same_fit(out, named)
 
 
-@pytest.mark.parametrize("name", MIXED_DEFAULTS)
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
 def test_categorical_naming_no_column_keeps_the_linear_bic(name, monkeypatch):
-    """The empty list overrides the inference: whole-number columns are numbers."""
+    """The empty list declares no column: whole-number columns are numbers."""
     fit, _, _, linear = SCORE_SEARCHES[name]
     x = _categorical_data()
     used = _scores_used(monkeypatch, name)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
         out = fit(x, categorical=[])
         explicit = fit(x, score_func=linear)
     assert used == [linear, linear]
     assert _same_fit(out, explicit)
-    assert _switch_warnings(caught) == []
 
 
-@pytest.mark.parametrize("name", MIXED_DEFAULTS)
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
 def test_an_explicit_score_func_wins_over_categorical(name, monkeypatch):
     fit, _, _, linear = SCORE_SEARCHES[name]
     used = _scores_used(monkeypatch, name)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        fit(_mixed_data(), score_func="local_score_degen_gauss", categorical=[0])
-        fit(_categorical_data(), score_func="local_score_cond_gauss", categorical=[0, 1, 2])
-    assert used == ["local_score_degen_gauss", "local_score_cond_gauss"]
-    assert _switch_warnings(caught) == []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
+        fit(_mixed_data(), score_func="degen_gauss", categorical=[0])
+        fit(_categorical_data(), score_func="cond_gauss", categorical=[0, 1, 2])
+    assert used == ["degen_gauss", "cond_gauss"]
     with pytest.raises(ValueError, match="leave categorical as None"):
         fit(_mixed_data(), score_func=linear, categorical=[0])
 
@@ -1061,7 +1028,7 @@ def test_an_explicit_score_func_wins_over_categorical(name, monkeypatch):
     ],
     ids=["missing-name", "missing-position", "not-a-list", "not-a-table"],
 )
-@pytest.mark.parametrize("name", MIXED_DEFAULTS)
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
 def test_categorical_must_list_columns_the_data_has_with_the_default_score(
     name, x, categorical, error, message
 ):
@@ -1086,24 +1053,23 @@ def test_continuous_data_keep_the_linear_bic(name, monkeypatch):
 
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))
 def test_the_default_score_and_graph_follow_the_columns_in_any_order(name, monkeypatch):
-    fit, _, _, linear = SCORE_SEARCHES[name]
+    fit, *_ = SCORE_SEARCHES[name]
     order = [2, 0, 1]
     used = _scores_used(monkeypatch, name)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.DataTypeWarning)
-        for x in (_mixed_data(), _categorical_data()):
-            out, moved = fit(x), fit(x[:, order])
-            assert np.array_equal(
-                moved.structure.to_numpy(), out.structure.to_numpy()[order][:, order]
-            )
-    mixed = linear if name == "tabu" else "local_score_cond_gauss"
-    assert used == [mixed, mixed, "local_score_BDeu", "local_score_BDeu"]
+    for x, categorical in ((_mixed_data(), [0, 2]), (_categorical_data(), [0, 1, 2])):
+        moved_categorical = [order.index(j) for j in categorical]
+        out, moved = (
+            fit(x, categorical=categorical),
+            fit(x[:, order], categorical=moved_categorical),
+        )
+        assert np.array_equal(moved.structure.to_numpy(), out.structure.to_numpy()[order][:, order])
+    assert used == ["cond_gauss", "cond_gauss", "bdeu", "bdeu"]
 
 
-def test_whole_number_counts_read_as_categories_and_the_warning_names_the_bic(monkeypatch):
-    """Counts of at most ``max_categories`` values meet the rule, so the warning names the BIC.
+def test_whole_number_counts_read_as_numbers_with_one_warning(monkeypatch):
+    """Counts of at most ``max_categories`` values keep the linear BIC; the warning names them.
 
-    With ``max_categories=9``, the third column's 10 values read as continuous: the data are mixed.
+    With ``max_categories=9``, the third column's 10 values are not named.
     """
     rng = np.random.default_rng(0)
     x = rng.binomial(4, 0.5, 500)
@@ -1111,12 +1077,12 @@ def test_whole_number_counts_read_as_categories_and_the_warning_names_the_bic(mo
     counts = np.column_stack([x, y, y + rng.binomial(2, 0.5, 500)]).astype(np.float64)
     assert np.unique(counts[:, 2]).size == 10
     used = _scores_used(monkeypatch, "hc")
-    with pytest.warns(andrey.DataTypeWarning) as caught:
+    with pytest.warns(andrey.DataTypeWarning, match=r"columns 0, 1, 2 hold at most 10") as caught:
         andrey.hc(counts)
-        andrey.hc(counts, score_func="local_score_BIC_from_cov")
+    with pytest.warns(andrey.DataTypeWarning, match=r"columns 0, 1 hold at most 9"):
         andrey.hc(counts, max_categories=9)
-    assert "local_score_BIC_from_cov" in str(caught[0].message)
-    assert used == ["local_score_BDeu", "local_score_BIC_from_cov", "local_score_cond_gauss"]
+    assert "score_func='bic'" in str(caught[0].message)
+    assert used == ["bic", "bic"]
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
@@ -1162,11 +1128,11 @@ def test_categorical_reads_a_string_as_a_label_and_an_integer_as_a_position(fit,
 @pytest.mark.parametrize(
     "fit",
     [
-        lambda x: andrey.pc(x, categorical=[0]),
+        lambda x: andrey.pc(x, indep_test="fisherz", categorical=[0]),
         lambda x: andrey.pc(x, indep_test="chisq", categorical=[0]),
-        lambda x: andrey.ges(x, score_func="local_score_BIC", categorical=[0]),
-        lambda x: andrey.boss(x, score_func="local_score_BIC_from_cov", categorical=[0]),
-        lambda x: andrey.exact_search(x, score_func="local_score_BIC", categorical=[0]),
+        lambda x: andrey.ges(x, score_func="bic", categorical=[0]),
+        lambda x: andrey.boss(x, score_func="bic", categorical=[0]),
+        lambda x: andrey.exact_search(x, score_func="bic", categorical=[0]),
     ],
 )
 def test_a_setting_that_reads_no_column_types_rejects_categorical(fit):
@@ -1195,21 +1161,21 @@ def _cdnod(x, **kwargs):
         (partial(andrey.fci, indep_test="fisherz"), _normal_data),
         (partial(andrey.fci, indep_test="gsq"), _categorical_data),
         (partial(_cdnod, indep_test="fisherz"), _normal_data),
-        (partial(andrey.gfci, score_func="local_score_BIC", indep_test="fisherz"), _normal_data),
+        (partial(andrey.gfci, score_func="bic", indep_test="fisherz"), _normal_data),
         (
-            partial(andrey.gfci, score_func="local_score_BDeu", indep_test="chisq"),
+            partial(andrey.gfci, score_func="bdeu", indep_test="chisq"),
             _categorical_data,
         ),
-        (partial(andrey.ges, score_func="local_score_BIC"), _normal_data),
-        (partial(andrey.ges, score_func="local_score_BDeu"), _categorical_data),
-        (partial(andrey.hc, score_func="local_score_BIC_from_cov"), _normal_data),
-        (partial(andrey.hc, score_func="local_score_BIC_categorical"), _categorical_data),
-        (partial(andrey.exact_search, score_func="local_score_BIC"), _normal_data),
-        (partial(andrey.exact_search, score_func="local_score_BDeu"), _categorical_data),
-        (partial(andrey.boss, score_func="local_score_BIC_from_cov", seed=0), _normal_data),
-        (partial(andrey.boss, score_func="local_score_BDeu", seed=0), _categorical_data),
-        (partial(andrey.grasp, score_func="local_score_BIC_from_cov", seed=0), _normal_data),
-        (partial(andrey.grasp, score_func="local_score_BDeu", seed=0), _categorical_data),
+        (partial(andrey.ges, score_func="bic"), _normal_data),
+        (partial(andrey.ges, score_func="bdeu"), _categorical_data),
+        (partial(andrey.hc, score_func="bic"), _normal_data),
+        (partial(andrey.hc, score_func="discrete_bic"), _categorical_data),
+        (partial(andrey.exact_search, score_func="bic"), _normal_data),
+        (partial(andrey.exact_search, score_func="bdeu"), _categorical_data),
+        (partial(andrey.boss, score_func="bic", seed=0), _normal_data),
+        (partial(andrey.boss, score_func="bdeu", seed=0), _categorical_data),
+        (partial(andrey.grasp, score_func="bic", seed=0), _normal_data),
+        (partial(andrey.grasp, score_func="bdeu", seed=0), _categorical_data),
     ],
     ids=lambda value: value.func.__name__ if isinstance(value, partial) else None,
 )
@@ -1242,9 +1208,9 @@ def test_a_column_that_does_not_hold_numbers_must_be_categorical():
 @pytest.mark.parametrize(
     ("score_func", "indep_test"),
     [
-        ("local_score_degen_gauss", "fisherz"),
-        ("local_score_BIC", "cond_gauss"),
-        ("local_score_BDeu", "degen_gauss"),
+        ("degen_gauss", "fisherz"),
+        ("bic", "cond_gauss"),
+        ("bdeu", "degen_gauss"),
     ],
 )
 def test_gfci_rejects_a_mixed_score_or_test_without_its_pair(score_func, indep_test):
@@ -1280,3 +1246,19 @@ def _intervened(rows, column):
 def test_gies_rejects_unusable_interventions(interventions, message):
     with pytest.raises(ValueError, match=message):
         andrey.gies(_data(), interventions)
+
+
+@pytest.mark.parametrize("fit", [andrey.pc, andrey.fci, andrey.mmhc, andrey.gfci])
+def test_a_null_test_picks_from_the_declared_column_types(fit):
+    """Declared types pick gsq or cond_gauss; undeclared codes keep fisherz, with one warning."""
+    frame, mixed = _categorical_frame(), _mixed_frame()
+    columns = ["group", "flag"]
+    score = {"score_func": "bdeu"} if fit in (andrey.mmhc, andrey.gfci) else {}
+    mixed_score = {"score_func": "cond_gauss"} if score else {}
+    assert _same_fit(fit(frame), fit(frame, indep_test="gsq", **score))
+    assert _same_fit(
+        fit(mixed), fit(mixed, indep_test="cond_gauss", categorical=columns, **mixed_score)
+    )
+    with pytest.warns(andrey.DataTypeWarning, match="may be category codes"):
+        coded = fit(_categorical_data())
+    assert _same_fit(coded, fit(_categorical_data(), indep_test="fisherz"))

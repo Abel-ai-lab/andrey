@@ -2,21 +2,22 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
-Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
-log(n)``, plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of ``len(parents)``
-when ``ebic_gamma`` is not 0, where ``resid`` is the residual sum of squares of the centered node on
-its centered parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is
-singular). A parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most
-``ZERO_RESIDUAL`` times the node's sum of squares, scores ``inf`` and is never chosen. The
-categorical scores are :class:`~andrey.core.score.BDeuScore` and
+Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + penalty_discount *
+len(parents) * log(n)``, plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of
+``len(parents)`` when ``ebic_gamma`` is not 0, where ``resid`` is the residual sum of squares of the
+centered node on its centered parents, solved from the Gram matrix (a pseudo-inverse when the
+parents' block is singular). A parent set of more than ``n - 2`` members, or one that leaves
+``resid`` at most ``ZERO_RESIDUAL`` times the node's sum of squares, scores ``inf`` and is never
+chosen. The categorical scores are :class:`~andrey.core.score.BDeuScore` and
 :class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
-:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each BIC with
-``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic program
-(``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest path from the
-empty set to the full set gives each variable its best parent set among the variables before it.
-Every DAG of the optimal DAG's Markov equivalence class has the same score, so the search's choice
-among them follows rounding and column order; :func:`_canonical_member` replaces it by one member
-fixed by the CPDAG and :func:`~andrey.search.hc.tie_ranks`.
+:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, whose BIC penalties
+``penalty_discount`` weighs as well; BDeu ignores it. Both searches, A* (``"astar"``) and the
+subset-lattice dynamic program (``"dp"``), run over the order graph, whose nodes are variable
+subsets: the shortest path from the empty set to the full set gives each variable its best parent
+set among the variables before it. Every DAG of the optimal DAG's Markov equivalence class has the
+same score, so the search's choice among them follows rounding and column order;
+:func:`_canonical_member` replaces it by one member fixed by the CPDAG and
+:func:`~andrey.search.hc.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -120,15 +121,19 @@ class _GramBICScore:
 
     Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
     :meth:`score_many` regresses a node on each parent set through the normal equations on ``S`` to
-    get the residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the
-    centering, a nonzero mean would count as shared signal and link independent variables. A
-    nonzero ``ebic_gamma`` adds the extended-BIC term :func:`~andrey.core.score.ebic_penalty`.
-    Raises ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects, or for an
-    ``ebic_gamma`` that is negative or non-finite.
+    get the residual sum of squares, then applies the BIC penalty weighted by ``penalty_discount``.
+    Without the centering, a nonzero mean would count as shared signal and link independent
+    variables. A nonzero ``ebic_gamma`` adds the extended-BIC term
+    :func:`~andrey.core.score.ebic_penalty`. Raises ``ValueError`` for a column
+    :func:`~andrey.core.score.check_columns` rejects, or for an ``ebic_gamma`` or
+    ``penalty_discount`` that is negative or non-finite.
     """
 
-    def __init__(self, data: np.ndarray, ebic_gamma: float = 0.0) -> None:
+    def __init__(
+        self, data: np.ndarray, ebic_gamma: float = 0.0, penalty_discount: float = 1.0
+    ) -> None:
         self._ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
+        self._penalty_discount = penalty_weight(penalty_discount)
         self._n_vars = data.shape[1]
         data = data - data.mean(axis=0)
         self._gram = data.T @ data
@@ -165,7 +170,7 @@ class _GramBICScore:
             resids = [
                 self._diag[node] - b @ beta for b, beta in zip(gram_node_pa, betas, strict=True)
             ]
-        penalty = size * self._log_n
+        penalty = self._penalty_discount * size * self._log_n
         if self._ebic_gamma:
             penalty += ebic_penalty(size, self._n_vars, self._ebic_gamma)
         values = []
@@ -191,15 +196,18 @@ def _generate_parent_graph(
     n_vars: int,
     constraints: Constraints | None = None,
     tables: bool = True,
+    max_parents: int | None = None,
 ) -> list[_ParentEntry]:
     """Build a variable's parent graph: the maximal-candidate parent sets, sorted by score.
 
-    Enumerates candidate parent sets by increasing size and keeps only *maximal candidates* -- a set
-    is dropped when a subset scores lower, since it can then never be the optimal choice for any
-    available-variable set. The retained entries stay sorted by ascending score, so the first entry
-    within an available-variable set is its optimum (:func:`_subset_lookup`). Each enumerated set
-    records the lowest score of a retained set within it, so a set's subsets are looked up rather
-    than searched for; with ``tables`` false, each subset is found by :func:`_best_subset` instead.
+    Enumerates candidate parent sets by increasing size, up to ``max_parents`` members (required
+    parents included) when it is set, and keeps only *maximal candidates* -- a set is dropped when
+    a subset scores lower, since it can then never be the optimal choice for any available-variable
+    set. The retained entries stay sorted by ascending score, so the first entry within an
+    available-variable set is its optimum among the enumerated sets (:func:`_subset_lookup`). Each
+    enumerated set records the lowest score of a retained set within it, so a set's subsets are
+    looked up rather than searched for; with ``tables`` false, each subset is found by
+    :func:`_best_subset` instead.
 
     With ``constraints``, every set holds the node's required parents and adds parents that are
     neither forbidden nor required, and a set is compared only with its subsets that still hold
@@ -228,7 +236,10 @@ def _generate_parent_graph(
     lowest = np.full(1 << n_vars if tables else 0, np.inf)
     if tables:
         lowest[required_bits] = required_value
-    for size in range(1, len(candidates) + 1):
+    largest = len(candidates)
+    if max_parents is not None:
+        largest = min(largest, max_parents - len(required))
+    for size in range(1, largest + 1):
         level = itertools.combinations(candidates, size)
         while extras := list(itertools.islice(level, _SCORE_BATCH)):
             combos = [tuple(sorted(required + extra)) if required else extra for extra in extras]
@@ -380,15 +391,17 @@ def exact_search(
     data: np.ndarray,
     *,
     search_method: str = "astar",
-    score_func: str = "local_score_BIC",
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
-    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC (``lambda=1``), on
-    mean-centered data.
+    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC, on mean-centered
+    data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
     ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score. Exponential in the
     number of variables, so intended for small problems.
@@ -407,13 +420,20 @@ def exact_search(
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
     score_func : str
-        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"local_score_BIC"``
-        or ``"local_score_BIC_from_cov"``), a categorical score, or a mixed-data BIC.
+        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"bic"``), a
+        categorical score, or a mixed-data BIC.
+    penalty_discount : float
+        Multiplier on the BIC penalty of ``log(n)`` per parameter; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
         ``2 * ebic_gamma * log C(n_vars - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    max_parents : int or None
+        Caps each node's parent set, required parents included: only parent sets of at most
+        ``max_parents`` members are scored, so the DAG is the score-optimal one among those within
+        the cap. ``None`` sets no cap. With a cap, ``constraints`` may not require more than
+        ``max_parents`` parents of a node (``ValueError``).
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
     constraints : Constraints or None
@@ -432,18 +452,33 @@ def exact_search(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {EXACT_SCORES}"
         )
+    if (
+        max_parents is not None
+        and constraints is not None
+        and (constraints.required.sum(axis=0) > max_parents).any()
+    ):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
     n_vars = X.shape[1]
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
     score: Score = (
-        _GramBICScore(X, ebic_gamma)
+        _GramBICScore(X, ebic_gamma, penalty_discount)
         if score_func in LINEAR_SCORES
-        else make_score(score_func, X, ebic_gamma=ebic_gamma, categorical=categorical)
+        else make_score(
+            score_func,
+            X,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            categorical=categorical,
+        )
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES
     parent_graphs = [
-        _generate_parent_graph(score, i, n_vars, constraints, tables) for i in range(n_vars)
+        _generate_parent_graph(score, i, n_vars, constraints, tables, max_parents)
+        for i in range(n_vars)
     ]
 
     if search_method == "astar":

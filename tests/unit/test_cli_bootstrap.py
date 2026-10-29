@@ -123,7 +123,7 @@ def test_a_method_with_a_result_per_group_gives_a_result_per_group(tmp_path, cap
         chain(150, k).to_csv(paths[-1], index=False)
     argv = ["bootstrap", "multi_group_direct_lingam", "--n-boot", "2", "--json"]
     for path in paths:
-        argv += ["--data-groups", str(path)]
+        argv += ["--data", str(path)]
     code, out, _ = _run(argv, capsys)
     env = json.loads(out)
     assert code == 0 and env["multi"] is True and len(env["results"]) == 2

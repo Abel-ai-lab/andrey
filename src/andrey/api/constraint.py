@@ -22,6 +22,8 @@ from andrey.api._adapt import (
     column_namer,
     copies_named,
     data_kind,
+    default_score,
+    default_test,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -41,7 +43,7 @@ def pc(
     data: npt.ArrayLike,
     *,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -64,18 +66,26 @@ def pc(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : str, default="fisherz"
+    indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
-        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal
-        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
-        Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
-        (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
-        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed data, continuous and categorical columns, by a likelihood ratio. Four more tests
-        detect nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is
-        the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
-        nearest-neighbor conditional mutual information test; and ``"gpdc"`` Gaussian-process
-        regression with a distance correlation test. See Notes.
+        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
+        ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
+        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
+        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
+        categorical columns, by a likelihood ratio. Four more tests detect nonlinear dependence in
+        continuous data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
+        random-feature approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information
+        test; and ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. See Notes. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -95,10 +105,10 @@ def pc(
         up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
-        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and accept
-        only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
@@ -135,6 +145,9 @@ def pc(
         ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
         unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
         column positions, the middle node second and ``x < y``, in ascending order.
+        ``metadata["conflicts"]`` lists the edges two colliders ask to orient both ways, as
+        ``[x, y]`` pairs of 0-based column positions with ``x < y``, in ascending order; Notes say
+        which orientation each keeps.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
@@ -355,6 +368,7 @@ def pc(
     from andrey.constraint.pc import pc as _pc
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
         data,
         categorical,
@@ -367,6 +381,7 @@ def pc(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     ambiguous: set[tuple[int, int, int]] = set()
+    conflicts: set[tuple[int, int]] = set()
     with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
@@ -380,8 +395,10 @@ def pc(
             in_column_order=resolve_in_column_order(),
             seed=seed,
             _ambiguous=ambiguous,
+            _conflicts=conflicts,
         )
     metadata = {
+        "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
@@ -406,7 +423,7 @@ def fci(
     data: npt.ArrayLike,
     *,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -429,18 +446,26 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : str, default="fisherz"
+    indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
-        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal
-        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
-        Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
-        (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
-        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed data, continuous and categorical columns. Four more tests detect nonlinear
-        dependence in continuous data, at a far higher cost per test: ``"kci"`` is the kernel
-        test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
-        conditional mutual information test; and ``"gpdc"`` Gaussian-process regression with a
-        distance correlation test. See Notes.
+        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
+        ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
+        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
+        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
+        categorical columns. Four more tests detect nonlinear dependence in continuous data, at a
+        far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
+        approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information test; and
+        ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None`` picks from
+        the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
+        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -453,10 +478,10 @@ def fci(
         ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
-        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and accept
-        only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
@@ -685,6 +710,7 @@ def fci(
     from andrey.constraint.fci import fci as _fci
     from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
 
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
         data,
         categorical,
@@ -723,10 +749,10 @@ def fci(
 def gfci(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC",
-    lambda_value: float = 1.0,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -748,14 +774,15 @@ def gfci(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC"
-        Local score driving the GES skeleton phase, as for :func:`~andrey.ges`:
-        ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian BIC;
-        ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"`` for categorical data, coded by
-        whole numbers; or
-        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or conditional
-        Gaussian BIC for mixed data.
-    lambda_value : float, default=1.0
+    score_func : str or None, default=None
+        Local score driving the GES skeleton phase, as for :func:`~andrey.ges`: ``"bic"``, the
+        linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
+        numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
+        BIC for mixed data. ``None`` picks from the declared column types, as for
+        :func:`~andrey.ges`.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
         finite and non-negative. BDeu ignores it.
@@ -764,13 +791,18 @@ def gfci(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
-    indep_test : str, default="fisherz"
+    indep_test : str or None, default=None
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
         ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
-        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data.
-        ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in
-        continuous data, at a far higher cost per test. Each as for :func:`~andrey.pc`.
+        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
+        data, at a far higher cost per test. Each as for :func:`~andrey.pc`. ``None`` picks from the
+        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
+        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -786,10 +818,10 @@ def gfci(
         Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
-        names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
-        text columns, and every column of at most ``max_categories`` distinct whole numbers, named
-        in a ``DataTypeWarning``. ``[]`` marks none. The other settings accept only ``None`` or
-        ``[]``. See *Data types* in the
+        names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
+        columns; a mixed-data setting passed explicitly also infers every column of at most
+        ``max_categories`` distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks
+        none. The other settings accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
@@ -883,7 +915,7 @@ def gfci(
     both and the reasons for keeping them.
 
     **Choosing the penalty.** The GES phase scores a variable with the linear-Gaussian BIC, which
-    charges ``lambda_value * log(n_samples)`` per parent, plus the extended-BIC term ``2 *
+    charges ``penalty_discount * log(n_samples)`` per parent, plus the extended-BIC term ``2 *
     ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, where ``C(n_variables - 1, n_parents)``
     counts the parent sets of that size. The term grows with the number of variables, so a larger
     ``ebic_gamma`` gives a sparser GES graph, with fewer false adjacencies and more missed ones; the
@@ -968,12 +1000,14 @@ def gfci(
     from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
+    score_func, _ = default_score(data, score_func, categorical=categorical)
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     # Both phases read the same data, so the score and the test must agree on its type.
     if data_kind(score_func) != data_kind(indep_test):
         raise ValueError(
-            "gfci's score and test must read the data alike: score_func='local_score_BDeu' or "
-            "'local_score_BIC_categorical' with indep_test 'chisq' or 'gsq' for categories, "
-            "'local_score_degen_gauss' or 'local_score_cond_gauss' with 'degen_gauss' or "
+            "gfci's score and test must read the data alike: score_func='bdeu' or "
+            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
+            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
             "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
@@ -987,7 +1021,7 @@ def gfci(
         pag = _gfci(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             alpha=alpha,
             indep_test=indep_test,
@@ -1013,7 +1047,7 @@ def cdnod(
     domain_index: npt.ArrayLike,
     *,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1043,13 +1077,18 @@ def cdnod(
         equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : str, default="fisherz"
+    indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
         test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
         and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
-        test. Each as for :func:`~andrey.pc`; see Notes for the index.
+        test. Each as for :func:`~andrey.pc`; see Notes for the index. ``None`` picks from the
+        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
+        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1067,11 +1106,11 @@ def cdnod(
         triple whose middle node is the index is not voted: the index is never a collider.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
-        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The domain index is categorical too, so ``data`` may
-        have no categorical column. The other tests take no column types and accept only ``None``
-        or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The domain index
+        is categorical too, so ``data`` may have no categorical column. The other tests take no
+        column types and accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
@@ -1119,7 +1158,9 @@ def cdnod(
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
         reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
         middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
-        numbered ``n_variables``.
+        numbered ``n_variables``. ``metadata["conflicts"]`` lists the edges between variables that
+        two colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based column positions with
+        ``x < y``, in ascending order, decided as in :func:`~andrey.pc`.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
@@ -1259,6 +1300,7 @@ def cdnod(
     from andrey.constraint.cdnod import cdnod as _cdnod
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
         data,
@@ -1284,6 +1326,7 @@ def cdnod(
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
+    conflicts: set[tuple[int, int]] = set()
     with (
         copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
         rows_tested() as rows,
@@ -1302,8 +1345,10 @@ def cdnod(
             in_column_order=resolve_in_column_order(),
             seed=seed,
             _ambiguous=ambiguous,
+            _conflicts=conflicts,
         )
     metadata = {
+        "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),

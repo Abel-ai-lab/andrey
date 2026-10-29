@@ -56,8 +56,7 @@ def test_mmhc_reaches_the_score_optimum_on_gauss_5v():
     x = datagen.generate("gauss_5v")
     out = andrey.mmhc(x)
     assert out.structure.kind == "cpdag"
-    assert markov_equivalent(out.structure, to_cpdag(andrey.exact_search(x).structure))
-    assert out.metadata["restrict"] == "mmpc" and out.metadata["maximize"] == "hc"
+    assert markov_equivalent(out.structure, andrey.exact_search(x).structure)
     assert_recorded_output(out, "MMHC", case="gauss_5v")
 
 
@@ -118,7 +117,7 @@ def test_mmhc_is_rsmax2_with_mmpc_and_hill_climbing():
 def test_rsmax2_reaches_the_score_optimum_on_gauss_5v():
     x = datagen.generate("gauss_5v")
     out = andrey.rsmax2(x, restrict="pc", maximize="tabu")
-    assert markov_equivalent(out.structure, to_cpdag(andrey.exact_search(x).structure))
+    assert markov_equivalent(out.structure, andrey.exact_search(x).structure)
     assert_recorded_output(out, "RSMAX2", case="gauss_5v")
 
 
@@ -182,8 +181,8 @@ def test_rsmax2_with_pc_gives_the_same_graph_on_more_workers():
     [
         ({"restrict": "gs"}, ValueError),
         ({"maximize": "ges"}, ValueError),
-        ({"maximize": "tabu", "score_func": "local_score_cond_gauss"}, ValueError),
-        ({"score_func": "local_score_BDeu"}, ValueError),  # a categorical score with fisherz
+        ({"maximize": "tabu", "score_func": "cond_gauss"}, ValueError),
+        ({"score_func": "bdeu"}, ValueError),  # a categorical score with fisherz
     ],
 )
 def test_rsmax2_rejects_settings_it_does_not_take(setting, error):
@@ -198,8 +197,8 @@ def test_categorical_data_with_the_chi_square_test_and_bdeu():
     a, b = rng.integers(0, 2, (2, 3000))
     c = np.where(rng.random(3000) < 0.85, a + b, rng.integers(0, 3, 3000))
     x = np.column_stack([a, b, c]).astype(float)
-    setting = {"indep_test": "chisq", "score_func": "local_score_BDeu"}
-    assert frozenset((0, 1)) in _adjacent(andrey.hc(x, score_func="local_score_BDeu"))
+    setting = {"indep_test": "chisq", "score_func": "bdeu"}
+    assert frozenset((0, 1)) in _adjacent(andrey.hc(x, score_func="bdeu"))
     assert _adjacent(andrey.mmhc(x, **setting)) == {frozenset((0, 2)), frozenset((1, 2))}
     out = andrey.rsmax2(x, maximize="tabu", **setting)
     assert _edges(out) == {(0, 2, "directed"), (1, 2, "directed")}

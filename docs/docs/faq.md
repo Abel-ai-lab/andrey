@@ -163,19 +163,18 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
-text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
-data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
-and exact search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`;
-all but GFCI pick BDeu by default when every column is categorical. For mixed data, with
-continuous and categorical columns, PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
-exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`; GES, hill climbing, BOSS,
-GRaSP, and exact search pick `"local_score_cond_gauss"` by default when some columns are
-categorical. They infer which columns are categorical unless you name them with `categorical`, and
-warn about what they inferred. The [release cards](benchmarks.md) benchmark them on categorical
-and mixed data against causal-learn, Tetrad, bnlearn, and pgmpy.
-[Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
-how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
+text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, and
+RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI,
+hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
+`score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
+the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
+`score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
+the column types you declare, with `categorical` or a DataFrame's `category` columns: `gsq` and
+`bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
+numbers that you have not declared reads as numbers, with a warning. The
+[release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
+Tetrad, bnlearn, and pgmpy. [Data types](guides/getting-started.md#data-types) explains the
+settings. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 

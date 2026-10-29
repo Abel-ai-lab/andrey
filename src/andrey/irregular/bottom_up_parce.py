@@ -22,6 +22,7 @@ import numpy as np
 from scipy.special import gammainc
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.units import unit_factors
 from andrey.lingam import adjacency
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
@@ -86,7 +87,13 @@ def _fisher_hsic_test(
 
 
 def _residual(X: np.ndarray, cov: np.ndarray, predictors: np.ndarray, target: int) -> np.ndarray:
-    """Least-squares residual of ``target`` on ``predictors``, solved through the covariance."""
+    """Least-squares residual of ``target`` on ``predictors``, solved through the covariance.
+
+    :func:`find_causal_order` passes unit-scale columns (:func:`~andrey.core.units.unit_factors`),
+    so the pseudo-inverse's cutoff, relative to the largest singular value, does not read the
+    predictors' units. The residual is then in the scaled target's units, which the HSIC test, on
+    a median-distance bandwidth, does not read.
+    """
     coef = np.dot(
         np.linalg.pinv(cov[np.ix_(predictors, predictors)]),
         cov[predictors, target].reshape(predictors.shape[0], 1),  # cov symmetric: [pred, target]
@@ -138,11 +145,12 @@ def find_causal_order(
     The returned order is source-first with any order-unknown block (more than one leftover) nested
     as a front sub-list in ``causal_order_``. With ``precedence`` (``precedence[a, b]``: ``a``
     comes before ``b``), a variable is a sink candidate only when no remaining variable must come
-    after it.
+    after it. The residuals are taken on unit-scale columns (:func:`_residual`).
     """
     d = X.shape[1]
     n = X.shape[0]
-    cov = np.cov(X, rowvar=False)
+    unit = X * unit_factors(X)
+    cov = np.cov(unit, rowvar=False)
     col_grams = [gamma_gram(X[:, [j]]) for j in range(d)]  # per-variable HSIC gram, cached once
     ranks = tie_ranks(X).tolist()
     U = np.arange(d)
@@ -154,7 +162,7 @@ def find_causal_order(
             candidates = None
             if precedence is not None:
                 candidates = U[~precedence[np.ix_(U, U)].any(axis=1)]
-            sink, fisher_p = _find_sink(X, cov, U, col_grams, n, ranks, candidates)
+            sink, fisher_p = _find_sink(unit, cov, U, col_grams, n, ranks, candidates)
             if fisher_p < threshold:
                 break
             resolved_sinks.append(sink)
@@ -182,7 +190,10 @@ def _flatten(order: list) -> list[int]:
 
 
 def estimate_adjacency(
-    X: np.ndarray, order: list, forbidden: np.ndarray | None = None
+    X: np.ndarray,
+    order: list,
+    forbidden: np.ndarray | None = None,
+    required: np.ndarray | None = None,
 ) -> np.ndarray:
     """Weighted adjacency ``B`` from a nested causal order: each vertex on its resolved parents.
 
@@ -190,7 +201,10 @@ def estimate_adjacency(
     directed edges and every pair inside it is set to ``NaN`` at both ``B[i, j]`` and ``B[j, i]``.
     Each fit lists its predictors by :func:`~andrey.search.hc.tie_ranks`, so the weights follow the
     columns when they are reordered. ``forbidden[j, i]`` drops predictor ``j`` of ``i``, and a pair
-    of the block forbidden both ways stays ``0``.
+    of the block forbidden both ways stays ``0``. ``required[j, i]`` keeps predictor ``j`` of ``i``
+    unpenalized (:func:`~andrey.lingam.adjacency.predict_with_required`); a required pair inside
+    the block is not ``NaN``: the child takes the least-squares weights of its required parents
+    there.
     """
     d = X.shape[1]
     ranks = tie_ranks(X).tolist()
@@ -200,19 +214,33 @@ def estimate_adjacency(
         predictors = sorted(_flatten(order[:position]), key=ranks.__getitem__)
         if forbidden is not None:
             predictors = [j for j in predictors if not forbidden[j, target]]
-        if not predictors:
-            continue
-        B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
+        forced = [] if required is None else [j for j in predictors if required[j, target]]
+        if forced:
+            free = [j for j in predictors if j not in forced]
+            B[target, forced], B[target, free] = adjacency.predict_with_required(
+                X, forced, free, target
+            )
+        elif predictors:
+            B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
 
     for block in order:
         if isinstance(block, list):
-            for pos in range(len(block)):
-                for other in range(pos + 1, len(block)):
-                    xi, xj = int(block[pos]), int(block[other])
+            members = [int(v) for v in block]
+            for pos in range(len(members)):
+                for other in range(pos + 1, len(members)):
+                    xi, xj = members[pos], members[other]
                     if forbidden is not None and forbidden[xi, xj] and forbidden[xj, xi]:
+                        continue
+                    if required is not None and (required[xi, xj] or required[xj, xi]):
                         continue
                     B[xi, xj] = np.nan
                     B[xj, xi] = np.nan
+            if required is None:
+                continue
+            for child in members:
+                parents = [p for p in members if required[p, child]]
+                if parents:
+                    B[child, parents], _ = adjacency.predict_with_required(X, parents, [], child)
     return B
 
 
@@ -223,9 +251,9 @@ def bottom_up_parce_lingam(
 
     ``alpha`` is the significance level of the bottom-up independence test (Bonferroni-corrected
     across the ``d - 1`` predictors). Returns a :class:`BottomUpParceLiNGAMResult` exposing
-    ``causal_order_`` and ``adjacency_matrix_``. With background knowledge ``constraints`` (no
-    required edges), the order keeps their tiers (:func:`find_causal_order`) and the regressions
-    drop the parents they forbid (:func:`estimate_adjacency`).
+    ``causal_order_`` and ``adjacency_matrix_``. With background knowledge ``constraints``, the
+    order keeps their required edges and tiers (:func:`find_causal_order`), and the regressions
+    drop the parents they forbid and keep the required ones (:func:`estimate_adjacency`).
     """
     X = np.asarray(X, dtype=np.float64)
     X = X - X.mean(axis=0)  # center before both the search and regression
@@ -234,5 +262,5 @@ def bottom_up_parce_lingam(
         B = estimate_adjacency(X, order)
     else:
         order = find_causal_order(X, alpha=alpha, precedence=constraints.precedence())
-        B = estimate_adjacency(X, order, constraints.forbidden)
+        B = estimate_adjacency(X, order, constraints.forbidden, constraints.required)
     return BottomUpParceLiNGAMResult(causal_order_=order, adjacency_matrix_=B)

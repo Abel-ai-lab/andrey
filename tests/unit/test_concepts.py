@@ -8,6 +8,7 @@ removes one fails here until it deletes the record.
 from __future__ import annotations
 
 import functools
+import importlib
 import inspect
 import pathlib
 import re
@@ -22,7 +23,8 @@ from andrey.api import _method as method_wrapper
 from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, Concept
+from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, SCORE_ALIASES, Concept
+from tests.recovery.helpers import datagen
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 #: Public callables outside the registry that a concept may name.
@@ -190,8 +192,8 @@ def inputs(method: str, *, codes: bool) -> list:
 
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
-SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
-AT_CAP = {"calm": {"max_outer": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "warm_iter": 1}}
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
 def fit(method: str, *, codes: bool, **kwargs):
@@ -233,11 +235,254 @@ def non_value_errors(method: str) -> str:
     return ",".join(sorted(raised))
 
 
+#: Each method's data for the units check: the first ``UNIT_ROWS`` rows of a case of
+#: ``tests/recovery/helpers/datagen`` whose model the method fits.
+UNIT_CASES = {
+    **dict.fromkeys(
+        (
+            *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+            *("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+        ),
+        "gauss_5v",
+    ),
+    "direct_lingam": "lingam_5v_uniform",
+    "multi_group_direct_lingam": "mgdl_2groups",
+    "varma_lingam": "varma_3v",
+    "longitudinal_lingam": "panel_4v",
+    "pcmci": "var_3v_lag2",
+    "pcmciplus": "var_4v_stable",
+    "lpcmci": "var_6v_hidden",
+    "granger": "var_4v_stable",
+    "gin": "measurement_chain_9v",
+    "rcd": "confounded_fork_4v",
+    "bottom_up_parce_lingam": "confounded_fork_4v",
+    "anm": "anm_pair_cubic",
+    "pnl": "anm_pair_cubic",
+}
+UNIT_ROWS = 1000
+#: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
+UNIT_EXPONENTS = [np.random.default_rng(seed).integers(-20, 21, size=16) for seed in (9, 22)]
+
+
+def unit_inputs(method: str, exponents: np.ndarray) -> list:
+    """The method's case with variable ``j`` multiplied by ``2**exponents[j]``; a domain index
+    stays as it is."""
+    case = UNIT_CASES[method]
+    factors = np.ldexp(1.0, exponents)
+    args = []
+    for inp in REGISTRY[method].data.inputs:
+        if not inp.required:
+            continue
+        if inp.kind == "panel":
+            groups = datagen.generate_groups(case)
+            args.append([x[:UNIT_ROWS] * factors[: x.shape[1]] for x in groups])
+        elif inp.kind == "matrix":
+            x = datagen.generate(case)[:UNIT_ROWS]
+            args.append(x * factors[: x.shape[1]])
+        else:
+            args.append(datagen.domain_index(case)[:UNIT_ROWS])
+    return args
+
+
+def graphs_and_orders(out) -> list:
+    """The endpoint marks of every graph (each lag, occasion, and group) and every causal order."""
+    if isinstance(out, list):
+        return [graphs_and_orders(o) for o in out]
+    s = out.structure
+    if isinstance(s, andrey.TemporalStructure):
+        graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
+    else:
+        graphs = [s]
+    keys = ("partial_order", "cluster_order", "causal_orders", "unordered")
+    orders = {k: out.metadata.get(k) for k in keys}
+    return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
+
+
+def unit_free(method: str) -> bool:
+    """Whether every graph and order stays the same with each variable in other units."""
+    fits = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
+            out = getattr(andrey, method)(*unit_inputs(method, exponents))
+            fits.append(graphs_and_orders(out))
+    return all(fit == fits[0] for fit in fits[1:])
+
+
+def declared_kind(out, method: str) -> bool:
+    """Whether a fit's graph has the kind its spec declares, ``None`` for a time-series result."""
+    kind = getattr(out.structure, "kind", None)
+    return kind == REGISTRY[method].output.graph_kind
+
+
+#: Settings that bring out the metadata keys a default fit leaves out.
+METADATA_FITS = {
+    **dict.fromkeys(("pc", "fci", "gfci", "cdnod"), {"collider_rule": "majority"}),
+    **dict.fromkeys(("iamb", "inter_iamb", "mmpc"), {"target": "y"}),
+}
+
+
+def declared_metadata(method: str) -> bool:
+    """Whether every key of a default fit, and of a fit with ``METADATA_FITS``, is declared."""
+    outs = [coded_fit(method)[0]]
+    if method in METADATA_FITS:
+        outs.append(fit(method, codes=False, **METADATA_FITS[method])[0])
+    keys = {key for out in outs for key in out.metadata}
+    return keys <= set(REGISTRY[method].output.metadata)
+
+
+def andrey_warnings(method: str) -> bool:
+    """Whether every warning of the coded fit and of the fit stopped at its cap is an
+    ``AndreyWarning``."""
+    caught = list(coded_fit(method)[1])
+    if method in CONCEPTS["cap_warning"].suitable:
+        cap = AT_CAP.get(method, {"max_iter": 1})
+        caught += fit(method, codes=False, **{**SHORT.get(method, {}), **cap})[1]
+    return all(issubclass(category, andrey.AndreyWarning) for category in caught)
+
+
+def typed_frame(kind: str, n: int = N) -> pd.DataFrame:
+    """A chain x -> y -> z of one kind of columns: continuous; all pandas ``category``; or mixed,
+    x a ``category`` and y and z continuous."""
+    rng = np.random.default_rng(5)
+    if kind == "categorical":
+        x = rng.integers(0, 3, n)
+        y = np.where(rng.random(n) < 0.8, x, rng.integers(0, 3, n))
+        z = np.where(rng.random(n) < 0.8, y, rng.integers(0, 3, n))
+        return pd.DataFrame({c: pd.Categorical(v) for c, v in zip("xyz", (x, y, z), strict=True)})
+    table = frame(5, codes=kind == "mixed")
+    if kind == "mixed":
+        table["x"] = pd.Categorical(table["x"].astype(int))
+    return table
+
+
+def args_for(method: str, tables: list[pd.DataFrame]) -> list:
+    """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
+    domain column for CD-NOD."""
+    kinds = (i.kind for i in REGISTRY[method].data.inputs if i.required)
+    domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
+    return [
+        tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
+    ]
+
+
+def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
+    """Record the name of every test and score the fits that follow build, by argument name."""
+    from andrey.temporal import pcmci
+
+    names: dict[str, list[str]] = {"indep_test": [], "score_func": []}
+
+    def spy(table: dict, key: str, argument: str):
+        def build(*args, _factory=table[key], **options):
+            names[argument].append(key)
+            return _factory(*args, **options)
+
+        monkeypatch.setitem(table, key, build)
+
+    for key in list(ci._CI_REGISTRY):
+        spy(ci._CI_REGISTRY, key, "indep_test")
+    for key in list(pcmci.INDEP_TESTS):
+        spy(pcmci.INDEP_TESTS, key, "indep_test")
+    for module in ("ges", "exact", "hc", "boss", "tabu"):
+        engine = importlib.import_module(f"andrey.search.{module}")
+
+        def make_score(score_func, *args, _make=engine.make_score, **options):
+            names["score_func"].append(score_func)
+            return _make(score_func, *args, **options)
+
+        monkeypatch.setattr(engine, "make_score", make_score)
+    return names
+
+
+def used_settings(method: str, table: pd.DataFrame, **kwargs) -> dict[str, tuple[str, set[str]]]:
+    """For each of the method's test and score arguments, the metadata it records and the names
+    the engines built."""
+    with pytest.MonkeyPatch.context() as mp:
+        names = spy_on_builds(mp)
+        warning_policy._warned.clear()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            out = getattr(andrey, method)(*args_for(method, [table] * 3), **kwargs)
+    keys = [k for k in ("indep_test", "score_func") if k in out.metadata]
+    return {k: (out.metadata[k], set(names[k])) for k in keys}
+
+
+def agrees(found: dict[str, tuple[str, set[str]]], wanted: set[str]) -> bool:
+    """Whether the fit recorded each of ``wanted`` and built exactly the name it recorded.
+
+    The linear-Gaussian BIC runs without a build by name in ``gies``, ``xges``, and the continuous
+    fit of ``exact_search``: the record says ``bic``.
+    """
+    if set(found) != wanted:
+        return False
+    for key, (recorded, built_names) in found.items():
+        if built_names:
+            if built_names != {recorded}:
+                return False
+        elif (key, recorded) != ("score_func", "bic"):
+            return False
+    return True
+
+
+def wanted_settings(method: str) -> set[str]:
+    return {k for k in ("indep_test", "score_func") if tagged(CONCEPTS[k], method)}
+
+
+def records_the_test_and_score_it_used(method: str) -> bool:
+    """Whether a default fit on continuous, categorical, and mixed columns records what it built."""
+    return all(
+        agrees(used_settings(method, typed_frame(kind)), wanted_settings(method))
+        for kind in ("continuous", "categorical", "mixed")
+    )
+
+
+#: A required edge, its data, and the settings that make a method fit it: a series or panel
+#: method's link is x -> y at lag 1.
+SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True}}
+
+
+def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
+    """Columns x, y, z of independent noise; with ``kind="flat"``, y is constant after its first
+    row, so every least-squares weight into y is exactly 0 and no test finds a dependence."""
+    table = pd.DataFrame(rng.standard_normal((60, 3)), columns=list("xyz"))
+    if kind == "flat":
+        table["y"] = 0.0
+        table.loc[0, "y"] = 1.0
+    return table
+
+
+def required_edge_is_kept(method: str, kind: str) -> bool:
+    """Whether a fit with the required edge x -> y keeps it on data that do not support it."""
+    spec = REGISTRY[method]
+    series = spec.output.structure_type == "temporal"
+    knowledge = andrey.Knowledge(required=[("x", "y", 1) if series else ("x", "y")])
+    rng = np.random.default_rng(3)
+    tables = [unsupported_data(kind, rng) for _ in range(3)]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out = getattr(andrey, method)(
+            *args_for(method, tables), knowledge=knowledge, **SERIES_SETTINGS.get(method, {})
+        )
+    out = out[0] if isinstance(out, list) else out
+    s = out.structure
+    if not series:
+        return ("x", "y", "directed") in s.oriented_edges()
+    graphs = [s.at(t, 1) for t in s.times] if s.n_times else [s.lag(1)]
+    return all(("x", "y", "directed") in g.oriented_edges() for g in graphs)
+
+
+def keeps_the_required_edge(method: str) -> bool:
+    """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
+    a constant column, on data where its weight is exactly 0."""
+    flat = () if method in PCMCI_FAMILY else ("flat",)
+    return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
     "data": (lambda m: REGISTRY[m].data.inputs[0].name, "data"),
-    "graph_kind": (lambda m: REGISTRY[m].output.graph_kind, None),
+    "graph_kind": (lambda m: declared_kind(coded_fit(m)[0], m), True),
     "algorithm": (lambda m: coded_fit(m)[0].metadata["algorithm"], "{method}"),
     "category_codes": (
         lambda m: "DataTypeWarning" * any(c is andrey.DataTypeWarning for c in coded_fit(m)[1]),
@@ -245,6 +490,11 @@ OBSERVE = {
     ),
     "cap_warning": (stopped_at_cap, "SearchLimitWarning"),
     "invalid_choice": (non_value_errors, ""),
+    "metadata": (declared_metadata, True),
+    "chosen_settings": (records_the_test_and_score_it_used, True),
+    "required_edges": (keeps_the_required_edge, True),
+    "warnings": (andrey_warnings, True),
+    "units": (unit_free, True),
 }
 
 
@@ -337,6 +587,35 @@ def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     for method in CI_SEARCHES:
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
+
+
+def named_setting(method: str, key: str) -> str:
+    """A test or score of ``method`` that the default does not pick on mixed columns."""
+    choices = tagged(CONCEPTS[key], method).choices  # ty: ignore[possibly-missing-attribute]
+    return next((c for c in ("cond_gauss", "degen_gauss", "student_t") if c in choices), choices[0])
+
+
+@pytest.mark.parametrize("method", CONCEPTS["chosen_settings"].suitable)
+def test_a_named_test_or_score_is_the_one_recorded_and_built(method):
+    named = {key: named_setting(method, key) for key in wanted_settings(method)}
+    found = used_settings(method, typed_frame("mixed"), **named)
+    assert agrees(found, set(named))
+    assert {key: recorded for key, (recorded, _) in found.items()} == named
+
+
+def test_a_registered_test_is_recorded_by_its_registered_name(monkeypatch):
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
+    out = andrey.pc(*inputs("pc", codes=False), indep_test="fisherz_copy")
+    assert out.metadata["indep_test"] == "fisherz_copy"
+
+
+@pytest.mark.parametrize(("former", "current"), [("local_score_BIC", "bic")])
+def test_a_former_score_name_is_recorded_as_the_current_one(former, current):
+    assert dict(SCORE_ALIASES)[former] == current
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning):
+        out = andrey.ges(*inputs("ges", codes=False), score_func=former)
+    assert out.metadata["score_func"] == current
 
 
 # --- randomness -----------------------------------------------------------------------------------
@@ -472,6 +751,40 @@ def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
         getattr(andrey, method)(*data, **{arg: 3})  # the message warns once
 
 
+ALIASED = [
+    pytest.param(m, a.name, old, id=f"{m}-{old}")
+    for m, spec in REGISTRY.items()
+    for a in (*spec.data.inputs, *spec.params)
+    for old in a.aliases
+]
+
+
+@pytest.mark.parametrize(("method", "name", "old"), ALIASED)
+def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warning(
+    method, name, old
+):
+    spec = REGISTRY[method]
+    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
+    as_input = argument in spec.data.inputs
+    data = inputs(method, codes=False)
+    settings = dict(SHORT.get(method, {}))
+    value = data[0] if as_input else settings.pop(name, argument.default)
+
+    def call(**named):
+        out = getattr(andrey, method)(*(() if as_input else data), **settings, **named)
+        return [o.structure for o in (out if isinstance(out, list) else [out])]
+
+    expected = call(**{name: value})
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{old} is now {name}"):
+        assert call(**{old: value}) == expected
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        call(**{old: value})  # the message warns once
+    with pytest.raises(ValueError, match=f"pass only {name}"):
+        call(**{old: value, name: value})
+
+
 def renamed(monkeypatch, method: str, name: str, **update) -> None:
     """Give ``method``'s parameter ``name`` the former names or values in ``update``."""
     spec = REGISTRY[method]
@@ -515,6 +828,37 @@ def test_an_indep_test_takes_the_registered_tests(monkeypatch):
 # --- surfaces -------------------------------------------------------------------------------------
 
 
+#: The calls whose category is a variable, keyed by file: ``warn_once`` itself, and the calls that
+#: raise again a warning another call raised (a worker's warnings in the parent process, and the
+#: warnings scikit-learn raises other than its ConvergenceWarning).
+REWARNED = {"resample.py": {"category"}, "warning_policy.py": {"category", "item.category"}}
+
+
+def test_every_warning_the_package_raises_is_an_andrey_warning():
+    """Each ``warnings.warn``, ``warn_explicit``, and ``warn_once`` call names an AndreyWarning
+    subclass as its category, or raises again a warning it caught."""
+    import ast
+
+    package = pathlib.Path(andrey.__file__).parent
+    calls = 0
+    for path in sorted(package.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            func = getattr(node, "func", None)
+            name = getattr(func, "attr", None) or getattr(func, "id", None)
+            if name not in ("warn", "warn_explicit", "warn_once"):
+                continue
+            calls += 1
+            args = [*node.args, *(k.value for k in node.keywords if k.arg == "category")]
+            category = ast.unparse(args[1]) if len(args) > 1 else "UserWarning"
+            if category in REWARNED.get(path.name, ()):
+                continue
+            found = getattr(warning_policy, category.rsplit(".", 1)[-1], None)
+            assert isinstance(found, type) and issubclass(found, andrey.AndreyWarning), (
+                f"{path.name}:{node.lineno} warns {category}"
+            )
+    assert calls > 10
+
+
 def test_documented_method_lists_match_the_table():
     """A paragraph of docs/docs/api.md marked ``% concept: <key>`` names exactly the methods that
     take the concept today, under any name."""
@@ -539,12 +883,48 @@ def test_documented_method_lists_match_the_table():
         assert named == takes, f"{key}: documented {sorted(named)}, table {sorted(takes)}"
 
 
+def test_the_graph_types_guide_lists_each_method_under_its_kind():
+    """The guide's "Which methods return each type?" table names each method under the kind its
+    spec declares, ``TemporalStructure`` for a time-series result."""
+    guide = API_MD.parent / "guides" / "graph-types.md"
+    table = guide.read_text(encoding="utf-8").split("## Which methods return each type?", 1)[1]
+    rows = re.findall(r"^\| `(\w+)` \| (.+) \|$", table.split("\n\n", 2)[1], re.MULTILINE)
+    listed = {kind: set(re.findall(r"`(\w+)`", methods)) for kind, methods in rows}
+    declared: dict[str, set[str]] = {}
+    for name, spec in REGISTRY.items():
+        declared.setdefault(spec.output.graph_kind or "TemporalStructure", set()).add(name)
+    assert listed == declared
+
+
+def test_each_cli_input_flag_names_the_methods_that_take_the_input():
+    """The help of a CLI flag for an input other than ``data`` starts with the methods whose spec
+    has that input, ``<methods> only:``."""
+    import typing
+
+    from andrey import cli
+
+    helps = {}
+    for value in vars(cli).values():
+        if typing.get_origin(value) is typing.Annotated:
+            info = typing.get_args(value)[1]
+            helps[getattr(info, "default", None)] = getattr(info, "help", "") or ""
+    takes: dict[str, list[str]] = {}
+    for name, spec in REGISTRY.items():
+        for inp in spec.data.inputs:
+            if inp.name != "data":
+                takes.setdefault(inp.flag, []).append(name)
+    assert takes
+    for flag, methods in takes.items():
+        assert helps[flag].startswith(f"{', '.join(methods)} only:"), flag
+
+
 def test_schema_carries_bounds_aliases_and_concepts():
     from andrey.spec import help_schema
 
     schema = help_schema()
     for name, spec in REGISTRY.items():
         assert schema["methods"][name]["dropped_args"] == list(spec.dropped_args)
+        assert schema["methods"][name]["output"]["metadata"] == list(spec.output.metadata)
         properties = schema["methods"][name]["params"]["properties"]
         for p in spec.params:
             entry = properties[p.name]

@@ -55,6 +55,7 @@ from andrey.constraint.pc import (
     _undirect_conflicts,
     check_collider_order,
     check_knowledge_cycle,
+    collider_conflicts,
     vote_colliders,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
@@ -86,6 +87,7 @@ def cdnod(
     workers: int | None = None,
     seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
+    _conflicts: set[tuple[int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -115,7 +117,9 @@ def cdnod(
     ``GraphStructure`` tagged ``"cpdag"``: its directions
     include those the index identifies, so it is not an observational CPDAG. The private
     ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
-    ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``.
+    ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``, and the private
+    ``_conflicts`` sink the edges between variables that colliders ask to orient both ways
+    (:func:`~andrey.constraint.pc.collider_conflicts`).
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -213,6 +217,9 @@ def cdnod(
             )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
+    if _conflicts is not None:
+        found = collider_conflicts(skeleton, sepsets, ambiguous)
+        _conflicts.update((a, b) for a, b in found if b < d)
     completed = _undirect_conflicts(
         meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
     )

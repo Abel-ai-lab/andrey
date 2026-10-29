@@ -11,7 +11,7 @@ rule Andrey and Tetrad's adapters read the columns by, then runs:
 - ``pc.stable`` with ``test="mi-cg"``, the conditional Gaussian mutual-information test: Andrey's
   ``indep_test="cond_gauss"`` family, at ``alpha=0.05``. It returns a CPDAG.
 
-bnlearn's ``k`` for the BIC defaults to ``log(n) / 2`` per parameter, Andrey's ``lambda_value=1``
+bnlearn's ``k`` for the BIC defaults to ``log(n) / 2`` per parameter, Andrey's ``penalty_discount=1``
 in deviance units.
 """
 

@@ -95,8 +95,9 @@ def _pairwise_output(
 ) -> StructureOutput:
     """Return a two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
-    Test statistics, when given, decide a p-value tie and go in metadata beside the p-values;
-    ``extra`` adds its entries after them.
+    ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
+    Test statistics, when given, decide a p-value tie and go in ``metadata["statistics"]`` under
+    the same keys; ``extra`` adds its entries after them.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -114,9 +115,17 @@ def _pairwise_output(
         GraphStructure.from_numpy(M, kind="dag"),
         labels=labels,
         metadata={
-            "pval_forward": forward,
-            "pval_backward": backward,
-            **stats,
+            "p_values": {"forward": forward, "backward": backward},
+            **(
+                {
+                    "statistics": {
+                        "forward": stats["stat_forward"],
+                        "backward": stats["stat_backward"],
+                    }
+                }
+                if stats
+                else {}
+            ),
             **(extra or {}),
         },
     )
@@ -202,25 +211,30 @@ def _adapt_rcd(model: Any) -> StructureOutput:
 # ---- BottomUpParceLiNGAM (order-unknown adjacency) ----------------------------------------------
 
 
-def _adapt_bottom_up_parce(model: Any, arrowheads: np.ndarray | None = None) -> StructureOutput:
+def _adapt_bottom_up_parce(
+    model: Any, arrowheads: np.ndarray | None = None, *, required: np.ndarray | None = None
+) -> StructureOutput:
     """BottomUpParceLiNGAM adjacency -> directed edges + circle ``o-o`` at ``NaN`` cells.
 
     A symmetric ``NaN`` block is an order-unknown pair and becomes a circle ``pag`` edge. The
     ``causal_order_`` is nested (order-unknown vars nest as sub-lists) so it cannot be a flat
-    ``ordering`` permutation -- it rides in ``metadata["causal_order"]`` as a JSON-safe nested list.
+    ``ordering`` permutation -- it rides in ``metadata["partial_order"]`` as a JSON-safe nested
+    list.
     ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The unordered
     variables form one block, which also holds the confounded variables' observed ancestors, so an
     ``o-o`` pair need not share a hidden cause, and no ``confounded_pairs`` are listed.
     ``arrowheads[i, j]``, from background knowledge, puts an arrowhead at ``i`` on an ``o-o``
-    pair ``i - j``.
+    pair ``i - j``, and ``required[i, j]`` makes ``i -> j`` an edge even where its weight is ``0``.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")
     if arrowheads is not None:
         M[arrowheads & (M == CIRCLE)] = ARROW
+    if required is not None:
+        M[required], M[required.T] = TAIL, ARROW
     structure = GraphStructure.from_numpy(M, kind="pag")
     metadata: dict[str, Any] = {}
     order = getattr(model, "causal_order_", None)
     if order is not None:
-        metadata["causal_order"] = order  # json_safe (via structure_output) coerces the nesting
+        metadata["partial_order"] = order  # json_safe (via structure_output) coerces the nesting
     return structure_output(structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata)

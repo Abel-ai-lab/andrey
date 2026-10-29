@@ -198,6 +198,11 @@ def test_from_fits_rejects_what_cannot_be_counted(counted):
     other = [graph(2, [directed(0, 1)]), StructureOutput.new(lagged)]
     with pytest.raises(ValueError, match="digraph"):
         BootstrapOutput.from_fits(other)
+    joined = np.array([[0, TAIL], [TAIL, 0]], dtype=np.int8)
+    undirected = StructureOutput.new(GraphStructure.from_numpy(joined, kind="undirected"))
+    with pytest.raises(ValueError, match="undirected"):
+        BootstrapOutput.from_fits([graph(2, [directed(0, 1)]), undirected])
+    assert BootstrapOutput.from_fits([undirected, undirected]).structure.kind == "undirected"
 
 
 def test_the_labels_of_the_fits_name_the_nodes():
@@ -347,7 +352,7 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
     assert out.metadata["block_length"] == 20
     assert out.frequency("->", lag=1).shape == (3, 3)
     assert {row["lag"] for row in out.table()} == {1}
-    default = bootstrap("granger", series(), n_boot=2, seed=0, maxlag=1)
+    default = bootstrap("granger", series(), n_boot=2, seed=0, tau_max=1)
     assert default.metadata["block_length"] == 7  # ceil(300 ** (1 / 3))
     with pytest.raises(ValueError, match="lag is for a time-series result"):
         bootstrap("pc", lingam_data(), n_boot=2).frequency("->", lag=1)

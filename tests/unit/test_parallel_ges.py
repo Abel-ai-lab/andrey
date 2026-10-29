@@ -87,7 +87,7 @@ def _move_sequence(x: np.ndarray, n_chunks: int):
     """
     X = np.asarray(x, dtype=np.float64)
     n = X.shape[1]
-    engine = DeltaBICScore(BICScore(X, lambda_value=1.0))
+    engine = DeltaBICScore(BICScore(X, penalty_discount=1.0))
     seq: list[tuple] = []
     orig_ins, orig_del = pg.ops.apply_insert, pg.ops.apply_delete
 
@@ -130,7 +130,7 @@ def test_objective_is_self_consistent(seed, d, n, p, ebic_gamma):
 
     x = _gaussian_sem(seed, n, d, p)
     struct, total = ges(x, ebic_gamma=ebic_gamma)
-    score = BICScore(np.asarray(x, dtype=np.float64), lambda_value=1.0, ebic_gamma=ebic_gamma)
+    score = BICScore(np.asarray(x, dtype=np.float64), penalty_discount=1.0, ebic_gamma=ebic_gamma)
     dag = pdag2dag(struct.to_numpy())
     independent = float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(d)))
     assert independent == total  # byte-identical: the objective is a pure function of the CPDAG
@@ -143,7 +143,7 @@ def test_ties_are_exercised_by_the_sweep():
     """
     x = _gaussian_sem(0, 600, 10, 0.4)
     n = x.shape[1]
-    score = BICScore(x, lambda_value=1.0)
+    score = BICScore(x, penalty_discount=1.0)
     from andrey.search.ges import _reachable
 
     adj = np.zeros((n, n), dtype=np.int8)
@@ -230,13 +230,13 @@ def test_pool_parity_at_larger_d():
 def test_run_token_guards_pool_reuse():
     """A worker rejects a task with a covariance token different from its initialized token."""
     x = _gaussian_sem(0, 600, 8, 0.4)
-    score = BICScore(x, lambda_value=1.0)
+    score = BICScore(x, penalty_discount=1.0)
     n = x.shape[1]
     wset = pg._create_pool(
         score.cov,
         score.n,
         n,
-        score.lambda_value,
+        score.penalty_discount,
         score.ebic_gamma,
         "token-A",
         workers=2,
@@ -292,10 +292,10 @@ def test_local_score_bic_thread_pinned_is_stable():
     cov = np.cov(rng.standard_normal((500, 300)), rowvar=False)
     parents = list(range(1, 130))
     with threadpool_limits(limits=1):
-        pinned = local_score_bic(cov, 500, 0, parents, lambda_value=1.0)
+        pinned = local_score_bic(cov, 500, 0, parents, penalty_discount=1.0)
     for ambient in (1, 2, 4, 8):
         with threadpool_limits(limits=ambient), threadpool_limits(limits=1):
-            assert local_score_bic(cov, 500, 0, parents, lambda_value=1.0) == pinned
+            assert local_score_bic(cov, 500, 0, parents, penalty_discount=1.0) == pinned
 
 
 def test_ges_result_independent_of_ambient_blas_threads():
@@ -445,7 +445,7 @@ def test_forward_scan_rescores_group_with_mixed_bounds():
     so the group's screening deltas are not exact and the passing sources are scored on their own.
     """
     x = _gaussian_sem(0, 200, 4, 0.5)
-    engine = DeltaBICScore(BICScore(x, lambda_value=1.0))
+    engine = DeltaBICScore(BICScore(x, penalty_discount=1.0))
     scan = pg._ForwardScan([0], engine, 4, None, range(4))
     screening = {1: 1.0, 2: 2.0, 3: 3.0}  # not deltas, so a returned screening value shows
     scan.groups[0] = {(): (0, 0b1110, frozenset({1, 2, 3}), screening, {1: 0.0, 2: 0.5, 3: 0.5})}
@@ -461,7 +461,7 @@ def test_forward_scan_refreshes_a_reach_map_before_the_first_graph():
     """The successor masks start as the empty graph's, one per node, so a reach set kept before
     the first pass meets masks of the same length."""
     x = _gaussian_sem(0, 200, 4, 0.5)
-    scan = pg._ForwardScan([0], DeltaBICScore(BICScore(x, lambda_value=1.0)), 4, None, range(4))
+    scan = pg._ForwardScan([0], DeltaBICScore(BICScore(x, penalty_discount=1.0)), 4, None, range(4))
     assert scan.succ == [0] * 4
     scan.reach[(0, 0)] = 0b1001
     scan._refresh(np.zeros((4, 4), dtype=np.int8))
@@ -531,12 +531,12 @@ def test_forkserver_template_preloads_worker_modules():
 def test_workers_are_live_at_construction(d):
     """Each pool has a live worker before dispatch, including with a large boot payload."""
     x = _gaussian_sem(0, 200, d, 0.3 if d < 10 else 0.02)
-    score = BICScore(x, lambda_value=1.0)
+    score = BICScore(x, penalty_discount=1.0)
     wset = pg._create_pool(
         score.cov,
         score.n,
         d,
-        score.lambda_value,
+        score.penalty_discount,
         score.ebic_gamma,
         "tok",
         workers=3,

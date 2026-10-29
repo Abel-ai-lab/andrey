@@ -16,6 +16,9 @@ taken, and of lowest p-values equal to ``_KEY_DP`` decimals, the one holding the
 column. When none passes, the ordering stops and the remaining clusters stay unordered: the paper
 adds a latent to the order only when the condition holds.
 
+The covariance is taken on standardized columns, so ``omega`` comes from the correlation block and
+does not depend on the columns' units (:func:`_surrogate`).
+
 The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed from
 each column's own data, so every column order of the same data gives the same clusters and order.
 
@@ -34,6 +37,7 @@ from scipy.special import gammaincc
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.output import StructureOutput
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
+from andrey.core.units import unit_factors
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
 
@@ -71,7 +75,9 @@ def _surrogate(data: np.ndarray, cov: np.ndarray, x: list[int], z: list[int]) ->
     """Return the GIN residual surrogate ``data[:, x] @ omega`` for group ``x`` against set ``z``.
 
     ``omega`` is the right singular vector of the smallest singular value of the ``cov[z, x]``
-    block.
+    block. :func:`gin` passes standardized columns (:func:`~andrey.core.units.unit_factors`), so
+    the block is the correlation block and ``omega`` does not depend on the columns' units; the
+    surrogate is the same linear combination of the data's columns in any unit.
     """
     block = cov[np.ix_(z, x)]
     _, _, vh = np.linalg.svd(block)
@@ -227,15 +233,17 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, so it orders its
     groups and members, and breaks its ties, by each column's data rather than its position. The
     sorted data are the same bytes for every column order, so reordering the columns of ``data``
-    relabels the result and changes nothing else, unless two columns are identical.
+    relabels the result and changes nothing else, unless two columns are identical. The surrogates
+    are built from standardized columns (:func:`_surrogate`).
     """
     data = np.asarray(data, dtype=np.float64)
     by_rank = np.argsort(tie_ranks(data))
     ranked = np.ascontiguousarray(data[:, by_rank])
-    cov = np.cov(ranked, rowvar=False)
+    unit = ranked * unit_factors(ranked, standardize=True)
+    cov = np.cov(unit, rowvar=False)
     grams = [gamma_gram(ranked[:, j]) for j in range(ranked.shape[1])]
-    clusters = _find_clusters(ranked, cov, grams, alpha)
-    ordered, unordered = _order_clusters(ranked, cov, grams, clusters, alpha)
+    clusters = _find_clusters(unit, cov, grams, alpha)
+    ordered, unordered = _order_clusters(unit, cov, grams, clusters, alpha)
 
     def columns(groups: list[list[int]]) -> list[list[int]]:
         return [sorted(int(by_rank[i]) for i in group) for group in groups]
@@ -291,9 +299,8 @@ def _structure_from_result(
         marks, kind="dag", labels=all_labels, node_types=node_types
     )
     metadata = {
-        "n_latents": n_latent,
         "clusters": [list(c) for c in result.clusters],
-        "causal_order": [list(c) for c in ordered],
+        "cluster_order": [list(c) for c in ordered],
         "unordered": [list(c) for c in result.unordered],
     }
     return StructureOutput.new(structure, metadata=metadata)

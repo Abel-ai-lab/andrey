@@ -75,7 +75,7 @@ METHODS = ("PC", "GES")
 CAUSAL_LEARN_PARAMETERS = {
     "PC": {"alpha": ALPHA, "indep_test": "fisherz", "stable": True},
     # Andrey's GES caps parents at half the variables, and causal-learn's lambda 0.5 is the same
-    # BIC penalty as Andrey's lambda_value=1.0 at ebic_gamma=0.0, the standard BIC.
+    # BIC penalty as Andrey's penalty_discount=1.0 at ebic_gamma=0.0, the standard BIC.
     "GES": {"score_func": "local_score_BIC", "maxP": len(LABELS) // 2, "lambda_value": 0.5},
 }
 

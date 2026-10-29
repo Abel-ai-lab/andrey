@@ -206,7 +206,7 @@ def test_a_backward_scan_asks_the_cap_before_it_selects_a_delete(
     cause, noise = rng.standard_normal((2, 2000))
     x = np.column_stack([cause, cause + 0.5 * rng.standard_normal(2000), noise])
     adj = _undirected(3, [(0, 1), (0, 2)])  # the edge to the independent column should go
-    engine = DeltaBICScore(BICScore(x, lambda_value=1.0))
+    engine = DeltaBICScore(BICScore(x, penalty_discount=1.0))
     ranks = tie_ranks(x).tolist()
     state = pg.neighborhood_state(adj)
     taken = pg.backward_chunk_best(range(3), adj, engine, 3, state, ranks, cap=3)

@@ -36,9 +36,71 @@ change names its pull request.
 - `ica_lingam` takes `seed` instead of `random_state`, and `direct_lingam` and
   `multi_group_direct_lingam` no longer have the `random_state` they ignored. The old names still
   work, with a `DeprecatedArgumentWarning`, in this release and stop in the next. ([#499])
+- `rcd` takes `max_depth` instead of `max_explanatory_vars`, the package-wide name of the cap on a
+  test's conditioning set; the default stays 2, its paper's setting. The old name still works, with
+  a `DeprecatedArgumentWarning`, in this release and stops in the next. scikit-learn's
+  `ConvergenceWarning` from FastICA in `ica_lingam` and from the LARS path of the LiNGAM methods'
+  adaptive Lasso is raised again as `andrey.SearchLimitWarning`. ([#505])
+- `tau_max` is the largest lag of every lagged method: `granger(maxlag=)` and
+  `longitudinal_lingam(n_lags=)` take `tau_max`, and `granger`'s default lag is 1, as in the other
+  methods, instead of 2; pass `tau_max=2` for the graphs it returned before. The `order=(p, q)` of
+  `varma_lingam` is the ARMA order and keeps its name. The old names still work, with a
+  `DeprecatedArgumentWarning`, in this release and stop in the next. ([#510])
+- The first argument of every method is `data`: `multi_group_direct_lingam(data_groups=)` and
+  `longitudinal_lingam(data_list=)` take `data`, and `andrey run` and `andrey bootstrap` read the
+  datasets of a method that takes several from one repeated `--data` flag. The old keyword names
+  and the `--data-groups` and `--data-list` flags still work in this release and stop in the next.
+  ([#510])
+- Column labels come from a DataFrame's columns for every method: `gin` and `calm` no longer take
+  `labels`, and `andrey run gin` reads the header of the data file. The argument is ignored, with
+  a `DeprecatedArgumentWarning`, in this release and stops in the next; wrap the array in a
+  DataFrame to name its columns. ([#510])
+- `calm` lists its parameters in its signature, with ranges checked in the one shared step, instead
+  of taking `**params`; the names and defaults are the same except that the moral-graph screen's
+  `alpha` is `screen_alpha` and the cap `max_outer` is `max_iter`, as in the other iterative
+  methods. The old names still work, with a `DeprecatedArgumentWarning`, in this release and stop
+  in the next. ([#510])
+- `indep_test=None` and `score_func=None` are the defaults of every method with a test or a score,
+  and pick from the column types you declare, with `categorical` or a DataFrame's `category`,
+  `bool`, or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when
+  some are, else `fisherz` and `bic`. Values never decide: a column of a few whole numbers that you
+  have not declared reads as numbers, where score searches switched to BDeu or the conditional
+  Gaussian score before, and every method that reads columns as numbers warns about such columns
+  with the same `DataTypeWarning`, the LiNGAM, time-series, continuous-optimization, and pairwise
+  methods included. ([#501])
+- `pcmci`, `pcmciplus`, and `lpcmci` default to `indep_test="fisherz"`, the default of every other
+  method with a test; pass `indep_test="student_t"` for the results of before. ([#501])
+- `bottom_up_parce_lingam` defaults to `alpha=0.05`, the level of the method's published
+  experiments (Tashiro et al. 2014), instead of 0.1. ([#501])
+- Renamed, with the former names working for one release behind a `DeprecatedArgumentWarning`:
+  `lambda_value` is `penalty_discount`; the scores are `"bic"`, `"discrete_bic"`, `"bdeu"`,
+  `"cond_gauss"`, and `"degen_gauss"`, and `"local_score_BIC_from_cov"`, a second name of the BIC,
+  maps to `"bic"`; `alpha` is the level that decides the returned edges, so `pcmci`'s
+  `alpha_level`, `pcmciplus`'s and `lpcmci`'s `pc_alpha`, and `rcd`'s `ind_alpha` are `alpha`.
+  ([#501])
+- `exact_search` returns the CPDAG of the optimal equivalence class, as the other score searches
+  do; `metadata["dag"]` keeps the DAG it found. `iamb`, `inter_iamb`, and `mmpc` return the new
+  graph kind `undirected` instead of `cpdag`, with the same edges: their edges claim no direction,
+  and a moral graph's do not even claim adjacency. `andrey.metrics` scores an undirected graph on
+  its skeleton, so its `shd` is the skeleton SHD, and refuses to orient or convert it. ([#509])
+- Metadata keys share one name and shape across methods, and each method's spec lists its keys
+  (`output.metadata` in `andrey --help --json`): `anm` and `pnl` report `p_values` and `statistics`,
+  each with `forward` and `backward`, instead of `pval_forward`, `pval_backward`, `stat_forward`,
+  and `stat_backward`; `bottom_up_parce_lingam` reports `partial_order` and `gin` `cluster_order`
+  instead of `causal_order`; `pcmciplus` lists `conflicts` as `[i, 0, j]` links, the shape
+  `lpcmci`'s take. `n_edges` (`calm`, `notears`, `dagma`), `robust` (`notears`, `dagma`),
+  `restrict` and `maximize` (`mmhc`, `rsmax2`), `n_groups` (`multi_group_direct_lingam`), and
+  `n_latents` (`gin`) are gone: each repeated an argument or a count of the result. ([#509])
 
 ### Added
 
+- `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
+  knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
+  others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
+  `longitudinal_lingam` do; `"pwling"` is the only measure. ([#510])
+- `pc` and `cdnod` report `metadata["conflicts"]`, the edges two colliders ask to orient both ways.
+  `bottom_up_parce_lingam` honors required edges in its `knowledge`, as the other LiNGAM methods
+  do. ([#509])
 - Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
   `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
   or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
@@ -94,12 +156,23 @@ change names its pull request.
   an Intel Core i7-7820X running Linux with 4 workers; a fit with more than one worker warns once
   on it when a pass reaches a tenth of it. `andrey calibrate --method rcot` measures the value for
   your machine, and `andrey calibrate` now measures it with the others. ([#457])
-- `lpcmci` takes `max_depth`, the largest number of neighbors a removal step conditions on beyond
-  the parents of both ends, which also bounds the subsets of the majority vote; unlike the
-  `max_depth` of `pc` and `fci`, it does not count those parents. Its number of tests grows
-  exponentially with the links at one node, so on many strongly related series an uncapped run may
-  not finish; a cap bounds the number of tests. The default, `None`, keeps the uncapped search.
-  ([#468])
+- `lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test
+  takes beyond the default conditions, the parents of both ends, which also bounds the subsets of
+  the majority vote; unlike `max_depth`, it does not count those parents. On `pcmciplus`,
+  `max_depth` caps the lagged phase and `max_p_global` the same-step skeleton and collider phases.
+  Their number of tests grows exponentially with the links at one node, so on many strongly
+  related series an uncapped run may not finish; a cap bounds the number of tests. The default,
+  `None`, keeps the uncapped search. ([#468], [#505])
+- `max_depth`, the maximum conditioning-set size of every conditional-independence test, on every
+  method that grows conditioning sets: `iamb`, `inter_iamb`, and `mmpc`, the restrict phase of
+  `mmhc` and `rsmax2`, and the PC1 step of `pcmci` and `pcmciplus`, as on `pc`, `fci`, `gfci`, and
+  `cdnod`. `max_parents`, a cap on every node's parents in every DAG the result represents, on
+  `hc`, `tabu`, `exact_search`, `boss`, `grasp`, and the score phase of `mmhc` and `rsmax2`, as on
+  `ges`. Both default to `None`, no cap, which returns the graphs these methods returned before.
+  ([#505])
+- `notears`, `dagma`, `calm`, and `varma_lingam` warn once with `andrey.SearchLimitWarning` when
+  they stop on an iteration cap rather than on their own stopping rule, as `hc` and `tabu` do; each
+  docstring names the cap's unit. ([#505])
 - A fit larger than its method was measured to finish warns once per method with
   `andrey.BoundaryWarning`: when the data have more variables (for `anm` and `pnl`, more rows) than
   the most any mean degree finished within the caps of the newest benchmark's boundary lane, at the
@@ -115,6 +188,12 @@ change names its pull request.
   before the fit. ([#492])
 - `andrey.DeprecatedArgumentWarning`, the warning a renamed argument or value gives while its former
   name or value still works, for one release. ([#496])
+- `tabu` takes `categorical`, `max_categories`, and the mixed-data scores `"cond_gauss"` and
+  `"degen_gauss"`; `exact_search` takes `penalty_discount`; `gies` takes `score_func`. ([#501])
+- `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score a fit used, as
+  the current short name, in every method with a test or a score: the one you passed, or, for
+  `None`, the one picked from the declared column types, so a default choice is visible. A
+  registered test is recorded under its registered name. ([#524])
 
 ### Changed
 
@@ -161,6 +240,10 @@ change names its pull request.
 - `ica_lingam`'s **Limitations** paragraph says that its causal order depends on the columns'
   scale, as its authors note, with one measurement on standardized data, and points to
   `direct_lingam`. ([#487])
+- The **Limitations** paragraphs of `notears` and `dagma` say that the `robust=True` fit's graph
+  changes when the columns are rescaled, even by powers of two, and that the penalized
+  likelihood's global minimizers keep their graph under rescaling with a small enough penalty.
+  ([#495])
 - `boss`, `grasp`, and `ica_lingam` record the seed they used in `metadata["seed"]`, as `calm`
   does. ([#496])
 - `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take `seed`,
@@ -168,6 +251,8 @@ change names its pull request.
   numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
   depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
   seed of a fit that uses one of those tests. ([#499])
+- `print(out)` leaves out a metadata entry whose value is an empty list or dict, such as
+  `conflicts: []`; the entry stays in `output.metadata`. ([#509])
 
 ### Fixed
 
@@ -181,6 +266,31 @@ change names its pull request.
   least-squares fit now runs again on the data divided by a power of two, and BIC picks its point
   on the whole path; a fit whose path reached the least-squares fit returns the same values as
   before. ([#478])
+- The LiNGAM methods, `varma_lingam`, and `gin` fit their regressions, covariances, and
+  time-series model on unit-scale columns and map the results back, so the units of the data no
+  longer change their graphs; on standardized data the LiNGAM methods return the same values as
+  before. ([#500])
+- `varma_lingam`'s `max_iter` raises the likelihood fit's evaluation limit with it. The optimizer
+  stopped after 15,000 function evaluations, which each iteration spends at about one per
+  parameter, however large `max_iter` was and without a warning, so raising `max_iter` could not
+  make a long fit converge. The limit is now 150 evaluations per iteration, the same 15,000 at the
+  default `max_iter=100`, and a fit that ends on it without converging warns with
+  `andrey.SearchLimitWarning` like one that ends on `max_iter`. Fits at the default `max_iter`
+  return the same values as before. ([#505])
+- `notears(robust=True)` and `dagma(robust=True)` floor each residual variance of the likelihood at
+  `1e-12` of its column's variance instead of `1e-12` of the mean column variance, which could
+  exceed the whole variance of a column in much smaller units than the others. On standardized
+  data the fits return the same values as before. ([#517])
+- Naming `indep_test="cond_gauss"` or `"degen_gauss"`, or the same scores, on a DataFrame with a
+  pandas `category`, `bool`, or text column no longer raises a `DataTypeWarning` that the column
+  was inferred as categorical: its type declares it. The warning stays for columns without such a
+  type that hold at most `max_categories` distinct whole numbers, and names only those. ([#524])
+- Every method that takes `required` keeps each required edge in its output. `granger` and
+  `varma_lingam(prune=True)` left out a required lagged link whose least-squares weight came out
+  exactly 0, such as a link into a series that does not vary over the fitted rows; the link is now
+  in the graph with its weight 0, as `direct_lingam` and `multi_group_direct_lingam` already kept
+  theirs. `longitudinal_lingam` builds its graph the same way. Fits without a zero weight on a
+  required link return the same graphs as before. ([#524])
 
 ## [0.10.0] - 2026-10-27
 
@@ -960,5 +1070,13 @@ First alpha release.
 [#485]: https://github.com/Abel-ai-lab/andrey/pull/485
 [#487]: https://github.com/Abel-ai-lab/andrey/pull/487
 [#492]: https://github.com/Abel-ai-lab/andrey/pull/492
+[#495]: https://github.com/Abel-ai-lab/andrey/pull/495
 [#496]: https://github.com/Abel-ai-lab/andrey/pull/496
 [#499]: https://github.com/Abel-ai-lab/andrey/pull/499
+[#500]: https://github.com/Abel-ai-lab/andrey/pull/500
+[#501]: https://github.com/Abel-ai-lab/andrey/pull/501
+[#505]: https://github.com/Abel-ai-lab/andrey/pull/505
+[#509]: https://github.com/Abel-ai-lab/andrey/pull/509
+[#510]: https://github.com/Abel-ai-lab/andrey/pull/510
+[#517]: https://github.com/Abel-ai-lab/andrey/pull/517
+[#524]: https://github.com/Abel-ai-lab/andrey/pull/524

@@ -16,6 +16,7 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
+    default_test,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -41,14 +42,16 @@ def _fit(
     *,
     target: str | int | None,
     alpha: float,
-    indep_test: str,
+    indep_test: str | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
     seed: int | None,
+    max_depth: int | None,
 ) -> StructureOutput:
     """Check the settings, run the search, and wrap its sets as undirected edges."""
     from andrey.search.hybrid import local_graph, local_set
 
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
         data,
         categorical,
@@ -61,7 +64,13 @@ def _fit(
     labels = column_labels(data)
     d = X.shape[1]
     t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
-    settings = {"alpha": alpha, "indep_test": indep_test, "categorical": mask, "seed": seed}
+    settings = {
+        "alpha": alpha,
+        "indep_test": indep_test,
+        "categorical": mask,
+        "seed": seed,
+        "max_depth": max_depth,
+    }
     metadata: dict[str, object] = {}
     with copies_named(labels), rows_tested() as rows:
         if t is None:
@@ -74,7 +83,9 @@ def _fit(
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
     marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
     metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
-    return structure_output(to_structure(marks, kind="cpdag"), labels=labels, metadata=metadata)
+    return structure_output(
+        to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
+    )
 
 
 @method_spec("iamb")
@@ -83,10 +94,11 @@ def iamb(
     *,
     target: str | int | None = None,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with incremental association (IAMB).
 
@@ -105,10 +117,13 @@ def iamb(
         the other's set.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
-    indep_test : str, default="fisherz"
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or
-        ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
+        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
+        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -120,11 +135,17 @@ def iamb(
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
         variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
         seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. Every test
+        conditions on the whole current blanket, so the blanket stops growing once it holds more
+        than ``max_depth`` members.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -224,6 +245,7 @@ def iamb(
         categorical=categorical,
         max_categories=max_categories,
         seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -233,10 +255,11 @@ def inter_iamb(
     *,
     target: str | int | None = None,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with interleaved IAMB (Inter-IAMB).
 
@@ -254,10 +277,13 @@ def inter_iamb(
         the other's set.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
-    indep_test : str, default="fisherz"
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or
-        ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
+        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
+        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -269,11 +295,17 @@ def inter_iamb(
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
         variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
         seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. Every test
+        conditions on the whole current blanket, so the blanket stops growing once it holds more
+        than ``max_depth`` members.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -373,6 +405,7 @@ def inter_iamb(
         categorical=categorical,
         max_categories=max_categories,
         seed=seed,
+        max_depth=max_depth,
     )
 
 
@@ -382,10 +415,11 @@ def mmpc(
     *,
     target: str | int | None = None,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
+    indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
+    max_depth: int | None = None,
 ) -> StructureOutput:
     """Learn a variable's parents and children with max-min parents and children (MMPC).
 
@@ -404,10 +438,13 @@ def mmpc(
         the other's set.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
-    indep_test : str, default="fisherz"
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or
-        ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+    indep_test : str or None, default=None
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
+        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
+        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -419,11 +456,16 @@ def mmpc(
         ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
         variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
         seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep variables that a larger conditioning set would remove. A test
+        conditions on a subset of the current set; the set itself may grow larger.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each of its parents and children; without, they
         form the skeleton: each pair in each other's set. ``metadata["algorithm"]`` is ``"mmpc"``;
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``
@@ -527,4 +569,5 @@ def mmpc(
         categorical=categorical,
         max_categories=max_categories,
         seed=seed,
+        max_depth=max_depth,
     )

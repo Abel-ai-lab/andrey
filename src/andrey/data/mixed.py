@@ -6,8 +6,8 @@ categorical variable has a conditional probability table, one Dirichlet-distribu
 configuration of its parents, as in :func:`~andrey.data.sample_discrete`. A continuous variable is a
 linear function of its continuous parents, plus a shift for each categorical parent's category, plus
 standard Gaussian noise. The data are the input of the mixed-data tests and scores
-(``indep_test="degen_gauss"`` or ``"cond_gauss"``, ``score_func="local_score_degen_gauss"`` or
-``"local_score_cond_gauss"``).
+(``indep_test="degen_gauss"`` or ``"cond_gauss"``, ``score_func="degen_gauss"`` or
+``"cond_gauss"``).
 
 As in :mod:`andrey.data.scm`, the graph, the parameters, and the samples each come from their own
 stream of the seed, so a change to one leaves the others' draws unchanged.

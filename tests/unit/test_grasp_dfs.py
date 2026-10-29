@@ -61,7 +61,7 @@ def test_every_tuck_is_on_an_edge_and_the_last_pass_tries_every_edge(
     monkeypatch.setattr(grasp_mod._Order, "__init__", capture_order)
     monkeypatch.setattr(grasp_mod, "_dfs", dfs)
     monkeypatch.setattr(grasp_mod, "_tuck", tuck)
-    grasp_mod.grasp(_sample(), lambda_value=1.0, random_state=0)
+    grasp_mod.grasp(_sample(), penalty_discount=1.0, random_state=0)
 
     (order,) = orders
     edges = sorted((x, y) for y in order.order for x in order.get_parents(y))
@@ -114,6 +114,6 @@ def test_a_tie_extends_the_chain_to_each_new_dag_and_never_to_one_in_it(
     monkeypatch.setattr(grasp_mod, "_dfs", dfs)
     monkeypatch.setattr(grasp_mod, "_update", update)
     monkeypatch.setattr(grasp_mod, "_restore", restore)
-    grasp_mod.grasp(_sample(), lambda_value=1.0, random_state=0)
+    grasp_mod.grasp(_sample(), penalty_discount=1.0, random_state=0)
 
     assert extended[0] > 5

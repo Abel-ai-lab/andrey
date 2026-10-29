@@ -218,8 +218,11 @@ uv run --group docs python scripts/execute_notebooks.py
 
 The docs workflow reruns every notebook with `--check` and fails when a cell fails or an output
 differs from the stored one; a decimal number may move by one in its last digit, as Linux and macOS
-round a few results apart. The speed notebook is never run and ships without outputs. The CALM
-notebook needs torch, which the workflow does not install, so the workflow never runs it either; its
+round a few results apart. A code cell whose output depends on the CPU, as a method's Limitations
+say, carries the cell tag `output-varies-by-cpu`: the check still runs it and still fails when it
+raises, but does not compare its output. Such a cell holds only the output that varies, and its
+text says why. The speed notebook is never run and ships without outputs. The CALM notebook
+needs torch, which the workflow does not install, so the workflow never runs it either; its
 stored outputs come from a local run with the `torch` extra, for example in
 `uv run --extra torch --with jupyter jupyter lab`. Run the notebooks locally with
 `uv run --with jupyter jupyter lab`. Notebook dependencies stay out of `pyproject.toml`: each

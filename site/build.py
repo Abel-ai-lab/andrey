@@ -1164,18 +1164,27 @@ TEMPORAL_CAPTIONS = (
         "every arrow over time points forward.",
     ),
 )
-# Every kind a method returns as a GraphStructure (andrey.core.structure.Kind), in the homepage's
-# words, then the graphs over time a TemporalStructure holds. A MAG comes from a conversion,
-# GraphStructure.to_mag, never from a method.
+# Every kind a supported method returns as a GraphStructure (andrey.core.structure.Kind), in the
+# homepage's words, then the graphs over time a TemporalStructure holds. A MAG comes from a
+# conversion, GraphStructure.to_mag, never from a method. The homepage shows supported methods only,
+# so a kind that only experimental methods return is not on it.
 GRAPH_KINDS = {"dag": "DAGs", "cpdag": "CPDAGs", "pag": "PAGs", "digraph": "cyclic graphs"}
 CONVERSION_KINDS = {"mag"}
 TEMPORAL_KIND = "graphs over time"
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 
 
+def experimental_kinds() -> set[str]:
+    """The graph kinds that only experimental methods return."""
+    specs = list_specs()
+    supported = {spec.output.graph_kind for spec in specs if spec.status == "supported"}
+    return {spec.output.graph_kind for spec in specs if spec.status == "experimental"} - supported
+
+
 def graph_kinds() -> list[str]:
-    """Every kind of causal graph the package returns, in the homepage's words."""
-    kinds = [kind for kind in get_args(Kind) if kind not in CONVERSION_KINDS]
+    """Every kind of causal graph the supported methods return, in the homepage's words."""
+    skipped = CONVERSION_KINDS | experimental_kinds()
+    kinds = [kind for kind in get_args(Kind) if kind not in skipped]
     if set(kinds) != GRAPH_KINDS.keys():
         raise ValueError(f"name every graph kind in GRAPH_KINDS: {sorted(kinds)}")
     return [GRAPH_KINDS[kind] for kind in kinds] + [TEMPORAL_KIND]

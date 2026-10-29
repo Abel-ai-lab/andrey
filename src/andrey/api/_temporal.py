@@ -27,7 +27,9 @@ if TYPE_CHECKING:
     from andrey.temporal.pcmciplus import PCMCIPlusResult
 
 
-def _lag_graphs(ar_stack: np.ndarray, *, instantaneous: bool) -> tuple[GraphStructure, ...]:
+def _lag_graphs(
+    ar_stack: np.ndarray, *, instantaneous: bool, required: np.ndarray | None = None
+) -> tuple[GraphStructure, ...]:
     """One derived :class:`GraphStructure` per lag from an AR coefficient stack.
 
     ``ar_stack`` has shape ``(n_lags, n, n)`` with ``block[i, j] != 0`` meaning an edge ``j -> i``.
@@ -35,12 +37,19 @@ def _lag_graphs(ar_stack: np.ndarray, *, instantaneous: bool) -> tuple[GraphStru
     is a self-loop-free DAG (``kind="dag"``); every lag>=1 keeps its autoregressive self-loop
     ``X(t-k) -> X(t)`` as ``M[i][i]=ARROW`` and is tagged ``kind="digraph"`` (a directed graph
     allowing 2-cycles and self-loops), so a both-directions lag pair reads as a 2-cycle, not a PAG.
+
+    ``required[k, j, i]`` marks a link ``j -> i`` the knowledge requires, in the stack's lag order,
+    with at least ``n_lags`` leading blocks: the view has it even where its estimated weight is
+    ``0``. A block of ``NaN`` has no link.
     """
     graphs: list[GraphStructure] = []
     for k in range(ar_stack.shape[0]):
         contemporaneous = instantaneous and k == 0
         allow_self_loops = not contemporaneous  # lag>=1 keeps autoregressive self-loops
-        marks = directed_marks(ar_stack[k], allow_self_loops=allow_self_loops)
+        block = ar_stack[k]
+        if required is not None:
+            block = (np.isfinite(block) & (block != 0)) | (required[k].T & ~np.isnan(block))
+        marks = directed_marks(block, allow_self_loops=allow_self_loops)
         kind = "dag" if contemporaneous else "digraph"
         graphs.append(
             GraphStructure.from_numpy(marks, kind=kind, allow_self_loops=allow_self_loops)
@@ -63,27 +72,27 @@ def _adapt_var_lingam(model: Any) -> StructureOutput:
     return structure_output(temporal, ordering=order)
 
 
-def _adapt_varma_lingam(model: Any) -> StructureOutput:
+def _adapt_varma_lingam(model: Any, required: np.ndarray | None = None) -> StructureOutput:
     """VARMALiNGAM fitted model -> ``StructureOutput`` over a :class:`TemporalStructure`.
 
     ``model.adjacency_matrices_`` is a ``(psis, omegas)`` tuple: ``psis`` (shape ``(1 + p, n, n)``,
     index 0 instantaneous) is the autoregressive stack and ``omegas`` (shape ``(q, n, n)``, no
-    instantaneous entry) is the moving-average stack. The lag topology derives from ``psis`` only;
-    ``psis`` is stored as ``lag_weights`` and ``omegas`` as ``lag_weights_ma``. Ordering is the
-    causal order.
+    instantaneous entry) is the moving-average stack. The lag topology derives from ``psis`` only,
+    with each link in ``required`` (:func:`_lag_graphs`); ``psis`` is stored as ``lag_weights`` and
+    ``omegas`` as ``lag_weights_ma``. Ordering is the causal order.
     """
     psis_raw, omegas_raw = getattr(model, "adjacency_matrices_")
     psis = np.asarray(psis_raw, dtype=np.float64)
     omegas = np.asarray(omegas_raw, dtype=np.float64)
     order = getattr(model, "causal_order_")
-    graphs = _lag_graphs(psis, instantaneous=True)
+    graphs = _lag_graphs(psis, instantaneous=True, required=required)
     temporal = TemporalStructure.from_lag_graphs(
         graphs, lag_weights=psis.transpose(0, 2, 1), lag_weights_ma=omegas.transpose(0, 2, 1)
     )
     return structure_output(temporal, ordering=order)
 
 
-def _adapt_longitudinal_lingam(model: Any) -> StructureOutput:
+def _adapt_longitudinal_lingam(model: Any, required: np.ndarray | None = None) -> StructureOutput:
     """LongitudinalLiNGAM fitted model -> ``StructureOutput`` over a :class:`TemporalStructure`.
 
     ``model.adjacency_matrices_`` has shape ``(T, 1 + n_lags, n, n)``: entry ``[t, 0]`` is the
@@ -96,7 +105,8 @@ def _adapt_longitudinal_lingam(model: Any) -> StructureOutput:
     explicit ``times``, and their coefficient blocks ride in ``time_weights``, ``NaN`` kept.
     The lag-only surface projects the final occasion, the same ``(1 + n_lags, n, n)`` view a vector
     autoregression exposes. The per-time causal orders ride in ``metadata`` (they need not agree
-    across time, so there is no single envelope ``ordering``).
+    across time, so there is no single envelope ``ordering``). Each link in ``required`` is in every
+    occasion's graph that can hold it (:func:`_lag_graphs`).
     """
     adjacency = np.asarray(getattr(model, "adjacency_matrices_"), dtype=np.float64).copy()
     # A lag-k block reaching before the panel start (block k > occasion t) is uncomputable. Andrey's
@@ -105,7 +115,7 @@ def _adapt_longitudinal_lingam(model: Any) -> StructureOutput:
     for t in range(adjacency.shape[0]):
         adjacency[t, t + 1 :] = np.nan
     times = range(1, adjacency.shape[0])  # occasion 0 is all-NaN (the fit starts at t=1)
-    grid = tuple(_lag_graphs(adjacency[t], instantaneous=True) for t in times)
+    grid = tuple(_lag_graphs(adjacency[t], instantaneous=True, required=required) for t in times)
     temporal = TemporalStructure.from_time_lag_graphs(
         grid, times=times, time_weights=adjacency[1:].transpose(0, 1, 3, 2)
     )
@@ -116,14 +126,17 @@ def _adapt_longitudinal_lingam(model: Any) -> StructureOutput:
     return structure_output(temporal, metadata=metadata)
 
 
-def _adapt_granger(coeff: np.ndarray, n_vars: int, maxlag: int) -> StructureOutput:
+def _adapt_granger(
+    coeff: np.ndarray, n_vars: int, maxlag: int, required: np.ndarray | None = None
+) -> StructureOutput:
     """Granger-lasso coefficients -> ``StructureOutput`` over a :class:`TemporalStructure`.
 
     ``coeff`` has shape ``(d, d * maxlag)``; the lag-``k`` block (``k`` in ``1..maxlag``) is
     ``coeff[:, d * (k - 1) : d * k]`` with ``block[i, j]`` the influence ``j -> i`` at lag ``k``.
     Granger has no lag-0 (contemporaneous) block and no causal order, so every lag view is tagged
     ``kind="digraph"`` and the envelope carries no ``ordering``. The re-stacked coefficients are
-    stored as ``lag_weights`` (shape ``(maxlag, d, d)``), so ``n_lags == maxlag``.
+    stored as ``lag_weights`` (shape ``(maxlag, d, d)``), so ``n_lags == maxlag``. ``required``
+    holds the required links of lags ``1`` to ``maxlag`` (:func:`_lag_graphs`).
     """
     coeff = np.asarray(coeff, dtype=np.float64)
     d = int(n_vars)
@@ -133,7 +146,7 @@ def _adapt_granger(coeff: np.ndarray, n_vars: int, maxlag: int) -> StructureOutp
             f"maxlag={maxlag}, got {coeff.shape}"
         )
     ar = np.stack([coeff[:, d * k : d * (k + 1)] for k in range(maxlag)])
-    graphs = _lag_graphs(ar, instantaneous=False)
+    graphs = _lag_graphs(ar, instantaneous=False, required=required)
     temporal = TemporalStructure.from_lag_graphs(
         graphs, lags=list(range(1, maxlag + 1)), lag_weights=ar.transpose(0, 2, 1)
     )
@@ -167,7 +180,8 @@ def _adapt_pcmciplus(
     """PCMCI+ result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
 
     Lag 0 is a ``cpdag`` built from ``result.marks``; a conflict (an arrowhead at both ends) has no
-    mark of its own, so it becomes an undirected link and is listed in ``metadata["conflicts"]``.
+    mark of its own, so it becomes an undirected link and is listed in ``metadata["conflicts"]`` as
+    an ``[i, 0, j]`` link, the shape LPCMCI's lagged conflicts take.
     ``result.adjacency[k, i, j]``, ``k >= 1``, marks the link ``i -> j`` at lag ``k`` (row =
     cause), transposed for :func:`_lag_graphs`. The p-values and statistics ride in ``metadata`` in
     the result's ``[lag, cause, effect]`` layout.
@@ -184,7 +198,7 @@ def _adapt_pcmciplus(
         "p_values": result.p_values,
         "statistics": result.statistics,
         "parents": [[list(link) for link in links] for links in result.parents],
-        "conflicts": [list(pair) for pair in result.conflicts],
+        "conflicts": [[i, 0, j] for i, j in result.conflicts],
         "ambiguous_triples": [list(triple) for triple in result.ambiguous_triples],
         **(extra or {}),
     }

@@ -67,17 +67,17 @@ def _collinear_sem(seed: int, n: int, d: int, p: float, k: int, noise: float) ->
 def _random_collinear_case(seed: int) -> tuple[np.ndarray, int | None, float]:
     """Near-collinear data with size, density, ``max_parents``, penalty, and noise from ``seed``.
 
-    Returns the data, ``max_parents``, and ``lambda_value``.
+    Returns the data, ``max_parents``, and ``penalty_discount``.
     """
     rng = np.random.default_rng(seed)
     d = int(rng.integers(5, 26))
     n = int(rng.choice([25, 50, 100, 300]))
     p = float(rng.uniform(0.05, 0.9))
     max_p = rng.choice([None, 1, 2, 3, 6], p=[0.5, 0.1, 0.15, 0.15, 0.1])
-    lambda_value = float(rng.choice([0.5, 1.0, 2.0]))
+    penalty_discount = float(rng.choice([0.5, 1.0, 2.0]))
     noise = float(10.0 ** rng.uniform(-8, -2))
     x = _collinear_sem(seed, n, d, p, max(1, d // 5), noise)
-    return x, None if max_p is None else int(max_p), lambda_value
+    return x, None if max_p is None else int(max_p), penalty_discount
 
 
 def _run(
@@ -86,7 +86,7 @@ def _run(
     prune: bool = True,
     max_parents: float | None,
     parent_rule: str = "cap",
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
     full_rescan: bool = False,
     local_reform: bool = True,
     constraints: Constraints | None = None,
@@ -135,7 +135,7 @@ def _run(
         with backend.config(num_workers=1):
             struct, score = ges(
                 x,
-                lambda_value=lambda_value,
+                penalty_discount=penalty_discount,
                 max_parents=max_parents,
                 constraints=constraints,
                 _parent_rule=parent_rule,
@@ -147,7 +147,7 @@ def _run(
 # sparse rows reach 100 nodes. The full rescan costs about one scan of every target per accepted
 # move, so the largest rows take a heavier penalty, which keeps chance edges and moves few.
 _SCAN_GRID = [
-    # (seed, d, n, p, lambda_value)
+    # (seed, d, n, p, penalty_discount)
     (0, 8, 80, 0.60, 1.0),
     (1, 8, 200, 0.80, 1.0),
     (0, 15, 300, 0.40, 1.0),
@@ -158,29 +158,33 @@ _SCAN_GRID = [
 
 
 def _assert_kept_matches_full(
-    x: np.ndarray, max_parents: float | None, lambda_value: float, label: str
+    x: np.ndarray, max_parents: float | None, penalty_discount: float, label: str
 ) -> None:
     """The kept scan and the full rescan apply the same moves and return one CPDAG and score."""
     kept_moves: list[tuple] = []
     full_moves: list[tuple] = []
     kept_adj, kept_score = _run(
-        x, max_parents=max_parents, lambda_value=lambda_value, moves=kept_moves
+        x, max_parents=max_parents, penalty_discount=penalty_discount, moves=kept_moves
     )
     full_adj, full_score = _run(
-        x, max_parents=max_parents, lambda_value=lambda_value, full_rescan=True, moves=full_moves
+        x,
+        max_parents=max_parents,
+        penalty_discount=penalty_discount,
+        full_rescan=True,
+        moves=full_moves,
     )
     assert kept_moves == full_moves, f"move sequences differ at {label}"
     assert np.array_equal(kept_adj, full_adj)
     assert kept_score.hex() == full_score.hex()
 
 
-@pytest.mark.parametrize("seed,d,n,p,lambda_value", _SCAN_GRID)
+@pytest.mark.parametrize("seed,d,n,p,penalty_discount", _SCAN_GRID)
 def test_kept_scan_matches_full_rescan(
-    seed: int, d: int, n: int, p: float, lambda_value: float
+    seed: int, d: int, n: int, p: float, penalty_discount: float
 ) -> None:
     """The kept forward scan applies the full rescan's moves and returns its CPDAG and score."""
     x = _gaussian_sem(seed, n, d, p)
-    _assert_kept_matches_full(x, None, lambda_value, f"seed={seed}, d={d}")
+    _assert_kept_matches_full(x, None, penalty_discount, f"seed={seed}, d={d}")
 
 
 def _valid_moves(adj: np.ndarray) -> list[tuple[str, int, int, tuple[int, ...]]]:
@@ -257,9 +261,9 @@ def test_cpdag_rewrite_declines_a_region_past_its_limit() -> None:
     assert _cpdag_of_pdag_near(adj, [0], 5) is adj
 
 
-@pytest.mark.parametrize("seed,d,n,p,lambda_value", [_SCAN_GRID[2], _SCAN_GRID[4]])
+@pytest.mark.parametrize("seed,d,n,p,penalty_discount", [_SCAN_GRID[2], _SCAN_GRID[4]])
 def test_local_reform_matches_full_rebuild(
-    seed: int, d: int, n: int, p: float, lambda_value: float, monkeypatch: pytest.MonkeyPatch
+    seed: int, d: int, n: int, p: float, penalty_discount: float, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """GES applies the same moves and returns the same CPDAG and score when each move rewrites
     only the nodes it can reach as when each move rebuilds the whole CPDAG."""
@@ -268,10 +272,10 @@ def test_local_reform_matches_full_rebuild(
     local_moves: list[tuple] = []
     full_moves: list[tuple] = []
     local_adj, local_score = _run(
-        x, max_parents=None, lambda_value=lambda_value, local_reform=True, moves=local_moves
+        x, max_parents=None, penalty_discount=penalty_discount, local_reform=True, moves=local_moves
     )
     full_adj, full_score = _run(
-        x, max_parents=None, lambda_value=lambda_value, local_reform=False, moves=full_moves
+        x, max_parents=None, penalty_discount=penalty_discount, local_reform=False, moves=full_moves
     )
     assert local_moves == full_moves
     assert np.array_equal(local_adj, full_adj)
@@ -317,7 +321,7 @@ def test_kept_scan_matches_full_rescan_on_random_collinear_data(
     """The kept scan matches the full rescan, move by move, on random near-collinear data."""
     from andrey.core.score_delta import DeltaBICScore
 
-    x, max_p, lambda_value = _random_collinear_case(seed)
+    x, max_p, penalty_discount = _random_collinear_case(seed)
     batch = DeltaBICScore.delta_many_with_base
     infinite_bounds = 0
 
@@ -328,11 +332,11 @@ def test_kept_scan_matches_full_rescan_on_random_collinear_data(
         return out
 
     monkeypatch.setattr(DeltaBICScore, "delta_many_with_base", counted)
-    _assert_kept_matches_full(x, max_p, lambda_value, f"seed={seed}")
+    _assert_kept_matches_full(x, max_p, penalty_discount, f"seed={seed}")
     assert infinite_bounds, "no update could cancel"
     if max_p is not None:
-        capped, _ = _run(x, max_parents=max_p, lambda_value=lambda_value)
-        uncapped, _ = _run(x, max_parents=None, lambda_value=lambda_value)
+        capped, _ = _run(x, max_parents=max_p, penalty_discount=penalty_discount)
+        uncapped, _ = _run(x, max_parents=None, penalty_discount=penalty_discount)
         assert not np.array_equal(capped, uncapped), "max_parents does not change the graph"
 
 

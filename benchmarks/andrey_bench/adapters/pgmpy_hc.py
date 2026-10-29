@@ -14,7 +14,7 @@ score:
   far below the gain of any real move.
 
 ``score_func="local_score_BIC_categorical"`` is pgmpy's ``BIC``, the multinomial BIC with penalty
-``log(n) / 2`` per parameter, Andrey's score at ``lambda_value=1``: Andrey's scores are ``-2`` times
+``log(n) / 2`` per parameter, Andrey's score at ``penalty_discount=1``: Andrey's scores are ``-2`` times
 pgmpy's. pgmpy's penalty has no weight, so any other ``lambda_value`` is refused.
 
 ``score_func="local_score_BDeu"`` is pgmpy's ``BDeu`` with ``equivalent_sample_size=1``, where its

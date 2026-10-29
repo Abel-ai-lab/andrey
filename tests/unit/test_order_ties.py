@@ -159,7 +159,7 @@ def test_pcmciplus_ties() -> None:
     _assert_lag_one_tie(x)
 
     def fit(data: np.ndarray) -> np.ndarray:
-        graph = andrey.pcmciplus(data, tau_max=2, pc_alpha=0.2).structure
+        graph = andrey.pcmciplus(data, tau_max=2, alpha=0.2).structure
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
     _assert_order_free(fit, x)
@@ -190,7 +190,7 @@ def test_lpcmci_ties() -> None:
     _assert_lag_one_tie(x)
 
     def fit(data: np.ndarray) -> np.ndarray:
-        graph = andrey.lpcmci(data, tau_max=2, pc_alpha=0.2).structure
+        graph = andrey.lpcmci(data, tau_max=2, alpha=0.2).structure
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
     _assert_order_free(fit, x)
@@ -218,7 +218,7 @@ def test_bottom_up_parce_lingam_ties() -> None:
     assert round(stats[0], _KEY_DP) == round(stats[1], _KEY_DP)
 
     def order(data: np.ndarray, columns: np.ndarray) -> list[int]:
-        found = andrey.bottom_up_parce_lingam(data[:, columns]).metadata["causal_order"]
+        found = andrey.bottom_up_parce_lingam(data[:, columns]).metadata["partial_order"]
         return [int(columns[v]) for v in found]
 
     orders = [np.array(columns) for columns in permutations(range(3))]
@@ -318,7 +318,7 @@ def test_bottom_up_parce_lingam_weights() -> None:
     x = np.empty((600, 3))
     x[0::2], x[1::2] = z, z[:, [1, 0, 2]]
     out = andrey.bottom_up_parce_lingam(x)
-    assert out.metadata["causal_order"] == [[0, 1], 2]
+    assert out.metadata["partial_order"] == [[0, 1], 2]
     want = out.structure.to_numpy()
     for order in permutations(range(3)):
         found = _mapped(
@@ -338,7 +338,7 @@ def test_calm_fit_order() -> None:
     z[:, 3] += z[:, 0] - z[:, 2]
 
     def fit(data: np.ndarray) -> np.ndarray:
-        return andrey.calm(data, seed=0, max_outer=4, subproblem_iter=300).structure.to_numpy()
+        return andrey.calm(data, seed=0, max_iter=4, subproblem_iter=300).structure.to_numpy()
 
     want = fit(z)
     for order in ([3, 2, 1, 0], [1, 3, 0, 2], [2, 0, 3, 1]):
