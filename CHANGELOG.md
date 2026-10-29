@@ -85,13 +85,13 @@ names its pull request.
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
   least squares and returns the links whose coefficient has a p-value of at most `alpha` (default
-  0.05): the F-test of that regressor (Granger 1969), the coefficient test of a vector
-  autoregression. `lag_weights` hold the regression coefficients of the returned links, and
+  0.05), after the correction `fdr_method` names: the F-test of that regressor (Granger 1969), the
+  coefficient test of a vector autoregression. `lag_weights` hold the regression coefficients of the returned links, and
   `metadata["p_values"]` holds the p-value of every link, as `pcmci` does. On the quality gate's
   simulated series of 5 variables with 2 lags, the median errors (missing and extra lagged edges;
-  the empty graph's is 28.5) fall from 13.5 to 5.5 at 1,000 steps and from 12.5 to 3.5 at 2,000.
-  At 80 or more variables with 1,000 steps the uncorrected tests return more errors than the empty
-  graph, as the docstring's Limitations say. The lasso, its `cv` argument, and its worker threads
+  the empty graph's is 28.5) fall from 13.5 to 6.5 at 1,000 steps and from 12.5 to 4 at 2,000. With
+  `fdr_method="none"`, at 80 or more variables with 1,000 steps the uncorrected tests return more
+  errors than the empty graph, as the docstring's Limitations say. The lasso, its `cv` argument, and its worker threads
   are gone: `cv` is ignored with an `andrey.DeprecatedArgumentWarning` and stops being accepted in
   the next release. ([#556])
 
@@ -105,12 +105,12 @@ names its pull request.
   `"fdr_bh"` replaces the p-values of the lagged links with their Benjamini-Hochberg adjusted
   values over all those links together. `pcmci` keeps a link when its adjusted p-value is at most
   `alpha`; `pcmciplus` decides its links in the skeleton phase and only reports the adjusted values
-  in `metadata["p_values"]`. The default, `"none"`, returns the results these methods returned
-  before. `lpcmci` takes none, as tigramite's does not. ([#554])
+  in `metadata["p_values"]`. `"none"` keeps the p-values as tested, which returns the results
+  these methods returned before. `lpcmci` takes none, as tigramite's does not. ([#554])
 - `granger` takes `fdr_method`, as `pcmci` and `pcmciplus` do: `"fdr_bh"` replaces the p-values of
   the lagged links with their Benjamini-Hochberg adjusted values over all those links together,
-  and a link is kept when its adjusted p-value is at most `alpha`. The default, `"none"`, returns
-  what `granger` returned before. On the simulated series of 80 and 160 variables with 1,000 steps,
+  and a link is kept when its adjusted p-value is at most `alpha`; `"none"` keeps the p-values as
+  tested. On the simulated series of 80 and 160 variables with 1,000 steps,
   where the uncorrected tests return more errors than the empty graph (median 762.5 against 494,
   and 2,855 against 973), `"fdr_bh"` returns fewer (266.5 and 546), at the cost of more missed
   true links. ([#565])
@@ -165,6 +165,20 @@ names its pull request.
 
 ### Changed
 
+- The default `fdr_method` of `pcmci`, `pcmciplus`, and `granger` is `"fdr_bh"`, where it was
+  `"none"` in the pull requests that added it ([#554], [#565]), so a link is kept when its
+  Benjamini-Hochberg adjusted p-value over all the lagged links is at most `alpha`. On simulated
+  linear-Gaussian VAR series of 5 to 80 variables, 500 and 1,000 steps, and `tau_max` 1 and 2 (20
+  cells of 20 series each), the correction had fewer errors (missing plus extra lagged links) than
+  none in 16 cells for `pcmci` and 15 for `granger`, by the paired 95% bootstrap interval of the
+  difference, the same in 3 and 4, and more in 1 and 1: 5 variables, 500 steps, and `tau_max=2`, by
+  0.85 and 0.95. At 80 variables with 1,000 steps and `tau_max=2` the errors fell from 779 to 252
+  (`pcmci`) and from 768 to 256 (`granger`), against the empty graph's 481: the extra links fell
+  from 616 and 603 to 13, and the missed true links rose from 163 and 165 to 239 and 243.
+  `pcmciplus`'s links do not change; its lagged `metadata["p_values"]` are the adjusted ones.
+  `fdr_method="none"` returns `pcmci`'s results of 0.11.0 and `granger`'s uncorrected test. The
+  quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
+  to 6.5 and 4. ([#TBD])
 - A score search records the penalties its score used: `metadata["penalty_discount"]` for every
   score but `"bdeu"`, and `metadata["ebic_gamma"]` for `"bic"`. Every fit whose result
   `andrey.config`'s `tie_break` can change records the rule in `metadata["tie_break"]`, so the

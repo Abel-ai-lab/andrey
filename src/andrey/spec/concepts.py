@@ -352,18 +352,18 @@ _CONCEPTS = (
     Concept(
         key="fdr_method",
         summary="The correction of the lagged links' p-values for the number of links tested "
-        "(tigramite's name): none leaves them as tested, and fdr_bh replaces them with their "
-        "Benjamini-Hochberg adjusted values over all the lagged links together. A method whose "
-        "graph is thresholded on those p-values (pcmci, granger) thresholds the adjusted ones; a "
-        "method that decides its links before it reports them (pcmciplus) reports the adjusted "
-        "values and keeps its links.",
+        "(tigramite's name): fdr_bh, the default, replaces them with their Benjamini-Hochberg "
+        "adjusted values over all the lagged links together, and none leaves them as tested. A "
+        "method whose graph is thresholded on those p-values (pcmci, granger) thresholds the "
+        "adjusted ones; a method that decides its links before it reports them (pcmciplus) "
+        "reports the adjusted values and keeps its links.",
         param=_template(
             "fdr_method",
             "str",
-            "none",
+            "fdr_bh",
             "How the p-values of the lagged links are corrected for the number of links tested: "
-            "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
-            "adjusted values over all the lagged links together.",
+            "fdr_bh replaces them with their Benjamini-Hochberg adjusted values over all the "
+            "lagged links together; none keeps them as tested.",
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
