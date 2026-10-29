@@ -1,7 +1,9 @@
 5,569 adults; 3,694 with no value missing
-gaps: 25 edges from every row, 25 from the complete
-  rows; they differ in 6 places
+gaps: 25 edges from every row, 25 from the
+  complete rows; the two differ in 6 places
+test: cond_gauss
 units: 0 differences
+arrows into age or sex: 10 without it, 0 with it
 edges in at least half the fits:
   age -> systolic: 1.00
   age -> pulse: 1.00

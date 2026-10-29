@@ -19,6 +19,11 @@ def edges(fit):
     return int(((a != 0) | (a.T != 0)).sum() // 2)
 
 
+def into_age_or_sex(fit):
+    rows = fit.structure.oriented_edges()
+    return sum(kind == "directed" and target in ("age", "sex") for _, target, kind in rows)
+
+
 if __name__ == "__main__":  # worker processes re-import this script
     files = ["DEMO_J", "BMX_J", "BPX_J", "GHB_J", "TCHOL_J", "HDL_J"]
     table = pd.read_sas(URL.format(files[0]), format="xport")
@@ -32,10 +37,10 @@ if __name__ == "__main__":  # worker processes re-import this script
     # Gaps: each test reads the rows where its variables are observed.
     every_row = andrey.pc(data)
     complete_rows = andrey.pc(data.dropna())
-    print(
-        f"gaps: {edges(every_row)} edges from every row, {edges(complete_rows)} from the complete"
-    )
-    print(f"  rows; they differ in {shd(every_row.structure, complete_rows.structure)} places")
+    differ = shd(every_row.structure, complete_rows.structure)
+    print(f"gaps: {edges(every_row)} edges from every row, {edges(complete_rows)} from the")
+    print(f"  complete rows; the two differ in {differ} places")
+    print(f"test: {every_row.metadata['indep_test']}")
 
     # Units: blood pressure in kPa and cholesterol in mmol/L give the same graph.
     metric = data.assign(
@@ -48,6 +53,9 @@ if __name__ == "__main__":  # worker processes re-import this script
 
     # What you already know: nothing causes age or sex.
     known = andrey.Knowledge(tiers=[["age", "sex"], [c for c in data if c not in ("age", "sex")]])
+    guided = andrey.pc(data, knowledge=known)
+    before, after = into_age_or_sex(every_row), into_age_or_sex(guided)
+    print(f"arrows into age or sex: {before} without it, {after} with it")
 
     # How sure each edge is: 100 fits on resampled rows, four at a time.
     with andrey.config(num_workers=4):
