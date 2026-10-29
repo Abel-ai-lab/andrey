@@ -1247,7 +1247,7 @@ def tabu(
     number of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
-    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.2 and took a
+    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.3 and took a
     median of 6.1 times as long as one start. On categorical data drawn from the ALARM network with
     1,000 rows, under BDeu, they lowered them from 23.8 to 12.3.
 
