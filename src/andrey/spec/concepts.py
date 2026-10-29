@@ -352,9 +352,9 @@ _CONCEPTS = (
         summary="The correction of the lagged links' p-values for the number of links tested "
         "(tigramite's name): none leaves them as tested, and fdr_bh replaces them with their "
         "Benjamini-Hochberg adjusted values over all the lagged links together. A method whose "
-        "graph is thresholded on those p-values (pcmci) thresholds the adjusted ones; a method "
-        "that decides its links before it reports them (pcmciplus) reports the adjusted values "
-        "and keeps its links.",
+        "graph is thresholded on those p-values (pcmci, granger) thresholds the adjusted ones; a "
+        "method that decides its links before it reports them (pcmciplus) reports the adjusted "
+        "values and keeps its links.",
         param=_template(
             "fdr_method",
             "str",
@@ -365,7 +365,7 @@ _CONCEPTS = (
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
-        suitable=("pcmci", "pcmciplus"),
+        suitable=("pcmci", "pcmciplus", "granger"),
         exempt=_exempt(
             "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
             "The marks come from the removal phases and the orientation rules at alpha, not from "
