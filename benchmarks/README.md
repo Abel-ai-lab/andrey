@@ -1052,15 +1052,14 @@ Every solution tests lags 1 to `tau_max`, at `pc_alpha=0.2` and `alpha_level=0.0
 | `tigramite.pcmci.parcorr.tau<k>` | `ParCorr(significance="analytic")`, Student-t p-value |
 | `baseline.empty.temporal.tau<k>` | none: no link at any lag |
 
-tigramite runs `run_pcmci` with `tau_min=1` and `fdr_method="none"` and its other defaults; its own
-`tau_min=0` would also test lag 0, which is PCMCI+'s scope. `tau_max` is in every name because
-`params` are not part of a `run_id`, and the record carries it as `tau_max`. Andrey's PCMCI runs
-its tests with one BLAS thread whatever the core budget, while tigramite's fits get the budget's
-BLAS threads; set the core budget to 1 to compare one core with one core. Andrey's Student-t test
-and tigramite's analytic `ParCorr` share their test, so their p-values match. Andrey's PCMCI runs at
-its default `fdr_method="fdr_bh"` and tigramite's at `"none"`, so their graphs differ in the links
-the correction removes. The driver ends by listing, per dataset, the solutions that returned
-identical graphs (`structure_hash`).
+tigramite runs `run_pcmci` with `tau_min=1` and `fdr_method="fdr_bh"`, Andrey's default, and its
+other defaults; its own `tau_min=0` would also test lag 0, which is PCMCI+'s scope. `tau_max` is in
+every name because `params` are not part of a `run_id`, and the record carries it as `tau_max`.
+Andrey's PCMCI runs its tests with one BLAS thread whatever the core budget, while tigramite's fits
+get the budget's BLAS threads; set the core budget to 1 to compare one core with one core. Andrey's
+Student-t test and tigramite's analytic `ParCorr` share their test, so their p-values match. Both
+run the same `fdr_method="fdr_bh"`, so the comparison is like for like. The driver ends by listing,
+per dataset, the solutions that returned identical graphs (`structure_hash`).
 
 A temporal estimate is scored lag by lag with `andrey.metrics.temporal_scores`; its CPDAG and PAG
 columns (`shd`, `skeleton_*`, `arrowhead_*`) stay empty. Each lag is a directed graph, so a link in
