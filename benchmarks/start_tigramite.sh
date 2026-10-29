@@ -45,7 +45,7 @@ pcmci = PCMCI(
     cond_ind_test=ParCorr(significance="analytic"),
     verbosity=0,
 )
-results = pcmci.run_pcmci(tau_min=1, tau_max=2, pc_alpha=0.2, alpha_level=0.05, fdr_method="none")
+results = pcmci.run_pcmci(tau_min=1, tau_max=2, pc_alpha=0.2, alpha_level=0.05, fdr_method="fdr_bh")
 assert results["graph"].shape == (3, 3, 3), results["graph"].shape
 assert results["graph"][0, 1, 1] == "-->", "the planted link X0(t-1) -> X1(t) was not found"
 

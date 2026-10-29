@@ -82,9 +82,9 @@ def test_every_regressor_forbidden_leaves_an_empty_row(series):
 def test_the_facade_reads_a_link_as_cause_effect_lag(series):
     """``(cause, effect, lag)``: forbidding x0 -> x1 at lag 1 empties that weight and leaves the
     other variables' regressions alone."""
-    plain = andrey.granger(series, tau_max=LAGS)
+    plain = andrey.granger(series, tau_max=LAGS, fdr_method="none")
     knowledge = andrey.Knowledge(forbidden=[(0, 1, 1)])
-    known = andrey.granger(series, tau_max=LAGS, knowledge=knowledge)
+    known = andrey.granger(series, tau_max=LAGS, fdr_method="none", knowledge=knowledge)
     # lag_weights[k - 1][cause, effect]
     assert plain.structure.lag_weights[0][0, 1] != 0 and known.structure.lag_weights[0][0, 1] == 0
     assert known.metadata["p_values"][0][0][1] == 1

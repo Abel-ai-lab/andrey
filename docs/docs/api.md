@@ -123,12 +123,13 @@ step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the 
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, and `granger` take `fdr_method`, tigramite's name for the correction of the
-lagged links' p-values for the number of links tested. `"none"`, the default, keeps each p-value as
-tested. `"fdr_bh"` replaces them with their Benjamini-Hochberg adjusted values over all the lagged
-links together, which holds the false discovery rate at or below the level when the tests are
-independent or positively dependent. `pcmci` and `granger` keep a link when its adjusted p-value is
-at most `alpha`; `pcmciplus` decides its links in the skeleton phase and reports the adjusted values
-in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
+lagged links' p-values for the number of links tested. `"fdr_bh"`, the default, replaces them with
+their Benjamini-Hochberg adjusted values over all the lagged links together, which holds the false
+discovery rate at or below the level when the tests are independent or positively dependent.
+`"none"` keeps each p-value as tested, so about `alpha` of the absent links appear as links. `pcmci`
+and `granger` keep a link when its adjusted p-value is at most `alpha`; `pcmciplus` decides its
+links in the skeleton phase and reports the adjusted values in `metadata["p_values"]` without
+changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
