@@ -502,8 +502,6 @@ worker, GES and GFCI scan each pass in worker processes, and GES returns the sam
 serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
 processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
 with one worker.
-`granger` fits its variables on worker threads, with the same coefficients, and needs none of the
-guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_N_JOBS` above 1, or `-1` for every core) must put its entry

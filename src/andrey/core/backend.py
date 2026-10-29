@@ -142,7 +142,7 @@ class _Config:
     uses ``"auto"``; a supported but unavailable backend also warns once with
     ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise ``ValueError``.
 
-    ``n_jobs`` counts worker processes (threads for ``granger``): ``-1`` uses every usable
+    ``n_jobs`` counts worker processes (threads for ``pnl``): ``-1`` uses every usable
     core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
     workers.
 

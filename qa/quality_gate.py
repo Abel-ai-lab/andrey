@@ -465,7 +465,7 @@ def _adapted(adapter: Any) -> Callable[[Any], Any]:
 def _granger(x: np.ndarray) -> np.ndarray:
     """The lagged edges of ``andrey.granger`` with the published settings, as ``(lag, cause,
     effect)``."""
-    out = andrey.granger(x, tau_max=GRANGER_LAGS, cv=5)
+    out = andrey.granger(x, tau_max=GRANGER_LAGS)
     return np.stack([np.asarray(w) != 0 for w in out.structure.lag_weights])
 
 

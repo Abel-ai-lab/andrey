@@ -172,7 +172,7 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, *_RESIDUAL),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt("Continuous optimization: no test decides an edge.", *_CONTINUOUS),
@@ -186,7 +186,6 @@ _CONCEPTS = (
                 "Lasso by BIC: no test at a level.",
                 *_LINGAM,
             ),
-            *_exempt("A Lasso chosen by cross-validation: no test.", "granger"),
         ),
         deviations=(
             Deviation(
