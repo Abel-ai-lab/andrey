@@ -107,6 +107,13 @@ names its pull request.
   `alpha`; `pcmciplus` decides its links in the skeleton phase and only reports the adjusted values
   in `metadata["p_values"]`. The default, `"none"`, returns the results these methods returned
   before. `lpcmci` takes none, as tigramite's does not. ([#554])
+- `granger` takes `fdr_method`, as `pcmci` and `pcmciplus` do: `"fdr_bh"` replaces the p-values of
+  the lagged links with their Benjamini-Hochberg adjusted values over all those links together,
+  and a link is kept when its adjusted p-value is at most `alpha`. The default, `"none"`, returns
+  what `granger` returned before. On the simulated series of 80 and 160 variables with 1,000 steps,
+  where the uncorrected tests return more errors than the empty graph (median 762.5 against 494,
+  and 2,855 against 973), `"fdr_bh"` returns fewer (266.5 and 546), at the cost of more missed
+  true links. ([#565])
 - `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
   random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
   graphs these methods returned before. ([#550])
@@ -1312,3 +1319,4 @@ First alpha release.
 [#555]: https://github.com/Abel-ai-lab/andrey/pull/555
 [#556]: https://github.com/Abel-ai-lab/andrey/pull/556
 [#564]: https://github.com/Abel-ai-lab/andrey/pull/564
+[#565]: https://github.com/Abel-ai-lab/andrey/pull/565
