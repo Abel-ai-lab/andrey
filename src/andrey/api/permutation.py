@@ -39,6 +39,7 @@ def boss(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     seed: int | None = None,
     n_starts: int = 1,
     max_parents: int | None = None,
@@ -76,6 +77,11 @@ def boss(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random order in which the search
@@ -289,6 +295,7 @@ def boss(
             X,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
             n_starts=n_starts,
             score_func=score_func,
@@ -307,6 +314,7 @@ def grasp(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     grasp_depth: int = 3,
     seed: int | None = None,
     n_starts: int = 1,
@@ -346,6 +354,11 @@ def grasp(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     grasp_depth : int, default=3
         Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
         follows a chain of tucks that leave the score unchanged until one improves it or the chain
@@ -574,6 +587,7 @@ def grasp(
             X,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             depth=grasp_depth,
             random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
             n_starts=n_starts,

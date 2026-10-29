@@ -44,6 +44,7 @@ def ges(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
@@ -80,6 +81,11 @@ def ges(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
         node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
@@ -316,6 +322,7 @@ def ges(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
@@ -338,6 +345,7 @@ def gies(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
@@ -382,6 +390,11 @@ def gies(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned graph represents gives a
         node more than ``max_parents`` parents (every DAG of a class has the same largest number of
@@ -575,6 +588,7 @@ def gies(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
@@ -590,6 +604,7 @@ def xges(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     extended_search: bool = True,
     categorical: Sequence[str | int] | None = None,
@@ -628,6 +643,11 @@ def xges(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
         node more than ``max_parents`` parents (every DAG of a class has the same largest number of
@@ -797,6 +817,7 @@ def xges(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             extended_search=extended_search,
             max_parents=max_parents,
             categorical=mask,
@@ -813,6 +834,7 @@ def hc(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -849,6 +871,11 @@ def hc(
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See
         Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
@@ -998,6 +1025,7 @@ def hc(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             max_iter=max_iter,
             max_parents=max_parents,
             categorical=mask,
@@ -1014,6 +1042,7 @@ def tabu(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
@@ -1053,6 +1082,11 @@ def tabu(
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See
         Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     tabu_length : int, default=10
         Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
@@ -1200,6 +1234,7 @@ def tabu(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
@@ -1219,6 +1254,7 @@ def exact_search(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
@@ -1260,6 +1296,11 @@ def exact_search(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the search scores only parent sets within it
         and finds the best-scoring DAG whose every node keeps within it, so no DAG the returned
@@ -1425,6 +1466,7 @@ def exact_search(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             categorical=mask,
             constraints=constraints,
             max_parents=max_parents,

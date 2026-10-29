@@ -103,6 +103,7 @@ def tabu(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
@@ -118,8 +119,9 @@ def tabu(
         Data matrix; rows are observations, columns are variables.
     score_func : str
         Local score, one of :data:`TABU_SCORES`: ``"bic"`` (linear-Gaussian BIC), ``"bdeu"``
-        (:class:`~andrey.core.score.BDeuScore` with its default priors) or ``"discrete_bic"``
-        (:class:`~andrey.core.score.CategoricalBICScore`), both on category codes, or
+        (:class:`~andrey.core.score.BDeuScore` with its default structure prior) or
+        ``"discrete_bic"`` (:class:`~andrey.core.score.CategoricalBICScore`), both on category
+        codes, or
         ``"degen_gauss"`` or ``"cond_gauss"``, the mixed-data scores over ``categorical``.
     penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
@@ -128,6 +130,9 @@ def tabu(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     categorical : ndarray of bool or None
         The categorical columns, for a mixed-data score; such a score allows no edge from a
         continuous into a categorical column.
@@ -166,6 +171,7 @@ def tabu(
         X,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
     )
     mask = np.full(d, score_func in DISCRETE_SCORES)
