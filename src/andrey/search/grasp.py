@@ -24,6 +24,7 @@ from andrey.search.boss import (
     parent_knowledge,
     precedence_sort,
     ranked_score,
+    start_rng,
 )
 
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
@@ -494,6 +495,68 @@ def _dfs(
     return False
 
 
+def _search_state(
+    X: np.ndarray,
+    score_func: str,
+    penalty_discount: float,
+    ebic_gamma: float,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    max_parents: int | None,
+) -> tuple[LocalScore, np.ndarray, list[_GST], np.ndarray | None]:
+    """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
+
+    The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
+    """
+    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    n_features = X.shape[1]
+    if constraints is None:
+        gsts = [
+            _GST(v, score, delta, n_features, max_parents=max_parents) for v in range(n_features)
+        ]
+        return score, ranks, gsts, None
+    ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
+    gsts = []
+    for v in range(n_features):
+        candidates, required = parent_knowledge(ranked, v)
+        gsts.append(
+            _GST(
+                v,
+                score,
+                delta,
+                n_features,
+                candidates=candidates,
+                required=required,
+                max_parents=max_parents,
+            )
+        )
+    return score, ranks, gsts, ranked.precedence()
+
+
+def _search_from(
+    n_features: int,
+    rng: random.Random,
+    gsts: list[_GST],
+    depth: int,
+    before: np.ndarray | None,
+) -> _Order:
+    """Grow-shrink every variable of an ``rng``-shuffled order, then tuck until none improves."""
+    order = _Order(n_features, rng, gsts, before)
+    prefix: set[int] = set()
+    for i in range(n_features):
+        y = order.get(i)
+        y_parents = order.get_parents(y)
+        local_score = gsts[y].trace(prefix, y_parents)
+        order.set_local_score(y, local_score)
+        order.bump_edges(len(y_parents))
+        prefix.add(y)
+
+    while _dfs(depth - 1, {_dag_key(order)}, order, gsts, rng, before):
+        pass
+    return order
+
+
 def grasp(
     data: np.ndarray,
     *,
@@ -501,6 +564,7 @@ def grasp(
     ebic_gamma: float = 1.0,
     depth: int = 3,
     random_state: int = 0,
+    n_starts: int = 1,
     score_func: str = "bic",
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
@@ -530,7 +594,12 @@ def grasp(
     depth : int
         Most tucks in one chain of moves, at least ``1``.
     random_state : int
-        Seed for the private RNG that fixes the initial permutation and DFS shuffles.
+        Seed for the private RNG of each start, which fixes its initial permutation and DFS
+        shuffles (:func:`~andrey.search.boss.start_rng`).
+    n_starts : int
+        Number of searches, each from its own seeded initial permutation, at least ``1``. The
+        returned DAG is the best-scoring one; a later start replaces an earlier one only when it
+        scores better by more than ``_SCORE_EPS``.
     score_func : str
         Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
     max_parents : int or None
@@ -571,51 +640,26 @@ def grasp(
         raise ValueError(
             f"the required edges give a node more than max_parents={max_parents} parents"
         )
-    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
-    rng = random.Random(random_state)
-    before = None
-    if constraints is None:
-        gsts = [
-            _GST(v, score, delta, n_features, max_parents=max_parents) for v in range(n_features)
-        ]
-    else:
-        ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
-        before = ranked.precedence()
-        gsts = []
-        for v in range(n_features):
-            candidates, required = parent_knowledge(ranked, v)
-            gsts.append(
-                _GST(
-                    v,
-                    score,
-                    delta,
-                    n_features,
-                    candidates=candidates,
-                    required=required,
-                    max_parents=max_parents,
-                )
-            )
-
-    order = _Order(n_features, rng, gsts, before)
-    prefix: set[int] = set()
-    for i in range(n_features):
-        y = order.get(i)
-        y_parents = order.get_parents(y)
-        local_score = gsts[y].trace(prefix, y_parents)
-        order.set_local_score(y, local_score)
-        order.bump_edges(len(y_parents))
-        prefix.add(y)
-
-    while _dfs(depth - 1, {_dag_key(order)}, order, gsts, rng, before):
-        pass
+    best: tuple[_Order, float] | None = None
+    for start in range(n_starts):
+        # Each start builds its own score, caches, and trees, so a search of many starts holds
+        # one start's state at a time.
+        score, ranks, gsts, before = _search_state(
+            X, score_func, penalty_discount, ebic_gamma, categorical, constraints, max_parents
+        )
+        order = _search_from(n_features, start_rng(random_state, start), gsts, depth, before)
+        total_bic = 0.0
+        for y in range(n_features):
+            total_bic += score.score(y, order.get_parents(y))
+        if best is None or total_bic < best[1] - _SCORE_EPS:
+            best = (order, total_bic)
+        del score, gsts
+    assert best is not None  # n_starts >= 1
+    order, total_bic = best
 
     adj = np.zeros((n_features, n_features), dtype=np.int8)
-    total_bic = 0.0
     for y in range(n_features):
-        parents = order.get_parents(y)
-        total_bic += score.score(y, parents)
-        for x in parents:
+        for x in order.get_parents(y):
             adj[x, y] = TAIL
             adj[y, x] = ARROW
 
