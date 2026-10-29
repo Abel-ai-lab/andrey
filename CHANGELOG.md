@@ -81,6 +81,10 @@ change names its pull request.
 
 ### Added
 
+- `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
+  searches do: a required edge is always in the result, a forbidden edge, an edge into an earlier
+  tier, and a pair outside `allowed` never are, and `iamb`, `inter_iamb`, and `mmpc` direct the
+  edges the knowledge decides. ([#521])
 - `gies`, `xges`, and `gfci` take `max_parents`, a cap on every node's parents, as `ges` does: no
   DAG the returned graph represents gives a node more than that many parents, and a move that would
   give a node more is skipped. `gfci` caps its GES phase; the PAG its tests then orient can put more
@@ -1047,3 +1051,4 @@ First alpha release.
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
 [#516]: https://github.com/Abel-ai-lab/andrey/pull/516
+[#521]: https://github.com/Abel-ai-lab/andrey/pull/521
