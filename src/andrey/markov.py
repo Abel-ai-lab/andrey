@@ -8,7 +8,7 @@ from __future__ import annotations
 import heapq
 import math
 import warnings
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,7 +26,7 @@ from .core.ci import make_indep_test
 from .core.ci_missing import rows_metadata, rows_tested
 from .core.output import StructureOutput
 from .core.seeding import resolve_seed
-from .core.structure import ARROW, TAIL, GraphStructure, Structure
+from .core.structure import GraphStructure
 from .core.warning_policy import SampleSizeWarning
 
 #: The rows per table cell below which a categorical test is called sparse (Cochran 1954).
@@ -142,7 +142,7 @@ def markov_check(
     *,
     indep_test: str | None = None,
     alpha: float = 0.05,
-    categorical: list[str | int] | None = None,
+    categorical: Sequence[str | int] | None = None,
     sample_fraction: float = 0.5,
     seed: int | None = None,
 ) -> MarkovCheckOutput:
@@ -289,7 +289,7 @@ def markov_check(
     """
     from .spec.concepts import MARKOV_CHECK_PARAMS
 
-    checked = {
+    checked: dict[str, Any] = {
         name: MARKOV_CHECK_PARAMS[name].check(value, "markov_check")
         for name, value in (
             ("alpha", alpha),
@@ -299,8 +299,8 @@ def markov_check(
         )
     }
     alpha, sample_fraction = float(checked["alpha"]), float(checked["sample_fraction"])
-    structure = graph.structure if isinstance(graph, StructureOutput) else graph
-    dag = _dag_of(structure)
+    structure = _graph_of(graph)
+    dag = structure if structure.kind == "dag" else structure.to_dag(tie_break="label")
     seed = resolve_seed(checked["seed"])
 
     test_name, categorical = default_test(data, checked["indep_test"], categorical=categorical)
@@ -308,8 +308,9 @@ def markov_check(
         data, categorical, "indep_test", test_name, method="markov_check", missing=True
     )
     columns = _columns(dag, column_labels(data), X.shape[1])
-    order = _order(dag)
-    facts = _facts(dag, order)
+    parents = [[int(u) for u in dag.parents(v, index=True)] for v in range(dag.n_nodes)]
+    order = _order(dag, parents)
+    facts = _facts(order, parents)
     rows_per_test = round(sample_fraction * X.shape[0])
     if facts and rows_per_test < max(len(z) for _, _, z in facts) + 4:
         raise ValueError(
@@ -347,15 +348,16 @@ def markov_check(
     )
 
 
-def _dag_of(structure: Structure) -> GraphStructure:
-    """Return the DAG whose independences are tested: the graph, or a CPDAG's extension."""
+def _graph_of(graph: StructureOutput | GraphStructure) -> GraphStructure:
+    """Return the graph to check: a result's structure, which must be a dag or a cpdag."""
+    structure = graph.structure if isinstance(graph, StructureOutput) else graph
     if not isinstance(structure, GraphStructure) or structure.kind not in ("dag", "cpdag"):
         kind = getattr(structure, "kind", type(structure).__name__)
         raise ValueError(
             f"markov_check checks a dag or a cpdag, got {kind!r}: the check is validated for "
             "those two kinds (Ramsey, Andrews, and Spirtes 2024)"
         )
-    return structure if structure.kind == "dag" else structure.to_dag(tie_break="label")
+    return structure
 
 
 def _columns(dag: GraphStructure, labels: tuple[str, ...] | None, n_columns: int) -> list[int]:
@@ -375,22 +377,11 @@ def _columns(dag: GraphStructure, labels: tuple[str, ...] | None, n_columns: int
     return [where[label] for label in dag.labels]
 
 
-def _parents(dag: GraphStructure) -> list[list[int]]:
-    """Return the parents of each node.
-
-    A node ``i`` is a parent of ``j`` when the marks at ``i`` and ``j`` are a tail and an arrowhead.
-    """
-    M = dag.to_numpy()
-    d = dag.n_nodes
-    return [[i for i in range(d) if M[i, j] == TAIL and M[j, i] == ARROW] for j in range(d)]
-
-
-def _order(dag: GraphStructure) -> list[int]:
+def _order(dag: GraphStructure, parents: list[list[int]]) -> list[int]:
     """Return Kahn's topological order of ``dag``, the lowest label (position) first among ties.
 
     The columns' order does not change it, only the nodes' labels do.
     """
-    parents = _parents(dag)
     children: list[list[int]] = [[] for _ in parents]
     waiting = [len(p) for p in parents]
     for j, ps in enumerate(parents):
@@ -412,15 +403,14 @@ def _order(dag: GraphStructure) -> list[int]:
     return order
 
 
-def _facts(dag: GraphStructure, order: list[int]) -> list[Fact]:
+def _facts(order: list[int], parents: list[list[int]]) -> list[Fact]:
     """Return the ordered local Markov independences.
 
     They are ``x`` and each earlier non-parent ``w``, given the parents of ``x``.
     """
-    parents = _parents(dag)
     facts: list[Fact] = []
     for k, x in enumerate(order):
-        given = tuple(sorted(parents[x]))
+        given = tuple(parents[x])
         facts += [(x, w, given) for w in order[:k] if w not in given]
     return facts
 
@@ -454,7 +444,7 @@ def _p_values(
         rows = np.sort(rng.choice(n, size=kept, replace=False))
         test = make_indep_test(
             test_name,
-            X[np.ix_(rows, cols)],
+            X[rows[:, None], cols],
             categorical=None if mask is None else mask[cols],
             seed=seed,
         )

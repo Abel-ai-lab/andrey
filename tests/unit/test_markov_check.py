@@ -75,6 +75,7 @@ def test_the_tests_are_the_non_parent_pairs_given_the_parents_whatever_the_colum
         parents[target].add(source)
     for row in check.table():
         assert set(row["given"]) == parents[row["x"]] and row["y"] not in parents[row["x"]]
+        assert named.d_separated(row["x"], row["y"], row["given"])
     shuffled = frame[list(np.random.default_rng(1).permutation(labels))]
     again = markov_check(named, shuffled, sample_fraction=1.0)
     assert {(r["x"], r["y"]): r["p_value"] for r in again.table()} == pytest.approx(

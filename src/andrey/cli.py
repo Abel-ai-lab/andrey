@@ -1282,7 +1282,7 @@ def execute_markov_check(
             warnings.simplefilter("always")
             out = andrey.markov_check(
                 graph,
-                table,
+                table,  # ty: ignore[invalid-argument-type]  # one table; _table also takes a list
                 indep_test=indep_test,
                 alpha=alpha,
                 categorical=positions,
