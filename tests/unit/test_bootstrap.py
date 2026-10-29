@@ -682,3 +682,12 @@ def test_knowledge_travels_to_the_workers():
     pooled = with_workers(2, "pc", data, n_resamples=3, seed=0, knowledge=knowledge)
     assert serial.table() == pooled.table()
     assert serial.frequency("->")[2, 3] == 1.0  # the required edge is in every fit
+
+
+@pytest.mark.parametrize("method", ["pc", "fci"])
+def test_an_edge_the_knowledge_directs_stays_directed_in_the_averaged_graph(method):
+    # Without knowledge, a - b - c - d is undirected in a CPDAG and has circles in a PAG.
+    knowledge = andrey.Knowledge(required=[("c", "d")])
+    out = bootstrap(method, lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
+    assert out.metadata["averaged_graph"] == "vote"
+    assert out.structure.endpoints(2, 3) == (TAIL, ARROW)
