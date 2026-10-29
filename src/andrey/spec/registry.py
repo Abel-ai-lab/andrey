@@ -85,6 +85,7 @@ _SEED = concept_param(
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
     "so a fit repeats. Seed for the search's random orders.",
 )
+_N_STARTS = concept_param("n_starts")
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
@@ -1097,6 +1098,7 @@ _add(
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             _SEED,
+            _N_STARTS,
             _CATEGORICAL,
         ),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
@@ -1138,6 +1140,7 @@ _add(
                 aliases=("depth",),
             ),
             _SEED,
+            _N_STARTS,
             _CATEGORICAL,
         ),
         references=("Lam, Andrews & Ramsey 2022",),
