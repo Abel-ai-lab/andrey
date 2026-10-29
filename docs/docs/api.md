@@ -414,14 +414,17 @@ DoWhy for effect estimation.
 
 `andrey.bootstrap` refits a method on resamples of the rows and reports how often each edge appears,
 and the graph that keeps the pairs that are adjacent often enough. It takes a method's name, such
-as `"pc"`, or the method itself, and the method's own arguments. Each resample draws the rows
-with replacement from a generator that depends on `seed` and the resample's number alone, so a seed
-gives the same result at any `n_jobs`, and a longer run begins with the shorter run's fits.
-A method that takes a row-aligned input (`cdnod`'s `domain_index`, `gies`'s `interventions`)
-resamples it with the rows; `multi_group_direct_lingam` resamples each dataset on its own and
-returns one result per dataset; `longitudinal_lingam` resamples the units, the same rows of every
-dataset. A time-series method on one series resamples blocks of `block_length` consecutive rows.
-`gin` is the one method it does not take, since its number of latent nodes differs from fit to fit.
+as `"pc"`, or the method itself, and the method's own arguments. Each resample is a subsample by
+default: `sample_fraction` (0.5) of the rows, drawn without replacement. `resampling="bootstrap"`
+draws as many rows as `data` has, with replacement, instead. The generator depends on `seed` and the
+resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run
+begins with the shorter run's fits. A method that takes a row-aligned input (`cdnod`'s
+`domain_index`, `gies`'s `interventions`) resamples it with the rows; `multi_group_direct_lingam`
+resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
+resamples the units, the same rows of every dataset. A time-series method on one series subsamples
+one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
+consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
+take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
@@ -429,9 +432,10 @@ cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-
 appeared; `structure` is the averaged graph, and `average(threshold)` builds it at another
 threshold without refitting. A pair is in the averaged graph when it is adjacent in at least
 `threshold` of the fits, and it takes the edge it has most often; two edges that tie give `--`
-(`o-o` for a PAG). Because a resample repeats rows, a conditional-independence test sees more
-evidence than the resample holds, so read a frequency as a ranking of the edges, not as a
-probability. `andrey bootstrap` runs the same from the shell
+(`o-o` for a PAG). A bootstrap resample repeats rows, so a conditional-independence test sees
+more evidence than the resample holds; a subsample does not, which is why we make it the default
+(the `bootstrap` docstring gives the measurements). Either way, read a frequency as a ranking of
+the edges, not as a probability. `andrey bootstrap` runs the same from the shell
 ([Command-line interface](#command-line-interface)).
 
 ```{eval-rst}
@@ -712,7 +716,7 @@ and `rc_params` return plain data and need no import.
 | `andrey list` | Available methods and their status |
 | `andrey run hc --help` | Readable inputs, parameters, defaults, and examples |
 | `andrey run hc --help --json` | One versioned method contract, without execution |
-| `andrey bootstrap hc --data data.csv` | Edge frequencies over bootstrap refits, and the averaged graph |
+| `andrey bootstrap hc --data data.csv` | Edge frequencies over refits on resamples, and the averaged graph |
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
@@ -730,9 +734,10 @@ configuration file and never executes the method, while `andrey run hc --data da
 HC. Configuration reports list detected backends, not the backend an operation will use.
 
 `andrey bootstrap <method>` takes the inputs, parameters, and options of `andrey run`, and
-`--n-boot`, `--seed`, `--threshold`, and `--block-length`. Its result is a run's, with the averaged
-graph as `structure`, plus `bootstrap` (the settings) and `frequencies` (each edge that appeared in
-a fit, most frequent first); see [Bootstrap](#bootstrap).
+`--n-boot`, `--seed`, `--threshold`, `--resampling`, `--sample-fraction`, and `--block-length`.
+Its result is a run's, with the averaged graph as `structure`, plus `bootstrap` (the settings) and
+`frequencies` (each edge that appeared in a fit, most frequent first); see
+[Bootstrap](#bootstrap).
 
 Structured help, configuration and calibration reports, and run results carry
 `schema_version: "2"`, which versions the command line's JSON separately from the `format_version`
