@@ -477,6 +477,10 @@ def _reaches(adj_int: list[int], a: int, b: int) -> bool:
     return False
 
 
+#: Uniform tries at an edge an operation can apply to, before :func:`perturb` lists all of them.
+_TRIES = 32
+
+
 def perturb(
     adj_int: list[int],
     parents_of: dict[int, list[int]],
@@ -494,37 +498,69 @@ def perturb(
     can apply to uniformly, as bnlearn's restarts do. An add joins two non-adjacent nodes. No add or
     reverse makes an edge ``u -> v`` that ``forbidden[v, u]`` bars or gives a node more than
     ``max_parents`` parents, and no remove or reverse touches an edge that ``required[v, u]`` holds;
-    a draw whose add or reverse would close a cycle changes nothing. The candidate edges are listed
-    in the order of ``ranks`` (:func:`tie_ranks`), so the draws move with the columns.
+    a draw whose add or reverse would close a cycle changes nothing. Nodes are indexed by their
+    place in the order of ``ranks`` (:func:`tie_ranks`), so the draws move with the columns. A draw
+    tries up to ``_TRIES`` uniform candidates and lists the legal ones only when all of them fail,
+    which keeps the pick uniform and its cost independent of the number of nodes while most
+    candidates are legal.
     """
     d = len(adj_int)
-    by_rank = np.argsort(ranks, kind="stable")
+    by_rank = np.argsort(ranks, kind="stable")  # place -> column
+    place = np.empty(d, dtype=np.intp)
+    place[by_rank] = np.arange(d)  # column -> place
     in_rank_order = np.ix_(by_rank, by_rank)
-    # [u, v]: no u -> v, and u -> v stays.
-    barred = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden.T
-    held = np.zeros((d, d), dtype=bool) if required is None else required.T
+    # [i, j] by place: no i -> j; i -> j stays.
+    barred = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden.T[in_rank_order]
+    held = np.zeros((d, d), dtype=bool) if required is None else required.T[in_rank_order]
+    cap = d if max_parents is None else max_parents  # a node with fewer parents can gain one
+    edge = np.zeros((d, d), dtype=bool)  # [i, j]: i -> j
+    n_parents = np.zeros(d, dtype=np.intp)
+    edges = sorted((int(place[u]), int(place[v])) for v, pa in parents_of.items() for u in pa)
+    for i, j in edges:
+        edge[i, j] = True
+        n_parents[j] += 1
+    slot = {e: k for k, e in enumerate(edges)}
+
+    def can_add(i: int, j: int) -> bool:
+        return not (i == j or edge[i, j] or edge[j, i] or barred[i, j]) and n_parents[j] < cap
+
+    def can_remove(i: int, j: int) -> bool:
+        return not held[i, j]
+
+    def can_reverse(i: int, j: int) -> bool:
+        return not (held[i, j] or barred[j, i]) and n_parents[i] < cap
+
+    def draw(op: str) -> tuple[int, int] | None:
+        """A uniformly drawn pair ``(i, j)`` that ``op`` applies to, or ``None`` if none."""
+        if op == "add":
+            for _ in range(_TRIES):
+                i, j = rng.randrange(d), rng.randrange(d)
+                if can_add(i, j):
+                    return i, j
+            legal = ~(edge | edge.T | barred)
+            np.fill_diagonal(legal, False)
+            legal[:, n_parents >= cap] = False
+            cells = np.flatnonzero(legal)
+            return divmod(int(cells[rng.randrange(cells.size)]), d) if cells.size else None
+        allowed = can_remove if op == "remove" else can_reverse
+        if not edges:
+            return None
+        for _ in range(_TRIES):
+            pair = edges[rng.randrange(len(edges))]
+            if allowed(*pair):
+                return pair
+        legal_edges = [pair for pair in edges if allowed(*pair)]
+        return legal_edges[rng.randrange(len(legal_edges))] if legal_edges else None
+
     made = 0
     for _ in range(3 * changes):
         if made == changes:
             break
-        edge = np.zeros((d, d), dtype=bool)  # [u, v]: u -> v
-        for v, pa in parents_of.items():
-            edge[pa, v] = True
-        full = np.zeros(d, dtype=bool)
-        if max_parents is not None:
-            full = edge.sum(axis=0) >= max_parents
         op = rng.choice(("add", "remove", "reverse"))
-        if op == "add":
-            legal = ~(edge | edge.T | barred) & ~full[None, :]
-            np.fill_diagonal(legal, False)
-        elif op == "remove":
-            legal = edge & ~held
-        else:  # u -> v becomes v -> u: v -> u must be allowed and u must have room for a parent
-            legal = edge & ~held & ~barred.T & ~full[:, None]
-        cells = np.flatnonzero(legal[in_rank_order])
-        if not cells.size:
+        pair = draw(op)
+        if pair is None:
             continue
-        i, j = divmod(int(cells[rng.randrange(cells.size)]), d)
+        i, j = pair
         u, v = int(by_rank[i]), int(by_rank[j])
         if op == "add" and _reaches(adj_int, v, u):
             continue
@@ -535,6 +571,25 @@ def perturb(
                 continue
         _apply_move(adj_int, parents_of, (op, u, v))
         made += 1
+        if op == "add":
+            edge[i, j] = True
+            n_parents[j] += 1
+            slot[i, j] = len(edges)
+            edges.append((i, j))
+            continue
+        edge[i, j] = False
+        n_parents[j] -= 1
+        k = slot.pop((i, j))
+        if op == "reverse":
+            edge[j, i] = True
+            n_parents[i] += 1
+            edges[k] = (j, i)
+            slot[j, i] = k
+        else:  # the last edge takes the removed one's slot
+            last = edges.pop()
+            if k < len(edges):
+                edges[k] = last
+                slot[last] = k
 
 
 def _climb(
