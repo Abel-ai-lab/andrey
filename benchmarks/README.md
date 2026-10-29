@@ -886,8 +886,8 @@ keys stay as they were. The Dirichlet concentration of the categorical tables is
 `datasets.MIXED_SETTINGS`. Codes and values are never rescaled.
 
 Every solution reads a column as categorical when it holds at most ten distinct whole numbers.
-Andrey infers its categorical columns with `max_categories=10`; Tetrad's reader marks a column of at
-most ten distinct values categorical, and the bnlearn adapters turn such columns into factors. On
+The Andrey adapters name those columns in `categorical`; Tetrad's reader marks a column of at most
+ten distinct values categorical, and the bnlearn adapters turn such columns into factors. On
 `mixed_er` the rule reads exactly the generated categorical columns, which
 `tests/test_adapters_mixed.py` checks, and every Tetrad fit stops unless Tetrad read exactly the
 rule's columns. Each
@@ -895,7 +895,7 @@ package's names for the settings map to Andrey's:
 
 | Andrey | Tetrad (causal-cmd) | bnlearn |
 |---|---|---|
-| `max_categories=10` | `--data-type mixed --numCategories 10` | integer columns of at most 10 values made `factor` |
+| `categorical=[...]`, the columns of at most 10 whole numbers | `--data-type mixed --numCategories 10` | integer columns of at most 10 values made `factor` |
 | `indep_test="degen_gauss"` | `--test dg-lr-test` | - |
 | `indep_test="cond_gauss"` | `--test cg-lr-test` | `pc.stable(test = "mi-cg")` |
 | `score_func="degen_gauss"` | `--score dg-bic-score` | - |
@@ -1478,7 +1478,7 @@ Resume cannot detect solution edits because part filenames exclude `params` and 
 the body of `fit`. Freeze the code during a run.
 
 The run declares `cores` and `device`, so timeout records include them. The child reports `threads`,
-`num_workers`, and `device_id`; these fields are empty when the fit does not return.
+`n_jobs`, and `device_id`; these fields are empty when the fit does not return.
 
 Each failure produces a record. A stopped fit includes `status=timeout` or `oom` and its cap.
 `error_text` describes other failures.

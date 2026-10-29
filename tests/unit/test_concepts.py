@@ -142,7 +142,7 @@ def test_bootstrap_takes_each_resampling_concept_as_its_spec_and_template_say(ke
 
 @pytest.mark.parametrize("utility", UTILITIES)
 def test_a_utility_takes_an_execution_setting_only_as_a_recorded_deviation(utility):
-    concept = CONCEPTS["num_workers"]
+    concept = CONCEPTS["n_jobs"]
     assert (concept.deviation(utility) is not None) == (concept.param.name in signature(utility))  # ty: ignore[possibly-missing-attribute]
 
 
@@ -642,6 +642,72 @@ def test_a_former_score_name_is_recorded_as_the_current_one(former, current):
     with pytest.warns(andrey.DeprecatedArgumentWarning):
         out = andrey.ges(*inputs("ges", codes=False), score_func=former)
     assert out.metadata["score_func"] == current
+
+
+#: The score searches, each with its penalty arguments by concept.
+PENALIZED = [m for m in REGISTRY if tagged(CONCEPTS["score_func"], m)]
+
+
+def penalties(method: str) -> dict[str, object]:
+    """The method's penalty arguments, by concept, with their defaults."""
+    return {
+        p.concept: p.default
+        for p in REGISTRY[method].params
+        if p.concept in ("penalty_discount", "ebic_gamma")
+    }
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_a_score_search_records_the_penalties_its_score_used(method):
+    """The linear-Gaussian BIC records both penalties; BDeu, which has neither, records none."""
+    assert set(penalties(method)) == {"penalty_discount", "ebic_gamma"}
+    assert {"penalty_discount", "ebic_gamma"} <= set(REGISTRY[method].output.metadata)
+    out = getattr(andrey, method)(*args_for(method, [typed_frame("continuous")] * 3))
+    assert out.metadata["score_func"] == "bic"
+    assert {k: out.metadata[k] for k in penalties(method)} == penalties(method)
+    out = getattr(andrey, method)(
+        *args_for(method, [typed_frame("categorical")] * 3), penalty_discount=2.0
+    )
+    assert out.metadata["score_func"] == "bdeu"
+    assert not set(penalties(method)) & set(out.metadata)
+    out = getattr(andrey, method)(
+        *args_for(method, [typed_frame("categorical")] * 3),
+        score_func="discrete_bic",
+        penalty_discount=2.0,
+    )
+    assert out.metadata["penalty_discount"] == 2.0 and "ebic_gamma" not in out.metadata
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_ebic_gamma_with_a_score_that_does_not_use_it_raises(method):
+    """Only bic adds the extended-BIC term: a call that passes ebic_gamma with another score, named
+    or picked from the declared column types, raises before the fit."""
+    categorical = args_for(method, [typed_frame("categorical")] * 3)
+    with pytest.raises(ValueError, match="ebic_gamma weighs the extended-BIC term"):
+        getattr(andrey, method)(*categorical, ebic_gamma=0.5)
+    with pytest.raises(ValueError, match="score_func='discrete_bic'"):
+        getattr(andrey, method)(*categorical, score_func="discrete_bic", ebic_gamma=0.0)
+    continuous = args_for(method, [typed_frame("continuous")] * 3)
+    assert getattr(andrey, method)(*continuous, ebic_gamma=0.5).metadata["ebic_gamma"] == 0.5
+
+
+#: The methods whose result andrey.config's tie_break can change.
+TIE_BREAKING = [m for m, spec in REGISTRY.items() if spec.tie_break]
+
+
+@pytest.mark.parametrize("method", TIE_BREAKING)
+def test_a_fit_the_tie_break_can_change_records_it(method):
+    assert "tie_break" in REGISTRY[method].output.metadata
+    assert coded_fit(method)[0].metadata["tie_break"] == "rank"
+    with andrey.config(tie_break="position"):
+        out, _ = fit(method, codes=False, **SHORT.get(method, {}))
+    assert out.metadata["tie_break"] == "position"
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if m not in TIE_BREAKING])
+def test_a_fit_the_tie_break_cannot_change_records_none(method):
+    assert "tie_break" not in REGISTRY[method].output.metadata
+    assert "tie_break" not in coded_fit(method)[0].metadata
 
 
 # --- randomness -----------------------------------------------------------------------------------

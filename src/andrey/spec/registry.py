@@ -43,7 +43,6 @@ _INDEP_TEST = concept_param(
     "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
 )
 _CATEGORICAL = concept_param("categorical")
-_MAX_CATEGORIES = concept_param("max_categories")
 _COLLIDER_RULE = concept_param("collider_rule")
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
@@ -80,25 +79,18 @@ _SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
 #: The same, for the methods whose score names shipped as local_score_*.
 _SCORE_FUNC_RENAMED = concept_param("score_func", doc=_SCORE_DOC, choice_aliases=SCORE_ALIASES)
 _EBIC_GAMMA = concept_param("ebic_gamma")
-_EBIC_GAMMA_STANDARD = ParamSpec(
-    name="ebic_gamma",
-    type="float",
-    default=0.0,
-    doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
-    "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
-    "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
-    minimum=0,
-    concept="ebic_gamma",
-)
+_EBIC_GAMMA_STANDARD = concept_param("ebic_gamma", default=0.0)
 _SEED = concept_param(
     "seed",
-    doc="Seed for the search's random orders. null uses ANDREY_SEED, or 0 when it is unset.",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the search's random orders.",
 )
 _N_STARTS = concept_param("n_starts")
 _TEST_SEED = concept_param(
     "seed",
-    doc="Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc make; the "
-    "other tests ignore it. null uses ANDREY_SEED, or 0 when it is unset.",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc "
+    "make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 
@@ -144,7 +136,6 @@ _add(
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _TEST_SEED,
         ),
         references=(
@@ -186,7 +177,6 @@ _add(
             _INDEP_TEST,
             _COLLIDER_RULE,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
             _TEST_SEED,
         ),
@@ -233,7 +223,6 @@ _add(
             _ALPHA,
             _COLLIDER_RULE,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
             _TEST_SEED,
             concept_param(
@@ -297,7 +286,6 @@ _add(
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             ParamSpec(
                 name="dependence_threshold",
                 minimum=0,
@@ -374,7 +362,7 @@ for _name, _summary, _key, _refs in (
             column_order="relabels",
             tie_break=True,
             seeded=True,
-            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES, _TEST_SEED),
+            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
             references=_refs,
         )
     )
@@ -416,7 +404,6 @@ _add(
                 "null sets no cap; the forward phase then keeps its gate of n_variables / 2.",
             ),
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Chickering 2002",),
     )
@@ -464,7 +451,6 @@ _add(
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Hauser & Buhlmann 2012", "Cooper & Yoo 1999"),
     )
@@ -508,7 +494,6 @@ _add(
                 "false returns the converged graph.",
             ),
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Nazaret & Blei 2024",),
     )
@@ -547,7 +532,6 @@ _add(
                 nullable=True,
             ),
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),
     )
@@ -608,7 +592,6 @@ _add(
                 nullable=True,
             ),
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Glover 1986", "Russell & Norvig 2009", "Scutari 2010"),
     )
@@ -647,7 +630,6 @@ _add(
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Yuan & Malone 2013", "Silander & Myllymaki 2006"),
     )
@@ -785,8 +767,9 @@ _add(
             ),
             concept_param(
                 "seed",
-                doc="Seed for the torch optimizer. null uses ANDREY_SEED, or 0 when it is unset; "
-                "metadata['seed'] records the seed used.",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the torch optimizer; metadata['seed'] "
+                "records the seed used.",
             ),
         ),
         references=("Jin, Ng, Zhang & Huang 2026",),
@@ -1009,7 +992,6 @@ _add(
             _EBIC_GAMMA,
             _HYBRID_MAX_ITER,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _TEST_SEED,
         ),
         references=("Tsamardinos, Brown & Aliferis 2006",),
@@ -1076,7 +1058,6 @@ _add(
                 nullable=True,
             ),
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _TEST_SEED,
         ),
         references=(
@@ -1119,7 +1100,6 @@ _add(
             _SEED,
             _N_STARTS,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
@@ -1151,17 +1131,17 @@ _add(
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             ParamSpec(
-                name="depth",
+                name="grasp_depth",
                 minimum=1,
                 type="int",
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
                 "search more chains and run longer.",
+                aliases=("depth",),
             ),
             _SEED,
             _N_STARTS,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
         ),
         references=("Lam, Andrews & Ramsey 2022",),
     )
@@ -1220,8 +1200,8 @@ _add(
         params=(
             concept_param(
                 "seed",
-                doc="Seed for FastICA's starting point. null uses ANDREY_SEED, or 0 when it is "
-                "unset.",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for FastICA's starting point.",
                 aliases=("random_state",),
             ),
             concept_param(
@@ -1433,7 +1413,7 @@ _add(
                 doc="The largest lag tested; links at lags 1 to tau_max are tested.",
             ),
             ParamSpec(
-                name="pc_alpha",
+                name="pc1_alpha",
                 type="float",
                 default=0.2,
                 doc="Significance level of the PC1 parent selection; larger keeps more parents as "
@@ -1442,6 +1422,7 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
+                aliases=("pc_alpha",),
             ),
             concept_param(
                 "alpha",
@@ -1451,8 +1432,14 @@ _add(
             ),
             _INDEP_TEST,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _TEST_SEED,
+            concept_param(
+                "max_depth",
+                doc="The maximum conditioning-set size of every test of the PC1 step, which "
+                "selects the lagged parents, at least 0: 0 runs only unconditional tests, and null "
+                "sets no limit. The MCI tests condition on the selected parents of both ends, "
+                "however many.",
+            ),
         ),
         references=("Runge et al. 2019",),
     )
@@ -1485,7 +1472,7 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        order_note='With `collider_rule="none"`, the orientations can follow the column order.',
+        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
         params=(
             concept_param(
                 "tau_max",
@@ -1499,19 +1486,16 @@ _add(
                 "(Runge 2020).",
                 aliases=("pc_alpha",),
             ),
-            ParamSpec(
-                name="collider_rule",
-                type="str",
+            concept_param(
+                "collider_rule",
                 default="majority",
-                choices=("majority", "conservative", "none"),
-                doc="How a same-step collider is judged: majority = fewer than half of the "
-                "separating subsets hold the middle; conservative = none does; none = the middle "
-                "is not in the one separating set found.",
-                concept="collider_rule",
+                doc="How a same-step collider is judged: sepsets = the middle is not in the one "
+                "separating set found; majority = fewer than half of the separating subsets hold "
+                "the middle; conservative = none does. The default majority is tigramite's.",
+                choice_aliases=(("none", "sepsets"),),
             ),
             _INDEP_TEST,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _TEST_SEED,
             concept_param(
                 "max_p_global",
@@ -1519,6 +1503,13 @@ _add(
                 "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
                 "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
                 "tests and can keep links that a larger conditioning set would remove.",
+            ),
+            concept_param(
+                "max_depth",
+                doc="The maximum conditioning-set size of every test of the lagged phase, PC1 as "
+                "in pcmci, at least 0: 0 runs only unconditional tests, and null sets no limit. "
+                "The later phases add the lagged parents of both ends to every test, which "
+                "max_p_global caps.",
             ),
         ),
         references=("Runge 2020",),
@@ -1574,7 +1565,6 @@ _add(
             ),
             _INDEP_TEST,
             _CATEGORICAL,
-            _MAX_CATEGORIES,
             _TEST_SEED,
             concept_param(
                 "max_p_global",
@@ -2023,6 +2013,13 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
         )
 
 
+# Every method with categorical columns ignores max_categories, with a warning, for one release:
+# values no longer declare a column's type.
+for _name in CONCEPTS["categorical"].suitable:
+    _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
+    REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
+
+
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
@@ -2046,9 +2043,9 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
 }
-# The shared keys: the name, the seed of a seeded fit, the test and the score it used, the column
-# types a mixed-data setting read, the fewest rows a test used, and the triples a collider vote left
-# ambiguous.
+# The shared keys: the name, the seed of a seeded fit, the test and the score it used with the
+# score's penalties, the configuration's tie-break rule, the column types a mixed-data setting read,
+# the fewest rows a test used, and the triples a collider vote left ambiguous.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -2056,6 +2053,8 @@ for _name, _spec in REGISTRY.items():
         *(("seed",) if _spec.seeded else ()),
         *(("indep_test",) if "indep_test" in _concepts else ()),
         *(("score_func",) if "score_func" in _concepts else ()),
+        *(k for k in ("penalty_discount", "ebic_gamma") if k in _concepts),
+        *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),

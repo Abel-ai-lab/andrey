@@ -205,12 +205,12 @@ def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
 
 @pytest.mark.parametrize(("pinned", "workers"), [("1", 1), ("4", 4), ("-1", -1), ("", 2), ("x", 2)])
 def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(monkeypatch, pinned, workers):
-    """`split_cores` pins `ANDREY_NUM_WORKERS` to the core budget, so at `--cores 1` a parallel
+    """`split_cores` pins `ANDREY_N_JOBS` to the core budget, so at `--cores 1` a parallel
     adapter runs one worker, as its record says. The fallback covers only an unset or unreadable
     value."""
     from andrey_bench.adapters import andrey_ges
 
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", pinned)
+    monkeypatch.setenv("ANDREY_N_JOBS", pinned)
     assert andrey_ges._parallel_workers() == workers
 
 

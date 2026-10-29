@@ -24,6 +24,64 @@ import andrey
 warnings.simplefilter("error", andrey.DeprecatedArgumentWarning)
 ```
 
+## From 0.11 to 0.12
+
+Andrey 0.12.0 renames the arguments below and reads a column's type only from what you declare. A
+former name in the table still works in 0.12, with an `andrey.DeprecatedArgumentWarning`, and stops
+working in the next release:
+
+| Method | Former name | Name now |
+| --- | --- | --- |
+| `grasp` | `depth` | `grasp_depth` |
+| `pcmci` | `pc_alpha` | `pc1_alpha` |
+| `pcmciplus` | `collider_rule="none"` | `collider_rule="sepsets"` |
+| `andrey.bootstrap` | `n_boot` (`--n-boot`) | `n_resamples` (`--n-resamples`) |
+| `andrey.config` | `num_workers` | `n_jobs` |
+| environment | `ANDREY_NUM_WORKERS` | `ANDREY_N_JOBS` |
+| every method with `categorical` | `max_categories` | none: ignored; declare the column types |
+
+```python
+# 0.11
+out = andrey.grasp(data, depth=2)
+out = andrey.pcmci(series, pc_alpha=0.1)
+with andrey.config(num_workers=8):
+    boot = andrey.bootstrap(andrey.pc, data, n_boot=200)
+
+# 0.12
+out = andrey.grasp(data, grasp_depth=2)
+out = andrey.pcmci(series, pc1_alpha=0.1)
+with andrey.config(n_jobs=8):
+    boot = andrey.bootstrap(andrey.pc, data, n_resamples=200)
+```
+
+A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` still works for
+one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now
+`bootstrap.n_resamples`, with no former name.
+
+### Column types
+
+A mixed-data test or score you name, such as `indep_test="cond_gauss"`, read every column of at
+most `max_categories` distinct whole numbers as categorical. It now reads only the columns you
+declare, with `categorical` or a DataFrame's `category`, `bool`, or text type, as `None` does, and
+warns about the others that they may hold category codes. Name such columns to keep the former
+result:
+
+```python
+# 0.11: column "smoker" holds 0 and 1, read as categorical from its values
+out = andrey.pc(df, indep_test="cond_gauss")
+
+# 0.12
+out = andrey.pc(df, indep_test="cond_gauss", categorical=["smoker"])
+out = andrey.pc(df.astype({"smoker": "category"}))  # None picks cond_gauss from the type
+```
+
+A test or score for continuous data, such as `"fisherz"` or `"bic"`, raises `ValueError` on a
+column you declare categorical, by its type as well as by `categorical`. Leave the setting as `None`
+to pick one that reads categories, or pass `categorical=[]` to read every column as numbers.
+
+`ebic_gamma` takes values from 0 to 1 and only with `score_func="bic"`; drop it from a call with
+another score.
+
 ## From 0.10 to 0.11
 
 Andrey 0.11.0 gives each setting one name in every method, such as `seed`, `alpha`,

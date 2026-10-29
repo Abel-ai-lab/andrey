@@ -379,7 +379,7 @@ def test_signed_endpoints_and_weighted_adjacency_preserve_edge_direction():
 
 def test_worker_environment_pins_all_numeric_threads():
     assert workers.THREAD_ENV["OMP_NUM_THREADS"] == "1"
-    assert workers.THREAD_ENV["ANDREY_NUM_WORKERS"] == "1"
+    assert workers.THREAD_ENV["ANDREY_N_JOBS"] == "1"
     assert workers.THREAD_ENV["CUDA_VISIBLE_DEVICES"] == ""
     assert all(
         workers.THREAD_ENV[name] == "1"

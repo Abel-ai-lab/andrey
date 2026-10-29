@@ -327,7 +327,7 @@ def _run(adapter, data: np.ndarray, params, warmup: int) -> dict:
         "output_hash": output_hash,
         # Record the resource settings seen by the child.
         "threads": _int_env("OMP_NUM_THREADS"),
-        "num_workers": _int_env("ANDREY_NUM_WORKERS"),
+        "n_jobs": _int_env("ANDREY_N_JOBS"),
         "device_id": _observed_device(backend_name),
         "gpu_peak_alloc_mb": _cuda_peak_alloc_mb(backend_name),
         "adj": adj,

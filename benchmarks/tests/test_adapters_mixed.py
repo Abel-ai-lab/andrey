@@ -24,7 +24,11 @@ import andrey
 from andrey.data import sample_mixed
 from andrey_bench import datasets
 from andrey_bench.adapters import tetrad_cmd
-from andrey_bench.adapters.andrey_mixed import MAX_CATEGORIES, andrey_mixed_adapters
+from andrey_bench.adapters.andrey_mixed import (
+    MAX_CATEGORIES,
+    andrey_mixed_adapters,
+    coded_columns,
+)
 from andrey_bench.adapters.bnlearn_mixed import BnlearnHCCondGauss, BnlearnPCStableCondGauss
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.datasets import DatasetKey
@@ -104,8 +108,8 @@ def test_the_lane_rule_reads_exactly_the_generated_categorical_columns(categorie
     key = _key(categories=categories)
     data, marks, kind, _ = datasets.generate_one(key)
     truth = sample_mixed(d=8, n=600, seed=0, categories=categories).provenance["config"]
-    with pytest.warns(andrey.DataTypeWarning):
-        out = andrey.pc(data, indep_test="degen_gauss", max_categories=MAX_CATEGORIES)
+    assert coded_columns(data, MAX_CATEGORIES) == truth["categorical"]
+    out = andrey.pc(data, indep_test="degen_gauss", categorical=coded_columns(data, MAX_CATEGORIES))
     assert out.metadata["categorical"] == truth["categorical"]
     assert kind == "dag" and marks.shape == (8, 8)
 

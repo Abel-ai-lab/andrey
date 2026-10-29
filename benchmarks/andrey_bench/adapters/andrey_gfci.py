@@ -58,7 +58,7 @@ class AndreyGFCI:
         import andrey
 
         workers = 1 if self.mode == "serial" else _parallel_workers()
-        with andrey.config(num_workers=workers):
+        with andrey.config(n_jobs=workers):
             out = andrey.gfci(
                 np.asarray(data, dtype=np.float64),
                 alpha=float(params.get("alpha", _DEFAULT_ALPHA)),

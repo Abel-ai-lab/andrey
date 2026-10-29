@@ -47,7 +47,7 @@ def parse_tie_break(value: str, source: str) -> str:
     return rule
 
 
-def parse_num_workers(value: int | str, source: str) -> int:
+def parse_n_jobs(value: int | str, source: str) -> int:
     """Return a worker count: an integer ``>= -1``, where ``-1`` means all usable cores."""
     try:
         n = int(value)
@@ -108,7 +108,9 @@ class Setting(Generic[T]):
 
 BACKEND = Setting("ANDREY_BACKEND", parse_backend)
 DEVICE = Setting("ANDREY_DEVICE", parse_backend)
-NUM_WORKERS = Setting("ANDREY_NUM_WORKERS", parse_num_workers)
+N_JOBS = Setting("ANDREY_N_JOBS", parse_n_jobs)
+#: The former name of ``ANDREY_N_JOBS``, read for one release when it is unset.
+NUM_WORKERS = Setting("ANDREY_NUM_WORKERS", parse_n_jobs)
 GES_PARALLEL_MIN_WORK = Setting("ANDREY_GES_PARALLEL_MIN_WORK", parse_int)
 SKELETON_PARALLEL_MIN_WORK = Setting("ANDREY_SKELETON_PARALLEL_MIN_WORK", parse_int)
 RCOT_PARALLEL_MIN_WORK = Setting("ANDREY_RCOT_PARALLEL_MIN_WORK", parse_int)
@@ -128,6 +130,7 @@ SETTINGS: dict[str, Setting] = {
     for s in (
         BACKEND,
         DEVICE,
+        N_JOBS,
         NUM_WORKERS,
         GES_PARALLEL_MIN_WORK,
         SKELETON_PARALLEL_MIN_WORK,

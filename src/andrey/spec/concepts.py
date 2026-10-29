@@ -159,7 +159,7 @@ _CONCEPTS = (
     Concept(
         key="alpha",
         summary="The significance level of the test that decides the returned edges, or of the "
-        "only test. A second test step's level is <step>_alpha.",
+        "only test, in the open interval (0, 1). A second test step's level is <step>_alpha.",
         param=_template(
             "alpha",
             "float",
@@ -271,16 +271,18 @@ _CONCEPTS = (
     ),
     Concept(
         key="ebic_gamma",
-        summary="The weight of the extended-BIC term.",
+        summary="The weight of the extended-BIC term of the linear-Gaussian BIC, from 0 to 1 "
+        "(Chen and Chen 2008). A call that passes it with another score raises ValueError.",
         param=_template(
             "ebic_gamma",
             "float",
             1.0,
             "Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) "
             "that the linear-Gaussian BIC adds per variable; it grows with the number of "
-            "variables. Larger values give sparser graphs; 0.0 is the standard BIC. Other scores "
-            "ignore it.",
+            "variables, from 0 to 1. Larger values give sparser graphs; 0.0 is the standard BIC. "
+            "Only bic uses it: passing it with another score raises ValueError.",
             minimum=0,
+            maximum=1,
         ),
         fragment="extended-BIC term",
         suitable=SCORE_SEARCHES,
@@ -368,6 +370,19 @@ _CONCEPTS = (
                 reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
                 "one when there are fewer rows than variables; the minimum is 1, since the "
                 "smallest ancestor test regresses one variable on another.",
+            ),
+            *(
+                Deviation(
+                    method=m,
+                    name="max_depth",
+                    default=None,
+                    fixed_in=None,
+                    fragment="pc1",
+                    reason="It caps the PC1 step that selects the lagged parents, as tigramite's "
+                    "max_conds_dim does; the later tests condition on those parents, however "
+                    "many, which max_p_global caps in pcmciplus.",
+                )
+                for m in ("pcmci", "pcmciplus")
             ),
         ),
     ),
@@ -484,19 +499,21 @@ _CONCEPTS = (
     ),
     Concept(
         key="seed",
-        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset. A "
-        "method that tests independence takes it for the randomized tests: "
+        summary="The seed of every random draw. None is the configured seed, ANDREY_SEED or 0 "
+        "when it is unset, not a fresh random one, so a fit repeats. A method that tests "
+        "independence takes it for the randomized tests: "
         f"{', '.join(STOCHASTIC_INDEP_TESTS)}.",
         param=_template(
             "seed",
             "int",
             None,
-            "Seed for the method's random draws. null uses ANDREY_SEED, or 0 when it is unset.",
+            "null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random "
+            "one, so a fit repeats. Seed for the method's random draws.",
             nullable=True,
             minimum=0,
             maximum=SEED_MAX,
         ),
-        fragment="ANDREY_SEED",
+        fragment="not a fresh random one",
         suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "boss", "grasp", "calm", "ica_lingam"),
         exempt=(
             *_exempt(
@@ -529,14 +546,14 @@ _CONCEPTS = (
         others_exempt="Runs one search per fit.",
     ),
     Concept(
-        key="num_workers",
+        key="n_jobs",
         summary="Parallelism and the device come from andrey.config or ANDREY_*, never from a "
         "method argument.",
         param=_template(
-            "num_workers",
+            "n_jobs",
             "int",
             None,
-            "Not a method argument: set it with andrey.config(num_workers=...).",
+            "Not a method argument: set it with andrey.config(n_jobs=...).",
             nullable=True,
         ),
         suitable=(),
@@ -611,41 +628,14 @@ _CONCEPTS = (
             None,
             "The categorical columns, for a mixed-data test or score: column names from the data "
             "file's header or 0-based positions, for example, categorical=[smoker,region]; [] "
-            "marks none. With a null test or score they declare the column types the default "
-            "picks from. null takes a DataFrame's category, bool, and text columns; a mixed-data "
-            "setting passed explicitly also infers every column of at most max_categories distinct "
-            "whole numbers, named in a DataTypeWarning; with none, the setting runs as its "
-            "linear-Gaussian form and warns. Other tests and scores take only null or [].",
+            "marks none. null takes a DataFrame's category, bool, and text columns. Values never "
+            "declare a column. With a null test or score they declare the column types the "
+            "default picks from; a mixed-data setting reads the declared columns as categorical, "
+            "and with none it runs as its linear-Gaussian form and warns. A setting for continuous "
+            "data raises ValueError on a declared column, by either route.",
             nullable=True,
         ),
         fragment="categorical columns",
-        suitable=(
-            *CI_SEARCHES,
-            "ges",
-            "hc",
-            "exact_search",
-            "boss",
-            "grasp",
-            "tabu",
-            "gies",
-            "xges",
-            *PCMCI_FAMILY,
-        ),
-        others_exempt="A continuous model.",
-    ),
-    Concept(
-        key="max_categories",
-        summary="The most distinct whole numbers a column may hold to be inferred as categorical.",
-        param=_template(
-            "max_categories",
-            "int",
-            10,
-            "The most distinct whole numbers a column may hold to be inferred as categorical, at "
-            "least 2. With a continuous test or score, such columns get a one-time "
-            "DataTypeWarning that they may be category codes.",
-            minimum=2,
-        ),
-        fragment="inferred as categorical",
         suitable=(
             *CI_SEARCHES,
             "ges",
@@ -788,10 +778,13 @@ _CONCEPTS = (
                 method="pcmciplus",
                 name="collider_rule",
                 default="majority",
-                choices=("majority", "conservative", "none"),
-                fixed_in="0.11.0",
+                choices=COLLIDER_RULES,
+                fixed_in=None,
                 aliases=("none",),
-                reason="none is sepsets under another name; the default majority is tigramite's.",
+                reason="majority is tigramite's default (contemp_collider_rule) and orients the "
+                "same-step links without regard to the order of the variables, where sepsets reads "
+                "the one separating set the skeleton phase stored, which can change with it "
+                "(Runge 2020).",
             ),
         ),
     ),
@@ -814,7 +807,9 @@ _CONCEPTS = (
         "conflicts for the links colliders ask to orient both ways, score for a score search's "
         "score. An order that is not a total order of the variables has its own name "
         "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
-        "default leaves open: seed, indep_test, and score_func hold the value the fit used.",
+        "default or the configuration leaves open: seed, indep_test, score_func, and the "
+        "score's penalty_discount and ebic_gamma hold the value the fit used, and tie_break the "
+        "rule of andrey.config that a fit it can change ran under.",
         suitable=ALL_METHODS,
     ),
     Concept(
@@ -822,7 +817,8 @@ _CONCEPTS = (
         summary="A method with an indep_test or a score_func records the one it used in "
         "metadata['indep_test'] or metadata['score_func'], as its current short name: the name "
         "the call passed, or, for None, the one picked from the declared column types. A "
-        "registered test records its registered name.",
+        "registered test records its registered name. A score search records the penalties its "
+        "score used: penalty_discount for every score but bdeu, and ebic_gamma for bic.",
         suitable=tuple(
             m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
         ),

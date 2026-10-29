@@ -149,6 +149,7 @@ pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
   jnk -> pkc
 
   indep_test: fisherz
+  tie_break: rank
 {'shd': 11, 'skeleton_precision': 1.0, 'skeleton_recall': 0.47}
 ```
 

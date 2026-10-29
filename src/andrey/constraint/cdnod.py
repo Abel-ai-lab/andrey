@@ -112,7 +112,7 @@ def cdnod(
     step, which orients only undirected edges, so it never orients against them. ``workers``
     worker processes share the skeleton search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
     ``GraphStructure`` tagged ``"cpdag"``: its directions
     include those the index identifies, so it is not an observational CPDAG. The private

@@ -28,7 +28,7 @@ _ENV = {
     "warmup": 1,
     "machine_id": "node-a",
     "threads": 16,
-    "num_workers": 1,
+    "n_jobs": 1,
 }
 
 _OTHER = {
@@ -41,7 +41,7 @@ _OTHER = {
     "warmup": 0,
     "machine_id": "node-b",
     "threads": 1,
-    "num_workers": 16,
+    "n_jobs": 16,
 }
 
 
@@ -75,7 +75,7 @@ def _measures(**overrides) -> dict:
         "dtype": "float64",
         "env_device": "cpu",
         "env_threads": 16,
-        "env_num_workers": 1,
+        "env_n_jobs": 1,
         "env_ges_min_work": None,
     }
     return {**base, **overrides}
@@ -112,7 +112,7 @@ def test_a_numeric_leg_is_compared_by_value_not_by_type():
 #: measures key -> a value differing from :func:`_measures`, for every field the runner reports.
 _MEASURES_FIELDS = {
     "env_threads": 1,
-    "env_num_workers": 8,
+    "env_n_jobs": 8,
     "env_ges_min_work": 5_000,
     "env_device": "cuda",
     "cap_mem_mb": 4096.0,
@@ -192,10 +192,10 @@ def test_the_parent_declaration_survives_a_censored_record():
 
 
 def test_an_env_overlay_moves_the_legs_the_arguments_would_have_missed():
-    base = {"OMP_NUM_THREADS": "16", "ANDREY_NUM_WORKERS": "1"}
+    base = {"OMP_NUM_THREADS": "16", "ANDREY_N_JOBS": "1"}
     assert runner.resolved_env_fields(base) == {
         "env_threads": 16,
-        "env_num_workers": 1,
+        "env_n_jobs": 1,
         "env_ges_min_work": None,
         "env_device": "cpu",
     }
@@ -208,9 +208,9 @@ def test_an_env_overlay_moves_the_legs_the_arguments_would_have_missed():
 
 def test_the_record_carries_the_child_observed_split_not_the_intent():
     """The parent's numbers are in ``run_id``; the columns are what the child came back with."""
-    record = _record(_measures(threads=4, num_workers=2, device_id="cpu"))
-    assert (record.threads, record.num_workers, record.device_id) == (4, 2, "cpu")
+    record = _record(_measures(threads=4, n_jobs=2, device_id="cpu"))
+    assert (record.threads, record.n_jobs, record.device_id) == (4, 2, "cpu")
     # A child that never reported leaves them empty rather than echoing the parent's intent.
     dead = _record(_measures(status="timeout"))
-    assert (dead.threads, dead.num_workers, dead.device_id) == (None, None, None)
+    assert (dead.threads, dead.n_jobs, dead.device_id) == (None, None, None)
     assert dead.run_id  # ... and the run is still identified

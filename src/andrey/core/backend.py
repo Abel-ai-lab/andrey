@@ -1,6 +1,6 @@
 """Backend, worker, and tie-break selection.
 
-``backend`` sets a preference for NumPy or PyTorch and the device it runs on; ``num_workers``
+``backend`` sets a preference for NumPy or PyTorch and the device it runs on; ``n_jobs``
 controls parallel execution; ``tie_break`` sets how the searches order tied choices.
 ``docs/docs/configuration.md`` describes every value. Each operation
 supports a subset of the backends, including the always-available ``numpy`` reference. A backend
@@ -10,7 +10,7 @@ warns once and uses automatic selection. PyTorch, provided by the ``torch`` extr
 only when needed.
 
 A setting resolves from the call's argument, then ``with andrey.config(...)``, then the
-:data:`config` object, then ``ANDREY_BACKEND`` / ``ANDREY_NUM_WORKERS`` / ``ANDREY_TIE_BREAK``
+:data:`config` object, then ``ANDREY_BACKEND`` / ``ANDREY_N_JOBS`` / ``ANDREY_TIE_BREAK``
 (read live), then the default. ``with`` uses context variables, so its overrides do not reach
 threads started inside the block.
 """
@@ -51,8 +51,8 @@ _UNAVAILABLE_HINT = {
 _backend_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "andrey_backend", default=None
 )
-_num_workers_var: contextvars.ContextVar[int | None] = contextvars.ContextVar(
-    "andrey_num_workers", default=None
+_n_jobs_var: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "andrey_n_jobs", default=None
 )
 _tie_break_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "andrey_tie_break", default=None
@@ -61,6 +61,14 @@ _tie_break_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 def _warn_once(message: str) -> None:
     warning_policy.warn_once(message, warning_policy.BackendFallbackWarning)
+
+
+def _warn_former(old: str, new: str) -> None:
+    """Warn once that the setting ``old`` is now ``new``."""
+    warning_policy.warn_once(
+        f"{old} is now {new}; the former name stops working in the next release",
+        warning_policy.DeprecatedArgumentWarning,
+    )
 
 
 # ---- optional accelerators ----------------------------------------------------------------------
@@ -118,10 +126,10 @@ def _is_live(b: str) -> bool:
 class _Config:
     """Process-wide backend, worker, and tie-break settings, also usable as a ``with`` block.
 
-    Assigning ``andrey.config.backend``, ``andrey.config.num_workers``, or
+    Assigning ``andrey.config.backend``, ``andrey.config.n_jobs``, or
     ``andrey.config.tie_break`` changes the default for later calls; assigning ``None`` returns to
-    ``ANDREY_BACKEND``, ``ANDREY_NUM_WORKERS``, and ``ANDREY_TIE_BREAK``.
-    ``with andrey.config(backend=..., num_workers=..., tie_break=...):`` changes them inside the
+    ``ANDREY_BACKEND``, ``ANDREY_N_JOBS``, and ``ANDREY_TIE_BREAK``.
+    ``with andrey.config(backend=..., n_jobs=..., tie_break=...):`` changes them inside the
     block only, and does not reach threads started inside it. The order, most specific first:
     ``with`` block, these attributes, the environment variables, the defaults.
 
@@ -134,7 +142,7 @@ class _Config:
     uses ``"auto"``; a supported but unavailable backend also warns once with
     ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise ``ValueError``.
 
-    ``num_workers`` counts worker processes (threads for ``granger``): ``-1`` uses every usable
+    ``n_jobs`` counts worker processes (threads for ``granger``): ``-1`` uses every usable
     core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
     workers.
 
@@ -154,7 +162,7 @@ class _Config:
     """
 
     _backend: str | None = None
-    _num_workers: int | None = None
+    _n_jobs: int | None = None
     _tie_break: str | None = None
 
     @property
@@ -167,15 +175,24 @@ class _Config:
         self._backend = None if value is None else env.parse_backend(value, "config.backend")
 
     @property
-    def num_workers(self) -> int:
+    def n_jobs(self) -> int:
         """The worker count in effect; assigning a value below ``-1`` raises ``ValueError``."""
-        return _resolve_num_workers(None)
+        return _resolve_n_jobs(None)
+
+    @n_jobs.setter
+    def n_jobs(self, value: int | None) -> None:
+        self._n_jobs = None if value is None else env.parse_n_jobs(value, "config.n_jobs")
+
+    @property
+    def num_workers(self) -> int:
+        """The former name of :attr:`n_jobs`, kept for one release with a warning."""
+        _warn_former("andrey.config.num_workers", "andrey.config.n_jobs")
+        return self.n_jobs
 
     @num_workers.setter
     def num_workers(self, value: int | None) -> None:
-        self._num_workers = (
-            None if value is None else env.parse_num_workers(value, "config.num_workers")
-        )
+        _warn_former("andrey.config.num_workers", "andrey.config.n_jobs")
+        self.n_jobs = value
 
     @property
     def tie_break(self) -> str:
@@ -190,8 +207,9 @@ class _Config:
         self,
         *,
         backend: str | None = None,
-        num_workers: int | None = None,
+        n_jobs: int | None = None,
         tie_break: str | None = None,
+        num_workers: int | None = None,
     ):
         """Return a context manager that sets the given settings for a ``with`` block.
 
@@ -199,10 +217,13 @@ class _Config:
         ----------
         backend : str or None, default=None
             Backend preference for the block; ``None`` keeps the current one.
-        num_workers : int or None, default=None
+        n_jobs : int or None, default=None
             Worker count for the block, ``-1`` or more; ``None`` keeps the current one.
         tie_break : {"rank", "position"} or None, default=None
             Tie-break rule for the block; ``None`` keeps the current one.
+        num_workers : int or None, default=None
+            The former name of ``n_jobs``, kept for one release with a
+            :class:`~andrey.DeprecatedArgumentWarning`.
 
         Returns
         -------
@@ -213,22 +234,27 @@ class _Config:
         ------
         ValueError
             On entering the block, if ``backend`` or ``tie_break`` is not a known name or
-            ``num_workers`` is not an integer of at least ``-1``; the message lists the accepted
-            values.
+            ``n_jobs`` is not an integer of at least ``-1``; the message lists the accepted
+            values. At once, if the call passes both ``n_jobs`` and ``num_workers``.
         """
-        return _scope(backend, num_workers, tie_break)
+        if num_workers is not None:
+            if n_jobs is not None:
+                raise ValueError("num_workers is the former name of n_jobs; pass only n_jobs")
+            _warn_former("andrey.config(num_workers=...)", "andrey.config(n_jobs=...)")
+            n_jobs = num_workers
+        return _scope(backend, n_jobs, tie_break)
 
 
 config = _Config()
 
 
 @contextlib.contextmanager
-def _scope(backend: str | None, num_workers: int | None, tie_break: str | None):
+def _scope(backend: str | None, n_jobs: int | None, tie_break: str | None):
     b = None if backend is None else env.parse_backend(backend, "backend")
-    w = None if num_workers is None else env.parse_num_workers(num_workers, "num_workers")
+    w = None if n_jobs is None else env.parse_n_jobs(n_jobs, "n_jobs")
     r = None if tie_break is None else env.parse_tie_break(tie_break, "tie_break")
     bt = _backend_var.set(b) if b is not None else None
-    wt = _num_workers_var.set(w) if w is not None else None
+    wt = _n_jobs_var.set(w) if w is not None else None
     rt = _tie_break_var.set(r) if r is not None else None
     try:
         yield
@@ -236,7 +262,7 @@ def _scope(backend: str | None, num_workers: int | None, tie_break: str | None):
         if bt is not None:
             _backend_var.reset(bt)
         if wt is not None:
-            _num_workers_var.reset(wt)
+            _n_jobs_var.reset(wt)
         if rt is not None:
             _tie_break_var.reset(rt)
 
@@ -256,16 +282,20 @@ def _resolve_backend() -> str:
     return backend or device or "auto"
 
 
-def _resolve_num_workers(kwarg: int | None) -> int:
-    """Resolve num_workers by precedence: kwarg > context > config > env > ``1`` (serial)."""
+def _resolve_n_jobs(kwarg: int | None) -> int:
+    """Resolve n_jobs by precedence: kwarg > context > config > env > ``1`` (serial)."""
     if kwarg is not None:
-        return env.parse_num_workers(kwarg, "num_workers")
-    scoped = _num_workers_var.get()
+        return env.parse_n_jobs(kwarg, "n_jobs")
+    scoped = _n_jobs_var.get()
     if scoped is not None:
         return scoped
-    if config._num_workers is not None:
-        return config._num_workers
-    n = env.NUM_WORKERS.read()
+    if config._n_jobs is not None:
+        return config._n_jobs
+    n = env.N_JOBS.read()
+    if n is None:
+        n = env.NUM_WORKERS.read()
+        if n is not None:
+            _warn_former("ANDREY_NUM_WORKERS", "ANDREY_N_JOBS")
     return 1 if n is None else n
 
 
@@ -425,7 +455,7 @@ def resolve(
     return dev
 
 
-# ---- the executor axis: num_workers over a process pool -----------------------------------------
+# ---- the executor axis: n_jobs over a process pool -----------------------------------------
 
 
 # CPU limits on Linux can come from both scheduler affinity and cgroups.
@@ -528,9 +558,9 @@ def usable_cpus() -> int:
     return max(1, min(limits))
 
 
-def worker_count(num_workers: int | None = None) -> int:
-    """Resolve ``num_workers`` to a worker count; ``-1`` means all usable CPUs."""
-    n = _resolve_num_workers(num_workers)
+def worker_count(n_jobs: int | None = None) -> int:
+    """Resolve ``n_jobs`` to a worker count; ``-1`` means all usable CPUs."""
+    n = _resolve_n_jobs(n_jobs)
     if n == -1:
         return usable_cpus()
     return max(1, n)
@@ -576,7 +606,7 @@ class Backend:
     """A snapshot of the backend + worker settings and what is available on this machine."""
 
     backend: str
-    num_workers: int
+    n_jobs: int
     torch: bool
     cuda: bool
     mps: bool
@@ -587,10 +617,7 @@ class Backend:
             for name, ok in self.available_backends().items()
             if ok
         )
-        return (
-            f"Backend(backend={self.backend!r}, num_workers={self.num_workers}, "
-            f"available=[{available}])"
-        )
+        return f"Backend(backend={self.backend!r}, n_jobs={self.n_jobs}, available=[{available}])"
 
     def available_backends(self) -> dict[str, bool]:
         """Availability for each explicit ``ANDREY_BACKEND`` choice; ``cpu`` uses PyTorch."""
@@ -603,10 +630,10 @@ class Backend:
 
     def as_dict(self) -> dict:
         """The machine-readable snapshot. ``andrey config --json`` reports its ``backend`` and
-        ``num_workers`` under ``configuration`` and its ``available_backends`` unchanged."""
+        ``n_jobs`` under ``configuration`` and its ``available_backends`` unchanged."""
         return {
             "backend": self.backend,
-            "num_workers": self.num_workers,
+            "n_jobs": self.n_jobs,
             "available_backends": self.available_backends(),
         }
 
@@ -656,23 +683,23 @@ def describe() -> Backend:
     -------
     Backend
         A read-only snapshot with the fields ``backend`` (the preference, such as ``"auto"``),
-        ``num_workers`` (``-1`` means every usable core), ``torch`` (whether the module is installed
+        ``n_jobs`` (``-1`` means every usable core), ``torch`` (whether the module is installed
         or already imported), and ``cuda`` and ``mps`` (whether PyTorch reports a usable device).
         ``available_backends()`` maps ``numpy``, ``cpu``, ``cuda``, and ``mps`` to availability;
-        ``cpu`` uses the ``torch`` field. ``as_dict()`` returns ``backend``, ``num_workers``, and
+        ``cpu`` uses the ``torch`` field. ``as_dict()`` returns ``backend``, ``n_jobs``, and
         this availability mapping as a JSON-ready dict.
 
     Raises
     ------
     ValueError
-        If a setting read from ``ANDREY_BACKEND``, ``ANDREY_DEVICE``, or ``ANDREY_NUM_WORKERS``
+        If a setting read from ``ANDREY_BACKEND``, ``ANDREY_DEVICE``, or ``ANDREY_N_JOBS``
         holds an invalid value; a context or config override takes precedence over those variables.
     """
     has_torch = _installed("torch")
     cuda_build = has_torch and ("torch" in sys.modules or _torch_gpu_build())
     return Backend(
         backend=_resolve_backend(),
-        num_workers=_resolve_num_workers(None),
+        n_jobs=_resolve_n_jobs(None),
         torch=has_torch,
         cuda=cuda_build and _is_available("cuda"),
         mps=has_torch and sys.platform == "darwin" and _is_available("mps"),

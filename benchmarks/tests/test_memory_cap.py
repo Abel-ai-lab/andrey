@@ -225,7 +225,7 @@ def test_a_cap_breached_only_by_pooled_workers_still_fires(footprint_mb):
     leader_only = _run(StubWorkerSizedAllocAdapter(), cap_mem_mb=cap)
     assert leader_only["status"] == "ok", leader_only  # one worker's share fits under the cap
 
-    pooled = _run(StubPoolAllocAdapter(), cap_mem_mb=cap, num_workers=2)
+    pooled = _run(StubPoolAllocAdapter(), cap_mem_mb=cap, n_jobs=2)
     assert pooled["status"] == "oom", pooled
     assert pooled["oom_source"] == "poller", pooled
     assert pooled["exit_code"] == -signal.SIGKILL, pooled  # the tree was killed, not just flagged

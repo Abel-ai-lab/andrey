@@ -1,11 +1,11 @@
 """Andrey's PC, GES, and hill climbing on mixed data: the degenerate and conditional Gaussian tests
 and scores.
 
-Each adapter calls the public facade as a user would, without ``categorical``: Andrey infers the
-categorical columns, every column of at most ``max_categories`` distinct whole numbers. On the
-``mixed_er`` regime that reads exactly the generated categorical columns, since a categorical column
-holds at most five codes and a continuous one a distinct value per row. The other packages in the
-mixed lane read the columns by the same rule. GES runs uncapped, as the facade does, on the numpy
+Each adapter declares the categorical columns as a user would, with ``categorical``: every column
+of at most ``max_categories`` distinct whole numbers (:func:`coded_columns`). On the ``mixed_er``
+regime that names exactly the generated categorical columns, since a categorical column holds at
+most five codes and a continuous one a distinct value per row. The other packages in the mixed lane
+read the columns by the same rule. GES runs uncapped, as the facade does, on the numpy
 backend in one process; its mixed-data moves are scored in that process. Hill climbing starts from
 the empty graph and has no move limit, as bnlearn's ``hc`` by default, and like bnlearn's conditional
 linear Gaussian networks it gives no categorical node a continuous parent.
@@ -22,8 +22,18 @@ from andrey_bench.adapters.bic_penalty import andrey_score
 
 _DEFAULT_ALPHA = 0.05
 _DEFAULT_LAMBDA = 1.0
-#: The most distinct whole numbers a column may hold to be read as categorical: Andrey's default.
+#: The most distinct whole numbers a column may hold to be declared categorical, the rule every
+#: package in the mixed lane reads the columns by.
 MAX_CATEGORIES = 10
+
+
+def coded_columns(X: np.ndarray, max_categories: int) -> list[int]:
+    """The positions of the columns of ``X`` that hold at most ``max_categories`` whole numbers."""
+    return [
+        j
+        for j in range(X.shape[1])
+        if np.all(X[:, j] == np.round(X[:, j])) and np.unique(X[:, j]).size <= max_categories
+    ]
 
 
 def _andrey_version() -> str:
@@ -61,7 +71,7 @@ class _AndreyMixed:
 
 
 class AndreyPCMixed(_AndreyMixed):
-    """Andrey's PC with a mixed-data test, ``alpha=0.05``, categorical columns inferred."""
+    """Andrey's PC with a mixed-data test, ``alpha=0.05``, categorical columns declared."""
 
     algorithm: str = "pc"
 
@@ -70,7 +80,7 @@ class AndreyPCMixed(_AndreyMixed):
         self.name = f"andrey.pc.{indep_test}"
 
     def params(self) -> dict[str, Any]:
-        """The test, its level, and the inference bound."""
+        """The test, its level, and the bound of the declared columns."""
         return {
             "alpha": _DEFAULT_ALPHA,
             "indep_test": self.indep_test,
@@ -82,18 +92,19 @@ class AndreyPCMixed(_AndreyMixed):
         import andrey
 
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore", andrey.DataTypeWarning)  # it names the inferred columns
+            warnings.simplefilter("ignore", andrey.DataTypeWarning)
+            X = np.asarray(data, dtype=np.float64)
             out = andrey.pc(
-                np.asarray(data, dtype=np.float64),
+                X,
                 alpha=float(params.get("alpha", _DEFAULT_ALPHA)),
                 indep_test=str(params.get("indep_test", self.indep_test)),
-                max_categories=int(params.get("max_categories", MAX_CATEGORIES)),
+                categorical=coded_columns(X, int(params.get("max_categories", MAX_CATEGORIES))),
             )
         return np.asarray(out.structure.to_numpy())
 
 
 class AndreyGESMixed(_AndreyMixed):
-    """Andrey's GES with a mixed-data score, the standard penalty, categorical columns inferred."""
+    """Andrey's GES with a mixed-data score, the standard penalty, categorical columns declared."""
 
     algorithm: str = "ges"
 
@@ -102,7 +113,7 @@ class AndreyGESMixed(_AndreyMixed):
         self.name = f"andrey.ges.{score_func.removeprefix('local_score_')}"
 
     def params(self) -> dict[str, Any]:
-        """The score, its BIC weight, and the inference bound."""
+        """The score, its BIC weight, and the bound of the declared columns."""
         return {
             "score_func": self.score_func,
             "lambda_value": _DEFAULT_LAMBDA,
@@ -113,13 +124,14 @@ class AndreyGESMixed(_AndreyMixed):
         """Run ``andrey.ges`` serially; return the CPDAG's endpoint marks. The only timed region."""
         import andrey
 
-        with warnings.catch_warnings(), andrey.config(backend="numpy", num_workers=1):
+        with warnings.catch_warnings(), andrey.config(backend="numpy", n_jobs=1):
             warnings.simplefilter("ignore", andrey.DataTypeWarning)
+            X = np.asarray(data, dtype=np.float64)
             out = andrey.ges(
-                np.asarray(data, dtype=np.float64),
+                X,
                 score_func=andrey_score(str(params.get("score_func", self.score_func))),
                 penalty_discount=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
-                max_categories=int(params.get("max_categories", MAX_CATEGORIES)),
+                categorical=coded_columns(X, int(params.get("max_categories", MAX_CATEGORIES))),
             )
         return np.asarray(out.structure.to_numpy())
 
@@ -134,7 +146,7 @@ class AndreyHCMixed(_AndreyMixed):
         self.name = f"andrey.hc.{score_func.removeprefix('local_score_')}"
 
     def params(self) -> dict[str, Any]:
-        """The score, its BIC weight, and the inference bound."""
+        """The score, its BIC weight, and the bound of the declared columns."""
         return {
             "score_func": self.score_func,
             "lambda_value": _DEFAULT_LAMBDA,
@@ -147,11 +159,12 @@ class AndreyHCMixed(_AndreyMixed):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", andrey.DataTypeWarning)
+            X = np.asarray(data, dtype=np.float64)
             out = andrey.hc(
-                np.asarray(data, dtype=np.float64),
+                X,
                 score_func=andrey_score(str(params.get("score_func", self.score_func))),
                 penalty_discount=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
-                max_categories=int(params.get("max_categories", MAX_CATEGORIES)),
+                categorical=coded_columns(X, int(params.get("max_categories", MAX_CATEGORIES))),
             )
         return np.asarray(out.structure.to_numpy())
 

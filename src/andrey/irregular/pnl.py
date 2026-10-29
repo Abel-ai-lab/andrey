@@ -397,7 +397,7 @@ def pnl_pairs(
     data: np.ndarray,
     pairs: Iterable[tuple[int, int]] | None = None,
     *,
-    num_workers: int | None = None,
+    n_jobs: int | None = None,
 ) -> np.ndarray:
     """Return :func:`pnl`'s four numbers for pairs of ``data``'s columns, one row per pair.
 
@@ -405,8 +405,8 @@ def pnl_pairs(
     pair ``(i, j)``, where forward means column ``i`` -> column ``j``; on the ``numpy`` backend it
     equals ``pnl(data[:, i], data[:, j])`` bit for bit, and on a torch device to rounding, because
     a device sums a batch of a cause's pairs in another order than a single pair. ``pairs``
-    defaults to every ``i < j`` in lexicographic order. ``num_workers`` worker threads share the
-    ordered pairs (``None`` reads ``andrey.config`` and ``ANDREY_NUM_WORKERS``, ``-1`` uses every
+    defaults to every ``i < j`` in lexicographic order. ``n_jobs`` worker threads share the
+    ordered pairs (``None`` reads ``andrey.config`` and ``ANDREY_N_JOBS``, ``-1`` uses every
     usable core); each holds three ``n x n`` float64 matrices, so a count whose matrices would
     pass 4 GiB is lowered, with a warning. With one worker the BLAS threads are not limited, so
     its last digits can differ from the several-worker rows'.
@@ -424,7 +424,7 @@ def pnl_pairs(
     columns = {k: _column(arr[:, k]) for k in sorted({k for pair in chosen for k in pair})}
     tasks = [(i, j) for i, j in chosen] + [(j, i) for i, j in chosen]
     dev = _pnl_backend(arr.shape[0], amortized=True)
-    tests = _ordered_tests(columns, tasks, backend.worker_count(num_workers), dev)
+    tests = _ordered_tests(columns, tasks, backend.worker_count(n_jobs), dev)
     return np.array(
         [(tests[i, j][1], tests[j, i][1], tests[i, j][0], tests[j, i][0]) for i, j in chosen],
         dtype=np.float64,
