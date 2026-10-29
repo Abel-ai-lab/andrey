@@ -285,8 +285,8 @@ def cli_meta() -> dict:
         "bootstrap": {
             "invocation": (
                 "andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] "
-                "[--threshold T] [--resampling subsample|bootstrap] [--sample-fraction F] "
-                "[--block-length ROWS] [key=value ...]"
+                "[--threshold T] [--strict] [--resampling subsample|bootstrap] "
+                "[--sample-fraction F] [--block-length ROWS] [key=value ...]"
             ),
             "what": (
                 "refits the method on resamples of the rows and reports how often each edge "
@@ -301,11 +301,10 @@ def cli_meta() -> dict:
             "parameters": {name: _param_schema(param) for name, param in BOOTSTRAP_PARAMS.items()},
             "envelope": (
                 "the result envelope of `run`, with `structure` the averaged graph, plus "
-                "bootstrap (n_resamples, threshold, seed, resampling, sample_fraction, "
-                "block_length) and frequencies[] (source, target, type, count, and frequency for "
-                "each edge "
-                "that appeared in a fit, most frequent first, and lag for a time-series method); "
-                "capped at 1000 (frequencies_truncated)"
+                "bootstrap (n_resamples, threshold, strict, averaged_graph, seed, resampling, "
+                "sample_fraction, block_length) and frequencies[] (source, target, type, count, "
+                "and frequency for each edge that appeared in a fit, most frequent first, and lag "
+                "for a time-series method); capped at 1000 (frequencies_truncated)"
             ),
         },
         "error_envelope": {
@@ -471,13 +470,18 @@ def render_skill() -> str:
     a("")
     a(
         "`andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] [--threshold T] "
-        "[--resampling subsample|bootstrap] [--sample-fraction F] [key=value ...]` refits the "
-        "method on resamples of the rows and answers how often each edge appears. It takes the "
-        "inputs and `key=value` params of `andrey run`, and not `gin`. Its envelope is a run's, "
-        "with `structure` the averaged graph: a pair is in it when it is adjacent in at least "
-        "`--threshold` of the fits (default 0.5), with the edge it has most often. `bootstrap` "
-        "gives `n_resamples`, `threshold`, `seed`, `resampling`, `sample_fraction`, and "
-        "`block_length`, and `frequencies` lists each edge that appeared in some fit, most "
+        "[--strict] [--resampling subsample|bootstrap] [--sample-fraction F] [key=value ...]` "
+        "refits the method on resamples of the rows and answers how often each edge appears. It "
+        "takes the inputs and `key=value` params of `andrey run`, and not `gin`. Its envelope is "
+        "a run's, with `structure` the averaged graph: each pair keeps its most frequent edge "
+        "when more fits have it than have no edge and the pair is adjacent in more than "
+        "`--threshold` of the fits (default 0.5, at least 0.5) or in all of them, and the result "
+        "is then made a valid graph of the method's kind. When no such graph exists, it is the "
+        "resample graph nearest the others, with a warning (`--strict` fails instead), and "
+        "`bootstrap.averaged_graph` is `nearest_resample` instead of `vote`. `bootstrap` gives "
+        "`n_resamples`, `threshold`, `strict`, `averaged_graph`, `seed`, `resampling`, "
+        "`sample_fraction`, and `block_length`, and `frequencies` lists each edge that appeared "
+        "in some fit, most "
         "frequent first, with its `source`, `target`, `type`, `count`, and `frequency` (a "
         "time-series method adds `lag`). Report an edge with its frequency: 0.95 is stable, 0.3 "
         "is not; a frequency ranks the edges and is not a probability. Each resample is a "

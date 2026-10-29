@@ -64,6 +64,21 @@ names its pull request.
   cells of simulated series. Pass `resampling="bootstrap"` for the resampling of before; the moving
   block bootstrap's default block is now `max(ceil(n ** (1/3)), 10 * tau_max)` rows for a method
   with a `tau_max`, instead of `ceil(n ** (1/3))`. ([#544])
+- `bootstrap`'s averaged graph gives each pair its most frequent state in the fits, no edge counted
+  as one, where it gave each pair adjacent in at least `threshold` of the fits its most frequent
+  edge. `threshold` now asks a pair to be adjacent in more than that share of the fits, or in all
+  of them, and takes values from 0.5 to 1, where it took any share above 0. The vote is then made
+  a valid graph of the method's kind by the published steps: the CPDAG (Chickering 2002) of a
+  consistent DAG extension (Dor and Tarsi 1992) for a CPDAG method, the PAG of Zhang's (2008) MAG
+  for a PAG method, and a DAG without a cycle for a DAG method, where the vote could be a partially
+  directed graph labeled `cpdag`, a graph that is not a PAG, or a graph with a cycle. A DAG
+  method's fits that split evenly between the two directions of an edge point it by the columns'
+  `tie_break` ranks, so reordering the columns relabels the averaged graph, and
+  `metadata["tie_break"]` records the rule. On linear
+  data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
+  the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
+  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,
+  Tetrad's `Median`, with an `andrey.AndreyWarning`. ([#555])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -97,6 +112,12 @@ names its pull request.
   of rows in a subsample; for a time-series method on one series a subsample is one stretch of
   consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
   records both. ([#544])
+- `bootstrap` and `BootstrapOutput.from_fits` take `strict`: `True` raises `ValueError` when no
+  valid graph of the method's kind holds the vote of the fits, instead of returning the resample
+  graph nearest the others with a warning. `metadata["averaged_graph"]` records which graph came
+  back, `"vote"` or `"nearest_resample"`. `andrey bootstrap` takes `--strict`, and its envelope
+  records both. The example notebook `bootstrap.ipynb` shows how to read the edge frequencies and
+  the averaged graph. ([#555])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
   searches do: a required edge is always in the result, a pair forbidden both ways or outside
   `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
@@ -1286,4 +1307,5 @@ First alpha release.
 [#551]: https://github.com/Abel-ai-lab/andrey/pull/551
 [#553]: https://github.com/Abel-ai-lab/andrey/pull/553
 [#554]: https://github.com/Abel-ai-lab/andrey/pull/554
+[#555]: https://github.com/Abel-ai-lab/andrey/pull/555
 [#556]: https://github.com/Abel-ai-lab/andrey/pull/556

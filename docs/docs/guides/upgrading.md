@@ -64,6 +64,24 @@ A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot
 one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now
 `bootstrap.n_resamples`, with no former name.
 
+### The bootstrap's averaged graph
+
+`andrey.bootstrap` builds its averaged graph from each pair's most frequent state, no edge counted
+as one, and then makes it a valid graph of the method's kind, so `structure` can differ from 0.11's.
+`threshold` takes values from 0.5 to 1: a pair must be adjacent in more than that share of the
+fits, or in all of them. When no valid graph of the kind holds the vote, `structure` is the resample
+graph nearest the others, with a warning, and `metadata["averaged_graph"]` is `"nearest_resample"`;
+`strict=True` raises instead. `frequency` and `table` do not change, so read the weaker edges there:
+
+```python
+# 0.11
+boot = andrey.bootstrap(andrey.pc, data, threshold=0.3)
+
+# 0.12
+boot = andrey.bootstrap(andrey.pc, data)
+weak = [row for row in boot.table() if row["frequency"] > 0.3]
+```
+
 ### Column types
 
 A mixed-data test or score you name, such as `indep_test="cond_gauss"`, read every column of at

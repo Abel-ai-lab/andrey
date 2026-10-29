@@ -283,12 +283,14 @@ pd.DataFrame(boot.table()[:8]).round(2)
 frequent first. The four undirected links appear in 91 to 100 of the 100 resamples. Directions are
 less stable: each arrow of the collider at pkc appears in 86 resamples, and `plc -> pip3` in 31.
 
-`boot.structure` is the averaged graph. A pair is in it when it is adjacent in at least half of the
-resamples (`threshold=0.5`), with the edge it has most often. It holds the same eight links as
-`out`. A stricter threshold keeps the links the resamples agree on, without refitting:
+`boot.structure` is the averaged graph. Each pair takes the state it has most often, with no edge
+counted as one of the states, and the result is then made a valid CPDAG. It holds seven of `out`'s
+eight links: plc and pip3 are adjacent in 54 of the 100 resamples, but no one edge between them is
+as frequent as no edge (`plc -> pip3` in 31, no edge in 46). A stricter threshold asks a link to be
+adjacent in more of the resamples, without refitting:
 
 ```{code-cell} ipython3
-print(boot.average(0.9))
+print(boot.average(0.95))
 ```
 
 ```{code-cell} ipython3
@@ -301,12 +303,19 @@ assert table.iloc[:4]["count"].between(75, 100).all()
 arrows = table[table["target"].eq("pkc") & table["type"].eq("directed")]
 assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(80, 90).all()
 assert 50 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 60
-assert links(boot.structure) == links(out.structure)
-assert links(boot.average(0.9)) < links(out.structure)
-assert len(links(out.structure) - links(boot.average(0.9))) == 1
+plc_pip3 = table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]
+assert plc_pip3["count"].max() < 100 - plc_pip3["count"].sum()
+assert links(boot.structure) == links(out.structure) - {frozenset({"plc", "pip3"})}
+assert links(out.structure) - links(boot.average(0.95)) == {
+    frozenset({"plc", "pip3"}),
+    frozenset({"erk", "pka"}),
+}
+adjacent = 1 - boot.frequency("absent")
+columns = list(sachs.data.columns)
+assert 0.9 < adjacent[columns.index("erk"), columns.index("pka")] <= 0.95
 ```
 
-That drops the link between plc and pip3, which is in 54 of the 100 resamples. Treat the counts as a
+That drops the link between erk and pka, which is in 93 of the 100 resamples. Treat the counts as a
 ranking of the links, not as probabilities. `resampling="bootstrap"` draws all the cells with
 replacement instead; a resample then repeats some cells, so PC's tests see more evidence than it
 holds and keep weak links more often than they do on the data.
