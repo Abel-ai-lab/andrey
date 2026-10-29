@@ -79,8 +79,7 @@ You install andrey-core and then `import andrey`.
 <!-- WHY_FAST:START -->
 <!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->
 
-Four ideas make it fast; each is animated in
-[a blog post](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html):
+Four ideas make it [fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html):
 
 - **Do many things at once**: thousands of independence tests run as one array operation, with the
   same results.

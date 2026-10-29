@@ -250,8 +250,7 @@ def why_fast_block():
         start,
         "<!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->",
         "",
-        "Four ideas make it fast; each is animated in",
-        f"[a blog post]({SITE_URL}/blog/20261008-why-andrey-is-fast.html):",
+        f"Four ideas make it [fast]({SITE_URL}/blog/20261008-why-andrey-is-fast.html):",
         "",
     ]
     for scene in scenes:
