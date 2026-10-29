@@ -56,9 +56,14 @@ with andrey.config(n_jobs=8):
 ```
 
 `granger` no longer fits a cross-validated lasso. It fits each variable on the past `tau_max` steps
-of every variable by least squares and returns the lagged links whose coefficient has a p-value of
-at most `alpha`, 0.05 by default; `metadata["p_values"]` holds the p-values. `cv` is ignored, with
-the warning.
+of every variable by least squares and returns the lagged links whose coefficient has a
+Benjamini-Hochberg adjusted p-value of at most `alpha`, 0.05 by default, over all the links
+(`fdr_method="fdr_bh"`; `"none"` tests each link at `alpha`); `metadata["p_values"]` holds the
+adjusted p-values. `cv` is ignored, with the warning.
+
+`pcmci` keeps a link when its Benjamini-Hochberg adjusted p-value over all the links is at most
+`alpha` (`fdr_method="fdr_bh"`, the default), so it returns fewer links than in 0.11, mostly the
+false ones. `fdr_method="none"` returns the links of 0.11.
 
 A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` still works for
 one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now

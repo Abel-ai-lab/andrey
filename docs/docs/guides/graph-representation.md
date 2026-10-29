@@ -88,9 +88,10 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   each two-node graph holds the direction they decide, by the rule the method's `alpha` parameter
   selects. PCMCI reports each lagged link's MCI `p_values` and `statistics`, and the `parents` its
   first step selected; PCMCI+ reports the same for every lag from 0, plus `conflicts` and
-  `ambiguous_triples`. Granger reports each lagged link's `p_values`. With `fdr_method="fdr_bh"`,
-  all three report the Benjamini-Hochberg adjusted lagged `p_values`. PC, CD-NOD, FCI, and GFCI
-  with `collider_rule="conservative"` or `"majority"` report `ambiguous_triples`, the `[x, z, y]`
+  `ambiguous_triples`. Granger reports each lagged link's `p_values`. By default,
+  `fdr_method="fdr_bh"`, all three report the Benjamini-Hochberg adjusted lagged `p_values`; with
+  `"none"` they report the p-values as tested. PC, CD-NOD, FCI, and GFCI with
+  `collider_rule="conservative"` or `"majority"` report `ambiguous_triples`, the `[x, z, y]`
   triples, by column position, whose middle node the vote left undecided. `conflicts` lists the
   links two colliders ask to orient both ways: `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]`
   links (variable `i` at lag `k`, and `j`) in PCMCI+ and LPCMCI, which also reports every link with
@@ -171,7 +172,7 @@ mixes numbers with text is an error.
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
 | `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
 | `to_dot()` | Graphviz DOT text, named by `labels` when set |
-| `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
+| `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes, by index |
 
 `GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
 take each label or NetworkX node as text, `str(label)`, and raise a `ValueError` when two are the
@@ -254,6 +255,41 @@ gives the PAG that `fci` returns with an exact conditional-independence test, th
 score `fci` against. `andrey.metrics.to_cpdag` returns a DAG's CPDAG. `from_numpy` never infers
 `mag`, so pass `kind="mag"` for one; `to_pcalg` writes a MAG as `amat.pag`, and
 `from_pcalg(amat, "mag")` reads it back.
+
+## Query a graph
+
+`GraphStructure` answers the usual questions about a node, taking it by label or by 0-based
+position and naming the nodes it returns as `oriented_edges()` does:
+
+```python
+import numpy as np
+from andrey import GraphStructure
+
+M = np.array([[0, 1, 0, 0], [2, 0, 1, 0], [0, 2, 0, 2], [0, 0, 1, 0]])  # a -> b -> c <- d
+g = GraphStructure.from_numpy(M, labels=("a", "b", "c", "d"))
+g.parents("c")                    # ["b", "d"]
+g.ancestors("c")                  # ["a", "b", "d"]
+g.markov_blanket("b")             # ["a", "c", "d"]
+g.d_separated("a", "d")           # True
+g.d_separated("a", "d", ["c"])    # False: c is a collider
+```
+
+| Call | Returns |
+|---|---|
+| `parents(x)`, `children(x)` | the nodes joined to `x` by a directed edge into it, or out of it |
+| `ancestors(x)`, `descendants(x)` | the nodes with a directed path to `x`, or from it; `x` left out |
+| `markov_blanket(x)` | the fewest nodes given which `x` is separated from every other node |
+| `d_separated(x, y, given)` | for a DAG or CPDAG: whether every path between `x` and `y` is blocked given `given` |
+| `m_separated(x, y, given)` | the same for a MAG, a PAG, an undirected graph, or a DAG, where it equals `d_separated` |
+
+Only directed edges make parents and ancestors, so in a CPDAG or a PAG they are the ones every
+member of the class shares; `neighbors` lists every adjacent node. The separation queries take a
+node or a set of nodes for `x` and `y`. `d_separated` is d-separation on a DAG, and a CPDAG answers
+as every DAG of its class does; `m_separated` is m-separation on a MAG, and a PAG answers as every
+MAG of its class does, since the members of a class share their separations. On an undirected
+graph, which has no colliders, `m_separated` is plain separation. Each raises a `ValueError` on a
+kind the other one defines, naming it, and so do both on a `digraph`, which may have directed
+cycles. `markov_blanket` answers for every kind but the `digraph`.
 
 ## Hand a graph to DoWhy
 

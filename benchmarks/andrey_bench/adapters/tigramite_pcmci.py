@@ -2,7 +2,7 @@
 
 Calls tigramite's public API only:
 ``PCMCI(dataframe=DataFrame(X), cond_ind_test=ParCorr(significance="analytic"), verbosity=0)``
-then ``run_pcmci(tau_min=1, tau_max=..., pc_alpha=0.2, alpha_level=0.05, fdr_method="none")``.
+then ``run_pcmci(tau_min=1, tau_max=..., pc_alpha=0.2, alpha_level=0.05, fdr_method="fdr_bh")``.
 ``tau_min=1`` tests lags ``1..tau_max`` as Andrey's PCMCI does; tigramite's own ``tau_min=0`` also
 tests lag 0, which is PCMCI+'s scope. ``pc_alpha`` and ``alpha_level`` are passed rather than left
 to the package, so both packages run the same settings; every other ``run_pcmci`` argument keeps
@@ -22,7 +22,7 @@ Orientation: ``results["graph"]`` has shape ``(N, N, tau_max + 1)``, and ``graph
 
 PCMCI+ calls ``PCMCI(...).run_pcmciplus(tau_min=0, tau_max=..., pc_alpha=0.01,
 contemp_collider_rule="majority", conflict_resolution=True, reset_lagged_links=False,
-fdr_method="none")``, and LPCMCI ``LPCMCI(dataframe=..., cond_ind_test=ParCorr(significance=
+fdr_method="fdr_bh")``, and LPCMCI ``LPCMCI(dataframe=..., cond_ind_test=ParCorr(significance=
 "analytic"), verbosity=0).run_lpcmci(tau_min=0, tau_max=..., pc_alpha=0.05,
 n_preliminary_iterations=1)``; every other argument keeps its default. Both return the link strings
 of ``results["graph"]`` as the window marks of :mod:`andrey_bench.window`, which Andrey's PCMCI+ and
@@ -114,7 +114,7 @@ class TigramitePCMCI:
             "tau_max": self.tau_max,
             "pc_alpha": DEFAULT_PC_ALPHA,
             "alpha_level": DEFAULT_ALPHA_LEVEL,
-            "fdr_method": "none",
+            "fdr_method": "fdr_bh",
             "cond_ind_test": "ParCorr",
             "significance": "analytic",
         }
@@ -205,7 +205,7 @@ class TigramitePCMCIPlus:
             "contemp_collider_rule": "majority",
             "conflict_resolution": True,
             "reset_lagged_links": False,
-            "fdr_method": "none",
+            "fdr_method": "fdr_bh",
             "cond_ind_test": "ParCorr",
             "significance": "analytic",
         }
