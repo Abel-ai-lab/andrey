@@ -137,6 +137,9 @@ class InterventionalScore:
         Weight on the extended-BIC term of the linear-Gaussian BIC,
         ``2 * ebic_gamma * log C(d - 1, len(parents))`` per variable; ``0.0`` is the standard BIC.
         The other scores ignore it.
+    equivalent_sample_size : float, default=1.0
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     categorical : ndarray of bool, shape (d,), or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
     cache_size : int or None, default=1_000_000
@@ -156,6 +159,7 @@ class InterventionalScore:
         score_func: str = "bic",
         penalty_discount: float = 1.0,
         ebic_gamma: float = 0.0,
+        equivalent_sample_size: float = 1.0,
         categorical: np.ndarray | None = None,
         cache_size: int | None = 1_000_000,
     ) -> None:
@@ -169,6 +173,7 @@ class InterventionalScore:
             X,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             categorical=categorical,
         )
         if mask is None:
@@ -788,6 +793,7 @@ def gies(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
@@ -819,6 +825,9 @@ def gies(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     max_parents : int or None
         A cap on the most parents any DAG of the class gives a node. An insertion or a turn is
         skipped when the DAG it builds gives its target more than ``max_parents`` parents; every DAG
@@ -856,6 +865,7 @@ def gies(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
     )
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)

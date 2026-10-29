@@ -42,6 +42,7 @@ def _fit(
     score_func: str | None,
     penalty_discount: float,
     ebic_gamma: float,
+    equivalent_sample_size: float,
     max_iter: int | None,
     tabu_length: int,
     max_tabu: int | None,
@@ -81,6 +82,7 @@ def _fit(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             max_iter=max_iter,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
@@ -106,6 +108,7 @@ def mmhc(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     seed: int | None = None,
@@ -150,6 +153,11 @@ def mmhc(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
         Maximum hill-climbing moves, at least ``1``; ``None`` sets no limit.
     categorical : sequence of str or int, optional
@@ -285,6 +293,7 @@ def mmhc(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         max_iter=max_iter,
         tabu_length=10,
         max_tabu=None,
@@ -307,6 +316,7 @@ def rsmax2(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,
@@ -355,6 +365,11 @@ def rsmax2(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
         Maximum moves of the maximize phase, at least ``1``; ``None`` sets no limit.
     tabu_length : int, default=10
@@ -509,6 +524,7 @@ def rsmax2(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         max_iter=max_iter,
         tabu_length=tabu_length,
         max_tabu=max_tabu,

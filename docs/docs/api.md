@@ -205,6 +205,17 @@ standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choi
 passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
 `metadata["ebic_gamma"]` records the value a `"bic"` fit used.
 
+% concept: equivalent_sample_size
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman, Geiger and
+Chickering 1995; Buntine 1991): the number of rows its uniform prior over each variable's
+conditional distributions is worth, a positive number. `1.0`, the default, is what the score used
+before the argument existed. A larger value weighs the prior more against the data, and the learned
+graph can change with it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value.
+Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size` with another score, named or
+picked by `None`, raises a `ValueError`; `metadata["equivalent_sample_size"]` records the value a
+`"bdeu"` fit used.
+
 ```{eval-rst}
 .. currentmodule:: andrey
 

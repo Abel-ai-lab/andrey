@@ -24,6 +24,13 @@ spaces. Biometrika 95(3):759-771. https://doi.org/10.1093/biomet/asn034
 Heckerman, Geiger & Chickering (1995). Learning Bayesian networks: the combination of knowledge
 and statistical data. Machine Learning 20(3):197-243. https://doi.org/10.1007/BF00994016
 
+Buntine (1991). Theory refinement on Bayesian networks. Proceedings of the Seventh Conference on
+Uncertainty in Artificial Intelligence, 52-60.
+
+Silander, Kontkanen & Myllymaki (2007). On sensitivity of the MAP Bayesian network structure to
+the equivalent sample size parameter. Proceedings of the Twenty-Third Conference on Uncertainty in
+Artificial Intelligence, 360-367.
+
 Chickering & Heckerman (1997). Efficient approximations for the marginal likelihood of Bayesian
 networks with hidden variables. Machine Learning 29(2-3):181-212.
 https://doi.org/10.1023/A:1007469629108
@@ -568,7 +575,8 @@ class BDeuScore(_CountScore):
     ``sum_j [lgamma(a / q) - lgamma(N_ij + a / q)
     + sum_k (lgamma(N_ijk + a / (r q)) - lgamma(a / (r q)))]``
 
-    with ``a`` the ``sample_prior`` (the equivalent sample size). A configuration or cell no row
+    with ``a`` the ``equivalent_sample_size``, the weight in rows of the uniform prior over each
+    node's conditional distributions [1]_ [2]_. A configuration or cell no row
     falls in adds zero, so only the occurring ones are summed. The structure prior gives each of
     the other ``d - 1`` variables probability ``p = structure_prior / (d - 1)`` of being a parent:
     ``k log p + (d - 1 - k) log(1 - p)`` for ``k`` parents. It depends only on the number of edges,
@@ -583,8 +591,9 @@ class BDeuScore(_CountScore):
     ----------
     data : ndarray, shape (n, d)
         Finite values; each distinct value of a column is one category.
-    sample_prior : float, default=1.0
-        The equivalent sample size ``a`` of the Dirichlet prior; positive.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size ``a`` of the Dirichlet prior; finite and positive. A larger value
+        weighs the prior more against the data, and the learned graph can change with it [3]_.
     structure_prior : float, default=1.0
         The expected number of parents per variable under the structure prior; positive.
     cache_size : int or None, default=1_000_000
@@ -594,13 +603,18 @@ class BDeuScore(_CountScore):
     ----------
     .. [1] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
        the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
+    .. [2] Buntine, W. (1991). Theory refinement on Bayesian networks. Proceedings of the Seventh
+       Conference on Uncertainty in Artificial Intelligence, 52-60.
+    .. [3] Silander, T., Kontkanen, P., and Myllymaki, P. (2007). On sensitivity of the MAP Bayesian
+       network structure to the equivalent sample size parameter. Proceedings of the Twenty-Third
+       Conference on Uncertainty in Artificial Intelligence, 360-367.
     """
 
     def __init__(
         self,
         data: np.ndarray,
         *,
-        sample_prior: float = 1.0,
+        equivalent_sample_size: float = 1.0,
         structure_prior: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
@@ -611,11 +625,14 @@ class BDeuScore(_CountScore):
             )
         if arr.dtype.kind == "f" and not np.isfinite(arr).all():
             raise ValueError("data contains NaN or Inf; cannot compute BDeu scores")
-        for name, value in (("sample_prior", sample_prior), ("structure_prior", structure_prior)):
+        for name, value in (
+            ("equivalent_sample_size", equivalent_sample_size),
+            ("structure_prior", structure_prior),
+        ):
             if not (np.isfinite(value) and value > 0):
                 raise ValueError(f"{name} must be finite and positive, got {value}")
         self.n: int = arr.shape[0]
-        self.sample_prior = float(sample_prior)
+        self.equivalent_sample_size = float(equivalent_sample_size)
         self.structure_prior = float(structure_prior)
         self._codes, self._cardinalities = categorical.encode(arr)
         others = arr.shape[1] - 1
@@ -629,7 +646,7 @@ class BDeuScore(_CountScore):
         q = float(np.prod([float(self._cardinalities[p]) for p in parents]))
         n_ij = counts.sum(axis=1)
         n_ijk = counts[counts > 0]
-        a_j = self.sample_prior / q
+        a_j = self.equivalent_sample_size / q
         a_jk = a_j / r
         log_likelihood = (
             m * float(gammaln(a_j))
@@ -938,16 +955,19 @@ def make_score(
     *,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
     categorical: npt.ArrayLike | None = None,
 ) -> LocalScore:
     """Build the local score ``score_func`` names over ``data``.
 
-    ``"bic"`` names :class:`BICScore`, ``"bdeu"`` :class:`BDeuScore` with its default priors,
-    ``"discrete_bic"`` :class:`CategoricalBICScore`, and ``"degen_gauss"`` and ``"cond_gauss"``
-    :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask. ``ebic_gamma`` weighs the
-    extended-BIC term of the linear-Gaussian BIC; the other scores leave it out but still check its
-    range, as BDeu does ``penalty_discount``'s. A search checks ``score_func`` against the names it
-    takes before calling this. Raises :class:`NotImplementedError` for any other name.
+    ``"bic"`` names :class:`BICScore`, ``"bdeu"`` :class:`BDeuScore` with its default structure
+    prior, ``"discrete_bic"`` :class:`CategoricalBICScore`, and ``"degen_gauss"`` and
+    ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask.
+    ``ebic_gamma`` weighs the extended-BIC term of the linear-Gaussian BIC; the other scores leave
+    it out but still check its range, as BDeu does ``penalty_discount``'s.
+    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. A search
+    checks ``score_func`` against the names it takes before calling this. Raises
+    :class:`NotImplementedError` for any other name.
     """
     if score_func in LINEAR_SCORES:
         return BICScore(
@@ -958,7 +978,7 @@ def make_score(
     penalty_weight(ebic_gamma, "ebic_gamma")
     if score_func == "bdeu":
         penalty_weight(penalty_discount)
-        return BDeuScore(np.asarray(data))
+        return BDeuScore(np.asarray(data), equivalent_sample_size=equivalent_sample_size)
     if score_func == "discrete_bic":
         return CategoricalBICScore(np.asarray(data), penalty_discount=penalty_discount)
     if score_func == "degen_gauss":

@@ -20,8 +20,11 @@ import pytest
 
 import andrey
 from andrey.api import _method as method_wrapper
+from andrey.api._method import PENALTIES
 from andrey.core import ci, warning_policy
+from andrey.core import score as score_module
 from andrey.core.knowledge import KNOWLEDGE_PARTS
+from andrey.core.score import BDeuScore
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import (
     BOOTSTRAP_PARAMS,
@@ -647,36 +650,34 @@ def test_a_former_score_name_is_recorded_as_the_current_one(former, current):
 
 #: The score searches, each with its penalty arguments by concept.
 PENALIZED = [m for m in REGISTRY if tagged(CONCEPTS["score_func"], m)]
+#: The arguments that weigh a score, by concept.
+PENALTY_CONCEPTS = ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
 
 
 def penalties(method: str) -> dict[str, object]:
     """The method's penalty arguments, by concept, with their defaults."""
-    return {
-        p.concept: p.default
-        for p in REGISTRY[method].params
-        if p.concept in ("penalty_discount", "ebic_gamma")
-    }
+    return {p.concept: p.default for p in REGISTRY[method].params if p.concept in PENALTY_CONCEPTS}
 
 
 @pytest.mark.parametrize("method", PENALIZED)
 def test_a_score_search_records_the_penalties_its_score_used(method):
-    """The linear-Gaussian BIC records both penalties; BDeu, which has neither, records none."""
-    assert set(penalties(method)) == {"penalty_discount", "ebic_gamma"}
-    assert {"penalty_discount", "ebic_gamma"} <= set(REGISTRY[method].output.metadata)
-    out = getattr(andrey, method)(*args_for(method, [typed_frame("continuous")] * 3))
-    assert out.metadata["score_func"] == "bic"
-    assert {k: out.metadata[k] for k in penalties(method)} == penalties(method)
-    out = getattr(andrey, method)(
-        *args_for(method, [typed_frame("categorical")] * 3), penalty_discount=2.0
-    )
-    assert out.metadata["score_func"] == "bdeu"
-    assert not set(penalties(method)) & set(out.metadata)
-    out = getattr(andrey, method)(
-        *args_for(method, [typed_frame("categorical")] * 3),
-        score_func="discrete_bic",
-        penalty_discount=2.0,
-    )
-    assert out.metadata["penalty_discount"] == 2.0 and "ebic_gamma" not in out.metadata
+    """Each score records the penalties it reads (PENALTIES) and none that it does not."""
+    assert set(penalties(method)) == set(PENALTY_CONCEPTS)
+    assert set(PENALTY_CONCEPTS) <= set(REGISTRY[method].output.metadata)
+    categorical = args_for(method, [typed_frame("categorical")] * 3)
+    cases = [
+        (args_for(method, [typed_frame("continuous")] * 3), {}, "bic"),
+        (categorical, {"penalty_discount": 2.0}, "bdeu"),
+        (categorical, {"penalty_discount": 2.0, "score_func": "discrete_bic"}, "discrete_bic"),
+        (categorical, {"equivalent_sample_size": 7.0}, "bdeu"),
+    ]
+    for args, given, score in cases:
+        out = getattr(andrey, method)(*args, **given)
+        assert out.metadata["score_func"] == score
+        recorded = {k for k in PENALTY_CONCEPTS if k in out.metadata}
+        assert recorded == {k for k in PENALTY_CONCEPTS if score in PENALTIES[k]}
+        for key in recorded:
+            assert out.metadata[key] == given.get(key, penalties(method)[key])
 
 
 @pytest.mark.parametrize("method", PENALIZED)
@@ -690,6 +691,45 @@ def test_ebic_gamma_with_a_score_that_does_not_use_it_raises(method):
         getattr(andrey, method)(*categorical, score_func="discrete_bic", ebic_gamma=0.0)
     continuous = args_for(method, [typed_frame("continuous")] * 3)
     assert getattr(andrey, method)(*continuous, ebic_gamma=0.5).metadata["ebic_gamma"] == 0.5
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_equivalent_sample_size_with_a_score_that_does_not_use_it_raises(method):
+    """Only bdeu reads the equivalent sample size: a call that passes it with another score, named
+    or picked from the declared column types, raises before the fit."""
+    continuous = args_for(method, [typed_frame("continuous")] * 3)
+    with pytest.raises(ValueError, match="equivalent_sample_size weighs the Dirichlet prior"):
+        getattr(andrey, method)(*continuous, equivalent_sample_size=2.0)
+    categorical = args_for(method, [typed_frame("categorical")] * 3)
+    with pytest.raises(ValueError, match="score_func='discrete_bic'"):
+        getattr(andrey, method)(*categorical, score_func="discrete_bic", equivalent_sample_size=2.0)
+    out = getattr(andrey, method)(*categorical, equivalent_sample_size=2.0)
+    assert out.metadata["equivalent_sample_size"] == 2.0
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_the_equivalent_sample_size_reaches_the_bdeu_score_of_a_fit(method, monkeypatch):
+    """Every BDeu score a fit builds carries the weight the call passed, 1 when it passed none, and
+    the weight changes the fit's score where the result records one."""
+    built = []
+
+    class Recording(BDeuScore):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            built.append(self.equivalent_sample_size)
+
+    monkeypatch.setattr(score_module, "BDeuScore", Recording)
+    args = args_for(method, [typed_frame("categorical")] * 3)
+    default = getattr(andrey, method)(*args)
+    assert built and set(built) == {1.0} and default.metadata["equivalent_sample_size"] == 1.0
+    built.clear()
+    other = getattr(andrey, method)(*args, equivalent_sample_size=50.0)
+    assert built and set(built) == {50.0}
+    if "score" in default.metadata:
+        assert other.metadata["score"] != default.metadata["score"]
+    for bad in (0.0, -1.0, float("inf")):
+        with pytest.raises(ValueError, match="equivalent_sample_size"):
+            getattr(andrey, method)(*args, equivalent_sample_size=bad)
 
 
 #: The methods whose result andrey.config's tie_break can change.

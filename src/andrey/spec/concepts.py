@@ -300,6 +300,26 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="equivalent_sample_size",
+        summary="The equivalent sample size of the BDeu score: the weight, in rows, of its uniform "
+        "Dirichlet prior (Heckerman, Geiger and Chickering 1995; Buntine 1991), in (0, inf). A "
+        "call that passes it with another score raises ValueError.",
+        param=_template(
+            "equivalent_sample_size",
+            "float",
+            1.0,
+            "The equivalent sample size of the BDeu score: how many rows the uniform prior over "
+            "each variable's conditional distributions is worth. A larger value weighs the prior "
+            "more against the data, and the graph can change with it. Only bdeu uses it: passing "
+            "it with another score raises ValueError.",
+            minimum=0,
+            exclusive_minimum=True,
+        ),
+        fragment="equivalent sample size",
+        suitable=SCORE_SEARCHES,
+        others_exempt="Does not score with BDeu.",
+    ),
+    Concept(
         key="lambda1",
         summary="The L1 weight of a continuous objective.",
         param=_template(
@@ -877,7 +897,8 @@ _CONCEPTS = (
         "score. An order that is not a total order of the variables has its own name "
         "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
         "default or the configuration leaves open: seed, indep_test, score_func, and the "
-        "score's penalty_discount and ebic_gamma hold the value the fit used, and tie_break the "
+        "score's penalty_discount, ebic_gamma, and equivalent_sample_size hold the value the fit "
+        "used, and tie_break the "
         "rule of andrey.config that a fit it can change ran under.",
         suitable=ALL_METHODS,
     ),
@@ -887,7 +908,8 @@ _CONCEPTS = (
         "metadata['indep_test'] or metadata['score_func'], as its current short name: the name "
         "the call passed, or, for None, the one picked from the declared column types. A "
         "registered test records its registered name. A score search records the penalties its "
-        "score used: penalty_discount for every score but bdeu, and ebic_gamma for bic.",
+        "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
+        "equivalent_sample_size for bdeu.",
         suitable=tuple(
             m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
         ),

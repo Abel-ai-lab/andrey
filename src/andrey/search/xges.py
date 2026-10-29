@@ -1086,6 +1086,7 @@ def xges(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     extended_search: bool = True,
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
@@ -1108,6 +1109,9 @@ def xges(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     extended_search : bool
         Run the extended search after the base search; ``False`` stops after the base search.
     max_parents : int or None
@@ -1145,6 +1149,7 @@ def xges(
         X,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
     )
     columns = np.full(d, score_func in DISCRETE_SCORES)
