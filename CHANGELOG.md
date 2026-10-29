@@ -149,6 +149,10 @@ names its pull request.
 - `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
   random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
   graphs these methods returned before. ([#550])
+- `hc` and `tabu` take `n_starts`, `n_perturbations`, and `seed`: each search after the first
+  starts from the best DAG so far after `n_perturbations` random edge additions, removals, or
+  reversals drawn from `seed`, by default as many as there are variables, and the fit returns the
+  best-scoring one; the default, 1, returns the graphs these methods returned before. ([#552])
 - `bootstrap` takes `resampling`, `"subsample"` or `"bootstrap"`, and `sample_fraction`, the share
   of rows in a subsample; for a time-series method on one series a subsample is one stretch of
   consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
@@ -1346,6 +1350,7 @@ First alpha release.
 [#544]: https://github.com/Abel-ai-lab/andrey/pull/544
 [#550]: https://github.com/Abel-ai-lab/andrey/pull/550
 [#551]: https://github.com/Abel-ai-lab/andrey/pull/551
+[#552]: https://github.com/Abel-ai-lab/andrey/pull/552
 [#553]: https://github.com/Abel-ai-lab/andrey/pull/553
 [#554]: https://github.com/Abel-ai-lab/andrey/pull/554
 [#555]: https://github.com/Abel-ai-lab/andrey/pull/555

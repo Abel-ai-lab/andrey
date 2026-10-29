@@ -139,10 +139,16 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     """Whether a fit of the seeded method ``spec`` with ``arguments`` draws random numbers.
 
     A method with an ``indep_test`` draws them only under a randomized test
-    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); every other seeded method always does.
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`), and a method with ``n_perturbations`` only
+    for the random changes before a later start, with ``n_starts`` above 1; every other seeded
+    method always does.
     """
     test = next((p for p in spec.params if p.name == "indep_test"), None)
-    return test is None or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
+    if test is not None:
+        return arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
+    if any(p.concept == "n_perturbations" for p in spec.params):
+        return arguments.get("n_starts", 1) > 1
+    return True
 
 
 #: The concepts of the arguments that name a test or a score, each with the function that picks it

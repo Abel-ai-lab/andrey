@@ -83,6 +83,18 @@ _SEED = concept_param(
     "so a fit repeats. Seed for the search's random orders.",
 )
 _N_STARTS = concept_param("n_starts")
+#: The seed of hc and tabu, whose only random draws are the changes before a later start.
+_RESTART_SEED = concept_param(
+    "seed",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random edge changes before each search after the first, which "
+    "only n_starts above 1 makes.",
+)
+_N_PERTURBATIONS = concept_param("n_perturbations")
+_RESTART_DOC = (
+    "; with n_starts above 1, metadata['seed'] is the seed used and metadata['n_perturbations'] "
+    "the number of random edge changes before each later search"
+)
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
@@ -503,19 +515,21 @@ _add(
         "categorical, conditional Gaussian when some are; score_func=bdeu or "
         "discrete_bic for categorical data, degen_gauss or "
         "cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
-        "when set. Returns the CPDAG of the final DAG and its score.",
+        "when set; n_starts above 1 climbs again from the best DAG after random edge changes. "
+        "Returns the CPDAG of the best DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _RESTART_DOC,
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -524,13 +538,20 @@ _add(
             concept_param(
                 "max_iter",
                 default=None,
-                doc="Most moves the search takes, at least 1; null sets no limit (the search still "
+                doc="Most moves each climb takes, at least 1; null sets no limit (the search still "
                 "ends). Reaching a set limit warns with SearchLimitWarning.",
                 nullable=True,
             ),
+            _RESTART_SEED,
+            _N_STARTS,
+            _N_PERTURBATIONS,
             _CATEGORICAL,
         ),
-        references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),
+        references=(
+            "Chickering, Geiger & Heckerman 1995",
+            "Scutari 2010",
+            "Scutari, Graafland & Gutierrez 2019",
+        ),
     )
 )
 _add(
@@ -539,22 +560,24 @@ _add(
         family="score",
         summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
         "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
-        "seen. With the same settings its score is never worse than hc's. BIC by default, BDeu "
-        "when every column is categorical, conditional Gaussian when some are; score_func=bdeu or "
-        "discrete_bic for categorical data, degen_gauss or cond_gauss for mixed data. Returns "
-        "the CPDAG of that DAG and its score.",
+        "seen. With one start and the same settings its score is never worse than hc's. BIC by "
+        "default, BDeu when every column is categorical, conditional Gaussian when some are; "
+        "score_func=bdeu or discrete_bic for categorical data, degen_gauss or cond_gauss for "
+        "mixed data; n_starts above 1 searches again from the best DAG after random edge changes. "
+        "Returns the CPDAG of the best DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _RESTART_DOC,
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -580,13 +603,23 @@ _add(
             concept_param(
                 "max_iter",
                 default=None,
-                doc="Most moves the search takes, improving or not, at least 1; null sets no limit "
-                "(the search still ends). Reaching a set limit warns with SearchLimitWarning.",
+                doc="Most moves each search takes, improving or not, at least 1; null sets no "
+                "limit (the search still ends). Reaching a set limit warns with "
+                "SearchLimitWarning.",
                 nullable=True,
             ),
+            _RESTART_SEED,
+            _N_STARTS,
+            _N_PERTURBATIONS,
             _CATEGORICAL,
         ),
-        references=("Glover 1986", "Russell & Norvig 2009", "Scutari 2010"),
+        references=(
+            "Glover 1986",
+            "Russell & Norvig 2009",
+            "Scutari 2010",
+            "Chickering, Geiger & Heckerman 1995",
+            "Scutari, Graafland & Gutierrez 2019",
+        ),
     )
 )
 _add(
@@ -2043,14 +2076,16 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
 }
-# The shared keys: the name, the seed of a seeded fit, the test and the score it used with the
-# score's penalties, the configuration's tie-break rule, the column types a mixed-data setting read,
-# the fewest rows a test used, and the triples a collider vote left ambiguous.
+# The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
+# test and the score it used with the score's penalties, the configuration's tie-break rule, the
+# column types a mixed-data setting read, the fewest rows a test used, and the triples a collider
+# vote left ambiguous.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
         "algorithm",
         *(("seed",) if _spec.seeded else ()),
+        *(("n_perturbations",) if "n_perturbations" in _concepts else ()),
         *(("indep_test",) if "indep_test" in _concepts else ()),
         *(("score_func",) if "score_func" in _concepts else ()),
         *(
