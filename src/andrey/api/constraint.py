@@ -84,6 +84,8 @@ def pc(
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -143,6 +145,9 @@ def pc(
         ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
         unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
         column positions, the middle node second and ``x < y``, in ascending order.
+        ``metadata["conflicts"]`` lists the edges two colliders ask to orient both ways, as
+        ``[x, y]`` pairs of 0-based column positions with ``x < y``, in ascending order; Notes say
+        which orientation each keeps.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
@@ -376,6 +381,7 @@ def pc(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     ambiguous: set[tuple[int, int, int]] = set()
+    conflicts: set[tuple[int, int]] = set()
     with copies_named(labels), rows_tested() as rows:
         cpdag = _pc(
             X,
@@ -389,8 +395,10 @@ def pc(
             in_column_order=resolve_in_column_order(),
             seed=seed,
             _ambiguous=ambiguous,
+            _conflicts=conflicts,
         )
     metadata = {
+        "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
@@ -456,6 +464,8 @@ def fci(
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -770,6 +780,8 @@ def gfci(
         numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
         BIC for mixed data. ``None`` picks from the declared column types, as for
         :func:`~andrey.ges`.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
@@ -789,6 +801,8 @@ def gfci(
         declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
         DataFrame's ``category``, ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -1073,6 +1087,8 @@ def cdnod(
         declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
         DataFrame's ``category``, ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1142,7 +1158,9 @@ def cdnod(
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
         reads as a collider or a non-collider, as ``[x, z, y]``: 0-based column positions, the
         middle node second and ``x < y``, in ascending order; the index, in a triple through it, is
-        numbered ``n_variables``.
+        numbered ``n_variables``. ``metadata["conflicts"]`` lists the edges between variables that
+        two colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based column positions with
+        ``x < y``, in ascending order, decided as in :func:`~andrey.pc`.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
@@ -1308,6 +1326,7 @@ def cdnod(
     # The search appends the index as column d, so a copy of it is named as the index.
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
+    conflicts: set[tuple[int, int]] = set()
     with (
         copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
         rows_tested() as rows,
@@ -1326,8 +1345,10 @@ def cdnod(
             in_column_order=resolve_in_column_order(),
             seed=seed,
             _ambiguous=ambiguous,
+            _conflicts=conflicts,
         )
     metadata = {
+        "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),

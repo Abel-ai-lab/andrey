@@ -65,6 +65,8 @@ def boss(
         column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are,
         else ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
         ``category``, ``bool``, or text type, never by its values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -322,6 +324,8 @@ def grasp(
         column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are,
         else ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
         ``category``, ``bool``, or text type, never by its values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the

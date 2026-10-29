@@ -27,21 +27,15 @@ if TYPE_CHECKING:
     from andrey.search.continuous import ContinuousResult
 
 
-def _output(
-    result: ContinuousResult,
-    labels: tuple[str, ...] | None,
-    robust: bool,
-) -> StructureOutput:
+def _output(result: ContinuousResult, labels: tuple[str, ...] | None) -> StructureOutput:
     """Wrap a fit as a weighted DAG with its bookkeeping."""
     return structure_output(
         result.dag,
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "edges_removed": result.edges_removed,
-            "robust": robust,
             "path_steps": result.path_steps,
         },
     )
@@ -112,9 +106,9 @@ def notears(
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"notears"``),
-        ``"n_edges"``, ``"h_final"`` (the acyclicity function of the fit before the threshold),
-        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), ``"robust"``,
-        and ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
+        ``"h_final"`` (the acyclicity function of the fit before the threshold),
+        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
+        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
 
     Raises
     ------
@@ -155,9 +149,9 @@ def notears(
     its cycles repaired, and the step is accepted when the likelihood of that graph is lower than
     the last accepted one's by more than a ``1e-6`` fraction. ``lam`` and ``delta`` then shrink by
     ``mcp_decay``, and the path ends at the first step that does not lower the likelihood. [2]_
-    shows that the global minimizers of the penalized likelihood have the same DAG structures for
-    the raw and the standardized data; the path finds a local solution, and the cost of a step is
-    the number of its Adam iterations times a matrix exponential.
+    shows that, with a small enough penalty, the global minimizers of the penalized likelihood have
+    the same DAG structures for the raw and the standardized data; the path finds a local solution,
+    and the cost of a step is the number of its Adam iterations times a matrix exponential.
 
     Ties between equal weights go to the column whose rank, computed from its own data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
@@ -175,18 +169,23 @@ def notears(
     variables, five graphs for each combination, at the default settings. Errors are SHD against the
     true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
     least-squares fit changes when the columns are rescaled or standardized [4]_ [5]_, and [6]_
-    traces this to the score. The global minimizers of the penalized likelihood that ``robust=True``
-    uses do not change under rescaling [2]_, but the optimization is harder on standardized data,
-    and more so as the number of variables grows [2]_. On standardized columns the default fit's
-    median errors were 7, 18.5, 44.5 and 92 at those sizes, below the empty graph's in 61 of the 80
-    fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 8, 17, 43.5 and 89,
-    below it in 78 of 80. With ``robust=True`` they were 10, 14.5 and 30.5 on standardized columns
-    and 6.5, 14.5 and 32.5 on unitless data at 10, 20 and 50 variables; at 50 variables one graph
-    per combination was fit (four fits), and the one fit tried at 100 variables did not finish
-    within 900 s, so there is no figure for it. On the same data, ``ges`` had median errors of 2, 4,
-    19.5 and 79 on standardized columns and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6,
-    18 and 36, and 4, 12, 31.5 and 55. The default fit's median time was 0.6 s at 10 variables and
-    54 s at 100 on standardized columns (0.4 s and 15.5 s on unitless data), on one core; with
+    traces this to the score. With a small enough penalty, the global minimizers of the penalized
+    likelihood that ``robust=True`` uses have the same graph on raw and standardized columns [2]_.
+    The robust fit, though, starts from the weights of the least-squares fit, and its penalty and
+    threshold act on the weights in data units; rescaling the columns by powers of two, all by one
+    factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. Both
+    that starting point and the penalty and threshold on the weights in data units are the published
+    method's [2]_. The optimization is also harder on standardized data, and more so as the number
+    of variables grows [2]_. On standardized columns the default fit's median errors were 7, 18.5,
+    44.5 and 92 at those sizes, below the empty graph's in 61 of the 80 fits; on
+    ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 8, 17, 43.5 and 89, below it
+    in 78 of 80. With ``robust=True`` they were 10, 14.5 and 30.5 on standardized columns and 6.5,
+    14.5 and 32.5 on unitless data at 10, 20 and 50 variables; at 50 variables one graph per
+    combination was fit (four fits), and the one fit tried at 100 variables did not finish within
+    900 s, so there is no figure for it. On the same data, ``ges`` had median errors of 2, 4, 19.5
+    and 79 on standardized columns and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6, 18
+    and 36, and 4, 12, 31.5 and 55. The default fit's median time was 0.6 s at 10 variables and 54 s
+    at 100 on standardized columns (0.4 s and 15.5 s on unitless data), on one core; with
     ``robust=True`` it was 23 s at 10 variables and 198 s at 50 on standardized columns (5.3 s and
     69 s on unitless data), because each Adam iteration of a path step computes a matrix
     exponential. A fit can stop at a local optimum, and only weights that reach ``w_threshold``
@@ -243,7 +242,7 @@ def notears(
             labels=labels,
             constraints=constraints,
         )
-    return _output(result, labels, robust)
+    return _output(result, labels)
 
 
 @method_spec("dagma")
@@ -316,10 +315,9 @@ def dagma(
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"dagma"``),
-        ``"n_edges"``, ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before
-        the threshold), ``"edges_removed"`` (edges the threshold kept that the cycle repair
-        dropped), ``"robust"``, and ``"path_steps"`` (accepted steps of the path, ``0`` without
-        ``robust``).
+        ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before the threshold),
+        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
+        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
 
     Raises
     ------
@@ -362,10 +360,10 @@ def dagma(
     above it. The result of a step is thresholded at ``w_threshold`` and its cycles repaired, and
     the step is accepted when the likelihood of that graph is lower than the last accepted one's by
     more than a ``1e-6`` fraction. ``lam`` and ``delta`` then shrink by ``mcp_decay``, and the path
-    ends at the first step that does not lower the likelihood. [2]_ shows that the global
-    minimizers of the penalized likelihood have the same DAG structures for the raw and the
-    standardized data; the path finds a local solution, and each step repeats the whole central
-    path.
+    ends at the first step that does not lower the likelihood. [2]_ shows that, with a small enough
+    penalty, the global minimizers of the penalized likelihood have the same DAG structures for the
+    raw and the standardized data; the path finds a local solution, and each step repeats the whole
+    central path.
 
     Ties between equal weights go to the column whose rank, computed from its own data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
@@ -383,23 +381,27 @@ def dagma(
     variables, five graphs for each combination, at the default settings. Errors are SHD against the
     true CPDAG, medians over those 20 fits; the empty graph's are 9.5, 19.5, 49.5 and 99.5. The
     least-squares fit changes when the columns are rescaled or standardized [4]_ [5]_, and [6]_
-    traces this to the score. The global minimizers of the penalized likelihood that ``robust=True``
-    uses do not change under rescaling [2]_, but the optimization is harder on standardized data,
-    and more so as the number of variables grows [2]_. On standardized columns the default fit's
-    median errors were 12, 25.5, 64 and 129.5 at those sizes, below the empty graph's in 7 of the 80
-    fits; on ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 9.5, 19, 49.5 and
-    99.5, below it in 38 of 80. With ``robust=True`` they were 12, 25, 65 and 135.5 on standardized
-    columns (below the empty graph's in 10 of 80 fits) and 9.5, 18, 48 and 98.5 on unitless data (44
-    of 80). On the same data, ``ges`` had median errors of 2, 4, 19.5 and 79 on standardized columns
-    and 3, 7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6, 18 and 36, and 4, 12, 31.5 and 55.
-    The default fit's median time was 2.2 s at 10 variables and 28 s at 100 on standardized columns
-    (1.8 s and 21 s on unitless data), on one core; with ``robust=True`` it was 21 s at 10 variables
-    and 212 s at 100 on standardized columns (27 s and 310 s on unitless data), because each path
-    step repeats the whole central path. A fit can stop at a local optimum, and only weights that
-    reach ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other
-    densities, row counts or noise types, or on non-linear data. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    traces this to the score. With a small enough penalty, the global minimizers of the penalized
+    likelihood that ``robust=True`` uses have the same graph on raw and standardized columns [2]_.
+    The robust fit, though, starts from the weights of the least-squares fit, and its penalty and
+    threshold act on the weights in data units; rescaling the columns by powers of two, all by one
+    factor or each by its own, changed its graph in every fit tried at 10 and 20 variables. Both
+    that starting point and the penalty and threshold on the weights in data units are the published
+    method's [2]_. The optimization is also harder on standardized data, and more so as the number
+    of variables grows [2]_. On standardized columns the default fit's median errors were 12, 25.5,
+    64 and 129.5 at those sizes, below the empty graph's in 7 of the 80 fits; on
+    ``scale="unitless"`` data of ``andrey.data.sample_scm`` they were 9.5, 19, 49.5 and 99.5, below
+    it in 38 of 80. With ``robust=True`` they were 12, 25, 65 and 135.5 on standardized columns
+    (below the empty graph's in 10 of 80 fits) and 9.5, 18, 48 and 98.5 on unitless data (44 of 80).
+    On the same data, ``ges`` had median errors of 2, 4, 19.5 and 79 on standardized columns and 3,
+    7.5, 29 and 90 on unitless data, and ``calm`` 3.5, 6, 18 and 36, and 4, 12, 31.5 and 55. The
+    default fit's median time was 2.2 s at 10 variables and 28 s at 100 on standardized columns (1.8
+    s and 21 s on unitless data), on one core; with ``robust=True`` it was 21 s at 10 variables and
+    212 s at 100 on standardized columns (27 s and 310 s on unitless data), because each path step
+    repeats the whole central path. A fit can stop at a local optimum, and only weights that reach
+    ``w_threshold`` become edges. Nothing was measured beyond 100 variables, at other densities, row
+    counts or noise types, or on non-linear data. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -451,4 +453,4 @@ def dagma(
             labels=labels,
             constraints=constraints,
         )
-    return _output(result, labels, robust)
+    return _output(result, labels)

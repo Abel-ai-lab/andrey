@@ -15,7 +15,7 @@ def assert_recorded_output(out: Any, algorithm: str, *, case: str) -> harness.Re
 
 
 def assert_recorded_output_mec(out: Any, algorithm: str, *, case: str) -> None:
-    """Compare the CPDAGs of the candidate and recorded DAGs.
+    """Compare the candidate's CPDAG with the CPDAG of the recorded DAG.
 
     Score-equivalent optima can differ in tie-breaking, so ExactSearch compares Markov
     equivalence classes. Check the input hash before comparing to detect generator drift.
@@ -24,6 +24,5 @@ def assert_recorded_output_mec(out: Any, algorithm: str, *, case: str) -> None:
 
     baseline = harness.check_input(case, algorithm)["output"]["graph"]
     baseline_dag = np.asarray(baseline, dtype=np.int8)
-    native_dag = out.structure.to_numpy()
-    if not np.array_equal(dag2cpdag(native_dag), dag2cpdag(baseline_dag)):
+    if not np.array_equal(out.structure.to_numpy(), dag2cpdag(baseline_dag)):
         raise AssertionError(f"{algorithm}: CPDAG (Markov-equivalence-class) mismatch vs baseline")

@@ -96,8 +96,6 @@ def _fit(
         )
     metadata = {
         "score": json_safe(score),
-        "restrict": restrict,
-        "maximize": maximize,
         **categorical_metadata(mask, data),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -141,11 +139,15 @@ def mmhc(
         ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test. It must read the
         same kind of data as ``score_func``. ``None`` picks from the declared column types, as for
         :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
         ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``None`` picks from the declared
         column types, as for :func:`~andrey.ges`.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0
@@ -187,8 +189,7 @@ def mmhc(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"mmhc"``, ``metadata["score"]`` the score of the DAG found, computed as for
-        :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
-        ``metadata["maximize"]`` are ``"mmpc"`` and ``"hc"``. Under a mixed-data setting,
+        :func:`andrey.ges` (lower is better). Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
@@ -350,9 +351,13 @@ def rsmax2(
         Conditional-independence test of the restrict phase, any of :func:`~andrey.pc`'s. It must
         read the same kind of data as ``score_func``. ``None`` picks from the declared column types,
         as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``None`` picks from the
         declared column types, as for :func:`~andrey.ges`.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0
@@ -400,8 +405,7 @@ def rsmax2(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"rsmax2"``, ``metadata["score"]`` the score of the DAG found, computed as for
-        :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
-        ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
+        :func:`andrey.ges` (lower is better). Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
         With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
@@ -505,8 +509,8 @@ def rsmax2(
     >>> with warnings.catch_warnings():
     ...     warnings.simplefilter("ignore")
     ...     out = rsmax2(np.column_stack([x, y]), restrict="pc", maximize="tabu")
-    >>> out.metadata["restrict"], out.metadata["maximize"]
-    ('pc', 'tabu')
+    >>> out.structure.kind
+    'cpdag'
     """
     return _fit(
         "rsmax2",

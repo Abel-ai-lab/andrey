@@ -105,8 +105,9 @@ def varma_lingam(
         puts the cause of each required link, and each earlier tier, first, and the regression
         drops forbidden parents and keeps required ones unpenalized. With ``prune=True``, each
         variable's regression also drops its forbidden lagged regressors and keeps its required
-        ones unpenalized. With ``prune=False`` every lagged weight stays, so a required lagged
-        link is in the graph, and a forbidden lagged link raises. Tiers forbid every link from a
+        ones unpenalized; a required lagged link is in the graph even where its estimated weight
+        is ``0``. With ``prune=False`` every lagged weight stays, so a required lagged link is in
+        the graph, and a forbidden lagged link raises. Tiers forbid every link from a
         later tier into an earlier one, and a pair left out of ``allowed`` has no link at any
         lag; a variable's links to its own past stay allowed. The moving-average weights are not
         constrained.
@@ -221,7 +222,8 @@ def varma_lingam(
         name=column_namer(labels),
     )
     model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
-    return with_labels(_adapt_varma_lingam(model), labels)
+    required = None if constraints is None else constraints.required
+    return with_labels(_adapt_varma_lingam(model, required), labels)
 
 
 @method_spec("longitudinal_lingam")
@@ -263,9 +265,9 @@ def longitudinal_lingam(
         link, and each earlier tier, first, and the regression drops forbidden parents and keeps
         required ones unpenalized. A forbidden lagged link is left out of the least-squares fit
         of its effect's lagged weights, so its weight is ``0``; every other lagged weight stays,
-        so a required lagged link is in the graph. Tiers forbid every link from a later tier into
-        an earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's
-        links to its own past stay allowed.
+        and a required lagged link is in the graph even where its least-squares weight is ``0``.
+        Tiers forbid every link from a later tier into an earlier one, and a pair left out of
+        ``allowed`` has no link at any lag; a variable's links to its own past stay allowed.
 
     Returns
     -------
@@ -348,7 +350,8 @@ def longitudinal_lingam(
         knowledge, panel[0].shape[1], labels, tau_max, method="longitudinal_lingam"
     )
     model = LongitudinalLiNGAM(n_lags=tau_max, measure=measure, constraints=constraints).fit(panel)
-    return with_labels(_adapt_longitudinal_lingam(model), labels)
+    required = None if constraints is None else constraints.required
+    return with_labels(_adapt_longitudinal_lingam(model, required), labels)
 
 
 @method_spec("pcmci")
@@ -388,6 +391,7 @@ def pcmci(
         The conditional-independence test behind every p-value, a partial-correlation test. Both
         report the same partial correlation; ``"student_t"`` takes its p-value from the Student-t
         distribution and ``"fisherz"`` from Fisher's z-transform. ``None`` picks ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the PC1
         step, at least ``0``: round ``p`` of PC1 conditions on the ``p`` strongest other
@@ -581,6 +585,7 @@ def pcmciplus(
         The conditional-independence test behind every p-value, a partial-correlation test. Both
         report the same partial correlation; ``"student_t"`` takes its p-value from the Student-t
         distribution and ``"fisherz"`` from Fisher's z-transform. ``None`` picks ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the lagged
         skeleton (phase 1, PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no
@@ -619,13 +624,13 @@ def pcmciplus(
         Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
         ``tau_max``. ``structure.lag(0)`` is a ``cpdag`` of the same-step links: ``i -> j`` is
         oriented, and ``i -- j`` is a link whose direction the data cannot tell or whose
-        orientations conflict; ``metadata["conflicts"]`` lists the latter as ``[i, j]`` pairs,
-        ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a ``digraph`` whose edge ``i -> j`` is
-        the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a
-        self-loop is a variable's dependence on its own past. The structure has no
-        ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value among the
-        skeleton-phase tests of the link between variable ``i`` at ``t - k`` and variable ``j``
-        at ``t`` (the first step's tests for a lagged link that step removed), and
+        orientations conflict; ``metadata["conflicts"]`` lists the latter as ``[i, 0, j]`` links
+        (variable ``i`` at lag ``0`` and ``j``), ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a
+        ``digraph`` whose edge ``i -> j`` is the link from variable ``i`` at time ``t - k`` to
+        variable ``j`` at time ``t``; a self-loop is a variable's dependence on its own past. The
+        structure has no ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value
+        among the skeleton-phase tests of the link between variable ``i`` at ``t - k`` and
+        variable ``j`` at ``t`` (the first step's tests for a lagged link that step removed), and
         ``metadata["statistics"][k][i][j]`` the partial correlation of that test; lag ``0`` is
         symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never
         tested, reads p-value 1 and statistic 0, and a required one reads 0 and 1.
@@ -796,6 +801,7 @@ def lpcmci(
         The conditional-independence test behind every p-value, a partial-correlation test. Both
         report the same partial correlation; ``"student_t"`` takes its p-value from the Student-t
         distribution and ``"fisherz"`` from Fisher's z-transform. ``None`` picks ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
     max_p_global : int or None, default=None
         The most conditions a test takes beyond the default conditions, at least ``0``: every test
         of the removal phases conditions on the parents of both ends, the default conditions, and
@@ -1006,9 +1012,9 @@ def granger(
         drops its forbidden lagged regressors and keeps its required ones unpenalized: the lasso
         selects among the other regressors on what the required ones leave of the variable, and a
         required link's weight is the least-squares weight of what the selected regressors leave of
-        the variable. Tiers forbid every link from a later tier into an earlier one, and a pair
-        left out of ``allowed`` has no link at any lag; a variable's links to its own past stay
-        allowed.
+        the variable, and the link is in the graph even where that weight is ``0``. Tiers forbid
+        every link from a later tier into an earlier one, and a pair left out of ``allowed`` has no
+        link at any lag; a variable's links to its own past stay allowed.
 
     Returns
     -------
@@ -1092,6 +1098,7 @@ def granger(
     constraints = resolve_lagged(
         knowledge, X.shape[1], labels, tau_max, method="granger", contemporaneous=False
     )
+    required = None if constraints is None else constraints.required[1:]
     peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
     spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
     coeff = granger_lasso(
@@ -1099,7 +1106,7 @@ def granger(
         maxlag=tau_max,
         cv=cv,
         forbidden=None if constraints is None else constraints.forbidden[1:],
-        required=None if constraints is None else constraints.required[1:],
+        required=required,
     )
     scale = spread * peak
     # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units.
@@ -1107,4 +1114,4 @@ def granger(
     with np.errstate(over="ignore", invalid="ignore"):
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max), labels)
+    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required), labels)

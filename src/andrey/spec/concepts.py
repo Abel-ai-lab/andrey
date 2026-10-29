@@ -140,6 +140,9 @@ _LINGAM = (
     "longitudinal_lingam",
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+#: The methods with no edge to name in knowledge, and the ones that take none until 0.12.0.
+_NO_KNOWLEDGE = ("gin", "anm", "pnl")
+_KNOWLEDGE_LATER = ("iamb", "inter_iamb", "mmpc", "calm")
 ALL_METHODS = (
     *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc"),
     *_PURE_SCORE,
@@ -574,7 +577,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="background knowledge",
-        suitable=tuple(m for m in ALL_METHODS if m not in ("gin", "anm", "pnl")),
+        suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
@@ -588,14 +591,17 @@ _CONCEPTS = (
                 "mmpc",
             ),
             *_absent("0.12.0", "A mask in the gated objective.", "calm"),
-            Deviation(
-                method="bottom_up_parce_lingam",
-                name="knowledge",
-                default=None,
-                observed="forbidden,allowed,tiers",
-                fixed_in="0.11.0",
-                reason="Required edges raise.",
-            ),
+        ),
+    ),
+    Concept(
+        key="required_edges",
+        summary="Every required edge is in the output, whatever its estimated weight, its test "
+        "result, or its score: a required edge whose least-squares weight is 0, or whose "
+        "variables look independent, is in the graph all the same.",
+        suitable=tuple(m for m in ALL_METHODS if m not in (*_NO_KNOWLEDGE, *_KNOWLEDGE_LATER)),
+        exempt=(
+            *_exempt("Takes no knowledge until 0.12.0 (the knowledge concept).", *_KNOWLEDGE_LATER),
+            *_exempt("Has no edge for knowledge to name (the knowledge concept).", *_NO_KNOWLEDGE),
         ),
     ),
     Concept(
@@ -711,7 +717,8 @@ _CONCEPTS = (
             ),
             *_exempt(
                 "The least-squares score with an l1 penalty and a weight threshold reads the "
-                "data's units (Zheng et al. 2018; Bello et al. 2022). robust=True is under review.",
+                "data's units (Zheng et al. 2018; Bello et al. 2022), and so do the quasi-MCP "
+                "penalty and the weight threshold of robust=True (Deng et al. 2024).",
                 *_CONTINUOUS,
             ),
             *_exempt("Not measured yet: its fit needs torch.", "calm"),
@@ -800,29 +807,42 @@ _CONCEPTS = (
     ),
     Concept(
         key="graph_kind",
-        summary="The graph kind names what an edge means.",
+        summary="The graph kind names what an edge means: a search identified up to its "
+        "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
+        "direction is undirected. A fit returns the kind its spec declares.",
         suitable=ALL_METHODS,
-        deviations=(
-            Deviation(
-                method="exact_search",
-                observed="dag",
-                fixed_in="0.11.0",
-                reason="One DAG of the equivalence class; the CPDAG is what the data determine.",
-            ),
-            *(
-                Deviation(
-                    method=m,
-                    observed="cpdag",
-                    fixed_in="0.11.0",
-                    reason="An undirected Markov-blanket or moral graph, not a CPDAG.",
-                )
-                for m in ("iamb", "inter_iamb", "mmpc")
-            ),
-        ),
     ),
     Concept(
         key="algorithm",
         summary="metadata['algorithm'] is the method's public name.",
+        suitable=ALL_METHODS,
+    ),
+    Concept(
+        key="metadata",
+        summary="A fit's metadata holds only the keys its OutputSpec declares, and a key means one "
+        "thing with one shape in every method: p_values and statistics for test results, "
+        "conflicts for the links colliders ask to orient both ways, score for a score search's "
+        "score. An order that is not a total order of the variables has its own name "
+        "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
+        "default leaves open: seed, indep_test, and score_func hold the value the fit used.",
+        suitable=ALL_METHODS,
+    ),
+    Concept(
+        key="chosen_settings",
+        summary="A method with an indep_test or a score_func records the one it used in "
+        "metadata['indep_test'] or metadata['score_func'], as its current short name: the name "
+        "the call passed, or, for None, the one picked from the declared column types. A "
+        "registered test records its registered name.",
+        suitable=tuple(
+            m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
+        ),
+        others_exempt="Neither a conditional-independence test nor a score to choose.",
+    ),
+    Concept(
+        key="warnings",
+        summary="Every warning a fit raises is an AndreyWarning, one class per situation: "
+        "ExperimentalWarning, BoundaryWarning, SearchLimitWarning, DataTypeWarning, "
+        "SampleSizeWarning, PerformanceWarning, BackendFallbackWarning, DeprecatedArgumentWarning.",
         suitable=ALL_METHODS,
     ),
     Concept(

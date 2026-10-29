@@ -83,7 +83,9 @@ def _fit(
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
     marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
     metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
-    return structure_output(to_structure(marks, kind="cpdag"), labels=labels, metadata=metadata)
+    return structure_output(
+        to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
+    )
 
 
 @method_spec("iamb")
@@ -120,6 +122,8 @@ def iamb(
         for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
         ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
         column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -141,7 +145,7 @@ def iamb(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -278,6 +282,8 @@ def inter_iamb(
         for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
         ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
         column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -299,7 +305,7 @@ def inter_iamb(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -437,6 +443,8 @@ def mmpc(
         for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
         ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
         column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -457,7 +465,7 @@ def mmpc(
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are all undirected.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each of its parents and children; without, they
         form the skeleton: each pair in each other's set. ``metadata["algorithm"]`` is ``"mmpc"``;
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``

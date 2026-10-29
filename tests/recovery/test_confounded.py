@@ -76,7 +76,7 @@ def test_bottom_up_parce_lingam_leaves_the_confounded_pair_unordered(replicate):
     out = andrey.bottom_up_parce_lingam(datagen.generate(_FORK, replicate=replicate), alpha=0.01)
     _assert_pairs_and_edges(out, _FORK, "circle", replicate=replicate, exact_edges=False)
     _edges, pairs = datagen.planted_structure(_FORK, replicate=replicate)
-    unordered = [set(item) for item in out.metadata["causal_order"] if isinstance(item, list)]
+    unordered = [set(item) for item in out.metadata["partial_order"] if isinstance(item, list)]
     assert unordered == [set(pair) for pair in sorted(pairs)]
 
 
@@ -85,7 +85,7 @@ def test_bottom_up_parce_lingam_orders_everything_when_the_cause_is_observed(rep
     x = datagen.generate(_FORK_OBSERVED, replicate=replicate)
     out = andrey.bottom_up_parce_lingam(x, alpha=0.01)
     _assert_pairs_and_edges(out, _FORK_OBSERVED, "circle", replicate=replicate, exact_edges=False)
-    assert not any(isinstance(item, list) for item in out.metadata["causal_order"])
+    assert not any(isinstance(item, list) for item in out.metadata["partial_order"])
 
 
 def test_rcd_matches_its_recorded_output():

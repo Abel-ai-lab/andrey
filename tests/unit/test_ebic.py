@@ -29,6 +29,7 @@ from andrey.core.score_delta import (
 )
 from andrey.search.exact import _GramBICScore
 from andrey.search.gies import InterventionalBICScore
+from tests.recovery.helpers.project import found_dag
 
 GAMMAS = (0.5, 1.0)
 
@@ -248,7 +249,7 @@ def test_exact_search_finds_the_optimum_of_the_formula(gamma):
         return sum(ref.score(j, np.flatnonzero(a[:, j]).tolist()) for j in range(4))
 
     best = min(total(a) for a in _dags(4))
-    found = andrey.exact_search(x, ebic_gamma=gamma).structure.to_numpy()
+    found = found_dag(andrey.exact_search(x, ebic_gamma=gamma)).to_numpy()
     assert total(found == TAIL) == pytest.approx(best, rel=1e-10)
 
 

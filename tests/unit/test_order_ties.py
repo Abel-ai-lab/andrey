@@ -218,7 +218,7 @@ def test_bottom_up_parce_lingam_ties() -> None:
     assert round(stats[0], _KEY_DP) == round(stats[1], _KEY_DP)
 
     def order(data: np.ndarray, columns: np.ndarray) -> list[int]:
-        found = andrey.bottom_up_parce_lingam(data[:, columns]).metadata["causal_order"]
+        found = andrey.bottom_up_parce_lingam(data[:, columns]).metadata["partial_order"]
         return [int(columns[v]) for v in found]
 
     orders = [np.array(columns) for columns in permutations(range(3))]
@@ -318,7 +318,7 @@ def test_bottom_up_parce_lingam_weights() -> None:
     x = np.empty((600, 3))
     x[0::2], x[1::2] = z, z[:, [1, 0, 2]]
     out = andrey.bottom_up_parce_lingam(x)
-    assert out.metadata["causal_order"] == [[0, 1], 2]
+    assert out.metadata["partial_order"] == [[0, 1], 2]
     want = out.structure.to_numpy()
     for order in permutations(range(3)):
         found = _mapped(
