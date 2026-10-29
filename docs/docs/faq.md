@@ -201,10 +201,11 @@ takes it except ANM, PNL, and GIN.
 ### How sure is each edge?
 
 `andrey.bootstrap(method, data)` refits a method on 100 resamples of the data and counts how often
-each edge appears. It returns each edge's frequency, a table of the edges, and an averaged graph of
-the pairs adjacent in at least half the fits; `andrey bootstrap <method>` does the same from the
-command line. Each resample is half of the rows, drawn without replacement; `resampling="bootstrap"`
-draws all the rows with replacement instead. Read the frequencies as a ranking: in the 0.11.0
+each edge appears. It returns each edge's frequency, a table of the edges, and an averaged graph:
+each pair takes the state it has most often, no edge included, and the result is made a valid
+graph of the method's kind; `andrey bootstrap <method>` does the same from the command line. Each
+resample is half of the rows, drawn without replacement; `resampling="bootstrap"` draws all the
+rows with replacement instead. Read the frequencies as a ranking: in the 0.11.0
 release card's simulations, which used that bootstrap resampling, edges seen in more than nine fits
 in ten were almost always true. A frequency is not the probability that an edge is true: a method
 that makes the same mistake on every resample gives it a frequency of 1.
