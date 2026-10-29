@@ -12,7 +12,7 @@ from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, SCORE_ALIASES, concept_param
+from .concepts import CONCEPTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -68,16 +68,12 @@ _COLLIDER_ORDER = ParamSpec(
     nullable=True,
 )
 _PENALTY_DISCOUNT = concept_param("penalty_discount")
-#: The same, for the methods that shipped it as lambda_value.
-_PENALTY_DISCOUNT_RENAMED = concept_param("penalty_discount", aliases=("lambda_value",))
 _SCORE_DOC = (
     "Local score: bic = linear-Gaussian BIC; bdeu = BDeu and discrete_bic = multinomial BIC, "
     "for categorical data coded by whole numbers; degen_gauss and cond_gauss = degenerate and "
     "conditional Gaussian BIC, for mixed data. " + _DECLARED.format(every="bdeu", fallback="bic")
 )
 _SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
-#: The same, for the methods whose score names shipped as local_score_*.
-_SCORE_FUNC_RENAMED = concept_param("score_func", doc=_SCORE_DOC, choice_aliases=SCORE_ALIASES)
 _EBIC_GAMMA = concept_param("ebic_gamma")
 _EBIC_GAMMA_STANDARD = concept_param("ebic_gamma", default=0.0)
 _EQUIVALENT_SAMPLE_SIZE = concept_param("equivalent_sample_size")
@@ -217,8 +213,8 @@ _add(
         ),
         seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA_STANDARD,
             _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
@@ -393,8 +389,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             concept_param(
@@ -451,7 +447,7 @@ _add(
                 doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
                 "on it.",
             ),
-            _PENALTY_DISCOUNT_RENAMED,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             _CATEGORICAL,
@@ -481,13 +477,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            concept_param(
-                "score_func",
-                doc=_SCORE_DOC,
-                # Before 0.11.0 xges took the linear-Gaussian BIC only.
-                choice_aliases=SCORE_ALIASES[:2],
-            ),
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
@@ -526,8 +517,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             concept_param(
@@ -565,13 +556,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            concept_param(
-                "score_func",
-                doc=_SCORE_DOC,
-                # Before 0.11.0 tabu took the linear and the categorical scores, not the mixed ones.
-                choice_aliases=SCORE_ALIASES[:4],
-            ),
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
@@ -633,7 +619,7 @@ _add(
                 doc="Exact search strategy: A* or dynamic programming.",
                 choices=("astar", "dp"),
             ),
-            _SCORE_FUNC_RENAMED,
+            _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
@@ -667,7 +653,6 @@ _add(
             "can differ."
         ),
         seeded=True,
-        dropped_args=("labels",),
         params=(
             concept_param(
                 "lambda1",
@@ -685,7 +670,6 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
-                aliases=("alpha",),
             ),
             ParamSpec(
                 name="use_moral_graph",
@@ -717,7 +701,6 @@ _add(
                 doc="Most quadratic-penalty rounds, at least 1. Stopping on it before the "
                 "acyclicity residual clears h_tol warns; raise it to let the fit run on.",
                 nullable=False,
-                aliases=("max_outer",),
             ),
             ParamSpec(
                 name="subproblem_iter",
@@ -1104,8 +1087,8 @@ _add(
         tie_break=True,
         seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             _SEED,
@@ -1138,8 +1121,8 @@ _add(
         tie_break=True,
         seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
@@ -1176,7 +1159,6 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        dropped_args=("random_state",),
         params=(
             concept_param(
                 "measure",
@@ -1214,7 +1196,6 @@ _add(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
                 "random one, so a fit repeats. Seed for FastICA's starting point.",
-                aliases=("random_state",),
             ),
             concept_param(
                 "max_iter",
@@ -1238,7 +1219,6 @@ _add(
                     name="data",
                     kind="panel",
                     doc="Two or more datasets over the same d variables (repeat the flag).",
-                    aliases=("data_groups",),
                 ),
             ),
             layout="each group (n_samples, n_variables); all groups share n_variables",
@@ -1256,7 +1236,6 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        dropped_args=("random_state",),
         params=(
             concept_param(
                 "measure",
@@ -1360,7 +1339,6 @@ _add(
                     name="data",
                     kind="panel",
                     doc="One dataset per time point, same units and shape (repeat the flag).",
-                    aliases=("data_list",),
                 ),
             ),
             layout="each (n_samples, n_variables); one array per time point",
@@ -1380,7 +1358,6 @@ _add(
                 "tau_max",
                 doc="The largest lag: the number of past time points regressed out before the "
                 "instantaneous fit, at least 1.",
-                aliases=("n_lags",),
             ),
             concept_param(
                 "measure",
@@ -1440,7 +1417,6 @@ _add(
                 "alpha",
                 doc="Significance level of the MCI test, the level that decides the returned "
                 "links; a link is kept when its p-value is at most this.",
-                aliases=("alpha_level",),
             ),
             concept_param(
                 "fdr_method",
@@ -1503,7 +1479,6 @@ _add(
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this. The default is the level of the published experiments "
                 "(Runge 2020).",
-                aliases=("pc_alpha",),
             ),
             concept_param(
                 "fdr_method",
@@ -1579,7 +1554,6 @@ _add(
                 "alpha",
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this.",
-                aliases=("pc_alpha",),
             ),
             ParamSpec(
                 name="n_preliminary_iterations",
@@ -1634,7 +1608,6 @@ _add(
                 "tau_max",
                 doc="The largest lag: each regression uses the past tau_max time steps, at least "
                 "1.",
-                aliases=("maxlag",),
             ),
             _ALPHA,
         ),
@@ -1770,7 +1743,6 @@ _add(
             "Reordering whole clusters relabels the result; reordering the columns inside a "
             "cluster can change the latents' order."
         ),
-        dropped_args=("labels",),
         params=(
             concept_param(
                 "alpha",
@@ -1802,7 +1774,6 @@ _add(
                 "regressed out together, at least 1; larger values find more ancestors and take "
                 "longer. The default 2 is the setting of Maeda and Shimizu's experiments.",
                 minimum=1,
-                aliases=("max_explanatory_vars",),
                 concept="max_depth",
             ),
             ParamSpec(
@@ -1821,7 +1792,6 @@ _add(
                 doc="Significance level of the HSIC independence tests, which decide the ancestors "
                 "and so the returned edges. The default is the level of the published experiments "
                 "(Maeda & Shimizu 2020).",
-                aliases=("ind_alpha",),
             ),
             ParamSpec(
                 name="shapiro_alpha",

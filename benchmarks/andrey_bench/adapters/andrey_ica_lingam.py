@@ -1,6 +1,6 @@
 """Andrey ICA-LiNGAM benchmark adapter.
 
-Calls ``andrey.ica_lingam(X, random_state=0, max_iter=1000)``, which returns a weighted DAG.
+Calls ``andrey.ica_lingam(X, seed=0, max_iter=1000)``, which returns a weighted DAG.
 ``weighted_adjacency[i, j]`` weights edge ``i -> j``, so the 0/1 reduction needs no transpose.
 FastICA starts from a random unmixing matrix, so the seed is pinned. The causal-learn adapter uses
 the same seed.
@@ -56,7 +56,7 @@ class AndreyICALiNGAM:
 
         out = andrey.ica_lingam(
             np.asarray(data, dtype=np.float64),
-            random_state=int(params.get("random_state", _DEFAULT_RANDOM_STATE)),
+            seed=int(params.get("random_state", _DEFAULT_RANDOM_STATE)),
             max_iter=int(params.get("max_iter", _DEFAULT_MAX_ITER)),
         )
         return np.ascontiguousarray((np.asarray(out.weighted_adjacency) != 0).astype(np.int8))

@@ -587,9 +587,10 @@ names map to Andrey's:
 
 | Andrey | causal-learn |
 |---|---|
-| `lambda1`, `alpha`, `tau`, `rho_init`, `rho_mult`, `subproblem_iter`, `standardize` | the same names |
+| `lambda1`, `tau`, `rho_init`, `rho_mult`, `subproblem_iter`, `standardize` | the same names |
+| `screen_alpha` | `alpha` |
 | `h_tol` | `htol` |
-| `lr=0.001`, `max_outer=100`, `rho_max=1e16`, `gate_threshold=0.5`, `w_threshold=0` | fixed inside `calm` |
+| `lr=0.001`, `max_iter=100`, `rho_max=1e16`, `gate_threshold=0.5`, `w_threshold=0` | fixed inside `calm` |
 | `seed=0` | `torch.manual_seed(0)` before the fit |
 
 causal-learn's `calm` stops after 100 rounds whether or not its graph is acyclic; a cyclic graph

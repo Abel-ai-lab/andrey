@@ -31,7 +31,6 @@ from andrey.spec.concepts import (
     CI_SEARCHES,
     CONCEPTS,
     PCMCI_FAMILY,
-    SCORE_ALIASES,
     Concept,
 )
 from tests.recovery.helpers import datagen
@@ -639,15 +638,6 @@ def test_a_registered_test_is_recorded_by_its_registered_name(monkeypatch):
     assert out.metadata["indep_test"] == "fisherz_copy"
 
 
-@pytest.mark.parametrize(("former", "current"), [("local_score_BIC", "bic")])
-def test_a_former_score_name_is_recorded_as_the_current_one(former, current):
-    assert dict(SCORE_ALIASES)[former] == current
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        out = andrey.ges(*inputs("ges", codes=False), score_func=former)
-    assert out.metadata["score_func"] == current
-
-
 #: The score searches, each with its penalty arguments by concept.
 PENALIZED = [m for m in REGISTRY if tagged(CONCEPTS["score_func"], m)]
 #: The arguments that weigh a score, by concept.
@@ -880,15 +870,6 @@ def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkey
     assert repr(results[0][1]) == repr(results[1][1])
 
 
-def test_a_former_seed_name_maps_to_seed_for_one_release():
-    data = inputs("ica_lingam", codes=False)
-    expected = andrey.ica_lingam(*data, seed=3)
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="random_state is now seed"):
-        out = andrey.ica_lingam(*data, random_state=3)
-    assert out.metadata["seed"] == 3 and out.ordering == expected.ordering
-
-
 DROPPED = [(m, arg) for m, spec in REGISTRY.items() for arg in spec.dropped_args]
 
 
@@ -909,10 +890,10 @@ def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
 
 
 ALIASED = [
-    pytest.param(m, a.name, old, id=f"{m}-{old}")
+    pytest.param(m, p.name, old, id=f"{m}-{old}")
     for m, spec in REGISTRY.items()
-    for a in (*spec.data.inputs, *spec.params)
-    for old in a.aliases
+    for p in spec.params
+    for old in p.aliases
 ]
 
 
@@ -921,14 +902,13 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
     method, name, old
 ):
     spec = REGISTRY[method]
-    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
-    as_input = argument in spec.data.inputs
+    argument = next(p for p in spec.params if p.name == name)
     data = inputs(method, codes=False)
     settings = dict(SHORT.get(method, {}))
-    value = data[0] if as_input else settings.pop(name, argument.default)
+    value = settings.pop(name, argument.default)
 
     def call(**named):
-        out = getattr(andrey, method)(*(() if as_input else data), **settings, **named)
+        out = getattr(andrey, method)(*data, **settings, **named)
         return [o.structure for o in (out if isinstance(out, list) else [out])]
 
     expected = call(**{name: value})
@@ -946,10 +926,10 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
 #: each argument it drops.
 FORMER = [
     *(
-        pytest.param(m, {old}, {a.name}, id=f"{m}-{old}")
+        pytest.param(m, {old}, {p.name}, id=f"{m}-{old}")
         for m, spec in REGISTRY.items()
-        for a in (*spec.data.inputs, *spec.params)
-        for old in a.aliases
+        for p in spec.params
+        for old in p.aliases
     ),
     *(
         pytest.param(m, {p.name, old}, {p.name, new}, id=f"{m}-{old}")
@@ -987,6 +967,76 @@ def test_each_former_name_is_in_a_changelog_table(method, former, current):
         len(cells) >= 3 and method in cells[0] and former <= cells[1] and current <= cells[2]
         for cells in changelog_rows()
     ), f"{method}: {sorted(former)} -> {sorted(current)} has no CHANGELOG table row"
+
+
+#: The former argument names that 0.11.0 kept for one release and 0.12.0 removed, as the first
+#: table of 0.11.0's CHANGELOG section lists them: (methods, former name, current name or None).
+REMOVED_NAMES = [
+    (("ica_lingam",), "random_state", "seed"),
+    (("direct_lingam", "multi_group_direct_lingam"), "random_state", None),
+    (("pcmci",), "alpha_level", "alpha"),
+    (("pcmciplus", "lpcmci"), "pc_alpha", "alpha"),
+    (("rcd",), "ind_alpha", "alpha"),
+    (("calm",), "alpha", "screen_alpha"),
+    (
+        ("gfci", "ges", "gies", "xges", "hc", "tabu", "boss", "grasp"),
+        "lambda_value",
+        "penalty_discount",
+    ),
+    (("granger",), "maxlag", "tau_max"),
+    (("longitudinal_lingam",), "n_lags", "tau_max"),
+    (("rcd",), "max_explanatory_vars", "max_depth"),
+    (("calm",), "max_outer", "max_iter"),
+    (("multi_group_direct_lingam",), "data_groups", "data"),
+    (("longitudinal_lingam",), "data_list", "data"),
+    (("gin", "calm"), "labels", None),
+]
+#: The former score names, which the score searches took in 0.11.0 and no longer take.
+REMOVED_SCORES = (
+    "local_score_BIC",
+    "local_score_BIC_from_cov",
+    "local_score_BDeu",
+    "local_score_BIC_categorical",
+    "local_score_cond_gauss",
+    "local_score_degen_gauss",
+)
+REMOVED = [pytest.param(m, old, id=f"{m}-{old}") for ms, old, _ in REMOVED_NAMES for m in ms]
+SCORE_SEARCHES = [
+    m for m, spec in REGISTRY.items() if any(p.name == "score_func" for p in spec.params)
+]
+
+
+@pytest.mark.parametrize(("method", "old"), REMOVED)
+def test_a_former_name_from_before_this_release_is_an_unknown_argument(method, old):
+    spec = REGISTRY[method]
+    assert old not in spec.dropped_args
+    assert all(old not in p.aliases for p in spec.params)
+    with pytest.raises(TypeError, match=old):
+        getattr(andrey, method)(*inputs(method, codes=False), **{old: 3})
+
+
+@pytest.mark.parametrize("method", SCORE_SEARCHES)
+def test_a_former_score_name_is_not_one_of_the_choices(method):
+    param = next(p for p in REGISTRY[method].params if p.name == "score_func")
+    assert not param.choice_aliases
+    for old in REMOVED_SCORES:
+        assert old not in param.choices
+        with pytest.raises(ValueError, match=f"{method}: score_func.*{old}") as error:
+            getattr(andrey, method)(*inputs(method, codes=False), score_func=old)
+        assert all(choice in str(error.value) for choice in param.choices)
+
+
+@pytest.mark.parametrize(("methods", "old", "current"), REMOVED_NAMES)
+def test_each_removed_name_is_in_a_changelog_table(methods, old, current):
+    """The table that announced the removal lists every name removed here, with its replacement."""
+    for method in methods:
+        assert any(
+            len(cells) >= 3
+            and method in cells[0]
+            and {old} <= cells[1]
+            and (current is None or {current} <= cells[2])
+            for cells in changelog_rows()
+        ), f"{method}: {old} has no CHANGELOG table row"
 
 
 def renamed(monkeypatch, method: str, name: str, **update) -> None:

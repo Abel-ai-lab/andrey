@@ -34,15 +34,6 @@ Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
 SCORE_NAMES = SCORES
-#: The score names that shipped before 0.11.0, each with its current name, kept for one release.
-SCORE_ALIASES = (
-    ("local_score_BIC", "bic"),
-    ("local_score_BIC_from_cov", "bic"),
-    ("local_score_BDeu", "bdeu"),
-    ("local_score_BIC_categorical", "discrete_bic"),
-    ("local_score_cond_gauss", "cond_gauss"),
-    ("local_score_degen_gauss", "degen_gauss"),
-)
 #: The largest seed NumPy and torch accept.
 SEED_MAX = 2**32 - 1
 

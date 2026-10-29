@@ -202,9 +202,9 @@ def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return ``kwargs`` with the former names and values of ``spec``'s arguments made current.
 
-    The arguments are the data inputs and the parameters. Each former name or value warns once at
-    the caller's line, and so does each dropped argument, which is removed. Raises ``ValueError``
-    when a call passes an argument under both its former and its current name.
+    Each former name or value of a parameter warns once at the caller's line, and so does each
+    dropped argument, which is removed. Raises ``ValueError`` when a call passes a parameter under
+    both its former and its current name.
     """
     kwargs = dict(kwargs)
     for old in spec.dropped_args:
@@ -215,18 +215,17 @@ def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
                 "release; drop it",
                 DeprecatedArgumentWarning,
             )
-    for argument in (*spec.data.inputs, *spec.params):
-        for old in argument.aliases:
+    for param in spec.params:
+        for old in param.aliases:
             if old not in kwargs:
                 continue
-            if argument.name in kwargs:
+            if param.name in kwargs:
                 raise ValueError(
-                    f"{spec.name}: {old} is the former name of {argument.name}; pass only "
-                    f"{argument.name}"
+                    f"{spec.name}: {old} is the former name of {param.name}; pass only {param.name}"
                 )
-            kwargs[argument.name] = kwargs.pop(old)
+            kwargs[param.name] = kwargs.pop(old)
             warn_once(
-                f"andrey.{spec.name}: {old} is now {argument.name}; the former name stops working "
+                f"andrey.{spec.name}: {old} is now {param.name}; the former name stops working "
                 "in the next release",
                 DeprecatedArgumentWarning,
             )

@@ -195,22 +195,12 @@ def test_run_multi_group(capsys, nongaussian_path):
     ("method", "former"),
     [("multi_group_direct_lingam", "--data-groups"), ("longitudinal_lingam", "--data-list")],
 )
-def test_a_former_panel_flag_reads_the_datasets_like_data(capsys, nongaussian_path, method, former):
-    path = str(nongaussian_path)
-    _, out, _ = _run(["run", method, "--data", path, "--data", path], capsys)
-    code, former_out, _ = _run(["run", method, former, path, former, path], capsys)
-    assert code == 0
-    drop = ("run",)  # the timing differs
-    assert {k: v for k, v in json.loads(former_out).items() if k not in drop} == {
-        k: v for k, v in json.loads(out).items() if k not in drop
-    }
-    code, _, err = _run(["run", method, "--data", path, former, path, former, path], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "bad_input"
-
-
-def test_a_former_panel_flag_is_refused_by_a_method_that_takes_one_matrix(capsys, csv_path):
-    code, _, err = _run(["run", "pc", "--data-groups", str(csv_path)], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
+def test_a_flag_of_a_removed_input_name_is_refused(capsys, nongaussian_path, method, former):
+    """The panel inputs are read from `--data` alone; the flags 0.11.0 kept for one release are
+    options no command has."""
+    code, _, err = _run(["run", method, former, str(nongaussian_path)], capsys)
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "usage_error" and former in error["message"]
 
 
 def test_the_panel_flag_is_data_in_the_help(capsys):
@@ -218,7 +208,6 @@ def test_the_panel_flag_is_data_in_the_help(capsys):
         _, out, _ = _run(["run", method, "--help", "--json"], capsys)
         (entry,) = json.loads(out)["method"]["data"]["inputs"]
         assert entry["flag"] == "--data" and entry["kind"] == "panel"
-        assert entry["aliases"] and entry["flag"] != "--" + entry["aliases"][0].replace("_", "-")
 
 
 # --- run: the error contract ----------------------------------------------------------------------
@@ -373,11 +362,17 @@ def test_former_names_and_values_map_to_current_ones():
 
 def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
     """A removed argument still runs for one release: the fit warns and the run's params omit it."""
-    code, out, _ = _run(["run", "direct_lingam", "--data", str(csv_path), "random_state=3"], capsys)
+    code, out, _ = _run(["run", "granger", "--data", str(csv_path), "cv=3"], capsys)
     env = json.loads(out)
-    assert code == 0 and "random_state" not in env["run"]["params"]
-    assert any("random_state" in w["message"] for w in env["run"]["warnings"])
-    assert "random_state" in get_spec("direct_lingam").dropped_args
+    assert code == 0 and "cv" not in env["run"]["params"]
+    assert any("cv" in w["message"] for w in env["run"]["warnings"])
+    assert "cv" in get_spec("granger").dropped_args
+
+
+@pytest.mark.parametrize("argument", ["lambda_value=0.5", "score_func=local_score_BIC"])
+def test_a_former_name_or_value_from_before_this_release_is_refused(capsys, csv_path, argument):
+    code, _, err = _run(["run", "ges", "--data", str(csv_path), argument], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
 
 
 def test_missing_input_error(capsys):
@@ -403,13 +398,10 @@ def test_method_help_defaults_are_grammar_not_repr():
 
 
 def test_input_name_override_is_usage_error(capsys, csv_path):
-    """A `data=...` override, or one under a former input name, is caught in validation (exit 2),
-    not passed to the facade positionally where it would raise a raw TypeError (exit 1)."""
-    for name in ("data", "data_groups"):
-        code, _out, err = _run(
-            ["run", "calm", "--data", str(csv_path), f"{name}=other.csv"], capsys
-        )
-        assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+    """A `data=...` override is caught in validation (exit 2), not passed to the facade
+    positionally where it would raise a raw TypeError (exit 1)."""
+    code, _out, err = _run(["run", "calm", "--data", str(csv_path), "data=other.csv"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
 
 
 def test_param_error_precedes_input_load(capsys):

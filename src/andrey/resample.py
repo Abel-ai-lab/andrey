@@ -1196,13 +1196,13 @@ def _method_spec(method: str | Callable[..., Any]) -> MethodSpec:
 def _default_block_length(spec: MethodSpec, kwargs: dict[str, Any], n: int) -> int:
     """Return ``max(ceil(n ** (1/3)), 10 * tau_max)``, at most ``n``.
 
-    The lag is the call's ``tau_max`` (or a former name of it), else the method's default. A method
-    without a ``tau_max`` has the first term only.
+    The lag is the call's ``tau_max``, else the method's default. A method without a ``tau_max``
+    has the first term only.
     """
     length = math.ceil(n ** (1 / 3))
     lag = next((p for p in spec.params if p.concept == "tau_max"), None)
     if lag is not None:
-        given = next((kwargs[k] for k in (lag.name, *lag.aliases) if k in kwargs), lag.default)
+        given = kwargs.get(lag.name, lag.default)
         if isinstance(given, (int, np.integer)) and not isinstance(given, bool):
             length = max(length, 10 * int(given))
     return min(length, n)
@@ -1255,12 +1255,6 @@ def _job(
         if len(value) != sizes[0]:
             raise ValueError(f"{entry.name} has {len(value)} rows but data has {sizes[0]}")
         aligned[entry.name] = value
-    for param in spec.params:
-        if param.concept == "seed" and set(param.aliases) & set(kwargs):
-            raise ValueError(
-                f"bootstrap derives each fit's seed from its own seed; {spec.name}'s "
-                f"{sorted(set(param.aliases) & set(kwargs))[0]} cannot be set"
-            )
     return _Job(
         name=spec.name,
         data=data,

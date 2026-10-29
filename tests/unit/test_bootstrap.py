@@ -390,8 +390,8 @@ def test_a_seeded_method_fits_each_resample_with_a_seed_derived_from_the_bootstr
     assert derived != seeds(seed=2)
 
 
-def test_the_bootstrap_does_not_take_a_seed_the_method_has_renamed():
-    with pytest.raises(ValueError, match="random_state cannot be set"):
+def test_the_bootstrap_refuses_a_name_the_method_no_longer_takes():
+    with pytest.raises(TypeError, match="random_state"):
         bootstrap("ica_lingam", lingam_data(), n_resamples=2, random_state=4)
 
 
@@ -588,7 +588,7 @@ def test_resampling_defaults_to_a_subsample_for_every_method():
         ("varma_lingam", {}, 300, 7),  # no lag: ceil(300 ** (1 / 3))
         ("pcmci", {"tau_max": 1}, 300, 10),  # ten times the longest lag
         ("pcmciplus", {"tau_max": 3}, 300, 30),
-        ("granger", {"maxlag": 2}, 300, 20),  # a former name of tau_max counts
+        ("granger", {"tau_max": 2}, 300, 20),
         ("pcmci", {}, 300, 10),  # the method's own tau_max
     ],
 )

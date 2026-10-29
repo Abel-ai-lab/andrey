@@ -749,7 +749,7 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
     Python passes only the ones it names, and the manifest of every parameter's value."""
     specs = {p.name: p for p in spec.params}
     former = {alias: p.name for p in spec.params for alias in p.aliases}
-    input_names = {name for i in spec.data.inputs for name in (i.name, *i.aliases)}
+    input_names = {i.name for i in spec.data.inputs}
     raw_overrides, errors = _parse_overrides(tokens)
     fkwargs: dict = {}  # the arguments set by --config and the overrides
     config = _current_names(config, former, errors)
@@ -799,23 +799,6 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
         if k not in spec.dropped_args
     }
     return fkwargs, resolved
-
-
-def _merge_former_inputs(spec: MethodSpec, provided: dict[str, list[str] | None]) -> None:
-    """Move the paths given under a former flag of ``spec``'s first input onto ``--data``.
-
-    A flag that is not a former name of the method's input stays in ``provided``, where
-    :func:`_load_method_inputs` refuses it. Raises ``CliError`` when a call passes both names.
-    """
-    for old in ("data_groups", "data_list"):
-        if provided.get(old) and old in spec.data.inputs[0].aliases:
-            if provided.get("data"):
-                raise CliError(
-                    "bad_input",
-                    f"--{old.replace('_', '-')} is the former name of --data; pass only --data",
-                    EXIT_USAGE,
-                )
-            provided["data"] = provided.pop(old)
 
 
 def _load_method_inputs(
@@ -1691,14 +1674,6 @@ _InterventionsOption = Annotated[
         "was set by an intervention.",
     ),
 ]
-_DataGroupsOption = Annotated[
-    Optional[list[str]],
-    typer.Option("--data-groups", metavar="PATH", hidden=True, help="Former name of --data."),
-]
-_DataListOption = Annotated[
-    Optional[list[str]],
-    typer.Option("--data-list", metavar="PATH", hidden=True, help="Former name of --data."),
-]
 _ConfigOption = Annotated[
     Optional[str],
     typer.Option(
@@ -1740,8 +1715,6 @@ def cmd_run(
     data: _DataOption = None,
     domain_index: _DomainIndexOption = None,
     interventions: _InterventionsOption = None,
-    data_groups: _DataGroupsOption = None,
-    data_list: _DataListOption = None,
     config: _ConfigOption = None,
     output: _OutputOption = None,
     as_json: _JsonOption = False,
@@ -1761,10 +1734,7 @@ def cmd_run(
         "data": data,
         "domain_index": domain_index,
         "interventions": interventions,
-        "data_groups": data_groups,
-        "data_list": data_list,
     }
-    _merge_former_inputs(spec, provided)
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
@@ -1793,8 +1763,6 @@ def cmd_bootstrap(
     data: _DataOption = None,
     domain_index: _DomainIndexOption = None,
     interventions: _InterventionsOption = None,
-    data_groups: _DataGroupsOption = None,
-    data_list: _DataListOption = None,
     n_resamples: Optional[int] = typer.Option(
         None, "--n-resamples", metavar="N", help="Number of resamples and fits. Default 100."
     ),
@@ -1858,10 +1826,7 @@ def cmd_bootstrap(
         "data": data,
         "domain_index": domain_index,
         "interventions": interventions,
-        "data_groups": data_groups,
-        "data_list": data_list,
     }
-    _merge_former_inputs(spec, provided)
     if n_boot is not None and n_resamples is not None:
         raise CliError(
             "bad_value",
