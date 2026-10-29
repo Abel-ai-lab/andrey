@@ -500,6 +500,7 @@ def _search_state(
     score_func: str,
     penalty_discount: float,
     ebic_gamma: float,
+    equivalent_sample_size: float,
     categorical: np.ndarray | None,
     constraints: Constraints | None,
     max_parents: int | None,
@@ -508,7 +509,9 @@ def _search_state(
 
     The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
     """
-    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
+    score, ranks = ranked_score(
+        X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
+    )
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     n_features = X.shape[1]
     if constraints is None:
@@ -562,6 +565,7 @@ def grasp(
     *,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     depth: int = 3,
     random_state: int = 0,
     n_starts: int = 1,
@@ -591,6 +595,9 @@ def grasp(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     depth : int
         Most tucks in one chain of moves, at least ``1``.
     random_state : int
@@ -645,7 +652,14 @@ def grasp(
         # Each start builds its own score, caches, and trees, so a search of many starts holds
         # one start's state at a time.
         score, ranks, gsts, before = _search_state(
-            X, score_func, penalty_discount, ebic_gamma, categorical, constraints, max_parents
+            X,
+            score_func,
+            penalty_discount,
+            ebic_gamma,
+            equivalent_sample_size,
+            categorical,
+            constraints,
+            max_parents,
         )
         order = _search_from(n_features, start_rng(random_state, start), gsts, depth, before)
         total_bic = 0.0

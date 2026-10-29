@@ -333,10 +333,46 @@ def test_bdeu_does_not_depend_on_the_codes():
     assert b.score(1, [2, 0]) == pytest.approx(a.score(1, [0, 2]), rel=1e-12)
 
 
-@pytest.mark.parametrize(("name", "value"), [("sample_prior", 0.0), ("structure_prior", -1.0)])
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("equivalent_sample_size", 0.0),
+        ("equivalent_sample_size", float("inf")),
+        ("structure_prior", -1.0),
+    ],
+)
 def test_bdeu_priors_must_be_positive(name, value):
     with pytest.raises(ValueError, match=name):
         BDeuScore(_codes(), **{name: value})
+
+
+def test_bdeu_equivalent_sample_size_matches_a_hand_computation():
+    """Two variables, so the structure prior is left out and only the Dirichlet term remains.
+
+    Node 0 has counts (4, 2) and no parent. With equivalent sample size ``a`` the marginal
+    likelihood is ``G(a) G(4 + a / 2) G(2 + a / 2) / (G(6 + a) G(a / 2) ** 2)``, with ``G`` the
+    gamma function: 7 / 1024 for a = 1 and 1 / 105 for a = 2. Given the binary node 1, with counts
+    (2, 0) where it is 0 and (2, 2) where it is 1, a = 2 gives 3 / 8 times 3 / 128.
+    """
+    x = np.array([[0, 0], [0, 0], [0, 1], [0, 1], [1, 1], [1, 1]], float)
+    default = BDeuScore(x)
+    assert default.equivalent_sample_size == 1.0
+    assert BDeuScore(x).score(0, []) == BDeuScore(x, equivalent_sample_size=1.0).score(0, [])
+    assert default.score(0, []) == pytest.approx(2 * math.log(1024 / 7))
+    two = BDeuScore(x, equivalent_sample_size=2.0)
+    assert two.score(0, []) == pytest.approx(2 * math.log(105))
+    assert two.score(0, [1]) == pytest.approx(2 * math.log(1024 / 9))
+    ten = BDeuScore(x, equivalent_sample_size=10.0)
+    assert ten.score(0, []) == pytest.approx(-2 * _bdeu(np.array([[4, 2]]), 1, a=10.0))
+    assert ten.score(0, [1]) == pytest.approx(-2 * _bdeu(np.array([[2, 0], [2, 2]]), 2, a=10.0))
+
+
+def test_make_score_builds_bdeu_with_the_equivalent_sample_size():
+    x = _codes()
+    score = make_score("bdeu", x, equivalent_sample_size=5.0)
+    assert isinstance(score, BDeuScore) and score.equivalent_sample_size == 5.0
+    assert make_score("bdeu", x).score(1, [0]) == BDeuScore(x).score(1, [0])
+    assert score.on_rows(np.arange(len(x)) % 2 == 0).equivalent_sample_size == 5.0
 
 
 def test_configurations_number_the_observed_rows_in_code_order():

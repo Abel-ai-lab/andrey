@@ -458,6 +458,7 @@ def hc(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
@@ -482,7 +483,7 @@ def hc(
     score_func : str
         Local score: ``"bic"`` (linear-Gaussian BIC),
         ``"bdeu"`` (BDeu on category codes,
-        :class:`~andrey.core.score.BDeuScore` with its default priors),
+        :class:`~andrey.core.score.BDeuScore` with its default structure prior),
         ``"discrete_bic"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
         ``"degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
@@ -494,6 +495,9 @@ def hc(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     max_iter : int or None
         Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.
@@ -522,6 +526,7 @@ def hc(
         X,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
     )
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)

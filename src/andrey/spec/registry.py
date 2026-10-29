@@ -80,6 +80,7 @@ _SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
 _SCORE_FUNC_RENAMED = concept_param("score_func", doc=_SCORE_DOC, choice_aliases=SCORE_ALIASES)
 _EBIC_GAMMA = concept_param("ebic_gamma")
 _EBIC_GAMMA_STANDARD = concept_param("ebic_gamma", default=0.0)
+_EQUIVALENT_SAMPLE_SIZE = concept_param("equivalent_sample_size")
 _SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
@@ -219,6 +220,7 @@ _add(
             _SCORE_FUNC_RENAMED,
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA_STANDARD,
+            _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
             _ALPHA,
             _COLLIDER_RULE,
@@ -394,6 +396,7 @@ _add(
             _SCORE_FUNC_RENAMED,
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             concept_param(
                 "max_parents",
                 doc="A cap on every node's parents, at least 0: no DAG the returned CPDAG "
@@ -450,6 +453,7 @@ _add(
             ),
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             _CATEGORICAL,
         ),
         references=("Hauser & Buhlmann 2012", "Cooper & Yoo 1999"),
@@ -485,6 +489,7 @@ _add(
             ),
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
                 name="extended_search",
                 type="bool",
@@ -524,6 +529,7 @@ _add(
             _SCORE_FUNC_RENAMED,
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             concept_param(
                 "max_iter",
                 default=None,
@@ -567,6 +573,7 @@ _add(
             ),
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
                 name="tabu_length",
                 minimum=1,
@@ -629,6 +636,7 @@ _add(
             _SCORE_FUNC_RENAMED,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             _CATEGORICAL,
         ),
         references=("Yuan & Malone 2013", "Silander & Myllymaki 2006"),
@@ -990,6 +998,7 @@ _add(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             _HYBRID_MAX_ITER,
             _CATEGORICAL,
             _TEST_SEED,
@@ -1039,6 +1048,7 @@ _add(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             _HYBRID_MAX_ITER,
             ParamSpec(
                 name="tabu_length",
@@ -1097,6 +1107,7 @@ _add(
             _SCORE_FUNC_RENAMED,
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             _SEED,
             _N_STARTS,
             _CATEGORICAL,
@@ -1130,6 +1141,7 @@ _add(
             _SCORE_FUNC_RENAMED,
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
                 name="grasp_depth",
                 minimum=1,
@@ -2053,7 +2065,11 @@ for _name, _spec in REGISTRY.items():
         *(("seed",) if _spec.seeded else ()),
         *(("indep_test",) if "indep_test" in _concepts else ()),
         *(("score_func",) if "score_func" in _concepts else ()),
-        *(k for k in ("penalty_discount", "ebic_gamma") if k in _concepts),
+        *(
+            k
+            for k in ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
+            if k in _concepts
+        ),
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),

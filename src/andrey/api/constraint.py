@@ -740,6 +740,7 @@ def gfci(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
@@ -779,6 +780,11 @@ def gfci(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     indep_test : str or None, default=None
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
         ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
@@ -1018,6 +1024,7 @@ def gfci(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             alpha=alpha,
             indep_test=indep_test,
             collider_rule=collider_rule,

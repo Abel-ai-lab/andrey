@@ -97,6 +97,13 @@ names its pull request.
   in the other score searches; `gies` scores each variable on the rows without an intervention on
   it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
   data. ([#520])
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+  `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman,
+  Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform prior over each
+  variable's conditional distributions is worth. The default, `1.0`, is the weight the score used
+  before, so every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that
+  passes it with another score, named or picked from the declared column types, raises
+  `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
 
 ### Changed
 
