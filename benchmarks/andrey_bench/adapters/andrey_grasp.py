@@ -71,7 +71,9 @@ class AndreyGRaSP:
 
         score_func = params.get("score_func", _DEFAULT_SCORE_FUNC)
         lambda_value = float(params.get("lambda_value", ANDREY_LAMBDA))
-        ebic_gamma = float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA))
+        score = andrey_score(score_func)
+        # Only the BIC takes the extended-BIC weight; any other score raises on it.
+        bic_weight = {"ebic_gamma": float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA))}
         depth = int(params.get("depth", _DEFAULT_DEPTH))
         seed = int(params.get("seed", SEARCH_SEED))
 
@@ -79,9 +81,9 @@ class AndreyGRaSP:
         with andrey.config(backend=self.backend, n_jobs=1):
             out = andrey.grasp(
                 X,
-                score_func=andrey_score(score_func),
+                score_func=score,
                 penalty_discount=lambda_value,
-                ebic_gamma=ebic_gamma,
+                **(bic_weight if score == "bic" else {}),
                 grasp_depth=depth,
                 seed=seed,
             )
