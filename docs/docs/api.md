@@ -121,6 +121,15 @@ panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting an
 DirectLiNGAM's order search and take `measure`, how it picks the most exogenous variable at each
 step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the only one.
 
+% concept: fdr_method
+`pcmci` and `pcmciplus` take `fdr_method`, tigramite's name for the correction of the lagged links'
+p-values for the number of links tested. `"none"`, the default, keeps each p-value as tested.
+`"fdr_bh"` replaces them with their Benjamini-Hochberg adjusted values over all the lagged links
+together, which holds the false discovery rate at or below the level when the tests are independent
+or positively dependent. `pcmci` keeps a link when its adjusted p-value is at most `alpha`;
+`pcmciplus` decides its links in the skeleton phase and reports the adjusted values in
+`metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
+
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
 `pcmciplus`, and `rcd` take `max_depth`, the maximum conditioning-set size of their

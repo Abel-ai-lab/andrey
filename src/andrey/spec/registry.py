@@ -1430,6 +1430,13 @@ _add(
                 "links; a link is kept when its p-value is at most this.",
                 aliases=("alpha_level",),
             ),
+            concept_param(
+                "fdr_method",
+                doc="How the MCI p-values are corrected for the number of links tested: none "
+                "keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+                "adjusted values over all the links together, and a link is kept when its "
+                "adjusted p-value is at most alpha.",
+            ),
             _INDEP_TEST,
             _CATEGORICAL,
             _TEST_SEED,
@@ -1485,6 +1492,13 @@ _add(
                 "p-value above this. The default is the level of the published experiments "
                 "(Runge 2020).",
                 aliases=("pc_alpha",),
+            ),
+            concept_param(
+                "fdr_method",
+                doc="How the p-values of the lagged links are corrected for the number of links "
+                "tested: none keeps them as tested; fdr_bh replaces them with their "
+                "Benjamini-Hochberg adjusted values over all the lagged links together. The "
+                "links do not change: the skeleton phase decides them at alpha.",
             ),
             concept_param(
                 "collider_rule",

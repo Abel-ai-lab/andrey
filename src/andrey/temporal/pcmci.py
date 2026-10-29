@@ -13,7 +13,10 @@ tau_max``:
    has ``p`` others left to condition on.
 2. **MCI.** Every link ``X^i_{t-tau} -> X^j_t`` is tested given the selected parents of ``X^j_t``
    (without ``X^i_{t-tau}``) and the selected parents of ``X^i_t`` shifted ``tau`` steps back. The
-   link is significant when its p-value is at most ``alpha_level``.
+   link is significant when its p-value is at most ``alpha_level``. With ``fdr_method="fdr_bh"``,
+   the p-values of all the links are first corrected together
+   (:func:`~andrey.core.fdr.corrected_pvalues`), and a link is significant when its corrected
+   p-value is at most ``alpha_level``.
 
 Every test reads one lagged design matrix: column ``lag * n + i`` holds ``X^i_{t-lag}`` for ``lag =
 0 .. 2 * tau_max``, over the ``T - 2 * tau_max`` time steps where all those lags exist, so every
@@ -63,6 +66,7 @@ from andrey.core.ci import (
     make_indep_test,
 )
 from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
+from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.score import copies_error
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
@@ -108,7 +112,8 @@ class PCMCIResult:
     ``statistics``, ``p_values``, and ``graph`` have shape ``(tau_max, n, n)``: entry
     ``[lag - 1, i, j]`` belongs to the link ``X^i_{t-lag} -> X^j_t``, and ``graph`` is
     ``p_values <= alpha_level``. A link the knowledge forbids reads statistic 0 and p-value 1, and
-    a required one 1 and 0.
+    a required one 1 and 0. With ``fdr_method``, ``p_values`` holds the corrected p-values
+    (:func:`~andrey.core.fdr.corrected_pvalues`).
     """
 
     parents: tuple[tuple[Link, ...], ...]
@@ -360,6 +365,7 @@ def pcmci(
     tau_max: int = 1,
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
+    fdr_method: str = "none",
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
@@ -368,12 +374,17 @@ def pcmci(
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` test.
 
+    ``fdr_method`` corrects the MCI p-values of all the links together before ``alpha_level``
+    decides which are significant (:func:`~andrey.core.fdr.corrected_pvalues`); ``"none"`` leaves
+    them as tested.
+
     With ``constraints``, background knowledge over lags ``0`` to ``tau_max``, PC1 and MCI test no
     forbidden or required link (:func:`pc1`, :func:`mci`): a forbidden link is not in the graph and
     a required one is. ``max_depth`` caps PC1's conditioning sets. ``categorical``, the mask of the
     categorical columns for a mixed-data test, and ``seed`` reach :func:`design_test`, which raises
     on an ``indep_test`` it cannot build.
     """
+    check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
     test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
@@ -384,6 +395,9 @@ def pcmci(
             for j in range(n_vars)
         )
         statistics, p_values = mci(test, n_vars, parents, tau_max, constraints)
+    p_values = corrected_pvalues(
+        p_values, fdr_method, None if constraints is None else constraints.forbidden[1:]
+    )
     return PCMCIResult(
         parents=parents, statistics=statistics, p_values=p_values, graph=p_values <= alpha_level
     )
