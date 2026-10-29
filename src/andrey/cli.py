@@ -1042,7 +1042,7 @@ def execute_bootstrap(
     as_json: bool,
     full: bool,
 ) -> None:
-    """Refit the method on bootstrap resamples, then emit the edge frequencies (shell-aware).
+    """Refit the method on resamples of the rows, then emit the edge frequencies (shell-aware).
 
     The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
     """

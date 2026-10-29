@@ -140,6 +140,8 @@ _LINGAM = (
     "longitudinal_lingam",
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+#: The methods with no edge to name in knowledge.
+_NO_KNOWLEDGE = ("gin", "anm", "pnl")
 ALL_METHODS = (
     *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc"),
     *_PURE_SCORE,
@@ -580,10 +582,20 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="background knowledge",
-        suitable=tuple(m for m in ALL_METHODS if m not in ("gin", "anm", "pnl")),
+        suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
+        ),
+    ),
+    Concept(
+        key="required_edges",
+        summary="Every required edge is in the output, whatever its estimated weight, its test "
+        "result, or its score: a required edge whose least-squares weight is 0, or whose "
+        "variables look independent, is in the graph all the same.",
+        suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
+        exempt=_exempt(
+            "Has no edge for knowledge to name (the knowledge concept).", *_NO_KNOWLEDGE
         ),
     ),
     Concept(
@@ -797,8 +809,20 @@ _CONCEPTS = (
         "thing with one shape in every method: p_values and statistics for test results, "
         "conflicts for the links colliders ask to orient both ways, score for a score search's "
         "score. An order that is not a total order of the variables has its own name "
-        "(partial_order, cluster_order), and no key repeats an argument.",
+        "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
+        "default leaves open: seed, indep_test, and score_func hold the value the fit used.",
         suitable=ALL_METHODS,
+    ),
+    Concept(
+        key="chosen_settings",
+        summary="A method with an indep_test or a score_func records the one it used in "
+        "metadata['indep_test'] or metadata['score_func'], as its current short name: the name "
+        "the call passed, or, for None, the one picked from the declared column types. A "
+        "registered test records its registered name.",
+        suitable=tuple(
+            m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
+        ),
+        others_exempt="Neither a conditional-independence test nor a score to choose.",
     ),
     Concept(
         key="warnings",

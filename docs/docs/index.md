@@ -33,7 +33,9 @@ The first call downloads 853 cells' measurements of 11 proteins, and PC learns a
 3.11 or later. Linux is fully supported; macOS and Windows install and run on the CPU, with no
 guarantee yet.
 
-::::{grid} 1 2 2 4
+::::{grid} 1 2 3 3
+:gutter: 3
+
 :::{grid-item-card} Get started
 :link: guides/getting-started
 :link-type: doc
