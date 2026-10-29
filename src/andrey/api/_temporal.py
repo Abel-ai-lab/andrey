@@ -167,7 +167,8 @@ def _adapt_pcmciplus(
     """PCMCI+ result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
 
     Lag 0 is a ``cpdag`` built from ``result.marks``; a conflict (an arrowhead at both ends) has no
-    mark of its own, so it becomes an undirected link and is listed in ``metadata["conflicts"]``.
+    mark of its own, so it becomes an undirected link and is listed in ``metadata["conflicts"]`` as
+    an ``[i, 0, j]`` link, the shape LPCMCI's lagged conflicts take.
     ``result.adjacency[k, i, j]``, ``k >= 1``, marks the link ``i -> j`` at lag ``k`` (row =
     cause), transposed for :func:`_lag_graphs`. The p-values and statistics ride in ``metadata`` in
     the result's ``[lag, cause, effect]`` layout.
@@ -184,7 +185,7 @@ def _adapt_pcmciplus(
         "p_values": result.p_values,
         "statistics": result.statistics,
         "parents": [[list(link) for link in links] for links in result.parents],
-        "conflicts": [list(pair) for pair in result.conflicts],
+        "conflicts": [[i, 0, j] for i, j in result.conflicts],
         "ambiguous_triples": [list(triple) for triple in result.ambiguous_triples],
         **(extra or {}),
     }

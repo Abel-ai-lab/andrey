@@ -315,13 +315,15 @@ def graph_digest(out: Any) -> str:
 
 
 def parts(out: Any) -> dict[str, str]:
-    """Return the digest of each part of ``out``: its graphs, its structure with any lag weights,
-    its causal order, its edge weights, and each metadata value; a list of results prefixes each
-    result's parts with its position."""
+    """Return the digest of each part of ``out``: its graphs, their kinds, their edges (marks and
+    node types), its structure with any lag weights, its causal order, its edge weights, and each
+    metadata value; a list of results prefixes each result's parts with its position."""
     if isinstance(out, list):
         return {f"{i}.{name}": d for i, o in enumerate(out) for name, d in parts(o).items()}
     return {
         "graph": graph_digest(out),
+        "kind": digest([g.kind for g in graphs(out)]),
+        "edges": digest([(g.to_numpy(), g.node_types) for g in graphs(out)]),
         "structure": digest(out.structure),
         "ordering": digest(out.ordering),
         "weights": digest(out.weighted_adjacency),
@@ -335,16 +337,18 @@ LAG_MATRICES = ("p_values", "statistics", "links")
 #: out: each method lays out its lists in its own way.
 NODE_LISTS = (
     "ambiguous_triples",
-    "causal_order",
     "causal_orders",
+    "cluster_order",
     "clusters",
     "confounded_pairs",
     "conflicts",
+    "dag",
     "parents",
+    "partial_order",
     "unordered",
 )
-#: Metadata of a pair's two directions, first column to second and back, which a swap exchanges.
-DIRECTIONS = (("pval_forward", "pval_backward"), ("stat_forward", "stat_backward"))
+#: The keys of a pair's two directions, first column to second and back, which a swap exchanges.
+DIRECTIONS = ("forward", "backward")
 
 
 def permuted(x: np.ndarray, order: np.ndarray, blocks: int) -> np.ndarray:
@@ -365,15 +369,17 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
     back = np.argsort(order)
     weights = out.weighted_adjacency
-    metadata = {
-        key: np.asarray(value)[:, back][:, :, back].tolist() if key in LAG_MATRICES else value
-        for key, value in out.metadata.items()
-        if key not in NODE_LISTS
-    }
-    if len(order) == 2 and order[0] == 1:
-        for forward, backward in DIRECTIONS:
-            if forward in metadata:
-                metadata[forward], metadata[backward] = metadata[backward], metadata[forward]
+    swapped = len(order) == 2 and order[0] == 1
+    metadata = {}
+    for key, value in out.metadata.items():
+        if key in NODE_LISTS:
+            continue
+        if isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
+            forward, backward = DIRECTIONS
+            value = {forward: value[backward], backward: value[forward]} if swapped else value
+        elif key in LAG_MATRICES:
+            value = np.asarray(value)[:, back][:, :, back].tolist()
+        metadata[key] = value
     return StructureOutput.new(
         _moved(out.structure, back),
         ordering=None if out.ordering is None else [int(order[i]) for i in out.ordering],
@@ -785,20 +791,26 @@ def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     is in one only, or a count rose or fell, else 0. A count that fell passes with ``allow_fewer``:
     it is either a real algorithmic change or a query the counting no longer sees.
 
-    A row whose graph is unchanged differs in its bits, or, when its :func:`parts` show that only
-    metadata values changed, in its metadata, and the compare names the metadata keys."""
+    A row whose graph differs keeps its edges when its :func:`parts` show that only the kind
+    changed. A row whose graph is unchanged differs in its bits, or, when its :func:`parts` show
+    that only metadata values changed, in its metadata, and the compare names the metadata keys."""
     for key in sorted(before["header"].keys() | after["header"].keys()):
         if before["header"].get(key) != after["header"].get(key):
             print(f"header {key}: {before['header'].get(key)} -> {after['header'].get(key)}")
     old = {tuple(r[k] for k in KEY): r for r in before["rows"]}
     new = {tuple(r[k] for k in KEY): r for r in after["rows"]}
-    graph, bits, metadata, raised, lowered = [], [], [], [], []
+    graph, kind, bits, metadata, raised, lowered = [], [], [], [], [], []
     keys: set[str] = set()
     for key in sorted(old.keys() & new.keys(), key=str):
         a, b = old[key], new[key]
         label = " ".join(map(str, key))
         if a["graph_hash"] != b["graph_hash"]:
-            graph.append(label)
+            changed = kind_change(a.get("parts", {}), b.get("parts", {}))
+            if changed is None:
+                graph.append(label)
+            else:
+                kind.append(f"{label} {', '.join(changed)}".rstrip())
+                keys.update(changed)
         elif a["hash"] != b["hash"]:
             changed = metadata_keys(a.get("parts", {}), b.get("parts", {}))
             if changed:
@@ -816,6 +828,7 @@ def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     only = sorted(" ".join(map(str, k)) for k in old.keys() ^ new.keys())
     for title, lines in (
         ("graph differs", graph),
+        ("only the kind differs", kind),
         ("only bits differ", bits),
         ("only metadata differs", metadata),
         ("in one manifest only", only),
@@ -827,11 +840,11 @@ def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     named = f" ({', '.join(sorted(keys))})" if keys else ""
     print(
         f"\n{len(old.keys() & new.keys())} rows in both: {len(graph)} with a different graph, "
-        f"{len(bits)} with only different bits, {len(metadata)} with only different metadata"
-        f"{named}; {len(only)} in one only; "
+        f"{len(bits)} with only different bits, {len(metadata)} with only different metadata, "
+        f"{len(kind)} with only a different kind{named}; {len(only)} in one only; "
         f"{len(raised)} counts rose, {len(lowered)} fell."
     )
-    differs = graph or bits or metadata or only or raised
+    differs = graph or kind or bits or metadata or only or raised
     return 1 if differs or (lowered and not allow_fewer) else 0
 
 
@@ -842,6 +855,16 @@ def metadata_keys(before: Mapping[str, str], after: Mapping[str, str]) -> list[s
     if not changed or any("metadata." not in name for name in changed):
         return []
     return sorted({name.split("metadata.", 1)[1] for name in changed})
+
+
+def kind_change(before: Mapping[str, str], after: Mapping[str, str]) -> list[str] | None:
+    """Return the metadata keys that differ when two rows' :func:`parts` differ in the graphs'
+    kind alone, their edges, order, and weights the same; else ``None``."""
+    changed = {name for name in before.keys() | after.keys() if before.get(name) != after.get(name)}
+    other = {name.rsplit(".", 1)[-1] for name in changed if "metadata." not in name}
+    if "kind" not in other or not other <= {"graph", "structure", "kind"}:
+        return None
+    return sorted({name.split("metadata.", 1)[1] for name in changed if "metadata." in name})
 
 
 # ==================================================================================================

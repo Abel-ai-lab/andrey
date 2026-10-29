@@ -56,6 +56,7 @@ def pc(
     seed: int | None = None,
     _trace: list[dict] | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
+    _conflicts: set[tuple[int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
 
@@ -86,7 +87,9 @@ def pc(
     with the fields :func:`~andrey.core.orient.meek` records), and, when colliders of equal rank
     conflict, the edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
     The tests of a collider vote are not recorded. The private ``_ambiguous`` sink receives the
-    triples no rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    triples no rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``, and
+    the private ``_conflicts`` sink the edges colliders ask to orient both ways
+    (:func:`collider_conflicts`).
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -113,6 +116,8 @@ def pc(
         )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
+    if _conflicts is not None:
+        _conflicts.update(collider_conflicts(skeleton, sepsets, ambiguous))
     if constraints is not None:
         skeleton = orient(skeleton, constraints)
         check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
@@ -324,6 +329,32 @@ def _orient_colliders(
                     )
                 )
     return pdag
+
+
+def collider_conflicts(
+    skeleton: np.ndarray,
+    sepsets: Mapping[tuple[int, int], Iterable[int] | None],
+    ambiguous: Collection[tuple[int, int, int]] = frozenset(),
+) -> set[tuple[int, int]]:
+    """Return the edges two unshielded colliders ask to orient both ways, as ``(x, y)``, ``x < y``.
+
+    A triple ``x - y - z`` of ``skeleton`` (``x`` and ``z`` not adjacent, with a recorded
+    separating set, and not in ``ambiguous``) whose middle node ``y`` is not in that set asks for
+    an arrowhead at ``y`` on ``x - y`` and on ``z - y``. An edge asked for an arrowhead at both ends
+    is a conflict, whichever collider the orientation order then keeps.
+    """
+    asked = np.zeros(skeleton.shape, dtype=bool)
+    for y in range(skeleton.shape[0]):
+        nbrs = np.flatnonzero(skeleton[y] != NULL).tolist()
+        for x, z in combinations(nbrs, 2):
+            if (
+                skeleton[x, z] == NULL
+                and ((x, z) in sepsets or (z, x) in sepsets)
+                and (x, y, z) not in ambiguous
+                and y not in _lookup_sepset(sepsets, x, z)
+            ):
+                asked[y, x] = asked[y, z] = True
+    return {(int(x), int(y)) for x, y in np.argwhere(np.triu(asked & asked.T))}
 
 
 def _undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:

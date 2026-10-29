@@ -62,6 +62,7 @@ _TIE_EDGE: dict[Kind, tuple[int, int]] = {
     "dag": (TAIL, TAIL),
     "cpdag": (TAIL, TAIL),
     "pag": (CIRCLE, CIRCLE),
+    "undirected": (TAIL, TAIL),
 }
 _STATES = 16  # a pair's mark pairs, coded near * 4 + far
 
@@ -143,7 +144,7 @@ class BootstrapOutput:
             ``o-o`` for a ``pag``. A ``digraph`` lag graph takes each directed edge that appears
             in at least ``threshold`` of the fits. The graph's kind is the widest kind among the
             fits (``dag``, ``cpdag``, ``pag``, with a ``mag`` read as a ``pag``), widened to
-            ``cpdag`` by a ``--``.
+            ``cpdag`` by a ``--``; an ``undirected`` graph stays ``undirected``.
 
         Raises
         ------
@@ -151,8 +152,8 @@ class BootstrapOutput:
             If a fit is not a ``StructureOutput``.
         ValueError
             If ``fits`` is empty, ``threshold`` is not in ``(0, 1]``, the fits differ in graph
-            type, node count, labels, or lags, a graph is a ``digraph`` in some fits and another
-            kind in others, or a fit has latent nodes.
+            type, node count, labels, or lags, a graph is a ``digraph`` or ``undirected`` in some
+            fits and another kind in others, or a fit has latent nodes.
         """
         fits = tuple(fits)
         if not fits:
@@ -469,17 +470,19 @@ def _check_threshold(threshold: float) -> float:
 
 
 def _widest(kinds: set[Kind]) -> Kind:
-    """Return the widest of ``kinds``: ``dag`` < ``cpdag`` < ``pag``, or ``digraph`` alone.
+    """Return the widest of ``kinds``: ``dag`` < ``cpdag`` < ``pag``, or a lone kind.
 
-    A ``mag`` counts as a ``pag``: an averaged MAG can hold a tie, which leaves a circle.
+    ``digraph`` and ``undirected`` average only with fits of their own kind. A ``mag`` counts as
+    a ``pag``: an averaged MAG can hold a tie, which leaves a circle.
     """
     kinds = {"pag" if is_ancestral_kind(kind) else kind for kind in kinds}
-    if "digraph" in kinds:
-        if len(kinds) > 1:
-            raise ValueError(
-                f"a graph is a digraph in some fits and another kind in others: {kinds}"
-            )
-        return "digraph"
+    for alone in ("digraph", "undirected"):
+        if alone in kinds:
+            if len(kinds) > 1:
+                raise ValueError(
+                    f"a graph is a {alone} in some fits and another kind in others: {kinds}"
+                )
+            return alone
     return max(kinds, key=_KIND_ORDER.__getitem__)
 
 

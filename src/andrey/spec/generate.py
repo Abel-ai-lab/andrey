@@ -207,6 +207,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
             "has_ordering": spec.output.has_ordering,
             "has_latents": spec.output.has_latents,
             "multi": spec.output.multi,
+            "metadata": list(spec.output.metadata),
             "description": spec.output.doc,
         },
         "knowledge": list(spec.knowledge),

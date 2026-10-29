@@ -31,9 +31,9 @@ def test_gin_recovers_the_planted_clusters_and_their_order(fit) -> None:
     planted = datagen.clusters(_CASE)  # earliest latent first
 
     assert out.metadata["algorithm"] == "gin"
-    assert out.metadata["n_latents"] == 2
+    assert len(out.metadata["clusters"]) == 2
     assert {frozenset(c) for c in out.metadata["clusters"]} == {frozenset(c) for c in planted}
-    assert [sorted(c) for c in out.metadata["causal_order"]] == planted
+    assert [sorted(c) for c in out.metadata["cluster_order"]] == planted
 
     s = out.structure
     assert isinstance(s, GraphStructure)
@@ -52,7 +52,7 @@ def test_gin_orders_a_chain_of_three_latents() -> None:
     planted = datagen.clusters(case)  # earliest latent first
     out = andrey.gin(datagen.generate(case))
     assert {frozenset(c) for c in out.metadata["clusters"]} == {frozenset(c) for c in planted}
-    assert [sorted(c) for c in out.metadata["causal_order"]] == planted
+    assert [sorted(c) for c in out.metadata["cluster_order"]] == planted
 
 
 def test_gin_finds_the_same_latents_for_reversed_columns() -> None:
@@ -66,7 +66,7 @@ def test_gin_finds_the_same_latents_for_reversed_columns() -> None:
         return [sorted(last - i for i in group) for group in groups]
 
     assert sorted(back(reversed_out["clusters"])) == sorted(out["clusters"])
-    assert back(reversed_out["causal_order"]) == out["causal_order"]
+    assert back(reversed_out["cluster_order"]) == out["cluster_order"]
     assert sorted(back(reversed_out["unordered"])) == sorted(out["unordered"])
 
 
@@ -99,7 +99,7 @@ def test_gin_needs_a_variable_outside_a_cluster() -> None:
     latent = rng.uniform(-1.0, 1.0, 500)
     data = np.column_stack([latent + 0.1 * rng.uniform(-1.0, 1.0, 500) for _ in range(2)])
     out = andrey.gin(data)
-    assert out.metadata["n_latents"] == 0
+    assert out.metadata["clusters"] == []
     assert out.structure.n_nodes == 2
     assert out.structure.oriented_edges(index=True) == []
 
@@ -110,7 +110,7 @@ def test_gin_leaves_latents_unordered_when_no_root_passes() -> None:
     planted = datagen.clusters(case)
     out = andrey.gin(datagen.generate(case))
     assert {frozenset(c) for c in out.metadata["clusters"]} == {frozenset(c) for c in planted}
-    assert out.metadata["causal_order"] == []
+    assert out.metadata["cluster_order"] == []
     unordered = sorted(planted, key=min)  # by smallest member, as GIN lists them
     assert out.metadata["unordered"] == unordered
     latent_edges = [(6, child, "directed") for child in unordered[0]]

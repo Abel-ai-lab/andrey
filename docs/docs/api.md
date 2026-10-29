@@ -277,11 +277,11 @@ its first call in a process.
 ```
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they return every variable's set as undirected edges, joining a pair when
-each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
-runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
-keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
-its maximize phase runs hill climbing or tabu search among them.
+`target`; without one, they return every variable's set as an `undirected` graph, joining a pair
+when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests,
+then runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict
+phase keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's
+skeleton, and its maximize phase runs hill climbing or tabu search among them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
@@ -447,8 +447,9 @@ environment variables and the order in which the settings apply, and
 
 ## Warnings
 
-Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`. A warning
-never changes a result. Each distinct message warns once per process, at the line in your code that
+Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`, and each
+situation has one category, the one the table names, in every method. A warning never changes a
+result. Each distinct message warns once per process, at the line in your code that
 made the call; a `BoundaryWarning` warns once per method. A warning from a dependency keeps its own
 category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, raised again as a
 `SearchLimitWarning`.
@@ -456,7 +457,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | Category | When |
 |---|---|
 | {py:class}`~andrey.ExperimentalWarning` | The first call of an experimental method. |
-| {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
+| {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests, PNL on fewer worker threads than asked to stay within its memory, worker processes that start without the forkserver's local socket, or a search's worker-pool cutoff left at its default. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A fit stopped at its iteration cap, such as `max_iter`, rather than on its own stopping rule, or FastICA or LARS did not converge. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
@@ -609,6 +610,7 @@ a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
 
 | `family` | When | `score` returns |
 |---|---|---|
+| `undirected` | either graph is `undirected` | the skeleton scores and `shd`, the skeleton SHD: the pairs adjacent in one graph and not in the other |
 | `dag` | both graphs are DAGs | skeleton and arrowhead precision, recall, and F1; `shd`; `mec_shd` and `mec_arrowhead_f1`, scored through the CPDAGs; the causal-order scores when the result has an ordering; `coefficient_mae` when both carry weights |
 | `cpdag` | either graph is a CPDAG | the skeleton and arrowhead scores and `shd`, with a DAG converted to its CPDAG first |
 | `pag` | either graph is a PAG or a MAG | the skeleton and arrowhead scores and `shd`, plus `shd_endpoint` and the scores for bidirected pairs |

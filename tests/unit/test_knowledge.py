@@ -371,11 +371,6 @@ def test_names_need_column_labels():
         resolve(Knowledge(required=[("a", "b")]), 3, None, method="pc")
 
 
-def test_bottom_up_parce_lingam_rejects_required_edges(data):
-    with pytest.raises(NotImplementedError, match="required"):
-        andrey.bottom_up_parce_lingam(data, knowledge=Knowledge(required=[("a", "c")]))
-
-
 def test_a_part_a_method_does_not_honor_raises():
     with pytest.raises(NotImplementedError, match="does not honor"):
         resolve(Knowledge(tiers=[[0], [1]]), 2, None, method="m", honors=("required",))
@@ -602,13 +597,25 @@ def test_rcd_raises_on_required_edges_that_close_a_cycle():
 def test_bottom_up_parce_lingam_reads_the_knowledge_in_the_unordered_block(forbidden):
     data = _confounded()
     plain = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    assert plain.metadata["causal_order"] == [[0, 1], 2, 3]
+    assert plain.metadata["partial_order"] == [[0, 1], 2, 3]
     out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(forbidden=forbidden))
     marks = from_structure(out.structure)
     if len(forbidden) == 2:
         assert marks[0, 1] == NULL and marks[1, 0] == NULL
     else:  # an arrowhead at the cause of the forbidden edge, a circle at its effect
         assert marks[0, 1] == ARROW and marks[1, 0] == CIRCLE
+
+
+@pytest.mark.parametrize(
+    "edge", [(0, 1), (1, 0), (1, 3)], ids=["in the block", "reversed", "resolved"]
+)
+def test_bottom_up_parce_lingam_keeps_every_required_edge(edge):
+    data = _confounded()  # the unordered block holds 0 and 1, then 2 and 3 follow
+    out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(required=[edge]))
+    i, j = edge
+    marks = from_structure(out.structure)
+    assert (marks[i, j], marks[j, i]) == (TAIL, ARROW)
+    assert out.metadata["partial_order"][0] == [0, 1]  # the order keeps the block
 
 
 def test_every_group_honors_the_knowledge(data):

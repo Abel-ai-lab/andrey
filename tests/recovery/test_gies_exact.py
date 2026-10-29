@@ -10,7 +10,7 @@ import andrey
 from andrey.core import ARROW, TAIL
 from andrey.core.orient import from_structure, pdag2dag
 from andrey.core.score import BICScore
-from andrey.metrics import markov_equivalent
+from andrey.metrics import markov_equivalent, to_cpdag
 from andrey.search import exact as exact_module
 from andrey.search import gies as gies_search
 from andrey.search.gies import cut_pairs, replace_unprotected
@@ -343,8 +343,8 @@ def test_exact_search_scores_as_well_as_every_dag(search_method):
     """On four variables the search returns one of the 543 DAGs, and none has a lower BIC."""
     x = datagen.generate("gauss_5v")[:, 1:]
     score = BICScore(x, ebic_gamma=1.0)
-    dag = andrey.exact_search(x, search_method=search_method, ebic_gamma=1.0).structure
-    found = (dag.to_numpy() == 1).astype(np.int8)
+    out = andrey.exact_search(x, search_method=search_method, ebic_gamma=1.0)
+    found = _found_dag(out)
     dags = list(_all_dags(4))
     assert any(np.array_equal(found, dag) for dag in dags)
     assert _bic(found, score) <= min(_bic(dag, score) for dag in dags) + 1e-9
@@ -372,8 +372,28 @@ def test_gies_output_contract():
     assert out.structure.kind == "cpdag" and "score" in out.metadata
 
 
-def test_exact_search_output_contract():
-    assert andrey.exact_search(datagen.generate("gauss_5v")).structure.kind == "dag"
+def _found_dag(out) -> np.ndarray:
+    """The DAG ``metadata["dag"]`` lists, as a 0/1 adjacency (``[i, j]`` for ``i -> j``)."""
+    n = out.structure.n_nodes
+    found = np.zeros((n, n), dtype=np.int8)
+    for i, j in out.metadata["dag"]:
+        found[i, j] = 1
+    return found
+
+
+def test_exact_search_returns_the_cpdag_of_the_dag_it_found():
+    out = andrey.exact_search(datagen.generate("gauss_5v"))
+    assert out.structure.kind == "cpdag"
+    assert out.structure == to_cpdag(_found_dag(out))
+
+
+def test_exact_search_directs_the_edges_the_knowledge_decides():
+    x = datagen.generate("gauss_5v")
+    free = andrey.exact_search(x)
+    i, j = next((i, j) for i, j, kind in free.structure.oriented_edges() if kind == "undirected")
+    out = andrey.exact_search(x, knowledge=andrey.Knowledge(required=[(i, j)]))
+    assert (i, j, "directed") in out.structure.oriented_edges()
+    assert [i, j] in out.metadata["dag"]
 
 
 @pytest.mark.parametrize("search_method", ["astar", "dp"])

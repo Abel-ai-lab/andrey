@@ -89,7 +89,6 @@ def test_defaults_recover_a_tree_with_equal_noise_variances(name, tree) -> None:
     assert _edges(out) == set(TREE)
     for (i, j), weight in TREE.items():
         assert out.weighted_adjacency[i, j] == pytest.approx(weight, abs=0.2)
-    assert out.metadata["robust"] is False
     assert out.metadata["path_steps"] == 0
 
 
@@ -103,7 +102,6 @@ def test_independent_columns_have_no_edges(name) -> None:
 def test_robust_recovers_a_chain_and_takes_a_path_step(name, chain) -> None:
     out = _fit(name, chain, robust=True, **QUICK[name])
     assert _edges(out) == set(CHAIN)
-    assert out.metadata["robust"] is True
     assert out.metadata["path_steps"] >= 1
 
 
