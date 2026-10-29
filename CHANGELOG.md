@@ -11,13 +11,15 @@ change names its pull request.
 
 ### Breaking
 
-- Every renamed or changed argument, default, and output, in four tables. A former name or value in
-  the first table still works in this release, in Python and in `andrey run` and
-  `andrey bootstrap`, with an `andrey.DeprecatedArgumentWarning`, and stops working in the next.
-  The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the common calls
-  before and after. ([#496], [#499], [#501], [#505], [#509], [#510], [#526])
+- This release renames some arguments and changes some defaults and outputs, so that methods that
+  do the same thing share one name and one behavior. The four tables below list every such change.
+  A former name or value in the first table still works in this release, in Python and in
+  `andrey run` and `andrey bootstrap`, but gives an `andrey.DeprecatedArgumentWarning` that names
+  its replacement, and it stops working in the next release. The
+  [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the common calls before
+  and after. ([#496], [#499], [#501], [#505], [#509], [#510], [#526])
 
-  Renamed arguments and values:
+  These arguments and values have new names, and the former ones still work in this release:
 
   | Method | Former name | Name now |
   | --- | --- | --- |
@@ -42,7 +44,8 @@ change names its pull request.
   | `andrey run`, `andrey bootstrap` | `--data-groups`, `--data-list` | `--data`, once per dataset |
   | `gin`, `calm` | `labels` | none: ignored with a warning; the labels come from a DataFrame's columns, or, in `andrey run`, from the data file's header |
 
-  Renamed with no former name, which raises `TypeError`:
+  These arguments have new names, and the former names no longer work: passing one raises
+  `TypeError`.
 
   | Function | Former name | Name now |
   | --- | --- | --- |
@@ -50,7 +53,7 @@ change names its pull request.
   | `andrey.bootstrap`, new in this release | `num_workers`, in pre-release builds | none: `andrey.config` or `ANDREY_NUM_WORKERS` sets the workers |
   | `lpcmci` | `max_depth`, in pre-release builds | `max_p_global` |
 
-  Changed defaults:
+  These defaults have changed; the last column gives the setting that returns the former results:
 
   | Method | Argument | Before | Now | For the former results |
   | --- | --- | --- | --- | --- |
@@ -64,7 +67,7 @@ change names its pull request.
   | `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `mmhc`, `rsmax2` | `ebic_gamma`, new | the standard BIC | 1.0, the extended BIC ([#445]) | `ebic_gamma=0.0` |
   | `andrey.data.sample_scm`, `SCM.sample`, `andrey.data.generate` | `scale` | `"raw"` | `"standardize"` ([#411]) | `scale="raw"` |
 
-  Changed outputs:
+  These outputs have changed:
 
   | Method | Before | Now |
   | --- | --- | --- |

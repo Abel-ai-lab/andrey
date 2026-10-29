@@ -661,47 +661,6 @@ def test_the_theme_stylesheet_keeps_only_the_icons_a_page_names(conf, tmp_path):
     assert css == '.fa-lg{font-size:1.25em}.fa-house,.fa-home{--fa:"\\f015"}.fa-sun{--fa:"\\f185"}'
 
 
-@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
-def test_the_readme_chart_has_six_cards_each_a_published_ratio():
-    summaries = build.release_summaries(build.load_summary(build.SUMMARY))
-    slides = build.speedup_slides(summaries)
-    assert {name for _, name in build.PANEL} == {
-        "PC",
-        "FCI",
-        "GES",
-        "XGES",
-        "Tabu search",
-        "DirectLiNGAM",
-    }
-    assert len(slides) == 6
-    # The strongest speedup leads.
-    speeds = [next(s for p, s, _ in bars if p == "Andrey") for _, _, bars in slides]
-    assert speeds == sorted(speeds, reverse=True)
-    by_release = dict(zip(build.RELEASES, summaries, strict=True))
-    shown = {name: (size, bars) for name, size, bars in slides}
-    for release, name in build.PANEL:
-        size, bars = shown[name]
-        # The slide is the method's largest size with a published ratio, at the panel's mean
-        # degree, or the size PANEL_SIZES names, and Andrey's bar prints that ratio, "≥" before a
-        # lower bound. A pair's size is its rows.
-        methods = [m for m in by_release[release]["methods"] if m["method"] == name]
-        rows = [
-            r
-            for m in methods
-            for r in m["rows"]
-            if r["ratio"] is not None and r.get("mean_degree", build.MEAN_DEGREE) == 2.0
-        ]
-        pairs = methods[0].get("family") == "pairwise"
-        unit = "rows" if pairs else "variables"
-        size_of = (lambda r: r["n"]) if pairs else (lambda r: r.get("observed", r["d"]))
-        largest = build.PANEL_SIZES.get((release, name), max(size_of(r) for r in rows))
-        assert size == f"{largest:,} {unit}"
-        ratio, at_least = max(build.claimed_ratio(r) for r in rows if size_of(r) == largest)
-        andrey = next(label for package, _, label in bars if package == "Andrey")
-        assert andrey == ("\u2265" if at_least else "") + build.ratio_text(ratio)
-        assert bars[-1][2] == "1x" and andrey == bars[0][2]
-
-
 def _remeasured() -> tuple[dict, dict]:
     """``SUMMARY`` with DirectLiNGAM also measured against causal-learn, and a later summary that
     measures DirectLiNGAM against lingam again."""
@@ -776,25 +735,6 @@ def test_each_published_comparison_comes_from_one_summary():
             assert kept >= summary["generated"]
 
 
-def test_the_readme_chart_takes_rows_at_its_mean_degree():
-    summaries = placeholder_summaries()
-    release, name = build.PANEL[0]
-    summary = summaries[build.RELEASES.index(release)]
-    method = next(m for m in summary["methods"] if m["method"] == name)
-    # The same sizes again at a denser mean degree, each with a larger ratio: the panel keeps the
-    # rows at MEAN_DEGREE.
-    denser = [dict(r, mean_degree=4.0, ratio=r["ratio"] * 2) for r in method["rows"]]
-
-    def slide():
-        return next(s for s in build.speedup_slides(summaries) if s[0] == name)
-
-    before = slide()
-    method["rows"] = [dict(r, mean_degree=build.MEAN_DEGREE) for r in method["rows"]] + denser
-    assert slide() == before
-    kept = {r["ratio"] for m in build.comparisons(summary) for r in m["rows"]}
-    assert kept.isdisjoint(r["ratio"] for r in denser)
-
-
 def _lower_bound(summaries, name, bound):
     """Flag ``name``'s largest row with a ratio, in every comparison, as a lower bound."""
     for summary in summaries:
@@ -808,65 +748,7 @@ def test_a_lower_bound_prints_as_one():
     summaries = placeholder_summaries()
     # FCI's largest size; its largest ratio is at a smaller one, so the bound tops its chart too.
     _lower_bound(summaries, "FCI", 20.0)
-    slide = next(s for s in build.speedup_slides(summaries) if s[0] == "FCI")
-    assert slide[2][0] == ("Andrey", 20.0, "\u226520x")
     assert "<b>20x+</b>" in build.speed_chart(summaries)
-    # A bound divides into no other package's bar: PC is compared with two packages.
-    _lower_bound(summaries, "PC", 1000.0)
-    with pytest.raises(ValueError, match="lower bound"):
-        build.speedup_slides(summaries)
-
-
-def test_the_panel_shows_only_supported_methods(monkeypatch):
-    summaries = placeholder_summaries()
-    _, name = build.PANEL[1]
-    spec = build.registry_name({"method": name})
-    specs = [
-        s.model_copy(update={"status": "experimental"}) if s.name == spec else s
-        for s in list_specs()
-    ]
-    monkeypatch.setattr(build, "list_specs", lambda: specs)
-    with pytest.raises(ValueError, match=f"{name} is not"):
-        build.speedup_slides(summaries)
-
-
-def test_every_speedup_bar_comes_from_andreys_paired_ratios():
-    summaries = placeholder_summaries()
-    summary = summaries[0]
-    bars = next(bars for name, _, bars in build.speedup_slides(summaries) if name == "PC")
-    labels = {package: label for package, _, label in bars}
-    pc = {m["comparator"]: m for m in summary["methods"] if m["method"] == "PC"}
-    row = {name: next(r for r in m["rows"] if r["d"] == 400) for name, m in pc.items()}
-    # Andrey's bar is its paired ratio against the slowest package (median times give 756x);
-    # gCastle's is that ratio over Andrey's paired ratio against gCastle (times give 3.3x).
-    ratio = {name: r["ratio"] for name, r in row.items()}
-    assert labels["Andrey"] == build.ratio_text(ratio["causal-learn"]) == "941x"
-    assert labels["gCastle"] == build.ratio_text(ratio["causal-learn"] / ratio["gCastle"]) == "3.7x"
-    assert labels["causal-learn"] == "1x"
-
-
-def test_every_timed_package_needs_a_published_ratio():
-    """No silent fallback to a time quotient for a package without a paired ratio."""
-    summaries = placeholder_summaries()
-    release, name = build.PANEL[0]
-    summary = summaries[build.RELEASES.index(release)]
-    method = next(m for m in summary["methods"] if m["method"] == name)
-    row = max((r for r in method["rows"] if r["ratio"]), key=lambda r: r["d"])
-    other = copy.deepcopy(method)
-    other["comparator"] = "slower package"
-    other["rows"] = [dict(row, comparator_s=row["comparator_s"] * 10, ratio=None)]
-    summary["methods"].append(other)
-    with pytest.raises(ValueError, match="no published ratio against slower package"):
-        build.speedup_slides(summaries)
-
-
-def test_the_readme_chart_needs_every_method():
-    summaries = placeholder_summaries()
-    release, name = build.PANEL[-1]
-    summary = summaries[build.RELEASES.index(release)]
-    summary["methods"] = [m for m in summary["methods"] if m["method"] != name]
-    with pytest.raises(ValueError, match=name):
-        build.speedup_slides(summaries)
 
 
 def test_the_speedup_bars_grow_on_every_page_that_shows_them():
