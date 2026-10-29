@@ -24,6 +24,7 @@ from andrey.api._method import PENALTIES
 from andrey.core import ci, warning_policy
 from andrey.core import score as score_module
 from andrey.core.knowledge import KNOWLEDGE_PARTS
+from andrey.core.removed import REMOVED, removal_hint
 from andrey.core.score import BDeuScore
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import (
@@ -38,6 +39,7 @@ from tests.recovery.helpers.ci_tests import PValueOnly
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
+UPGRADING = API_MD.parent / "guides" / "upgrading.md"
 #: Public callables outside the registry that a concept may name.
 UTILITIES = ("bootstrap",)
 
@@ -969,74 +971,111 @@ def test_each_former_name_is_in_a_changelog_table(method, former, current):
     ), f"{method}: {sorted(former)} -> {sorted(current)} has no CHANGELOG table row"
 
 
-#: The former argument names that 0.11.0 kept for one release and 0.12.0 removed, as the first
-#: table of 0.11.0's CHANGELOG section lists them: (methods, former name, current name or None).
+#: The rows of the table of argument names and choices that 0.11.0 renamed and 0.12.0 removed, one
+#: for each method.
 REMOVED_NAMES = [
-    (("ica_lingam",), "random_state", "seed"),
-    (("direct_lingam", "multi_group_direct_lingam"), "random_state", None),
-    (("pcmci",), "alpha_level", "alpha"),
-    (("pcmciplus", "lpcmci"), "pc_alpha", "alpha"),
-    (("rcd",), "ind_alpha", "alpha"),
-    (("calm",), "alpha", "screen_alpha"),
-    (
-        ("gfci", "ges", "gies", "xges", "hc", "tabu", "boss", "grasp"),
-        "lambda_value",
-        "penalty_discount",
-    ),
-    (("granger",), "maxlag", "tau_max"),
-    (("longitudinal_lingam",), "n_lags", "tau_max"),
-    (("rcd",), "max_explanatory_vars", "max_depth"),
-    (("calm",), "max_outer", "max_iter"),
-    (("multi_group_direct_lingam",), "data_groups", "data"),
-    (("longitudinal_lingam",), "data_list", "data"),
-    (("gin", "calm"), "labels", None),
+    pytest.param(m, row, id=f"{m}-{row.name}")
+    for row in REMOVED
+    if row.value is None
+    for m in row.methods
+]
+REMOVED_CHOICES = [
+    pytest.param(m, row, id=f"{m}-{row.value}")
+    for row in REMOVED
+    if row.value is not None
+    for m in row.methods
 ]
 #: The former score names, which the score searches took in 0.11.0 and no longer take.
-REMOVED_SCORES = (
-    "local_score_BIC",
-    "local_score_BIC_from_cov",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_cond_gauss",
-    "local_score_degen_gauss",
-)
-REMOVED = [pytest.param(m, old, id=f"{m}-{old}") for ms, old, _ in REMOVED_NAMES for m in ms]
+REMOVED_SCORES = sorted({row.value for row in REMOVED if row.name == "score_func"})
 SCORE_SEARCHES = [
     m for m, spec in REGISTRY.items() if any(p.name == "score_func" for p in spec.params)
 ]
 
 
-@pytest.mark.parametrize(("method", "old"), REMOVED)
-def test_a_former_name_from_before_this_release_is_an_unknown_argument(method, old):
+def call_with(method: str, **named):
+    return getattr(andrey, method)(*inputs(method, codes=False), **named)
+
+
+@pytest.mark.parametrize(("method", "row"), REMOVED_NAMES)
+def test_a_removed_name_is_an_unknown_argument_that_says_what_it_is_called_now(method, row):
     spec = REGISTRY[method]
-    assert old not in spec.dropped_args
-    assert all(old not in p.aliases for p in spec.params)
-    with pytest.raises(TypeError, match=old):
-        getattr(andrey, method)(*inputs(method, codes=False), **{old: 3})
+    assert row.name not in spec.dropped_args
+    assert all(row.name not in p.aliases for p in spec.params)
+    with pytest.raises(TypeError, match=rf"{method}\(\) got an unexpected keyword argument") as e:
+        call_with(method, **{row.name: 3})
+    message = str(e.value)
+    assert repr(row.name) in message
+    assert row.note in message if row.now is None else f"`{row.now}`" in message
+
+
+@pytest.mark.parametrize(("method", "row"), REMOVED_CHOICES)
+def test_a_removed_score_name_is_refused_with_the_score_it_is_called_now(method, row):
+    param = next(p for p in REGISTRY[method].params if p.name == row.name)
+    assert not param.choice_aliases
+    assert row.value not in param.choices and row.now in param.choices
+    with pytest.raises(ValueError, match=f"{method}: {row.name}.*{row.value}") as error:
+        call_with(method, **{row.name: row.value})
+    assert removal_hint(method, row.name, row.value) in str(error.value)
 
 
 @pytest.mark.parametrize("method", SCORE_SEARCHES)
 def test_a_former_score_name_is_not_one_of_the_choices(method):
     param = next(p for p in REGISTRY[method].params if p.name == "score_func")
-    assert not param.choice_aliases
     for old in REMOVED_SCORES:
         assert old not in param.choices
         with pytest.raises(ValueError, match=f"{method}: score_func.*{old}") as error:
-            getattr(andrey, method)(*inputs(method, codes=False), score_func=old)
+            call_with(method, score_func=old)
         assert all(choice in str(error.value) for choice in param.choices)
 
 
-@pytest.mark.parametrize(("methods", "old", "current"), REMOVED_NAMES)
-def test_each_removed_name_is_in_a_changelog_table(methods, old, current):
+def test_a_name_only_some_methods_removed_gets_no_hint_from_the_others():
+    """`pc_alpha` is gone from `pcmciplus`; `pcmci` still takes it for one release."""
+    assert removal_hint("pcmciplus", "pc_alpha") and removal_hint("pcmci", "pc_alpha") is None
+    assert removal_hint("pc", "pc_alpha") is None and removal_hint("ges", "score_func") is None
+    assert removal_hint("ges", "score_func", ["local_score_BIC"]) is None
+
+
+@pytest.mark.parametrize(
+    "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
+)
+def test_the_hint_gives_the_current_name_or_what_to_do(row):
+    hint = removal_hint(row.methods[0], row.name, row.value)
+    assert (row.now or row.note) in hint
+
+
+def guide_rows() -> set[tuple[frozenset[str], str, str | None, str | None]]:
+    """Each row of the upgrade guide's table of former names from 0.10, as the table lists it."""
+    text = UPGRADING.read_text(encoding="utf-8")
+    section = text.split("### Former names from 0.10", 1)[1].split("\n#", 1)[0]
+    rows = set()
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not line.startswith("|") or cells[0] in ("Method", "---"):
+            continue
+        name, value = re.match(r'`(\w+)(?:="(\w+)")?`', cells[1]).groups()
+        now = re.match(r'`(?:\w+=")?(\w+)', cells[2])
+        rows.add((frozenset(re.findall(r"`(\w+)`", cells[0])), name, value, now and now[1]))
+    return rows
+
+
+def test_the_upgrade_guide_lists_the_removed_names_and_values_the_errors_name():
+    table = {(frozenset(r.methods), r.name, r.value, r.now) for r in REMOVED}
+    assert guide_rows() == table
+
+
+@pytest.mark.parametrize(
+    "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
+)
+def test_each_removed_name_is_in_a_changelog_table(row):
     """The table that announced the removal lists every name removed here, with its replacement."""
-    for method in methods:
+    for method in row.methods:
         assert any(
             len(cells) >= 3
             and method in cells[0]
-            and {old} <= cells[1]
-            and (current is None or {current} <= cells[2])
+            and {row.value or row.name} <= cells[1]
+            and (row.now is None or {row.now} <= cells[2])
             for cells in changelog_rows()
-        ), f"{method}: {old} has no CHANGELOG table row"
+        ), f"{method}: {row.value or row.name} has no CHANGELOG table row"
 
 
 def renamed(monkeypatch, method: str, name: str, **update) -> None:

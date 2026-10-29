@@ -100,7 +100,8 @@ names its pull request.
 - The former argument names and values that 0.11.0 kept for one release no longer work, as its
   changelog announced. A call that passes one raises `TypeError`, as for any argument a method does
   not take, and a former score name raises `ValueError`, which lists the scores the method takes;
-  `andrey run` and `andrey bootstrap` refuse the flags and the `key=value` names the same way, and
+  each message adds what the name or value is called now. `andrey run` and `andrey bootstrap`
+  refuse the flags and the `key=value` names the same way, with the same hint, and
   the data inputs in `andrey --help --json` no longer list `aliases`. The
   [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) gives the current calls.
   ([#559])

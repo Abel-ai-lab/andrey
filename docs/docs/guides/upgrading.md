@@ -68,11 +68,40 @@ one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now
 
 The former names that 0.11 kept for one release stopped working in 0.12. A call that passes one
 raises `TypeError`, as it does for any argument the method does not take, such as
-`andrey.ges(data, lambda_value=2.0)`; a former score name, such as `"local_score_BIC"`, raises
-`ValueError`, which lists the scores that work. `andrey run` and `andrey bootstrap` refuse the
-former `--data-groups` and `--data-list` flags and the former `key=value` names the same way. The
-section From 0.10 to 0.11 below gives the current name of each, and the changelog's 0.11.0 section
-lists all of them. `gin` and `calm` refuse `labels` too: the labels come from a DataFrame's columns.
+`andrey.ges(data, lambda_value=2.0)`, and the message gives the current name:
+
+```text
+pcmciplus() got an unexpected keyword argument 'pc_alpha'; it was renamed `alpha` in 0.11.0
+```
+
+A former score name, such as `"local_score_BIC"`, raises `ValueError`, which lists the scores that
+work and gives the current one. `andrey run` and `andrey bootstrap` refuse the former
+`--data-groups` and `--data-list` flags, which are `--data` now, and the former `key=value` names
+the same way. The table gives the current name of each, and the section From 0.10 to 0.11 below
+shows the common calls:
+
+| Method | Former name | Name now |
+| --- | --- | --- |
+| `ica_lingam` | `random_state` | `seed` |
+| `direct_lingam`, `multi_group_direct_lingam` | `random_state` | none: it set nothing |
+| `pcmci` | `alpha_level` | `alpha` |
+| `pcmciplus`, `lpcmci` | `pc_alpha` | `alpha` |
+| `rcd` | `ind_alpha` | `alpha` |
+| `calm` | `alpha` | `screen_alpha` |
+| `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` | `lambda_value` | `penalty_discount` |
+| `gfci`, `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC"` | `score_func="bic"` |
+| `gfci`, `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC_from_cov"` | `score_func="bic"` |
+| `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC_categorical"` | `score_func="discrete_bic"` |
+| `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BDeu"` | `score_func="bdeu"` |
+| `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_cond_gauss"` | `score_func="cond_gauss"` |
+| `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_degen_gauss"` | `score_func="degen_gauss"` |
+| `granger` | `maxlag` | `tau_max` |
+| `longitudinal_lingam` | `n_lags` | `tau_max` |
+| `rcd` | `max_explanatory_vars` | `max_depth` |
+| `calm` | `max_outer` | `max_iter` |
+| `multi_group_direct_lingam` | `data_groups` (`--data-groups`) | `data` (`--data`, once per dataset) |
+| `longitudinal_lingam` | `data_list` (`--data-list`) | `data` (`--data`, once per dataset) |
+| `gin`, `calm` | `labels` | none: the labels come from a DataFrame's columns |
 
 ### The bootstrap's averaged graph
 

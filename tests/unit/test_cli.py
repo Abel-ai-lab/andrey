@@ -16,6 +16,7 @@ import pytest
 
 import andrey
 from andrey.cli import graph_view, main, render_method_help
+from andrey.core.removed import REMOVED, removal_hint
 from andrey.spec import REGISTRY, SCHEMA_VERSION, get_spec
 
 
@@ -197,10 +198,11 @@ def test_run_multi_group(capsys, nongaussian_path):
 )
 def test_a_flag_of_a_removed_input_name_is_refused(capsys, nongaussian_path, method, former):
     """The panel inputs are read from `--data` alone; the flags 0.11.0 kept for one release are
-    options no command has."""
+    options no command has, and the error says what the flag is called now."""
     code, _, err = _run(["run", method, former, str(nongaussian_path)], capsys)
     error = json.loads(err)["error"]
     assert code == 2 and error["code"] == "usage_error" and former in error["message"]
+    assert "`--data`" in error["message"]
 
 
 def test_the_panel_flag_is_data_in_the_help(capsys):
@@ -369,10 +371,17 @@ def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
     assert "cv" in get_spec("granger").dropped_args
 
 
-@pytest.mark.parametrize("argument", ["lambda_value=0.5", "score_func=local_score_BIC"])
-def test_a_former_name_or_value_from_before_this_release_is_refused(capsys, csv_path, argument):
-    code, _, err = _run(["run", "ges", "--data", str(csv_path), argument], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+@pytest.mark.parametrize(
+    "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
+)
+def test_a_removed_name_or_value_is_refused_with_what_it_is_called_now(capsys, csv_path, row):
+    method = row.methods[0]
+    argument = f"{row.name}={row.value or 3}"
+    code, _, err = _run(["run", method, "--data", str(csv_path), argument], capsys)
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "invalid_params"
+    hint = removal_hint(method, row.name, row.value)
+    assert any(hint in detail["message"] for detail in error["details"])
 
 
 def test_missing_input_error(capsys):

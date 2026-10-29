@@ -35,6 +35,7 @@ from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KnowledgeError
+from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, node_labels
 from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
@@ -657,6 +658,11 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
     return value
 
 
+def _with_hint(message: str, hint: str | None) -> str:
+    """The error message, then what a removed name or value is called now, when there is a hint."""
+    return message if hint is None else f"{message}; {hint}"
+
+
 def _flag_hint(token: str) -> dict:
     """A structured error for a stale `--flag` token, with a did_you_mean when it names a param."""
     name = token.lstrip("-").replace("-", "_")
@@ -768,9 +774,8 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             return
         param = specs.get(key)
         if param is None:
-            errors.append(
-                {"param": key, "message": f"unknown param {key!r}", "valid_options": sorted(specs)}
-            )
+            message = _with_hint(f"unknown param {key!r}", removal_hint(spec.name, key))
+            errors.append({"param": key, "message": message, "valid_options": sorted(specs)})
             return
         try:
             if from_config:
@@ -778,7 +783,8 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             else:
                 fkwargs[key] = _coerce(value, param)  # ty: ignore[invalid-argument-type]
         except CliError as exc:
-            errors.append({"param": key, "message": exc.message, **exc.extra})
+            message = _with_hint(exc.message, removal_hint(spec.name, key, value))
+            errors.append({"param": key, "message": message, **exc.extra})
 
     for key, value in config.items():  # config layer: typed values
         _assign(key, value, from_config=True)
@@ -1883,11 +1889,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             msg = getattr(exc, "format_message")()  # noqa: B009  # duck-typed Click UsageError
             extra: dict = {}
             hit = re.search(r"(?i)no such option:?\s+(--[\w-]+)", msg)
-            if hit and hit.group(1).lstrip("-").replace("-", "_") in {
-                p.name for s in REGISTRY.values() for p in s.params
-            }:
+            if hit:
                 key = hit.group(1).lstrip("-").replace("-", "_")
-                extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
+                if key in {p.name for s in REGISTRY.values() for p in s.params}:
+                    extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
+                method = next((a for a in args if a in REGISTRY), "")
+                flags = {i.name for i in REGISTRY[method].data.inputs} if method else set()
+                msg = _with_hint(msg, removal_hint(method, key, flags=flags))
             return emit_error(CliError("usage_error", msg, EXIT_USAGE, **extra))
         return emit_error(CliError("internal", f"{type(exc).__name__}: {exc}", EXIT_INTERNAL))
 
