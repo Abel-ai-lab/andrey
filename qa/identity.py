@@ -103,6 +103,13 @@ def _pcmci(x: np.ndarray) -> StructureOutput:
     return andrey.pcmci(x, **params)
 
 
+def _longitudinal(x):
+    """Longitudinal LiNGAM with the gate adapter's settings; the adapter names the lag ``n_lags``,
+    as lingam does."""
+    params = qg.AndreyLongitudinalLiNGAM().params()
+    return andrey.longitudinal_lingam(list(x), tau_max=params["n_lags"], measure=params["measure"])
+
+
 #: The gate's settings, with each method's full output: the benchmark adapters' parameters for the
 #: methods the gate fits through an adapter, which returns only the graph.
 FITS: dict[str, Fit] = {
@@ -145,9 +152,7 @@ FITS: dict[str, Fit] = {
             x, order=tuple(_VARMA["order"]), criterion=_VARMA["criterion"], prune=_VARMA["prune"]
         )
     ),
-    "LongitudinalLiNGAM": Fit(
-        lambda x: andrey.longitudinal_lingam(list(x), **qg.AndreyLongitudinalLiNGAM().params())
-    ),
+    "LongitudinalLiNGAM": Fit(_longitudinal),
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
 }
 
