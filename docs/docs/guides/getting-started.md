@@ -322,7 +322,9 @@ returns.
 ## Background knowledge
 
 What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
-naming each column by its label, a string, or by its 0-based position, an integer:
+naming each column by its label, a string, or by its 0-based position, an integer. The
+[background knowledge notebook](../examples/knowledge) shows tiers orienting a graph that the data
+alone leave undirected.
 
 ```python
 from andrey import Knowledge, pc
