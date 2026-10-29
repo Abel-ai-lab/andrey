@@ -104,6 +104,7 @@ names its pull request.
   before, so every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that
   passes it with another score, named or picked from the declared column types, raises
   `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
+  ([#553])
 
 ### Changed
 
@@ -1260,3 +1261,4 @@ First alpha release.
 [#544]: https://github.com/Abel-ai-lab/andrey/pull/544
 [#550]: https://github.com/Abel-ai-lab/andrey/pull/550
 [#551]: https://github.com/Abel-ai-lab/andrey/pull/551
+[#553]: https://github.com/Abel-ai-lab/andrey/pull/553
