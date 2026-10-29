@@ -66,9 +66,9 @@ function of other columns. Copies of one variable cannot be told apart, so one `
 every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
 group and read its edges as the group's; no option drops or merges the copies for you. `pc`, `fci`,
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
-same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series
-that repeats another up to `2 * tau_max` steps back and name its lagged value, such as
-`'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
+same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
+also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
+such as `'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
 cell, its row and column. A single column gives a one-node graph.
 
 % concept: missing
@@ -85,13 +85,17 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
-`indep_test` choices: `"fisherz"` and `"student_t"` for continuous data, `"chisq"`
-and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
-nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"` and `"student_t"` for
+continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
+for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
 from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
-`lpcmci` take `"fisherz"`, which `None` picks, and `"student_t"`.
+`lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
+the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
+likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance
+correlation. A test you register that reports only p-values is ordered by its p-value, smallest
+first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
@@ -150,8 +154,8 @@ gives a node more than that many parents. `None`, the default, sets no cap. `ges
 `gfci` caps its GES phase; the PAG its tests then orient can put more arrowheads at a node.
 
 % concept: seed
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `boss`, `grasp`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
 draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
 The methods that test independence draw random numbers only under `indep_test="rcot"`,
 `"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not

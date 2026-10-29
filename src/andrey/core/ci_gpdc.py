@@ -17,7 +17,7 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
 from andrey.search.hc import tie_ranks
 
-from .ci import _canonical_ranked, _checked_data
+from .ci import _canonical_ranked, _checked_data, per_query
 from .seeding import resolve_seed
 
 __all__ = ["GPDC"]
@@ -138,15 +138,31 @@ class GPDC:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the GPDC p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The squared distance correlations and p-values of many queries, one per row.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        conditioning sets; a constant residual reads statistic ``0`` and p-value ``1``.
+        """
+        return per_query(self._statistic_pvalue, x, y, conditions)
+
+    def _statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int]
+    ) -> tuple[float, float]:
+        """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         rx, ry = self._residual(x_int, cond), self._residual(y_int, cond)
         if not (np.ptp(rx) > 0.0 and np.ptp(ry) > 0.0):
-            return 1.0  # a constant variable: no variation to depend on
+            return 0.0, 1.0  # a constant variable: no variation to depend on
         statistic = _squared_distance_correlation(
             _centered_distances(self._ranks(rx, x_int)), _centered_distances(self._ranks(ry, y_int))
         )
         exceed = np.count_nonzero(self._null_distribution() >= statistic)
-        return (exceed + 1) / (self._n_null + 1)
+        return statistic, (exceed + 1) / (self._n_null + 1)
 
     def _residual(self, column: int, cond: list[int]) -> np.ndarray:
         """``column`` minus its Gaussian-process fit on ``cond``, kept for later queries."""

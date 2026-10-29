@@ -25,7 +25,7 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
-from andrey.core.score import LINEAR_SCORES, SCORES
+from andrey.core.score import SCORES
 
 from .models import ParamSpec, ParamType, Spec
 
@@ -236,18 +236,6 @@ _CONCEPTS = (
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger"),
         ),
-        deviations=tuple(
-            Deviation(
-                method=m,
-                name="indep_test",
-                default=None,
-                choices=("student_t", "fisherz"),
-                fixed_in="0.12.0",
-                reason="The partial-correlation tests only; the categorical and nonlinear tests "
-                "come in 0.12.0.",
-            )
-            for m in PCMCI_FAMILY
-        ),
     ),
     Concept(
         key="score_func",
@@ -263,18 +251,6 @@ _CONCEPTS = (
         fragment="score",
         suitable=SCORE_SEARCHES,
         others_exempt="Not a search over parent sets scored by a decomposable score.",
-        deviations=tuple(
-            Deviation(
-                method=m,
-                name="score_func",
-                default=None,
-                choices=LINEAR_SCORES,
-                fixed_in="0.12.0",
-                reason="The linear-Gaussian BIC only; the categorical scores are published and "
-                "come in 0.12.0.",
-            )
-            for m in ("gies", "xges")
-        ),
     ),
     Concept(
         key="penalty_discount",
@@ -519,13 +495,8 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="ANDREY_SEED",
-        suitable=(*CI_SEARCHES, "boss", "grasp", "calm", "ica_lingam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "boss", "grasp", "calm", "ica_lingam"),
         exempt=(
-            *_exempt(
-                "Deterministic: student_t and fisherz draw no random numbers. It becomes suitable "
-                "with the nonlinear tests.",
-                *PCMCI_FAMILY,
-            ),
             *_exempt(
                 "Deterministic.",
                 *(m for m in _PURE_SCORE if m not in ("boss", "grasp")),
@@ -611,10 +582,6 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
         ),
         others_exempt="A continuous model.",
-        deviations=(
-            *_absent("0.12.0", "Categorical scores are published; engine work.", "gies", "xges"),
-            *_absent("0.12.0", "Discrete conditional-independence tests.", *PCMCI_FAMILY),
-        ),
     ),
     Concept(
         key="max_categories",
@@ -642,10 +609,6 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
         ),
         others_exempt="A continuous model.",
-        deviations=(
-            *_absent("0.12.0", "Categorical scores are published; engine work.", "gies", "xges"),
-            *_absent("0.12.0", "Discrete conditional-independence tests.", *PCMCI_FAMILY),
-        ),
     ),
     Concept(
         key="category_codes",

@@ -1,9 +1,9 @@
 """Score-based facade adapters.
 
 ``ges``, ``gies``, ``xges``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC
-scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. ``ges`` and ``hc``
-also score categorical data with BDeu, and mixed data with the degenerate and conditional Gaussian
-BICs. Reported objectives are stored in ``metadata``.
+scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. Each also scores
+categorical data with BDeu and the multinomial BIC, and mixed data with the degenerate and
+conditional Gaussian BICs. Reported objectives are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -345,6 +345,8 @@ def gies(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_parents: int | None = None,
+    categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
@@ -363,24 +365,44 @@ def gies(
     interventions : array-like of shape (n_samples, n_variables), default=None
         ``True`` (or 1) where the row's value of the variable was set by an intervention, ``False``
         (or 0) where its causes set it. ``None`` means no interventions: observational data. Every
-        variable needs at least two rows without an intervention.
-    score_func : {"bic"} or None, default=None
-        Local score: ``"bic"``, the linear-Gaussian BIC, the only score GIES supports. ``None``
-        picks it.
+        variable needs at least two rows without an intervention, with different values.
+    score_func : str or None, default=None
+        Local score objective, as for :func:`~andrey.ges`: ``"bic"``, the linear-Gaussian BIC, for
+        continuous data. ``"bdeu"`` is the BDeu score and ``"discrete_bic"`` the multinomial BIC,
+        for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
+        ``"cond_gauss"`` (conditional Gaussian) are BIC scores for mixed data, continuous and
+        categorical columns. ``None`` picks from the declared column types: ``"bdeu"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. Every score reads a variable on the rows without an
+        intervention on it; see Notes.
     penalty_discount : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and
-        non-negative.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. ``n_samples`` counts every row. Larger values give sparser graphs;
+        ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and non-negative. BDeu
+        ignores it; for the multinomial BIC it weighs ``log(n_samples)`` per free parameter of a
+        variable's conditional probability table.
     ebic_gamma : float, default=1.0
-        Weight on the extended-BIC term of the BIC: each variable's score adds
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. See Notes.
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned graph represents gives a
         node more than ``max_parents`` parents (every DAG of a class has the same largest number of
         parents). A step that would give a node more is skipped for the next best step. A cap can
         stop the search short of the lowest-scoring graph. ``None`` sets no cap. See Notes.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -394,26 +416,41 @@ def gies(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
         graph: directed marks (``->``) are edges every graph in the class orients alike,
         undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"gies"`` and
-        ``metadata["score"]`` the BIC score of the result, the sum over variables of
-        ``n_v * log(residual variance) + penalty_discount * log(n_samples) * n_parents + 2 *
-        ebic_gamma * log C(n_variables - 1, n_parents)``, where ``n_v`` counts the rows without an
-        intervention on the variable; lower is better.
+        ``metadata["score"]`` the score of the result, the sum over variables of each one's local
+        score on the rows without an intervention on it; lower is better. For BIC, a variable's
+        term is ``n_v * log(residual variance) + penalty_discount * log(n_samples) * n_parents + 2 *
+        ebic_gamma * log C(n_variables - 1, n_parents)``, where ``n_v`` counts those rows; for the
+        other scores, see :func:`~andrey.ges`. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``data`` is
         not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
         column; if ``interventions`` does not have ``data``'s shape, holds a value other than 0 or
-        1, or leaves a variable fewer than two rows, or one value, without an intervention; or if a
-        column repeats another up to scale and shift given more than two rows or, with more rows
-        than columns, is a linear function of other columns. One message names every group of copies
-        and says to keep one column per group. Also if a given ``max_parents`` is below the parents
-        some graph of the required edges of ``knowledge`` gives a node, or if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        1, or leaves a variable fewer than two rows, or one value, without an intervention; with a
+        categorical score, if ``data`` holds a number that is not whole; or, with a mixed-data
+        score, if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a
+        number that is not whole. Also if ``categorical`` is given with another score. With the BIC
+        score, also if a column repeats another up to scale and shift given more than two rows or,
+        with more rows than columns, is a linear function of other columns. One message names every
+        group of copies and says to keep one column per group. Also if a given ``max_parents`` is
+        below the parents some graph of the required edges of ``knowledge`` gives a node, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes. Each message warns once per process.
 
     See Also
     --------
@@ -421,9 +458,25 @@ def gies(
 
     Notes
     -----
-    **When to use it.** GIES makes the assumptions of :func:`~andrey.ges`: continuous data, no
-    unmeasured common causes, and linear relations with Gaussian noise. An intervention replaces
-    the intervened variable's mechanism and leaves every other variable's unchanged.
+    **When to use it.** GIES makes the assumptions of :func:`~andrey.ges`: no unmeasured common
+    causes and, with the default BIC score on continuous data, linear relations with Gaussian
+    noise. When every column is categorical, the default is ``"bdeu"``, and on mixed data
+    ``"cond_gauss"``; ``"discrete_bic"`` and ``"degen_gauss"`` also score those data, as
+    :func:`~andrey.ges` describes. An intervention replaces the intervened variable's mechanism and
+    leaves every other variable's unchanged.
+
+    **Scores under interventions.** Each score reads a variable only on the rows where it was not
+    intervened on, as the likelihood of interventional data does [1]_, and every BIC charges
+    ``log(n_samples)`` per parameter, with ``n_samples`` counting every row. BDeu and the
+    multinomial BIC count each column's categories over every row, so a category seen only under
+    an intervention stays one of the variable's categories; BDeu is then the score of Cooper and Yoo
+    [3]_ for a mix of experimental and observational data, with its uniform prior. The mixed-data
+    scores read the categories, and the conditional Gaussian score its cells, from those rows alone;
+    their interventional form follows the same per-variable rule [1]_, and no paper defines these
+    scores under interventions. Under every score, two graphs of one interventional class get the
+    same score: they differ only in how the edges the class leaves undirected are directed [1]_, the
+    two ends of such an edge are intervened on in the same rows, and on any set of rows each score
+    gives Markov equivalent graphs the same score.
 
     **How it works.** The search starts from the empty graph and repeats three phases: adding
     edges, removing edges, and turning one edge around, each while it improves the score, until a
@@ -471,13 +524,15 @@ def gies(
     with 2,000 rows. The ladders ended after two sizes in a row did not beat the empty graph, except
     at mean degree 4 or 8 with 2,000 rows, where they ended when three fits of the next size ran
     past 1 h. The median fit took 1,231 s at 1,600 variables (mean degree 2, 10,000 rows in total).
-    Each distinct set of rows without an intervention on a variable keeps its own covariance matrix
-    of all the variables, so memory grows with the number of intervened variables times the square
-    of the variable count. A parent set of ``m - 1`` or more variables, where ``m`` counts the rows
-    without an intervention on the child, fits its child exactly, so the search never selects one,
-    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
-    variance. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    Each distinct set of rows without an intervention on a variable keeps its own score over those
+    rows, under the BIC a covariance matrix of all the variables, so memory grows with the number
+    of intervened variables times the square of the variable count. A parent set of ``m - 1`` or
+    more variables, where ``m`` counts the rows without an intervention on the child, fits its
+    child exactly under the BIC, so the search never selects one, nor any parent set that leaves its
+    child a residual variance of at most ``1e-12`` times its variance. The categorical and
+    mixed-data scores are not benchmarked with GIES yet: its tests run them on small fixed
+    networks, with and without interventions. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -485,6 +540,9 @@ def gies(
        interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
     .. [2] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [3] Cooper, G. F., and Yoo, C. (1999). Causal discovery from a mixture of experimental and
+       observational data. Proceedings of the Fifteenth Conference on Uncertainty in Artificial
+       Intelligence, 116-125.
 
     Examples
     --------
@@ -499,24 +557,40 @@ def gies(
     >>> intervened[400:, 1] = True
     >>> gies(pd.DataFrame({"x": x, "y": y}), intervened).structure.oriented_edges()
     [('x', 'y', 'directed')]
+
+    On categorical data, declared by a pandas ``category`` type, the default score is BDeu:
+
+    >>> a = rng.integers(0, 3, 2000)
+    >>> b = np.where(rng.random(2000) < 0.8, a, rng.integers(0, 3, 2000))
+    >>> b[1000:] = rng.integers(0, 3, 1000)  # the last 1000 rows set b from outside
+    >>> intervened = np.zeros((2000, 2), dtype=bool)
+    >>> intervened[1000:, 1] = True
+    >>> data = pd.DataFrame({"a": pd.Categorical(a), "b": pd.Categorical(b)})
+    >>> gies(data, intervened).structure.oriented_edges()
+    [('a', 'b', 'directed')]
     """
     from andrey.search.gies import gies as _gies
     from andrey.search.gies import intervention_mask
 
-    X = data_matrix(data, method="gies")
+    score_func, categorical = default_score(data, score_func, categorical=categorical)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="gies"
+    )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
-    mask = None if interventions is None else intervention_mask(interventions, X)
+    intervened = None if interventions is None else intervention_mask(interventions, X)
     with copies_named(labels):
         graph, score = _gies(
             X,
-            mask,
+            intervened,
+            score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             max_parents=max_parents,
+            categorical=mask,
             constraints=constraints,
         )
-    metadata = {"score": json_safe(score)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(graph, labels=labels, metadata=metadata)
 
 
@@ -529,31 +603,41 @@ def xges(
     ebic_gamma: float = 1.0,
     max_parents: int | None = None,
     extended_search: bool = True,
+    categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
 
     XGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning move
-    of GIES [3]_, and the BIC score, but applies them in a different order [1]_ (see Notes). On
-    linear-Gaussian data it often finds a graph with a better score than GES.
+    of GIES [3]_, and a decomposable score, the BIC by default, but applies them in a different
+    order [1]_ (see Notes). On linear-Gaussian data it often finds a graph with a better score than
+    GES.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"bic"} or None, default=None
-        Local score: ``"bic"``, the linear-Gaussian BIC, the only score XGES supports. ``None``
-        picks it.
+    score_func : str or None, default=None
+        Local score objective, as for :func:`~andrey.ges`: ``"bic"``, the linear-Gaussian BIC, for
+        continuous data. ``"bdeu"`` is the BDeu score and ``"discrete_bic"`` the multinomial BIC,
+        for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
+        ``"cond_gauss"`` (conditional Gaussian) are BIC scores for mixed data, continuous and
+        categorical columns. ``None`` picks from the declared column types: ``"bdeu"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values.
     penalty_discount : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and
-        non-negative.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC. Must be finite and non-negative. BDeu ignores it; for the multinomial BIC
+        it weighs ``log(n)`` per free parameter of a variable's conditional probability table.
     ebic_gamma : float, default=1.0
-        Weight on the extended-BIC term of the BIC: each variable's score adds
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. See Notes.
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
         node more than ``max_parents`` parents (every DAG of a class has the same largest number of
@@ -563,6 +647,17 @@ def xges(
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -574,24 +669,37 @@ def xges(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"xges"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
-        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
-        the equivalence class leaves open.
+        ``"xges"`` and ``metadata["score"]`` the score of the result, computed as for
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
+        undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``data`` is
         not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is
-        constant, repeats another column up to scale and shift given more than two rows, or, with
-        more rows than columns, is a linear function of other columns. One message names every group
-        of copies and says to keep one column per group. Also if a given ``max_parents`` is below
-        the parents some graph of the required edges of ``knowledge`` gives a node, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        constant; with a categorical score, if ``data`` holds a number that is not whole; or, with
+        a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        column holds a number that is not whole. Also if ``categorical`` is given with another
+        score. With the BIC score, also if a column repeats another column up to scale and shift
+        given more than two rows or, with more rows than columns, is a linear function of other
+        columns. One message names every group of copies and says to keep one column per group.
+        Also if a given ``max_parents`` is below the parents some graph of the required edges of
+        ``knowledge`` gives a node, or if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes. Each message warns once per process.
 
     See Also
     --------
@@ -599,9 +707,13 @@ def xges(
 
     Notes
     -----
-    **When to use it.** XGES makes the assumptions of :func:`~andrey.ges`: continuous data, no
-    unmeasured common causes, and linear relations with Gaussian noise. It returns the equivalence
-    class.
+    **When to use it.** XGES makes the assumptions of :func:`~andrey.ges`: no unmeasured common
+    causes and, with the default BIC score on continuous data, linear relations with Gaussian
+    noise. When every column is categorical, the default is ``"bdeu"``, and on mixed data
+    ``"cond_gauss"``; ``"discrete_bic"`` and ``"degen_gauss"`` also score those data, as
+    :func:`~andrey.ges` describes. Its moves need only a score that adds one term per variable and
+    gives equivalent graphs the same score [1]_, which each of these does. It returns the
+    equivalence class.
 
     **How it works.** Each step takes the best improving deletion, else reversal of a directed edge,
     else addition; the search stops when no move improves the score [1]_. The extended search then
@@ -649,9 +761,11 @@ def xges(
     number of edges and of results kept. Its BIC score assumes linear relations with Gaussian noise.
     With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
     or more variables fits its child exactly, so the search never selects one, nor any parent set
-    that leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    that leaves its child a residual variance of at most ``1e-12`` times its variance. The
+    categorical and mixed-data scores are not benchmarked with XGES yet: its tests run them on small
+    fixed networks. Under them, each candidate parent is scored by two full local scores rather
+    than a rank-one update. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -675,11 +789,22 @@ def xges(
     >>> z = x + y + 0.5 * rng.standard_normal(500)
     >>> xges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+
+    On categorical data, with BDeu:
+
+    >>> a = rng.integers(0, 2, 2000)
+    >>> b = rng.integers(0, 2, 2000)
+    >>> c = np.where(rng.random(2000) < 0.8, a + b, rng.integers(0, 3, 2000))
+    >>> data = pd.DataFrame({"a": a, "b": b, "c": c})
+    >>> xges(data, score_func="bdeu").structure.oriented_edges()
+    [('a', 'c', 'directed'), ('b', 'c', 'directed')]
     """
     from andrey.search.xges import xges as _xges
 
-    score_func = "bic" if score_func is None else score_func
-    X = data_matrix(data, method="xges")
+    score_func, categorical = default_score(data, score_func, categorical=categorical)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="xges"
+    )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="xges")
     with copies_named(labels):
@@ -690,9 +815,10 @@ def xges(
             ebic_gamma=ebic_gamma,
             extended_search=extended_search,
             max_parents=max_parents,
+            categorical=mask,
             constraints=constraints,
         )
-    metadata = {"score": json_safe(score)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 

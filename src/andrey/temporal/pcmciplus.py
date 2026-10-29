@@ -56,7 +56,7 @@ from andrey.core import backend
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
 from andrey.search.hc import tie_ranks
-from andrey.temporal.pcmci import INDEP_TESTS, Link, LinkTest, design_test, pc1
+from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -75,7 +75,7 @@ class PCMCIPlusResult:
     strongest first. ``adjacency``, ``p_values``, and ``statistics`` have shape
     ``(tau_max + 1, n, n)``, indexed ``[lag, i, j]`` for ``X^i_{t-lag}`` and ``X^j_t``; lag 0 is
     symmetric. ``adjacency`` holds the links after phase 2. A link's p-value is the largest of its
-    phase-2 tests, and its statistic the partial correlation of that test; a lagged link phase 1
+    phase-2 tests, and its statistic that test's statistic; a lagged link phase 1
     removed reports its largest phase-1 test instead, and the lag-0 diagonal is ``1`` and ``0``,
     as is a link the knowledge keeps apart; a required link reads ``0`` and ``1``.
     ``marks`` holds the lag-0 endpoint marks: ``marks[i, j]`` is the mark at ``i`` on the link
@@ -455,24 +455,24 @@ def pcmciplus(
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> PCMCIPlusResult:
     """Run the four PCMCI+ phases on a ``(T, n)`` series with the ``indep_test`` test.
 
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach every phase
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
-    conditions phases 2 and 3 take beyond the lagged parents. Raises :class:`ValueError` when
-    ``indep_test`` is not a key of :data:`~andrey.temporal.pcmci.INDEP_TESTS` or ``collider_rule``
-    is not in :data:`COLLIDER_RULES`.
+    conditions phases 2 and 3 take beyond the lagged parents. ``categorical`` and ``seed`` reach
+    :func:`~andrey.temporal.pcmci.design_test`, which raises on an ``indep_test`` it cannot build.
+    Raises :class:`ValueError` when ``collider_rule`` is not in :data:`COLLIDER_RULES`.
     """
-    if indep_test not in INDEP_TESTS:
-        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     if collider_rule not in COLLIDER_RULES:
         raise ValueError(
             f"collider_rule must be one of {list(COLLIDER_RULES)}, got {collider_rule!r}"
         )
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(indep_test, data, tau_max)
-    ranks = tie_ranks(data).tolist()
+    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         return run_phases(
             test,

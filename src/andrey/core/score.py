@@ -37,10 +37,11 @@ data-types. Proceedings of Machine Learning Research 104:4-21.
 
 from __future__ import annotations
 
+import copy
 import math
 from collections.abc import Callable, Sequence
 from functools import lru_cache
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Self, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
@@ -498,12 +499,14 @@ class BICScore:
 class _CountScore:
     """Memoized local scores computed from a node's counts in each configuration of its parents.
 
-    A subclass sets ``_codes`` and ``_cardinalities`` (see :func:`~andrey.core.categorical.encode`)
-    and ``_memo``, and scores one table in :meth:`_local`. :meth:`score_many` counts the tables of
-    every parent set not yet memoized together (:func:`~andrey.core.categorical.table_counts`); a
-    score is the same whether it is computed alone or in a batch.
+    A subclass sets ``n``, ``_codes`` and ``_cardinalities`` (see
+    :func:`~andrey.core.categorical.encode`) and ``_memo``, and scores one table in :meth:`_local`.
+    :meth:`score_many` counts the tables of every parent set not yet memoized together
+    (:func:`~andrey.core.categorical.table_counts`); a score is the same whether it is computed
+    alone or in a batch.
     """
 
+    n: int
     _codes: np.ndarray
     _cardinalities: np.ndarray
     _memo: _LRU
@@ -537,6 +540,17 @@ class _CountScore:
                 found[key] = self._local(node, key, counts)
                 self._memo.put((node, key), found[key])
         return [found[key] for key in keys]
+
+    def on_rows(self, rows: np.ndarray, cache_size: int | None = 1_000_000) -> Self:
+        """The same score over the rows ``rows`` marks, with each column's categories unchanged.
+
+        Every other setting is kept, the multinomial BIC's ``log(n)`` of all rows included.
+        """
+        out = copy.copy(self)
+        out._codes = self._codes[rows]
+        out.n = out._codes.shape[0]
+        out._memo = _LRU(cache_size)
+        return out
 
 
 class BDeuScore(_CountScore):

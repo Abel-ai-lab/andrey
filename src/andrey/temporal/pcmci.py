@@ -18,18 +18,24 @@ tau_max``:
 Every test reads one lagged design matrix: column ``lag * n + i`` holds ``X^i_{t-lag}`` for ``lag =
 0 .. 2 * tau_max``, over the ``T - 2 * tau_max`` time steps where all those lags exist, so every
 test uses the same samples, unless the series has missing values: then each test reads the design
-rows observed in all of its columns (:func:`design_test`). Every test is a partial-correlation test:
-``indep_test="student_t"`` (:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
-(:class:`~andrey.core.ci.FisherZ`). A PC1 round tests all of a target's candidates in one call, and
-MCI tests all links into a target together, grouped by conditioning-set size. Any object with
+rows observed in all of its columns (:func:`design_test`). ``indep_test`` names any registered
+conditional-independence test (:func:`~andrey.core.ci.make_indep_test`) built over the design, its
+categorical mask repeated for every lag. A PC1 round tests all of a target's candidates in one call,
+and MCI tests all links into a target together, grouped by conditioning-set size. Any object with
 ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
-can drive :func:`pc1` and :func:`mci`.
+can drive :func:`pc1` and :func:`mci`: a candidate's strength is its test statistic, as in the
+reference implementation, tigramite: the partial correlation, the chi-square or G-square
+statistic, the likelihood ratio of the mixed-data tests, CMIknn's estimate of the conditional
+mutual information, GPDC's squared distance correlation, RCoT's statistic, or KCI's relative to
+its mean under independence. A registered test that reports only p-values is asked one query at a
+time and its candidates are ranked by p-value, smallest first (:class:`~andrey.core.ci.PValueTest`).
 
 A partial correlation is the correlation of the residuals of ``x`` and ``y`` after a least-squares
-fit on the conditioning columns. The test takes it from the inverse of the ``[x, y, *S]``
-correlation submatrix; when that submatrix is singular to working precision, as lagged copies of a
-strongly autocorrelated series can make it, :class:`DesignTest` takes it from the residuals of the
-design instead (:func:`design_test`).
+fit on the conditioning columns. The partial-correlation tests, ``"student_t"``
+(:class:`~andrey.core.ci.StudentT`) and ``"fisherz"`` (:class:`~andrey.core.ci.FisherZ`), take it
+from the inverse of the ``[x, y, *S]`` correlation submatrix; when that submatrix is singular to
+working precision, as lagged copies of a strongly autocorrelated series can make it,
+:class:`DesignTest` takes it from the residuals of the design instead (:func:`design_test`).
 
 References
 ----------
@@ -48,7 +54,14 @@ from typing import TYPE_CHECKING, Protocol, cast
 import numpy as np
 
 from andrey.core import backend
-from andrey.core.ci import FisherZ, PartialCorrelationTest, SingularCorrelationError, StudentT
+from andrey.core.ci import (
+    FisherZ,
+    PartialCorrelationTest,
+    PValueTest,
+    SingularCorrelationError,
+    StudentT,
+    make_indep_test,
+)
 from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
 from andrey.core.score import copies_error
 from andrey.search._parallel import _KEY_DP
@@ -79,8 +92,9 @@ class LinkTest(Protocol):
         ...
 
 
-# The ``indep_test`` names: each builds a test over the lagged design.
-INDEP_TESTS: dict[str, type[PartialCorrelationTest]] = {
+# The partial-correlation tests, which a :class:`DesignTest` answers where their correlation
+# submatrix is singular.
+PARTIAL_CORRELATION_TESTS: dict[str, type[PartialCorrelationTest]] = {
     "student_t": StudentT,
     "fisherz": FisherZ,
 }
@@ -140,30 +154,47 @@ class DesignTest:
         return statistics, p_values
 
 
-def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
-    """The ``indep_test`` partial-correlation test over the lagged design of ``data``.
+def design_test(
+    indep_test: str,
+    data: np.ndarray,
+    tau_max: int,
+    *,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
+) -> LinkTest:
+    """The ``indep_test`` test over the lagged design of ``data``.
 
-    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`, and
-    :class:`~andrey.core.score.CopiedColumnsError` when design columns repeat others up to scale
-    and shift: a variable that copies another, at the same step or some lags apart. A copy at one
-    step repeats at every lag of the design, so the error names each group that holds a lag-0
-    column, by :func:`design_column_name`.
+    A partial-correlation test (:data:`PARTIAL_CORRELATION_TESTS`) comes as a :class:`DesignTest`.
+    Any other name is built by :func:`~andrey.core.ci.make_indep_test` over the design, with
+    ``categorical``, the mask of the categorical columns of ``data``, repeated for every lag, and
+    ``seed``, which the randomized tests take. A registered test that reports no statistics, one
+    without ``statistic_pvalues``, is asked one query at a time
+    (:class:`~andrey.core.ci.PValueTest`) and ranks the candidates by p-value, smallest first.
+    Raises :class:`NotImplementedError` when ``indep_test`` is not registered and, for a
+    partial-correlation test, :class:`~andrey.core.score.CopiedColumnsError` when design columns
+    repeat others up to scale and shift: a variable that copies another, at the same step or some
+    lags apart. A copy at one step repeats at every lag of the design, so the error names each
+    group that holds a lag-0 column, by :func:`design_column_name`.
 
     A series with ``NaN`` gets a design with ``NaN`` in every row that reads a missing value, and
     the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
     """
-    if indep_test not in INDEP_TESTS:
-        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     design = lagged_design(data, tau_max)
+    if indep_test not in PARTIAL_CORRELATION_TESTS:
+        mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
+        built = make_indep_test(indep_test, design, categorical=mask, seed=seed)
+        if not callable(getattr(built, "statistic_pvalues", None)):
+            built = PValueTest(built)
+        return cast("LinkTest", built)
     test: PartialCorrelationTest | PartialCorrelationDeletion
     if np.isnan(design).any():
         test = cast(
             "PartialCorrelationDeletion",  # a partial-correlation test gives its deletion this kind
             testwise_deletion(
                 indep_test,
-                INDEP_TESTS[indep_test],
+                PARTIAL_CORRELATION_TESTS[indep_test],
                 design,
                 None,
                 {},
@@ -172,7 +203,7 @@ def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
             ),
         )
     else:
-        test = INDEP_TESTS[indep_test](design)
+        test = PARTIAL_CORRELATION_TESTS[indep_test](design)
     n_vars = data.shape[1]
     groups = [group for group in test.copies() if group[0] < n_vars]
     if groups:
@@ -332,18 +363,21 @@ def pcmci(
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> PCMCIResult:
-    """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
+    """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` test.
 
     With ``constraints``, background knowledge over lags ``0`` to ``tau_max``, PC1 and MCI test no
     forbidden or required link (:func:`pc1`, :func:`mci`): a forbidden link is not in the graph and
-    a required one is. ``max_depth`` caps PC1's conditioning sets. Raises :class:`ValueError`
-    when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
+    a required one is. ``max_depth`` caps PC1's conditioning sets. ``categorical``, the mask of the
+    categorical columns for a mixed-data test, and ``seed`` reach :func:`design_test`, which raises
+    on an ``indep_test`` it cannot build.
     """
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
-    test = design_test(indep_test, data, tau_max)
-    ranks = tie_ranks(data).tolist()
+    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         parents = tuple(
             pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)

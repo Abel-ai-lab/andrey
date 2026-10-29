@@ -4,8 +4,10 @@ import itertools
 
 import numpy as np
 import pytest
+from scipy.special import gammaln
 
 import andrey
+from andrey.core import ARROW, TAIL
 from andrey.core.orient import from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent
@@ -174,10 +176,139 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
 
 def test_gies_step_that_does_not_lower_the_score_fails():
     X, mask = _interventional_sem([[1], [6]], n=600, seed=0)
-    score = gies_search.InterventionalBICScore(X, mask)
+    score = gies_search.InterventionalScore(X, mask)
     search = gies_search._Search(score, X.shape[1], range(X.shape[1]))
     with pytest.raises(RuntimeError):
         search.apply(search.adj.copy())
+
+
+# ---- categorical and mixed scores under interventions -------------------------------------------
+
+#: Each score, the data it reads, and its categorical columns: ``"continuous"``, ``"categorical"``,
+#: or ``"mixed"``, with columns 0 and 3 categorical.
+_KINDS = {
+    "bic": "continuous",
+    "bdeu": "categorical",
+    "discrete_bic": "categorical",
+    "degen_gauss": "mixed",
+    "cond_gauss": "mixed",
+}
+
+
+def _intervened_chain(kind: str, n: int, seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The chain ``x0 -> x1 -> x2 -> x3`` with ``x1`` set from outside in every other row.
+
+    Returns the data, the intervention mask, and the categorical columns. A categorical child
+    copies its parent's category (or, from a continuous parent, its sign) in 70% of the rows and
+    takes one at random in the rest; a continuous child adds standard normal noise to its parent's
+    value, or to a mean per category. The intervened ``x1`` takes values at random.
+    """
+    rng = np.random.default_rng(seed)
+    mask = np.zeros((n, 4), dtype=bool)
+    mask[1::2, 1] = True
+    noise = rng.standard_normal((n, 4))
+
+    def copy(parent: np.ndarray, k: int) -> np.ndarray:
+        return np.where(rng.random(n) < 0.7, parent, rng.integers(0, k, n))
+
+    if kind == "categorical":
+        x0 = rng.integers(0, 3, n)
+        x1 = np.where(mask[:, 1], rng.integers(0, 3, n), copy(x0, 3))
+        x2 = copy(x1, 3)
+        x3 = copy(x2 > 0, 2)
+    elif kind == "mixed":
+        x0 = rng.integers(0, 3, n)
+        x1 = np.where(mask[:, 1], 1.5 * noise[:, 1], np.array([-1.0, 0.0, 1.0])[x0] + noise[:, 1])
+        x2 = x1 + noise[:, 2]
+        x3 = copy(x2 > 0, 2)
+    else:
+        x0 = noise[:, 0]
+        x1 = np.where(mask[:, 1], rng.normal(2.0, 0.5, n), 0.8 * x0 + noise[:, 1])
+        x2 = 0.8 * x1 + noise[:, 2]
+        x3 = 0.8 * x2 + noise[:, 3]
+    X = np.column_stack([x0, x1, x2, x3]).astype(np.float64)
+    categorical = np.array(
+        [kind == "categorical" or (kind == "mixed" and j in (0, 3)) for j in (0, 1, 2, 3)]
+    )
+    return X, mask, categorical
+
+
+def _marks(adjacency: np.ndarray) -> np.ndarray:
+    """The mark matrix of a DAG given as a 0/1 adjacency, ``adjacency[i, j] = 1`` for ``i -> j``."""
+    return (adjacency * TAIL + adjacency.T * ARROW).astype(np.int8)
+
+
+@pytest.mark.parametrize("score_func", list(_KINDS))
+def test_every_dag_of_an_interventional_class_gets_one_score(score_func):
+    """The two ends of an edge the class leaves undirected share their rows, so each score gives
+    every DAG of an interventional class the same total: the property the search relies on."""
+    X, mask, categorical = _intervened_chain(_KINDS[score_func], n=1200, seed=0)
+    score = gies_search.InterventionalScore(X, mask, score_func=score_func, categorical=categorical)
+    cut = cut_pairs(mask)
+    totals: dict[bytes, list[float]] = {}
+    for adjacency in _all_dags(4):
+        key = replace_unprotected(_marks(adjacency), cut).tobytes()
+        total = sum(score.score(v, np.flatnonzero(adjacency[:, v]).tolist()) for v in range(4))
+        totals.setdefault(key, []).append(total)
+    assert max(len(values) for values in totals.values()) >= 3
+    for values in totals.values():
+        assert max(values) - min(values) <= 1e-9 * abs(min(values))
+
+
+@pytest.mark.parametrize("score_func", list(_KINDS))
+def test_a_variable_is_scored_without_the_rows_that_intervene_on_it(score_func):
+    """Shuffling ``x1``'s values among the rows that set it from outside leaves its own score
+    unchanged and changes the score of its child ``x2``, which reads those rows."""
+    X, mask, categorical = _intervened_chain(_KINDS[score_func], n=1200, seed=1)
+    shuffled = X.copy()
+    rows = np.flatnonzero(mask[:, 1])
+    shuffled[rows, 1] = np.random.default_rng(2).permutation(X[rows, 1])
+    before, after = (
+        gies_search.InterventionalScore(x, mask, score_func=score_func, categorical=categorical)
+        for x in (X, shuffled)
+    )
+    assert after.score(1, [0]) == before.score(1, [0])
+    assert after.score(2, [1]) != before.score(2, [1])
+
+
+@pytest.mark.parametrize("score_func", ["bdeu", "discrete_bic", "degen_gauss", "cond_gauss"])
+def test_gies_orients_a_categorical_or_mixed_chain_by_its_interventions(score_func):
+    """Setting ``x1`` from outside orients every edge of the chain; without the mask, the same
+    data leave the chain undirected."""
+    X, mask, categorical = _intervened_chain(_KINDS[score_func], n=4000, seed=3)
+    columns = np.flatnonzero(categorical).tolist() if _KINDS[score_func] == "mixed" else None
+    found = andrey.gies(X, mask, score_func=score_func, categorical=columns)
+    assert sorted(found.structure.oriented_edges()) == [
+        (0, 1, "directed"),
+        (1, 2, "directed"),
+        (2, 3, "directed"),
+    ]
+    alone = andrey.gies(X, score_func=score_func, categorical=columns)
+    assert {kind for _, _, kind in alone.structure.oriented_edges()} == {"undirected"}
+
+
+@pytest.mark.parametrize("score_func", ["bdeu", "discrete_bic"])
+def test_a_category_seen_only_under_an_intervention_stays_one(score_func):
+    """``x1`` takes category 2 only where an intervention set it. Its local score counts the other
+    rows over all three categories; the multinomial BIC's penalty takes log(n) of every row."""
+    rng = np.random.default_rng(0)
+    n, kept = 400, 300
+    x0 = rng.integers(0, 3, n)
+    x1 = np.where(np.arange(n) < kept, rng.integers(0, 2, n), 2)
+    mask = np.zeros((n, 2), dtype=bool)
+    mask[kept:, 1] = True
+    X = np.column_stack([x0, x1]).astype(np.float64)
+    counts = np.bincount(x1[:kept])
+    if score_func == "bdeu":  # two variables: no structure prior; equivalent sample size 1
+        a = 1.0 / 3
+        expected = -2.0 * float(
+            gammaln(1.0) - gammaln(kept + 1.0) + np.sum(gammaln(counts + a) - gammaln(a))
+        )
+    else:
+        expected = -2.0 * float(np.sum(counts * np.log(counts / kept))) + np.log(n) * 2
+    score = gies_search.InterventionalScore(X, mask, score_func=score_func)
+    assert score.score(1, []) == pytest.approx(expected, rel=1e-12)
+    assert np.isfinite(andrey.gies(X, mask, score_func=score_func).metadata["score"])
 
 
 def test_gies_is_deterministic():

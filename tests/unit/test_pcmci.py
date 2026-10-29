@@ -16,7 +16,7 @@ from scipy import stats
 import andrey
 from andrey.core.ci import SingularCorrelationError, StudentT
 from andrey.temporal.pcmci import (
-    INDEP_TESTS,
+    PARTIAL_CORRELATION_TESTS,
     DesignTest,
     _column,
     _strongest_others,
@@ -248,7 +248,7 @@ _EQUIVALENCE_CASES = [
 @pytest.mark.parametrize(("data", "tau_max", "pc_alpha"), _EQUIVALENCE_CASES)
 def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, tau_max, pc_alpha):
     n_vars = data.shape[1]
-    test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
+    test = PARTIAL_CORRELATION_TESTS[indep_test](lagged_design(data, tau_max))
     ranks = range(n_vars)
     parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
     assert parents == tuple(
@@ -260,8 +260,8 @@ def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, ta
     np.testing.assert_array_equal(p_values, expected_p_values)
 
 
-def test_an_unknown_indep_test_raises_naming_the_choices():
-    with pytest.raises(ValueError, match=r"indep_test must be one of \['fisherz', 'student_t'\]"):
+def test_an_unknown_indep_test_raises_naming_the_registered_ones():
+    with pytest.raises(NotImplementedError, match="unknown indep_test 'spearman'; registered"):
         pcmci(_chain(100), indep_test="spearman")
 
 

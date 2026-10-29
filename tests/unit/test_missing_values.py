@@ -28,6 +28,7 @@ from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 SUPPORTED = [name for name, spec in REGISTRY.items() if spec.data.missing]
 REFUSED = [name for name, spec in REGISTRY.items() if not spec.data.missing]
@@ -253,6 +254,20 @@ def test_a_small_block_gives_a_p_value_or_raises(name):
                 assert f"the {rows} rows where all" in str(error)
             else:
                 assert 0.0 <= p <= 1.0
+
+
+def test_a_registered_test_with_p_values_only_reports_statistics_under_deletion(monkeypatch):
+    """Without a many-query method, each query is asked of the test over its own rows and counted
+    in ``rows_tested``; the statistic orders the queries by p-value, smallest first."""
+    monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    test = make_indep_test("p_value_only", _gaps(_continuous(), 0.1))
+    x, y = np.array([0, 0, 1, 4]), np.array([3, 2, 4, 2])
+    conditions = np.array([[2], [4], [3], [1]])
+    with rows_tested() as rows:
+        statistics, p_values = test.statistic_pvalues(x, y, conditions)
+    assert sum(rows.values()) == len(x)
+    assert p_values.tolist() == [test(a, b, c) for a, b, c in zip(x, y, conditions.tolist())]
+    assert np.array_equal(np.argsort(-statistics), np.argsort(p_values))
 
 
 def test_a_registered_test_runs_on_one_blas_thread():

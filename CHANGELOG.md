@@ -85,11 +85,25 @@ change names its pull request.
   searches do: a required edge is always in the result, a forbidden edge, an edge into an earlier
   tier, and a pair outside `allowed` never are, and `iamb`, `inter_iamb`, and `mmpc` direct the
   edges the knowledge decides. ([#521])
+- `pcmci`, `pcmciplus`, and `lpcmci` take every `indep_test` the other conditional-independence
+  searches take: `"chisq"` and `"gsq"` for categorical series, `"degen_gauss"` and `"cond_gauss"`
+  for mixed ones, and the nonlinear `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`, each on the lagged
+  values under test-wise deletion, with `categorical`, `max_categories`, and `seed`. Candidate
+  conditions are ordered by each test's statistic, as in tigramite. `None` still picks from the
+  declared column types. A test registered with `register_indep_test` needs only the single-query
+  call, as in every other search with an `indep_test`, under missing values too: the family orders
+  its candidates by p-value, smallest first. ([#515])
 - `gies`, `xges`, and `gfci` take `max_parents`, a cap on every node's parents, as `ges` does: no
   DAG the returned graph represents gives a node more than that many parents, and a move that would
   give a node more is skipped. `gfci` caps its GES phase; the PAG its tests then orient can put more
   arrowheads at a node. Required edges of `knowledge` above the cap raise `ValueError`. The default,
   `None`, sets no cap and returns the graphs these methods returned before. ([#516])
+- `gies` and `xges` take every score the other score searches take, `"bdeu"` and `"discrete_bic"`
+  for categorical data and `"cond_gauss"` and `"degen_gauss"` for mixed data besides `"bic"`, with
+  `categorical` and `max_categories`, and `score_func=None` picks from the declared column types as
+  in the other score searches; `gies` scores each variable on the rows without an intervention on
+  it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
+  data. ([#520])
 - `granger` takes `knowledge`: each variable's regression drops the lagged regressors the
   knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
   others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
@@ -1050,5 +1064,7 @@ First alpha release.
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
+[#515]: https://github.com/Abel-ai-lab/andrey/pull/515
 [#516]: https://github.com/Abel-ai-lab/andrey/pull/516
+[#520]: https://github.com/Abel-ai-lab/andrey/pull/520
 [#521]: https://github.com/Abel-ai-lab/andrey/pull/521

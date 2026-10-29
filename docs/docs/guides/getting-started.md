@@ -384,8 +384,9 @@ Each test and score reads the columns as one kind of data:
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
-`ges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every
-score. `gfci`, `mmhc`, and `rsmax2` take a score and a test
+`ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and
+`exact_search` take every score; `gies` scores each variable on the rows without an intervention on
+it. `gfci`, `mmhc`, and `rsmax2` take a score and a test
 that read the same kind of data, such as
 `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
