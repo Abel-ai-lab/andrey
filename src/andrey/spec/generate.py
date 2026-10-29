@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import andrey
 from andrey.core.structure import EDGE_GLYPHS
 
-from .concepts import CONCEPTS
+from .concepts import BOOTSTRAP_PARAMS, CONCEPTS
 from .environment import ENV_VARS, PRECEDENCE
 from .registry import REGISTRY, get_spec, list_specs
 
@@ -278,21 +278,26 @@ def cli_meta() -> dict:
         "bootstrap": {
             "invocation": (
                 "andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] "
-                "[--threshold T] [--block-length ROWS] [key=value ...]"
+                "[--threshold T] [--resampling subsample|bootstrap] [--sample-fraction F] "
+                "[--block-length ROWS] [key=value ...]"
             ),
             "what": (
-                "refits the method on bootstrap resamples of the rows (blocks of rows for a "
-                "time-series method on one series) and reports how often each edge appears; "
-                "takes the inputs, params, --config, -o, --json, and --full of `run`, and not "
-                "gin. The method's own seed= is the bootstrap's --seed. Workers follow "
-                "ANDREY_NUM_WORKERS and the result does not depend on their number."
+                "refits the method on resamples of the rows and reports how often each edge "
+                "appears: by default subsamples of --sample-fraction (0.5) of the rows drawn "
+                "without replacement, or with --resampling bootstrap, bootstrap resamples drawn "
+                "with replacement. A time-series method on one series subsamples one stretch of "
+                "consecutive rows, or bootstraps blocks of rows. Takes the inputs, params, "
+                "--config, -o, --json, and --full of `run`, and not gin. The method's own seed= is "
+                "the bootstrap's --seed. Workers follow ANDREY_NUM_WORKERS and the result does "
+                "not depend on their number."
             ),
+            "parameters": {name: _param_schema(param) for name, param in BOOTSTRAP_PARAMS.items()},
             "envelope": (
                 "the result envelope of `run`, with `structure` the averaged graph, plus "
-                "bootstrap (n_boot, threshold, seed, block_length) and frequencies[] (source, "
-                "target, type, count, and frequency for each edge that appeared in a fit, most "
-                "frequent first, and lag for a time-series method); capped at 1000 "
-                "(frequencies_truncated)"
+                "bootstrap (n_boot, threshold, seed, resampling, sample_fraction, block_length) "
+                "and frequencies[] (source, target, type, count, and frequency for each edge "
+                "that appeared in a fit, most frequent first, and lag for a time-series method); "
+                "capped at 1000 (frequencies_truncated)"
             ),
         },
         "error_envelope": {
@@ -460,16 +465,22 @@ def render_skill() -> str:
     a("")
     a(
         "`andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] [--threshold T] "
-        "[key=value ...]` refits the method on resamples of the rows and answers how often each "
-        "edge appears. It takes the inputs and `key=value` params of `andrey run`, and not `gin`. "
-        "Its envelope is a run's, with `structure` the averaged graph: a pair is in it when it is "
-        "adjacent in at least `--threshold` of the fits (default 0.5), with the edge it has most "
-        "often. `bootstrap` gives `n_boot`, `threshold`, `seed`, and `block_length`, and "
-        "`frequencies` lists each edge that appeared in some fit, most frequent first, with its "
-        "`source`, `target`, `type`, `count`, and `frequency` (a time-series method adds `lag`). "
-        "Report an edge with its frequency: 0.95 is stable, 0.3 is not. A time-series method on "
-        "one series resamples blocks of `--block-length` rows. Set `--seed` when the result must "
-        "repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without changing it."
+        "[--resampling subsample|bootstrap] [--sample-fraction F] [key=value ...]` refits the "
+        "method on resamples of the rows and answers how often each edge appears. It takes the "
+        "inputs and `key=value` params of `andrey run`, and not `gin`. Its envelope is a run's, "
+        "with `structure` the averaged graph: a pair is in it when it is adjacent in at least "
+        "`--threshold` of the fits (default 0.5), with the edge it has most often. `bootstrap` "
+        "gives `n_boot`, `threshold`, `seed`, `resampling`, `sample_fraction`, and "
+        "`block_length`, and `frequencies` lists each edge that appeared in some fit, most "
+        "frequent first, with its `source`, `target`, `type`, `count`, and `frequency` (a "
+        "time-series method adds `lag`). Report an edge with its frequency: 0.95 is stable, 0.3 "
+        "is not; a frequency ranks the edges and is not a probability. Each resample is a "
+        "subsample of `--sample-fraction` (default 0.5) of the rows, drawn without replacement "
+        "(one stretch of consecutive rows for a time-series method on one series); "
+        "`--resampling bootstrap` draws as many rows with replacement (blocks of "
+        "`--block-length` rows for such a method). Set `--seed` when the "
+        "result must repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without "
+        "changing it."
     )
     a("")
     a("## Data types")

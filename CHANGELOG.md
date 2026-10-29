@@ -10,6 +10,21 @@ names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `bootstrap` draws each resample as a subsample by default: `sample_fraction=0.5` of the rows,
+  without replacement, instead of all the rows with replacement, so every default result changes
+  (frequencies and averaged graph). A bootstrap resample repeats rows, so a test or a score sees
+  more evidence than the resample holds; Banerjee, Andrews, and Kummerfeld (2025) find that
+  subsampling half of the rows performs as well as the best correction. On linear data with 20 and
+  50 variables and 1,000 and 5,000 rows, the averaged graph had no more errors (SHD) than the
+  bootstrap's in any of 10 cells and fewer in 5, `ges` with 50 variables and 1,000 rows had 5.0
+  fewer, and a fit takes 0.56 to 0.95 of the time. A time-series method on one series subsamples
+  one stretch of consecutive rows, which had no more errors than the block bootstrap in any of 14
+  cells of simulated series. Pass `resampling="bootstrap"` for the resampling of before; the moving
+  block bootstrap's default block is now `max(ceil(n ** (1/3)), 10 * tau_max)` rows for a method
+  with a `tau_max`, instead of `ceil(n ** (1/3))`. ([#544])
+
 ### Added
 
 - `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
@@ -19,6 +34,10 @@ names its pull request.
   starts from the best DAG so far after `n_perturbations` random edge additions, removals, or
   reversals drawn from `seed`, by default as many as there are variables, and the fit returns the
   best-scoring one; the default, 1, returns the graphs these methods returned before. ([#552])
+- `bootstrap` takes `resampling`, `"subsample"` or `"bootstrap"`, and `sample_fraction`, the share
+  of rows in a subsample; for a time-series method on one series a subsample is one stretch of
+  consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
+  records both. ([#544])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
   searches do: a required edge is always in the result, a pair forbidden both ways or outside
   `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
@@ -1177,5 +1196,6 @@ First alpha release.
 [#521]: https://github.com/Abel-ai-lab/andrey/pull/521
 [#524]: https://github.com/Abel-ai-lab/andrey/pull/524
 [#526]: https://github.com/Abel-ai-lab/andrey/pull/526
+[#544]: https://github.com/Abel-ai-lab/andrey/pull/544
 [#550]: https://github.com/Abel-ai-lab/andrey/pull/550
 [#552]: https://github.com/Abel-ai-lab/andrey/pull/552
