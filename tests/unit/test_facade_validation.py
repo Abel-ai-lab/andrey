@@ -830,8 +830,6 @@ SCORE_SEARCHES = {
     "gies": (andrey.gies, "andrey.search.gies", "gies", "bic"),
     "xges": (andrey.xges, "andrey.search.xges", "xges", "bic"),
 }
-#: The score searches that took the former linear-Gaussian score names before 0.11.0.
-FORMER_LINEAR_NAMES = ("ges", "hc", "tabu", "exact_search", "boss", "grasp", "xges", "gfci")
 
 
 def _scores_used(monkeypatch, name):
@@ -884,17 +882,6 @@ def _mixed_frame():
     return pd.DataFrame(
         {"group": pd.Categorical(x[:, 0].astype(int)), "u": x[:, 1], "flag": x[:, 2] > 0}
     )
-
-
-@pytest.mark.parametrize("name", FORMER_LINEAR_NAMES)
-def test_a_former_score_name_maps_to_the_current_one_with_one_warning(name):
-    fit = getattr(andrey, name)
-    x = _normal_data()
-    current = fit(x, score_func="bic")
-    for former in ("local_score_BIC", "local_score_BIC_from_cov"):
-        with pytest.warns(andrey.DeprecatedArgumentWarning, match=former):
-            assert _same_fit(fit(x, score_func=former), current)
-    assert current.structure.to_numpy().any()
 
 
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))

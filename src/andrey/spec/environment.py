@@ -178,9 +178,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         default="0",
         effect=(
             "Global default seed for every method that draws random numbers (BOSS, GRaSP, "
-            "ICA-LiNGAM, CALM, and the searches that test independence, with the rcot, cmiknn, and "
-            "gpdc tests). An explicit `seed=` overrides it. Deterministic methods (GES, "
-            "DirectLiNGAM, ...) and the other tests ignore it."
+            "ICA-LiNGAM, CALM, HC and tabu search with n_starts above 1, and the searches that "
+            "test independence, with the rcot, cmiknn, and gpdc tests). An explicit `seed=` "
+            "overrides it. Deterministic methods (GES, DirectLiNGAM, ...) and the other tests "
+            "ignore it."
         ),
         group="reproducibility",
     ),

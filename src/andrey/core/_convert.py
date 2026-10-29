@@ -17,6 +17,8 @@ from .structure import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, is_ancestral
 if TYPE_CHECKING:
     import networkx
 
+    from .knowledge import Constraints
+
 _LISTED = 10  # undirected edges an error message lists before "and N more"
 
 
@@ -85,18 +87,27 @@ def pag_of(
     structure: GraphStructure,
     latent: Collection[str | int] | None,
     selection: Collection[str | int],
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
-    """Return the PAG of a ``dag`` or a MAG over the nodes ``latent`` and ``selection`` leave."""
+    """Return the PAG of a ``dag`` or a MAG over the nodes ``latent`` and ``selection`` leave.
+
+    ``constraints``, over those nodes, set their endpoints before the orientation rules run, as
+    ``fci`` sets them; ``None`` sets none.
+    """
     if structure.kind == "dag":
         digraph = _causal_dag(structure)
         observed, selected = _split(structure, latent, selection)
-        return _named(_project(digraph, observed, selected, "pag"), structure, observed)
+        return _named(
+            _project(digraph, observed, selected, "pag", constraints), structure, observed
+        )
     if not is_ancestral_kind(structure.kind):
         raise ValueError(f"to_pag takes a dag or a mag, not kind {structure.kind!r}")
     digraph, added_selection = _canonical_dag(structure)
     observed, selected = _split(structure, latent, selection)
     return _named(
-        _project(digraph, observed, [*selected, *added_selection], "pag"), structure, observed
+        _project(digraph, observed, [*selected, *added_selection], "pag", constraints),
+        structure,
+        observed,
     )
 
 
@@ -200,18 +211,24 @@ def _observed_ancestors_of(
 
 
 def _project(
-    digraph: networkx.DiGraph, observed: list[int], selection: list[int], target: str
+    digraph: networkx.DiGraph,
+    observed: list[int],
+    selection: list[int],
+    target: str,
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Return the MAG or the PAG over ``observed``, node ``k`` being ``observed[k]``.
 
-    Every d-separation query also conditions on ``selection``.
+    Every d-separation query also conditions on ``selection``. A PAG gets the endpoints
+    ``constraints`` set before its orientation rules.
     """
     from andrey.data.latent import _mag_projection, _observed_ancestors, _pag_projection
 
     anc = _observed_ancestors(digraph, observed)
     up = _observed_ancestors_of(digraph, observed, selection)
-    build = _mag_projection if target == "mag" else _pag_projection
-    return build(digraph, observed, anc, selection, up)
+    if target == "mag":
+        return _mag_projection(digraph, observed, anc, selection, up)
+    return _pag_projection(digraph, observed, anc, selection, up, constraints)
 
 
 def _named(

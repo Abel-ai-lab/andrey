@@ -34,15 +34,6 @@ Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
 SCORE_NAMES = SCORES
-#: The score names that shipped before 0.11.0, each with its current name, kept for one release.
-SCORE_ALIASES = (
-    ("local_score_BIC", "bic"),
-    ("local_score_BIC_from_cov", "bic"),
-    ("local_score_BDeu", "bdeu"),
-    ("local_score_BIC_categorical", "discrete_bic"),
-    ("local_score_cond_gauss", "cond_gauss"),
-    ("local_score_degen_gauss", "degen_gauss"),
-)
 #: The largest seed NumPy and torch accept.
 SEED_MAX = 2**32 - 1
 
@@ -141,6 +132,8 @@ _LINGAM = (
     "longitudinal_lingam",
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+#: The searches that take n_starts.
+_STARTS = ("boss", "grasp", "hc", "tabu")
 #: The methods with no edge to name in knowledge.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl")
 ALL_METHODS = (
@@ -352,9 +345,9 @@ _CONCEPTS = (
         summary="The correction of the lagged links' p-values for the number of links tested "
         "(tigramite's name): none leaves them as tested, and fdr_bh replaces them with their "
         "Benjamini-Hochberg adjusted values over all the lagged links together. A method whose "
-        "graph is thresholded on those p-values (pcmci) thresholds the adjusted ones; a method "
-        "that decides its links before it reports them (pcmciplus) reports the adjusted values "
-        "and keeps its links.",
+        "graph is thresholded on those p-values (pcmci, granger) thresholds the adjusted ones; a "
+        "method that decides its links before it reports them (pcmciplus) reports the adjusted "
+        "values and keeps its links.",
         param=_template(
             "fdr_method",
             "str",
@@ -365,7 +358,7 @@ _CONCEPTS = (
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
-        suitable=("pcmci", "pcmciplus"),
+        suitable=("pcmci", "pcmciplus", "granger"),
         exempt=_exempt(
             "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
             "The marks come from the removal phases and the orientation rules at alpha, not from "
@@ -561,11 +554,11 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "boss", "grasp", "calm", "ica_lingam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, *_STARTS, "calm", "ica_lingam"),
         exempt=(
             *_exempt(
                 "Deterministic.",
-                *(m for m in _PURE_SCORE if m not in ("boss", "grasp")),
+                *(m for m in _PURE_SCORE if m not in _STARTS),
                 *_CONTINUOUS,
                 "direct_lingam",
                 "multi_group_direct_lingam",
@@ -578,19 +571,41 @@ _CONCEPTS = (
     ),
     Concept(
         key="n_starts",
-        summary="The number of searches a fit runs, each later one from a random start drawn "
-        "from seed; the best-scoring one is returned, and 1, the default, runs one search.",
+        summary="The number of searches a fit runs, each later one from a start drawn from seed: "
+        "a random order (boss, grasp), or the best DAG so far after n_perturbations random edge "
+        "changes (hc, tabu); the best-scoring one is returned, and 1, the default, runs one "
+        "search.",
         param=_template(
             "n_starts",
             "int",
             1,
             "Number of searches, the first from the method's usual start and each later one from a "
-            "random start drawn from seed and its index; returns the best-scoring one.",
+            "start drawn from seed and its index: a random order, or the best DAG so far after "
+            "random edge changes; returns the best-scoring one.",
             minimum=1,
         ),
         fragment="best-scoring search",
-        suitable=("boss", "grasp"),
+        suitable=_STARTS,
         others_exempt="Runs one search per fit.",
+    ),
+    Concept(
+        key="n_perturbations",
+        summary="The number of random edge additions, removals, or reversals made to the best DAG "
+        "so far before each later start of n_starts; None, the default, is the number of "
+        "variables.",
+        param=_template(
+            "n_perturbations",
+            "int",
+            None,
+            "Number of random edge additions, removals, or reversals made to the best DAG so far "
+            "before each search after the first, at least 1; null uses the number of variables. "
+            "Changes nothing when n_starts is 1.",
+            nullable=True,
+            minimum=1,
+        ),
+        fragment="random edge",
+        suitable=("hc", "tabu"),
+        others_exempt="No later start from a changed DAG.",
     ),
     Concept(
         key="n_jobs",
@@ -895,10 +910,10 @@ _CONCEPTS = (
         "conflicts for the links colliders ask to orient both ways, score for a score search's "
         "score. An order that is not a total order of the variables has its own name "
         "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
-        "default or the configuration leaves open: seed, indep_test, score_func, and the "
-        "score's penalty_discount, ebic_gamma, and equivalent_sample_size hold the value the fit "
-        "used, and tie_break the "
-        "rule of andrey.config that a fit it can change ran under.",
+        "default or the configuration leaves open: seed, indep_test, score_func, the score's "
+        "penalty_discount, ebic_gamma, and equivalent_sample_size, and n_perturbations hold the "
+        "value the fit used, and tie_break the rule of andrey.config that a fit it can change ran "
+        "under.",
         suitable=ALL_METHODS,
     ),
     Concept(

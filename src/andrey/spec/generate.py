@@ -196,7 +196,6 @@ def to_json_schema(spec: MethodSpec) -> dict:
                     "flag": inp.flag,
                     "kind": inp.kind,
                     "required": inp.required,
-                    "aliases": list(inp.aliases),
                     "description": inp.doc,
                 }
                 for inp in spec.data.inputs
@@ -246,7 +245,7 @@ def cli_meta() -> dict:
             "hyperparameters are `key=value` after the method (or a `--config <file>` YAML/JSON "
             "base; overrides win). Types / choices are in each method's `params` schema below -- "
             "for example, alpha=0.05, indep_test=fisherz, 'order=[1,1]', criterion=null. "
-            "Data arrays stay --flags (--data, --data-groups, --data-list, --domain-index, "
+            "Data arrays stay --flags (--data, --domain-index, "
             "--interventions), never key=value."
         ),
         "introspection": {

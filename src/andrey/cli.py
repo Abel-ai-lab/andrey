@@ -35,6 +35,7 @@ from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KnowledgeError
+from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, node_labels
 from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
@@ -657,6 +658,11 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
     return value
 
 
+def _with_hint(message: str, hint: str | None) -> str:
+    """The error message, then what a removed name or value is called now, when there is a hint."""
+    return message if hint is None else f"{message}; {hint}"
+
+
 def _flag_hint(token: str) -> dict:
     """A structured error for a stale `--flag` token, with a did_you_mean when it names a param."""
     name = token.lstrip("-").replace("-", "_")
@@ -749,7 +755,7 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
     Python passes only the ones it names, and the manifest of every parameter's value."""
     specs = {p.name: p for p in spec.params}
     former = {alias: p.name for p in spec.params for alias in p.aliases}
-    input_names = {name for i in spec.data.inputs for name in (i.name, *i.aliases)}
+    input_names = {i.name for i in spec.data.inputs}
     raw_overrides, errors = _parse_overrides(tokens)
     fkwargs: dict = {}  # the arguments set by --config and the overrides
     config = _current_names(config, former, errors)
@@ -768,9 +774,8 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             return
         param = specs.get(key)
         if param is None:
-            errors.append(
-                {"param": key, "message": f"unknown param {key!r}", "valid_options": sorted(specs)}
-            )
+            message = _with_hint(f"unknown param {key!r}", removal_hint(spec.name, key))
+            errors.append({"param": key, "message": message, "valid_options": sorted(specs)})
             return
         try:
             if from_config:
@@ -778,7 +783,8 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             else:
                 fkwargs[key] = _coerce(value, param)  # ty: ignore[invalid-argument-type]
         except CliError as exc:
-            errors.append({"param": key, "message": exc.message, **exc.extra})
+            message = _with_hint(exc.message, removal_hint(spec.name, key, value))
+            errors.append({"param": key, "message": message, **exc.extra})
 
     for key, value in config.items():  # config layer: typed values
         _assign(key, value, from_config=True)
@@ -799,23 +805,6 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
         if k not in spec.dropped_args
     }
     return fkwargs, resolved
-
-
-def _merge_former_inputs(spec: MethodSpec, provided: dict[str, list[str] | None]) -> None:
-    """Move the paths given under a former flag of ``spec``'s first input onto ``--data``.
-
-    A flag that is not a former name of the method's input stays in ``provided``, where
-    :func:`_load_method_inputs` refuses it. Raises ``CliError`` when a call passes both names.
-    """
-    for old in ("data_groups", "data_list"):
-        if provided.get(old) and old in spec.data.inputs[0].aliases:
-            if provided.get("data"):
-                raise CliError(
-                    "bad_input",
-                    f"--{old.replace('_', '-')} is the former name of --data; pass only --data",
-                    EXIT_USAGE,
-                )
-            provided["data"] = provided.pop(old)
 
 
 def _load_method_inputs(
@@ -1691,14 +1680,6 @@ _InterventionsOption = Annotated[
         "was set by an intervention.",
     ),
 ]
-_DataGroupsOption = Annotated[
-    Optional[list[str]],
-    typer.Option("--data-groups", metavar="PATH", hidden=True, help="Former name of --data."),
-]
-_DataListOption = Annotated[
-    Optional[list[str]],
-    typer.Option("--data-list", metavar="PATH", hidden=True, help="Former name of --data."),
-]
 _ConfigOption = Annotated[
     Optional[str],
     typer.Option(
@@ -1740,8 +1721,6 @@ def cmd_run(
     data: _DataOption = None,
     domain_index: _DomainIndexOption = None,
     interventions: _InterventionsOption = None,
-    data_groups: _DataGroupsOption = None,
-    data_list: _DataListOption = None,
     config: _ConfigOption = None,
     output: _OutputOption = None,
     as_json: _JsonOption = False,
@@ -1761,10 +1740,7 @@ def cmd_run(
         "data": data,
         "domain_index": domain_index,
         "interventions": interventions,
-        "data_groups": data_groups,
-        "data_list": data_list,
     }
-    _merge_former_inputs(spec, provided)
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
@@ -1793,8 +1769,6 @@ def cmd_bootstrap(
     data: _DataOption = None,
     domain_index: _DomainIndexOption = None,
     interventions: _InterventionsOption = None,
-    data_groups: _DataGroupsOption = None,
-    data_list: _DataListOption = None,
     n_resamples: Optional[int] = typer.Option(
         None, "--n-resamples", metavar="N", help="Number of resamples and fits. Default 100."
     ),
@@ -1858,10 +1832,7 @@ def cmd_bootstrap(
         "data": data,
         "domain_index": domain_index,
         "interventions": interventions,
-        "data_groups": data_groups,
-        "data_list": data_list,
     }
-    _merge_former_inputs(spec, provided)
     if n_boot is not None and n_resamples is not None:
         raise CliError(
             "bad_value",
@@ -1918,11 +1889,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             msg = getattr(exc, "format_message")()  # noqa: B009  # duck-typed Click UsageError
             extra: dict = {}
             hit = re.search(r"(?i)no such option:?\s+(--[\w-]+)", msg)
-            if hit and hit.group(1).lstrip("-").replace("-", "_") in {
-                p.name for s in REGISTRY.values() for p in s.params
-            }:
+            if hit:
                 key = hit.group(1).lstrip("-").replace("-", "_")
-                extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
+                if key in {p.name for s in REGISTRY.values() for p in s.params}:
+                    extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
+                method = next((a for a in args if a in REGISTRY), "")
+                flags = {i.name for i in REGISTRY[method].data.inputs} if method else set()
+                msg = _with_hint(msg, removal_hint(method, key, flags=flags))
             return emit_error(CliError("usage_error", msg, EXIT_USAGE, **extra))
         return emit_error(CliError("internal", f"{type(exc).__name__}: {exc}", EXIT_INTERNAL))
 

@@ -28,15 +28,10 @@ from andrey.spec.models import Status
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
 _INPUT_FLAGS = ("data", "domain_index", "interventions")
 
-# The former names of the inputs, which the CLI still takes for one release.
-_FORMER_INPUT_FLAGS = tuple(
-    sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases})
-)
-
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
     {"method", "config", "output", "json", "full", "help", "version", "debug"}
-    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
+    | {*_INPUT_FLAGS}
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
@@ -257,7 +252,7 @@ def test_cmd_run_wires_every_input_flag():
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
+    missing = {*_INPUT_FLAGS} - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
 
 
@@ -320,33 +315,6 @@ def test_every_indep_test_takes_the_shipped_tests():
     assert {"pc", "pcmci", "pcmciplus", "lpcmci"} <= set(params)
     for name, p in params.items():
         assert p.choices == SHIPPED_INDEP_TESTS, name
-
-
-def test_a_score_search_aliases_the_score_names_it_took_before_the_rename():
-    """The former `local_score_*` names keep working for one release on the searches that took
-    them, and only on those: a score a search gained later has no former name."""
-    from andrey.spec.concepts import SCORE_ALIASES
-
-    former = {old for old, _ in SCORE_ALIASES}
-    linear = {old for old, new in SCORE_ALIASES if new == "bic"}
-    categorical = linear | {old for old, new in SCORE_ALIASES if new in ("bdeu", "discrete_bic")}
-    took = {
-        "gfci": former,
-        "ges": former,
-        "hc": former,
-        "boss": former,
-        "grasp": former,
-        "exact_search": former,
-        "tabu": categorical,
-        "xges": linear,
-    }
-    aliased = {}
-    for name, spec in REGISTRY.items():
-        for p in spec.params:
-            if p.name == "score_func" and p.choice_aliases:
-                aliased[name] = {old for old, _ in p.choice_aliases}
-    assert aliased == took
-    assert len(former) == len(SCORE_ALIASES)
 
 
 # --- support status -------------------------------------------------------------------------------

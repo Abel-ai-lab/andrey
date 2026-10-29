@@ -88,15 +88,15 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   each two-node graph holds the direction they decide, by the rule the method's `alpha` parameter
   selects. PCMCI reports each lagged link's MCI `p_values` and `statistics`, and the `parents` its
   first step selected; PCMCI+ reports the same for every lag from 0, plus `conflicts` and
-  `ambiguous_triples`. With `fdr_method="fdr_bh"`, both report the Benjamini-Hochberg adjusted
-  lagged `p_values`. PC, CD-NOD, FCI, and GFCI with `collider_rule="conservative"` or
-  `"majority"` report `ambiguous_triples`, the `[x, z, y]` triples, by column position, whose
-  middle node the vote left undecided. `conflicts` lists the links two colliders ask to orient both
-  ways: `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]` links (variable `i` at lag `k`, and `j`)
-  in PCMCI+ and LPCMCI, which also reports every link with all its marks as `links`, plus
-  `p_values`, `statistics`, and its preliminary `parents`. An order that is not a total order of the
-  variables has its own key: BottomUpParceLiNGAM's `partial_order` nests the unordered variables in
-  a list, and GIN's `cluster_order` orders its latent clusters.
+  `ambiguous_triples`. Granger reports each lagged link's `p_values`. With `fdr_method="fdr_bh"`,
+  all three report the Benjamini-Hochberg adjusted lagged `p_values`. PC, CD-NOD, FCI, and GFCI
+  with `collider_rule="conservative"` or `"majority"` report `ambiguous_triples`, the `[x, z, y]`
+  triples, by column position, whose middle node the vote left undecided. `conflicts` lists the
+  links two colliders ask to orient both ways: `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]`
+  links (variable `i` at lag `k`, and `j`) in PCMCI+ and LPCMCI, which also reports every link with
+  all its marks as `links`, plus `p_values`, `statistics`, and its preliminary `parents`. An order
+  that is not a total order of the variables has its own key: BottomUpParceLiNGAM's `partial_order`
+  nests the unordered variables in a list, and GIN's `cluster_order` orders its latent clusters.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results

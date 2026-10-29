@@ -78,7 +78,9 @@ names its pull request.
   data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
   the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
   graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,
-  Tetrad's `Median`, with an `andrey.AndreyWarning`. ([#555])
+  Tetrad's `Median`, with an `andrey.AndreyWarning`. Under `knowledge`, a PAG method's averaged
+  graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's rules until
+  no endpoint changes. ([#555], [#564])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -97,6 +99,38 @@ names its pull request.
   | --- | --- | --- |
   | `granger` | `cv` | none: `alpha` sets the level of the test of each link |
 
+- The former argument names and values that 0.11.0 kept for one release no longer work, as its
+  changelog announced. A call that passes one raises `TypeError`, as for any argument a method does
+  not take, and a former score name raises `ValueError`, which lists the scores the method takes;
+  each message adds what the name or value is called now. `andrey run` and `andrey bootstrap`
+  refuse the flags and the `key=value` names the same way, with the same hint, and
+  the data inputs in `andrey --help --json` no longer list `aliases`. The
+  [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) gives the current calls.
+  ([#559])
+
+  | Method | Removed name or value | Name now |
+  | --- | --- | --- |
+  | `ica_lingam` | `random_state` | `seed` |
+  | `direct_lingam`, `multi_group_direct_lingam` | `random_state` | none: it set nothing |
+  | `pcmci` | `alpha_level` | `alpha` |
+  | `pcmciplus`, `lpcmci` | `pc_alpha` | `alpha` |
+  | `rcd` | `ind_alpha` | `alpha` |
+  | `calm` | `alpha` | `screen_alpha` |
+  | `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` | `lambda_value` | `penalty_discount` |
+  | `gfci`, `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC"`, `"local_score_BIC_from_cov"` | `score_func="bic"` |
+  | `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC_categorical"` | `score_func="discrete_bic"` |
+  | `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BDeu"` | `score_func="bdeu"` |
+  | `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_cond_gauss"` | `score_func="cond_gauss"` |
+  | `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_degen_gauss"` | `score_func="degen_gauss"` |
+  | `granger` | `maxlag` | `tau_max` |
+  | `longitudinal_lingam` | `n_lags` | `tau_max` |
+  | `rcd` | `max_explanatory_vars` | `max_depth` |
+  | `calm` | `max_outer` | `max_iter` |
+  | `multi_group_direct_lingam` | `data_groups` | `data` |
+  | `longitudinal_lingam` | `data_list` | `data` |
+  | `andrey run`, `andrey bootstrap` | `--data-groups`, `--data-list` | `--data`, once per dataset |
+  | `gin`, `calm` | `labels` | none: the labels come from a DataFrame's columns, or, in `andrey run`, from the data file's header |
+
 ### Added
 
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
@@ -110,9 +144,20 @@ names its pull request.
   `alpha`; `pcmciplus` decides its links in the skeleton phase and only reports the adjusted values
   in `metadata["p_values"]`. The default, `"none"`, returns the results these methods returned
   before. `lpcmci` takes none, as tigramite's does not. ([#554])
+- `granger` takes `fdr_method`, as `pcmci` and `pcmciplus` do: `"fdr_bh"` replaces the p-values of
+  the lagged links with their Benjamini-Hochberg adjusted values over all those links together,
+  and a link is kept when its adjusted p-value is at most `alpha`. The default, `"none"`, returns
+  what `granger` returned before. On the simulated series of 80 and 160 variables with 1,000 steps,
+  where the uncorrected tests return more errors than the empty graph (median 762.5 against 494,
+  and 2,855 against 973), `"fdr_bh"` returns fewer (266.5 and 546), at the cost of more missed
+  true links. ([#565])
 - `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
   random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
   graphs these methods returned before. ([#550])
+- `hc` and `tabu` take `n_starts`, `n_perturbations`, and `seed`: each search after the first
+  starts from the best DAG so far after `n_perturbations` random edge additions, removals, or
+  reversals drawn from `seed`, by default as many as there are variables, and the fit returns the
+  best-scoring one; the default, 1, returns the graphs these methods returned before. ([#552])
 - `bootstrap` takes `resampling`, `"subsample"` or `"bootstrap"`, and `sample_fraction`, the share
   of rows in a subsample; for a time-series method on one series a subsample is one stretch of
   consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
@@ -1310,7 +1355,11 @@ First alpha release.
 [#544]: https://github.com/Abel-ai-lab/andrey/pull/544
 [#550]: https://github.com/Abel-ai-lab/andrey/pull/550
 [#551]: https://github.com/Abel-ai-lab/andrey/pull/551
+[#552]: https://github.com/Abel-ai-lab/andrey/pull/552
 [#553]: https://github.com/Abel-ai-lab/andrey/pull/553
 [#554]: https://github.com/Abel-ai-lab/andrey/pull/554
 [#555]: https://github.com/Abel-ai-lab/andrey/pull/555
 [#556]: https://github.com/Abel-ai-lab/andrey/pull/556
+[#559]: https://github.com/Abel-ai-lab/andrey/pull/559
+[#564]: https://github.com/Abel-ai-lab/andrey/pull/564
+[#565]: https://github.com/Abel-ai-lab/andrey/pull/565

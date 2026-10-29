@@ -12,7 +12,7 @@ from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, SCORE_ALIASES, concept_param
+from .concepts import CONCEPTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -68,16 +68,12 @@ _COLLIDER_ORDER = ParamSpec(
     nullable=True,
 )
 _PENALTY_DISCOUNT = concept_param("penalty_discount")
-#: The same, for the methods that shipped it as lambda_value.
-_PENALTY_DISCOUNT_RENAMED = concept_param("penalty_discount", aliases=("lambda_value",))
 _SCORE_DOC = (
     "Local score: bic = linear-Gaussian BIC; bdeu = BDeu and discrete_bic = multinomial BIC, "
     "for categorical data coded by whole numbers; degen_gauss and cond_gauss = degenerate and "
     "conditional Gaussian BIC, for mixed data. " + _DECLARED.format(every="bdeu", fallback="bic")
 )
 _SCORE_FUNC = concept_param("score_func", doc=_SCORE_DOC)
-#: The same, for the methods whose score names shipped as local_score_*.
-_SCORE_FUNC_RENAMED = concept_param("score_func", doc=_SCORE_DOC, choice_aliases=SCORE_ALIASES)
 _EBIC_GAMMA = concept_param("ebic_gamma")
 _EBIC_GAMMA_STANDARD = concept_param("ebic_gamma", default=0.0)
 _EQUIVALENT_SAMPLE_SIZE = concept_param("equivalent_sample_size")
@@ -87,6 +83,18 @@ _SEED = concept_param(
     "so a fit repeats. Seed for the search's random orders.",
 )
 _N_STARTS = concept_param("n_starts")
+#: The seed of hc and tabu, whose only random draws are the changes before a later start.
+_RESTART_SEED = concept_param(
+    "seed",
+    doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
+    "so a fit repeats. Seed for the random edge changes before each search after the first, which "
+    "only n_starts above 1 makes.",
+)
+_N_PERTURBATIONS = concept_param("n_perturbations")
+_RESTART_DOC = (
+    "; with n_starts above 1, metadata['seed'] is the seed used and metadata['n_perturbations'] "
+    "the number of random edge changes before each later search"
+)
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
@@ -217,8 +225,8 @@ _add(
         ),
         seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA_STANDARD,
             _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
@@ -393,8 +401,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             concept_param(
@@ -451,7 +459,7 @@ _add(
                 doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
                 "on it.",
             ),
-            _PENALTY_DISCOUNT_RENAMED,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             _CATEGORICAL,
@@ -481,13 +489,8 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
-            concept_param(
-                "score_func",
-                doc=_SCORE_DOC,
-                # Before 0.11.0 xges took the linear-Gaussian BIC only.
-                choice_aliases=SCORE_ALIASES[:2],
-            ),
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
@@ -512,34 +515,43 @@ _add(
         "categorical, conditional Gaussian when some are; score_func=bdeu or "
         "discrete_bic for categorical data, degen_gauss or "
         "cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
-        "when set. Returns the CPDAG of the final DAG and its score.",
+        "when set; n_starts above 1 climbs again from the best DAG after random edge changes. "
+        "Returns the CPDAG of the best DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _RESTART_DOC,
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             concept_param(
                 "max_iter",
                 default=None,
-                doc="Most moves the search takes, at least 1; null sets no limit (the search still "
+                doc="Most moves each climb takes, at least 1; null sets no limit (the search still "
                 "ends). Reaching a set limit warns with SearchLimitWarning.",
                 nullable=True,
             ),
+            _RESTART_SEED,
+            _N_STARTS,
+            _N_PERTURBATIONS,
             _CATEGORICAL,
         ),
-        references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),
+        references=(
+            "Chickering, Geiger & Heckerman 1995",
+            "Scutari 2010",
+            "Scutari, Graafland & Gutierrez 2019",
+        ),
     )
 )
 _add(
@@ -548,30 +560,27 @@ _add(
         family="score",
         summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
         "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
-        "seen. With the same settings its score is never worse than hc's. BIC by default, BDeu "
-        "when every column is categorical, conditional Gaussian when some are; score_func=bdeu or "
-        "discrete_bic for categorical data, degen_gauss or cond_gauss for mixed data. Returns "
-        "the CPDAG of that DAG and its score.",
+        "seen. With one start and the same settings its score is never worse than hc's. BIC by "
+        "default, BDeu when every column is categorical, conditional Gaussian when some are; "
+        "score_func=bdeu or discrete_bic for categorical data, degen_gauss or cond_gauss for "
+        "mixed data; n_starts above 1 searches again from the best DAG after random edge changes. "
+        "Returns the CPDAG of the best DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
+            "a mixed-data setting read" + _RESTART_DOC,
         ),
-        determinism="deterministic",
+        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
+        seeded=True,
         params=(
-            concept_param(
-                "score_func",
-                doc=_SCORE_DOC,
-                # Before 0.11.0 tabu took the linear and the categorical scores, not the mixed ones.
-                choice_aliases=SCORE_ALIASES[:4],
-            ),
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
@@ -594,13 +603,23 @@ _add(
             concept_param(
                 "max_iter",
                 default=None,
-                doc="Most moves the search takes, improving or not, at least 1; null sets no limit "
-                "(the search still ends). Reaching a set limit warns with SearchLimitWarning.",
+                doc="Most moves each search takes, improving or not, at least 1; null sets no "
+                "limit (the search still ends). Reaching a set limit warns with "
+                "SearchLimitWarning.",
                 nullable=True,
             ),
+            _RESTART_SEED,
+            _N_STARTS,
+            _N_PERTURBATIONS,
             _CATEGORICAL,
         ),
-        references=("Glover 1986", "Russell & Norvig 2009", "Scutari 2010"),
+        references=(
+            "Glover 1986",
+            "Russell & Norvig 2009",
+            "Scutari 2010",
+            "Chickering, Geiger & Heckerman 1995",
+            "Scutari, Graafland & Gutierrez 2019",
+        ),
     )
 )
 _add(
@@ -633,7 +652,7 @@ _add(
                 doc="Exact search strategy: A* or dynamic programming.",
                 choices=("astar", "dp"),
             ),
-            _SCORE_FUNC_RENAMED,
+            _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
@@ -667,7 +686,6 @@ _add(
             "can differ."
         ),
         seeded=True,
-        dropped_args=("labels",),
         params=(
             concept_param(
                 "lambda1",
@@ -685,7 +703,6 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
-                aliases=("alpha",),
             ),
             ParamSpec(
                 name="use_moral_graph",
@@ -717,7 +734,6 @@ _add(
                 doc="Most quadratic-penalty rounds, at least 1. Stopping on it before the "
                 "acyclicity residual clears h_tol warns; raise it to let the fit run on.",
                 nullable=False,
-                aliases=("max_outer",),
             ),
             ParamSpec(
                 name="subproblem_iter",
@@ -1104,8 +1120,8 @@ _add(
         tie_break=True,
         seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             _SEED,
@@ -1138,8 +1154,8 @@ _add(
         tie_break=True,
         seeded=True,
         params=(
-            _SCORE_FUNC_RENAMED,
-            _PENALTY_DISCOUNT_RENAMED,
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
             _EQUIVALENT_SAMPLE_SIZE,
             ParamSpec(
@@ -1176,7 +1192,6 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        dropped_args=("random_state",),
         params=(
             concept_param(
                 "measure",
@@ -1214,7 +1229,6 @@ _add(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
                 "random one, so a fit repeats. Seed for FastICA's starting point.",
-                aliases=("random_state",),
             ),
             concept_param(
                 "max_iter",
@@ -1238,7 +1252,6 @@ _add(
                     name="data",
                     kind="panel",
                     doc="Two or more datasets over the same d variables (repeat the flag).",
-                    aliases=("data_groups",),
                 ),
             ),
             layout="each group (n_samples, n_variables); all groups share n_variables",
@@ -1256,7 +1269,6 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        dropped_args=("random_state",),
         params=(
             concept_param(
                 "measure",
@@ -1360,7 +1372,6 @@ _add(
                     name="data",
                     kind="panel",
                     doc="One dataset per time point, same units and shape (repeat the flag).",
-                    aliases=("data_list",),
                 ),
             ),
             layout="each (n_samples, n_variables); one array per time point",
@@ -1380,7 +1391,6 @@ _add(
                 "tau_max",
                 doc="The largest lag: the number of past time points regressed out before the "
                 "instantaneous fit, at least 1.",
-                aliases=("n_lags",),
             ),
             concept_param(
                 "measure",
@@ -1440,7 +1450,6 @@ _add(
                 "alpha",
                 doc="Significance level of the MCI test, the level that decides the returned "
                 "links; a link is kept when its p-value is at most this.",
-                aliases=("alpha_level",),
             ),
             concept_param(
                 "fdr_method",
@@ -1503,7 +1512,6 @@ _add(
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this. The default is the level of the published experiments "
                 "(Runge 2020).",
-                aliases=("pc_alpha",),
             ),
             concept_param(
                 "fdr_method",
@@ -1579,7 +1587,6 @@ _add(
                 "alpha",
                 doc="Significance level of every test; a link is removed when a test gives it a "
                 "p-value above this.",
-                aliases=("pc_alpha",),
             ),
             ParamSpec(
                 name="n_preliminary_iterations",
@@ -1634,9 +1641,15 @@ _add(
                 "tau_max",
                 doc="The largest lag: each regression uses the past tau_max time steps, at least "
                 "1.",
-                aliases=("maxlag",),
             ),
             _ALPHA,
+            concept_param(
+                "fdr_method",
+                doc="How the p-values of the lagged links are corrected for the number of links "
+                "tested: none keeps them as tested; fdr_bh replaces them with their "
+                "Benjamini-Hochberg adjusted values over all the lagged links together, and a "
+                "link is kept when its adjusted p-value is at most alpha.",
+            ),
         ),
         dropped_args=("cv",),
         references=("Granger 1969", "Lutkepohl 2005"),
@@ -1770,7 +1783,6 @@ _add(
             "Reordering whole clusters relabels the result; reordering the columns inside a "
             "cluster can change the latents' order."
         ),
-        dropped_args=("labels",),
         params=(
             concept_param(
                 "alpha",
@@ -1802,7 +1814,6 @@ _add(
                 "regressed out together, at least 1; larger values find more ancestors and take "
                 "longer. The default 2 is the setting of Maeda and Shimizu's experiments.",
                 minimum=1,
-                aliases=("max_explanatory_vars",),
                 concept="max_depth",
             ),
             ParamSpec(
@@ -1821,7 +1832,6 @@ _add(
                 doc="Significance level of the HSIC independence tests, which decide the ancestors "
                 "and so the returned edges. The default is the level of the published experiments "
                 "(Maeda & Shimizu 2020).",
-                aliases=("ind_alpha",),
             ),
             ParamSpec(
                 name="shapiro_alpha",
@@ -2066,14 +2076,16 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
 }
-# The shared keys: the name, the seed of a seeded fit, the test and the score it used with the
-# score's penalties, the configuration's tie-break rule, the column types a mixed-data setting read,
-# the fewest rows a test used, and the triples a collider vote left ambiguous.
+# The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
+# test and the score it used with the score's penalties, the configuration's tie-break rule, the
+# column types a mixed-data setting read, the fewest rows a test used, and the triples a collider
+# vote left ambiguous.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
         "algorithm",
         *(("seed",) if _spec.seeded else ()),
+        *(("n_perturbations",) if "n_perturbations" in _concepts else ()),
         *(("indep_test",) if "indep_test" in _concepts else ()),
         *(("score_func",) if "score_func" in _concepts else ()),
         *(

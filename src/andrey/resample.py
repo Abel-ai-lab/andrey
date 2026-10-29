@@ -26,7 +26,7 @@ from andrey import api
 from andrey.api._adapt import flag, int_in_range
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput
 from andrey.core import backend as _backend
-from andrey.core._convert import extend_in_order, mag_of_pag
+from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
 from andrey.core.knowledge import mpdag
 from andrey.core.knowledge import orient as knowledge_orient
 from andrey.core.orient import _cpdag_of_pdag
@@ -599,18 +599,19 @@ def _valid_graph(
     ``cpdag``: the CPDAG (Chickering) of its consistent extension; every extension gives the same
     CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
     ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
-    MPDAG, and a ``pag`` gets the knowledge's endpoints.
+    MPDAG, and a ``pag`` is oriented as ``fci`` orients one under knowledge: the vote and the PAG
+    get the knowledge's endpoints (``_knowledge_marks``) before the MAG step and before the
+    orientation rules, which then run to a fixed point.
     Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
-        pag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels).to_pag()
-        if constraints is None:
-            return pag
-        marks = np.array(pag.to_numpy(), dtype=np.int8)
-        from andrey.constraint.fci import _knowledge_marks
+        if constraints is not None:
+            from andrey.constraint.fci import _knowledge_marks
 
-        _knowledge_marks(marks, constraints)
-        return GraphStructure.from_numpy(marks, kind="pag", labels=labels)
+            vote = vote.copy()
+            _knowledge_marks(vote, constraints)  # a tie edge o-o can drop a knowledge endpoint
+        mag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels)
+        return pag_of(mag, None, (), constraints)
     if ((vote == ARROW) & (vote.T == ARROW)).any():
         raise ValueError("it has a bidirected edge, which no DAG has")
     if constraints is not None:
@@ -1008,7 +1009,9 @@ def bootstrap(
     undirected. A ``pag`` becomes
     the PAG of the MAG that Zhang's construction builds from it [10]_. With ``knowledge``, the
     edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
-    gets the endpoints the knowledge sets, as ``fci`` sets them. A time-series result's lag graphs
+    is oriented as ``fci`` orients one under knowledge: the endpoints the knowledge sets come
+    first, and Zhang's orientation rules then run from them until no endpoint changes, as they do
+    in a fit [10]_, [11]_. A time-series result's lag graphs
     keep the vote, as tigramite's does [7]_: a lag-0 graph is oriented with the lagged edges, which
     the steps for one graph do not see.
 
@@ -1019,7 +1022,7 @@ def bootstrap(
     with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). A
     warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is
     ``"vote"`` otherwise. ``strict=True`` raises instead, as bnlearn's ``cextend`` does by default
-    [11]_. Either way, ``frequency`` and ``table`` keep the whole vote.
+    [12]_. Either way, ``frequency`` and ``table`` keep the whole vote.
 
     On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
     ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with
@@ -1071,7 +1074,11 @@ def bootstrap(
     .. [10] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
        presence of latent confounders and selection bias. Artificial Intelligence, 172(16-17),
        1873-1896.
-    .. [11] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
+    .. [11] Andrews, B., Spirtes, P., and Cooper, G. F. (2020). On the completeness of causal
+       discovery in the presence of latent confounding with tiered background knowledge.
+       Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics,
+       PMLR 108, 4002-4011.
+    .. [12] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
        Statistical Software, 35(3), 1-22.
 
     Examples
@@ -1196,13 +1203,13 @@ def _method_spec(method: str | Callable[..., Any]) -> MethodSpec:
 def _default_block_length(spec: MethodSpec, kwargs: dict[str, Any], n: int) -> int:
     """Return ``max(ceil(n ** (1/3)), 10 * tau_max)``, at most ``n``.
 
-    The lag is the call's ``tau_max`` (or a former name of it), else the method's default. A method
-    without a ``tau_max`` has the first term only.
+    The lag is the call's ``tau_max``, else the method's default. A method without a ``tau_max``
+    has the first term only.
     """
     length = math.ceil(n ** (1 / 3))
     lag = next((p for p in spec.params if p.concept == "tau_max"), None)
     if lag is not None:
-        given = next((kwargs[k] for k in (lag.name, *lag.aliases) if k in kwargs), lag.default)
+        given = kwargs.get(lag.name, lag.default)
         if isinstance(given, (int, np.integer)) and not isinstance(given, bool):
             length = max(length, 10 * int(given))
     return min(length, n)
@@ -1255,12 +1262,6 @@ def _job(
         if len(value) != sizes[0]:
             raise ValueError(f"{entry.name} has {len(value)} rows but data has {sizes[0]}")
         aligned[entry.name] = value
-    for param in spec.params:
-        if param.concept == "seed" and set(param.aliases) & set(kwargs):
-            raise ValueError(
-                f"bootstrap derives each fit's seed from its own seed; {spec.name}'s "
-                f"{sorted(set(param.aliases) & set(kwargs))[0]} cannot be set"
-            )
     return _Job(
         name=spec.name,
         data=data,
