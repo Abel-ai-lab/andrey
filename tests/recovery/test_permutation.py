@@ -37,7 +37,7 @@ def test_grasp_at_depth_2_recovers_the_depth_3_graph():
     # Both depths score with the standard BIC, where the two reach one graph on this case.
     x = datagen.generate("gauss_5v")
     depth_3 = andrey.grasp(x, penalty_discount=_BASELINE_LAMBDA, ebic_gamma=0.0)
-    depth_2 = andrey.grasp(x, penalty_discount=_BASELINE_LAMBDA, ebic_gamma=0.0, depth=2)
+    depth_2 = andrey.grasp(x, penalty_discount=_BASELINE_LAMBDA, ebic_gamma=0.0, grasp_depth=2)
     assert depth_2.structure.oriented_edges() == depth_3.structure.oriented_edges()
     assert depth_2.metadata["score"] == pytest.approx(depth_3.metadata["score"], abs=1e-9)
 

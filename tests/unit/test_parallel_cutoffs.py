@@ -36,7 +36,7 @@ def unset_cutoffs(monkeypatch):
 
 
 def _fit(method: str, workers: int, d: int = 6):
-    with andrey.config(num_workers=workers):
+    with andrey.config(n_jobs=workers):
         return getattr(andrey, method)(cal.sample(d)).structure.to_numpy()
 
 
@@ -211,7 +211,7 @@ def test_fits_never_run_the_calibrator(monkeypatch):
         monkeypatch.setattr(cal, name, refuse)
     for method in METHODS:
         _fit(method, workers=2)
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         andrey.pc(cal.sample(12))
 
 
@@ -226,16 +226,16 @@ def test_calibrate_command_prints_the_settings(capsys, monkeypatch):
     assert main(["calibrate", "--workers", "4", "--method", "ges", "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert seen == {"workers": 4, "methods": ["ges"]}
-    assert report["settings"] == {"ANDREY_NUM_WORKERS": "4", "ANDREY_GES_PARALLEL_MIN_WORK": "1100"}
+    assert report["settings"] == {"ANDREY_N_JOBS": "4", "ANDREY_GES_PARALLEL_MIN_WORK": "1100"}
     assert report["methods"]["ges"]["pool_faster_at"] == {"d": 35, "work": 1190}
     assert report["schema_version"] == "2"
 
 
 def test_calibrate_command_rejects_a_malformed_environment(capsys, monkeypatch):
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "many")
+    monkeypatch.setenv("ANDREY_N_JOBS", "many")
     assert main(["calibrate", "--workers", "4"]) == 2
     error = json.loads(capsys.readouterr().err)["error"]
-    assert error["code"] == "invalid_configuration" and "ANDREY_NUM_WORKERS" in error["message"]
+    assert error["code"] == "invalid_configuration" and "ANDREY_N_JOBS" in error["message"]
 
 
 @pytest.mark.parametrize("args", [["--workers", "1"], ["--method", "pc"], ["--method", "hc"]])
@@ -296,7 +296,7 @@ def test_the_skeleton_override_sets_the_pass_size_that_uses_the_pool(
 
 def test_a_bad_skeleton_override_fails_the_fit_before_any_pass(monkeypatch):
     monkeypatch.setenv(SKELETON_VARIABLE, "many")
-    with andrey.config(num_workers=2), pytest.raises(ValueError, match=SKELETON_VARIABLE):
+    with andrey.config(n_jobs=2), pytest.raises(ValueError, match=SKELETON_VARIABLE):
         andrey.pc(cal.sample(6))
 
 
@@ -343,12 +343,12 @@ def test_a_pc_fit_warns_on_the_default_skeleton_cutoff_and_not_on_an_override(mo
     """Forty sparse variables reach a size-2 pass; a default of 1 test warns and pools it."""
     monkeypatch.setattr(sk, "MIN_POOL_QUERIES", 1)
     x = cal.sample(40)
-    with warnings.catch_warnings(record=True) as caught, andrey.config(num_workers=2):
+    with warnings.catch_warnings(record=True) as caught, andrey.config(n_jobs=2):
         warnings.simplefilter("always")
         warned = andrey.pc(x).structure.to_numpy()
     assert len(_cutoff_warnings(caught)) == 1
     monkeypatch.setenv(SKELETON_VARIABLE, "1")
-    with warnings.catch_warnings(record=True) as caught, andrey.config(num_workers=2):
+    with warnings.catch_warnings(record=True) as caught, andrey.config(n_jobs=2):
         warnings.simplefilter("always")
         explicit = andrey.pc(x).structure.to_numpy()
     assert not _cutoff_warnings(caught)
@@ -423,7 +423,7 @@ def test_calibrate_command_measures_every_cutoff_by_default(capsys, monkeypatch)
     report = json.loads(capsys.readouterr().out)
     assert seen["methods"] == list(cal.METHODS)
     assert set(report["settings"]) == {
-        "ANDREY_NUM_WORKERS",
+        "ANDREY_N_JOBS",
         *(m.variable for m in cal.METHODS.values()),
     }
     assert report["methods"]["skeleton"]["variable"] == SKELETON_VARIABLE
@@ -574,6 +574,6 @@ def test_rcot_fits_return_the_same_bits_with_one_and_two_workers(method, monkeyp
     x[:, 1] += np.sin(2 * x[:, 0])
     outs = []
     for workers in (1, 2):
-        with andrey.config(num_workers=workers):
+        with andrey.config(n_jobs=workers):
             outs.append(identity.digest(getattr(andrey, method)(x, indep_test="rcot")))
     assert outs[0] == outs[1]

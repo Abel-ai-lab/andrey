@@ -20,7 +20,6 @@ from andrey.core.knowledge import Knowledge, resolve_lagged
 from ._adapt import (
     DROP_UNITS,
     FILL_STEPS,
-    MAX_CATEGORIES,
     categorical_metadata,
     checked_data,
     column_labels,
@@ -363,11 +362,10 @@ def pcmci(
     data: npt.ArrayLike,
     *,
     tau_max: int = 1,
-    pc_alpha: float = 0.2,
+    pc1_alpha: float = 0.2,
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -387,9 +385,9 @@ def pcmci(
         column names become the structure's ``labels``.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``1`` to ``tau_max`` are tested.
-    pc_alpha : float, default=0.2
+    pc1_alpha : float, default=0.2
         Significance level of the PC1 step, in ``(0, 1)``: a candidate parent is dropped when a test
-        gives it a p-value above ``pc_alpha``. A larger value keeps more parents as conditions for
+        gives it a p-value above ``pc1_alpha``. A larger value keeps more parents as conditions for
         the MCI step.
     alpha : float, default=0.05
         Significance level of the MCI step, in ``(0, 1)``, the level that decides the returned
@@ -414,20 +412,15 @@ def pcmci(
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data test passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. Every lagged value of a column
-        has its type.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. Every lagged value of a column has its type.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the PC1
         step, at least ``0``: round ``p`` of PC1 conditions on the ``p`` strongest other
@@ -475,10 +468,10 @@ def pcmci(
         tau_max`` steps apart, before any test runs; one message names every group of copies, a
         lagged value as ``'x' at lag k``, and says to keep one column per group. With ``"chisq"`` or
         ``"gsq"``, also if ``data`` holds a value that is not a whole number; with ``"degen_gauss"``
-        or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and if
-        ``categorical`` is given with another test. Also if ``knowledge`` names a column ``data``
-        lacks, contradicts itself, or requires a link without a lag or outside lags ``1`` to
-        ``tau_max``.
+        or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and, with a
+        continuous test, if a column is declared categorical, by ``categorical`` or by its type.
+        Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or requires a link
+        without a lag or outside lags ``1`` to ``tau_max``.
 
     Notes
     -----
@@ -574,7 +567,6 @@ def pcmci(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="pcmci",
         missing=True,
     )
@@ -597,7 +589,7 @@ def pcmci(
         result = _native(
             X,
             tau_max=tau_max,
-            pc_alpha=pc_alpha,
+            pc_alpha=pc1_alpha,
             alpha_level=alpha,
             indep_test=indep_test,
             constraints=constraints,
@@ -618,7 +610,6 @@ def pcmciplus(
     collider_rule: str = "majority",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
@@ -644,14 +635,15 @@ def pcmciplus(
         Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
         p-value above ``alpha``. The default is the level of the method's published experiments
         [1]_.
-    collider_rule : {"majority", "conservative", "none"}, default="majority"
+    collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
         How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a
-        collider ``a -> b <- c``. ``"majority"`` and ``"conservative"`` test ``a`` and ``c`` again
-        given every subset of their same-step neighbors and look at the subsets that separate
-        them: ``"majority"`` calls the triple a collider when fewer than half hold ``b``, and
-        ``"conservative"`` when none does; a triple neither rule can decide is ambiguous and
-        orients nothing. ``"none"`` calls it a collider when ``b`` is not in the one separating
-        set the skeleton search found.
+        collider ``a -> b <- c``. ``"sepsets"`` calls it a collider when ``b`` is not in the one
+        separating set the skeleton search found. ``"majority"`` and ``"conservative"`` test ``a``
+        and ``c`` again given every subset of their same-step neighbors and look at the subsets
+        that separate them: ``"majority"`` calls the triple a collider when fewer than half hold
+        ``b``, and ``"conservative"`` when none does; a triple neither rule can decide is ambiguous
+        and orients nothing. The default, ``"majority"``, is tigramite's, and its orientations do
+        not depend on the order of the variables.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -672,20 +664,15 @@ def pcmciplus(
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data test passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. Every lagged value of a column
-        has its type.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. Every lagged value of a column has its type.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the lagged
         skeleton (phase 1, PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no
@@ -709,7 +696,7 @@ def pcmciplus(
         ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
         ``0`` to ``tau_max``. The lagged and skeleton phases test neither: a required link stays
         and a forbidden one is never linked. The collider phase tests a pair kept apart for the
-        subsets that separate it, as it does any unlinked pair; with ``collider_rule="none"``,
+        subsets that separate it, as it does any unlinked pair; with ``collider_rule="sepsets"``,
         which reads the skeleton phase's separating set, a triple over such a pair is ambiguous.
         At the same step, a pair forbidden in both directions is not linked, and a link the
         knowledge allows in one direction only is directed that way before the colliders, which
@@ -756,10 +743,11 @@ def pcmciplus(
         or up to ``2 * tau_max`` steps apart, before any test runs; one message names every group of
         copies, a lagged value as ``'x' at lag k``, and says to keep one column per group. With
         ``"chisq"`` or ``"gsq"``, also if ``data`` holds a value that is not a whole number; with
-        ``"degen_gauss"`` or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and
-        if ``categorical`` is given with another test. Also if ``knowledge`` names a column ``data``
-        lacks, contradicts itself, requires a link without a lag or beyond ``tau_max``, or directs
-        same-step links into a directed cycle over the links the skeleton phase kept.
+        ``"degen_gauss"`` or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks;
+        and, with a continuous test, if a column is declared categorical, by ``categorical`` or by
+        its type. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, requires
+        a link without a lag or beyond ``tau_max``, or directs same-step links into a directed cycle
+        over the links the skeleton phase kept.
 
     Notes
     -----
@@ -775,7 +763,7 @@ def pcmciplus(
     R1 to R3 to the same-step links until none applies. Each collider or rule pass collects its
     orientations before applying them, and marks a link that gets both orientations as a
     conflict. With the ``"majority"`` or ``"conservative"`` rule the orientations do not depend on
-    the order of the variables either; ``"none"`` reads the one separating set the skeleton phase
+    the order of the variables either; ``"sepsets"`` reads the one separating set the skeleton phase
     stored, which can change with the order.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
@@ -857,7 +845,6 @@ def pcmciplus(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="pcmciplus",
         missing=True,
     )
@@ -900,7 +887,6 @@ def lpcmci(
     n_preliminary_iterations: int = 1,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_p_global: int | None = None,
     knowledge: Knowledge | None = None,
@@ -949,20 +935,15 @@ def lpcmci(
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data test passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. Every lagged value of a column
-        has its type.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. Every lagged value of a column has its type.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_p_global : int or None, default=None
         The most conditions a test takes beyond the default conditions, at least ``0``: every test
         of the removal phases conditions on the parents of both ends, the default conditions, and
@@ -1026,9 +1007,10 @@ def lpcmci(
         or up to ``2 * tau_max`` steps apart, before any test runs; one message names every group of
         copies, a lagged value as ``'x' at lag k``, and says to keep one column per group. With
         ``"chisq"`` or ``"gsq"``, also if ``data`` holds a value that is not a whole number; with
-        ``"degen_gauss"`` or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks; and
-        if ``categorical`` is given with another test. Also if ``knowledge`` names a column ``data``
-        lacks, contradicts itself, or requires a link without a lag or beyond ``tau_max``.
+        ``"degen_gauss"`` or ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks;
+        and, with a continuous test, if a column is declared categorical, by ``categorical`` or by
+        its type. Also if ``knowledge`` names a column ``data`` lacks, contradicts itself, or
+        requires a link without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -1140,7 +1122,6 @@ def lpcmci(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="lpcmci",
         missing=True,
     )
@@ -1237,7 +1218,7 @@ def granger(
     any variable; the coefficients are converted back to the data's units. Cross-validation chooses
     the penalty that predicts best, which often keeps small coefficients on lags with no effect:
     judge the edges by the size of their weights. The folds are consecutive blocks of time steps,
-    and the fit is deterministic. With ``andrey.config(num_workers=k)``, the regressions run on
+    and the fit is deterministic. With ``andrey.config(n_jobs=k)``, the regressions run on
     ``k`` threads and return the same coefficients.
 
     The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a

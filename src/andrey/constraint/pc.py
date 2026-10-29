@@ -77,7 +77,7 @@ def pc(
     Meek's rules one at a time in column order instead of in order-free rounds
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
     larger conditioning-size passes (:func:`_discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns the
     CPDAG, or the MPDAG with ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
 

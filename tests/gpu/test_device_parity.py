@@ -137,7 +137,7 @@ def test_pnl_matches_the_cpu(device):
     backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         got = pnl_pairs(table)
-        threaded = pnl_pairs(table, num_workers=3)
+        threaded = pnl_pairs(table, n_jobs=3)
     assert backend.dispatch_stats() == {("pnl", "cuda"): 2}
     assert (cpu[:, :2] == 0).all(axis=1).any()  # the statistics decide a pair
     # The largest difference over 4,490 pairs of up to 5,000 rows was 5e-15 on an A100.

@@ -258,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
                 for adapter in LANE:
                     if all((d, seed, adapter.name, r) in done for r in range(args.repeats)):
                         continue
-                    threads, num_workers = split_cores(args.cores, adapter.mode)
+                    threads, n_jobs = split_cores(args.cores, adapter.mode)
                     measures = run_task(
                         adapter,
                         data,
@@ -268,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
                         repeats=args.repeats,
                         warmup=args.warmup,
                         threads=threads,
-                        num_workers=num_workers,
+                        n_jobs=n_jobs,
                     )
                     for repeat, m in enumerate(measures):
                         if (d, seed, adapter.name, repeat) in done:  # kept from an earlier run

@@ -36,6 +36,7 @@ from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES, node_labels
+from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS
 from andrey.spec.generate import (
@@ -333,7 +334,7 @@ def bootstrap_envelope(
     first = outs[0]
     env: dict = {"schema_version": SCHEMA_VERSION, "method": spec.name, "status": spec.status}
     env["bootstrap"] = {
-        "n_boot": first.n_boot,
+        "n_resamples": first.n_resamples,
         "threshold": first.threshold,
         "seed": first.metadata["seed"],
         "resampling": first.metadata["resampling"],
@@ -740,12 +741,15 @@ def _current_names(layer: dict, former: dict[str, str], errors: list[dict]) -> d
 
 def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tuple[dict, dict]:
     """Layer spec defaults < --config < key=value overrides; coerce / validate against the spec. All
-    problems collect into one `invalid_params` envelope (a `details` list)."""
+    problems collect into one `invalid_params` envelope (a `details` list).
+
+    Returns the arguments the call passes, those --config and the overrides set, as a call from
+    Python passes only the ones it names, and the manifest of every parameter's value."""
     specs = {p.name: p for p in spec.params}
     former = {alias: p.name for p in spec.params for alias in p.aliases}
     input_names = {name for i in spec.data.inputs for name in (i.name, *i.aliases)}
     raw_overrides, errors = _parse_overrides(tokens)
-    fkwargs: dict = {p.name: p.default for p in spec.params}  # manifest = defaults + config + CLI
+    fkwargs: dict = {}  # the arguments set by --config and the overrides
     config = _current_names(config, former, errors)
     raw_overrides = _current_names(raw_overrides, former, errors)
 
@@ -789,7 +793,7 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
         )
     resolved = {
         k: (list(v) if isinstance(v, tuple) else v)
-        for k, v in fkwargs.items()
+        for k, v in {**{p.name: p.default for p in spec.params}, **fkwargs}.items()
         if k not in spec.dropped_args
     }
     return fkwargs, resolved
@@ -1032,7 +1036,8 @@ def execute_bootstrap(
     resolved: dict,
     *,
     labels: tuple[str, ...] | None = None,
-    n_boot: int,
+    n_resamples: int,
+    n_boot: int | None = None,
     seed: int | None,
     threshold: float,
     resampling: str,
@@ -1045,6 +1050,7 @@ def execute_bootstrap(
     """Refit the method on resamples of the rows, then emit the edge frequencies (shell-aware).
 
     The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
+    ``n_boot`` is the former ``--n-boot`` flag, which replaces ``n_resamples`` and warns.
     """
     import time
 
@@ -1053,10 +1059,11 @@ def execute_bootstrap(
             "bad_value", "the bootstrap seeds each fit itself; set --seed, not seed=", EXIT_USAGE
         )
     panel = spec.data.inputs[0].kind == "panel"
+    n_resamples = n_resamples if n_boot is None else n_boot
     bad = [
         message
         for ok, message in (
-            (n_boot >= 1, f"--n-boot must be at least 1, got {n_boot}"),
+            (n_resamples >= 1, f"--n-resamples must be at least 1, got {n_resamples}"),
             (0 < threshold <= 1, f"--threshold must lie in (0, 1], got {threshold}"),
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),
@@ -1092,10 +1099,16 @@ def execute_bootstrap(
     with _fit_errors():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            if n_boot is not None:
+                warn_once(
+                    "andrey bootstrap: --n-boot is now --n-resamples; the former flag stops "
+                    "working in the next release",
+                    DeprecatedArgumentWarning,
+                )
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
-                n_boot=n_boot,
+                n_resamples=n_resamples,
                 seed=seed,
                 threshold=threshold,
                 resampling=resampling,
@@ -1169,12 +1182,12 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
     if command == "bootstrap":
         lines += [
             "",
-            "Bootstrap flags: --n-boot <n> (default 100), --seed <int>, --threshold <share> "
+            "Bootstrap flags: --n-resamples <n> (default 100), --seed <int>, --threshold <share> "
             "(default 0.5),",
             "  --resampling subsample|bootstrap (default subsample), --sample-fraction <share> "
             "(default 0.5, a subsample's rows),",
             "  --block-length <rows> (--resampling bootstrap of a time-series method on one "
-            "series). Workers follow ANDREY_NUM_WORKERS.",
+            "series). Workers follow ANDREY_N_JOBS.",
         ]
     lines += [
         "",
@@ -1291,7 +1304,7 @@ def config_report() -> dict:
         "andrey_version": andrey.__version__,
         "configuration": {
             "backend": state["backend"],
-            "num_workers": state["num_workers"],
+            "n_jobs": state["n_jobs"],
             "tie_break": andrey.config.tie_break,
         },
         "available_backends": state["available_backends"],
@@ -1311,7 +1324,7 @@ def render_config(report: dict) -> str:
     system = report["system"]
     lines = [
         f"Backend preference: {settings['backend']}",
-        f"Worker setting: {settings['num_workers']}",
+        f"Worker setting: {settings['n_jobs']}",
         f"Tie break: {settings['tie_break']}",
         f"Available backends: {available}",
         *[f"  {name}: {why}" for name, why in system["unavailable_backends"].items()],
@@ -1506,7 +1519,7 @@ def cmd_calibrate(
     workers: Optional[int] = typer.Option(
         None,
         "--workers",
-        help="Pool size to measure; default: ANDREY_NUM_WORKERS if above 1, else all usable CPUs.",
+        help="Pool size to measure; default: ANDREY_N_JOBS if above 1, else all usable CPUs.",
     ),
     method: Optional[list[str]] = typer.Option(
         None,
@@ -1573,7 +1586,7 @@ def calibration_report(results: dict, workers: int) -> dict:
         }
         for m, c in results.items()
     }
-    settings = {"ANDREY_NUM_WORKERS": str(workers)}
+    settings = {"ANDREY_N_JOBS": str(workers)}
     settings.update({v["variable"]: str(v["cutoff"]) for v in methods.values()})
     return {
         "schema_version": SCHEMA_VERSION,
@@ -1778,7 +1791,12 @@ def cmd_bootstrap(
     interventions: _InterventionsOption = None,
     data_groups: _DataGroupsOption = None,
     data_list: _DataListOption = None,
-    n_boot: int = typer.Option(100, "--n-boot", metavar="N", help="Number of resamples and fits."),
+    n_resamples: Optional[int] = typer.Option(
+        None, "--n-resamples", metavar="N", help="Number of resamples and fits. Default 100."
+    ),
+    n_boot: Optional[int] = typer.Option(
+        None, "--n-boot", metavar="N", hidden=True, help="Former name of --n-resamples."
+    ),
     seed: Optional[int] = typer.Option(
         None,
         "--seed",
@@ -1833,6 +1851,12 @@ def cmd_bootstrap(
         "data_list": data_list,
     }
     _merge_former_inputs(spec, provided)
+    if n_boot is not None and n_resamples is not None:
+        raise CliError(
+            "bad_value",
+            "--n-boot is the former name of --n-resamples; pass only --n-resamples",
+            EXIT_USAGE,
+        )
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
@@ -1843,6 +1867,7 @@ def cmd_bootstrap(
         fkwargs,
         resolved,
         labels=labels,
+        n_resamples=100 if n_resamples is None else n_resamples,
         n_boot=n_boot,
         seed=seed,
         threshold=threshold,

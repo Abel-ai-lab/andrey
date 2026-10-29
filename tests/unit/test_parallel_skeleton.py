@@ -4,7 +4,7 @@ The pool runs an ``|S| >= 2`` pass of a FisherZ or StudentT test when the pass h
 ``MIN_POOL_QUERIES`` tests. A pooled pass returns the serial scan's removals in the serial order,
 so the adjacency, the separating sets, their insertion order, and the p-values are the serial
 ones, and a singular query raises the serial exception. ``andrey.pc``, ``fci``, ``gfci``, and
-``cdnod`` read the worker count from ``andrey.config.num_workers`` or ``ANDREY_NUM_WORKERS``. Most
+``cdnod`` read the worker count from ``andrey.config.n_jobs`` or ``ANDREY_N_JOBS``. Most
 tests that need the pool set the gate to 0, so a small case still reaches it, and every one spies
 on the pool's creation, so a pooled comparison cannot silently run serial against serial.
 """
@@ -152,7 +152,7 @@ def test_facades_run_the_configured_workers_on_the_pool(pools: list[int], method
     x = _gaussian_dag(1, 600, 20, 0.25)
     fit = _FACADES[method]
     serial = fit(x)
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         pooled = fit(x)
     assert pools == [2]
     assert _same_output(pooled, serial)
@@ -164,7 +164,7 @@ def test_the_environment_sets_the_workers(
 ) -> None:
     x = _gaussian_dag(1, 600, 20, 0.25)
     serial = andrey.fci(x)
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
+    monkeypatch.setenv("ANDREY_N_JOBS", "3")
     pooled = andrey.fci(x)
     assert pools == [3]
     assert _same_output(pooled, serial)
@@ -177,7 +177,7 @@ def test_a_pass_above_the_gate_runs_on_the_pool(
     monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "10000")
     x = _gaussian_dag(4, 800, 40, 0.3)
     serial = andrey.pc(x, max_depth=2)
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         pooled = andrey.pc(x, max_depth=2)
     assert pools == [2]
     assert _same_output(pooled, serial)

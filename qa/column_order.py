@@ -47,7 +47,7 @@ def changes(method: str, x: np.ndarray, seed: int) -> int:
 
 
 if __name__ == "__main__":
-    with andrey.config(backend="numpy", num_workers=1), threadpool_limits(limits=1):
+    with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         grid = list(models())
         for method in ("fci", "gfci"):
             counts = [changes(method, x, seed) for x, seed in grid]

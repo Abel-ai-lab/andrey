@@ -52,7 +52,7 @@ def test_both_packages_return_the_same_coefficients_on_standardized_data(series)
 
 def test_the_parallel_variant_returns_the_serial_coefficients(series, monkeypatch) -> None:
     data, _ = series
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
+    monkeypatch.setenv("ANDREY_N_JOBS", "3")
     assert PARALLEL.mode == "parallel" and SERIAL.mode == "serial"
     assert np.array_equal(PARALLEL.fit(data, {"maxlag": 2}), SERIAL.fit(data, {"maxlag": 2}))
 

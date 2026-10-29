@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
-    MAX_CATEGORIES,
     categorical_metadata,
     checked_data,
     column_labels,
@@ -47,7 +46,6 @@ def _fit(
     tabu_length: int,
     max_tabu: int | None,
     categorical: Sequence[str | int] | None,
-    max_categories: int,
     seed: int | None,
     max_depth: int | None,
     max_parents: int | None,
@@ -67,9 +65,7 @@ def _fit(
             "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
             f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
-    X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories, method=name
-    )
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method=name)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
@@ -112,7 +108,6 @@ def mmhc(
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     max_parents: int | None = None,
@@ -159,15 +154,12 @@ def mmhc(
         Maximum hill-climbing moves, at least ``1``; ``None`` sets no limit.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test and score, as for
-        :func:`~andrey.pc`. The other settings take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        :func:`~andrey.pc`. A continuous setting raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test in the MMPC phase,
         at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller
@@ -215,8 +207,8 @@ def mmhc(
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data setting infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data setting finds no declared categorical column or
+        a setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -297,7 +289,6 @@ def mmhc(
         tabu_length=10,
         max_tabu=None,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         max_parents=max_parents,
@@ -320,7 +311,6 @@ def rsmax2(
     tabu_length: int = 10,
     max_tabu: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     max_parents: int | None = None,
@@ -375,15 +365,12 @@ def rsmax2(
         to ``tabu_length``; ``None`` uses ``tabu_length``. Hill climbing ignores it.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test and score, as for
-        :func:`~andrey.pc`. The other settings take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        :func:`~andrey.pc`. A continuous setting raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test in the restrict
         phase, at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A
@@ -435,8 +422,8 @@ def rsmax2(
         With ``restrict="pc"``, when a conditioning pass needs at least ten million tests, as for
         :func:`~andrey.pc`.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data setting infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data setting finds no declared categorical column or
+        a setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -526,7 +513,6 @@ def rsmax2(
         tabu_length=tabu_length,
         max_tabu=max_tabu,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         max_parents=max_parents,

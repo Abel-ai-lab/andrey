@@ -16,7 +16,7 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
    when no linked pair has ``p`` neighbors left to condition on.
 3. **Colliders.** Each unshielded triple ``X^i_{t-tau} - X^k_t - X^j_t`` with a lag-0 link
    ``X^k_t - X^j_t`` is a collider, ``X^i_{t-tau} -> X^k_t <- X^j_t``, by ``collider_rule``:
-   ``"none"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
+   ``"sepsets"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
    test ``X^i_{t-tau}`` and ``X^j_t`` again given every subset of the lag-0 neighbors of
    ``X^j_t`` (and, at lag 0, of ``X^i_t``), with the phase-2 conditions added, and count the
    separating subsets that hold ``X^k_t``. ``"majority"`` calls the triple a collider when under
@@ -61,7 +61,7 @@ from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
 
-COLLIDER_RULES: tuple[str, ...] = ("majority", "conservative", "none")
+COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # A triple ``(i, lag, k, j)``: ``X^i_{t-lag} - X^k_t - X^j_t``.
 Triple = tuple[int, int, int, int]
@@ -321,9 +321,9 @@ def colliders(
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
-    one. With ``collider_rule="none"``, a triple over a pair they keep apart has no separating set
-    to read and is ambiguous. ``max_p_global`` caps the subsets the majority and conservative votes
-    read.
+    one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating
+    set to read and is ambiguous. ``max_p_global`` caps the subsets the majority and conservative
+    votes read.
     """
     tau_max = adjacency.shape[0] - 1
     marks = np.where(adjacency[0], TAIL, NULL).astype(np.int8)
@@ -347,9 +347,9 @@ def colliders(
                 if adjacency[lag, i, k] and not adjacency[lag, i, j]
             ]
             for i, lag in far:
-                if collider_rule == "none" and apart[lag, i, j]:
+                if collider_rule == "sepsets" and apart[lag, i, j]:
                     verdict = "ambiguous"
-                elif collider_rule == "none":
+                elif collider_rule == "sepsets":
                     verdict = "non-collider" if k in sepsets.get((i, lag, j), ()) else "collider"
                 else:
                     key = (min(i, j), 0, max(i, j)) if lag == 0 else (i, lag, j)

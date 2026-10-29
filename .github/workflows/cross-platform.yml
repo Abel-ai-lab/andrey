@@ -84,7 +84,7 @@ jobs:
       - name: GES with two worker processes
         # The start method differs by OS (spawn on Windows); the script records the one used.
         env:
-          ANDREY_NUM_WORKERS: "2"
+          ANDREY_N_JOBS: "2"
           ANDREY_GES_PARALLEL_MIN_WORK: "0"
         run: |
           cat > workers.py <<'EOF'

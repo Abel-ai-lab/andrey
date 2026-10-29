@@ -55,7 +55,7 @@ def test_both_gfci_solutions_run_one_setting() -> None:
 def test_the_parallel_gfci_returns_the_serial_pag(monkeypatch) -> None:
     from andrey.search import _parallel_ges
 
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "2")
+    monkeypatch.setenv("ANDREY_N_JOBS", "2")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")  # every GES pass fans out
     pools = []
     get = _parallel_ges._LazyWorkerSet.get

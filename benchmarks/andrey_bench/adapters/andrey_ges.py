@@ -14,7 +14,7 @@ _DEFAULT_SCORE_FUNC = "local_score_BIC"
 #: Matches causal-learn's 0.5 penalty after conversion to deviance units.
 _DEFAULT_LAMBDA = 1.0
 _DEFAULT_MAX_PARENTS = 4
-# Worker count for the parallel variant when ANDREY_NUM_WORKERS is unset or unreadable. An explicit 1
+# Worker count for the parallel variant when ANDREY_N_JOBS is unset or unreadable. An explicit 1
 # is kept: the runner pins the core budget there, and the record reports it.
 _PARALLEL_FALLBACK_WORKERS = 2
 
@@ -32,7 +32,7 @@ def _andrey_version() -> str:
 
 def _parallel_workers() -> int:
     try:
-        n = int(os.environ.get("ANDREY_NUM_WORKERS", "").strip())
+        n = int(os.environ.get("ANDREY_N_JOBS", "").strip())
     except ValueError:
         return _PARALLEL_FALLBACK_WORKERS
     return n if n == -1 or n >= 1 else _PARALLEL_FALLBACK_WORKERS
@@ -104,7 +104,7 @@ class AndreyGES:
 
         workers = 1 if self.mode == "serial" else _parallel_workers()
         X = np.asarray(data, dtype=np.float64)
-        with andrey.config(backend=self.backend, num_workers=workers):
+        with andrey.config(backend=self.backend, n_jobs=workers):
             cpdag, _score = _ges(
                 X,
                 score_func=andrey_score(score_func),

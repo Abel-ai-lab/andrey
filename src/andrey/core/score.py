@@ -59,6 +59,8 @@ DISCRETE_SCORES: tuple[str, ...] = ("bdeu", "discrete_bic")
 MIXED_SCORES: tuple[str, ...] = ("cond_gauss", "degen_gauss")
 #: Every score name :func:`make_score` builds: what a search with all three kinds of score accepts.
 SCORES: tuple[str, ...] = (*LINEAR_SCORES, *DISCRETE_SCORES, *MIXED_SCORES)
+#: The scores whose penalty ``penalty_discount`` multiplies; BDeu has no such penalty.
+PENALIZED_SCORES: tuple[str, ...] = (*LINEAR_SCORES, "discrete_bic", *MIXED_SCORES)
 
 # A residual variance at most this fraction of the node's variance is zero up to rounding.
 ZERO_RESIDUAL = 1e-12

@@ -81,7 +81,7 @@ def fci(
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     ``workers`` worker processes share the adjacency search's larger conditioning-size passes
-    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.num_workers``. ``seed`` fixes
+    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes
     the draws of a stochastic ``indep_test`` (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`);
     ``None`` uses ``ANDREY_SEED``. Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle
     marks and all). The private ``_ambiguous`` sink receives the triples no orientation rule reads

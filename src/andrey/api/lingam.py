@@ -231,9 +231,9 @@ def ica_lingam(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     seed : int or None, default=None
-        Seed for FastICA's starting point, from ``0`` to ``2**32 - 1``. ``None`` uses the
-        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset. ``metadata["seed"]``
-        records the seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for FastICA's starting point, from ``0`` to
+        ``2**32 - 1``. ``metadata["seed"]`` records the seed used.
     max_iter : int, default=1000
         Most FastICA iterations, at least ``1``. Reaching it before FastICA converges warns with
         :class:`~andrey.SearchLimitWarning`.

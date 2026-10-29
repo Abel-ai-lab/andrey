@@ -70,7 +70,7 @@ def test_pair_rows_equal_single_calls():
     with andrey.config(backend="numpy"):
         rows = _pnl.pnl_pairs(X, pairs)
         assert [tuple(row) for row in rows] == [_pnl.pnl(X[:, i], X[:, j]) for i, j in pairs]
-        assert np.array_equal(_pnl.pnl_pairs(X, pairs, num_workers=3), rows)
+        assert np.array_equal(_pnl.pnl_pairs(X, pairs, n_jobs=3), rows)
 
 
 def test_worker_threads_are_capped_by_a_byte_budget(monkeypatch):
@@ -87,21 +87,21 @@ def test_worker_threads_are_capped_by_a_byte_budget(monkeypatch):
     )
     with andrey.config(backend="numpy"), warnings.catch_warnings():
         warnings.simplefilter("error")  # the default budget holds four threads at 120 rows
-        full = _pnl.pnl_pairs(X, num_workers=4)
+        full = _pnl.pnl_pairs(X, n_jobs=4)
         assert len(runs) == 4
         for budget, threads in ((2 * per_thread, 2), (per_thread // 2, 1)):
             runs.clear()
             warning_policy._warned.clear()
             monkeypatch.setattr(_pnl, "_THREAD_BYTES", budget)
             with pytest.warns(andrey.PerformanceWarning, match=f"runs {threads} of the 4 worker"):
-                capped = _pnl.pnl_pairs(X, num_workers=4)
+                capped = _pnl.pnl_pairs(X, n_jobs=4)
             assert len(runs) == threads
             if threads > 1:  # every task's result is the same on any number of limited threads
                 assert np.array_equal(capped, full)
         # `pnl` fits two directions, so 64 workers ask for two threads, which this budget holds.
         monkeypatch.setattr(_pnl, "_THREAD_BYTES", 2 * per_thread)
         runs.clear()
-        with andrey.config(num_workers=64):
+        with andrey.config(n_jobs=64):
             _pnl.pnl(X[:, 0], X[:, 1])
         assert len(runs) == 2
 
@@ -172,7 +172,7 @@ def test_torch_path_matches_numpy(n):
     with andrey.config(backend="cpu"):
         got = _pnl.pnl_pairs(X, pairs)
         with mock.patch.object(_pnl, "_DEVICE_BATCH_BYTES", 8 * n * n):  # one kernel per batch
-            one_per_batch = _pnl.pnl_pairs(X, pairs, num_workers=2)
+            one_per_batch = _pnl.pnl_pairs(X, pairs, n_jobs=2)
     assert backend.dispatch_stats() == {("pnl", "cpu"): 2}
     tied = expected[:, 2] == expected[:, 3]
     assert tied.sum() == 2 and not tied.all()

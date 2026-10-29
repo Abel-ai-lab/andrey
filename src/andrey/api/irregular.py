@@ -260,7 +260,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     running in the process; the fits stay on the CPU, and the p-values then match the CPU's to
     rounding.
 
-    On the CPU, ``num_workers`` above 1 (``andrey.config`` or ``ANDREY_NUM_WORKERS``) fits the two
+    On the CPU, ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) fits the two
     directions on two threads, each limited to one BLAS thread; with one worker the BLAS threads
     are not limited. On a machine with several cores the fits then round differently, so the
     p-values and statistics with one worker and with several can differ in their last digits, and

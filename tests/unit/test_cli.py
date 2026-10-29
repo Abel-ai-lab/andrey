@@ -901,9 +901,9 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     from andrey.core.backend import Backend
     from andrey.spec.generate import env_dict
 
-    state = Backend(backend="auto", num_workers=-1, torch=True, cuda=False, mps=True)
+    state = Backend(backend="auto", n_jobs=-1, torch=True, cuda=False, mps=True)
     monkeypatch.setattr("andrey.describe", lambda: state)
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "-1")
+    monkeypatch.setenv("ANDREY_N_JOBS", "-1")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "90000")
     monkeypatch.setenv("ANDREY_TIE_BREAK", "Position")
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
@@ -912,7 +912,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     report = json.loads(out)
     assert report["configuration"] == {
         "backend": "auto",
-        "num_workers": -1,
+        "n_jobs": -1,
         "tie_break": "position",
     }
     assert report["available_backends"] == {
@@ -922,7 +922,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
         "mps": True,
     }
     variables = {v["name"]: v for v in report["environment"]["variables"]}
-    assert variables["ANDREY_NUM_WORKERS"]["value"] == "-1"
+    assert variables["ANDREY_N_JOBS"]["value"] == "-1"
     assert variables["ANDREY_BACKEND"]["value"] is None
     assert variables["ANDREY_GES_PARALLEL_MIN_WORK"]["value"] == "90000"
     for actual, expected in zip(
@@ -953,7 +953,7 @@ def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: False)
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(backend="numpy", num_workers=1, torch=False, cuda=False, mps=False),
+        lambda: Backend(backend="numpy", n_jobs=1, torch=False, cuda=False, mps=False),
     )
     code, out, err = _run(["config"], capsys)
     assert code == 0 and not err
@@ -972,7 +972,7 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
 
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(backend="auto", num_workers=1, torch=True, cuda=False, mps=False),
+        lambda: Backend(backend="auto", n_jobs=1, torch=True, cuda=False, mps=False),
     )
     monkeypatch.setattr(
         cli,
@@ -984,7 +984,7 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
     )
     monkeypatch.setattr(cli, "_version", {"torch": "2.8.0", "matplotlib": "3.9.0"}.get)
     monkeypatch.setattr(cli.sys, "platform", "linux")
-    # The cores ANDREY_NUM_WORKERS=-1 would use: the same count, cgroup quota included.
+    # The cores ANDREY_N_JOBS=-1 would use: the same count, cgroup quota included.
     monkeypatch.setattr(cli, "usable_cpus", lambda: 2)
     code, out, err = _run(["config", "--json"], capsys)
     assert code == 0 and not err
@@ -1037,7 +1037,7 @@ def test_config_and_describe_report_one_availability_shape(torch, cuda, capsys, 
 # One bad value per parser: backend name, worker count, integer, seed, flag.
 BAD_SETTINGS = [
     ("ANDREY_BACKEND", "quantum"),
-    ("ANDREY_NUM_WORKERS", "-2"),
+    ("ANDREY_N_JOBS", "-2"),
     ("ANDREY_COV_GPU_THRESHOLD", "abc"),
     ("ANDREY_SEED", "4294967296"),
     ("ANDREY_GPU_CALIBRATE", "maybe"),
@@ -1157,15 +1157,22 @@ def test_target_names_a_header_column_or_a_position(capsys, tmp_path):
     assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
 
 
-def test_a_mixed_run_reports_inferred_columns_and_its_warning(capsys, tmp_path):
+def test_a_mixed_run_reads_the_named_columns_and_warns_of_undeclared_codes(capsys, tmp_path):
+    """A data file holds numbers only, so ``categorical`` names the categorical columns; without
+    it, a whole-number column stays continuous and the warning names it."""
     rng = np.random.default_rng(4)
     g = rng.integers(0, 3, 400)
     u = rng.standard_normal(400)
     v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(400)
     path = tmp_path / "mixed.csv"
     path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
-    code, out, _ = _run(["run", "pc", "--data", str(path), "indep_test=cond_gauss"], capsys)
+    base = ["run", "pc", "--data", str(path), "indep_test=cond_gauss"]
+    code, out, _ = _run([*base, "categorical=[g]"], capsys)
     env = json.loads(out)
     assert code == 0 and env["metadata"]["categorical"] == ["g"]
-    [warning] = [w for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
-    assert "'g' (3 values)" in warning["message"]
+    assert not [w for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
+    code, out, _ = _run(base, capsys)
+    env = json.loads(out)
+    assert code == 0 and env["metadata"]["categorical"] == []
+    messages = [w["message"] for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
+    assert any("columns 'g' hold at most 10" in m for m in messages)

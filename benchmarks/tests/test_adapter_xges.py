@@ -137,7 +137,7 @@ def test_two_penalties_are_two_solutions() -> None:
         "warmup": 1,
         "machine_id": "m",
         "threads": 16,
-        "num_workers": 1,
+        "n_jobs": 1,
     }
     ids = {run_id(dataset_id="d", name=a.name, repeat=0, env=env) for a in (matched, shipped)}
     assert len(ids) == 2

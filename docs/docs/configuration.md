@@ -16,9 +16,9 @@ or `off`. Any other value Andrey cannot read raises `ValueError` naming the vari
 The backend, the worker count, and the tie-break rule can also be set in code. The most specific
 setting wins:
 
-1. `with andrey.config(backend=..., num_workers=..., tie_break=...):`, for the calls inside the
+1. `with andrey.config(backend=..., n_jobs=..., tie_break=...):`, for the calls inside the
    block;
-2. `andrey.config.backend = ...`, `andrey.config.num_workers = ...`, or
+2. `andrey.config.backend = ...`, `andrey.config.n_jobs = ...`, or
    `andrey.config.tie_break = ...`, for every later call;
 3. the environment variables below, read at each call;
 4. the defaults.
@@ -43,7 +43,7 @@ requested backend uses `auto`, without a warning.
 
 ## Parallel search
 
-- `ANDREY_NUM_WORKERS`: the worker processes for GES and GFCI, and the worker threads for the
+- `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the
   per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
   also use the worker processes for their skeleton search with the `fisherz`, `student_t`, and
   `rcot` tests, and send a conditioning-set size to them only when it has enough tests to repay
@@ -53,7 +53,8 @@ requested backend uses `auto`, without a warning.
   threads unlimited and with several limits each thread to one, so on a machine with several cores
   its p-values and statistics can differ in the last digits between one worker and several. Each
   `pnl` thread holds three n x n float64 matrices; when the threads you ask for would hold more than
-  4 GiB, fewer run, with a `PerformanceWarning`.
+  4 GiB, fewer run, with a `PerformanceWarning`. `ANDREY_NUM_WORKERS`, its former name, is still
+  read when `ANDREY_N_JOBS` is unset, with a `DeprecatedArgumentWarning`, until the next release.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
@@ -107,14 +108,15 @@ already running in the process, so a CPU fit never pays to start a GPU.
 - `ANDREY_SEED`: the seed of every method that draws random numbers (BOSS, GRaSP, ICA-LiNGAM, CALM,
   hill climbing and tabu search with `n_starts` above 1, and the searches that test independence,
   with the `rcot`, `cmiknn`, and `gpdc` tests) when the call gives no `seed=`. The default is `0`;
-  it takes any integer from `0` to `2**32 - 1`. A call that gives `seed=` does not depend on it.
-  Deterministic methods ignore it.
+  it takes any integer from `0` to `2**32 - 1`. So `seed=None` is this configured seed, not a fresh
+  random one, and a call repeats. A call that gives `seed=` does not depend on it. Deterministic
+  methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from each column's own data, so reordering the columns relabels the
   result. `position` orders them by column position, which skips computing the ranks, fires the
   orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, and visits
   the possible-d-separation step of `fci` and `gfci` in column order; the result can then depend on
-  the column order.
+  the column order. A fit whose result the rule can change records it in `metadata["tie_break"]`.
 
 Results repeat on the same machine; across platforms they can differ, CALM's most of all.
 [Column order and machines](guides/column-order.md) lists what each method keeps under a new column

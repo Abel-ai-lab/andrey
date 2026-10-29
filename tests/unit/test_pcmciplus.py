@@ -228,7 +228,7 @@ def test_pcmciplus_on_data_orients_the_contemporaneous_chain(indep_test):
 def test_unknown_names_raise_naming_the_choices():
     with pytest.raises(NotImplementedError, match="unknown indep_test 'spearman'"):
         pcmciplus(_chain_series(100), indep_test="spearman")
-    with pytest.raises(ValueError, match=r"collider_rule must be one of \['majority', "):
+    with pytest.raises(ValueError, match=r"collider_rule must be one of \['sepsets', "):
         pcmciplus(_chain_series(100), collider_rule="vote")
 
 

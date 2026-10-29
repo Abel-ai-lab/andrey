@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
-    MAX_CATEGORIES,
     categorical_metadata,
     check_categories,
     checked_data,
@@ -47,7 +46,6 @@ def pc(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -105,20 +103,16 @@ def pc(
         up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -161,11 +155,12 @@ def pc(
         too few samples for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``,
         if ``data`` holds a value that is not a whole number; or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
-        up to scale and shift, before any test runs; one message names every group of copies and
-        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        column holds a number that is not whole or a missing value. Also if a continuous test meets
+        a column declared categorical, by ``categorical`` or by its type. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift, before any test
+        runs; one message names every group of copies and says to keep one column per group. Also if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -173,9 +168,9 @@ def pc(
         When a conditioning pass of size two or greater requires at least ten million CI tests;
         each message warns once per process. The warning does not limit the search.
     DataTypeWarning
-        When a mixed-data test infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     See Also
     --------
@@ -374,7 +369,6 @@ def pc(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="pc",
         missing=True,
     )
@@ -426,7 +420,6 @@ def fci(
     indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -478,15 +471,11 @@ def fci(
         ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -496,10 +485,10 @@ def fci(
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -548,9 +537,9 @@ def fci(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data test infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     See Also
     --------
@@ -716,7 +705,6 @@ def fci(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="fci",
         missing=True,
     )
@@ -756,7 +744,6 @@ def gfci(
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -820,14 +807,10 @@ def gfci(
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
-        columns; a mixed-data setting passed explicitly also infers every column of at most
-        ``max_categories`` distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks
-        none. The other settings accept only ``None`` or ``[]``. See *Data types* in the
+        columns, never a column by its values. ``[]`` marks none. A categorical setting reads every
+        column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
+        named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
@@ -837,10 +820,10 @@ def gfci(
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -895,9 +878,9 @@ def gfci(
     Warns
     -----
     DataTypeWarning
-        When the mixed-data score and test infers the categorical columns, or finds none and so runs
-        as the linear-Gaussian form, or when a continuous setting meets columns that look like
-        category codes; each message warns once per process.
+        When the mixed-data score or test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     Notes
     -----
@@ -1025,9 +1008,7 @@ def gfci(
             "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
-    X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories, method="gfci"
-    )
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method="gfci")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
     ambiguous: set[tuple[int, int, int]] = set()
@@ -1066,7 +1047,6 @@ def cdnod(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1121,26 +1101,22 @@ def cdnod(
         triple whose middle node is the index is not voted: the index is never a collider.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The domain index
-        is categorical too, so ``data`` may have no categorical column. The other tests take no
-        column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. The domain index is categorical too, so
+        ``data`` may have no categorical column. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1198,9 +1174,9 @@ def cdnod(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data test infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     Notes
     -----
@@ -1322,7 +1298,6 @@ def cdnod(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         index_categorical=True,
         method="cdnod",
         missing=True,
