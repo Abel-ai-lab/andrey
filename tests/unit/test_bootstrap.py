@@ -17,7 +17,7 @@ from andrey.resample import EDGES, _draw, _Job
 
 def with_workers(workers, *args, **kwargs):
     """``bootstrap`` run on ``workers`` worker processes, set the way every method sets them."""
-    with andrey.config(num_workers=workers):
+    with andrey.config(n_jobs=workers):
         return bootstrap(*args, **kwargs)
 
 
@@ -429,11 +429,11 @@ def test_each_warning_of_the_fits_is_raised_once():
 
 def test_the_workers_follow_the_configured_count_and_never_nest():
     data = lingam_data()
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         configured = bootstrap("pc", data, n_boot=4, seed=0, keep_fits=True)
     serial = with_workers(1, "pc", data, n_boot=4, seed=0, keep_fits=True)
     assert configured.fits == serial.fits
-    assert andrey.config.num_workers == 1 or "ANDREY_NUM_WORKERS" in os.environ
+    assert andrey.config.n_jobs == 1 or "ANDREY_N_JOBS" in os.environ
 
 
 def test_knowledge_travels_to_the_workers():

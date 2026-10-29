@@ -583,7 +583,7 @@ def _init_worker(job: _Job) -> None:
     from threadpoolctl import threadpool_limits
 
     _BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime
-    _backend.config.num_workers = 1
+    _backend.config.n_jobs = 1
     _backend.config.backend = job.backend
     _backend.config.tie_break = job.tie_break
     _JOB = job
@@ -598,7 +598,7 @@ def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
 def _fit_all(job: _Job, n_boot: int, workers: int) -> list[tuple[Any, list]]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes."""
     if workers <= 1:
-        with _backend.one_blas_thread(), _backend.config(num_workers=1):
+        with _backend.one_blas_thread(), _backend.config(n_jobs=1):
             return [_run_one(job, b) for b in range(n_boot)]
     pool = ProcessPoolExecutor(
         max_workers=workers, mp_context=pick_context(), initializer=_init_worker, initargs=(job,)
@@ -608,8 +608,7 @@ def _fit_all(job: _Job, n_boot: int, workers: int) -> list[tuple[Any, list]]:
         return [future.result() for future in futures]
     except BrokenProcessPool as exc:
         raise RuntimeError(
-            "a bootstrap worker died, most likely out of memory; rerun with "
-            "andrey.config(num_workers=1)"
+            "a bootstrap worker died, most likely out of memory; rerun with andrey.config(n_jobs=1)"
         ) from exc
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
@@ -698,8 +697,8 @@ def bootstrap(
     fit that raises stops the run, and its row numbers count the rows of the resample. The averaged
     graph can contain a directed cycle.
 
-    **Workers.** The fits run on the worker processes ``andrey.config.num_workers`` and
-    ``ANDREY_NUM_WORKERS`` set, as for every method: ``-1`` uses every usable core, and ``0`` or
+    **Workers.** The fits run on the worker processes ``andrey.config.n_jobs`` and
+    ``ANDREY_N_JOBS`` set, as for every method: ``-1`` uses every usable core, and ``0`` or
     ``1`` fits in this process. Each fit runs on one worker and one BLAS thread, and the result is
     the same at any worker count.
 
