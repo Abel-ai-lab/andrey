@@ -172,7 +172,7 @@ trust.
 :link: markov_check
 :link-type: doc
 :img-top: /_generated/thumbs/markov_check.svg
-:img-alt: The sparsest graph GES recovers that the Markov check does not reject on data from the ALARM network
+:img-alt: The sparsest GES graph on ALARM data that the Markov check does not reject
 
 Test the independences a graph implies against held-out rows: a true graph passes, a damaged one is
 rejected, and the sparsest passing graph is not always the most accurate.
