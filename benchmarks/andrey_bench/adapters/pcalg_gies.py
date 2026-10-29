@@ -2,7 +2,7 @@
 
 `pcalg::gies` maximizes an L0-penalized Gaussian likelihood through `GaussL0penIntScore`. Its default
 penalty `lambda = 0.5 * log(n)`, with `n` every row of the data, is BIC in log-likelihood units: the
-objective Andrey's `gies` minimizes at `lambda_value=1.0` in deviance units. The score's default
+objective Andrey's `gies` minimizes at `penalty_discount=1.0` in deviance units. The score's default
 `intercept = FALSE` fits each structural equation through the origin; the adapter sets
 `intercept = TRUE`, as Andrey centers each variable on the rows it is scored on.
 

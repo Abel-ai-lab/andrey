@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import andrey
 from andrey.core.structure import EDGE_GLYPHS
 
+from .concepts import CONCEPTS
 from .environment import ENV_VARS, PRECEDENCE
 from .registry import REGISTRY, get_spec, list_specs
 
@@ -55,7 +56,7 @@ _JSON_TYPES: dict[str, dict] = {
                         "type": "array",
                         "items": {"type": ["string", "integer"]},
                         "minItems": 2,
-                        "maxItems": 2,
+                        "maxItems": 2 if part == "allowed" else 3,
                     },
                 }
                 for part in ("required", "forbidden", "allowed")
@@ -73,8 +74,9 @@ _JSON_TYPES: dict[str, dict] = {
 KNOWLEDGE_NOTE = (
     "knowledge= takes a JSON object, inline or as a .json file path: required and forbidden list "
     "directed edges [cause, effect], allowed lists the only pairs that may be adjacent, and tiers "
-    "lists groups of columns in time order (no edge from a later tier into an earlier one). Name "
-    "columns by the data file's header or by 0-based position, for example, "
+    "lists groups of columns in time order (no edge from a later tier into an earlier one). For a "
+    "time-series method, [cause, effect, lag] is the link from cause at time t - lag to effect at "
+    "time t. Name columns by the data file's header or by 0-based position, for example, "
     'knowledge=\'{"forbidden": [["y", "x"]], "tiers": [["age"], ["x", "y"]]}\'.'
 )
 
@@ -86,8 +88,30 @@ def _param_schema(p: ParamSpec) -> dict:
     if p.nullable and isinstance(schema.get("type"), str):
         schema["type"] = [schema["type"], "null"]
     schema["default"] = list(p.default) if isinstance(p.default, tuple) else p.default
+    if p.minimum is not None:
+        schema["exclusiveMinimum" if p.exclusive_minimum else "minimum"] = p.minimum
+    if p.maximum is not None:
+        schema["exclusiveMaximum" if p.exclusive_maximum else "maximum"] = p.maximum
     schema["description"] = p.doc
+    schema["concept"] = p.concept
+    schema["aliases"] = list(p.aliases)
+    schema["choice_aliases"] = dict(p.choice_aliases)
     return schema
+
+
+def concepts_dict() -> dict:
+    """The package-wide parameter concepts: each one's meaning and the name each method uses."""
+    return {
+        key: {
+            "parameter": concept.param.name,
+            "description": concept.summary,
+            "methods": {
+                spec.name: p.name for spec in list_specs() for p in spec.params if p.concept == key
+            },
+        }
+        for key, concept in CONCEPTS.items()
+        if concept.param is not None
+    }
 
 
 def grammar_default(p: ParamSpec) -> str:
@@ -154,15 +178,18 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "determinism": spec.determinism,
         "accel": spec.accel,
         "seeded": spec.seeded,
+        "dropped_args": list(spec.dropped_args),
         "data": {
             "layout": spec.data.layout,
             "notes": spec.data.notes,
+            "missing": spec.data.missing,
             "inputs": [
                 {
                     "name": inp.name,
                     "flag": inp.flag,
                     "kind": inp.kind,
                     "required": inp.required,
+                    "aliases": list(inp.aliases),
                     "description": inp.doc,
                 }
                 for inp in spec.data.inputs
@@ -171,7 +198,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "params": {
             "type": "object",
             "properties": {p.name: _param_schema(p) for p in spec.params},
-            "additionalProperties": spec.passthrough,
+            "additionalProperties": False,
         },
         "output": {
             "structure_type": spec.output.structure_type,
@@ -180,6 +207,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
             "has_ordering": spec.output.has_ordering,
             "has_latents": spec.output.has_latents,
             "multi": spec.output.multi,
+            "metadata": list(spec.output.metadata),
             "description": spec.output.doc,
         },
         "knowledge": list(spec.knowledge),
@@ -247,6 +275,26 @@ def cli_meta() -> dict:
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",
         },
+        "bootstrap": {
+            "invocation": (
+                "andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] "
+                "[--threshold T] [--block-length ROWS] [key=value ...]"
+            ),
+            "what": (
+                "refits the method on bootstrap resamples of the rows (blocks of rows for a "
+                "time-series method on one series) and reports how often each edge appears; "
+                "takes the inputs, params, --config, -o, --json, and --full of `run`, and not "
+                "gin. The method's own seed= is the bootstrap's --seed. Workers follow "
+                "ANDREY_NUM_WORKERS and the result does not depend on their number."
+            ),
+            "envelope": (
+                "the result envelope of `run`, with `structure` the averaged graph, plus "
+                "bootstrap (n_boot, threshold, seed, block_length) and frequencies[] (source, "
+                "target, type, count, and frequency for each edge that appeared in a fit, most "
+                "frequent first, and lag for a time-series method); capped at 1000 "
+                "(frequencies_truncated)"
+            ),
+        },
         "error_envelope": {
             "error": {
                 "code": "machine-readable error code",
@@ -273,6 +321,7 @@ def help_schema(name: str | None = None) -> dict:
     }
     if name is None:
         ctx["methods"] = {n: to_json_schema(s) for n, s in REGISTRY.items()}
+        ctx["concepts"] = concepts_dict()
     else:
         ctx["method"] = to_json_schema(get_spec(name))
     return ctx
@@ -322,24 +371,24 @@ def _data_types_section() -> str:
         name for name, spec in REGISTRY.items() if any(p.name == "categorical" for p in spec.params)
     ]
     return (
-        "The default tests read every column as continuous. A score search left at "
-        "`score_func=null` picks `local_score_BDeu` when every column is categorical and "
-        "`local_score_cond_gauss` when some are (`tabu`, with no mixed-data score, keeps the BIC), "
-        "inferring the columns by the rule below and saying so in a `DataTypeWarning`; otherwise "
-        "it picks the linear-Gaussian BIC. For categorical columns "
+        "`indep_test=null` and `score_func=null` pick from the declared column types, a column "
+        "`categorical=[...]` names or a DataFrame's `category`, `bool`, or text column: `gsq` and "
+        "`bdeu` when every column is categorical, `cond_gauss` when some are, else `fisherz` and "
+        "the linear-Gaussian BIC `bic`; values never decide. For categorical columns "
         f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
         f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
         "and name the categorical columns with `categorical=[col,...]` (header names or 0-based "
-        "positions), or `categorical=[]` for none. Without `categorical`, the setting infers them: "
+        "positions), or `categorical=[]` for none. Without `categorical`, a mixed-data setting "
+        "passed explicitly infers them: "
         "a DataFrame's `category`, `bool`, and text columns, and every column of at most "
         f"`max_categories` (default {MAX_CATEGORIES}) distinct whole numbers. `andrey run` reads "
         "numbers only, so its data file codes each category as a whole number. The result's "
         "`metadata.categorical` lists the categorical columns read, and `run.warnings` holds a "
         "`DataTypeWarning` that names the inferred columns, or says that none was found and the "
-        "setting ran as its linear-Gaussian form. Under a continuous setting, a `DataTypeWarning` "
-        "names whole-number columns that may be category codes: check them before reading the "
-        "graph."
+        "setting ran as its linear-Gaussian form. Every method that reads columns as numbers "
+        "raises a `DataTypeWarning` naming whole-number columns that may be category codes: "
+        "declare them, or check them before reading the graph."
     )
 
 
@@ -407,9 +456,40 @@ def render_skill() -> str:
         "report them as such."
     )
     a("")
+    a("## How stable an edge is")
+    a("")
+    a(
+        "`andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] [--threshold T] "
+        "[key=value ...]` refits the method on resamples of the rows and answers how often each "
+        "edge appears. It takes the inputs and `key=value` params of `andrey run`, and not `gin`. "
+        "Its envelope is a run's, with `structure` the averaged graph: a pair is in it when it is "
+        "adjacent in at least `--threshold` of the fits (default 0.5), with the edge it has most "
+        "often. `bootstrap` gives `n_boot`, `threshold`, `seed`, and `block_length`, and "
+        "`frequencies` lists each edge that appeared in some fit, most frequent first, with its "
+        "`source`, `target`, `type`, `count`, and `frequency` (a time-series method adds `lag`). "
+        "Report an edge with its frequency: 0.95 is stable, 0.3 is not. A time-series method on "
+        "one series resamples blocks of `--block-length` rows. Set `--seed` when the result must "
+        "repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without changing it."
+    )
+    a("")
     a("## Data types")
     a("")
     a(_data_types_section())
+    a("")
+    a("## Missing values")
+    a("")
+    a(
+        "A `NaN` cell, or an empty, `NA`, or `N/A` field of the data file, is a missing value. "
+        "The methods whose schema sets `data.missing` accept it and delete rows per test: each "
+        "test reads the rows observed in all of its variables, and `metadata.rows_tested` gives "
+        "the fewest (`min`) and the median rows a test read. They are "
+        + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
+        + ". Every other method refuses a missing value with a data error that says what to do "
+        "instead. The deletion is sound when values are missing completely at random; when "
+        "whether a value is missing depends on the variables, `pc` can keep extra edges, and "
+        "`fci` stays sound "
+        "when no missingness mechanism causally affects another."
+    )
     a("")
     a("## Background knowledge")
     a("")

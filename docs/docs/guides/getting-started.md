@@ -268,6 +268,48 @@ On these data GES returns the same graph as PC. Agreement between methods is rea
 proof: GES's score assumes linear-Gaussian data too. The {doc}`../examples/index` compare more
 methods, and draw the learned graph beside the known one.
 
+### Resampling
+
+One run gives one graph, and a different sample of cells could give another. `andrey.bootstrap`
+refits PC on resamples of the cells, drawn with replacement, and counts how often each link
+appears. `seed` fixes the resamples, so a rerun gives the same counts:
+
+```{code-cell} ipython3
+boot = andrey.bootstrap("pc", sachs.data, n_boot=100, seed=0)
+pd.DataFrame(boot.table()[:8]).round(2)
+```
+
+`table()` lists every link that appeared in some resample, with the direction it had there, most
+frequent first. The four undirected links appear in 79 to 96 of the 100 resamples. Directions are
+less stable: each arrow of the collider at pkc appears in 56 resamples, and `plc -> pip3` in 41.
+
+`boot.structure` is the averaged graph. A pair is in it when it is adjacent in at least half of the
+resamples (`threshold=0.5`), with the edge it has most often. It holds the same eight links as
+`out`. A stricter threshold keeps the links the resamples agree on, without refitting:
+
+```{code-cell} ipython3
+print(boot.average(0.9))
+```
+
+```{code-cell} ipython3
+:tags: [remove-cell]
+
+# The prose below holds only while these do.
+table = pd.DataFrame(boot.table())
+assert table.iloc[:4]["type"].eq("undirected").all()
+assert table.iloc[:4]["count"].between(75, 100).all()
+arrows = table[table["target"].eq("pkc") & table["type"].eq("directed")]
+assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(50, 65).all()
+assert 70 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 90
+assert links(boot.structure) == links(out.structure)
+assert links(boot.average(0.9)) < links(out.structure)
+assert len(links(out.structure) - links(boot.average(0.9))) == 1
+```
+
+That drops the link between plc and pip3, which is in 81 of the 100 resamples. Treat the counts as a
+ranking of the links, not as probabilities. A resample repeats some cells, so PC's tests see more
+evidence than it holds and keep weak links more often than they do on the data.
+
 ## Your own data
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
@@ -280,7 +322,9 @@ returns.
 ## Background knowledge
 
 What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
-naming each column by its label, a string, or by its 0-based position, an integer:
+naming each column by its label, a string, or by its 0-based position, an integer. The
+[background knowledge notebook](../examples/knowledge) shows tiers orienting a graph that the data
+alone leave undirected.
 
 ```python
 from andrey import Knowledge, pc
@@ -312,42 +356,56 @@ in any column order. A label is the column name as text: name a column called `1
 the integer `1` is the second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
+PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
+lagged variables. A third entry
+gives an edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`,
+and lag `0` is the same step. A forbidden pair without a lag holds at every lag, and a required
+link names its lag. Tiers and `allowed` hold at every lag, and a variable's links to its own past
+stay allowed:
+
+```python
+from andrey import Knowledge, pcmciplus
+
+knowledge = Knowledge(
+    forbidden=[("y", "x", 1)],     # no link from y at t - 1 to x at t
+    required=[("x", "y", 0)],      # x drives y within a step
+    tiers=[["temperature"], ["x", "y"]],
+)
+result = pcmciplus(series, tau_max=2, knowledge=knowledge)
+```
+
 ## Data types
 
 Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `local_score_BIC` (the default when no column is categorical) |
-| Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
-| Mixed | `degen_gauss`, `cond_gauss` | `local_score_cond_gauss` (the default when some columns are categorical), `local_score_degen_gauss` |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`; for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
+| Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
+| Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, `boss`, `grasp`, and
-`exact_search` take every score, and `tabu` the continuous and categorical ones. `gfci` takes a
-score and a test that read the same kind of data, such as
-`andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
+`ges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every
+score. `gfci`, `mmhc`, and `rsmax2` take a score and a test
+that read the same kind of data, such as
+`andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
 numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
 
-**The default score.** `ges`, `hc`, `tabu`, `boss`, `grasp`, and `exact_search` pick their score
-from the columns: a DataFrame's `category`, `bool`, or text column, or a column of at most
-`max_categories` distinct whole numbers (10 by default), is categorical. When every column is
-categorical, they score with `local_score_BDeu`; when some are, with `local_score_cond_gauss`, the
-conditional Gaussian score. `tabu` has no mixed-data score and keeps the linear-Gaussian BIC on
-mixed data. Either switch says so with a one-time `DataTypeWarning`, which names the categorical
-columns of mixed data. A column of counts or ratings with that few values counts as categorical too;
-to read such columns as numbers, pass the linear-Gaussian BIC, `score_func="local_score_BIC"` or
-`"local_score_BIC_from_cov"`; every one of these searches takes both names. A `score_func` you pass
-is always the one used. To name the categorical columns yourself, pass `categorical=[...]`
-instead of the inference: naming every column picks `local_score_BDeu`, and naming some picks
-`local_score_cond_gauss`, each with the same warning. Data with no categorical column keep the
-linear-Gaussian BIC. The tests do not switch: `pc`, `fci`, `gfci`, and `cdnod` take
-`indep_test="chisq"` or `"gsq"` for categorical data and a mixed-data test for mixed data.
+**The default test and score.** `indep_test=None` and `score_func=None`, the defaults, pick from
+the column types you declare: a column is categorical when `categorical=[...]` names it, by label
+or 0-based position, or when it is a DataFrame's `category`, `bool`, or text column. When every
+column is categorical, the tests default to `gsq` and the scores to `bdeu`; when some are, both
+default to `cond_gauss`, the conditional Gaussian; otherwise to `fisherz` and `bic`. Values never
+decide: a column of counts or ratings stays numbers until you declare it. An `indep_test` or
+`score_func` you pass is always the one used. The result's `metadata["indep_test"]` and
+`metadata["score_func"]` name the test and the score the fit used, the one picked for `None`
+included.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or
-`andrey.ges(data, score_func="local_score_cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
+`andrey.ges(data, score_func="cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
 turns each categorical column into indicator columns and treats every column as Gaussian, so it
 suits effects that are linear and add up across categories. The conditional Gaussian
 (`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
@@ -357,12 +415,13 @@ continuous parent.
 
 **Marking the categorical columns.** Name them with `categorical`, by label (the column name as
 text) or 0-based position:
-`andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
-`categorical`, a mixed-data setting infers them: a DataFrame's `category`, `bool`, and text columns,
-and every column whose values, over all its rows, are at most `max_categories` distinct whole
-numbers (10 by default). pandas does not mark a column as categorical by itself, so this follows
-the rule Tetrad applies when it loads mixed data. A `DataTypeWarning` names the inferred columns and
-why; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
+`andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without `categorical`,
+a mixed-data setting you pass reads a DataFrame's `category`, `bool`, and text columns as
+categorical, since their type declares them, and infers every other column whose values, over all
+its rows, are at most `max_categories` distinct whole numbers (10 by default). pandas does not mark
+such a column as categorical by itself, so this follows the rule Tetrad applies when it loads mixed
+data. A `DataTypeWarning` names the columns inferred from their values, and none of the declared
+ones; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
 for none. The result's `metadata["categorical"]` lists the categorical columns it read.
 
 **No categorical column.** A mixed-data setting that finds no categorical column, or gets
@@ -370,16 +429,60 @@ for none. The result's `metadata["categorical"]` lists the categorical columns i
 form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
 the BIC.
 
-**Integer-coded columns.** The default test and the linear-Gaussian BIC read a column of codes
-such as 0, 1, 2 as numbers, which assumes the categories are ordered and evenly spaced. When columns
-of at most `max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names
-those columns; if they are categories, choose a mixed-data setting.
+**Integer-coded columns.** Every method that reads columns as numbers, the default test and the
+linear-Gaussian BIC included, reads a column of codes such as 0, 1, 2 as numbers, which assumes
+the categories are ordered and evenly spaced. When columns of at most `max_categories` distinct
+whole numbers (10 by default) reach such a method, a one-time `DataTypeWarning` names those
+columns; if they are categories, declare them with `categorical=[...]` or a pandas `category`, and
+the default test or score switches to a categorical or mixed-data one.
 
 From the command line, the same settings are `key=value` arguments, such as
 `andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
 `max_categories=5`. The data file holds numbers only, so code each category as a whole number. The
 JSON result lists the categorical columns under `metadata.categorical` and the warnings under
 `run.warnings`.
+
+## Missing values
+
+Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty or
+write `NA` or `N/A` in the data file. PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and
+LPCMCI accept missing values: each conditional-independence test reads only the rows where all of
+its variables are observed (test-wise deletion), so it keeps the rows that deleting every incomplete
+row first would drop. The pair tests ANM and PNL read the rows where both columns are observed,
+which for a pair is the same deletion. Here a tenth of the Sachs measurements go missing at random:
+
+```{code-cell} ipython3
+gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)
+out = andrey.pc(gappy)
+out.metadata["rows_tested"]
+```
+
+`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read; a fit on
+complete data has no such entry. With `fisherz` and `student_t`, each test computes its
+correlations directly from its rows, for many tests at once; the other tests are built anew on each
+test's rows, which costs more. A time series keeps every step: each row of the lagged design that
+reads a missing value holds it, and each test of PCMCI, PCMCI+, or LPCMCI reads the design rows
+where all of its lagged variables are observed.
+
+Deleting rows per test is sound when values are missing completely at random: the rows a test keeps
+are then a random sample of all rows. When whether a value is missing depends on the variables, as
+when high incomes go unreported, the rows a test keeps are a selected sample. PC's tests can then
+find dependence where the population has none and keep extra edges ([Tu et al., 2019][tu]); FCI
+allows for selection and stays sound when no missingness mechanism causally affects another
+([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
+
+A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
+with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
+`ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
+with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A column with no
+observed value, or with one value throughout, raises before the fit, and so does infinity, which is
+not a missing value. CD-NOD needs a complete domain index.
+
+Every other method raises a `ValueError` that names it: its score or loss reads every variable over
+the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
+`data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
+methods above. A time series cannot lose a step without joining the steps around it, so for
+VARMA-LiNGAM and Granger, fill in the missing steps first.
 
 ## Backends and parallelism
 
@@ -388,7 +491,8 @@ Andrey reads its numeric backend and its worker count from `andrey.config`, or f
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
 serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
-processes with the `fisherz` and `student_t` tests, and return the same graph as with one worker.
+processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
+with one worker.
 `granger` fits its variables on worker threads, with the same coefficients, and needs none of the
 guard below.
 
@@ -415,13 +519,14 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-GES was more accurate with a stronger penalty on the large sparse benchmark graphs. On
-linear-Gaussian data from Erdos-Renyi graphs with mean degree 2, PC's median errors stayed below the
-empty graph's through 400 variables with 2,000 rows, and its fits finished within 1 h on 4 cores
-through 1,600; with 10 rows per variable, FCI's stayed below the empty graph's through 200
-variables. Each method's API page states the data and sizes it was measured on, the largest sizes
-where its errors stayed below the empty graph's, and what ended each measurement. See
-[Known limits](../benchmarks/0.1.0.md#known-limits).
+On the large sparse benchmark graphs, GES with the standard BIC (`ebic_gamma=0.0`) kept many false
+edges. The default extended BIC, `ebic_gamma=1.0`, adds a penalty that grows with the number of
+variables, as the {py:func}`~andrey.ges` page describes. On linear-Gaussian data from Erdos-Renyi
+graphs with mean degree 2, PC's median errors stayed below the empty graph's through 400 variables
+with 2,000 rows, and its fits finished within 1 h on 4 cores through 1,600; with 10 rows per
+variable, FCI's stayed below the empty graph's through 200 variables. Each method's API page states
+the data and sizes it was measured on, the largest sizes where its errors stayed below the empty
+graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 
@@ -434,6 +539,10 @@ where its errors stayed below the empty graph's, and what ended each measurement
   rules with background knowledge.
 - [Perkovic, Kalisch, and Maathuis (2017), Interpreting and Using CPDAGs with Background
   Knowledge][mpdag]: the MPDAG.
+- [Strobl, Visweswaran, and Spirtes (2018), Fast Causal Inference with Non-Random Missingness by
+  Test-Wise Deletion][strobl]: FCI with test-wise deletion.
+- [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
+  deletion.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
@@ -441,3 +550,5 @@ where its errors stayed below the empty graph's, and what ended each measurement
 [lingam]: https://www.jmlr.org/papers/v7/shimizu06a.html
 [meek]: https://arxiv.org/abs/1302.4972
 [mpdag]: https://arxiv.org/abs/1707.02171
+[strobl]: https://doi.org/10.1007/s41060-017-0094-6
+[tu]: https://proceedings.mlr.press/v89/tu19a.html

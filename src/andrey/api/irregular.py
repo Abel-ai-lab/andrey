@@ -12,7 +12,16 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ._adapt import column_labels, data_matrix, int_in_range, open_unit_interval, with_labels
+from andrey.api._method import method_spec
+from andrey.core.ci_missing import rows_metadata
+from andrey.core.knowledge import Knowledge, resolve
+
+from ._adapt import (
+    column_labels,
+    column_namer,
+    data_matrix,
+    with_labels,
+)
 from ._irregular import (
     _adapt_anm,
     _adapt_bottom_up_parce,
@@ -26,6 +35,35 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+def _complete_pairs(
+    X: np.ndarray, labels: tuple[str, ...] | None, method: str
+) -> tuple[np.ndarray, dict[str, dict[str, float]]]:
+    """Return the rows of the pair ``X`` where both columns are observed, and ``rows_tested``.
+
+    Without a missing value, ``X`` returns as it is with no metadata. Both tests of the pair read
+    the kept rows, which for two columns are the rows test-wise deletion keeps. Raises
+    ``ValueError`` when fewer than 2 rows are kept, or a column is constant on them.
+    """
+    observed = ~np.isnan(X).any(axis=1)
+    if observed.all():
+        return X, {}
+    kept = X[observed]
+    rows = kept.shape[0]
+    if rows < 2:
+        raise ValueError(
+            f"{method} needs at least 2 rows where both columns are observed, got {rows}"
+        )
+    flat = np.flatnonzero(np.ptp(kept, axis=0) == 0).tolist()
+    if flat:
+        raise ValueError(
+            f"{method}: data column {column_namer(labels)(flat[0])} is constant on the {rows} rows "
+            "where both columns are observed, so no direction can be told; drop the rows that "
+            "hold the missing values"
+        )
+    return kept, rows_metadata({rows: 2})
+
+
+@method_spec("anm")
 def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the additive noise model (ANM).
 
@@ -48,15 +86,17 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"ANM"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-        divided by its mean under independence.
+        edge, or no edge. ``metadata["algorithm"]`` is ``"anm"``. ``metadata["p_values"]`` holds
+        the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``; ``metadata["statistics"]`` holds the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
 
     Raises
     ------
     ValueError
-        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        does not have 2 columns.
 
     Notes
     -----
@@ -89,6 +129,12 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
     deterministic.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
+    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
+    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``.
+
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
     mechanism and Gaussian noise, with rows doubling from 1,000, on 4 cores with a cap of 1 h and 28
     GB per fit. It named the true direction on 95% to 100% of the 20 pairs at every size through
@@ -96,8 +142,10 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     the next size ran out of the 28 GB. The median fit took 380 s at 8,000 rows. At 200 rows it
     named the true direction on three pairs in four. Each regression and HSIC test builds matrices
     with one row and one column per sample, so memory grows with the square of ``n_samples`` and the
-    regression's time with its cube. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    regression's time with its cube. Missing values are not benchmarked yet; the tests run them on
+    pairs with up to a fifth of the values missing completely at random. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -119,7 +167,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out = anm(np.column_stack([x, y]))
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
-    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    >>> out.metadata["p_values"]["forward"] > 0.05 >= out.metadata["p_values"]["backward"]
     True
     """
     from andrey.irregular.anm import anm as _native
@@ -128,10 +176,9 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         raise ValueError(
             f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
-    X = data_matrix(data)
-    if alpha is not None:
-        alpha = open_unit_interval(alpha, "alpha")
+    X = data_matrix(data, method="anm", missing=True)
     labels = column_labels(data)
+    X, rows = _complete_pairs(X, labels, "anm")
     X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
     Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
     pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
@@ -142,9 +189,11 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
+        extra=rows,
     )
 
 
+@method_spec("pnl")
 def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the post-nonlinear (PNL) model.
 
@@ -166,15 +215,17 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"PNL"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-        divided by its mean under independence.
+        edge, or no edge. ``metadata["algorithm"]`` is ``"pnl"``. ``metadata["p_values"]`` holds
+        the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``; ``metadata["statistics"]`` holds the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
 
     Raises
     ------
     ValueError
-        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        does not have 2 columns.
 
     Notes
     -----
@@ -217,6 +268,12 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
     ``PerformanceWarning``.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
+    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
+    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``.
+
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, with rows
     doubling from 1,000, on 4 cores with a cap of 1 h and 28 GB per fit. It named the true direction
@@ -225,8 +282,9 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     took 80 s at 32,000 rows. At 200 rows it named the true direction on three pairs in four. Each
     HSIC test builds kernel matrices with one row and one column per sample, so time and memory grow
     with the square of the row count: each worker thread holds three such float64 matrices, 600 MB
-    at 5,000 rows. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    at 5,000 rows. Missing values are not benchmarked yet; the tests run them on pairs with up to a
+    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -250,7 +308,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out = pnl(np.column_stack([x, y]))
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
-    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    >>> out.metadata["p_values"]["forward"] > 0.05 >= out.metadata["p_values"]["backward"]
     True
     """
     from andrey.irregular.pnl import pnl as _native
@@ -259,10 +317,9 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         raise ValueError(
             f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
-    X = data_matrix(data)
-    if alpha is not None:
-        alpha = open_unit_interval(alpha, "alpha")
+    X = data_matrix(data, method="pnl", missing=True)
     labels = column_labels(data)
+    X, rows = _complete_pairs(X, labels, "pnl")
     pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
     return _adapt_pnl(
         pval_forward,
@@ -271,16 +328,19 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
+        extra=rows,
     )
 
 
+@method_spec("rcd")
 def rcd(
     data: npt.ArrayLike,
     *,
-    max_explanatory_vars: int = 2,
+    max_depth: int = 2,
     cor_alpha: float = 0.01,
-    ind_alpha: float = 0.01,
+    alpha: float = 0.01,
     shapiro_alpha: float = 0.01,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a linear non-Gaussian graph with hidden common causes by repetitive causal discovery.
 
@@ -293,37 +353,58 @@ def rcd(
     data : array-like of shape (n_samples, n_variables)
         Observations, one variable per column. A DataFrame's column names become the structure's
         ``labels``.
-    max_explanatory_vars : int, default=2
-        Most variables regressed out together when testing whether one variable is an ancestor of
-        another, at least 1. Larger values find more ancestors and take longer.
+    max_depth : int, default=2
+        The maximum conditioning-set size of an ancestor test, at least ``1``: the most variables
+        regressed out together when testing whether one variable is an ancestor of another. Larger
+        values find more ancestors and take longer. The default ``2`` is the setting of Maeda and
+        Shimizu's experiments [1]_, who advise a small value when there are fewer rows than
+        variables.
     cor_alpha : float, default=0.01
         Significance level of the Pearson correlation tests, in ``(0, 1)``.
-    ind_alpha : float, default=0.01
-        Significance level of the HSIC independence tests, in ``(0, 1)``.
+    alpha : float, default=0.01
+        Significance level of the HSIC independence tests, in ``(0, 1)``, which decide the
+        ancestors and so the returned edges. The default is the level of the method's published
+        experiments [1]_, as are those of ``cor_alpha`` and ``shapiro_alpha``.
     shapiro_alpha : float, default=0.01
         Significance level of the Shapiro-Wilk tests that decide whether a residual is
         non-Gaussian, in ``(0, 1)``.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The ancestor search runs as
+        without knowledge. The parent sets it leads to then drop each forbidden parent, an edge
+        into an earlier tier and a pair outside ``allowed`` included, and gain each required one,
+        and the weights are fitted on those parents. A pair forbidden in both directions is never
+        marked ``<->``; a pair forbidden in one direction can be, since ``<->`` claims a hidden
+        common cause, not an edge.
 
     Returns
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
-        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"RCD"``;
+        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"rcd"``;
         ``metadata["confounded_pairs"]`` lists the ``<->`` pairs as sorted ``[i, j]`` lists;
         ``weighted_adjacency`` holds the edge coefficients.
 
     Raises
     ------
     TypeError
-        If ``max_explanatory_vars`` is not an int.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
-        significance level is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than 6 rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle
+        with the parents the search found.
 
     Notes
     -----
     RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
     tests compare residuals, and a weak hidden cause leaves only a small trace in them.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
     which one node in five is hidden (at least one), the hidden ones counted among the variables, on
@@ -337,7 +418,7 @@ def rcd(
     degree 2 with 10,000 rows, where the ladder ended when three fits of the next size ran out of
     the 28 GB, and at mean degree 4 with 10,000 rows, where the ladder ended when three fits of the
     next size ran past 1 h. The median fit took 45 s at 60 variables (mean degree 2, 2,000 rows).
-    The work grows with the number of variables and with ``max_explanatory_vars``. The numbers are a
+    The work grows with the number of variables and with ``max_depth``. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
@@ -361,19 +442,24 @@ def rcd(
     """
     from andrey.irregular.rcd import fit_rcd
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
-    max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
+    X = data_matrix(data, min_rows=6, method="rcd")  # HSIC's null variance has (n - 4)(n - 5)
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="rcd")
     model = fit_rcd(
         X,
-        max_explanatory_num=max_explanatory_vars,
-        cor_alpha=open_unit_interval(cor_alpha, "cor_alpha"),
-        ind_alpha=open_unit_interval(ind_alpha, "ind_alpha"),
-        shapiro_alpha=open_unit_interval(shapiro_alpha, "shapiro_alpha"),
+        max_explanatory_num=max_depth,
+        cor_alpha=cor_alpha,
+        ind_alpha=alpha,
+        shapiro_alpha=shapiro_alpha,
+        constraints=constraints,
     )
-    return with_labels(_adapt_rcd(model), column_labels(data))
+    return with_labels(_adapt_rcd(model), labels)
 
 
-def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> StructureOutput:
+@method_spec("bottom_up_parce_lingam")
+def bottom_up_parce_lingam(
+    data: npt.ArrayLike, *, alpha: float = 0.05, knowledge: Knowledge | None = None
+) -> StructureOutput:
     """Learn a linear non-Gaussian causal order that tolerates hidden common causes.
 
     BottomUpParceLiNGAM [1]_ finds sinks one at a time, from the last variable in the causal order
@@ -385,24 +471,39 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     data : array-like of shape (n_samples, n_variables)
         Observations, one variable per column. A DataFrame's column names become the structure's
         ``labels``.
-    alpha : float, default=0.1
+    alpha : float, default=0.05
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
-        across the remaining variables, in ``(0, 1)``.
+        across the remaining variables, in ``(0, 1)``. The default is the level of the method's
+        published experiments [1]_.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is taken as a sink only
+        when no remaining variable belongs to a later tier or is the effect of one of its required
+        edges, so the order keeps the tiers and the required edges, and each regression drops the
+        parents the knowledge forbids, an edge into an earlier tier and a pair outside ``allowed``
+        included, and keeps the required ones unpenalized. In the unordered block, a pair
+        forbidden in both directions is not adjacent, an ``o-o`` pair forbidden in one direction
+        gets an arrowhead at the cause, as in :func:`~andrey.fci`, and a required edge is directed
+        (see Notes).
 
     Returns
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
-        ``metadata["algorithm"]`` is ``"BottomUpParceLiNGAM"``; ``metadata["causal_order"]`` gives
-        the order, with the unordered variables nested in one list; ``weighted_adjacency`` holds
-        the edge coefficients.
+        ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["partial_order"]``
+        gives the order, with the unordered variables nested in one list; ``weighted_adjacency``
+        holds the edge coefficients.
 
     Raises
     ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
-        ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than 6 rows or no more rows than columns. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -414,6 +515,18 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     pair need not share a cause, and edges among the block's variables stay unoriented. The edge
     weights come from an adaptive-Lasso regression of each variable on those before it, which needs
     more rows than columns.
+
+    **Knowledge.** ``knowledge`` honors required and forbidden edges, ``allowed``, and tiers. The
+    order puts each required edge's cause first and keeps the tiers, and each regression drops the
+    forbidden parents and keeps the required ones unpenalized, so a required parent's weight is
+    estimated and can be ``0``. A required edge whose two ends both stay in the unordered block is
+    directed there, with the least-squares weight of the child on its required parents in the
+    block, while the block's other pairs stay ``o-o``. Every required edge is in the graph.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
     which one node in five is hidden (at least one), the hidden ones counted among the variables, on
@@ -444,15 +557,23 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     >>> x0, x1 = 1.5 * h + u(), 1.5 * h + u()
     >>> data = np.column_stack([x0, x1, x1 + u(), x0 + u()])
     >>> out = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    >>> out.metadata["causal_order"]
+    >>> out.metadata["partial_order"]
     [[0, 1], 2, 3]
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    # HSIC's null variance has (n - 4)(n - 5).
+    X = data_matrix(data, min_rows=6, method="bottom_up_parce_lingam")
     if X.shape[0] <= X.shape[1]:
         raise ValueError(
             f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"
         )
-    model = _native(X, alpha=open_unit_interval(alpha, "alpha"))
-    return with_labels(_adapt_bottom_up_parce(model), column_labels(data))
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="bottom_up_parce_lingam")
+    model = _native(X, alpha=alpha, constraints=constraints)
+    if constraints is None:
+        return with_labels(_adapt_bottom_up_parce(model), labels)
+    one_way = constraints.forbidden & ~constraints.forbidden.T
+    return with_labels(
+        _adapt_bottom_up_parce(model, one_way, required=constraints.required), labels
+    )

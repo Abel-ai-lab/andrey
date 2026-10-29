@@ -67,7 +67,7 @@ def _tiny_dataset() -> np.ndarray:
     """A fixed small linear-Gaussian ER sample from Andrey's own generators (bench-env only)."""
     import andrey.data as data
 
-    ds = data.benchmarks.scm("linear_gauss_er", D_NODES).sample(n=N_SAMPLES, seed=0)
+    ds = data.benchmarks.scm("linear_gauss_er", D_NODES).sample(n=N_SAMPLES, seed=0, scale="raw")
     return np.asarray(ds.data, dtype=np.float64)
 
 

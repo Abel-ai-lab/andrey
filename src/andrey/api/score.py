@@ -12,7 +12,7 @@ committed baseline.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
     MAX_CATEGORIES,
@@ -20,17 +20,15 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
-    data_kind,
     data_matrix,
     default_score,
-    flag,
     int_in_range,
     json_safe,
     structure_output,
 )
+from andrey.api._method import method_spec
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
-from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -40,11 +38,13 @@ if TYPE_CHECKING:
     from andrey.core import StructureOutput
 
 
+@method_spec("ges")
 def ges(
     data: npt.ArrayLike,
     *,
     score_func: str | None = None,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -62,21 +62,26 @@ def ges(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the
-        linear-Gaussian BIC, for continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ and
-        ``"local_score_BIC_categorical"`` the multinomial BIC [7]_, for categorical data coded by
-        whole numbers.
-        ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and ``"local_score_cond_gauss"``
+        Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data. ``"bdeu"``
+        is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [7]_, for categorical data
+        coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) [4]_ and ``"cond_gauss"``
         (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
-        columns. ``None`` reads the column types from ``categorical``, or infers them, and picks
-        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"`` when
-        some are, each with a ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
-        ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers. See Notes.
-    lambda_value : float, default=1.0
+        columns. ``None`` picks from the declared column types: ``"bdeu"`` when every column is
+        categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared
+        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
+        never by its values. See Notes.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
-        be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
-        per free parameter of a variable's conditional probability table.
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC. Must be finite and non-negative. BDeu ignores it; for the multinomial BIC
+        it weighs ``log(n)`` per free parameter of a variable's conditional probability table.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
         node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
@@ -85,16 +90,15 @@ def ges(
         no cap; the forward phase then keeps its gate of ``n_variables / 2``. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
-        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
-        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
-        only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes. With ``score_func=None``, the columns it infers pick the default
-        score.
+        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -106,42 +110,39 @@ def ges(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
-        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; for BDeu, ``-2`` times the log of the structure prior times the marginal
-        likelihood; for the multinomial BIC and the mixed-data scores, see Notes. Directed marks
+        ``"ges"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
+        the sum over variables of ``n * log(residual variance) + penalty_discount * log(n) *
+        n_parents + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``; for BDeu, ``-2`` times the
+        log of the structure prior times the marginal likelihood; for the multinomial BIC and the
+        mixed-data scores, see Notes. Directed marks
         (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves open.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
         read, by name or 0-based position.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_parents`` is not an int.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if a given ``max_parents`` is negative or
-        below the parents some graph of the required edges of ``knowledge`` gives a node, if
-        ``max_categories`` is less than ``2``, with a categorical score, if ``data`` holds a number
-        that is not whole, or, with a mixed-data score, if ``categorical`` names a column ``data``
-        lacks, or if a categorical column holds a number that is not whole or a missing value. Also
-        if ``categorical`` is given with another score. With the BIC score, also if a column
-        repeats another up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if a given
+        ``max_parents`` is below the parents some graph of the required edges of ``knowledge`` gives
+        a node; with a categorical score, if ``data`` holds a number that is not whole; or, with a
+        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
+        with another score. With the BIC score, also if a column repeats another up to scale and
+        shift given more than two rows or, with more rows than columns, is a linear function of
+        other columns. One message names every group of copies and says to keep one column per
+        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
-        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
-        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
-        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
-        continuous setting meets columns that look like category codes. Each message warns once per
-        process.
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes. Each message warns once per process.
 
     See Also
     --------
@@ -153,17 +154,30 @@ def ges(
     **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
     assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
     in that setting it is a fast, accurate default. When every column is categorical, the default is
-    ``"local_score_BDeu"``, and on mixed data ``"local_score_cond_gauss"``;
-    ``"local_score_BIC_categorical"`` and ``"local_score_degen_gauss"`` also score those data.
+    ``"bdeu"``, and on mixed data ``"cond_gauss"``;
+    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
 
-    **Choosing lambda_value.** A larger value raises the penalty per parent, giving a sparser graph:
-    fewer false edges and more missed ones. ``1.0`` is the standard BIC. With many variables and
-    about ``10 * n_variables`` samples, ``lambda_value=2.0`` gave more accurate graphs than ``1.0``
-    on the published benchmarks. FGES, a fast GES, multiplied the BIC penalty by 4 when searching
-    continuous data on graphs of up to a million variables [2]_.
+    **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``penalty_discount *
+    log(n_samples)`` per parent and adds ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``,
+    where ``C(n_variables - 1, n_parents)`` counts the parent sets of that size: this extended BIC
+    [8]_ charges more as the number of variables grows. A larger value of either gives a sparser
+    graph, with fewer false edges and more missed ones. The standard BIC, ``ebic_gamma=0.0``,
+    charges a fixed ``log(n_samples)`` per edge while the candidate edges grow with the square of
+    the number of variables, so with many variables it keeps many false edges. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured, and the most where the rows are few for the variables: 24 against
+    211 with 200 variables and 2,000 rows (200 true edges), and 46 against 2,162 with 400 variables
+    and 200 rows (400 true edges). It misses more weak edges: on four Gaussian networks with
+    published parameters, the share of true adjacencies it found fell from 0.84 to 0.77, while the
+    share of its adjacencies that were true rose from 0.72 to 0.94. With about
+    ``10 * n_variables`` rows or more, ``penalty_discount=2.0`` at ``ebic_gamma=0.0`` made about as
+    few errors as the default, and more with fewer rows. Pass ``ebic_gamma=0.0`` for the standard
+    BIC. FGES, a fast GES, multiplied the BIC penalty by 4 when searching continuous data on graphs
+    of up to a million variables [2]_.
 
     **How it works.** Without ``max_parents``, a variable that already has more than
     ``n_variables / 2`` parents gains no new parents in the forward phase; the backward phase has
@@ -178,36 +192,45 @@ def ges(
     rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
     what the rank keeps under a new column order and on another machine.
 
-    **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
+    **Categorical data.** ``"bdeu"`` takes each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
     ``category`` columns are read the same way. It scores a variable given its parents by the
     marginal likelihood of its counts in each parent configuration, under a Dirichlet prior with an
     equivalent sample size of 1 spread evenly over the cells [3]_. A structure prior with one
     expected parent per variable multiplies it, from three variables up. Equivalent graphs score the
     same, as GES requires. Moves are scored in this process, without the worker processes the BIC
-    search can use. ``"local_score_BIC_categorical"`` reads the columns the same way and scores a
+    search can use. ``"discrete_bic"`` reads the columns the same way and scores a
     variable by ``-2`` times the log-likelihood of its counts in each parent configuration, plus
-    ``lambda_value * log(n)`` for each of the ``q * (r - 1)`` free parameters, with ``r`` its
+    ``penalty_discount * log(n)`` for each of the ``q * (r - 1)`` free parameters, with ``r`` its
     categories and ``q`` its parents' joint categories [7]_. Both scores are on the scale of the
     BIC: ``-2`` times a log score.
 
-    **Mixed data.** ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` score data with
+    **Mixed data.** ``"degen_gauss"`` and ``"cond_gauss"`` score data with
     continuous and categorical columns; the categorical columns are read as :func:`~andrey.pc`
     describes. Each is a BIC: ``-2`` times the fitted log-likelihood of a variable given its
-    parents, plus ``lambda_value * log(n)`` per parameter; the degenerate Gaussian's leaves out a
-    constant per variable, which does not change which graph scores best. Equivalent graphs score
+    parents, plus ``penalty_discount * log(n)`` per parameter; the degenerate Gaussian's leaves out
+    a constant per variable, which does not change which graph scores best. Equivalent graphs score
     the same. The degenerate Gaussian score [4]_ replaces a categorical column of ``k`` categories
     by ``k - 1`` indicator columns and scores every column as Gaussian, by the residual covariance
     of a linear regression on the parents' columns; on continuous columns only, it equals
-    ``"local_score_BIC"``. The conditional Gaussian score [5]_ fits the continuous variables of a
-    variable and its parents in each joint category of their categorical ones, with a Gaussian of
+    ``"bic"`` at ``ebic_gamma=0.0``. The conditional Gaussian score [5]_ fits the
+    continuous variables of a variable and its parents in each joint category of their categorical
+    ones, with a Gaussian of
     that category's own mean and a covariance shrunk toward that of all rows by one pseudo-row [6]_,
     and divides by the same fit of the parents alone, so a categorical variable can have continuous
     parents. It counts parameters for every joint category, so a parent with many categories costs
-    many parameters; on continuous columns only, it differs from ``"local_score_BIC"`` by a
-    constant per variable, so it finds the same graph. Moves are scored in this process.
+    many parameters; on continuous columns only, it differs from ``"bic"`` at
+    ``ebic_gamma=0.0`` by a constant per variable, so it finds the same graph. Moves are scored in
+    this process.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
     ``max_parents=4``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
     which its median errors (SHD) stayed below the empty graph's, and through which its fits
     finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000 rows and mean
@@ -220,21 +243,21 @@ def ges(
     On this release, ``max_parents=4`` caps every DAG of the returned class at 4 parents, a stricter
     rule that is not benchmarked yet. With the same gate, mean degree 2, and ten rows per variable,
     at 200 variables its median errors were 206 against the empty graph's 200 at
-    ``lambda_value=1.0`` and 43 at ``lambda_value=2.0``. On the 223-variable ANDES network with
-    1,000 simulated rows and a forward-phase gate of ``n_variables / 2`` parents, its median errors
-    passed the empty graph's (612 against 338). With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. On simulated mixed data (conditional linear Gaussian networks
-    on sparse random graphs, the first half of the variables categorical with 2 to 5 categories),
-    from 10 to 40 variables with 2,000 rows, its median errors at 40 variables were 8 with
-    ``"local_score_degen_gauss"`` and 6.5 with ``"local_score_cond_gauss"``, against 40, and the
-    median fit took 0.75 s and 1.2 s on 4 cores. On simulated categorical networks with 2 or 3
-    categories per variable, of the same sizes and rows, ``"local_score_BDeu"`` gave 6 against 40 at
-    40 variables, in 0.60 s. The multinomial BIC is not benchmarked with GES yet: its tests check it
-    against the formula and run GES on small fixed categorical networks. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    ``penalty_discount=1.0`` and 43 at ``penalty_discount=2.0``. On the 223-variable ANDES network
+    with 1,000 simulated rows and a forward-phase gate of ``n_variables / 2`` parents, its median
+    errors passed the empty graph's (612 against 338). With fewer rows than columns the standard BIC
+    is unreliable; the extended BIC made far fewer errors there (see Choosing the penalty). A parent
+    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
+    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. On simulated mixed data (conditional linear Gaussian networks on sparse random graphs,
+    the first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables
+    with 2,000 rows, its median errors at 40 variables were 8 with ``"degen_gauss"`` and
+    6.5 with ``"cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4
+    cores. On simulated categorical networks with 2 or 3 categories per variable, of the same sizes
+    and rows, ``"bdeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial
+    BIC is not benchmarked with GES yet: its tests check it against the formula and run GES on small
+    fixed categorical networks. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -254,6 +277,8 @@ def ges(
        Statistical Association 84(405), 165-175.
     .. [7] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
        461-464.
+    .. [8] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -273,7 +298,7 @@ def ges(
     >>> b = rng.integers(0, 2, 2000)
     >>> c = np.where(rng.random(2000) < 0.8, a + b, rng.integers(0, 3, 2000))
     >>> data = pd.DataFrame({"a": a, "b": b, "c": c})
-    >>> ges(data, score_func="local_score_BDeu").structure.oriented_edges()
+    >>> ges(data, score_func="bdeu").structure.oriented_edges()
     [('a', 'c', 'directed'), ('b', 'c', 'directed')]
 
     On mixed data, with a category column and the conditional Gaussian score:
@@ -282,17 +307,14 @@ def ges(
     >>> u = rng.standard_normal(2000)
     >>> v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(2000)
     >>> data = pd.DataFrame({"g": pd.Categorical(g), "u": u, "v": v})
-    >>> ges(data, score_func="local_score_cond_gauss").structure.oriented_edges()
+    >>> ges(data, score_func="cond_gauss").structure.oriented_edges()
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.search.ges import ges as _ges
 
-    max_parents = None if max_parents is None else int_in_range(max_parents, "max_parents", 0)
-    score_func, categorical = default_score(
-        data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
-    )
+    score_func, categorical = default_score(data, score_func, categorical=categorical)
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="ges"
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ges")
@@ -300,7 +322,8 @@ def ges(
         cpdag, score = _ges(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
@@ -309,18 +332,20 @@ def ges(
         cpdag,
         labels=labels,
         metadata={
-            "algorithm": "GES",
             "score": json_safe(score),
             **categorical_metadata(mask, data),
         },
     )
 
 
+@method_spec("gies")
 def gies(
     data: npt.ArrayLike,
     interventions: npt.ArrayLike | None = None,
     *,
-    lambda_value: float = 1.0,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
@@ -340,9 +365,19 @@ def gies(
         ``True`` (or 1) where the row's value of the variable was set by an intervention, ``False``
         (or 0) where its causes set it. ``None`` means no interventions: observational data. Every
         variable needs at least two rows without an intervention.
-    lambda_value : float, default=1.0
+    score_func : {"bic"} or None, default=None
+        Local score: ``"bic"``, the linear-Gaussian BIC, the only score GIES supports. ``None``
+        picks it.
+        ``metadata["score_func"]`` names the score the fit used.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and
+        non-negative.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -355,24 +390,26 @@ def gies(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
         graph: directed marks (``->``) are edges every graph in the class orients alike,
-        undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"GIES"`` and
+        undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"gies"`` and
         ``metadata["score"]`` the BIC score of the result, the sum over variables of
-        ``n_v * log(residual variance) + lambda_value * log(n_samples) * n_parents``, where
-        ``n_v`` counts the rows without an intervention on the variable; lower is better.
+        ``n_v * log(residual variance) + penalty_discount * log(n_samples) * n_parents + 2 *
+        ebic_gamma * log C(n_variables - 1, n_parents)``, where ``n_v`` counts the rows without an
+        intervention on the variable; lower is better.
 
     Raises
     ------
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
-        no constant column; if ``interventions`` does not have ``data``'s shape, holds a value
-        other than 0 or 1, or leaves a variable fewer than two rows, or one value, without an
-        intervention; if ``lambda_value`` is negative or non-finite; or if a column repeats another
-        up to scale and shift given more than two rows or, with more rows than columns, is a linear
-        function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
+        column; if ``interventions`` does not have ``data``'s shape, holds a value other than 0 or
+        1, or leaves a variable fewer than two rows, or one value, without an intervention; or if a
+        column repeats another up to scale and shift given more than two rows or, with more rows
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks
+        or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -394,29 +431,46 @@ def gies(
     :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
     keeps.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with
-    single-variable interventions on 40% of the variables, the rows split evenly between observation
-    and each intervention, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
-    which its median errors (SHD against the interventional essential graph) stayed below the empty
-    graph's, and through which its fits finished within the caps, were 50 and 200 variables at mean
-    degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2 with 10,000 rows; 200 and 800 at mean
-    degree 2 with 2,000 rows; 100 and 400 at mean degree 2 with 500 rows; 400 and 800 at mean degree
-    4 with 2,000 rows; and 800 and 800 at mean degree 8 with 2,000 rows. The ladders ended after two
-    sizes in a row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where
-    they ended when three fits of the next size ran past 1 h. The median fit took 1,231 s at 1,600
-    variables (mean degree 2, 10,000 rows in total). Each distinct set of rows without an
-    intervention on a variable keeps its own covariance matrix of all the variables, so memory grows
-    with the number of intervened variables times the square of the variable count. A parent set of
-    ``m - 1`` or more variables, where ``m`` counts the rows without an intervention on the child,
-    fits its child exactly, so the search never selects one, nor any parent set that leaves its
-    child a residual variance of at most ``1e-12`` times its variance. The numbers are a reference,
-    not a hard limit: they change with the data generator, the density, the method's settings, and
-    the machine.
+    **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
+    [2]_, which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``penalty_discount=1.0`` is the standard BIC. On simulated observational
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured: 23 against 210 with 200 variables and 2,000 rows (200 true
+    edges).
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian
+    data from Erdos-Renyi graphs with single-variable interventions on 40% of the variables, the
+    rows split evenly between observation and each intervention, on 4 cores with a cap of 1 h and 28
+    GB per fit. The largest sizes through which its median errors (SHD against the interventional
+    essential graph) stayed below the empty graph's, and through which its fits finished within the
+    caps, were 50 and 200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2
+    with 10,000 rows; 200 and 800 at mean degree 2 with 2,000 rows; 100 and 400 at mean degree 2
+    with 500 rows; 400 and 800 at mean degree 4 with 2,000 rows; and 800 and 800 at mean degree 8
+    with 2,000 rows. The ladders ended after two sizes in a row did not beat the empty graph, except
+    at mean degree 4 or 8 with 2,000 rows, where they ended when three fits of the next size ran
+    past 1 h. The median fit took 1,231 s at 1,600 variables (mean degree 2, 10,000 rows in total).
+    Each distinct set of rows without an intervention on a variable keeps its own covariance matrix
+    of all the variables, so memory grows with the number of intervened variables times the square
+    of the variable count. A parent set of ``m - 1`` or more variables, where ``m`` counts the rows
+    without an intervention on the child, fits its child exactly, so the search never selects one,
+    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
     .. [1] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
        interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+    .. [2] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -435,21 +489,29 @@ def gies(
     from andrey.search.gies import gies as _gies
     from andrey.search.gies import intervention_mask
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="gies")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
     with copies_named(labels):
-        graph, score = _gies(X, mask, lambda_value=lambda_value, constraints=constraints)
-    metadata = {"algorithm": "GIES", "score": json_safe(score)}
+        graph, score = _gies(
+            X,
+            mask,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            constraints=constraints,
+        )
+    metadata = {"score": json_safe(score)}
     return structure_output(graph, labels=labels, metadata=metadata)
 
 
+@method_spec("xges")
 def xges(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC",
-    lambda_value: float = 1.0,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     extended_search: bool = True,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -464,11 +526,19 @@ def xges(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC", "local_score_BIC_from_cov"}, default="local_score_BIC"
-        Two names of the Gaussian BIC, the only score XGES supports.
-    lambda_value : float, default=1.0
+    score_func : {"bic"} or None, default=None
+        Local score: ``"bic"``, the linear-Gaussian BIC, the only score XGES supports. ``None``
+        picks it.
+        ``metadata["score_func"]`` names the score the fit used.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be finite and
+        non-negative.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. See Notes.
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
@@ -483,24 +553,22 @@ def xges(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"XGES"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
+        ``"xges"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
         lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
         the equivalence class leaves open.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC"``.
     TypeError
-        If ``extended_search`` is not a bool. Also if ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
-        ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift given more than two rows, or, with more rows than columns, is a
-        linear function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is
+        constant, repeats another column up to scale and shift given more than two rows, or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -521,25 +589,41 @@ def xges(
     :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
     keeps.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
-    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
-    stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
-    200 variables at mean degree 1 with 2,000 rows and mean degree 2 with 500 rows; 400 and 1,600 at
-    mean degree 2 with 10,000 rows and mean degree 4 with 2,000 rows; 200 and 800 at mean degree 2
-    with 2,000 rows; and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended after two
-    sizes in a row did not beat the empty graph. The median fit took 828 s at 1,600 variables (mean
-    degree 4, 2,000 rows). With ten rows per variable at mean degree 2, where its errors exceeded
-    the empty graph's from 500 variables, the BIC score still preferred the returned graphs to the
-    true one. At 1,000 variables with ten rows per variable, the median fit took under a minute at
-    mean degree 2 and under five minutes at mean degree 4, on one core, and a few seconds with
-    ``extended_search=False``. The extended search reruns the base search for each edge it tries to
-    delete and retries the edges after keeping a result, so its run time grows with the number of
-    edges and of results kept. Its BIC score assumes linear relations with Gaussian noise. With
-    fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
-    variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
+    [4]_, which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``penalty_discount=1.0`` is the standard BIC. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured: 8 against 199 with 200 variables and 2,000 rows (200 true
+    edges).
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
+    cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors
+    (SHD) stayed below the empty graph's, and through which its fits finished within the caps, were
+    50 and 200 variables at mean degree 1 with 2,000 rows and mean degree 2 with 500 rows; 400 and
+    1,600 at mean degree 2 with 10,000 rows and mean degree 4 with 2,000 rows; 200 and 800 at mean
+    degree 2 with 2,000 rows; and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
+    after two sizes in a row did not beat the empty graph. The median fit took 828 s at 1,600
+    variables (mean degree 4, 2,000 rows). With ten rows per variable at mean degree 2, where its
+    errors exceeded the empty graph's from 500 variables, the BIC score still preferred the returned
+    graphs to the true one. At 1,000 variables with ten rows per variable, the median fit took under
+    a minute at mean degree 2 and under five minutes at mean degree 4, on one core, and a few
+    seconds with ``extended_search=False``. The extended search reruns the base search for each edge
+    it tries to delete and retries the edges after keeping a result, so its run time grows with the
+    number of edges and of results kept. Its BIC score assumes linear relations with Gaussian noise.
+    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
+    or more variables fits its child exactly, so the search never selects one, nor any parent set
+    that leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -549,6 +633,8 @@ def xges(
        507-554.
     .. [3] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
        interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+    .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -564,28 +650,32 @@ def xges(
     """
     from andrey.search.xges import xges as _xges
 
-    X = data_matrix(data)
-    extended_search = flag(extended_search, "extended_search")
+    score_func = "bic" if score_func is None else score_func
+    X = data_matrix(data, method="xges")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="xges")
     with copies_named(labels):
         cpdag, score = _xges(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
             extended_search=extended_search,
             constraints=constraints,
         )
-    metadata = {"algorithm": "XGES", "score": json_safe(score)}
+    metadata = {"score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("hc")
 def hc(
     data: npt.ArrayLike,
     *,
     score_func: str | None = None,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_iter: int | None = None,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -602,36 +692,45 @@ def hc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, a
-        covariance-based Gaussian BIC for continuous data; ``"local_score_BDeu"``, the BDeu score,
-        or ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by
-        whole numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the
-        degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
-        ``None`` reads the column types from ``categorical``, or infers them, and picks
-        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"``
-        when some are, each with a ``DataTypeWarning``; otherwise it picks
-        ``"local_score_BIC_from_cov"``. Pass
-        ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
-    lambda_value : float, default=1.0
+        Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
+        ``"bdeu"``, the BDeu score, or ``"discrete_bic"``, the multinomial BIC, for categorical data
+        coded by whole numbers; or ``"degen_gauss"`` and ``"cond_gauss"``, the degenerate and
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks from
+        the declared column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"``
+        when some are, else ``"bic"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
-        finite and non-negative. BDeu ignores it.
+        Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
+        standard BIC. Must be finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See
+        Notes.
     max_iter : int or None, default=None
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
         adds at most one edge.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the search takes no move that gives a node
+        more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
+        (every DAG of a class has the same largest number of parents). A cap can stop the search
+        short of the lowest-scoring graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
-        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
-        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
-        only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes. With ``score_func=None``, the columns it infers pick the default
-        score.
+        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -643,7 +742,7 @@ def hc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"HC"`` and ``metadata["score"]`` the score of the DAG found, computed as for
+        ``"hc"`` and ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
@@ -651,20 +750,19 @@ def hc(
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
-        positions, or ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None``
-        nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
-        or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With
-        the BIC score, also if a column repeats another up to scale and shift given more than two
-        rows or, with more rows than columns, is a linear function of other columns. One message
-        names every group of copies and says to keep one column per group. Also if ``knowledge``
-        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists,
-        or, under a mixed-data score, requires an edge from a continuous into a categorical column.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
+        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists, or, under a
+        mixed-data score, requires an edge from a continuous into a categorical column.
 
     Warns
     -----
@@ -672,11 +770,9 @@ def hc(
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
     DataTypeWarning
-        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
-        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
-        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
-        continuous setting meets columns that look like category codes. Each message warns once per
-        process.
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes. Each message warns once per process.
 
     Notes
     -----
@@ -692,7 +788,24 @@ def hc(
     column order and on another machine, and how ``andrey.config(tie_break="position")`` orders the
     ties by column position instead.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [3]_,
+    which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``penalty_discount=1.0`` is the standard BIC. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured: 109 against 272 with 200 variables and 2,000 rows (200 true edges).
+    Its mean errors stayed below the empty graph's in each of the 65 settings, where the standard
+    BIC's exceeded it in 37.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
     ``max_iter=100000``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
     which its median errors (SHD) stayed below the empty graph's, and through which its fits
     finished within the caps, were 50 and 1,600 variables at mean degree 1 with 2,000 rows; 200 and
@@ -704,15 +817,15 @@ def hc(
     The median fit took 148 s at 3,200 variables (mean degree 2, 2,000 rows). It has no move limit
     by default; run time grows with the moves the search takes. A graph that no single move improves
     need not be the best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
-    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
-    more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated mixed
-    data (conditional linear Gaussian networks on sparse random graphs, the first half of the
+    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
+    or more variables fits its child exactly, so the search never selects one, nor any parent set
+    that leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
+    mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
     variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
-    median errors at 40 variables were 12.5 with ``"local_score_degen_gauss"`` and 11 with
-    ``"local_score_cond_gauss"``, against 40. On simulated categorical networks with 2 or 3
-    categories per variable, of the same sizes and rows, they were 18 with ``"local_score_BDeu"``
-    and 20 with ``"local_score_BIC_categorical"``. Every median fit took under 0.2 s at 40
+    median errors at 40 variables were 12.5 with ``"degen_gauss"`` and 11 with
+    ``"cond_gauss"``, against 40. On simulated categorical networks with 2 or 3
+    categories per variable, of the same sizes and rows, they were 18 with ``"bdeu"``
+    and 20 with ``"discrete_bic"``. Every median fit took under 0.2 s at 40
     variables, on 4 cores. The numbers are a reference, not a hard limit: they change with the data
     generator, the density, the method's settings, and the machine.
 
@@ -722,6 +835,8 @@ def hc(
        search methods and experimental results. AISTATS, PMLR R0, 112-128.
     .. [2] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+    .. [3] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -738,37 +853,41 @@ def hc(
     score_func, categorical = default_score(
         data,
         score_func,
-        "local_score_BIC_from_cov",
         categorical=categorical,
-        max_categories=max_categories,
     )
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="hc"
     )
-    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="hc")
     with copies_named(labels):
         cpdag, score = _hc(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
             max_iter=max_iter,
+            max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
         )
-    metadata = {"algorithm": "HC", "score": json_safe(score), **categorical_metadata(mask, data)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("tabu")
 def tabu(
     data: npt.ArrayLike,
     *,
     score_func: str | None = None,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
+    max_parents: int | None = None,
+    categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with tabu search.
@@ -783,20 +902,26 @@ def tabu(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, a
-        covariance-based Gaussian BIC for continuous data, or ``"local_score_BDeu"`` or
-        ``"local_score_BIC_categorical"``, the BDeu
-        score or the multinomial BIC for categorical data coded by whole numbers, as for
-        :func:`~andrey.ges`. ``None`` picks ``"local_score_BDeu"`` when every column is categorical
-        (a DataFrame's ``category``, ``bool``, or text column, or a column of at most 10 distinct
-        whole numbers) and warns with a ``DataTypeWarning``; otherwise it picks
-        ``"local_score_BIC_from_cov"``, on mixed data too, since tabu search has no mixed-data
-        score. Pass ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as
-        numbers.
-    lambda_value : float, default=1.0
+        Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
+        ``"bdeu"`` or ``"discrete_bic"``, the BDeu score or the multinomial BIC for categorical data
+        coded by whole numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or
+        conditional Gaussian BIC for mixed data; each as for :func:`~andrey.ges`. ``None`` picks
+        from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be finite
-        and non-negative. BDeu ignores it.
+        Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
+        standard BIC. Must be finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See
+        Notes.
     tabu_length : int, default=10
         Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
@@ -806,6 +931,22 @@ def tabu(
         Maximum moves, improving or not, at least ``1``; ``None`` sets no limit. The search still
         terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
         strictly lower.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the search takes no move that gives a node
+        more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
+        (every DAG of a class has the same largest number of parents). A cap can stop the search
+        short of the lowest-scoring graph. ``None`` sets no cap.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -817,25 +958,24 @@ def tabu(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"Tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
+        ``"tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no score tabu search takes.
     TypeError
-        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int. Also if
-        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
-        less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
-        score, if ``data`` holds a number that is not whole. With the BIC score, also if a column
-        repeats another up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``max_tabu``
+        is greater than ``tabu_length``; if the required edges of ``knowledge`` give a node more
+        than ``max_parents`` parents; or, with a categorical score, if ``data`` holds a number
+        that is not whole. With the BIC score, also if a column repeats another up to scale and
+        shift given more than two rows or, with more rows than columns, is a linear function of
+        other columns. One message names every group of copies and says to keep one column per
+        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -843,8 +983,9 @@ def tabu(
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
     DataTypeWarning
-        When ``score_func`` is ``None`` and every column is categorical, so the search scores with
-        BDeu; once per process.
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes. Each message warns once per process.
 
     Notes
     -----
@@ -859,7 +1000,24 @@ def tabu(
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
+    **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [4]_,
+    which grows with the number of variables; :func:`~andrey.ges` describes the choice.
+    ``ebic_gamma=0.0`` with ``penalty_discount=1.0`` is the standard BIC. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average at every number of
+    variables and rows measured: 85 against 276 with 200 variables and 2,000 rows (200 true edges).
+    Its mean errors stayed below the empty graph's in each of the 65 settings, where the standard
+    BIC's exceeded it in 35.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
+    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
     ``max_iter=100000`` and ``max_tabu=10``, on 4 cores with a cap of 1 h and 28 GB per fit. The
     largest sizes through which its median errors (SHD) stayed below the empty graph's, and through
     which its fits finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000
@@ -872,11 +1030,11 @@ def tabu(
     moves between new best scores, with no move limit by default; run time grows with the moves
     taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
     missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than columns
-    the BIC score is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child
-    exactly, so the search never selects one, nor any parent set that leaves its child a residual
-    variance of at most ``1e-12`` times its variance. With a categorical score, its tests run it on
-    small fixed categorical networks. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its
+    child exactly, so the search never selects one, nor any parent set that leaves its child a
+    residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
+    run it on small fixed categorical networks. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -887,6 +1045,8 @@ def tabu(
        3rd edition. Prentice Hall.
     .. [3] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+    .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -898,52 +1058,54 @@ def tabu(
     >>> tabu(np.column_stack([x, y])).structure.kind
     'cpdag'
     """
-    from andrey.search.tabu import TABU_SCORES
     from andrey.search.tabu import tabu as _tabu
 
-    score_func, _ = default_score(data, score_func, "local_score_BIC_from_cov", mixed=False)
-    if score_func not in TABU_SCORES:
-        raise NotImplementedError(f"tabu supports {TABU_SCORES}, not {score_func!r}")
-    if data_kind(score_func) == "categorical":
-        X, _ = checked_data(data, None, "score_func", score_func)
-    else:
-        X = data_matrix(data)
-    tabu_length = int_in_range(tabu_length, "tabu_length", 1)
+    score_func, categorical = default_score(data, score_func, categorical=categorical)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories, method="tabu"
+    )
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
-    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
     with copies_named(labels):
         cpdag, score = _tabu(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
+            max_parents=max_parents,
+            categorical=mask,
             constraints=constraints,
         )
-    metadata = {"algorithm": "Tabu", "score": json_safe(score)}
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("exact_search")
 def exact_search(
     data: npt.ArrayLike,
     *,
     search_method: str = "astar",
     score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn the globally optimal DAG for a decomposable score by exact search.
+    """Learn the CPDAG of the globally optimal DAGs for a decomposable score by exact search.
 
-    The optimum is identified up to its Markov equivalence class, and A*
-    (``search_method="astar"``) [1]_ and dynamic programming (``"dp"``) [2]_ return the same DAG of
-    that class. Runtime is exponential in the variable count, so keep the problem small (roughly
-    <= 20 variables).
+    The optimum is identified up to its Markov equivalence class, so the search returns the class's
+    CPDAG, as the other score searches do; A* (``search_method="astar"``) [1]_ and dynamic
+    programming (``"dp"``) [2]_ find the same DAG of that class, which ``metadata["dag"]`` keeps.
+    Runtime is exponential in the variable count, so keep the problem small (roughly <= 20
+    variables).
 
     Parameters
     ----------
@@ -953,77 +1115,94 @@ def exact_search(
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
     score_func : str or None, default=None
-        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian
-        BIC; ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu score or the
-        multinomial BIC for categorical data coded by whole numbers; or
-        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or
-        conditional Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each BIC uses the
-        standard penalty, ``lambda_value=1``. ``None`` reads the column types from
-        ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when every column is
-        categorical or ``"local_score_cond_gauss"`` when some are, each with a
-        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
-        ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers.
+        Local score: ``"bic"``, the linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"``, the BDeu
+        score or the multinomial BIC for categorical data coded by whole numbers; or
+        ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed
+        data, as for :func:`~andrey.ges`. Each BIC uses the penalty of ``penalty_discount=1``, and
+        the linear-Gaussian BIC adds the extended-BIC term that ``ebic_gamma`` weighs. ``None``
+        picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC. Must be finite and non-negative. BDeu ignores it; for the multinomial BIC
+        it weighs ``log(n)`` per free parameter of a variable's conditional probability table.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the search scores only parent sets within it
+        and finds the best-scoring DAG whose every node keeps within it, so no DAG the returned
+        CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
+        the same largest number of parents). ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
-        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
-        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
-        only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
+        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
+        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
+        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes. With ``score_func=None``, the columns it infers pick the default
-        score.
+        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
         the forbidden parents and include the required ones, so the DAG found is the best one that
-        satisfies the knowledge.
+        satisfies the knowledge, and the returned graph directs the edges the knowledge decides.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` (one DAG of the optimal equivalence
-        class); ``metadata["algorithm"]`` is ``"ExactSearch"``. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
-        0-based position.
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the optimal equivalence class:
+        directed marks (``->``) are the edges every DAG of the class shares, or the knowledge
+        directs, and undirected (``--``) the ones the class leaves open. ``metadata["dag"]`` lists
+        the edges of the DAG the search found as ``[i, j]`` pairs for ``i -> j``, 0-based column
+        positions in ascending order; ``metadata["algorithm"]`` is ``"exact_search"``. Under a
+        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read, by
+        name or 0-based position.
 
     Raises
     ------
-    NotImplementedError
-        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical`` does
-        not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
-        another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns. One message names every group of copies and says to keep
-        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if the required
+        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
+        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every group
+        of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
-        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
-        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
-        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
-        continuous setting meets columns that look like category codes. Each message warns once per
-        process.
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes. Each message warns once per process.
 
     Notes
     -----
-    **When to use it.** With ``"local_score_BIC"``, exact search makes the assumptions of
+    **When to use it.** With ``"bic"``, exact search makes the assumptions of
     :func:`~andrey.ges`: continuous data, no unmeasured common causes, and linear relations with
     Gaussian noise; the categorical and mixed-data scores below make theirs. It suits a few
     variables, where it returns a graph with the best score rather than a greedy search's local
     optimum.
 
     **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
-    own pick among them would follow last-bit rounding and the column order. Exact search instead
-    reports one fixed member of the class it found: it keeps the edges every DAG of the class
+    own pick among them would follow last-bit rounding and the column order. The returned CPDAG
+    does not depend on the pick; for ``metadata["dag"]``, exact search reports one fixed member of
+    the class it found: it keeps the edges every DAG of the class
     shares, and those the knowledge directs, and orients the others by a rank computed from each
     column's own data, as :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so
     reordering the columns reorders the graph's nodes and changes nothing else, unless two columns
@@ -1032,31 +1211,47 @@ def exact_search(
     the class unchanged; the :doc:`column-order guide </docs/guides/column-order>` says what the
     rank keeps.
 
-    **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
+    **Categorical data.** ``"bdeu"`` [5]_ and ``"discrete_bic"`` [6]_
     read each distinct value of a column as one category and score a variable by its counts in
     each configuration of its parents, as :func:`~andrey.ges` describes. Both give equivalent graphs
     the same score.
 
-    **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
+    **Mixed data.** ``"degen_gauss"`` [3]_ and ``"cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
     categorical columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so
     the optimum is again identified up to its equivalence class.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
-    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
-    stayed below the empty graph's, and through which its fits finished within the caps, were 24 and
-    24 variables at mean degree 1 with 2,000 rows; and 22 and 22 at mean degree 2 with 500, 2,000,
-    or 10,000 rows and mean degree 4 or 8 with 2,000 rows. Every ladder ended when three fits of the
-    next size ran past 1 h. The median fit took 1,457 s at 24 variables (mean degree 1, 2,000 rows).
-    With a mixed-data or categorical score it is not benchmarked yet: its tests run it with a
-    mixed-data score on 5 variables with 3,000 rows, and with a categorical score on small fixed
-    categorical networks. It scores every possible parent set of every variable, so its run time at
-    least doubles with each added variable. The ``"dp"`` search also keeps one entry per subset of
-    the variables, so its memory doubles as well. With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Choosing the penalty.** With ``"bic"``, the score charges a variable
+    ``log(n_samples)`` per parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables -
+    1, n_parents)`` [7]_, which grows with the number of variables; :func:`~andrey.ges` describes
+    the choice. ``ebic_gamma=0.0`` is the standard BIC. On simulated linear-Gaussian data with 20
+    variables and 200 or 1,000 rows, the best-scoring graph under the default ``ebic_gamma=1.0`` had
+    fewer errors (SHD) than the standard BIC's on average in each of the 10 settings of graph and
+    rows measured: 2.0 against 9.6 with 200 rows and 20 true edges. Larger graphs were not
+    measured.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
+    simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores with a cap of 1 h and 28 GB
+    per fit. The largest sizes through which its median errors (SHD) stayed below the empty graph's,
+    and through which its fits finished within the caps, were 24 and 24 variables at mean degree 1
+    with 2,000 rows; and 22 and 22 at mean degree 2 with 500, 2,000, or 10,000 rows and mean degree
+    4 or 8 with 2,000 rows. Every ladder ended when three fits of the next size ran past 1 h. The
+    median fit took 1,457 s at 24 variables (mean degree 1, 2,000 rows). With a mixed-data or
+    categorical score it is not benchmarked yet: its tests run it with a mixed-data score on 5
+    variables with 3,000 rows, and with a categorical score on small fixed categorical networks. It
+    scores every possible parent set of every variable, so its run time at least doubles with each
+    added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so its
+    memory doubles as well. With fewer rows than columns the standard BIC is unreliable. A parent
+    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
+    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1072,6 +1267,8 @@ def exact_search(
        the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
     .. [6] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
        461-464.
+    .. [7] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------
@@ -1082,18 +1279,23 @@ def exact_search(
     >>> y = x + 0.1 * rng.standard_normal(500)
     >>> z = y + 0.1 * rng.standard_normal(500)
     >>> exact_search(np.column_stack([x, y, z])).structure.kind
-    'dag'
+    'cpdag'
     """
-    from andrey.search.exact import EXACT_SCORES
+    import numpy as np
+
+    from andrey.core.knowledge import mpdag
+    from andrey.core.orient import dag2cpdag, to_structure
+    from andrey.core.structure import ARROW, TAIL
     from andrey.search.exact import exact_search as _exact
 
-    score_func, categorical = default_score(
-        data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
-    )
-    if score_func not in EXACT_SCORES:
-        raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
+    score_func, categorical = default_score(data, score_func, categorical=categorical)
     X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories
+        data,
+        categorical,
+        "score_func",
+        score_func,
+        max_categories=max_categories,
+        method="exact_search",
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
@@ -1102,30 +1304,92 @@ def exact_search(
             X,
             search_method=search_method,
             score_func=score_func,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
             categorical=mask,
             constraints=constraints,
+            max_parents=max_parents,
         )
+    marks = dag.to_numpy()
+    cpdag = dag2cpdag(marks)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    edges = np.argwhere((marks == TAIL) & (marks.T == ARROW))
     return structure_output(
-        dag,
+        to_structure(cpdag, kind="cpdag"),
         labels=labels,
-        metadata={"algorithm": "ExactSearch", **categorical_metadata(mask, data)},
+        metadata={"dag": edges, **categorical_metadata(mask, data)},
     )
 
 
-def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> StructureOutput:
+@method_spec("calm")
+def calm(
+    data: npt.ArrayLike,
+    *,
+    lambda1: float = 0.005,
+    screen_alpha: float = 0.01,
+    use_moral_graph: bool = True,
+    standardize: bool = False,
+    w_threshold: float = 0.3,
+    gate_threshold: float = 0.5,
+    max_iter: int = 25,
+    subproblem_iter: int = 3000,
+    lr: float = 0.01,
+    tau: float = 0.5,
+    rho_init: float = 0.001,
+    rho_mult: float = 3.0,
+    rho_max: float = 1e16,
+    h_tol: float = 1e-8,
+    seed: int | None = None,
+) -> StructureOutput:
     """Learn a weighted DAG with CALM, a continuous-optimization structure learner.
 
     CALM (Continuous and Acyclicity-constrained L0-penalized likelihood with an estimated Moral
     graph) [1]_ fits a linear-Gaussian DAG with torch. By default it keeps only the candidate edges
     of an estimated moral graph, then minimizes the Gaussian likelihood plus a penalty per edge
-    under an acyclicity constraint. The optimizer draws random numbers and is seeded on every call;
-    see ``seed``.
+    under an acyclicity constraint. It is a continuous-optimization method in the line of NOTEARS
+    (:func:`~andrey.notears`), with a likelihood in place of least squares, gates that count edges
+    in place of an ``l1`` penalty, and a candidate set restricted to the moral graph. The optimizer
+    draws random numbers and is seeded on every call; see ``seed``.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
+    lambda1 : float, default=0.005
+        Weight of the l1 penalty on the sum of the edge gates, at least ``0``. The gates
+        approximate a count of edges, so it prices each edge: larger values give sparser graphs.
+    screen_alpha : float, default=0.01
+        Significance level of the Fisher-Z tests that estimate the moral graph, in ``(0, 1)``.
+        Only pairs the screen keeps can become edges; smaller values keep fewer.
+    use_moral_graph : bool, default=True
+        With ``False`` every pair is a candidate edge, and ``screen_alpha`` has no effect.
+    standardize : bool, default=False
+        Scale each column to unit variance first.
+    w_threshold : float, default=0.3
+        An edge is kept when its weight magnitude reaches this value, at least ``0``.
+    gate_threshold : float, default=0.5
+        An edge is kept when its gate probability reaches this value, in ``[0, 1]``.
+    max_iter : int, default=25
+        Most quadratic-penalty rounds, each an Adam subproblem, at least ``1``. Stopping on this
+        limit before the acyclicity residual clears ``h_tol`` or ``rho`` reaches ``rho_max`` warns
+        with :class:`~andrey.SearchLimitWarning`; raise it to let the fit run on.
+    subproblem_iter : int, default=3000
+        Most Adam steps per round, at least ``1``.
+    lr : float, default=0.01
+        Adam's learning rate, above ``0``.
+    tau : float, default=0.5
+        The gate's Gumbel-sigmoid temperature, above ``0``.
+    rho_init : float, default=0.001
+        The acyclicity penalty ``rho`` of the first round, above ``0``.
+    rho_mult : float, default=3.0
+        The factor by which ``rho`` grows between rounds, at least ``1``.
+    rho_max : float, default=1e16
+        The largest ``rho``: the rounds end when it is reached, above ``0``.
+    h_tol : float, default=1e-8
+        The acyclicity residual of the noise-free gates at or below which the rounds end, at
+        least ``0``.
     seed : int or None, default=None
         Seed for the optimizer's torch random number generator. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so every call is seeded
@@ -1133,29 +1397,13 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc` (the
         :doc:`column-order guide </docs/guides/column-order>`). ``metadata["seed"]`` records the
         seed used.
-    **params : Any
-        Optimizer settings passed to the solver; a name not listed here raises ``TypeError``.
-
-        - ``lambda1`` (default ``0.005``): penalty per edge. Larger values give sparser graphs.
-        - ``alpha`` (default ``0.01``): significance level of the Fisher-Z tests that estimate the
-          moral graph. Only pairs it keeps can become edges; smaller values keep fewer.
-        - ``use_moral_graph`` (default ``True``): ``False`` makes every pair a candidate edge.
-        - ``standardize`` (default ``False``): scale each column to unit variance first.
-        - ``w_threshold`` (default ``0.3``) and ``gate_threshold`` (default ``0.5``): an edge is
-          kept when its weight magnitude and its gate probability reach these values.
-        - ``max_outer`` (default ``25``), ``subproblem_iter`` (default ``3000``), and ``lr``
-          (default ``0.01``): quadratic-penalty rounds, Adam steps per round, and learning rate.
-        - ``tau`` (default ``0.5``), ``rho_init`` (default ``0.001``), ``rho_mult`` (default
-          ``3.0``), ``rho_max`` (default ``1e16``), and ``h_tol`` (default ``1e-8``): gate
-          temperature and the acyclicity-penalty schedule.
-        - ``labels`` (default ``None``): node names; a DataFrame's column names take precedence.
 
     Returns
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"CALM"``), the
-        ``"seed"`` used, ``"n_edges"``, ``"objective"`` (half the sum of the log residual
+        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"calm"``), the
+        ``"seed"`` used, ``"objective"`` (half the sum of the log residual
         variances plus ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the
         acyclicity residual of the returned graph, ``0`` when it is acyclic).
 
@@ -1163,20 +1411,20 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     ------
     ImportError
         If the ``[torch]`` extra is not installed.
-    TypeError
-        If ``params`` holds a name the solver does not accept.
     ValueError
-        If the fit's loss or weights stop being finite, for example when the data's scale
-        overflows its covariance; ``standardize=True`` rescales the columns.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if the fit's
+        loss or weights stop being finite, for example when the data's scale overflows its
+        covariance; ``standardize=True`` rescales the columns.
 
     Notes
     -----
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
-    the variable most dependent on it given those already added (Fisher-Z at level ``alpha``),
-    then drops any member the others make independent of it. The most dependent variable has the
-    largest absolute partial correlation; equal ones are chosen by each column's rank, as in
-    :func:`~andrey.hc`. A pair is a candidate edge, in either direction, when each is in the other's
-    set.
+    the variable most dependent on it given those already added (Fisher-Z at level
+    ``screen_alpha``), then drops any member the others make independent of it. The most dependent
+    variable has the largest absolute partial correlation; equal ones are chosen by each column's
+    rank, as in :func:`~andrey.hc`. A pair is a candidate edge, in either direction, when each is in
+    the other's set.
 
     Each candidate edge ``i -> j`` has a weight and a gate. During the fit a gate is a
     Gumbel-Softmax sample [3]_, ``sigmoid((logit + noise) / tau)``, so ``lambda1`` times the sum
@@ -1189,7 +1437,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     after 50 steps, the loss changes by less than a ``1e-7`` fraction from one step to the next.
     Between rounds ``rho`` grows by the factor ``rho_mult``, the quadratic penalty method [6]_,
     until ``h`` of the noise-free gates ``sigmoid(logit / tau)`` is at most ``h_tol``, ``rho``
-    reaches ``rho_max``, or ``max_outer`` rounds have run.
+    reaches ``rho_max``, or ``max_iter`` rounds have run; stopping on ``max_iter`` warns with
+    :class:`~andrey.SearchLimitWarning`.
 
     If the edges that ``gate_threshold`` and ``w_threshold`` keep still form a cycle, edges are
     removed in order of increasing weight magnitude until none does.
@@ -1197,7 +1446,12 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5``,
     runs 40,000 steps per round at learning rate ``0.001``, and keeps every edge whose gate
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
-    larger ``max_outer`` runs that schedule.
+    larger ``max_iter`` runs that schedule.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every variable
+    over the same rows, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
@@ -1209,11 +1463,11 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     three fits of the next size ran past 1 h. The median fit took 3,332 s at 400 variables (mean
     degree 4, 2,000 rows). With mean degree 2 and ten rows per variable, the median fit took 18 s at
     10 variables and 59 s at 50, where its median errors were 15; the paper's schedule
-    (``lr=0.001``, ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
+    (``lr=0.001``, ``max_iter=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
     ``w_threshold=0.0``) took 174 s and 472 s for median errors of 6 and 12. Every optimizer step
     computes a determinant and a matrix power of the full weight matrix, one row and one column per
     variable, so a step's cost grows with the cube of the variable count; the defaults allow up to
-    75,000 steps (``max_outer`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
+    75,000 steps (``max_iter`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
     local optimum: on a collider whose two parents are independent, it can return both edges
     reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
     The numbers are a reference, not a hard limit: they change with the data generator, the density,
@@ -1251,19 +1505,32 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = data_matrix(data)
+    X = data_matrix(data, method="calm")
     labels = column_labels(data)
-    used_seed = resolve_seed(seed)
     with copies_named(labels):
-        result = _calm(X, seed=used_seed, **params)
+        result = _calm(
+            X,
+            lambda1=lambda1,
+            alpha=screen_alpha,
+            tau=tau,
+            rho_init=rho_init,
+            rho_mult=rho_mult,
+            rho_max=rho_max,
+            h_tol=h_tol,
+            max_outer=max_iter,
+            subproblem_iter=subproblem_iter,
+            lr=lr,
+            w_threshold=w_threshold,
+            gate_threshold=gate_threshold,
+            standardize=standardize,
+            use_moral_graph=use_moral_graph,
+            seed=seed,  # ty: ignore[invalid-argument-type]  # an int here
+        )
     return structure_output(
         result.dag,
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "algorithm": "CALM",
-            "seed": used_seed,
-            "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "objective": json_safe(result.objective),
         },

@@ -17,8 +17,9 @@ tau_max``:
 
 Every test reads one lagged design matrix: column ``lag * n + i`` holds ``X^i_{t-lag}`` for ``lag =
 0 .. 2 * tau_max``, over the ``T - 2 * tau_max`` time steps where all those lags exist, so every
-test uses the same samples. Every test is a partial-correlation test: ``indep_test="student_t"``
-(:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
+test uses the same samples, unless the series has missing values: then each test reads the design
+rows observed in all of its columns (:func:`design_test`). Every test is a partial-correlation test:
+``indep_test="student_t"`` (:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
 (:class:`~andrey.core.ci.FisherZ`). A PC1 round tests all of a target's candidates in one call, and
 MCI tests all links into a target together, grouped by conditioning-set size. Any object with
 ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
@@ -42,15 +43,19 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 import numpy as np
 
 from andrey.core import backend
 from andrey.core.ci import FisherZ, PartialCorrelationTest, SingularCorrelationError, StudentT
+from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
 from andrey.core.score import copies_error
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import LaggedConstraints
 
 # A lagged variable ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Link = tuple[int, int]
@@ -88,7 +93,8 @@ class PCMCIResult:
     ``parents[j]`` holds the ``(i, lag)`` parents PC1 selected for variable ``j``, strongest first.
     ``statistics``, ``p_values``, and ``graph`` have shape ``(tau_max, n, n)``: entry
     ``[lag - 1, i, j]`` belongs to the link ``X^i_{t-lag} -> X^j_t``, and ``graph`` is
-    ``p_values <= alpha_level``.
+    ``p_values <= alpha_level``. A link the knowledge forbids reads statistic 0 and p-value 1, and
+    a required one 1 and 0.
     """
 
     parents: tuple[tuple[Link, ...], ...]
@@ -108,7 +114,9 @@ class DesignTest:
     not raise returns ``test``'s results unchanged.
     """
 
-    def __init__(self, test: PartialCorrelationTest, design: np.ndarray) -> None:
+    def __init__(
+        self, test: PartialCorrelationTest | PartialCorrelationDeletion, design: np.ndarray
+    ) -> None:
         self.test = test
         self.design = design
 
@@ -140,11 +148,31 @@ def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
     and shift: a variable that copies another, at the same step or some lags apart. A copy at one
     step repeats at every lag of the design, so the error names each group that holds a lag-0
     column, by :func:`design_column_name`.
+
+    A series with ``NaN`` gets a design with ``NaN`` in every row that reads a missing value, and
+    the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
+    rows observed in all of its columns. Two columns are then copies when they repeat each other on
+    the rows where both are observed.
     """
     if indep_test not in INDEP_TESTS:
         raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     design = lagged_design(data, tau_max)
-    test = INDEP_TESTS[indep_test](design)
+    test: PartialCorrelationTest | PartialCorrelationDeletion
+    if np.isnan(design).any():
+        test = cast(
+            "PartialCorrelationDeletion",  # a partial-correlation test gives its deletion this kind
+            testwise_deletion(
+                indep_test,
+                INDEP_TESTS[indep_test],
+                design,
+                None,
+                {},
+                mixed=False,
+                check_copies=False,
+            ),
+        )
+    else:
+        test = INDEP_TESTS[indep_test](design)
     n_vars = data.shape[1]
     groups = [group for group in test.copies() if group[0] < n_vars]
     if groups:
@@ -194,6 +222,8 @@ def pc1(
     tau_max: int,
     pc_alpha: float,
     ranks: Sequence[int],
+    constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
@@ -201,19 +231,32 @@ def pc1(
     re-sorts the survivors by strength rounded to ``_KEY_DP`` decimals, strongest first, and equal
     ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
     variable's :func:`~andrey.search.hc.tie_ranks`. Each round is one ``test`` call over all
-    remaining candidates.
+    remaining candidates. With ``constraints``, a forbidden link is no candidate, and a required one
+    is never tested: it stays, with the strength of a partial correlation of ``1``. With
+    ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
     """
     columns = np.array(
         [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
         dtype=np.intp,
     )
+    if constraints is not None:
+        columns = columns[~constraints.forbidden[columns // n_vars, columns % n_vars, target]]
     tie = np.asarray(ranks, dtype=np.intp)[columns % n_vars] * (tau_max + 1) + columns // n_vars
     strength = np.full(len(columns), math.inf)
     p = 0
-    while len(columns) - 1 >= p:
-        statistics, p_values = test.statistic_pvalues(
-            columns, np.full_like(columns, target), _strongest_others(columns, p)
-        )
+    while len(columns) - 1 >= p and (max_depth is None or p <= max_depth):
+        y = np.full_like(columns, target)
+        conditions = _strongest_others(columns, p)
+        if constraints is None:
+            statistics, p_values = test.statistic_pvalues(columns, y, conditions)
+        else:
+            statistics, p_values = _known_links_pvalues(
+                test,
+                constraints.required[columns // n_vars, columns % n_vars, target],
+                columns,
+                y,
+                conditions,
+            )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
         kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], _KEY_DP)))]
@@ -222,21 +265,47 @@ def pc1(
     return tuple((int(c) % n_vars, int(c) // n_vars) for c in columns)
 
 
+def _known_links_pvalues(
+    test: LinkTest, required: np.ndarray, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """``test`` the rows that are not ``required``; a required row reads statistic 1, p-value 0."""
+    statistics = np.ones(len(x), dtype=np.float64)
+    p_values = np.zeros(len(x), dtype=np.float64)
+    free = ~required
+    if free.any():
+        statistics[free], p_values[free] = test.statistic_pvalues(
+            x[free], y[free], conditions[free]
+        )
+    return statistics, p_values
+
+
 def mci(
-    test: LinkTest, n_vars: int, parents: tuple[tuple[Link, ...], ...], tau_max: int
+    test: LinkTest,
+    n_vars: int,
+    parents: tuple[tuple[Link, ...], ...],
+    tau_max: int,
+    constraints: LaggedConstraints | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run the MCI test on every link; return ``(statistics, p_values)``, each ``(tau_max, n, n)``.
 
     The link ``X^i_{t-lag} -> X^j_t`` is tested given ``parents[j]`` without ``(i, lag)`` and
     ``parents[i]`` shifted ``lag`` steps back. The links into each ``X^j_t`` are tested together,
-    one ``test`` call per conditioning-set size.
+    one ``test`` call per conditioning-set size. With ``constraints``, no test runs on a forbidden
+    link, which reads statistic 0 and p-value 1, or on a required one, which reads 1 and 0.
     """
     statistics = np.zeros((tau_max, n_vars, n_vars))
     p_values = np.ones((tau_max, n_vars, n_vars))
+    if constraints is not None:
+        statistics[constraints.required[1:]] = 1.0
+        p_values[constraints.required[1:]] = 0.0
     for j in range(n_vars):
         groups: dict[int, list[tuple[int, int, list[int]]]] = {}
         for i in range(n_vars):
             for lag in range(1, tau_max + 1):
+                if constraints is not None and (
+                    constraints.forbidden[lag, i, j] or constraints.required[lag, i, j]
+                ):
+                    continue
                 conditions = {c for c in parents[j] if c != (i, lag)}
                 conditions.update((k, s + lag) for k, s in parents[i])
                 columns = sorted(_column(c, n_vars) for c in conditions)
@@ -261,18 +330,26 @@ def pcmci(
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
     indep_test: str = "student_t",
+    constraints: LaggedConstraints | None = None,
+    max_depth: int | None = None,
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
 
-    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
+    With ``constraints``, background knowledge over lags ``0`` to ``tau_max``, PC1 and MCI test no
+    forbidden or required link (:func:`pc1`, :func:`mci`): a forbidden link is not in the graph and
+    a required one is. ``max_depth`` caps PC1's conditioning sets. Raises :class:`ValueError`
+    when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
     """
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
     test = design_test(indep_test, data, tau_max)
     ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
-        parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
-        statistics, p_values = mci(test, n_vars, parents, tau_max)
+        parents = tuple(
+            pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)
+            for j in range(n_vars)
+        )
+        statistics, p_values = mci(test, n_vars, parents, tau_max, constraints)
     return PCMCIResult(
         parents=parents, statistics=statistics, p_values=p_values, graph=p_values <= alpha_level
     )

@@ -8,13 +8,21 @@ emitted it. The keys it returns are listed on :func:`score`.
 from __future__ import annotations
 
 from andrey.core.output import StructureOutput
-from andrey.core.structure import LATENT, GraphStructure, Kind, Structure, TemporalStructure
+from andrey.core.structure import (
+    LATENT,
+    GraphStructure,
+    Kind,
+    Structure,
+    TemporalStructure,
+    is_ancestral_kind,
+)
 
 from ._common import two_marks
 from .graph import (
     _confounder,
     _orientation,
     _shd_endpoint,
+    _shd_skeleton,
     _shd_structural,
     _skeleton,
     canonicalize_marks,
@@ -46,10 +54,13 @@ def score(output: object, truth: object) -> dict[str, object]:
         - ``dag`` adds ``mec_shd`` and ``mec_arrowhead_f1``, scored through the CPDAGs for methods
           identified only up to their equivalence class, and ``order_*`` and
           ``coefficient_mae`` when an ordering or weights are present.
-        - ``pag`` adds ``shd_endpoint`` and ``confounder_precision``, ``confounder_recall``, and
-          ``confounder_f1``.
+        - ``pag``, when either graph is a ``pag`` or a ``mag``, adds ``shd_endpoint`` and
+          ``confounder_precision``, ``confounder_recall``, and ``confounder_f1``.
         - ``digraph`` keeps the base metrics only: it has no CPDAG, and a 2-cycle claims no latent
-          confounder. Comparing a ``digraph`` with a ``pag`` raises.
+          confounder. Comparing a ``digraph`` with a ``pag`` or a ``mag`` raises.
+        - ``undirected``, when either graph is ``undirected``, keeps the skeleton metrics and
+          ``shd``, the skeleton SHD: one edit per pair adjacent in one graph and not in the other.
+          An undirected edge claims no direction, so no arrowhead metric is scored.
         - ``latent``: ``latent_cluster_ari``, ``n_latents_estimated``, and ``n_latents_true``.
         - ``temporal``: ``per_lag``, ``contemporaneous``, ``lagged``, and ``summary``, each
           nested, plus ``coefficient_mae_per_lag``.
@@ -103,14 +114,18 @@ def _has_latent(x: object) -> bool:
 
 
 def _graph_family(k_est: Kind, k_true: Kind) -> str:
-    """Family by kind precedence: any digraph -> digraph, any PAG -> pag, any CPDAG -> cpdag,
-    else dag. A ``digraph`` (directed, cyclic) has no essential graph and makes no confounder
-    claim, so it scores on the base skeleton / arrowhead / SHD trio alone. A digraph paired with a
-    PAG is rejected -- their shared ARROW/ARROW mark means a 2-cycle versus a latent confounder."""
+    """Family by kind precedence: any undirected -> undirected, any digraph -> digraph, any PAG or
+    MAG -> pag, any CPDAG -> cpdag, else dag. An ``undirected`` graph claims adjacencies alone, so
+    it scores on the skeleton. A ``digraph`` (directed, cyclic) has no essential graph and makes no
+    confounder claim, so it scores on the base skeleton / arrowhead / SHD trio alone. A digraph
+    paired with a PAG is rejected -- their shared ARROW/ARROW mark means a 2-cycle versus a latent
+    confounder."""
+    if "undirected" in (k_est, k_true):
+        return "undirected"
     reject_digraph_pag(k_est, k_true)
     if k_est == "digraph" or k_true == "digraph":
         return "digraph"
-    if k_est == "pag" or k_true == "pag":
+    if is_ancestral_kind(k_est) or is_ancestral_kind(k_true):
         return "pag"
     if k_est == "cpdag" or k_true == "cpdag":
         return "cpdag"
@@ -123,6 +138,10 @@ def _flat(prefix: str, scores: dict[str, float]) -> dict[str, float]:
 
 def _fill_graph(result: dict, m_est, k_est: Kind, m_true, k_true: Kind, family: str) -> None:
     """Skeleton / SHD / orientation; canonicalizes CPDAGs and dual-reports MEC scores for DAGs."""
+    if family == "undirected":
+        result.update(_flat("skeleton", _skeleton(m_est, m_true)))
+        result["shd"] = _shd_skeleton(m_est, m_true)
+        return
     est, true_ = m_est, m_true
     if family == "cpdag":  # a DAG and any MEC-equivalent member score through their CPDAG
         est, true_ = canonicalize_marks(m_est, k_est), canonicalize_marks(m_true, k_true)
@@ -134,7 +153,7 @@ def _fill_graph(result: dict, m_est, k_est: Kind, m_true, k_true: Kind, family: 
         result["shd_endpoint"] = _shd_endpoint(est, true_)
         result.update(_flat("confounder", _confounder(est, true_)))
     if family == "dag":
-        # ExactSearch / CALM emit kind="dag" yet identify only up to the MEC; report both the
+        # CALM emits kind="dag" yet identifies only up to the MEC; report both the
         # directed scores above and the canonicalized ones, so the consumer picks by method. A
         # non-acyclic input has no CPDAG, so skip the MEC pair and keep the directed scores valid.
         try:

@@ -48,7 +48,7 @@ def _er_sample(d: int, avg_degree: float, n: int, seed: int) -> data.CausalDatas
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
     )
-    return scm.sample(n=n, seed=seed)
+    return scm.sample(n=n, seed=seed, scale="raw")
 
 
 # ---- fixed cases ---------------------------------------------------------------------------------
@@ -81,9 +81,9 @@ def test_output_contract():
     x = datagen.generate("gauss_7v")
     out = andrey.xges(x)
     assert out.structure.kind == "cpdag"
-    assert out.metadata["algorithm"] == "XGES"
+    assert out.metadata["algorithm"] == "xges"
     assert np.isfinite(out.metadata["score"])
-    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "XGES"
+    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "xges"
 
 
 # ---- ground truth --------------------------------------------------------------------------------
@@ -105,11 +105,14 @@ def _dense(seed: int) -> data.CausalDataset:
 
 @pytest.fixture(scope="module")
 def dense_fits():
+    """GES, XGES, and XGES without the extended search on the dense graphs, at the standard BIC,
+    where GES stops in local optima."""
     fits = []
     for seed in _DENSE_SEEDS:
         ds = _dense(seed)
-        ges, xges = andrey.ges(ds.data), andrey.xges(ds.data)
-        fits.append((to_cpdag(ds.graph), ges, xges, andrey.xges(ds.data, extended_search=False)))
+        ges, xges = andrey.ges(ds.data, ebic_gamma=0.0), andrey.xges(ds.data, ebic_gamma=0.0)
+        base = andrey.xges(ds.data, ebic_gamma=0.0, extended_search=False)
+        fits.append((to_cpdag(ds.graph), ges, xges, base))
     return fits
 
 
@@ -153,15 +156,17 @@ def test_returns_a_cpdag(dense_fits):
 
 @pytest.mark.parametrize("seed", [0, 4])
 @pytest.mark.parametrize("extended_search", [True, False])
-def test_queue_search_matches_the_rescanning_reference(seed, extended_search):
+@pytest.mark.parametrize("ebic_gamma", [0.0, 1.0])
+def test_queue_search_matches_the_rescanning_reference(seed, extended_search, ebic_gamma):
     """The queues, the incremental updates, and the local CPDAG completion pick the same moves as
     rescanning every operator and re-forming the CPDAG after each move.
 
-    Seeds 0 and 4 are graphs where the extended search keeps branches that change the result.
+    At ``ebic_gamma=0.0``, seeds 0 and 4 are graphs where the extended search keeps branches that
+    change the result.
     """
     x = _dense(seed).data
-    fast, fast_score = xges_search(x, extended_search=extended_search)
-    slow, slow_score = xges_rescan(x, extended_search=extended_search)
+    fast, fast_score = xges_search(x, ebic_gamma=ebic_gamma, extended_search=extended_search)
+    slow, slow_score = xges_rescan(x, ebic_gamma=ebic_gamma, extended_search=extended_search)
     assert np.array_equal(from_structure(fast), from_structure(slow))
     assert fast_score == slow_score
 
@@ -173,13 +178,13 @@ def test_repeat_runs_are_identical():
     assert first.metadata["score"] == second.metadata["score"]
 
 
-def test_lambda_value_is_the_penalty_ges_uses():
-    """At the same lambda_value, XGES without the extended search and GES search the same score: on
-    a graph both recover, the reported scores agree."""
+def test_penalty_discount_is_the_penalty_ges_uses():
+    """At the same penalty_discount, XGES without the extended search and GES search the same
+    score: on a graph both recover, the reported scores agree."""
     ds = _sparse(0)
     for lam in (1.0, 2.0):
-        ges = andrey.ges(ds.data, lambda_value=lam)
-        xges = andrey.xges(ds.data, lambda_value=lam, extended_search=False)
+        ges = andrey.ges(ds.data, penalty_discount=lam)
+        xges = andrey.xges(ds.data, penalty_discount=lam, extended_search=False)
         assert shd(ges.structure, xges.structure) == 0
         assert xges.metadata["score"] == pytest.approx(ges.metadata["score"], rel=1e-12)
 
@@ -210,9 +215,9 @@ def test_branches_are_scored_on_a_member_of_the_class(seed):
 def test_the_extended_search_scores_the_graph_it_returns(seed):
     """The extended search keeps a running total, rescoring only the nodes a kept branch changed.
     On the returned graph it must equal the total over the whole graph, scored on a DAG in that
-    graph's class. On seeds 0 and 4 the search keeps branches."""
+    graph's class. On seeds 0 and 4 the search keeps branches at the standard BIC."""
     x = _dense(seed).data
-    score = BICScore(x)
+    score = BICScore(x, ebic_gamma=0.0)
     search = _Search(score, x.shape[1], tie_ranks(x).tolist())
     with threadpool_limits(limits=1):
         search.inserts_on_empty_graph()
@@ -220,7 +225,7 @@ def test_the_extended_search_scores_the_graph_it_returns(seed):
         base_total = _marks_total(search.g.marks(), score)
         total = search.extend(x.shape[0])
     marks = search.g.marks()
-    assert np.array_equal(marks, from_structure(xges_search(x)[0]))
+    assert np.array_equal(marks, from_structure(xges_search(x, ebic_gamma=0.0)[0]))
     assert total < base_total
     assert total == _marks_total(marks, score)
     assert np.array_equal(dag2cpdag(_extension_dag(marks)), marks)

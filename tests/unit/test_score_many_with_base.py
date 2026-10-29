@@ -84,9 +84,9 @@ def _threshold_score(gain: float) -> BICScore:
     x[:, 1] += x[:, 0]
     x[:, 2] += x[:, 1]
     x[:, 3] += x[:, 0] + x[:, 2]
-    raw = BICScore(x, lambda_value=0.0)
+    raw = BICScore(x, penalty_discount=0.0)
     lam = (raw.score(0, [1]) - raw.score(0, [1, 2]) - gain) / raw.log_n
-    return BICScore.from_cov(raw.cov, raw.n, lambda_value=lam)
+    return BICScore.from_cov(raw.cov, raw.n, penalty_discount=lam)
 
 
 @pytest.mark.parametrize(

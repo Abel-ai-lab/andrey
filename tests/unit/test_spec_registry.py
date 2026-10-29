@@ -26,11 +26,17 @@ from andrey.spec.models import Status
 
 # Input names are a closed set (the InputSpec names in the registry), each a `cmd_run` option.
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
-_INPUT_FLAGS = ("data", "domain_index", "interventions", "data_groups", "data_list")
+_INPUT_FLAGS = ("data", "domain_index", "interventions")
+
+# The former names of the inputs, which the CLI still takes for one release.
+_FORMER_INPUT_FLAGS = tuple(
+    sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases})
+)
 
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
-    {"method", "config", "output", "json", "full", "help", "version", "debug", *_INPUT_FLAGS}
+    {"method", "config", "output", "json", "full", "help", "version", "debug"}
+    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
@@ -44,10 +50,10 @@ def test_registry_matches_api_all_both_ways():
 
 @pytest.mark.parametrize("name", _SPEC_NAMES)
 def test_signature_agreement(name):
-    """Data inputs, keyword params, defaults, and ``**params`` passthrough match the live signature.
+    """Data inputs, keyword params, and defaults match the live signature.
 
     Convention across every facade: array inputs are positional-or-keyword (before ``*``);
-    hyperparameters are keyword-only; a ``**params`` passthrough maps to ``spec.passthrough``.
+    hyperparameters are keyword-only, and none takes ``**params``.
     """
     spec = get_spec(name)
     sig = inspect.signature(getattr(andrey, name))
@@ -55,7 +61,7 @@ def test_signature_agreement(name):
 
     data_names = [p.name for p in params if p.kind is p.POSITIONAL_OR_KEYWORD]
     kw_params = {p.name: p for p in params if p.kind is p.KEYWORD_ONLY}
-    has_var_kw = any(p.kind is p.VAR_KEYWORD for p in params)
+    assert not any(p.kind is p.VAR_KEYWORD for p in params), "no facade uses **params"
     assert not any(p.kind is p.VAR_POSITIONAL for p in params), "no facade uses *args"
 
     # Array inputs: same names, same order.
@@ -71,9 +77,6 @@ def test_signature_agreement(name):
     for pname, sig_param in kw_params.items():
         assert spec_params[pname].default == sig_param.default, f"{name}.{pname} default drift"
 
-    # A **params passthrough is declared iff the facade accepts one.
-    assert spec.passthrough is has_var_kw
-
 
 def test_shared_concepts_are_consistent():
     """One concept, one type -- for example, ``alpha`` is always a float, seeds are always
@@ -82,7 +85,7 @@ def test_shared_concepts_are_consistent():
         for p in spec.params:
             if p.name == "alpha":
                 assert p.type == "float"
-            if p.name in ("seed", "random_state"):
+            if p.name == "seed":
                 assert p.type == "int" and p.nullable
 
 
@@ -186,9 +189,7 @@ def _docstring_param_names(doc: str) -> list[str]:
 @pytest.mark.parametrize("name", sorted(set(REGISTRY) & set(API_ALL)))
 def test_facade_docstring_documents_every_parameter(name):
     """Every facade docstring names exactly the signature's arguments in ``Parameters``, plus a
-    summary line and ``Returns`` / ``Examples`` sections. A ``**params`` passthrough (calm) is not a
-    signature parameter, so it drops out of ``sig_names``; its ``**params`` doc entry is likewise
-    skipped -- the parser matches only ``name :`` lines."""
+    summary line and ``Returns`` / ``Examples`` sections."""
     fn = getattr(andrey, name)
     doc = inspect.getdoc(fn)
     assert doc and doc.splitlines()[0].strip(), f"{name}: missing docstring summary line"
@@ -196,9 +197,7 @@ def test_facade_docstring_documents_every_parameter(name):
     # Examples are half the standard (they feed the gallery); the doctest runner only checks the
     # ones that exist, so enforce presence here or a facade could silently drop its example.
     assert re.search(r"^Examples\n-{3,}", doc, re.MULTILINE), f"{name}: no Examples section"
-    sig_names = [
-        p.name for p in inspect.signature(fn).parameters.values() if p.kind is not p.VAR_KEYWORD
-    ]
+    sig_names = list(inspect.signature(fn).parameters)
     doc_names = _docstring_param_names(doc)
     assert doc_names == sig_names, f"{name}: Parameters {doc_names} != signature {sig_names}"
 
@@ -258,15 +257,14 @@ def test_cmd_run_wires_every_input_flag():
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = set(_INPUT_FLAGS) - params
+    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
 
 
 def test_seeded_methods_expose_a_seed_param():
     for spec in REGISTRY.values():
         if spec.seeded:
-            names = {p.name for p in spec.params}
-            assert names & {"seed", "random_state"}, f"{spec.name} is seeded but has no seed param"
+            assert "seed" in {p.name for p in spec.params}, f"{spec.name} has no seed param"
 
 
 def test_multi_output_only_in_family_that_supports_it():
@@ -329,15 +327,31 @@ def test_indep_test_choices_track_the_tests_each_method_dispatches():
         assert p.choices == expected, name
 
 
-def test_every_score_search_offers_both_names_of_the_linear_gaussian_bic():
-    """One name means the same score in every search that takes a score, so the schema and the
-    command line offer both names of the linear-Gaussian BIC."""
-    from andrey.core.score import LINEAR_SCORES
+def test_a_score_search_aliases_the_score_names_it_took_before_the_rename():
+    """The former `local_score_*` names keep working for one release on the searches that took
+    them, and only on those: a score a search gained later has no former name."""
+    from andrey.spec.concepts import SCORE_ALIASES
 
-    params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "score_func"}
-    assert params
-    for name, p in params.items():
-        assert set(LINEAR_SCORES) <= set(p.choices), name
+    former = {old for old, _ in SCORE_ALIASES}
+    linear = {old for old, new in SCORE_ALIASES if new == "bic"}
+    categorical = linear | {old for old, new in SCORE_ALIASES if new in ("bdeu", "discrete_bic")}
+    took = {
+        "gfci": former,
+        "ges": former,
+        "hc": former,
+        "boss": former,
+        "grasp": former,
+        "exact_search": former,
+        "tabu": categorical,
+        "xges": linear,
+    }
+    aliased = {}
+    for name, spec in REGISTRY.items():
+        for p in spec.params:
+            if p.name == "score_func" and p.choice_aliases:
+                aliased[name] = {old for old, _ in p.choice_aliases}
+    assert aliased == took
+    assert len(former) == len(SCORE_ALIASES)
 
 
 # --- support status -------------------------------------------------------------------------------

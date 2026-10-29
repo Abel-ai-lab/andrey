@@ -6,7 +6,7 @@ on linear-Gaussian data over Erdos-Renyi graphs at two average degrees. XGES gai
 denser graphs, so the default densities are 2 and 4. ``n`` is ``10 * d`` unless ``--n`` fixes it.
 
 Every arm searches under one penalty, ``--lambda-value``. The package's ``alpha`` is Andrey's
-``lambda_value``: the two scores differ by a factor of ``-2`` and by terms that cancel in every move.
+``penalty_discount``: the two scores differ by a factor of ``-2`` and by terms that cancel in every move.
 No arm caps the parents of a node: XGES has no cap, and the GES arm lifts the benchmark adapter's
 cap of 4, as the public ``andrey.ges`` does.
 
@@ -169,7 +169,7 @@ def add_bic(
                         "pass the first run's flags"
                     )
                 data, marks = datasets.load(store, keys[record.dataset_id])
-                score = BICScore(data, lambda_value=lambda_value)
+                score = BICScore(data, penalty_discount=lambda_value)
                 cached = (record.dataset_id, score, total_bic(marks, score))
             _, score, truth_bic = cached
             bic = total_bic(estimate.to_numpy(), score)

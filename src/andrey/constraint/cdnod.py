@@ -42,20 +42,24 @@ columns are identical.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Collection
 from itertools import combinations
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import unseparated_triples
+from andrey.constraint._skeleton import check_collider_rule, unseparated_triples
 from andrey.constraint.pc import (
     _discover_skeleton,
     _orient_colliders,
     _undirect_conflicts,
     check_collider_order,
     check_knowledge_cycle,
+    collider_conflicts,
+    vote_colliders,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core.ci import make_indep_test
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
@@ -74,20 +78,26 @@ def cdnod(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_order: str = "p_value",
+    collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     dependence_threshold: float | None = None,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+    _conflicts: set[tuple[int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
     ``data`` is an ``(n_samples, n_features)`` array; ``domain_index`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` domain/context index (one label per row); ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the CI test. ``collider_order`` orders the colliders as in
-    :func:`~andrey.constraint.pc.pc`. ``dependence_threshold``, when given, runs the
+    ``indep_test`` selects the CI test. ``collider_order`` orders the colliders, and
+    ``collider_rule`` decides the unshielded triples, as in :func:`~andrey.constraint.pc.pc`; the
+    vote of a voting rule skips the triples whose middle node is the context, which is never a
+    collider. ``dependence_threshold``, when given, runs the
     independent-change step with that threshold on the module dependence measure; ``None`` skips
     it. ``in_column_order`` fires Meek's rules one at a time in column order instead of in
     order-free rounds (:func:`~andrey.core.orient.meek`), and runs the independent-change step on
@@ -102,10 +112,17 @@ def cdnod(
     step, which orients only undirected edges, so it never orients against them. ``workers``
     worker processes share the skeleton search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions
-    include those the index identifies, so it is not an observational CPDAG.
+    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
+    ``GraphStructure`` tagged ``"cpdag"``: its directions
+    include those the index identifies, so it is not an observational CPDAG. The private
+    ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
+    ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``, and the private
+    ``_conflicts`` sink the edges between variables that colliders ask to orient both ways
+    (:func:`~andrey.constraint.pc.collider_conflicts`).
     """
     check_collider_order(collider_order)
+    check_collider_rule(collider_rule)
     X = np.asarray(data, dtype=np.float64)
     context = np.asarray(domain_index, dtype=np.float64)
     # One value per row: a wider index reshaped to a column would pair rows with the wrong values.
@@ -133,8 +150,14 @@ def cdnod(
             workers=workers,
             max_depth=max_depth,
             constraints=constraints,
+            seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
+        if collider_rule != "sepsets":
+            test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+            ambiguous |= vote_colliders(
+                skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
+            )
         pdag = _orient_with_context(
             skeleton,
             sepsets,
@@ -142,6 +165,7 @@ def cdnod(
             context=None,
             order=collider_order,
             constraints=constraints,
+            ambiguous=ambiguous,
         )
     else:
         augmented = np.concatenate([X, context], axis=1)
@@ -156,10 +180,30 @@ def cdnod(
             workers=workers,
             max_depth=max_depth,
             constraints=padded,
+            seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
+        if collider_rule != "sepsets":
+            test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
+            sources = np.flatnonzero(skeleton[d] != NULL).tolist()
+            through_context = {(a, d, c) for a, c in combinations(sources, 2)}
+            ambiguous |= vote_colliders(
+                skeleton,
+                test,
+                alpha,
+                sepsets,
+                collider_rule,
+                max_depth=max_depth,
+                skip=ambiguous | through_context,
+            )
         pdag = _orient_with_context(
-            skeleton, sepsets, pvalues, context=d, order=collider_order, constraints=padded
+            skeleton,
+            sepsets,
+            pvalues,
+            context=d,
+            order=collider_order,
+            constraints=padded,
+            ambiguous=ambiguous,
         )
         if dependence_threshold is not None:
             changing = np.nonzero(skeleton[d] != NULL)[0].tolist()
@@ -171,6 +215,11 @@ def cdnod(
                 dependence_threshold,
                 in_column_order=in_column_order,
             )
+    if _ambiguous is not None:
+        _ambiguous.update(ambiguous)
+    if _conflicts is not None:
+        found = collider_conflicts(skeleton, sepsets, ambiguous)
+        _conflicts.update((a, b) for a, b in found if b < d)
     completed = _undirect_conflicts(
         meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
     )
@@ -185,6 +234,7 @@ def _orient_with_context(
     context: int | None,
     order: str = "p_value",
     constraints: Constraints | None = None,
+    ambiguous: Collection[tuple[int, int, int]] = frozenset(),
 ) -> np.ndarray:
     """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
@@ -195,8 +245,8 @@ def _orient_with_context(
     Colliders are then oriented as PC orients them, in ``order``
     (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge it would
     orient already has an arrowhead at the other end; so none puts an arrowhead at the context or
-    reverses a decided edge. With ``context=None``, for a skeleton without a context node, only the
-    decided edges and the colliders are oriented.
+    reverses a decided edge; a triple in ``ambiguous`` is never a collider. With ``context=None``,
+    for a skeleton without a context node, only the decided edges and the colliders are oriented.
     """
     pdag = skeleton.copy()
     if context is not None:
@@ -206,7 +256,7 @@ def _orient_with_context(
     if constraints is not None:
         pdag = orient(pdag, constraints)
         check_knowledge_cycle((pdag == TAIL) & (pdag.T == ARROW))
-    return _orient_colliders(pdag, sepsets, pvalues, order=order)
+    return _orient_colliders(pdag, sepsets, pvalues, order=order, ambiguous=ambiguous)
 
 
 def _orient_by_independent_changes(

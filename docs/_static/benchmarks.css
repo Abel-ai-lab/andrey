@@ -136,6 +136,11 @@ html[data-theme="dark"] .release-cover {
     url("release-cards/0.10.0.jpg") center 62% / cover no-repeat,
     var(--andrey-ground-navy);
 }
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-11-0 {
+  background:
+    url("release-cards/0.11.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
+}
 
 .bd-content .sd-card.release-cover .sd-card-body {
   padding: 1.2rem 1.7rem 1.9rem 2.05rem;
@@ -522,6 +527,58 @@ html[data-theme="dark"] .release-tile {
   margin-top: 1.25rem;
   color: var(--andrey-muted);
   font-size: 0.88rem;
+}
+
+/* ---------- pages of earlier releases and posts (paginate.js) ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0;
+  font-size: 0.85rem;
+}
+
+.pager ol {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pager a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  color: var(--andrey-muted);
+  text-decoration: none;
+}
+
+.pager a:hover {
+  color: var(--andrey-ink);
+}
+
+.pager a[aria-current="page"] {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+  font-weight: 600;
+}
+
+.pager a[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.pager a:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
 }
 
 /* ---------- narrow screens: the cover over its TL;DR ---------- */

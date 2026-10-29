@@ -5,8 +5,8 @@ The LiNGAM coefficient matrix ``B`` follows ``x_i = sum_j B[i, j] x_j``, so ``B[
 ``j -> i`` -- the transpose of a standard adjacency. Andrey exposes one convention:
 ``weighted_adjacency[i, j]`` is the weight of edge ``i -> j`` (row = source), matching
 ``GraphStructure`` and every other adapter -- so the adapter stores ``B.T`` and builds the ``dag``
-from it (:func:`_canonical_weights`). Each estimator takes its own ``random_state``, resolved from
-the explicit argument else the global ``ANDREY_SEED``.
+from it (:func:`_canonical_weights`). ``ica_lingam`` is the one estimator that draws random numbers;
+it takes a ``seed``, resolved from the explicit argument else the global ``ANDREY_SEED``.
 
 ``multi_group_direct_lingam`` is the one multi-output member: joint estimation over a list of
 datasets yields one shared causal order plus a *per-group* weighted adjacency, so it returns a
@@ -24,10 +24,10 @@ from andrey.api._adapt import (
     column_labels,
     dag_from_adjacency,
     data_matrix,
-    int_in_range,
     shared_labels,
     structure_output,
 )
+from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -67,10 +67,10 @@ def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
     return X
 
 
+@method_spec("direct_lingam")
 def direct_lingam(
     data: npt.ArrayLike,
     *,
-    random_state: int | None = None,
     measure: str = "pwling",
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -86,9 +86,6 @@ def direct_lingam(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    random_state : int or None, default=None
-        Ignored. DirectLiNGAM with ``measure="pwling"`` is deterministic; the argument exists so
-        that ``direct_lingam`` accepts ``random_state`` as ``ica_lingam`` does.
     measure : {"pwling"}, default="pwling"
         How the order search picks the most exogenous remaining variable at each step. Only
         ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
@@ -104,7 +101,7 @@ def direct_lingam(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"DirectLiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
+        ``"direct_lingam"``. ``ordering`` is the causal order as a tuple of column indices, causes
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
         adaptive Lasso, or by least squares for a copy (see Notes) and for a variable with a
         required parent; the DAG has an edge where the coefficient is nonzero and at every required
@@ -112,15 +109,15 @@ def direct_lingam(
 
     Raises
     ------
-    NotImplementedError
-        If ``measure`` is not ``"pwling"``.
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` is not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a
-        constant column, named in the message. Also if it has fewer than ``n_variables + 1`` rows,
-        the fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
-        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
+        named in the message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with
+        which the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -155,6 +152,11 @@ def direct_lingam(
     the other copies follow it directly in the order. Each of them gets a single edge from it,
     weighted by the scale between the two, and no edges to later columns, which take their edges
     from the column it copies.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
     with no hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
@@ -193,7 +195,7 @@ def direct_lingam(
     """
     from andrey.lingam.direct import direct_lingam as _native
 
-    X = _pruning_rows(data_matrix(data))
+    X = _pruning_rows(data_matrix(data, method="direct_lingam"))
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
     order, B = _native(X, measure=measure, constraints=constraints)
@@ -204,12 +206,16 @@ def direct_lingam(
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,
-        metadata={"algorithm": "DirectLiNGAM"},
     )
 
 
+@method_spec("ica_lingam")
 def ica_lingam(
-    data: npt.ArrayLike, *, random_state: int | None = None, max_iter: int = 1000
+    data: npt.ArrayLike,
+    *,
+    seed: int | None = None,
+    max_iter: int = 1000,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a fully oriented DAG with ICA-LiNGAM (linear, non-Gaussian noise).
 
@@ -217,42 +223,58 @@ def ica_lingam(
     reorders this matrix into a causal order [1]_. It estimates edge weights by regressing each
     variable on those before it, using adaptive Lasso. Like DirectLiNGAM, it returns one weighted
     DAG (directed acyclic graph) with a total ordering, rather than an equivalence class. FastICA
-    starts from a random point, so the order can change with ``random_state``.
+    starts from a random point, so the order can change with ``seed``.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    random_state : int or None, default=None
+    seed : int or None, default=None
         Seed for FastICA's starting point, from ``0`` to ``2**32 - 1``. ``None`` uses the
-        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset.
+        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset. ``metadata["seed"]``
+        records the seed used.
     max_iter : int, default=1000
-        Maximum FastICA iterations; at least ``1``.
+        Most FastICA iterations, at least ``1``. Reaching it before FastICA converges warns with
+        :class:`~andrey.SearchLimitWarning`.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The order search reads the unmixing
+        weight of every edge the knowledge forbids as ``0``, the reverse of each required edge and
+        every edge into an earlier tier included, and puts the cause of each required edge, and each
+        earlier tier, first. The regression on that order drops the forbidden parents and does not
+        penalize the required ones. A variable with a required parent takes least-squares weights on
+        the parents it keeps; the others keep the adaptive Lasso's. Every required edge is in the
+        DAG, even where its least-squares weight is ``0``.
 
     Returns
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"ICALiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
-        first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
-        adaptive Lasso; the DAG has an edge exactly where the coefficient is nonzero.
+        ``"ica_lingam"`` and ``metadata["seed"]`` the seed used. ``ordering`` is the causal order as
+        a tuple of column indices, causes first. ``weighted_adjacency[i, j]`` is the coefficient of
+        edge ``i -> j``, estimated by adaptive Lasso, or by least squares for a variable with a
+        required parent; the DAG has an edge where the coefficient is nonzero and at every required
+        edge.
 
     Raises
     ------
     RuntimeError
         If no causal order can be read from the FastICA result.
     TypeError
-        If ``max_iter`` is not an int.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0`` to
-        ``2**32 - 1``, or if ``data`` has fewer than ``n_variables + 1`` rows, the fewest with which
-        the pruning step can estimate the edge weights.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the
+        edge weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
-    sklearn.exceptions.ConvergenceWarning
-        When FastICA does not converge within ``max_iter`` iterations.
+    SearchLimitWarning
+        When FastICA does not converge within ``max_iter`` iterations, or the adaptive Lasso's LARS
+        path reports that it stopped early (scikit-learn's ``ConvergenceWarning``, raised again).
 
     See Also
     --------
@@ -266,14 +288,19 @@ def ica_lingam(
     it scored worse than the empty graph at the benchmarks' sample size, while DirectLiNGAM
     recovered most edges. Prefer :func:`~andrey.direct_lingam` unless ICA is needed.
 
-    **Choosing random_state and max_iter.** Different values of ``random_state`` can give different
-    orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
-    converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
+    **Choosing seed and max_iter.** Different seeds can give different orders; compare a few when
+    the result matters. If FastICA reaches ``max_iter`` before converging, the fit warns with
+    :class:`~andrey.SearchLimitWarning`; then raise ``max_iter``.
 
     **Column order and machines.** When several variables can come next in the causal order, the one
     whose column ranks first by its own values goes first. FastICA itself can reach another solution
     under a new column order or on another machine when it converges slowly, at few rows per
     variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
+    unmix every variable over the same rows, so a row with a missing value has no place in them.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
     with no hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
@@ -292,12 +319,22 @@ def ica_lingam(
     at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's protein-signaling data (853 rows, 11
     variables), its errors were below the empty graph's (14 against 17). The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    settings, and the machine. Its causal order depends on the columns' scale, as its authors note
+    [2]_: matching the rows of the unmixing matrix to the variables, and pruning its coefficients
+    from the smallest, both read the data's units, and the matching assumes every noise term has
+    the same scale [1]_. On simulated linear data with uniform noise and weights between 0.5 and 2
+    whose noise terms all have unit variance, at 50 variables, mean degree 4 and 2,000 rows, its
+    errors (SHD) summed over 5 datasets were 9 on the columns as drawn and 1,784 on the same columns
+    standardized, against 500 for the empty graph. ``direct_lingam`` finds the order in a way that
+    does not depend on the scale [2]_.
 
     References
     ----------
     .. [1] Shimizu, S., Hoyer, P. O., Hyvarinen, A., and Kerminen, A. (2006). A linear
        non-Gaussian acyclic model for causal discovery. JMLR 7, 2003-2030.
+    .. [2] Shimizu, S., Inazumi, T., Sogawa, Y., Hyvarinen, A., Kawahara, Y., Washio, T., Hoyer,
+       P. O., and Bollen, K. (2011). DirectLiNGAM: A direct method for learning a linear
+       non-Gaussian structural equation model. JMLR 12, 1225-1248.
 
     Examples
     --------
@@ -306,28 +343,32 @@ def ica_lingam(
     >>> rng = np.random.default_rng(0)
     >>> x = rng.uniform(-1, 1, 500)
     >>> y = 0.8 * x + rng.uniform(-1, 1, 500)
-    >>> out = ica_lingam(np.column_stack([x, y]), random_state=0)
+    >>> out = ica_lingam(np.column_stack([x, y]), seed=0)
     >>> out.structure.kind
     'dag'
     """
     from andrey.lingam.ica import ica_lingam as _native
 
-    X = _pruning_rows(data_matrix(data))
-    max_iter = int_in_range(max_iter, "max_iter", 1)
+    X = _pruning_rows(data_matrix(data, method="ica_lingam"))
     labels = column_labels(data)
-    order, B = _native(X, random_state=random_state, max_iter=max_iter)
+    constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
+    order, B = _native(X, random_state=seed, max_iter=max_iter, constraints=constraints)
     weighted = _canonical_weights(B)
+    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
     return structure_output(
-        dag_from_adjacency(weighted),
+        dag_from_adjacency(edges),
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,
-        metadata={"algorithm": "ICALiNGAM"},
     )
 
 
+@method_spec("multi_group_direct_lingam")
 def multi_group_direct_lingam(
-    data_groups: Sequence[npt.ArrayLike], *, random_state: int | None = None
+    data: Sequence[npt.ArrayLike],
+    *,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> list[StructureOutput]:
     """Jointly learn one fully oriented DAG per group with multi-group DirectLiNGAM.
 
@@ -338,30 +379,43 @@ def multi_group_direct_lingam(
 
     Parameters
     ----------
-    data_groups : sequence of array-like, each of shape (n_samples, n_variables)
+    data : sequence of array-like, each of shape (n_samples, n_variables)
         Two or more datasets over the same ``d`` variables; sample counts may differ per group.
         Each is coerced to ``float64``. DataFrames must name their columns alike; the names become
         the structures' ``labels``.
-    random_state : int or None, default=None
-        Ignored. The method is deterministic; the argument exists so that
-        ``multi_group_direct_lingam`` accepts ``random_state`` as the other LiNGAM methods do.
+    measure : {"pwling"}, default="pwling"
+        How the order search picks the most exogenous variable at each step; ``"pwling"`` is
+        DirectLiNGAM's pairwise likelihood-ratio measure, with the groups' scores weighted by their
+        share of the samples.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. It holds for every group. The
+        shared causal order puts the cause of each required edge, and each earlier tier, first. The
+        regression on that order drops the forbidden parents and does not penalize the required
+        ones. A variable with a required parent takes least-squares weights on the parents it keeps;
+        the others keep the adaptive Lasso's. Every required edge is in every group's DAG, even
+        where its least-squares weight is ``0``.
 
     Returns
     -------
     list[StructureOutput]
         One envelope per group, in input order. Each wraps a ``dag``
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
-        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights
-        ``i -> j``). ``metadata["algorithm"]`` is ``"MultiGroupDirectLiNGAM"``, with ``group_index``
-        and ``n_groups``.
+        order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
+        j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
+        ``metadata["group_index"]`` is the group's position in ``data_groups``.
 
     Raises
     ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If fewer than two groups are given, if the groups disagree on the variable count or on
-        their column names, or if a group is not a usable 2-D matrix or has fewer than
-        ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
-        weights.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if fewer than
+        two groups are given, if the groups disagree on the variable count or on their column names,
+        or if a group is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the
+        fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
+        names a column the groups lack or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -369,6 +423,11 @@ def multi_group_direct_lingam(
     does, ranking each column by its data stacked over the groups. Columns that are copies in any
     group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
     only in the groups where it is one.
+
+    **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: the causal order compares the
+    residuals of every variable over the same rows, so a row with a missing value has no place in
+    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise in 3 groups that share one
     Erdos-Renyi graph, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
@@ -403,31 +462,31 @@ def multi_group_direct_lingam(
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native
 
     groups = [
-        _pruning_rows(data_matrix(X, name=f"data_groups[{k}]"), name=f"data_groups[{k}]")
-        for k, X in enumerate(data_groups)
+        _pruning_rows(
+            data_matrix(X, name=f"data[{k}]", method="multi_group_direct_lingam"),
+            name=f"data[{k}]",
+        )
+        for k, X in enumerate(data)
     ]
     if len(groups) < 2:
-        raise ValueError(f"data_groups must hold at least two datasets, got {len(groups)}")
+        raise ValueError(f"data must hold at least two datasets, got {len(groups)}")
     if len({X.shape[1] for X in groups}) > 1:
         widths = [X.shape[1] for X in groups]
-        raise ValueError(f"every dataset in data_groups needs the same columns, got {widths}")
-    labels = shared_labels(column_labels(X) for X in data_groups)
-    order, adjacency_matrices = _native(groups)
-    n_groups = len(groups)
+        raise ValueError(f"every dataset in data needs the same columns, got {widths}")
+    labels = shared_labels(column_labels(X) for X in data)
+    constraints = resolve(knowledge, groups[0].shape[1], labels, method="multi_group_direct_lingam")
+    order, adjacency_matrices = _native(groups, measure=measure, constraints=constraints)
     outputs = []
     for k, B in enumerate(adjacency_matrices):
         weighted = _canonical_weights(B)
+        edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
         outputs.append(
             structure_output(
-                dag_from_adjacency(weighted),
+                dag_from_adjacency(edges),
                 labels=labels,
                 ordering=order,
                 weighted_adjacency=weighted,
-                metadata={
-                    "algorithm": "MultiGroupDirectLiNGAM",
-                    "group_index": k,
-                    "n_groups": n_groups,
-                },
+                metadata={"group_index": k},
             )
         )
     return outputs

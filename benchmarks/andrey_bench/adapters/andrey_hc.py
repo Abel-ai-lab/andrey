@@ -28,6 +28,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, andrey_score
+
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: Deviance units: the penalty of bnlearn's `bic-g` at `k = log(n)/2` and pcalg's `0.5*log(n)`.
 #: `bic-g` divides the residual sum of squares by n - p - 1, so its likelihood differs.
@@ -75,6 +77,7 @@ class AndreyHC:
         return {
             "score_func": _DEFAULT_SCORE_FUNC,
             "lambda_value": _DEFAULT_LAMBDA,
+            "ebic_gamma": ANDREY_EBIC_GAMMA,
             "max_iter": _DEFAULT_MAX_ITER,
         }
 
@@ -94,7 +97,11 @@ class AndreyHC:
         X = np.asarray(data, dtype=np.float64)
         with andrey.config(backend=self.backend):
             cpdag, _score = _hc(
-                X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter
+                X,
+                score_func=andrey_score(score_func),
+                penalty_discount=lambda_value,
+                ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
+                max_iter=max_iter,
             )
         return np.asarray(cpdag.to_numpy())
 
@@ -130,8 +137,8 @@ class AndreyHCCategorical(AndreyHC):
 
     ``score_func`` is ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``. ``params`` names
     every setting the search runs with, each a value the other packages' hill climbing is set to:
-    BDeu's two priors, or the BIC weight; the accepted-move budget; and no parent cap, since
-    :func:`andrey.search.hc.hc` has none.
+    BDeu's two priors, or the BIC weight; the accepted-move budget; and no parent cap, which is
+    the default of :func:`andrey.search.hc.hc`.
     """
 
     score_func: str = "local_score_BDeu"

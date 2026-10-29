@@ -13,9 +13,9 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core import NULL
+from andrey.core import NULL, ci
 from andrey.core.ci import make_indep_test
-from andrey.data import sample_scm
+from andrey.data import sample_discrete, sample_mixed, sample_scm
 
 fci = importlib.import_module("andrey.constraint.fci")
 
@@ -48,7 +48,7 @@ def test_keeps_the_recorded_pag(method, possible_dsep):
 
 @pytest.mark.parametrize(("method", "value"), [("fci", "order-free"), ("gfci", "FAST")])
 def test_unknown_possible_dsep_raises(method, value):
-    with pytest.raises(ValueError, match="possible_dsep must be 'order_free' or 'fast'"):
+    with pytest.raises(ValueError, match="possible_dsep must be one of 'order_free', 'fast'"):
         getattr(andrey, method)(
             np.random.default_rng(0).standard_normal((50, 3)), possible_dsep=value
         )
@@ -106,3 +106,125 @@ def _counting(function, builds, key):
         return function(*args)
 
     return counted
+
+
+class _Scripted:
+    """A test whose p-value of each conditioning set is set in advance.
+
+    ``answered`` logs the queries a caller is answered, as the identity check counts them: each
+    scalar call, and the sets ``separating_prefix`` returns p-values for, not the calls it makes
+    inside. ``raising`` names a set whose evaluation raises, alone or in a batch. Without
+    ``batched``, the test has no ``separating_prefix`` and takes one call per subset.
+    """
+
+    def __init__(self, pvalues, raising=None, batched=True):
+        self.pvalues, self.raising, self.answered, self.inside = pvalues, raising, [], False
+        if not batched:
+            self.separating_prefix = None
+
+    def _p(self, condition_set):
+        key = tuple(sorted(condition_set))
+        if key == self.raising:
+            raise FloatingPointError(f"set {key}")
+        return self.pvalues.get(key, 0.0)
+
+    def __call__(self, x, y, condition_set=()):
+        p = self._p(condition_set)
+        if not self.inside:
+            self.answered.append((tuple(condition_set), p))
+        return p
+
+    def batched_call(self, x, y, condition_sets):
+        return [self._p(s) for s in condition_sets]
+
+    def separating_prefix(self, x, y, condition_sets, alpha):
+        self.inside = True
+        try:
+            pvalues = ci._separating_prefix(self, x, y, condition_sets, alpha)
+        finally:
+            self.inside = False
+        self.answered.extend(zip(map(tuple, condition_sets), pvalues))
+        return pvalues
+
+
+def _dsep_run(test, dsep, alpha=0.05):
+    marks = np.full((12, 12), 1, dtype=np.int8)
+    sepsets: dict = {}
+    try:
+        removed, error = (
+            fci._try_remove_by_dsep(marks, 0, 1, dsep, {2}, {3}, test, alpha, sepsets),
+            None,
+        )
+    except FloatingPointError as exc:
+        removed, error = None, str(exc)
+    return removed, sepsets, int(marks[0, 1]), test.answered, error
+
+
+@pytest.mark.parametrize("seed", range(48))
+def test_runs_answer_the_one_at_a_time_queries(seed, monkeypatch):
+    """Runs of 1, 2, 4, ... subsets give the one-at-a-time loop's separating set and answered
+    queries, in order, whether the pair separates early, late, or never; a set that raises raises
+    only when the loop reaches it, after the queries the loop answers first."""
+    monkeypatch.setattr(fci, "_DSEP_RUN", 8)  # several capped runs on a small case
+    rng = np.random.default_rng(seed)
+    dsep = rng.permutation(np.arange(2, 12)).tolist()[: rng.integers(3, 8)]
+    choices = list(fci._iter_dsep_choices(dsep, {2}, {3}))
+    pvalues = {tuple(sorted(c)): float(rng.uniform(0.0, 0.04)) for c in choices}
+    where = ("early", "late", "never")[seed % 3]
+    if where != "never":
+        late = int(rng.integers(len(choices) // 2, len(choices)))
+        at = int(rng.integers(0, 3)) if where == "early" else late
+        pvalues[tuple(sorted(choices[at]))] = 0.5
+    raising = tuple(sorted(choices[rng.integers(len(choices))])) if seed % 2 else None
+    removed, sepsets, mark, answered, error = _dsep_run(_Scripted(pvalues, raising), dsep)
+    want = _dsep_run(_Scripted(pvalues, raising, batched=False), dsep)
+    assert (removed, sepsets, mark, error) == (want[0], want[1], want[2], want[4])
+    if error is None:
+        assert answered == want[3]
+    else:  # the fit raises; the queries answered before the failing run are the loop's
+        assert answered == want[3][: len(answered)]
+
+
+@pytest.mark.parametrize("test_name", ["fisherz", "chisq", "degen_gauss", "cond_gauss"])
+@pytest.mark.parametrize("possible_dsep", ["order_free", "fast"])
+def test_shipped_tests_answer_the_one_at_a_time_queries(test_name, possible_dsep, monkeypatch):
+    """FCI with each shipped test that has ``separating_prefix`` returns the PAG and answers the
+    possible-d-sep queries, p-values included, of the one-at-a-time loop, which a test without it
+    takes."""
+
+    if test_name == "chisq":
+        x = sample_discrete(d=12, n=600, seed=5, density=5.0).data
+    elif test_name == "fisherz":
+        x = sample_scm(d=15, n=750, density=4.0, seed=3).data
+    else:
+        x = sample_mixed(d=12, n=600, seed=1, density=5.0).data
+    asked = []
+    try_remove = fci._try_remove_by_dsep
+
+    def logged(marks, x_, y_, dsep, adj_a, adj_b, test, *args):
+        def answer(a, b, condition_set):
+            p = test(a, b, condition_set)
+            asked.append((a, b, tuple(condition_set), p))
+            return p
+
+        return try_remove(marks, x_, y_, dsep, adj_a, adj_b, answer, *args)
+
+    monkeypatch.setattr(fci, "_try_remove_by_dsep", logged)
+    x = np.asarray(x, float)
+    want = andrey.fci(x, indep_test=test_name, possible_dsep=possible_dsep)
+    one_at_a_time = list(asked)
+    monkeypatch.setattr(fci, "_try_remove_by_dsep", try_remove)
+    prefixes = []
+    for cls in (ci.PartialCorrelationTest, ci.ChiSquare, ci.DGTest, ci.CGTest):
+        method = vars(cls)["separating_prefix"]
+
+        def spied(self, a, b, sets, alpha, _method=method):
+            pvalues = _method(self, a, b, sets, alpha)
+            prefixes.extend((a, b, tuple(s), p) for s, p in zip(sets, pvalues))
+            return pvalues
+
+        monkeypatch.setattr(cls, "separating_prefix", spied)
+    got = andrey.fci(x, indep_test=test_name, possible_dsep=possible_dsep)
+    assert np.array_equal(got.structure.to_numpy(), want.structure.to_numpy())
+    assert prefixes == one_at_a_time
+    assert one_at_a_time, "the case must reach the possible-d-sep step"

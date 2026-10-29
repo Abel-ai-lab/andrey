@@ -20,5 +20,27 @@ def andrey_lambda(causal_learn_lambda: float) -> float:
 #: The equivalent penalty in Andrey's deviance units.
 ANDREY_LAMBDA = andrey_lambda(CAUSAL_LEARN_LAMBDA)
 
+#: Andrey's name for each score the adapters' params name in the harness's recorded vocabulary
+#: (Andrey's names from 0.10.0), which every package's adapter shares.
+ANDREY_SCORE = {
+    "local_score_BIC": "bic",
+    "local_score_BIC_from_cov": "bic",
+    "local_score_BDeu": "bdeu",
+    "local_score_BIC_categorical": "discrete_bic",
+    "local_score_cond_gauss": "cond_gauss",
+    "local_score_degen_gauss": "degen_gauss",
+}
+
+
+def andrey_score(name: str) -> str:
+    """Return Andrey's name for the params' score ``name``; a name Andrey keeps passes through."""
+    return ANDREY_SCORE.get(name, name)
+
+
 #: Shared seed because BOSS and GRaSP search random variable orders.
 SEARCH_SEED = 0
+
+#: Andrey's extended-BIC weight in every lane. The reference packages score the standard BIC, so
+#: Andrey's linear-Gaussian BIC runs at ``ebic_gamma=0.0`` and both sides of a row optimize one
+#: objective.
+ANDREY_EBIC_GAMMA = 0.0

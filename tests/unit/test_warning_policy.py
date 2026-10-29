@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.api import _boundary
 from andrey.api._experimental import warn_experimental
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
@@ -68,6 +69,12 @@ def _experimental(monkeypatch):
     return lambda: warn_experimental("new_method")  # an experimental facade's first line
 
 
+def _past_the_boundary(monkeypatch):
+    ladder = _boundary.Ladder("2,000 rows", 2000, False, 2, "variables", 20, 20, "time")
+    monkeypatch.setattr(_boundary, "measured", lambda: {"new_method": (ladder,)})
+    return lambda: _boundary.warn_past_boundary("new_method", (2000, 30))  # a facade's check
+
+
 def _search_limit(monkeypatch):
     data = np.cumsum(np.random.default_rng(0).standard_normal((200, 4)), axis=1)  # a chain
     return lambda: hc_module.hc(data, max_iter=1)  # the search itself: no experimental warning
@@ -97,6 +104,7 @@ TRIGGERS = {
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
     "default pool cutoff": (_default_pool_cutoff, andrey.PerformanceWarning),
     "experimental method": (_experimental, andrey.ExperimentalWarning),
+    "past the boundary": (_past_the_boundary, andrey.BoundaryWarning),
     "search limit": (_search_limit, andrey.SearchLimitWarning),
     "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
     "inferred categorical columns": (_inferred_categories, andrey.DataTypeWarning),
@@ -150,6 +158,8 @@ def test_every_category_is_a_user_warning_under_the_base():
         andrey.BackendFallbackWarning,
         andrey.SearchLimitWarning,
         andrey.SampleSizeWarning,
+        andrey.DataTypeWarning,
+        andrey.BoundaryWarning,
     ):
         assert issubclass(category, andrey.AndreyWarning)
     assert issubclass(andrey.AndreyWarning, UserWarning)

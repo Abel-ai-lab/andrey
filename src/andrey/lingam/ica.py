@@ -5,26 +5,39 @@ The algorithm, its settings, and its reference are described on :func:`andrey.ic
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from sklearn.decomposition import FastICA
 
 from andrey.core.seeding import resolve_seed
+from andrey.core.warning_policy import convergence_as_search_limit
 from andrey.lingam.adjacency import estimate
 from andrey.search.hc import tie_ranks
 
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
-def _search_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] | None:
+
+def _search_causal_order(
+    matrix: np.ndarray, ranks: np.ndarray, precedence: np.ndarray | None = None
+) -> list[int] | None:
     """Strict causal order of a matrix by repeatedly peeling off all-zero rows, or ``None``.
 
-    When several rows are all zero, the one with the lowest ``ranks`` entry goes first.
+    When several rows are all zero, the one with the lowest ``ranks`` entry goes first. With
+    ``precedence`` (``precedence[a, b]``: ``a`` comes before ``b``), a row is peeled only when no
+    remaining row must come before it.
     """
     causal_order: list[int] = []
     row_num = matrix.shape[0]
     original_index = np.arange(row_num)
 
     while len(matrix) > 0:
-        row_index_list = np.where(np.sum(np.abs(matrix), axis=1) == 0)[0]
+        zero = np.sum(np.abs(matrix), axis=1) == 0
+        if precedence is not None:
+            zero &= ~precedence[np.ix_(original_index, original_index)].any(axis=0)
+        row_index_list = np.where(zero)[0]
         if len(row_index_list) == 0:
             break
         target_index = row_index_list[np.argmin(ranks[original_index[row_index_list]])]
@@ -39,8 +52,13 @@ def _search_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] | N
     return causal_order
 
 
-def _estimate_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] | None:
-    """Approximate a lower-triangular order: zero smallest entries until a strict order appears."""
+def _estimate_causal_order(
+    matrix: np.ndarray, ranks: np.ndarray, precedence: np.ndarray | None = None
+) -> list[int] | None:
+    """Approximate a lower-triangular order: zero smallest entries until a strict order appears.
+
+    ``precedence`` reaches :func:`_search_causal_order`, so the order keeps it.
+    """
     matrix = matrix.copy()
     pos_list = np.argsort(np.abs(matrix), axis=None)
     pos_list = np.vstack(np.unravel_index(pos_list, matrix.shape)).T
@@ -52,14 +70,18 @@ def _estimate_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] |
     causal_order = None
     for i, j in pos_list[initial_zero_num:]:
         matrix[i, j] = 0
-        causal_order = _search_causal_order(matrix, ranks)
+        causal_order = _search_causal_order(matrix, ranks, precedence)
         if causal_order is not None:
             break
     return causal_order
 
 
 def ica_lingam(
-    X: np.ndarray, *, random_state: int | None = None, max_iter: int = 1000
+    X: np.ndarray,
+    *,
+    random_state: int | None = None,
+    max_iter: int = 1000,
+    constraints: Constraints | None = None,
 ) -> tuple[list[int], np.ndarray]:
     """Fit ICA-LiNGAM: return ``(causal_order, B)`` with ``x_i = sum_j B[i, j] x_j``.
 
@@ -73,6 +95,12 @@ def ica_lingam(
 
     ``random_state`` resolves through :func:`andrey.core.seeding.resolve_seed` (default seed ``0``)
     and is passed straight to FastICA.
+
+    With background knowledge ``constraints``, the order search reads the weight of every edge
+    they forbid as ``0`` (the reverse of each required edge, and every edge into an earlier tier,
+    included) and peels a variable only after every variable that
+    :meth:`~andrey.core.knowledge.Constraints.precedence` puts before it. The re-estimation drops
+    forbidden parents and keeps required ones unpenalized, as DirectLiNGAM's does.
     """
     X = np.asarray(X, dtype=np.float64)
     seed = resolve_seed(random_state)
@@ -80,7 +108,9 @@ def ica_lingam(
         return [0], np.zeros((1, 1))  # one variable: nothing to order, no edge to weigh
 
     ica = FastICA(max_iter=max_iter, random_state=seed)
-    ica.fit(X)
+    convergence_as_search_limit(
+        f"ica_lingam (max_iter={max_iter} FastICA iterations)", lambda: ica.fit(X)
+    )
     w_ica = ica.components_
 
     _, col_index = linear_sum_assignment(1 / np.abs(w_ica))
@@ -91,9 +121,15 @@ def ica_lingam(
     w_estimate = pw_ica / diag
     b_estimate = np.eye(len(w_estimate)) - w_estimate
 
-    causal_order = _estimate_causal_order(b_estimate, tie_ranks(X))
+    if constraints is None:
+        causal_order = _estimate_causal_order(b_estimate, tie_ranks(X))
+    else:
+        b_estimate[constraints.forbidden.T] = 0.0  # B[i, j] weighs j -> i
+        causal_order = _estimate_causal_order(b_estimate, tie_ranks(X), constraints.precedence())
     if causal_order is None:
         raise RuntimeError("ICA-LiNGAM failed to find a causal order (no nilpotent permutation)")
 
-    B = estimate(X, causal_order)
+    if constraints is None:
+        return causal_order, estimate(X, causal_order)
+    B = estimate(X, causal_order, forbidden=constraints.forbidden, required=constraints.required)
     return causal_order, B

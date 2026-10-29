@@ -57,7 +57,7 @@ TABLE_SPECS = [
 ]
 
 #: Settings that shorten a slow fit; the labels come from the same facade path.
-SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
@@ -129,6 +129,23 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
             assert named_marks(fit([COLUMNS[k] for k in order])) == want
 
 
+@pytest.mark.parametrize(
+    "spec", [spec for spec in TABLE_SPECS if spec.data.missing], ids=lambda spec: spec.name
+)
+def test_reordering_the_columns_of_data_with_missing_values_relabels_the_result(spec):
+    """A method that deletes rows per test names the same edges under reordered columns."""
+    cells = np.random.default_rng(5).random((N, 3)) < 0.1
+
+    def fit(columns: list[str]):
+        frames = [frame(seed).mask(cells)[columns] for seed in range(3)]
+        return getattr(andrey, spec.name)(*inputs(spec, frames))
+
+    want = named_marks(fit(COLUMNS))
+    pair = spec.family == "pairwise"  # a pair test reads the first two columns, which swap
+    for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):
+        assert named_marks(fit([COLUMNS[k] for k in order])) == want
+
+
 @pytest.mark.parametrize("data", [frame().to_numpy(), pd.DataFrame(frame().to_numpy())])
 def test_arrays_and_default_columns_keep_integer_nodes(data):
     out = andrey.pc(data)
@@ -158,23 +175,29 @@ def test_reversed_columns_give_the_same_named_edges_on_torch(monkeypatch):
     assert sorted(forward.oriented_edges()) == [("x", "y", "directed"), ("z", "y", "directed")]
 
 
-def test_gin_explicit_labels_beat_columns():
-    out = andrey.gin(frame(), labels=("a", "b", "c"))
-    assert out.structure.labels[:3] == ("a", "b", "c")
+def test_gin_ignores_the_former_labels_argument_with_a_warning():
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="labels is ignored"):
+        out = andrey.gin(frame(), labels=("a", "b", "c"))
+    assert out.structure.labels[:3] == ("x", "y", "z")
 
 
 @pytest.mark.parametrize(
-    ("labels", "message"), [(("a", "a", "b"), r"'a' names columns \[0, 1\]"), ((1, "1", 2), "'1'")]
+    ("columns", "message"), [(["a", "a", "b"], r"'a' names columns \[0, 1\]"), ([1, "1", 2], "'1'")]
 )
-def test_gin_explicit_labels_must_differ_as_text(labels, message):
+def test_gin_columns_must_differ_as_text(columns, message):
     with pytest.raises(ValueError, match=message):
-        andrey.gin(frame(), labels=labels)
+        andrey.gin(frame().set_axis(columns, axis=1))
 
 
 def test_gin_latents_skip_the_names_of_observed_columns():
     latents = andrey.gin(frame().set_axis(["L1", "x", "L3"], axis=1)).structure.labels[3:]
     assert latents[0] == "L2" and not set(latents) & {"L1", "x", "L3"}
-    assert andrey.gin(frame(), labels=(1, 2, 3)).structure.labels[:4] == ("1", "2", "3", "L1")
+    assert andrey.gin(frame().set_axis([1, 2, 3], axis=1)).structure.labels[:4] == (
+        "1",
+        "2",
+        "3",
+        "L1",
+    )
 
 
 @pytest.mark.parametrize(

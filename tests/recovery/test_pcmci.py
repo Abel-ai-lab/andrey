@@ -59,14 +59,14 @@ INDEP_TESTS = ["student_t", "fisherz"]
 def test_recovers_the_planted_links(planted, indep_test):
     data, truth = planted
     assert len(truth) == 10
-    out = andrey.pcmci(data, tau_max=2, alpha_level=0.01, indep_test=indep_test)
+    out = andrey.pcmci(data, tau_max=2, alpha=0.01, indep_test=indep_test)
     assert _links(out) == truth
 
 
 def test_the_tests_differ_in_p_values_and_agree_on_the_graph(planted):
     data, _ = planted
     student_t, fisherz = (
-        andrey.pcmci(data, tau_max=2, alpha_level=0.01, indep_test=name) for name in INDEP_TESTS
+        andrey.pcmci(data, tau_max=2, alpha=0.01, indep_test=name) for name in INDEP_TESTS
     )
     assert student_t.structure == fisherz.structure
     assert student_t.metadata["p_values"] != fisherz.metadata["p_values"]
@@ -86,8 +86,8 @@ def test_generated_var_scores_well_above_the_empty_graph(indep_test):
         functional=functional.var(n_lags=2, lag_density=0.3),
         noise=noise.gaussian(),
     )
-    dataset = scm.sample(1000, 0)
-    out = andrey.pcmci(dataset.data, tau_max=2, alpha_level=0.01, indep_test=indep_test)
+    dataset = scm.sample(1000, 0, scale="raw")
+    out = andrey.pcmci(dataset.data, tau_max=2, alpha=0.01, indep_test=indep_test)
     lagged = temporal_scores(out, dataset.graph)["lagged"]
     nothing = GraphStructure.from_numpy(np.zeros((5, 5), np.int8), kind="digraph")
     empty = TemporalStructure.from_lag_graphs([nothing, nothing], lags=[1, 2])
@@ -101,10 +101,10 @@ def test_independent_autocorrelated_series_give_only_self_loops(indep_test):
     rng = np.random.default_rng(1)
     innovations = rng.standard_normal((700, 4))
     data = temporal.generate(np.eye(4), 0.9 * np.eye(4)[None], None, innovations, burn_in=200)
-    out = andrey.pcmci(data, tau_max=2, alpha_level=0.01, indep_test=indep_test)
+    out = andrey.pcmci(data, tau_max=2, alpha=0.01, indep_test=indep_test)
     assert _links(out) == {(i, i, 1) for i in range(4)}
 
 
 def test_matches_the_recorded_output():
-    out = andrey.pcmci(datagen.generate("var_3v_lag2"), tau_max=2)
+    out = andrey.pcmci(datagen.generate("var_3v_lag2"), tau_max=2, indep_test="student_t")
     assert_recorded_output(out, "PCMCI", case="var_3v_lag2")

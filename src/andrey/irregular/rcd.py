@@ -21,13 +21,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import combinations
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.special import betaincc
 from scipy.stats import pearsonr, shapiro
-from sklearn.linear_model import LinearRegression
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.knowledge import KnowledgeError, _has_cycle
+from andrey.core.units import least_squares
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 # Memo tables keyed by column-index signatures, valid only while the data matrix stays fixed:
 # a residual/coefficient pair per ``(endog, exog-order)``, a Shapiro-Wilk p-value per
@@ -71,18 +76,18 @@ def _resid_and_coef(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Ordinary-least-squares residual and coefficients of ``X[:, endog]`` on ``X[:, exog]``.
 
-    An intercept is fitted and discarded; the returned coefficients align with ``exog``. When
-    ``memo`` is given (the matrix is the fixed data), the ``(endog, exog)`` result is stored and
-    reused; the key keeps the ``exog`` order so a cached coefficient vector aligns with its request.
+    An intercept is fitted and discarded; the returned coefficients align with ``exog``. The fit
+    runs on unit-scale predictors (:func:`~andrey.core.units.least_squares`). When ``memo`` is
+    given (the matrix is the fixed data), the ``(endog, exog)`` result is stored and reused; the
+    key keeps the ``exog`` order so a cached coefficient vector aligns with its request.
     """
     key = (endog, tuple(exog))
     if memo is not None:
         cached = memo.get(key)
         if cached is not None:
             return cached
-    regressor = LinearRegression()
-    regressor.fit(X[:, exog], X[:, endog])
-    result = (X[:, endog] - regressor.predict(X[:, exog]), regressor.coef_)
+    coef, intercept = least_squares(X[:, exog], X[:, endog])
+    result = (X[:, endog] - (X[:, exog] @ coef + intercept), coef)
     if memo is not None:
         memo[key] = result
     return result
@@ -335,13 +340,38 @@ def extract_parents(
     return P
 
 
+def apply_knowledge(P: list[set[int]], constraints: Constraints) -> list[set[int]]:
+    """The parent sets ``P`` without the parents ``constraints`` forbid and with the required ones.
+
+    Raises :class:`~andrey.core.knowledge.KnowledgeError` when the required parents close a
+    directed cycle that the parents found from the data did not have.
+    """
+    d = len(P)
+    found = np.zeros((d, d), dtype=bool)  # [j, i]: j -> i
+    for i, parents in enumerate(P):
+        found[list(parents), i] = True
+    edges = (found & ~constraints.forbidden) | constraints.required
+    if _has_cycle(edges) and not _has_cycle(found):
+        raise KnowledgeError(
+            "the required edges close a directed cycle with the parents RCD found; change the "
+            "required edges, or forbid an edge on the cycle"
+        )
+    return [set(np.flatnonzero(edges[:, i]).tolist()) for i in range(d)]
+
+
 def extract_confounded_pairs(
-    X: np.ndarray, P: list[set[int]], caches: _FitCaches, *, cor_alpha: float
+    X: np.ndarray,
+    P: list[set[int]],
+    caches: _FitCaches,
+    *,
+    cor_alpha: float,
+    apart: np.ndarray | None = None,
 ) -> list[set[int]]:
     """Flag each non-parent pair whose parent-residuals stay correlated as latently confounded.
 
     A variable is first residualized on its recovered parents; two such residuals that remain
-    Pearson-correlated point to an unobserved common cause.
+    Pearson-correlated point to an unobserved common cause. A pair ``apart[i, j]`` marks, one that
+    background knowledge keeps non-adjacent, is never flagged.
     """
     d = X.shape[1]
     C: list[set[int]] = [set() for _ in range(d)]
@@ -356,7 +386,7 @@ def extract_confounded_pairs(
         return cached
 
     for i, j in combinations(range(d), 2):
-        if (i in P[j]) or (j in P[i]):
+        if (i in P[j]) or (j in P[i]) or (apart is not None and apart[i, j]):
             continue
         if _is_correlated(resid(i), resid(j), cor_alpha):
             C[i].add(j)
@@ -393,13 +423,17 @@ def fit_rcd(
     cor_alpha: float = 0.01,
     ind_alpha: float = 0.01,
     shapiro_alpha: float = 0.01,
+    constraints: Constraints | None = None,
 ) -> RcdResult:
     """Fit RCD to ``X`` (rows are samples, columns variables); return the confounder-aware result.
 
     Runs ancestor extraction, parent extraction, and confounder detection, then assembles the
     adjacency matrix (``NaN`` on confounded pairs). ``max_explanatory_num`` caps the explanatory-set
     size; ``cor_alpha`` / ``ind_alpha`` / ``shapiro_alpha`` are the Pearson, HSIC, and Shapiro-Wilk
-    significance levels. Deterministic on its default settings.
+    significance levels. Deterministic on its default settings. With background knowledge
+    ``constraints``, the ancestor search runs as without them; the parent sets then drop the
+    forbidden parents and gain the required ones (:func:`apply_knowledge`), and no pair the
+    knowledge keeps non-adjacent is flagged as confounded.
     """
     X = np.asarray(X, dtype=np.float64)
     caches = _FitCaches()
@@ -412,5 +446,11 @@ def fit_rcd(
         shapiro_alpha=shapiro_alpha,
     )
     P = extract_parents(X, M, caches, cor_alpha=cor_alpha)
-    C = extract_confounded_pairs(X, P, caches, cor_alpha=cor_alpha)
+    if constraints is None:
+        C = extract_confounded_pairs(X, P, caches, cor_alpha=cor_alpha)
+    else:
+        P = apply_knowledge(P, constraints)
+        apart = ~constraints.support()
+        np.fill_diagonal(apart, False)
+        C = extract_confounded_pairs(X, P, caches, cor_alpha=cor_alpha, apart=apart)
     return RcdResult(adjacency_matrix_=estimate_adjacency(X, P, C, caches))

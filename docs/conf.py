@@ -310,6 +310,9 @@ NAV_ICONS = {
     "docs/brand": "palette",
 }
 NAV_SHOWN = 5
+# A page that lists every release folds only its newest pages, newest first in its toctree, under
+# its row in the sidebar, and links the rest through its own page.
+NAV_NEWEST = {"docs/benchmarks": 5}
 html_additional_pages = {
     "index": "homepage.html",
     "demo/index": "demo-redirect.html",
@@ -906,8 +909,8 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         context["newest_post"] = _newest_post_card(app)
         css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "prompt.js"]
     elif pagename == "blog/index":
-        # The posts in the Release cards page's blocks.
-        css = ["benchmarks.css", "blog.css"]
+        # The posts in the Release cards page's blocks, nine earlier posts to a page.
+        css, js = ["benchmarks.css", "blog.css"], ["paginate.js"]
     elif pagename == "blog" or pagename.startswith("blog/"):
         css, js = ["figures.css", "blog.css"], ["figures.js"]
     elif pagename in INTERACTIVE:
@@ -915,7 +918,8 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     elif pagename in ("docs/examples/index", "docs/demos/index"):
         css = ["examples.css"]
     elif pagename == "docs/benchmarks":
-        css = ["benchmarks.css"]
+        # Nine earlier releases to a page.
+        css, js = ["benchmarks.css"], ["paginate.js"]
     elif pagename.startswith("docs/benchmarks/"):
         # A release card: its cover and its figures.
         css, js = ["benchmarks.css", "figures.css"], ["figures.js"]
@@ -988,13 +992,23 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
         return {doc}.union(*(pages(child) for child in includes.get(doc, ())))
 
     def row(doc: str) -> dict:
-        kids = dict.fromkeys(includes.get(doc, ()))
-        return {
-            "doc": doc,
-            "title": title(doc),
-            "pages": pages(doc),
-            "kids": [row(k) for k in kids],
-        }
+        kids = list(dict.fromkeys(includes.get(doc, ())))
+        listed = [row(k) for k in kids]
+        if doc in NAV_NEWEST:
+            # The newest pages, the one being read if it is older, then a link to the whole list.
+            shown = NAV_NEWEST[doc]
+            listed = listed[:shown] + [k for k in listed[shown:] if pagename in k["pages"]]
+            if len(kids) > shown:
+                listed.append(
+                    {
+                        "doc": doc,
+                        "title": f"All {title(doc).lower()}",
+                        "pages": set(),
+                        "kids": [],
+                        "all": True,
+                    }
+                )
+        return {"doc": doc, "title": title(doc), "pages": pages(doc), "kids": listed}
 
     top = list(dict.fromkeys(includes[root_doc]))
     groups = [
@@ -1381,7 +1395,9 @@ THUMBS = GENERATED / "thumbs"
 # The data behind a notebook whose run shows no figure: the gallery draws its true graph instead.
 NOTEBOOK_DATA = {
     # The first size and seed the speed notebook times.
-    "speed_on_your_machine": lambda: benchmarks.scm("linear_gauss_er", 10).sample(n=100, seed=7),
+    "speed_on_your_machine": lambda: benchmarks.scm("linear_gauss_er", 10).sample(
+        n=100, seed=7, scale="raw"
+    ),
 }
 
 

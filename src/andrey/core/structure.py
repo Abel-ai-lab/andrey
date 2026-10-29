@@ -11,14 +11,15 @@ Endpoint marks are unsigned: ``NULL`` (0, never stored) / ``TAIL`` (1) / ``ARROW
 two entries (``M[i][j]`` and ``M[j][i]``). A double arrowhead ``ARROW``/``ARROW`` on an
 off-diagonal pair is kind-relative: a bidirected (latent-confounded) edge under ``pag`` but a
 2-cycle (``i -> j`` and ``j -> i``, two directed edges) under ``digraph``, the directed graph kind
-that also carries autoregressive self-loops.
+that also carries autoregressive self-loops. An ``undirected`` graph holds tail-tail pairs only:
+its edges join two variables without a claim about direction or, for a moral graph, adjacency.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import itertools
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Literal
 
@@ -39,8 +40,15 @@ CIRCLE = 3
 OBSERVED = 0
 LATENT = 1
 
-Kind = Literal["dag", "cpdag", "pag", "digraph"]
-KINDS: tuple[Kind, ...] = ("dag", "cpdag", "pag", "digraph")
+Kind = Literal["dag", "cpdag", "pag", "mag", "digraph", "undirected"]
+KINDS: tuple[Kind, ...] = ("dag", "cpdag", "pag", "mag", "digraph", "undirected")
+
+
+def is_ancestral_kind(kind: str) -> bool:
+    """Whether ``kind`` is an ancestral graph, a ``pag`` or a ``mag``, where ``<->`` is a hidden
+    common cause and edges score by their endpoints."""
+    return kind in ("pag", "mag")
+
 
 # pcalg's ``amat.pag`` codes (0 none, 1 circle, 2 arrowhead, 3 tail) by Andrey mark, and back.
 _PCALG_PAG_CODE = np.array([0, 3, 2, 1], dtype=np.int8)  # indexed by NULL, TAIL, ARROW, CIRCLE
@@ -78,6 +86,8 @@ _TYPE_CODE[[a * 4 + b for a, b in _EDGE_TYPES]] = [
     _TYPE_NAMES.index(t) for t, _ in _EDGE_TYPES.values()
 ]
 SUMMARY_EDGES = 30  # edges a printed summary lists before "... and N more"
+# Graphviz arrow shape per endpoint mark.
+_DOT_ARROWS = {TAIL: "none", ARROW: "normal", CIRCLE: "odot"}
 
 
 @dataclass(frozen=True, eq=False, slots=True, kw_only=True, repr=False)
@@ -164,6 +174,9 @@ class GraphStructure(Structure):
     - ``"cpdag"``: an equivalence class of DAGs; an undirected edge ``--`` can point either way.
     - ``"pag"``: an equivalence class that allows hidden variables; a circle ``o`` is an
       unresolved endpoint, and ``<->`` is a relation through hidden causes.
+    - ``"mag"``: a maximal ancestral graph, one member of a PAG's class, with the PAG's marks
+      but no circle: ``a -> b`` when ``a`` is an ancestor of ``b``, ``<->`` through hidden causes,
+      and ``--`` between ancestors of a selection variable.
     - ``"digraph"``: directed edges that may form cycles and self-loops, such as the graph for a
       positive lag of a ``TemporalStructure``. Here the pair ``(2, 2)`` is two directed edges,
       ``i -> j`` and ``j -> i``.
@@ -245,11 +258,11 @@ class GraphStructure(Structure):
             Endpoint marks: ``M[i, j]`` is the mark at node ``i`` on its edge with ``j``, ``0``
             absent, ``1`` tail, ``2`` arrowhead, ``3`` circle. ``i -> j`` is ``M[i, j] = 1`` and
             ``M[j, i] = 2``. Every edge needs a mark in both cells.
-        kind : {"dag", "cpdag", "pag", "digraph"} or None, default=None
+        kind : {"dag", "cpdag", "pag", "mag", "digraph", "undirected"} or None, default=None
             Graph type. ``None`` infers ``"pag"`` from any circle or ``(2, 2)`` pair, else
-            ``"cpdag"`` from any ``(1, 1)`` pair, else ``"dag"``; it never infers ``"digraph"``,
-            so pass it for a graph with 2-cycles. The marks are not checked against ``kind``;
-            call ``validate()``.
+            ``"cpdag"`` from any ``(1, 1)`` pair, else ``"dag"``; it never infers ``"mag"``,
+            ``"digraph"``, or ``"undirected"``, so pass it for a MAG, a graph with 2-cycles, or an
+            undirected graph. The marks are not checked against ``kind``; call ``validate()``.
         labels : tuple[str, ...] or None, default=None
             Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
             nodes from 0.
@@ -269,7 +282,7 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If ``kind`` is not one of the four kinds, ``M`` is not square, has a nonzero diagonal
+            If ``kind`` is not one of the six kinds, ``M`` is not square, has a nonzero diagonal
             without ``allow_self_loops`` or a diagonal value other than ``0`` or ``2`` with it,
             holds a value outside ``0..3``, has a mark in ``M[i, j]`` but not in ``M[j, i]``,
             ``labels`` does not have ``n`` entries or has two that are equal as text, such as ``1``
@@ -320,7 +333,7 @@ class GraphStructure(Structure):
             ``mark_j`` the mark at ``j``. A row with ``i == j`` is a self-loop.
         n_nodes : int
             Number of nodes, including nodes without edges.
-        kind : {"dag", "cpdag", "pag", "digraph"} or None, default=None
+        kind : {"dag", "cpdag", "pag", "mag", "digraph", "undirected"} or None, default=None
             Graph type; ``None`` infers it as ``from_numpy`` does.
         labels : tuple[str, ...] or None, default=None
             Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
@@ -368,7 +381,7 @@ class GraphStructure(Structure):
         ----------
         g : networkx.DiGraph or networkx.MultiDiGraph
             The graph to read.
-        kind : {"dag", "cpdag", "pag", "digraph"} or None, default=None
+        kind : {"dag", "cpdag", "pag", "mag", "digraph", "undirected"} or None, default=None
             Graph type; ``None`` infers it as ``from_numpy`` does.
 
         Returns
@@ -410,7 +423,7 @@ class GraphStructure(Structure):
     def from_pcalg(
         cls,
         amat: npt.ArrayLike,
-        kind: Literal["dag", "cpdag", "pag"],
+        kind: Literal["dag", "cpdag", "pag", "mag"],
         *,
         labels: tuple[str, ...] | None = None,
     ) -> GraphStructure:
@@ -426,8 +439,8 @@ class GraphStructure(Structure):
         ----------
         amat : array-like of shape (n, n)
             The pcalg matrix, such as ``fit@amat`` from ``fci`` or ``as(fit, "amat")`` from ``pc``.
-        kind : {"dag", "cpdag", "pag"}
-            How pcalg coded the graph: ``"pag"`` reads ``amat.pag`` (a MAG too), and ``"cpdag"``
+        kind : {"dag", "cpdag", "pag", "mag"}
+            How pcalg coded the graph: ``"pag"`` and ``"mag"`` read ``amat.pag``, and ``"cpdag"``
             and ``"dag"`` read ``amat.cpdag``.
         labels : tuple[str, ...] or None, default=None
             Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
@@ -441,11 +454,12 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If ``kind`` is not ``"dag"``, ``"cpdag"``, or ``"pag"``, ``amat`` is not square, has a
-            nonzero diagonal, holds a value other than ``0``, ``1``, ``2``, ``3`` for a ``"pag"``
-            or ``0`` and ``1`` otherwise, or, for a ``"pag"``, has a mark in ``amat[a, b]`` but
-            not in ``amat[b, a]``. Also if the edges are not allowed for ``kind``, such as an
-            undirected edge in a ``"dag"``, or ``labels`` does not have ``n`` entries or has two
+            If ``kind`` is not ``"dag"``, ``"cpdag"``, ``"pag"``, or ``"mag"``, ``amat`` is not
+            square, has a nonzero diagonal, holds a value other than ``0``, ``1``, ``2``, ``3``
+            for a ``"pag"`` or ``"mag"`` or ``0`` and ``1`` otherwise, or, for a ``"pag"`` or
+            ``"mag"``, has a mark in ``amat[a, b]`` but not in ``amat[b, a]``. Also if the edges
+            are not allowed for ``kind``, such as an undirected edge in a ``"dag"`` or a circle
+            in a ``"mag"``, or ``labels`` does not have ``n`` entries or has two
             that are equal as text.
 
         Examples
@@ -456,15 +470,15 @@ class GraphStructure(Structure):
         >>> GraphStructure.from_pcalg(amat, "cpdag").oriented_edges()
         [(0, 2, 'directed'), (1, 2, 'directed')]
         """
-        if kind not in ("dag", "cpdag", "pag"):
-            raise ValueError(f"kind must be 'dag', 'cpdag', or 'pag', got {kind!r}")
+        if kind not in ("dag", "cpdag", "pag", "mag"):
+            raise ValueError(f"kind must be 'dag', 'cpdag', 'pag', or 'mag', got {kind!r}")
         A = np.asarray(amat)
         if A.ndim != 2 or A.shape[0] != A.shape[1]:
             raise ValueError(f"expected a square (n, n) matrix, got shape {A.shape}")
-        codes = (0, 1, 2, 3) if kind == "pag" else (0, 1)
+        codes = (0, 1, 2, 3) if is_ancestral_kind(kind) else (0, 1)
         if not np.isin(A, codes).all():
             raise ValueError(f"amat for kind={kind!r} holds only the codes {codes}")
-        if kind == "pag":
+        if is_ancestral_kind(kind):
             M = _PCALG_PAG_MARK[A.astype(np.intp)].T  # amat[a, b] marks b; M[i, j] marks i
         else:
             child_row = A != 0
@@ -479,7 +493,8 @@ class GraphStructure(Structure):
 
     @property
     def kind(self) -> Kind:
-        """Graph type: ``"dag"``, ``"cpdag"``, ``"pag"``, or ``"digraph"`` (cycles allowed)."""
+        """Graph type: ``"dag"``, ``"cpdag"``, ``"pag"``, ``"mag"``, ``"digraph"`` (cycles
+        allowed), or ``"undirected"`` (no edge has an arrowhead)."""
         return self._kind
 
     @property
@@ -543,7 +558,7 @@ class GraphStructure(Structure):
         """Return the graph as a NetworkX graph whose edges carry their marks.
 
         Each arc ``(u, v)`` has the attribute ``endpoints=(mark at u, mark at v)``. For a ``dag``,
-        ``cpdag``, or ``pag``, each edge is one arc from the lower to the higher node index
+        ``cpdag``, ``pag``, or ``mag``, each edge is one arc from the lower to the higher node index
         whatever its direction, so read ``endpoints`` or use ``oriented_edges()``. A ``digraph``
         runs each arc from tail to arrowhead and gives a 2-cycle both arcs, so NetworkX cycle
         functions see its cycles. A ``MultiDiGraph`` also adds the reverse arc for ``<->`` and
@@ -553,16 +568,17 @@ class GraphStructure(Structure):
         Parameters
         ----------
         multigraph : bool, default=False
-            Return a ``MultiDiGraph`` for any ``kind``; a ``pag`` always gets one.
+            Return a ``MultiDiGraph`` for any ``kind``; a ``pag`` or ``mag`` always gets one.
 
         Returns
         -------
         networkx.DiGraph or networkx.MultiDiGraph
-            A ``MultiDiGraph`` for a ``pag`` or with ``multigraph=True``, else a ``DiGraph``.
+            A ``MultiDiGraph`` for a ``pag`` or ``mag`` or with ``multigraph=True``, else a
+            ``DiGraph``.
         """
         import networkx as nx
 
-        use_multi = multigraph or self._kind == "pag"
+        use_multi = multigraph or is_ancestral_kind(self._kind)
         # A multigraph adds the reciprocal for symmetric PAG marks so the pair does not collapse; a
         # digraph likewise emits both directed edges of a 2-cycle into a plain DiGraph.
         emit_reciprocal = use_multi or self._kind == "digraph"
@@ -589,9 +605,9 @@ class GraphStructure(Structure):
     def to_pcalg(self) -> np.ndarray:
         """Return the adjacency matrix ``amat`` that R's pcalg package uses for this kind of graph.
 
-        A ``pag`` is written as pcalg's ``amat.pag``: ``amat[a, b]`` is the mark at the column node
-        ``b`` on the edge between ``a`` and ``b``, ``0`` no edge, ``1`` circle, ``2`` arrowhead,
-        ``3`` tail. A ``dag`` or ``cpdag`` is written as ``amat.cpdag``: ``a -> b`` is
+        A ``pag`` or ``mag`` is written as pcalg's ``amat.pag``: ``amat[a, b]`` is the mark at the
+        column node ``b`` on the edge between ``a`` and ``b``, ``0`` no edge, ``1`` circle, ``2``
+        arrowhead, ``3`` tail. A ``dag`` or ``cpdag`` is written as ``amat.cpdag``: ``a -> b`` is
         ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's row, and ``a -- b`` is ``1`` in
         both cells. ``from_pcalg`` reads the result back. Each call builds a new array.
 
@@ -622,11 +638,252 @@ class GraphStructure(Structure):
         M = self.to_numpy()
         if M.size and np.diagonal(M).any():
             raise ValueError("pcalg's adjacency matrix has no self-loops")
-        if self._kind == "pag":
+        if is_ancestral_kind(self._kind):
             # M[i, j] marks i, and amat[a, b] marks b.
             return np.ascontiguousarray(_PCALG_PAG_CODE[M].T)
         # amat[a, b] = 1 where b is the source of a -> b or an end of a -- b.
         return np.ascontiguousarray((M == TAIL).T, dtype=np.int8)
+
+    def to_dot(self) -> str:
+        """Return the graph as Graphviz DOT text, which Graphviz, DoWhy, and other tools read.
+
+        Each node is named by its label, or by its index when the graph has no labels, in double
+        quotes. A directed edge runs from its tail to its arrowhead, and an undirected edge has
+        ``dir=none``. Any other edge has ``dir=both``, with ``arrowhead`` and ``arrowtail`` the
+        marks at its second and first node: ``normal`` for an arrowhead, ``odot`` for a circle,
+        ``none`` for a tail. A ``digraph`` 2-cycle is two directed edges, and a self-loop an edge
+        from a node to itself. Writing it needs no other package.
+
+        Returns
+        -------
+        str
+            A DOT ``digraph``: one line per node, in node order, then one per edge, in
+            ``to_edges`` order.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1], [2, 0]])  # 0 -> 1
+        >>> print(GraphStructure.from_numpy(M, labels=("rain", "wet")).to_dot())
+        digraph {
+          "rain";
+          "wet";
+          "rain" -> "wet";
+        }
+        """
+        names = self._labels if self._labels is not None else range(self._n_nodes)
+        ids = [_dot_id(str(name)) for name in names]
+        lines = ["digraph {", *(f"  {node};" for node in ids)]
+        for i, j, attrs in self._dot_edges():
+            style = ", ".join(f"{key}={value}" for key, value in attrs.items())
+            lines.append(f"  {ids[i]} -> {ids[j]}" + (f" [{style}]" if style else "") + ";")
+        lines.append("}")
+        return "\n".join(lines)
+
+    def to_dag(
+        self, *, tie_break: Literal["label"] | None = None, seed: int | None = None
+    ) -> GraphStructure:
+        """Return a DAG from this CPDAG's Markov equivalence class.
+
+        A CPDAG with an undirected edge stands for several DAGs, and the choice among them can
+        change what a later step concludes, such as an effect estimate, so the caller picks how to
+        choose: by label with ``tie_break="label"``, or at random with ``seed``.
+
+        Parameters
+        ----------
+        tie_break : {"label"} or None, default=None
+            ``"label"`` picks the DAG the node labels decide, whatever the column order: the same
+            DAG, in label terms, for every column order of a labeled graph. A graph without labels
+            is named by position, so its DAG follows the column order.
+        seed : int or None, default=None
+            Picks a DAG of the class at random, the same one for the same seed. Every DAG of the
+            class can come back, but not with equal probability.
+
+        Returns
+        -------
+        GraphStructure
+            A ``dag`` with this graph's nodes and labels, skeleton, v-structures, and directed
+            edges, so a DAG of its class. A graph with no undirected edge, a ``dag`` among them,
+            has one such DAG, which comes back whatever ``tie_break`` and ``seed`` say.
+
+        Raises
+        ------
+        ValueError
+            If the graph is not a ``dag`` or a ``cpdag``; if no DAG has its skeleton, its
+            v-structures, and its directed edges, with a message that names a chordless
+            undirected cycle of four or more nodes when there is one, since every orientation of
+            such a cycle adds a v-structure or closes a directed cycle; if the graph has an
+            undirected edge and neither ``tie_break`` nor ``seed`` is given, with a message that
+            names the undirected edges; if both are given; or if ``tie_break`` is not ``"label"``
+            or ``None``.
+
+        Notes
+        -----
+        The algorithm of Dor and Tarsi (1992) keeps every directed edge, then repeatedly removes the
+        first node, in a ranking of the nodes, that has no outgoing directed edge and whose
+        undirected neighbors are each adjacent to all its other neighbors, and directs its
+        undirected edges into it. When no node qualifies before every node is removed, no
+        extension exists. ``tie_break="label"`` ranks the nodes by label, and ``seed`` by a
+        random permutation. A DAG of the class comes back from every ranking that lists its nodes
+        from the last in its causal order to the first, so each DAG has a positive probability
+        under ``seed``; DAGs that more rankings reach are more likely.
+
+        References
+        ----------
+        Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension of a
+        partially oriented graph. Technical Report R-185, Cognitive Systems Laboratory, UCLA.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])  # a -- b -- c
+        >>> cpdag = GraphStructure.from_numpy(M, kind="cpdag", labels=("a", "b", "c"))
+        >>> dag = cpdag.to_dag(tie_break="label")
+        >>> dag.kind, dag.oriented_edges()
+        ('dag', [('b', 'a', 'directed'), ('c', 'b', 'directed')])
+        """
+        from ._convert import dag_extension
+
+        return dag_extension(self, tie_break, seed)
+
+    def to_mag(
+        self,
+        *,
+        latent: Collection[str | int] | None = None,
+        selection: Collection[str | int] = (),
+    ) -> GraphStructure:
+        """Project this DAG with hidden and selection variables onto its other nodes as a MAG.
+
+        Parameters
+        ----------
+        latent : collection of str or int, or None, default=None
+            The hidden variables, each a label or a 0-based position. ``None`` takes the nodes
+            that ``node_types`` flags as latent, and none when it flags none.
+        selection : collection of str or int, default=()
+            The selection variables, each a label or a 0-based position: variables the data are
+            conditioned on, such as one that decides which units enter the sample.
+
+        Returns
+        -------
+        GraphStructure
+            The maximal ancestral graph over the other nodes, in their order and with their
+            labels, of kind ``"mag"``. Two nodes are adjacent when no set of the other observed
+            nodes, with the selection variables, d-separates them. The mark at ``a`` on its edge
+            with ``b`` is a tail when ``a`` is an ancestor of ``b`` or of a selection variable,
+            and an arrowhead otherwise: ``a <-> b`` relates two nodes through hidden common
+            causes, and ``a -- b`` two ancestors of the selection.
+
+        Raises
+        ------
+        TypeError
+            If ``latent`` or ``selection`` is a single string or holds a value that is neither a
+            label nor a position.
+        ValueError
+            If the graph is not a ``dag`` or has a directed cycle, or ``latent`` or ``selection``
+            names a node the graph does not have, names a node twice, or shares a node with the
+            other.
+
+        Notes
+        -----
+        The construction is Richardson and Spirtes' (2002). Observed ``a`` and ``b`` are adjacent
+        exactly when the DAG does not d-separate them given the selection variables and the
+        observed ancestors of ``a``, ``b``, and the selection variables. By the moralization
+        criterion of Lauritzen et al. (1990), that holds when the moral graph of the ancestors of
+        ``a``, ``b``, and the selection variables joins ``a`` and ``b`` by a path through hidden
+        variables alone, so one search from each observed node decides all its pairs.
+
+        References
+        ----------
+        Lauritzen, S. L., Dawid, A. P., Larsen, B. N., and Leimer, H.-G. (1990). Independence
+        properties of directed Markov fields. Networks 20(5), 491-505.
+
+        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+        Statistics 30(4), 962-1030.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.zeros((3, 3), dtype=int)
+        >>> M[0, [1, 2]], M[[1, 2], 0] = 1, 2  # u -> a, u -> b
+        >>> dag = GraphStructure.from_numpy(M, kind="dag", labels=("u", "a", "b"))
+        >>> mag = dag.to_mag(latent=["u"])
+        >>> mag.kind, mag.oriented_edges()
+        ('mag', [('a', 'b', 'bidirected')])
+        """
+        from ._convert import mag_of
+
+        return mag_of(self, latent, selection)
+
+    def to_pag(
+        self,
+        *,
+        latent: Collection[str | int] | None = None,
+        selection: Collection[str | int] = (),
+    ) -> GraphStructure:
+        """Return the PAG of this DAG or MAG, after projecting out hidden and selection variables.
+
+        Parameters
+        ----------
+        latent : collection of str or int, or None, default=None
+            Nodes to treat as hidden, each a label or a 0-based position. ``None`` takes the nodes
+            that ``node_types`` flags as latent, and none when it flags none.
+        selection : collection of str or int, default=()
+            Nodes to treat as selection variables, each a label or a 0-based position.
+
+        Returns
+        -------
+        GraphStructure
+            The ``pag`` over the other nodes, in their order and with their labels: the MAG of
+            ``to_mag``, with each mark that some Markov-equivalent MAG does not share replaced by
+            a circle. A tail or an arrowhead is a mark every MAG of the equivalence class has.
+
+        Raises
+        ------
+        TypeError
+            If ``latent`` or ``selection`` is a single string or holds a value that is neither a
+            label nor a position.
+        ValueError
+            If the graph is not a ``dag``, a ``mag``, or a ``pag`` without circles; a ``dag`` has
+            a directed cycle; a ``mag`` is not ancestral and maximal; or ``latent`` or
+            ``selection`` names a node the graph does not have, names a node twice, or shares a
+            node with the other.
+
+        Notes
+        -----
+        A MAG is read through its canonical DAG (Richardson and Spirtes 2002): each ``a <-> b``
+        becomes a hidden common parent of ``a`` and ``b``, and each ``a -- b`` a selection variable
+        that both ``a`` and ``b`` point into. The MAG of that DAG is the input exactly when the
+        input is a MAG. The PAG then comes from the MAG's skeleton and separating sets: its
+        unshielded colliders, then the orientation rules R1-R10 of Zhang (2008), which are complete,
+        applied to a fixed point. These are the rules ``andrey.fci`` and ``andrey.gfci`` apply, with
+        the conditional independence test of R4 answered by d-separation in the DAG. R4 and R5
+        search a bounded number of paths, a bound small graphs do not reach.
+
+        References
+        ----------
+        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+        Statistics 30(4), 962-1030.
+
+        Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+        presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+        1873-1896.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.zeros((3, 3), dtype=int)
+        >>> M[[0, 1], 2], M[2, [0, 1]] = 1, 2  # a -> c <- b
+        >>> dag = GraphStructure.from_numpy(M, kind="dag", labels=("a", "b", "c"))
+        >>> dag.to_pag().oriented_edges()
+        [('a', 'c', 'partially_directed'), ('b', 'c', 'partially_directed')]
+        """
+        from ._convert import pag_of
+
+        return pag_of(self, latent, selection)
 
     def to_edges(self) -> np.ndarray:
         """Return the derived typed edge list, one row per edge ``i <= j``.
@@ -736,8 +993,8 @@ class GraphStructure(Structure):
         ------
         ValueError
             If a circle appears outside a ``pag``, a ``dag`` or ``cpdag`` has an edge with two
-            arrowheads, a ``dag`` or ``digraph`` has an undirected edge, or an edge has a mark at
-            one end only.
+            arrowheads, a ``dag`` or ``digraph`` has an undirected edge, an ``undirected`` graph
+            has an arrowhead, or an edge has a mark at one end only.
         """
         indptr, indices, marks = self._sym_csr()
         if self._kind != "pag" and (marks == CIRCLE).any():
@@ -747,11 +1004,15 @@ class GraphStructure(Structure):
                 continue  # a self-loop (autoregressive lag edge) is single-endpoint, not bidirected
             if self._kind in ("dag", "cpdag") and mi == ARROW and mj == ARROW:
                 raise ValueError(
-                    f"double arrowhead {i}<->{j} requires kind='pag' (bidirected) or "
+                    f"double arrowhead {i}<->{j} requires kind='pag' or 'mag' (bidirected) or "
                     f"kind='digraph' (2-cycle)"
                 )
             if self._kind in ("dag", "digraph") and mi == TAIL and mj == TAIL:
-                raise ValueError(f"undirected edge {i}--{j} requires kind='cpdag' or 'pag'")
+                raise ValueError(
+                    f"undirected edge {i}--{j} requires kind='cpdag', 'pag', 'mag', or 'undirected'"
+                )
+            if self._kind == "undirected" and (mi, mj) != (TAIL, TAIL):
+                raise ValueError(f"edge {i}-{j} has an arrowhead, which kind='undirected' forbids")
         # Support symmetry: every stored (i, j) has a matching (j, i).
         n = self._n_nodes
         rows = np.repeat(np.arange(n, dtype=np.intp), np.diff(indptr))
@@ -883,6 +1144,22 @@ class GraphStructure(Structure):
             names = self._labels
             lines.append("  latent: " + ", ".join(names[i] if names else str(i) for i in latent))
         return lines
+
+    def _dot_edges(self) -> Iterator[tuple[int, int, dict[str, str]]]:
+        """Yield each edge as Graphviz draws it, ``(from, to, attributes)``, as ``to_dot`` says."""
+        for i, j, mark_i, mark_j in self._iter_edges():
+            if i == j or (mark_i, mark_j) == (TAIL, ARROW):
+                yield i, j, {}
+            elif (mark_i, mark_j) == (ARROW, TAIL):
+                yield j, i, {}
+            elif (mark_i, mark_j) == (TAIL, TAIL):
+                yield i, j, {"dir": "none"}
+            elif self._kind == "digraph":  # arrowheads at both ends: a 2-cycle
+                yield i, j, {}
+                yield j, i, {}
+            else:
+                head, tail = _DOT_ARROWS[mark_j], _DOT_ARROWS[mark_i]
+                yield i, j, {"dir": "both", "arrowhead": head, "arrowtail": tail}
 
     def _iter_edges(self):
         """Yield ``(i, j, mark_i, mark_j)`` per edge, ``i <= j`` (self-loop when ``i == j``)."""
@@ -1454,6 +1731,11 @@ class SummaryGraph(GraphStructure):
     __hash__ = None  # type: ignore[assignment]
 
 
+def _dot_id(name: str) -> str:
+    """``name`` as a quoted DOT identifier."""
+    return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 def _frozen(arr: np.ndarray, dtype: npt.DTypeLike) -> np.ndarray:
     """An owned, read-only copy in ``dtype`` -- keeps the frozen container's store immutable."""
     out = np.array(arr, dtype=dtype)
@@ -1550,7 +1832,7 @@ def _lookup(indptr: np.ndarray, indices: np.ndarray, marks: np.ndarray, a: int, 
 def _try_compact(
     n: int, indptr: np.ndarray, indices: np.ndarray, marks: np.ndarray, kind: Kind
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
-    """Halved dag/cpdag store (one entry per edge) if the marks conform, else ``None`` (stay full).
+    """Halved dag/cpdag/undirected store (one entry per edge) if the marks conform, else ``None``.
 
     A directed edge ``i -> j`` keeps a single entry ``(i, j)`` carrying the far mark ``ARROW``; an
     undirected ``i -- j`` a single ``(min, max)`` entry with ``TAIL``; a self-loop the diagonal.
@@ -1559,7 +1841,7 @@ def _try_compact(
     ``NULL``-bearing CSR) so ``validate()`` still flags it. The public views reconstruct the
     symmetric matrix via ``_expand_compact``.
     """
-    if kind not in ("dag", "cpdag"):
+    if kind not in ("dag", "cpdag", "undirected"):
         return None
     import scipy.sparse
 
@@ -1590,7 +1872,10 @@ def _try_compact(
     fwd = (mi == TAIL) & (mj == ARROW)  # r -> c
     bwd = (mi == ARROW) & (mj == TAIL)  # c -> r
     und = (mi == TAIL) & (mj == TAIL)  # r -- c (cpdag only)
-    ok = fwd | bwd | (und if kind == "cpdag" else np.zeros_like(und))
+    if kind == "undirected":
+        ok = und
+    else:
+        ok = fwd | bwd | (und if kind == "cpdag" else np.zeros_like(und))
     if not bool(ok.all()):
         return None  # a bidirected pair, or an undirected edge under dag
     r_up, c_up = rows[upper], cols[upper]

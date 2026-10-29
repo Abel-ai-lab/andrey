@@ -16,14 +16,19 @@ against latent confounders." Neural Computation 26(1): 57-83, 2014.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.special import gammainc
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.units import unit_factors
 from andrey.lingam import adjacency
 from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 _Gram = tuple[np.ndarray, float]
 
@@ -82,7 +87,13 @@ def _fisher_hsic_test(
 
 
 def _residual(X: np.ndarray, cov: np.ndarray, predictors: np.ndarray, target: int) -> np.ndarray:
-    """Least-squares residual of ``target`` on ``predictors``, solved through the covariance."""
+    """Least-squares residual of ``target`` on ``predictors``, solved through the covariance.
+
+    :func:`find_causal_order` passes unit-scale columns (:func:`~andrey.core.units.unit_factors`),
+    so the pseudo-inverse's cutoff, relative to the largest singular value, does not read the
+    predictors' units. The residual is then in the scaled target's units, which the HSIC test, on
+    a median-distance bandwidth, does not read.
+    """
     coef = np.dot(
         np.linalg.pinv(cov[np.ix_(predictors, predictors)]),
         cov[predictors, target].reshape(predictors.shape[0], 1),  # cov symmetric: [pred, target]
@@ -97,6 +108,7 @@ def _find_sink(
     col_grams: list[_Gram],
     n: int,
     ranks: list[int],
+    candidates: np.ndarray | None = None,
 ) -> tuple[int, float]:
     """Return the most-sink variable in ``U`` and its Fisher p-value.
 
@@ -104,34 +116,41 @@ def _find_sink(
     the others (smallest Fisher statistic, so largest p-value under the monotone gamma /
     chi-squared tail) is the sink. Statistics equal to ``_KEY_DP`` decimals go to the lower of
     ``ranks``, each variable's :func:`~andrey.search.hc.tie_ranks`. ``col_grams`` holds each
-    variable's cached HSIC gram (keyed by variable index).
+    variable's cached HSIC gram (keyed by variable index). ``candidates``, a subset of ``U``,
+    limits the sinks considered; each is still regressed on all the others in ``U``.
     """
+    pool = U if candidates is None else candidates
     best: tuple[float, int] | None = None
-    sink, best_p = int(U[0]), -np.inf
-    for j in range(len(U)):
-        predictors = np.setdiff1d(U, U[j])
-        residual = _residual(X, cov, predictors, int(U[j]))
+    sink, best_p = int(pool[0]), -np.inf
+    for j in range(len(pool)):
+        predictors = np.setdiff1d(U, pool[j])
+        residual = _residual(X, cov, predictors, int(pool[j]))
         bound = np.inf if best is None else best[0]
         fisher_p, fisher_stat = _fisher_hsic_test(
             [col_grams[p] for p in predictors], residual, n, bound
         )
-        key = (round(fisher_stat, _KEY_DP), ranks[int(U[j])])
+        key = (round(fisher_stat, _KEY_DP), ranks[int(pool[j])])
         if best is None or key < best:
-            best, sink, best_p = key, int(U[j]), fisher_p
+            best, sink, best_p = key, int(pool[j]), fisher_p
     return sink, best_p
 
 
-def find_causal_order(X: np.ndarray, *, alpha: float = 0.1) -> list:
+def find_causal_order(
+    X: np.ndarray, *, alpha: float = 0.1, precedence: np.ndarray | None = None
+) -> list:
     """Estimate a (possibly partial) nested causal order of centered ``X`` from the sink upward.
 
     Peels the most-sink variable while its Fisher HSIC p-value clears the Bonferroni threshold
     ``alpha / (d - 1)``; when the test is first rejected the remaining variables stay unresolved.
     The returned order is source-first with any order-unknown block (more than one leftover) nested
-    as a front sub-list in ``causal_order_``.
+    as a front sub-list in ``causal_order_``. With ``precedence`` (``precedence[a, b]``: ``a``
+    comes before ``b``), a variable is a sink candidate only when no remaining variable must come
+    after it. The residuals are taken on unit-scale columns (:func:`_residual`).
     """
     d = X.shape[1]
     n = X.shape[0]
-    cov = np.cov(X, rowvar=False)
+    unit = X * unit_factors(X)
+    cov = np.cov(unit, rowvar=False)
     col_grams = [gamma_gram(X[:, [j]]) for j in range(d)]  # per-variable HSIC gram, cached once
     ranks = tie_ranks(X).tolist()
     U = np.arange(d)
@@ -140,7 +159,10 @@ def find_causal_order(X: np.ndarray, *, alpha: float = 0.1) -> list:
     if d > 1:
         threshold = alpha / (d - 1)
         while len(U) > 1:
-            sink, fisher_p = _find_sink(X, cov, U, col_grams, n, ranks)
+            candidates = None
+            if precedence is not None:
+                candidates = U[~precedence[np.ix_(U, U)].any(axis=1)]
+            sink, fisher_p = _find_sink(unit, cov, U, col_grams, n, ranks, candidates)
             if fisher_p < threshold:
                 break
             resolved_sinks.append(sink)
@@ -167,13 +189,22 @@ def _flatten(order: list) -> list[int]:
     return flat
 
 
-def estimate_adjacency(X: np.ndarray, order: list) -> np.ndarray:
+def estimate_adjacency(
+    X: np.ndarray,
+    order: list,
+    forbidden: np.ndarray | None = None,
+    required: np.ndarray | None = None,
+) -> np.ndarray:
     """Weighted adjacency ``B`` from a nested causal order: each vertex on its resolved parents.
 
     ``B[i, j]`` weights edge ``j -> i``, fitted by adaptive Lasso; an order-unknown block adds no
     directed edges and every pair inside it is set to ``NaN`` at both ``B[i, j]`` and ``B[j, i]``.
     Each fit lists its predictors by :func:`~andrey.search.hc.tie_ranks`, so the weights follow the
-    columns when they are reordered.
+    columns when they are reordered. ``forbidden[j, i]`` drops predictor ``j`` of ``i``, and a pair
+    of the block forbidden both ways stays ``0``. ``required[j, i]`` keeps predictor ``j`` of ``i``
+    unpenalized (:func:`~andrey.lingam.adjacency.predict_with_required`); a required pair inside
+    the block is not ``NaN``: the child takes the least-squares weights of its required parents
+    there.
     """
     d = X.shape[1]
     ranks = tie_ranks(X).tolist()
@@ -181,29 +212,55 @@ def estimate_adjacency(X: np.ndarray, order: list) -> np.ndarray:
     for position in range(1, len(order)):
         target = order[position]
         predictors = sorted(_flatten(order[:position]), key=ranks.__getitem__)
-        if not predictors:
-            continue
-        B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
+        if forbidden is not None:
+            predictors = [j for j in predictors if not forbidden[j, target]]
+        forced = [] if required is None else [j for j in predictors if required[j, target]]
+        if forced:
+            free = [j for j in predictors if j not in forced]
+            B[target, forced], B[target, free] = adjacency.predict_with_required(
+                X, forced, free, target
+            )
+        elif predictors:
+            B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
 
     for block in order:
         if isinstance(block, list):
-            for pos in range(len(block)):
-                for other in range(pos + 1, len(block)):
-                    xi, xj = int(block[pos]), int(block[other])
+            members = [int(v) for v in block]
+            for pos in range(len(members)):
+                for other in range(pos + 1, len(members)):
+                    xi, xj = members[pos], members[other]
+                    if forbidden is not None and forbidden[xi, xj] and forbidden[xj, xi]:
+                        continue
+                    if required is not None and (required[xi, xj] or required[xj, xi]):
+                        continue
                     B[xi, xj] = np.nan
                     B[xj, xi] = np.nan
+            if required is None:
+                continue
+            for child in members:
+                parents = [p for p in members if required[p, child]]
+                if parents:
+                    B[child, parents], _ = adjacency.predict_with_required(X, parents, [], child)
     return B
 
 
-def bottom_up_parce_lingam(X: np.ndarray, *, alpha: float = 0.1) -> BottomUpParceLiNGAMResult:
+def bottom_up_parce_lingam(
+    X: np.ndarray, *, alpha: float = 0.1, constraints: Constraints | None = None
+) -> BottomUpParceLiNGAMResult:
     """Fit BottomUpParceLiNGAM: a nested causal order plus a ``NaN``-flagged weighted adjacency.
 
     ``alpha`` is the significance level of the bottom-up independence test (Bonferroni-corrected
     across the ``d - 1`` predictors). Returns a :class:`BottomUpParceLiNGAMResult` exposing
-    ``causal_order_`` and ``adjacency_matrix_``.
+    ``causal_order_`` and ``adjacency_matrix_``. With background knowledge ``constraints``, the
+    order keeps their required edges and tiers (:func:`find_causal_order`), and the regressions
+    drop the parents they forbid and keep the required ones (:func:`estimate_adjacency`).
     """
     X = np.asarray(X, dtype=np.float64)
     X = X - X.mean(axis=0)  # center before both the search and regression
-    order = find_causal_order(X, alpha=alpha)
-    B = estimate_adjacency(X, order)
+    if constraints is None:
+        order = find_causal_order(X, alpha=alpha)
+        B = estimate_adjacency(X, order)
+    else:
+        order = find_causal_order(X, alpha=alpha, precedence=constraints.precedence())
+        B = estimate_adjacency(X, order, constraints.forbidden, constraints.required)
     return BottomUpParceLiNGAMResult(causal_order_=order, adjacency_matrix_=B)

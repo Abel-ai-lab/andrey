@@ -100,7 +100,7 @@ def test_generated_var_scores_well_above_the_empty_graph(indep_test):
         functional=functional.var(n_lags=2, lag_density=0.2),
         noise=noise.gaussian(),
     )
-    dataset = scm.sample(1000, 0)
+    dataset = scm.sample(1000, 0, scale="raw")
     out = andrey.pcmciplus(dataset.data, tau_max=2, indep_test=indep_test)
     scores = temporal_scores(out, dataset.graph)
     nothing = GraphStructure.from_numpy(np.zeros((5, 5), np.int8), kind="digraph")
@@ -126,5 +126,5 @@ def test_independent_autocorrelated_series_give_only_self_loops(indep_test):
 
 
 def test_matches_the_recorded_output():
-    out = andrey.pcmciplus(datagen.generate("var_4v_stable"), tau_max=2)
+    out = andrey.pcmciplus(datagen.generate("var_4v_stable"), tau_max=2, indep_test="student_t")
     assert_recorded_output(out, "PCMCIplus", case="var_4v_stable")

@@ -195,3 +195,35 @@ def test_markov_equivalent_accepts_cpdag_structures():
 def test_markov_equivalent_rejects_node_count_mismatch():
     with pytest.raises(ValueError, match="node-count mismatch"):
         markov_equivalent(np.zeros((2, 2), dtype=int), np.zeros((3, 3), dtype=int))
+
+
+# ---- undirected graphs ---------------------------------------------------------------------------
+
+
+def _undirected(pairs, n: int):
+    from andrey.core import GraphStructure
+
+    marks = np.zeros((n, n), dtype=np.int8)
+    for i, j in pairs:
+        marks[i, j] = marks[j, i] = 1
+    return GraphStructure.from_numpy(marks, kind="undirected")
+
+
+def test_the_shd_of_an_undirected_graph_counts_the_pairs_whose_adjacency_differs():
+    # Against the chain 0 -> 1 -> 2: 0 -- 1 matches, 1 -- 2 is missing, 0 -- 2 is extra.
+    estimate = _undirected([(0, 1), (0, 2)], 3)
+    assert shd(estimate, CHAIN) == 2
+    assert shd(CHAIN, estimate) == 2
+    assert shd(_undirected([(0, 1), (1, 2)], 3), FORK) == 0  # any orientation of one skeleton
+
+
+def test_an_undirected_graph_makes_no_orientation_or_class_claim():
+    estimate = _undirected([(0, 1)], 2)
+    for compare in (orientation_scores, confounder_pair_scores, markov_equivalent):
+        with pytest.raises(ValueError, match="undirected graph"):
+            compare(estimate, EDGE_01)
+    with pytest.raises(ValueError, match="undirected graph"):
+        shd(estimate, EDGE_01, endpoint_aware=True)
+    with pytest.raises(ValueError, match="undirected graph has no CPDAG"):
+        to_cpdag(estimate)
+    assert skeleton_scores(estimate, EDGE_10)["f1"] == 1.0

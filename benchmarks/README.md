@@ -196,6 +196,9 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | Granger (lasso) | Andrey (serial, parallel), causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
+An adapter's `params` name the BIC penalty `lambda_value` and the scores `local_score_*` for every
+package, the harness's recorded vocabulary; the Andrey adapters pass Andrey's `penalty_discount` and
+score names (`bic`, `bdeu`, `discrete_bic`, `cond_gauss`, `degen_gauss`) to it.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
 identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selects CUDA inside
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
@@ -238,6 +241,30 @@ published up to 0.6.0 were measured on the generated order and stay as recorded.
 order drawn from the seed rather than the file's order, often a causal one; each record carries
 `shuffle`. Sachs keeps its file's order, which does not follow its network. The public-datasets
 rows published with 0.1.0 were measured on the file's order and stay as recorded.
+
+### Scale
+
+A key's `standardize` coordinate sets how `andrey.data` scales the values, and it enters the
+generator call, so each scale is a dataset of its own. The linear and nonlinear regimes are
+`standardized`: every column is z-scored, so no solution can order the variables by their variances
+(var-sortability, Reisach et al. 2021). Z-scoring leaves each variable's R², the share of its
+variance the other variables explain, as it was, and in linear data that share still grows down the
+causal order (R²-sortability, Reisach et al. 2023).
+
+The `_unitless` regimes, `linear_gauss_er_unitless`, `lingam_sf_unitless`,
+`latent_gauss_er_unitless`, and `latent_lingam_er_unitless`, are the four linear regimes with the
+weights and noise of Herman et al. (2025): every variable has variance 1 in the population, and a
+variable's weights depend only on its number of parents. Their R²-sortability is close to chance as
+well. Over 20 seeds at `d = 10, 20, 50` and `n = 10 d`, its mean is 0.46 to 0.62 against 0.65 to
+0.76 for the standardized regimes; the hidden-confounder ones sit at the top of that range, since
+hiding a node changes what the others explain. The generator keeps the variables' dense correlation
+matrix, so a unitless key takes at most 1,000 variables and raises above that; run these regimes
+at small sizes. A unitless key's data are not z-scored, so its sample variances differ from 1 by
+sampling error.
+
+Every record carries its dataset's `varsortability` and `r2_sortability` under the truth, over all
+directed paths between observed variables, computed once per dataset in the parent; a time series
+has neither. A solution's fit receives the data matrix alone.
 
 ### Hidden confounders
 
@@ -400,7 +427,7 @@ read `shd_endpoint`. Each package's names for the settings map to Andrey's:
 | Andrey | Tetrad (causal-cmd) |
 |---|---|
 | `indep_test="fisherz"`, `alpha=0.05` | `--test fisher-z-test --alpha 0.05` |
-| `score_func="local_score_BIC"`, `lambda_value=1.0` | `--score sem-bic-score --penaltyDiscount 1`, with `--semBicStructurePrior 0 --semBicRule 1` |
+| `score_func="bic"`, `penalty_discount=1.0` | `--score sem-bic-score --penaltyDiscount 1`, with `--semBicStructurePrior 0 --semBicRule 1` |
 | no cap on conditioning sets or discriminating paths | `--depth -1 --maxPathLength -1` |
 | possible-d-separation, the discriminating-path rule, and rules R1-R10 | `--possibleMsepDone --doDiscriminatingPathRule --completeRuleSetUsed` |
 
@@ -462,8 +489,8 @@ rest. The settings map as follows:
 | Andrey | Tetrad (driver setting) |
 |---|---|
 | `indep_test="fisherz"`, `alpha=0.05` | `IndTestFisherZ`, `alpha 0.05` |
-| `score_func="local_score_BIC"` (GES), `"local_score_BIC_from_cov"` (BOSS, GRaSP) | `SemBicScore` with `ruleType chickering`, `structurePrior 0`, `precomputeCovariances true` |
-| `lambda_value` | `penaltyDiscount`, the same number: both score a node `n log s2 + lambda k log n` |
+| `score_func="bic"` | `SemBicScore` with `ruleType chickering`, `structurePrior 0`, `precomputeCovariances true` |
+| `penalty_discount` | `penaltyDiscount`, the same number: both score a node `n log s2 + lambda k log n` |
 | `max_parents=None`, no cap on a node's parents (GES) | `maxDegree -1`, no cap on a node's degree (FGES) |
 | `seed=0` (BOSS, GRaSP) | `seed 0` of `PermutationSearch` and of `Grasp` |
 | GRaSP `depth=3` | `depth 3`, `uncoveredDepth 1`, `nonSingularDepth 1` |
@@ -478,8 +505,8 @@ parent count at its default of `d / 2`, a bound no node of a mean-degree-2 graph
 GRaSP run one start from the data's column order (`useDataOrder true`, `numStarts 1`), which a
 dataset draws from its seed. BOSS runs without the BES step (`useBes false`) and with Tetrad's two
 reset settings (`resetAfterBM false`, `resetAfterRS true`), which Andrey's BOSS has no counterpart
-for. Both run at the penalty the BOSS and GRaSP lane runs, `lambda_value=4`, so their Andrey rows
-are that lane's. FCI runs order-independent with possible-d-separation, the complete rule set R1-R10
+for. Both run at the penalty the BOSS and GRaSP lane runs, `penalty_discount=4`, so their Andrey
+rows are that lane's. FCI runs order-independent with possible-d-separation, the complete rule set R1-R10
 (`completeRuleSetUsed`), and no cap on conditioning sets or discriminating paths; selection bias is
 not excluded (`excludeSelectionBias false`), so R5-R7 run as in Andrey. `guaranteePag` is off.
 
@@ -604,9 +631,9 @@ search (the arms `andrey.xges.numpy`, `andrey.xges.numpy.no_extended_search`, `x
 linear-Gaussian and standardized, on Erdos-Renyi graphs of average degree 2 and 4, with `10 * d`
 rows. XGES gains most over GES on the denser graphs. Every arm searches under one BIC weight: the
 package scores in log-likelihood units, -0.5 times Andrey's deviance plus terms that cancel in every
-move, so its `alpha` is Andrey's `lambda_value`. No arm caps the parents of a node: XGES has no cap,
-and the GES arm lifts the adapter's usual cap of 4, as `andrey.ges` does. `params` records the
-settings.
+move, so its `alpha` is Andrey's `penalty_discount`. No arm caps the parents of a node: XGES has
+no cap, and the GES arm lifts the adapter's usual cap of 4, as `andrey.ges` does. `params` records
+the settings.
 
 Each record's `shd` is against the true CPDAG. After each rung the driver adds two columns from the
 graphs in `structures/`: `bic`, the BIC of the returned graph under Andrey's `BICScore` at the
@@ -780,7 +807,7 @@ Where a package's default differs, the adapter overrides it:
 | PC level, conditioning-set size | `alpha=0.05`, no limit | `alpha=0.05`, no limit (`max.sx`) | |
 | BDeu equivalent sample size | 1 (`sample_prior`) | `iss=1` | `equivalent_sample_size=1` (default 10) |
 | BDeu structure prior | each other variable a parent with probability `1 / (d - 1)` | `prior="vsp"`, `beta = 1 / (d - 1)` | the same, added through `structure_prior_ratio` (pgmpy has none) |
-| BIC penalty | `lambda_value=1`: `log(n)` per parameter, in deviance units | `k = log(n) / 2`, in log-likelihood units | `log(n) / 2`, fixed |
+| BIC penalty | `penalty_discount=1`: `log(n)` per parameter, in deviance units | `k = log(n) / 2`, in log-likelihood units | `log(n) / 2`, fixed |
 | parent cap | none | `maxp=Inf` | `max_indegree=None` |
 | move budget | `max_iter=100000` | `max.iter=100000` | `max_iter=100000` |
 | restarts, tabu list | none | `restart=0` | `tabu_length=0` (default 100) |
@@ -871,11 +898,11 @@ package's names for the settings map to Andrey's:
 | `max_categories=10` | `--data-type mixed --numCategories 10` | integer columns of at most 10 values made `factor` |
 | `indep_test="degen_gauss"` | `--test dg-lr-test` | - |
 | `indep_test="cond_gauss"` | `--test cg-lr-test` | `pc.stable(test = "mi-cg")` |
-| `score_func="local_score_degen_gauss"` | `--score dg-bic-score` | - |
-| `score_func="local_score_cond_gauss"` | `--score cg-bic-score` | `hc(score = "bic-cg")` |
+| `score_func="degen_gauss"` | `--score dg-bic-score` | - |
+| `score_func="cond_gauss"` | `--score cg-bic-score` | `hc(score = "bic-cg")` |
 | `max_iter=None`, from the empty graph | - | the defaults `max.iter = Inf`, `start = NULL` |
 | `alpha=0.05` | `--alpha 0.05` | `alpha = 0.05` |
-| `lambda_value=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
+| `penalty_discount=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
 
 Tetrad's PC runs order-independent (`--stableFAS`) and has no depth cap, as Andrey's PC does. It
 keeps Tetrad's default collider conflict rule (`--conflictRule 1`), under which a later collider
@@ -948,10 +975,10 @@ and the 0/1 intervention matrix side by side; pcalg's adapter turns the matrix i
 and `target.index` inside the timed fit.
 
 Both packages score BIC with every row counted in the penalty, pcalg's `lambda = 0.5 * log(n)` in
-log-likelihood units and Andrey's `lambda_value=1.0` in deviance units, and both fit an intercept:
-pcalg's `GaussL0penIntScore` defaults to none, so the adapter sets `intercept = TRUE`. Both run the
-forward, backward, and turning phases until none improves, with no degree cap. `params` records the
-settings.
+log-likelihood units and Andrey's `penalty_discount=1.0` in deviance units, and both fit an
+intercept: pcalg's `GaussL0penIntScore` defaults to none, so the adapter sets `intercept = TRUE`.
+Both run the forward, backward, and turning phases until none improves, with no degree cap.
+`params` records the settings.
 
 Each fit's graph is scored against the interventional essential graph of the generating DAG:
 `shd` counts the variable pairs whose edge differs, and `empty_shd`, the true edge count, is the

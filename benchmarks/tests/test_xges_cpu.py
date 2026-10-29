@@ -47,7 +47,7 @@ def test_the_test_dataset_separates_the_extended_search_from_the_base_search() -
     """Otherwise an arm that ignored ``extended_search`` would pass the comparisons below."""
     data = _dataset()
     graphs = [
-        andrey.xges(data, lambda_value=2.0, extended_search=flag).structure.to_numpy()
+        andrey.xges(data, penalty_discount=2.0, extended_search=flag).structure.to_numpy()
         for flag in (True, False)
     ]
     assert not np.array_equal(*graphs)
@@ -75,7 +75,9 @@ def test_the_andrey_fit_is_the_public_xges(extended_search: bool, lambda_value: 
     data = _dataset()
     adapter = AndreyXGES(extended_search=extended_search, lambda_value=lambda_value)
     marks = adapter.fit(data, adapter.params())
-    public = andrey.xges(data, lambda_value=lambda_value, extended_search=extended_search)
+    public = andrey.xges(
+        data, penalty_discount=lambda_value, ebic_gamma=0.0, extended_search=extended_search
+    )
     np.testing.assert_array_equal(marks, public.structure.to_numpy())
     assert adapter.to_structure(marks).kind == "cpdag"
 

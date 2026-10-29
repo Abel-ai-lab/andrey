@@ -2,7 +2,9 @@
 
 The negative local BIC score (lower is better; proportional to ``-2 * BIC``) for a target node
 given a parent set, evaluated from the sample covariance. Uses the linear-Gaussian BIC closed
-form, branching on parent-set size for the scalar fast paths.
+form, branching on parent-set size for the scalar fast paths. Its penalty can add the
+extended-BIC term of :func:`ebic_penalty`, which grows with the number of parent sets a node can
+choose from.
 
 :func:`local_score_bic` is the pure per-node primitive; :class:`BICScore` precomputes the covariance
 once and memoizes scores behind the :class:`Score` protocol that structure-search engines consume.
@@ -15,6 +17,9 @@ References
 ----------
 Schwarz (1978). Estimating the Dimension of a Model. Annals of Statistics 6(2):461-464.
 https://doi.org/10.1214/aos/1176344136
+
+Chen & Chen (2008). Extended Bayesian information criteria for model selection with large model
+spaces. Biometrika 95(3):759-771. https://doi.org/10.1093/biomet/asn034
 
 Heckerman, Geiger & Chickering (1995). Learning Bayesian networks: the combination of knowledge
 and statistical data. Machine Learning 20(3):197-243. https://doi.org/10.1007/BF00994016
@@ -46,12 +51,11 @@ from scipy.special import gammaln
 from . import categorical, stats
 from .mixed import _LRU, ConditionalGaussian, DegenerateGaussian
 
-#: The two names of the linear-Gaussian BIC, which :func:`make_score` builds alike. A search that
-#: takes this score takes both.
-LINEAR_SCORES: tuple[str, ...] = ("local_score_BIC", "local_score_BIC_from_cov")
+#: The linear-Gaussian BIC.
+LINEAR_SCORES: tuple[str, ...] = ("bic",)
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
-DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu", "local_score_BIC_categorical")
-MIXED_SCORES: tuple[str, ...] = ("local_score_cond_gauss", "local_score_degen_gauss")
+DISCRETE_SCORES: tuple[str, ...] = ("bdeu", "discrete_bic")
+MIXED_SCORES: tuple[str, ...] = ("cond_gauss", "degen_gauss")
 #: Every score name :func:`make_score` builds: what a search with all three kinds of score accepts.
 SCORES: tuple[str, ...] = (*LINEAR_SCORES, *DISCRETE_SCORES, *MIXED_SCORES)
 
@@ -65,14 +69,16 @@ def local_score_bic(
     node: int,
     parents: Sequence[int],
     *,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
     log_n: float | None = None,
     cov_diag: np.ndarray | None = None,
 ) -> float:
     """Return the negative local BIC score for ``node`` given ``parents``.
 
-    Evaluates ``n * log R(node | parents) + log_n * len(parents) * lambda_value``, where ``R`` is
-    the linear-regression residual variance
+    Evaluates ``n * log R(node | parents) + log_n * len(parents) * penalty_discount``, plus
+    :func:`ebic_penalty` of ``len(parents)`` among the ``d`` columns of ``cov`` when
+    ``ebic_gamma`` is not 0, where ``R`` is the linear-regression residual variance
     ``cov[node, node] - cov[node, parents] @ inv(cov[parents, parents]) @ cov[parents, node]``.
     Lower is better; the value is proportional to ``-2 * BIC``.
 
@@ -94,8 +100,10 @@ def local_score_bic(
         Target column index.
     parents : sequence of int
         Parent column indices.
-    lambda_value : float
+    penalty_discount : float
         Weight on the BIC complexity term.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term (:func:`ebic_penalty`); ``0.0`` is the standard BIC.
     log_n : float, optional
         Precomputed ``log(n)``; computed from ``n`` when omitted.
     cov_diag : ndarray, optional
@@ -110,7 +118,9 @@ def local_score_bic(
     if n_parents > n - 2:
         return math.inf
     variance = float(cov_diag[node])
-    penalty = log_n * n_parents * lambda_value
+    penalty = log_n * n_parents * penalty_discount
+    if ebic_gamma:
+        penalty += ebic_penalty(n_parents, cov.shape[0], ebic_gamma)
 
     if n_parents == 0:
         return _from_residual(variance, variance, n, penalty)
@@ -288,16 +298,52 @@ def check_columns(cov: np.ndarray, n: int) -> None:
         )
 
 
-def penalty_weight(lambda_value: float) -> float:
-    """Return the BIC penalty weight ``lambda_value`` as a float, checked to be finite and >= 0.
+def penalty_weight(penalty_discount: float, name: str = "penalty_discount") -> float:
+    """Return the penalty weight ``penalty_discount`` as a float, checked to be finite and >= 0.
 
-    Raises ``ValueError`` naming ``lambda_value`` otherwise. The searches check it under BDeu too,
-    which ignores it, so a setting is valid or not whatever the score.
+    Raises ``ValueError`` naming the parameter ``name`` otherwise. The searches check
+    ``penalty_discount`` and ``ebic_gamma`` under every score, including those that ignore them, so
+    a setting is valid or not whatever the score.
     """
-    value = float(lambda_value)
+    value = float(penalty_discount)
     if not np.isfinite(value) or value < 0.0:
-        raise ValueError(f"lambda_value must be finite and non-negative, got {value}")
+        raise ValueError(f"{name} must be finite and non-negative, got {value}")
     return value
+
+
+@lru_cache(maxsize=65_536)
+def ebic_penalty(n_parents: int, n_variables: int, ebic_gamma: float) -> float:
+    """Return the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``.
+
+    A node picks its parents among the other ``n_variables - 1`` variables, so
+    ``C(n_variables - 1, n_parents)`` counts its parent sets of ``n_parents`` members. Added to a
+    family's BIC, the term gives the node-wise extended BIC of Chen and Chen (2008), which spreads
+    a prior mass of ``C(n_variables - 1, n_parents) ** -ebic_gamma`` evenly over the parent sets of
+    each size. With ``ebic_gamma`` 0 it is 0, the standard BIC. It depends on the parent count
+    only, so equivalent DAGs, which give their nodes the same parent counts, score the same. Every
+    score and score change of the linear-Gaussian BIC takes the term from here;
+    :func:`ebic_step` is the change of one added parent. It is ``inf`` for ``n_parents`` of
+    ``n_variables`` or more, which no node can have.
+    """
+    if n_parents >= n_variables:
+        return math.inf
+    log_count = (
+        math.lgamma(n_variables) - math.lgamma(n_parents + 1) - math.lgamma(n_variables - n_parents)
+    )
+    return 2.0 * ebic_gamma * log_count
+
+
+def ebic_step(n_parents: int, n_variables: int, ebic_gamma: float) -> float:
+    """Return the change in :func:`ebic_penalty` when a node of ``n_parents`` parents gains one.
+
+    It is ``2 * ebic_gamma * (log(n_variables - 1 - n_parents) - log(n_parents + 1))``, computed
+    as the difference of the two terms, so a move's score change and the difference of its two
+    family scores carry the same term. It falls below 0 past ``(n_variables - 2) / 2`` parents,
+    where the count of parent sets shrinks.
+    """
+    return ebic_penalty(n_parents + 1, n_variables, ebic_gamma) - ebic_penalty(
+        n_parents, n_variables, ebic_gamma
+    )
 
 
 def _solve(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -326,8 +372,11 @@ class BICScore:
     ----------
     data : ndarray, shape (n, d)
         Data matrix; rows are observations, columns are variables.
-    lambda_value : float, default=1.0
+    penalty_discount : float, default=1.0
         Weight on the BIC complexity term of the deviance the search minimizes.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term :func:`ebic_penalty` over the ``d`` columns; ``0.0`` is the
+        standard BIC.
     cache_size : int or None, default=1_000_000
         Memoization cache bound; ``None`` is unbounded.
 
@@ -335,14 +384,15 @@ class BICScore:
     ------
     ValueError
         If ``data`` is not 2-D, holds ``NaN`` or ``inf``, or has a column :func:`check_columns`
-        rejects.
+        rejects; or if ``penalty_discount`` or ``ebic_gamma`` is negative or non-finite.
     """
 
     def __init__(
         self,
         data: np.ndarray,
         *,
-        lambda_value: float = 1.0,
+        penalty_discount: float = 1.0,
+        ebic_gamma: float = 0.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
         data = np.asarray(data, dtype=np.float64)
@@ -355,7 +405,7 @@ class BICScore:
         # np.cov of a single column is a 0-d variance; keep the (1, 1) matrix the score reads.
         cov = np.atleast_2d(stats.cov(data, rowvar=False))
         check_columns(cov, data.shape[0])
-        self._init(cov, data.shape[0], lambda_value, cache_size)
+        self._init(cov, data.shape[0], penalty_discount, ebic_gamma, cache_size)
 
     @classmethod
     def from_cov(
@@ -363,7 +413,8 @@ class BICScore:
         cov: np.ndarray,
         n: int,
         *,
-        lambda_value: float = 1.0,
+        penalty_discount: float = 1.0,
+        ebic_gamma: float = 0.0,
         cache_size: int | None = 1_000_000,
     ) -> BICScore:
         """Build a scorer from a precomputed covariance.
@@ -378,15 +429,19 @@ class BICScore:
             Sample covariance matrix; must be square and finite.
         n : int
             Sample count the BIC complexity penalty uses.
-        lambda_value : float, default=1.0
+        penalty_discount : float, default=1.0
             Weight on the BIC complexity term of the deviance the search minimizes.
+        ebic_gamma : float, default=0.0
+            Weight on the extended-BIC term :func:`ebic_penalty` over the columns of ``cov``;
+            ``0.0`` is the standard BIC.
         cache_size : int or None, default=1_000_000
             Memoization cache bound; ``None`` is unbounded.
 
         Raises
         ------
         ValueError
-            If ``cov`` is not a square 2-D matrix, or holds ``NaN`` / ``inf``.
+            If ``cov`` is not a square 2-D matrix, or holds ``NaN`` / ``inf``; or if
+            ``penalty_discount`` or ``ebic_gamma`` is negative or non-finite.
         """
         cov = np.asarray(cov, dtype=np.float64)
         if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
@@ -394,14 +449,22 @@ class BICScore:
         if not np.isfinite(cov).all():
             raise ValueError("cov contains NaN or Inf; cannot compute BIC scores")
         obj = cls.__new__(cls)
-        obj._init(cov, int(n), lambda_value, cache_size)
+        obj._init(cov, int(n), penalty_discount, ebic_gamma, cache_size)
         return obj
 
-    def _init(self, cov: np.ndarray, n: int, lambda_value: float, cache_size: int | None) -> None:
-        lambda_value = penalty_weight(lambda_value)
+    def _init(
+        self,
+        cov: np.ndarray,
+        n: int,
+        penalty_discount: float,
+        ebic_gamma: float,
+        cache_size: int | None,
+    ) -> None:
+        penalty_discount = penalty_weight(penalty_discount)
         self.cov = cov
         self.n = n
-        self.lambda_value = lambda_value
+        self.penalty_discount = penalty_discount
+        self.ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
         self.log_n = float(np.log(self.n))
         self._cov_diag = np.diag(self.cov)
         self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
@@ -412,7 +475,8 @@ class BICScore:
             self.n,
             node,
             parents,
-            lambda_value=self.lambda_value,
+            penalty_discount=self.penalty_discount,
+            ebic_gamma=self.ebic_gamma,
             log_n=self.log_n,
             cov_diag=self._cov_diag,
         )
@@ -573,11 +637,11 @@ class CategoricalBICScore(_CountScore):
     categories, ``N_ij`` the rows in parent configuration ``j``, and ``N_ijk`` those of them where
     the node takes value ``k``, the local score is
 
-    ``-2 * sum_jk N_ijk * log(N_ijk / N_ij) + lambda_value * log(n) * q * (r - 1)``
+    ``-2 * sum_jk N_ijk * log(N_ijk / N_ij) + penalty_discount * log(n) * q * (r - 1)``
 
-    ``-2`` times the maximized log-likelihood plus ``lambda_value * log(n)`` per free parameter of
-    the node's conditional probability table. Lower is better; with ``lambda_value=1`` it is ``-2``
-    times the BIC. A cell no row falls in adds nothing to the likelihood but still counts its
+    ``-2`` times the maximized log-likelihood plus ``penalty_discount * log(n)`` per free parameter
+    of the node's conditional probability table. Lower is better; with ``penalty_discount=1`` it is
+    ``-2`` times the BIC. A cell no row falls in adds nothing to the likelihood but still counts its
     parameters. Equivalent graphs score the same.
 
     ``__init__`` re-encodes each column to the codes ``0..r-1`` (see
@@ -588,7 +652,7 @@ class CategoricalBICScore(_CountScore):
     ----------
     data : ndarray, shape (n, d)
         Finite values; each distinct value of a column is one category.
-    lambda_value : float, default=1.0
+    penalty_discount : float, default=1.0
         Weight on the BIC complexity term.
     cache_size : int or None, default=1_000_000
         Memoization cache bound; ``None`` is unbounded.
@@ -615,7 +679,7 @@ class CategoricalBICScore(_CountScore):
         self,
         data: np.ndarray,
         *,
-        lambda_value: float = 1.0,
+        penalty_discount: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
         arr = np.asarray(data)
@@ -626,7 +690,7 @@ class CategoricalBICScore(_CountScore):
         if arr.dtype.kind == "f" and not np.isfinite(arr).all():
             raise ValueError("data contains NaN or Inf; cannot compute categorical BIC scores")
         self.n: int = arr.shape[0]
-        self.lambda_value = penalty_weight(lambda_value)
+        self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
         self._codes, self._cardinalities = categorical.encode(arr)
         self._memo = _LRU(cache_size)
@@ -637,7 +701,7 @@ class CategoricalBICScore(_CountScore):
         n_ij = np.repeat(counts.sum(axis=1), r)[counts.ravel() > 0]
         n_ijk = counts[counts > 0]
         log_likelihood = float(np.sum(n_ijk * np.log(n_ijk / n_ij)))
-        return -2.0 * log_likelihood + self.lambda_value * self.log_n * q * (r - 1)
+        return -2.0 * log_likelihood + self.penalty_discount * self.log_n * q * (r - 1)
 
 
 class DGScore:
@@ -648,7 +712,7 @@ class DGScore:
     embedded columns are scored as Gaussian [1]_. With ``Y`` the node's embedded columns, ``X`` its
     parents', and ``S`` the sample covariance of the embedded columns, the negative local score is
 
-    ``n * log det S(Y | X) + lambda_value * log(n) * |Y| * |X|``
+    ``n * log det S(Y | X) + penalty_discount * log(n) * |Y| * |X|``
 
     where ``S(Y | X)`` is the residual covariance of ``Y`` regressed on ``X`` and ``|Y| * |X|``
     counts the regression's coefficients. Lower is better. It is :class:`BICScore` on the embedded
@@ -676,7 +740,7 @@ class DGScore:
         a column one category.
     categorical : array-like of bool, shape (d,), optional
         Marks the categorical columns; ``None`` marks none.
-    lambda_value : float, default=1.0
+    penalty_discount : float, default=1.0
         Weight on the BIC complexity term.
     cache_size : int or None, default=1_000_000
         Memoization cache bound; ``None`` is unbounded.
@@ -692,12 +756,12 @@ class DGScore:
         data: npt.ArrayLike,
         categorical: npt.ArrayLike | None = None,
         *,
-        lambda_value: float = 1.0,
+        penalty_discount: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
         self._dg = DegenerateGaussian(data, categorical)
         self.n: int = self._dg.n
-        self.lambda_value = penalty_weight(lambda_value)
+        self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
         self._cov_diag = np.diag(self._dg.cov)
         self._sd = np.sqrt(self._cov_diag)
@@ -730,7 +794,7 @@ class DGScore:
                 self.n,
                 int(ys[0]),
                 xs.tolist(),
-                lambda_value=self.lambda_value,
+                penalty_discount=self.penalty_discount,
                 log_n=self.log_n,
                 cov_diag=self._cov_diag,
             )
@@ -746,7 +810,7 @@ class DGScore:
         except np.linalg.LinAlgError:
             return math.inf
         log_det = np.linalg.slogdet(residual)[1]
-        return float(self.n * log_det + self.log_n * self.lambda_value * ys.size * xs.size)
+        return float(self.n * log_det + self.log_n * self.penalty_discount * ys.size * xs.size)
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the memoized negative local DG score for ``node`` given ``parents``.
@@ -773,7 +837,7 @@ class CGScore:
     alone [1]_. With ``F`` the node and its
     parents and ``P`` the parents,
 
-    ``-2 * (l(F) - l(P)) + lambda_value * log(n) * (k(F) - k(P))``
+    ``-2 * (l(F) - l(P)) + penalty_discount * log(n) * (k(F) - k(P))``
 
     Lower is better; the value is ``-2`` times a BIC. Each term models a set of variables jointly,
     so a categorical node with continuous parents is scored as well as a continuous one, and two
@@ -787,7 +851,7 @@ class CGScore:
         a column one category.
     categorical : array-like of bool, shape (d,), optional
         Marks the categorical columns; ``None`` marks none.
-    lambda_value : float, default=1.0
+    penalty_discount : float, default=1.0
         Weight on the BIC complexity term.
     cache_size : int or None, default=1_000_000
         Memoization cache bound; ``None`` is unbounded.
@@ -808,12 +872,12 @@ class CGScore:
         data: npt.ArrayLike,
         categorical: npt.ArrayLike | None = None,
         *,
-        lambda_value: float = 1.0,
+        penalty_discount: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
         self._cg = ConditionalGaussian(data, categorical, cache_size=cache_size)
         self.n: int = self._cg.n
-        self.lambda_value = penalty_weight(lambda_value)
+        self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
         self._memo = _LRU(cache_size)
 
@@ -842,7 +906,7 @@ class CGScore:
             for i, (family, key) in enumerate(zip(families, todo, strict=True)):
                 dof = cg.dof(family) - cg.dof(key)
                 value = -2.0 * (loglik[i] - loglik[len(todo) + i])
-                value += self.lambda_value * self.log_n * dof
+                value += self.penalty_discount * self.log_n * dof
                 found[key] = value
                 self._memo.put((node, key), value)
         return [found[key] for key in keys]
@@ -856,28 +920,33 @@ def make_score(
     score_func: str,
     data: npt.ArrayLike,
     *,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
     categorical: npt.ArrayLike | None = None,
 ) -> LocalScore:
     """Build the local score ``score_func`` names over ``data``.
 
-    ``"local_score_BIC"`` and ``"local_score_BIC_from_cov"`` name :class:`BICScore`,
-    ``"local_score_BDeu"`` :class:`BDeuScore` with its default priors,
-    ``"local_score_BIC_categorical"`` :class:`CategoricalBICScore`, and
-    ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` :class:`DGScore` and
-    :class:`CGScore` over the ``categorical`` mask. BDeu has no penalty weight but still checks
-    ``lambda_value``'s range. A search checks ``score_func`` against the names it takes before
-    calling this. Raises :class:`NotImplementedError` for any other name.
+    ``"bic"`` names :class:`BICScore`, ``"bdeu"`` :class:`BDeuScore` with its default priors,
+    ``"discrete_bic"`` :class:`CategoricalBICScore`, and ``"degen_gauss"`` and ``"cond_gauss"``
+    :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask. ``ebic_gamma`` weighs the
+    extended-BIC term of the linear-Gaussian BIC; the other scores leave it out but still check its
+    range, as BDeu does ``penalty_discount``'s. A search checks ``score_func`` against the names it
+    takes before calling this. Raises :class:`NotImplementedError` for any other name.
     """
     if score_func in LINEAR_SCORES:
-        return BICScore(np.asarray(data, dtype=np.float64), lambda_value=lambda_value)
-    if score_func == "local_score_BDeu":
-        penalty_weight(lambda_value)
+        return BICScore(
+            np.asarray(data, dtype=np.float64),
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+        )
+    penalty_weight(ebic_gamma, "ebic_gamma")
+    if score_func == "bdeu":
+        penalty_weight(penalty_discount)
         return BDeuScore(np.asarray(data))
-    if score_func == "local_score_BIC_categorical":
-        return CategoricalBICScore(np.asarray(data), lambda_value=lambda_value)
-    if score_func == "local_score_degen_gauss":
-        return DGScore(data, categorical, lambda_value=lambda_value)
-    if score_func == "local_score_cond_gauss":
-        return CGScore(data, categorical, lambda_value=lambda_value)
+    if score_func == "discrete_bic":
+        return CategoricalBICScore(np.asarray(data), penalty_discount=penalty_discount)
+    if score_func == "degen_gauss":
+        return DGScore(data, categorical, penalty_discount=penalty_discount)
+    if score_func == "cond_gauss":
+        return CGScore(data, categorical, penalty_discount=penalty_discount)
     raise NotImplementedError(f"unknown score_func {score_func!r}")

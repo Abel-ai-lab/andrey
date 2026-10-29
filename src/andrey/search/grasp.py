@@ -204,12 +204,17 @@ class _GSTNode:
 
         Descends into the first improving addition whose variable is an allowed predecessor (in
         ``prefix_set``), appending it to ``parents``; variables passed over are added to
-        ``excluded``, and a node grows from the tree's ``available`` variables outside it. When no
-        further addition is allowed, applies the shrink step and returns the higher-is-better local
-        score of the settled parent set.
+        ``excluded``, and a node grows from the tree's ``available`` variables outside it, unless
+        its parent set holds the tree's ``max_parents`` members. When no further addition is
+        allowed, applies the shrink step and returns the higher-is-better local score of the
+        settled parent set.
         """
         if self.branches is None:
-            self.grow([u for u in self.tree.available if u not in excluded], parents)
+            cap = self.tree.max_parents
+            if cap is not None and len(parents) >= cap:
+                self.branches = []
+            else:
+                self.grow([u for u in self.tree.available if u not in excluded], parents)
         branches = self.branches
         assert branches is not None  # grow() above always assigns a list
         for branch in branches:
@@ -237,6 +242,8 @@ class _GST:
     ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
     ``required`` parents are in every parent set: the root scores them, grow adds to them, and
     shrink never removes them. The caller keeps each required parent in ``prefix``.
+    ``max_parents`` caps every parent set, required parents included: a node whose set holds that
+    many members grows no branches (``None``: no cap).
     """
 
     __slots__ = (
@@ -247,6 +254,7 @@ class _GST:
         "root",
         "available",
         "required",
+        "max_parents",
     )
 
     def __init__(
@@ -258,6 +266,7 @@ class _GST:
         *,
         candidates: list[int] | None = None,
         required: list[int] | None = None,
+        max_parents: int | None = None,
     ) -> None:
         self.vertex = vertex
         self.score = score
@@ -266,6 +275,7 @@ class _GST:
             [i for i in range(n_features) if i != vertex] if candidates is None else candidates
         )
         self.required = [] if required is None else required
+        self.max_parents = max_parents
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
 
@@ -404,11 +414,6 @@ def _is_covered(x: int, y_parent_set: set[int], order: _Order) -> bool:
     return x_parent_set == y_parent_set
 
 
-def _flipped_pairs(x: int, i: int, order: _Order) -> set[tuple[int, int]]:
-    """Sorted pairs ``(x, z)`` for parents ``z`` of ``x`` that precede position ``i``."""
-    return {(x, z) if x <= z else (z, x) for z in order.get_parents(x) if order.index(z) < i}
-
-
 def _snapshot(order: _Order, start: int, stop: int) -> tuple:
     """Snapshot the order span ``[start, stop]`` -- variables, parent sets, scores, edge total."""
     vertices: list[int] = []
@@ -433,27 +438,28 @@ def _restore(order: _Order, start: int, snapshot: tuple) -> None:
     order._positions_dirty = True
 
 
+def _dag_key(order: _Order) -> frozenset[tuple[int, int]]:
+    """The DAG the order induces, as its set of ``(parent, child)`` edges."""
+    return frozenset((x, y) for y, parents in order.parents.items() for x in parents)
+
+
 def _dfs(
     depth: int,
-    flipped: set[tuple[int, int]],
-    history: list[set[tuple[int, int]]],
+    chain: set[frozenset[tuple[int, int]]],
     order: _Order,
     gsts: list[_GST],
     rng: random.Random,
-    history_keys: set[frozenset[tuple[int, int]]] | None = None,
     before: np.ndarray | None = None,
 ) -> bool:
-    """Search covered tucks for a score-improving move; return ``True`` when one is applied.
+    """Search tucks for a score-improving chain; return ``True`` when one is applied.
 
-    Visits variables and their parents in shuffled order. Each covered tuck is applied and the span
-    re-scored: a strictly-improving move is kept (returns ``True``); a score-preserving move is
-    recursed through (bounded by ``depth``, de-duplicated by the set of flipped edge pairs) before
-    the tuck is rolled back. A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled
-    back unscored. Returns ``False`` when no move improves the score.
+    ``chain`` holds the DAGs of the chain of tucks that led to this order, its own DAG included.
+    Visits variables and their parents in shuffled order: any edge at the first level, covered
+    edges below. A strictly improving tuck is kept (returns ``True``); a score-preserving tuck to a
+    DAG not yet in the chain is recursed through (bounded by ``depth``) before it is rolled back.
+    A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled back unscored. Returns
+    ``False`` when no chain improves the score.
     """
-    if history_keys is None:
-        history_keys = {frozenset(item) for item in history}
-
     indices = list(range(order.len()))
     rng.shuffle(indices)
     for i in indices:
@@ -461,9 +467,9 @@ def _dfs(
         y_parents = order.get_parents(y)
         rng.shuffle(y_parents)
         y_parent_set = set(y_parents)
-        for x in y_parents:
-            covered = _is_covered(x, y_parent_set, order)
-            if len(history) > 0 and not covered:
+        # A copy: re-scoring a tuck refills y's stored parent list.
+        for x in list(y_parents):
+            if len(chain) > 1 and not _is_covered(x, y_parent_set, order):
                 continue
             j = order.index(x)
             cache = _snapshot(order, j, i)
@@ -477,19 +483,13 @@ def _dfs(
             if score_bump > _SCORE_EPS:
                 order.bump_edges(edge_bump)
                 return True
-            if score_bump > -_SCORE_EPS:
-                flipped = flipped ^ _flipped_pairs(x, i, order)
-                if len(flipped) > 0:
-                    flipped_key = frozenset(flipped)
-                    if flipped_key not in history_keys:
-                        history.append(flipped)
-                        history_keys.add(flipped_key)
-                        if depth > 0 and _dfs(
-                            depth - 1, flipped, history, order, gsts, rng, history_keys, before
-                        ):
-                            return True
-                        del history[-1]
-                        history_keys.remove(flipped_key)
+            if depth > 0 and score_bump > -_SCORE_EPS:
+                key = _dag_key(order)
+                if key not in chain:
+                    chain.add(key)
+                    if _dfs(depth - 1, chain, order, gsts, rng, before):
+                        return True
+                    chain.remove(key)
             _restore(order, j, cache)
     return False
 
@@ -497,10 +497,12 @@ def _dfs(
 def grasp(
     data: np.ndarray,
     *,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     depth: int = 3,
     random_state: int = 0,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str = "bic",
+    max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -518,14 +520,23 @@ def grasp(
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
-    lambda_value : float
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     depth : int
         Most tucks in one chain of moves, at least ``1``.
     random_state : int
         Seed for the private RNG that fixes the initial permutation and DFS shuffles.
     score_func : str
         Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
+    max_parents : int or None
+        Caps each node's parent set, required parents included: the grow step adds no parent to a
+        set that holds ``max_parents`` members. ``None`` sets no cap. With a cap, ``constraints``
+        may not require more than ``max_parents`` parents of a node (``ValueError``).
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; BDeu and the multinomial BIC read
         every column as categorical.
@@ -552,19 +563,39 @@ def grasp(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score, ranks = ranked_score(X, score_func, lambda_value, categorical)
+    if (
+        max_parents is not None
+        and constraints is not None
+        and (constraints.required.sum(axis=0) > max_parents).any()
+    ):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
+    score, ranks = ranked_score(X, score_func, penalty_discount, categorical, ebic_gamma)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     before = None
     if constraints is None:
-        gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
+        gsts = [
+            _GST(v, score, delta, n_features, max_parents=max_parents) for v in range(n_features)
+        ]
     else:
         ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
         before = ranked.precedence()
         gsts = []
         for v in range(n_features):
             candidates, required = parent_knowledge(ranked, v)
-            gsts.append(_GST(v, score, delta, n_features, candidates=candidates, required=required))
+            gsts.append(
+                _GST(
+                    v,
+                    score,
+                    delta,
+                    n_features,
+                    candidates=candidates,
+                    required=required,
+                    max_parents=max_parents,
+                )
+            )
 
     order = _Order(n_features, rng, gsts, before)
     prefix: set[int] = set()
@@ -576,7 +607,7 @@ def grasp(
         order.bump_edges(len(y_parents))
         prefix.add(y)
 
-    while _dfs(depth - 1, set(), [], order, gsts, rng, before=before):
+    while _dfs(depth - 1, {_dag_key(order)}, order, gsts, rng, before):
         pass
 
     adj = np.zeros((n_features, n_features), dtype=np.int8)

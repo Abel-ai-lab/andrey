@@ -8,13 +8,17 @@ calls, and the scalar loop otherwise, so a test that implements only
 :class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
 p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
 chunks, so the scan holds one chunk in memory however many subsets it visits. :func:`scan_pairs`
-scans every pair of one conditioning size; for FisherZ and StudentT it stacks the chunks of
-consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices.
+scans every pair of one conditioning size; for FisherZ, StudentT, RCoT, and the degenerate
+Gaussian test it stacks the chunks of consecutive pairs into one evaluation, up to
+``_STACK_BYTES`` of submatrices; RCoT evaluates a stack one conditioning set at a time, and the
+degenerate Gaussian test regresses on each conditioning set once. :func:`vote_triples` decides the
+unshielded triples of a final skeleton by the conservative or majority collider rule.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+import sys
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import partial
 from itertools import chain, combinations, islice
@@ -23,8 +27,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.core import backend
-from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
+from andrey.core import NULL, backend
+from andrey.core.ci import CITest, DGTest, FisherZ, StudentT, pins_blas
+from andrey.core.ci_missing import GaussianDeletion
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -39,6 +44,13 @@ _Chunk = tuple[int, int, int, Sequence[tuple[int, ...]]]
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
 # is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
+
+# Conditioning sets per test call in a collider vote (:func:`vote_triples`). A vote keeps only the
+# separating subsets, so the tests of a pair hold one chunk however large the endpoint degrees are.
+_VOTE_CHUNK = 64
+
+#: How PC, CD-NOD, FCI, and GFCI decide an unshielded triple (:func:`vote_triples`).
+COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
 # B queries of conditioning size k takes 8 * B * (k + 2) ** 2 bytes, and holds at least one chunk.
@@ -129,17 +141,43 @@ def canonical_capable(test: CITest) -> bool:
 
     A subclass or a wrapper of either keeps the ``batched_call`` and ``first_order_pvalues`` it
     may override, and a worker cannot rebuild it from the correlation matrix, so it scans in the
-    caller's process one call at a time.
+    caller's process; the test-wise deletion of either takes the canonical query arrays there
+    (:func:`_canonical_route`), and any other one call at a time.
     """
     return type(test) in (FisherZ, StudentT)
 
 
 def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
-    """A :func:`canonical_capable` test's ``_canonical_pvalues``, which the canonical query arrays
-    take, else ``None``."""
-    if canonical_capable(test):
+    """The ``_canonical_pvalues``, which the canonical query arrays take, of a
+    :func:`canonical_capable` test, of the test-wise deletion of either
+    (:class:`~andrey.core.ci_missing.GaussianDeletion`), or of a degenerate Gaussian test, exactly,
+    else ``None``.
+
+    A subclass of the degenerate Gaussian test may change what a query returns, so it keeps its
+    scalar calls.
+    """
+    if canonical_capable(test) or isinstance(test, GaussianDeletion) or type(test) is DGTest:
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
+
+
+def _stacked_route(test: CITest) -> Callable[..., np.ndarray] | None:
+    """The ``_canonical_pvalues`` that :func:`scan_pairs` stacks the chunks of many pairs into:
+    :func:`_canonical_route`'s, or an RCoT test's, exactly, which evaluates a stack one
+    conditioning set at a time; else ``None``."""
+    canonical = _canonical_route(test)
+    if canonical is not None:
+        return canonical
+    if is_rcot(test):
+        return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
+    return None
+
+
+def is_rcot(test: CITest) -> bool:
+    """Whether ``test`` is an RCoT test, exactly: a subclass may change what a query returns."""
+    # An RCoT test has loaded its module; a fit with another test leaves it unloaded.
+    kernel = sys.modules.get("andrey.core.ci_kernel")
+    return kernel is not None and type(test) is kernel.RCoT
 
 
 def _query_arrays(
@@ -172,9 +210,10 @@ def marginal_separated(
 ) -> np.ndarray | None:
     """Whether the marginal test separates each pair ``(xs[i], ys[i])``, ``xs[i] < ys[i]``.
 
-    A FisherZ or StudentT test answers every pair in one canonical query array, with the p-values
-    of the scalar calls. Another test returns ``None``: its scalar calls keep their order. So does
-    a call with no pair, whose query array a one-column test cannot index.
+    A FisherZ, StudentT, or degenerate Gaussian test answers every pair in one canonical query
+    array, with the p-values of the scalar calls. Another test returns ``None``: its scalar calls
+    keep their order. So does a call with no pair, whose query array a one-column test cannot
+    index.
     """
     canonical = _canonical_route(test)
     if canonical is None or not len(xs):
@@ -192,10 +231,10 @@ def separating_subsets(
 ) -> list[tuple[int, ...]]:
     """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
 
-    A FisherZ or StudentT test evaluates the subsets in chunks of ``_CHUNK`` canonical queries, in
-    order. A chunk whose evaluation raises is tested again subset by subset with scalar ``test``
-    calls, so the error is the one the scalar loop raises, after the same queries. Another test
-    makes one scalar call per subset.
+    A FisherZ, StudentT, or degenerate Gaussian test evaluates the subsets in chunks of ``_CHUNK``
+    canonical queries, in order. A chunk whose evaluation raises is tested again subset by subset
+    with scalar ``test`` calls, so the error is the one the scalar loop raises, after the same
+    queries. Another test makes one scalar call per subset.
     """
     canonical = _canonical_route(test)
     if canonical is None:
@@ -371,14 +410,15 @@ def scan_pairs(
     removals do not depend on column order; a subset both endpoints offer is tested once, from the
     first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
-    and the parallel workers share it, so they stay identical. A FisherZ or StudentT test evaluates
-    the chunks of consecutive pairs in one stack (:func:`_stacked_scan`); another test scans each
-    pair with :func:`scan_conditioning_sets`. Both test the same subsets in the same order. With
-    ``trace`` given, every test is recorded in the order it runs.
+    and the parallel workers share it, so they stay identical. A FisherZ, StudentT, RCoT, or
+    degenerate Gaussian test evaluates the chunks of consecutive pairs in one stack
+    (:func:`_stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
+    test the same subsets in the same order. With ``trace`` given, every test is recorded in the
+    order it runs.
     """
-    canonical = _canonical_route(test)
-    if canonical is not None:
-        return _stacked_scan(canonical, pairs, neighbors, size, alpha, trace, record_pvalues)
+    stacked = _stacked_route(test)
+    if stacked is not None:
+        return _stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
@@ -581,6 +621,115 @@ def unseparated_triples(
             if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
                 triples.add((a, b, c))
     return frozenset(triples)
+
+
+def check_collider_rule(collider_rule: str) -> None:
+    """Raise ``ValueError`` unless ``collider_rule`` is one of :data:`COLLIDER_RULES`."""
+    if collider_rule not in COLLIDER_RULES:
+        raise ValueError(
+            f"collider_rule must be 'sepsets', 'conservative', or 'majority', got {collider_rule!r}"
+        )
+
+
+def collider_verdict(separating: Sequence[Iterable[int]], b: int, rule: str) -> str:
+    """``"collider"``, ``"non-collider"``, or ``"ambiguous"``: what ``rule`` makes of middle node
+    ``b`` from the ``separating`` subsets of its endpoints.
+
+    ``"conservative"`` makes ``b`` a collider when no subset contains it and a non-collider when
+    every subset does. ``"majority"`` makes it a collider when fewer than half contain it and a
+    non-collider when more than half do. Any other share, an exact half under ``"majority"``
+    included, is ambiguous, and so is an empty ``separating``.
+    """
+    if not separating:
+        return "ambiguous"
+    share = sum(b in subset for subset in separating) / len(separating)
+    if rule == "conservative":
+        return "collider" if share == 0 else "non-collider" if share == 1 else "ambiguous"
+    return "collider" if share < 0.5 else "non-collider" if share > 0.5 else "ambiguous"
+
+
+def vote_triples(
+    marks: np.ndarray,
+    test: Callable[..., float],
+    alpha: float,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+    rule: str,
+    *,
+    unseparated: str,
+    max_depth: int | None = None,
+    skip: Collection[tuple[int, int, int]] = frozenset(),
+) -> frozenset[tuple[int, int, int]]:
+    """Decide every unshielded triple of ``marks`` by ``rule``; rewrite ``sepsets`` to match and
+    return the ambiguous triples.
+
+    ``marks`` is the final skeleton, a pair adjacent where its entry is not ``NULL``. For each
+    unshielded triple ``(a, b, c)``, ``a < c``, the pair ``(a, c)`` is tested given every subset of
+    ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
+    members when one is given: a subset both endpoints offer is tested and counted twice. A subset
+    separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
+    triple from the separating subsets; a pair no subset separates takes the verdict
+    ``unseparated``, ``"collider"`` or ``"ambiguous"``. A collider removes ``b`` from the pair's
+    separating sets and a non-collider adds it, under both key orders, a missing order taking the
+    other's set first; an ambiguous triple leaves them as they are. The separating sets already
+    recorded do not vote. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither
+    voted nor returned.
+
+    Each pair is tested once, however many middle nodes it has, in chunks of ``_VOTE_CHUNK``
+    subsets, through the test's ``batched_call`` when it has one. The chunks do not depend on the
+    middle node, so every middle node counts the p-values one test of the pair gives. The cost
+    grows as ``2**degree`` per pair.
+    """
+    neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
+    votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
+    ambiguous = set()
+    for b, adjacent in enumerate(neighbors):
+        for a, c in combinations(adjacent, 2):
+            if marks[a, c] != NULL or (a, b, c) in skip:
+                continue
+            if (a, c) not in votes:
+                votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
+            separating = votes[a, c]
+            verdict = collider_verdict(separating, b, rule) if separating else unseparated
+            if verdict == "ambiguous":
+                ambiguous.add((a, b, c))
+                continue
+            for pair in ((a, c), (c, a)):
+                recorded = sepsets.get(pair)
+                if recorded is None:
+                    recorded = sepsets.get(pair[::-1], ())
+                if verdict == "non-collider":
+                    sepsets[pair] = recorded if b in recorded else (*recorded, b)
+                else:
+                    sepsets[pair] = tuple(node for node in recorded if node != b)
+    return frozenset(ambiguous)
+
+
+def _separating_votes(
+    test: Callable[..., float],
+    a: int,
+    c: int,
+    neighbors: list[list[int]],
+    alpha: float,
+    max_depth: int | None,
+) -> list[tuple[int, ...]]:
+    """The subsets of ``a``'s neighbors, then of ``c``'s, that separate ``a`` and ``c``
+    (``p >= alpha``), each endpoint's by increasing size, as :func:`vote_triples` counts them."""
+    subsets = (
+        subset
+        for endpoint in (a, c)
+        for size in range(
+            len(neighbors[endpoint]) + 1
+            if max_depth is None
+            else min(len(neighbors[endpoint]), max_depth) + 1
+        )
+        for subset in combinations(neighbors[endpoint], size)
+    )
+    batched = getattr(test, "batched_call", None)
+    found: list[tuple[int, ...]] = []
+    while chunk := list(islice(subsets, _VOTE_CHUNK)):
+        pvalues = batched(a, c, chunk) if callable(batched) else [test(a, c, s) for s in chunk]
+        found.extend(subset for subset, p in zip(chunk, pvalues) if p >= alpha)
+    return found
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:

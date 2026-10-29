@@ -18,6 +18,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from andrey_bench.adapters.bic_penalty import andrey_score
+
 _DEFAULT_ALPHA = 0.05
 _DEFAULT_LAMBDA = 1.0
 #: The most distinct whole numbers a column may hold to be read as categorical: Andrey's default.
@@ -115,8 +117,8 @@ class AndreyGESMixed(_AndreyMixed):
             warnings.simplefilter("ignore", andrey.DataTypeWarning)
             out = andrey.ges(
                 np.asarray(data, dtype=np.float64),
-                score_func=str(params.get("score_func", self.score_func)),
-                lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
+                score_func=andrey_score(str(params.get("score_func", self.score_func))),
+                penalty_discount=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
                 max_categories=int(params.get("max_categories", MAX_CATEGORIES)),
             )
         return np.asarray(out.structure.to_numpy())
@@ -147,8 +149,8 @@ class AndreyHCMixed(_AndreyMixed):
             warnings.simplefilter("ignore", andrey.DataTypeWarning)
             out = andrey.hc(
                 np.asarray(data, dtype=np.float64),
-                score_func=str(params.get("score_func", self.score_func)),
-                lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
+                score_func=andrey_score(str(params.get("score_func", self.score_func))),
+                penalty_discount=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
                 max_categories=int(params.get("max_categories", MAX_CATEGORIES)),
             )
         return np.asarray(out.structure.to_numpy())

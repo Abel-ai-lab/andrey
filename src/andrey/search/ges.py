@@ -82,8 +82,9 @@ GES_SCORES: tuple[str, ...] = SCORES
 def ges(
     data: np.ndarray,
     *,
-    score_func: str = "local_score_BIC",
-    lambda_value: float = 1.0,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
     max_parents: float | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
@@ -106,15 +107,20 @@ def ges(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC),
-        ``"local_score_BDeu"`` (BDeu on category codes,
+        Local score: ``"bic"`` (linear-Gaussian BIC),
+        ``"bdeu"`` (BDeu on category codes,
         :class:`~andrey.core.score.BDeuScore` with its default priors),
-        ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
+        ``"discrete_bic"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
-        ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
-        ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
-    lambda_value : float
+        ``"degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        ``"cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
+    ebic_gamma : float
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
     max_parents : float or None
         A cap on the most parents any DAG of the class gives a node, in the returned CPDAG and in
         the CPDAG after each move (:func:`~andrey.search.operators.max_parents_in_class`): an Insert
@@ -148,7 +154,13 @@ def ges(
     gate, cap = _parent_limits(n, max_parents, _parent_rule)
     if score_func not in GES_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")
-    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    score = make_score(
+        score_func,
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        categorical=categorical,
+    )
 
     adj = np.zeros((n, n), dtype=np.int8)
     if constraints is not None and constraints.required.any():

@@ -115,10 +115,10 @@ def test_varma_lingam_orders_innovations_by_least_squares():
 def test_longitudinal_lingam_output_contract():
     from andrey.api.temporal import longitudinal_lingam
 
-    out = longitudinal_lingam(_panel(0), n_lags=1)
+    out = longitudinal_lingam(_panel(0), tau_max=1)
     assert out.structure.type == "temporal"
     assert out.structure.lag_weights.shape == (2, 4, 4)
-    assert out.metadata["algorithm"] == "longitudinallingam"
+    assert out.metadata["algorithm"] == "longitudinal_lingam"
 
 
 def test_longitudinal_lingam_matches_the_recorded_output():
@@ -175,7 +175,7 @@ def test_granger_output_contract():
 def var_lag2_fit():
     from andrey.api.temporal import granger
 
-    return granger(datagen.generate("var_3v_lag2"))
+    return granger(datagen.generate("var_3v_lag2"), tau_max=2)
 
 
 def _var_lag2_truth() -> np.ndarray:
@@ -209,7 +209,7 @@ def test_granger_keeps_absent_edges_absent_when_units_are_far_apart():
             1e200 * np.resize([0, 0, 1, 0, 0, 0, -1, 0.0], 17),
         )
     )
-    weights = granger(x, maxlag=1, cv=2).structure.lag_weights
+    weights = granger(x, tau_max=1, cv=2).structure.lag_weights
     assert not np.isnan(weights).any()
 
 
@@ -219,14 +219,16 @@ def test_granger_does_not_depend_on_the_units(var_lag2_fit, scale):
     from andrey.api.temporal import granger
 
     scale = np.array(scale)
-    out = granger(datagen.generate("var_3v_lag2") * scale)
+    out = granger(datagen.generate("var_3v_lag2") * scale, tau_max=2)
     weights = var_lag2_fit.structure.lag_weights
     # A weight of x_i on x_j scales with the units of x_j over those of x_i.
     np.testing.assert_allclose(
         out.structure.lag_weights, weights * scale[None, None, :] / scale[None, :, None], rtol=1e-7
     )
     assert np.array_equal(out.structure.lag_weights != 0, weights != 0)
-    assert np.array_equal(granger(datagen.generate("var_3v_lag2")).structure.lag_weights, weights)
+    assert np.array_equal(
+        granger(datagen.generate("var_3v_lag2"), tau_max=2).structure.lag_weights, weights
+    )
 
 
 def test_granger_keeps_only_small_weights_between_independent_series():

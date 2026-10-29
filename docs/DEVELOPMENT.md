@@ -107,7 +107,7 @@ comparison's errors in the measure its summary records (`ERRORS`). The README, t
 the homepage's description state `CLAIM`, a speed claim with no number. The build fails unless the
 first summary's headline is `claim_sentence()` of its numbers: the largest ratio rounded down to a
 power of ten on its method, then whether the other supported methods are faster ("the other", "most
-other", or nothing). The README chart shows one card per `PANEL` method, at most six.
+other", or nothing).
 
 The homepage's description names PC, GES, and FCI, counts the other methods, and states `CLAIM`.
 Every other page's description is the `description` in its front matter; without one, its first
@@ -154,7 +154,9 @@ in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never
 
 [`docs/benchmarks.md`](docs/benchmarks.md), the Release cards page, leads with the latest release as
 a cover beside its TL;DR (the abstract, three numbers, and a button to the card), then lists the
-earlier releases, newest first. To add a release:
+earlier releases, newest first, nine to a page (`_static/paginate.js`, which pages the blog's
+earlier posts too; without scripts every row shows). The sidebar folds the five newest cards under
+Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release:
 
 1. Move the current latest release to the top of "Earlier releases" (a copied row with its
    version, title, methods sentence, facts, release date, and links).
@@ -218,8 +220,11 @@ uv run --group docs python scripts/execute_notebooks.py
 
 The docs workflow reruns every notebook with `--check` and fails when a cell fails or an output
 differs from the stored one; a decimal number may move by one in its last digit, as Linux and macOS
-round a few results apart. The speed notebook is never run and ships without outputs. The CALM
-notebook needs torch, which the workflow does not install, so the workflow never runs it either; its
+round a few results apart. A code cell whose output depends on the CPU, as a method's Limitations
+say, carries the cell tag `output-varies-by-cpu`: the check still runs it and still fails when it
+raises, but does not compare its output. Such a cell holds only the output that varies, and its
+text says why. The speed notebook is never run and ships without outputs. The CALM notebook
+needs torch, which the workflow does not install, so the workflow never runs it either; its
 stored outputs come from a local run with the `torch` extra, for example in
 `uv run --extra torch --with jupyter jupyter lab`. Run the notebooks locally with
 `uv run --with jupyter jupyter lab`. Notebook dependencies stay out of `pyproject.toml`: each

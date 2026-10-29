@@ -48,7 +48,9 @@ class _RecordingTest:
         return self._fisherz(x, y, condition_set)
 
 
-@pytest.mark.parametrize("facade", ["pc", "fci", "gfci", "cdnod"])
+@pytest.mark.parametrize(
+    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+)
 def test_registered_test_is_dispatched_end_to_end(facade, clean_registry):
     """Every constraint facade routes its CI queries to the registered test, not FisherZ."""
     recorders: list[_RecordingTest] = []
@@ -85,8 +87,8 @@ def test_minimal_protocol_is_the_guaranteed_floor(clean_registry):
 
 
 def test_unknown_indep_test_raises():
-    """An unregistered name raises NotImplementedError, naming what is available."""
-    with pytest.raises(NotImplementedError, match="unknown indep_test"):
+    """An unregistered name raises ValueError, naming what is available."""
+    with pytest.raises(ValueError, match="indep_test must be one of .*'fisherz'"):
         andrey.pc(_chain_data(), indep_test="does_not_exist")
 
 
@@ -111,7 +113,9 @@ def test_registry_surface(clean_registry):
     assert isinstance(ci.make_indep_test("student_t", _chain_data()), ci.StudentT)
 
 
-@pytest.mark.parametrize("facade", ["pc", "fci", "gfci", "cdnod"])
+@pytest.mark.parametrize(
+    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+)
 def test_student_t_is_selectable_by_every_constraint_facade(facade):
     """Each constraint facade accepts ``indep_test="student_t"`` and returns a valid graph."""
     x = _chain_data()

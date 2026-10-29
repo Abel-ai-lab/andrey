@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import marginal_separated, separating_subsets
+from andrey.constraint._skeleton import check_collider_rule, marginal_separated, separating_subsets
 from andrey.constraint.fci import (
     _adjacent,
     _arrow_allowed,
@@ -29,14 +29,13 @@ from andrey.constraint.fci import (
     _is_def_collider,
     _knowledge_marks,
     _largest_size,
-    _majority_sepsets,
     _neighbor_lists,
     _remove_by_possible_dsep,
     _sepset,
     _test_in_rank_order,
     _triple,
-    _validate_collider_rule,
     _validate_possible_dsep,
+    _vote_sepsets,
 )
 from andrey.core import ARROW, NULL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
@@ -50,8 +49,9 @@ if TYPE_CHECKING:
 def gfci(
     data: np.ndarray,
     *,
-    score_func: str = "local_score_BIC",
-    lambda_value: float = 1.0,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
@@ -61,6 +61,8 @@ def gfci(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
@@ -77,24 +79,30 @@ def gfci(
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
     ``workers`` worker processes share the GES passes and the adjacency search's larger
     conditioning-size passes, each above its own work threshold; ``None`` reads
-    ``andrey.config.num_workers``.
+    ``andrey.config.num_workers``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
+    the triples the pattern shields by the vote of :func:`~andrey.constraint.fci._vote_sepsets`
+    after the possible-d-sep step. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. The private
+    ``_ambiguous`` sink receives the triples no orientation rule reads as a collider or a
+    non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
     workers = backend.worker_count(workers)
 
-    _validate_collider_rule(collider_rule)
+    check_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
     cpdag_structure, _score = ges(
         X,
         score_func=score_func,
-        lambda_value=lambda_value,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
         categorical=categorical,
         constraints=constraints,
         workers=workers,
     )
     pattern = from_structure(cpdag_structure)
 
-    test = make_indep_test(indep_test, X, categorical=categorical)
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     keep = None if constraints is None else constraints.required | constraints.required.T
     support, sepsets = _fast_adjacency_search(
         X, test, alpha, workers=workers, support=pattern != NULL, keep=keep, max_depth=max_depth
@@ -109,7 +117,7 @@ def gfci(
     if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
     else:
-        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
         _remove_by_possible_dsep(
             marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
         )
@@ -118,12 +126,16 @@ def gfci(
     ambiguous = (
         frozenset(
             triple
-            for triple in _majority_sepsets(marks, test, alpha, sepsets, max_depth=max_depth)
+            for triple in _vote_sepsets(
+                marks, test, alpha, sepsets, rule=collider_rule, max_depth=max_depth
+            )
             if _adjacent(pattern, triple[0], triple[2])
         )
-        if collider_rule == "majority"
+        if collider_rule != "sepsets"
         else frozenset()
     )
+    if _ambiguous is not None:
+        _ambiguous.update(ambiguous)
     _orient_colliders_from_pattern(marks, pattern, sepsets, ambiguous)
     _fci_orient(
         marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
@@ -184,10 +196,11 @@ def _derive_sepsets(
     subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
 
-    A FisherZ or StudentT test answers the size-0 query of every pair in one canonical query array
-    (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates each nonempty size's
-    subsets in chunks of them (:func:`~andrey.constraint._skeleton.separating_subsets`), with the
-    p-values of the scalar calls. Every query of another test, or of ``in_column_order``, is a
+    A FisherZ, StudentT, or degenerate Gaussian test answers the size-0 query of every pair in one
+    canonical query array (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates
+    each nonempty size's subsets in chunks of them
+    (:func:`~andrey.constraint._skeleton.separating_subsets`), with the p-values of the scalar
+    calls. Every query of another test, or of ``in_column_order``, is a
     scalar call.
     """
     adjacent = cpdag != NULL

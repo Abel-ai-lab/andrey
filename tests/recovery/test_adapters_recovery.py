@@ -44,7 +44,7 @@ def test_fci_recovery():
 
 
 def test_gfci_recovery():
-    out = andrey.gfci(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.gfci(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "GFCI", case="gauss_5v")
 
 
@@ -57,12 +57,12 @@ def test_cdnod_recovery():
 
 
 def test_ges_recovery():
-    out = andrey.ges(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.ges(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "GES", case="gauss_5v")
 
 
 def test_gies_recovery():
-    out = andrey.gies(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.gies(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "GIES", case="gauss_5v")
 
 
@@ -83,10 +83,10 @@ def test_exact_search_recovery():
 
 
 def test_boss_recovery():
-    out = andrey.boss(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.boss(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "BOSS", case="gauss_5v")
 
 
 def test_grasp_recovery():
-    out = andrey.grasp(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.grasp(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "GRaSP", case="gauss_5v")

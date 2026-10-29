@@ -63,18 +63,20 @@ these differences, and the rank of a continuous column depends only on compariso
 consecutive rows, which they rarely change. So a tie goes the same way on every machine, unless
 two tied scores round to different values.
 
-The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`
-with the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000
-rows, the scores of `ges` (and so of `gfci`'s first phase), `gies`, `xges`, `hc`, and `tabu`, and
-the tests of `pcmci`, `pcmciplus`, and `lpcmci` run on one BLAS thread, and so do their worker
-processes, so the host's thread count cannot change their results. From 2,000 rows, KCI runs on
-every BLAS thread, where its kernel products run faster; its p-values then repeat for a fixed
-thread count.
+The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`,
+and the tests of `iamb`, `inter_iamb`, `mmpc`, and the restrict phases of `mmhc` and `rsmax2`, with
+the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000 rows,
+the scores of `ges` (and so of `gfci`'s first phase), `gies`, `xges`, `hc`, `tabu`, `mmhc`, and
+`rsmax2`, the fits of `notears` and `dagma`, and the tests of `pcmci`, `pcmciplus`, and `lpcmci` run
+on one BLAS thread, and so do their worker processes, so the host's thread count cannot change their
+results. From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run faster; its
+p-values then repeat for a fixed thread count.
 
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
 with one torch version, and another platform can give another graph. When the likelihood fit of
 `varma_lingam` stops before it converges, its graph can change with the versions of the numerical
-libraries.
+libraries. Where the fit stops, even when it converges, also depends on the BLAS kernels the CPU
+runs, so a series can give another graph on another type of CPU.
 
 ### ICA-LiNGAM
 
@@ -127,7 +129,9 @@ how much a dataset's column order reveals of its causal order.
 
 For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented:
 by the p-value that separated each pair under `rank`, in column order under `position`. Their
-`collider_order` argument, `"p_value"` or `"column"`, overrides it for one call.
+`collider_order` argument, `"p_value"` or `"column"`, overrides it for one call. Their
+`collider_rule="conservative"` and `"majority"`, and those of `fci` and `gfci`, decide each
+collider by a vote over the final skeleton's adjacencies, which does not read the column order.
 
 The orientation rules of `pc`, `cdnod`, `fci`, and `gfci`, Meek's rules and FCI's R1-R10, run in
 rounds under `rank`: each round sets together everything the rules imply on the graph as it stands,

@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.core.orient import dag2cpdag
-from andrey.core.structure import ARROW, GraphStructure, Kind
+from andrey.core.structure import ARROW, GraphStructure, Kind, is_ancestral_kind
 
 from ._common import _offdiag, as_marks, prf, two_marks
 
@@ -30,6 +30,14 @@ def _shd_structural(
     iu = np.triu_indices(m_est.shape[0], 0 if include_diagonal else 1)
     differ = (m_est[iu] != m_true[iu]) | (m_est.T[iu] != m_true.T[iu])
     return int(differ.sum())
+
+
+def _shd_skeleton(m_est: np.ndarray, m_true: np.ndarray) -> int:
+    """Skeleton SHD: one edit per unordered pair adjacent in one graph and not in the other."""
+    iu = np.triu_indices(m_est.shape[0], 1)
+    est = ((m_est != 0) | (m_est.T != 0))[iu]
+    true_ = ((m_true != 0) | (m_true.T != 0))[iu]
+    return int((est != true_).sum())
 
 
 def _shd_endpoint(m_est: np.ndarray, m_true: np.ndarray) -> int:
@@ -68,26 +76,38 @@ def _confounder(m_est: np.ndarray, m_true: np.ndarray) -> dict[str, float]:
 
 
 def canonicalize_marks(marks: np.ndarray, kind: Kind) -> np.ndarray:
-    """CPDAG marks of a DAG (its essential graph); CPDAG / PAG marks pass through unchanged."""
+    """CPDAG marks of a DAG (its essential graph); CPDAG, PAG, and MAG marks pass through."""
     return dag2cpdag(marks) if kind == "dag" else marks
 
 
 def _digraph_pair(k_est: Kind, k_true: Kind) -> bool:
-    """Whether either kind is ``digraph``; then the diagonal (self-loops) is scored, not masked."""
-    return k_est == "digraph" or k_true == "digraph"
+    """Whether either kind is ``digraph`` and neither ``undirected``; then the diagonal
+    (self-loops) is scored, not masked."""
+    return "digraph" in (k_est, k_true) and not undirected_pair(k_est, k_true)
+
+
+def undirected_pair(k_est: Kind, k_true: Kind) -> bool:
+    """Whether either kind is ``undirected``; then only the skeletons compare."""
+    return "undirected" in (k_est, k_true)
+
+
+def reject_undirected(k_est: Kind, k_true: Kind, claim: str) -> None:
+    """Raise when either kind is ``undirected``: such a graph makes no ``claim`` to compare."""
+    if undirected_pair(k_est, k_true):
+        raise ValueError(f"an undirected graph claims no {claim}; compare skeletons instead")
 
 
 def reject_digraph_pag(k_est: Kind, k_true: Kind) -> None:
-    """Raise when one kind is a ``digraph`` and the other a ``pag`` -- semantically incompatible.
+    """Raise when one kind is a ``digraph`` and the other a ``pag`` or ``mag`` -- incompatible.
 
     A digraph and a PAG share the ``ARROW``/``ARROW`` mark pattern but mean opposite things (a
     directed 2-cycle versus a latent-confounded bidirected edge), so identical marks would score a
     perfect match between contradictory claims. No comparison family covers the pair; fail fast.
     """
-    if {k_est, k_true} == {"digraph", "pag"}:
+    if "digraph" in (k_est, k_true) and (is_ancestral_kind(k_est) or is_ancestral_kind(k_true)):
         raise ValueError(
-            "cannot compare a digraph to a PAG: ARROW/ARROW marks mean a 2-cycle in a digraph "
-            "but a latent confounder in a PAG"
+            "cannot compare a digraph to a PAG or MAG: ARROW/ARROW marks mean a 2-cycle in a "
+            "digraph but a latent confounder in a PAG or MAG"
         )
 
 
@@ -100,7 +120,15 @@ def shd(estimated: object, true: object, *, endpoint_aware: bool = False) -> int
     The default structural count charges one edit per unordered pair whose ``(mark_i, mark_j)``
     differs, so an inserted, deleted, or reversed edge each costs 1. ``endpoint_aware=True`` sums
     the per-endpoint mark mismatches instead -- the standard PAG distance, where a reversal or a
-    deleted directed edge costs 2 and tail/arrow/circle are distinguished.
+    deleted directed edge costs 2 and tail/arrow/circle are distinguished. When either graph is
+    ``undirected``, whose edges claim no direction, the count is the skeleton SHD: one edit per
+    pair adjacent in one graph and not in the other, whatever the marks.
+
+    Raises
+    ------
+    ValueError
+        If the graphs differ in size or labels, one is a ``digraph`` and the other a ``pag`` or
+        ``mag``, or ``endpoint_aware=True`` with an ``undirected`` graph.
 
     Examples
     --------
@@ -110,6 +138,10 @@ def shd(estimated: object, true: object, *, endpoint_aware: bool = False) -> int
     """
     m_est, k_est, m_true, k_true = two_marks(estimated, true)
     reject_digraph_pag(k_est, k_true)  # identical ARROW/ARROW marks would read as SHD 0
+    if undirected_pair(k_est, k_true):
+        if endpoint_aware:
+            reject_undirected(k_est, k_true, "endpoint marks")
+        return _shd_skeleton(m_est, m_true)
     if endpoint_aware:
         return _shd_endpoint(m_est, m_true)
     return _shd_structural(m_est, m_true, include_diagonal=_digraph_pair(k_est, k_true))
@@ -140,6 +172,7 @@ def orientation_scores(estimated: object, true: object) -> dict[str, float]:
     """
     m_est, k_est, m_true, k_true = two_marks(estimated, true)
     reject_digraph_pag(k_est, k_true)  # identical ARROW/ARROW marks would read as perfect agreement
+    reject_undirected(k_est, k_true, "orientation")
     return _orientation(m_est, m_true, include_diagonal=_digraph_pair(k_est, k_true))
 
 
@@ -160,6 +193,7 @@ def confounder_pair_scores(estimated: object, true: object) -> dict[str, float]:
     """
     m_est, k_est, m_true, k_true = two_marks(estimated, true)
     reject_digraph_pag(k_est, k_true)  # a digraph 2-cycle is not a latent confounder
+    reject_undirected(k_est, k_true, "latent confounder")
     return _confounder(m_est, m_true)
 
 
@@ -198,7 +232,8 @@ def markov_equivalent(estimated: object, true: object) -> bool:
     >>> markov_equivalent([[0, 1, 0], [0, 0, 1], [0, 0, 0]], [[0, 0, 0], [1, 0, 1], [0, 0, 0]])
     True
     """
-    m_est, _k_est, m_true, _k_true = two_marks(estimated, true)  # fails loud on node-count mismatch
+    m_est, k_est, m_true, k_true = two_marks(estimated, true)  # fails loud on node-count mismatch
+    reject_undirected(k_est, k_true, "equivalence class")
     same_skeleton = np.array_equal(m_est != 0, m_true != 0)
     return bool(same_skeleton) and _vstructures(m_est) == _vstructures(m_true)
 
@@ -208,7 +243,7 @@ def to_cpdag(graph: object) -> GraphStructure:
 
     Comparing MEC-identified graphs (PC / GES / ...) through their CPDAG lets a DAG and
     any score-equivalent member of its Markov equivalence class score identically. A ``digraph``
-    (directed, cyclic) has no essential graph and raises.
+    (directed, cyclic) or an ``undirected`` graph has no essential graph and raises.
 
     Examples
     --------
@@ -219,5 +254,7 @@ def to_cpdag(graph: object) -> GraphStructure:
     marks, kind = as_marks(graph)
     if kind == "digraph":
         raise ValueError("a digraph (directed, cyclic) has no CPDAG")
+    if kind == "undirected":
+        raise ValueError("an undirected graph has no CPDAG; compare skeletons instead")
     canonical = canonicalize_marks(marks, kind)
     return GraphStructure.from_numpy(canonical, kind="cpdag" if kind == "dag" else kind)

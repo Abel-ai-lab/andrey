@@ -4,7 +4,7 @@ title: "Andrey: Accelerated, accurate, agentic causal discovery"
 type: software
 authors:
   - name: Abel AI Lab
-version: 0.10.0
+version: 0.11.0
 license: Apache-2.0
 url: "https://andrey.abel.ai"
 repository-code: "https://github.com/Abel-ai-lab/andrey"

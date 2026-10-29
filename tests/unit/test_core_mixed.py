@@ -9,6 +9,7 @@ on simulated data where the independence holds, a category of two rows included.
 from __future__ import annotations
 
 import math
+from itertools import combinations
 
 import numpy as np
 import pytest
@@ -203,7 +204,7 @@ def test_cg_counts_parameters_for_every_joint_category():
 
 def test_cg_score_is_the_family_likelihood_over_the_parents_likelihood():
     x, mask = _mixed()
-    score = CGScore(x, mask, lambda_value=2.0)
+    score = CGScore(x, mask, penalty_discount=2.0)
     for node, parents in [(3, (1, 2)), (0, (1,)), (2, ()), (1, (0, 2, 3))]:
         family = [*parents, node]
         loglik = _cg_loglik(x, mask, family) - _cg_loglik(x, mask, list(parents))
@@ -252,7 +253,7 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
     x = rng.standard_normal((300, 4))
     x[:, 1] += x[:, 0]
     x[:, 3] += x[:, 1] - x[:, 2]
-    bic, dg = BICScore(x, lambda_value=1.5), DGScore(x, lambda_value=1.5)
+    bic, dg = BICScore(x, penalty_discount=1.5), DGScore(x, penalty_discount=1.5)
     for node, parents in [(1, ()), (1, (0,)), (3, (1, 2)), (3, (0, 1, 2)), (0, (3,))]:
         assert dg.score(node, parents) == bic.score(node, parents)
 
@@ -260,23 +261,24 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
 @pytest.mark.parametrize(
     ("search", "bic"),
     [
-        (ges, "local_score_BIC"),
-        (hc, "local_score_BIC_from_cov"),
-        (boss, "local_score_BIC_from_cov"),
-        (grasp, "local_score_BIC_from_cov"),
+        (ges, "bic"),
+        (hc, "bic"),
+        (boss, "bic"),
+        (grasp, "bic"),
     ],
 )
 def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
-    x = sample_scm(d=8, n=1000, seed=0, density=2.0).data
-    dg_graph, dg_score = search(x, score_func="local_score_degen_gauss")
-    bic_graph, bic_score = search(x, score_func=bic)
+    x = sample_scm(d=8, n=1000, seed=0, density=2.0, scale="raw").data
+    dg_graph, dg_score = search(x, score_func="degen_gauss")
+    # The degenerate Gaussian score has no extended-BIC term, so the BIC side is the standard BIC.
+    bic_graph, bic_score = search(x, score_func=bic, ebic_gamma=0.0)
     assert np.array_equal(dg_graph.to_numpy(), bic_graph.to_numpy())
     assert dg_score == bic_score
 
 
 def test_exact_search_with_dg_on_continuous_columns_finds_the_bic_equivalence_class():
-    x = sample_scm(d=5, n=1000, seed=0, density=2.0).data
-    dg = to_cpdag(exact_search(x, score_func="local_score_degen_gauss"))
+    x = sample_scm(d=5, n=1000, seed=0, density=2.0, scale="raw").data
+    dg = to_cpdag(exact_search(x, score_func="degen_gauss"))
     assert np.array_equal(dg.to_numpy(), to_cpdag(exact_search(x)).to_numpy())
 
 
@@ -319,7 +321,7 @@ def test_dg_score_of_a_node_its_parents_determine_is_inf():
 @pytest.mark.parametrize("search", [ges, hc, boss, grasp])
 def test_a_dg_search_never_selects_a_family_its_parents_determine(search):
     x, mask = _determined()
-    _, total = search(x, score_func="local_score_degen_gauss", categorical=mask)
+    _, total = search(x, score_func="degen_gauss", categorical=mask)
     assert math.isfinite(total)
 
 
@@ -474,3 +476,31 @@ def test_cg_rejects_a_constant_continuous_column():
     x[:, 1] = 2.0
     with pytest.raises(ValueError, match="continuous column 1 is constant"):
         ConditionalGaussian(x, mask)
+
+
+@pytest.mark.parametrize("data", [_mixed, _determined], ids=["mixed", "determined columns"])
+def test_dg_stacked_queries_return_the_scalar_p_values(data):
+    """Queries stacked by shape, over random conditioning sets of sizes 0-3 with sets shared across
+    pairs, in two orders, equal fresh scalar calls bit for bit; so does each pair's batched call."""
+    x, mask = data()
+    rng = np.random.default_rng(0)
+    x = np.column_stack([x, rng.integers(0, 4, len(x)), rng.standard_normal(len(x))])
+    mask = np.append(mask, [True, False])
+    d = x.shape[1]
+    queries = []
+    for size in range(4):
+        for given in combinations(range(d), size):
+            others = [v for v in range(d) if v not in given]
+            for a, b in combinations(others, 2):
+                queries.append((a, b, given))
+    want = np.array([DGTest(x, mask)(a, b, given) for a, b, given in queries])
+    for order in (np.arange(len(queries)), rng.permutation(len(queries))):
+        xs, ys, sets = zip(*(queries[i] for i in order))
+        got = DGTest(x, mask)._stacked_pvalues(list(xs), list(ys), list(sets))
+        assert got.view(np.int64).tolist() == want[order].view(np.int64).tolist()
+    for a, b in [(0, 3), (1, 2), (4, 5)]:
+        sets = [given[::-1] for x_, y_, given in queries if (x_, y_) == (a, b)]
+        got = np.array(DGTest(x, mask).batched_call(b, a, sets))
+        assert got.view(np.int64).tolist() == [
+            np.float64(DGTest(x, mask)(a, b, s)).view(np.int64) for s in sets
+        ]

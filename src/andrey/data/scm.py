@@ -25,6 +25,7 @@ from . import qa
 from .dataset import CausalDataset, QAReport, SCMParams
 from .functional import (
     Functional,
+    Linear,
     additive_noise,
     linear,
     nonmonotone,
@@ -47,7 +48,10 @@ from .qa import FaithfulnessScreen
 from .sortability import standardize
 from .temporal import relabel_truth
 
-_SCALES = ("raw", "standardize", "rescale")
+__all__ = ["SCM", "sample_scm"]
+
+_SCALES = ("raw", "standardize", "rescale", "unitless")
+_TEMPORAL_SCALES = ("raw", "standardize")
 _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 
 # Per-component sub-keys off the root SeedSequence: the graph, the weights, the noise, the latent
@@ -115,7 +119,7 @@ class SCM:
         n: int,
         seed: int,
         *,
-        scale: str = "raw",
+        scale: str = "standardize",
         screen: FaithfulnessScreen | None = None,
         dtype: npt.DTypeLike = np.float64,
         shuffle: bool = True,
@@ -128,12 +132,35 @@ class SCM:
             Number of samples (rows).
         seed : int
             Root seed; the graph, weights, and noise streams are derived from it statelessly.
-        scale : {"raw", "standardize", "rescale"}, default="raw"
-            Honesty mode. ``"raw"`` leaves the generated variances (high varsortability).
-            ``"standardize"`` z-scores columns post-hoc -- varsortability becomes 0.5 but
-            **R^2-sortability is unchanged** (standardized synthetic data is not scale-hard).
-            ``"rescale"`` standardizes each node *during generation* (ancestral rescaling), killing
-            varsortability by construction while preserving the recovered structure.
+        scale : {"standardize", "unitless", "rescale", "raw"}, default="standardize"
+            How the generated values are scaled; no mode changes the graph. In raw linear data a
+            variable's variance grows down the causal order, so sorting the columns by variance
+            recovers much of that order (var-sortability, Reisach et al. 2021). The default
+            removes it for every functional at any size, so no method gains from the units the
+            generator happens to produce.
+
+            - ``"standardize"`` z-scores each column after generation: every column has mean 0
+              and variance 1, and var-sortability is exactly 0.5. R^2-sortability, the share of a
+              variable's variance the other variables explain, is the same under any rescaling of
+              the columns, so it stays as high as in the raw data (Reisach et al. 2023).
+            - ``"unitless"`` draws the weights and noise scales of the linear model so that every
+              node has variance 1 in the population, with each node's parameters depending only on
+              its number of parents and no bound on the ratio of a parent's share of the variance
+              to the noise's (Algorithm 1 of Herman et al. 2025;
+              :meth:`~andrey.data.functional.Linear.draw_unitless`). Var-sortability and
+              R^2-sortability are near 0.5, R^2-sortability a little below it on denser graphs,
+              and the sample variances differ from 1 by sampling error. It takes the linear
+              functional without heteroscedastic noise, does not use the functional's
+              ``weight_range``, and keeps a dense ``(d, d)`` correlation matrix, so it takes at
+              most 1,000 nodes (``andrey.data.functional.UNITLESS_MAX_NODES``).
+            - ``"rescale"`` divides each node by its sample standard deviation as it is generated,
+              before its children use it, so variance does not accumulate down the causal order:
+              var-sortability is exactly 0.5 and R^2-sortability near 0.5 on sparse graphs. The
+              model then depends on the sample, and the weights keep their ``weight_range``
+              relative to the noise.
+            - ``"raw"`` returns the generated values as they are.
+
+            Temporal functionals take ``"standardize"`` and ``"raw"``.
         screen : FaithfulnessScreen or None, default=None
             If given, reject-resample near-unfaithful draws (bounded; raises after
             ``max_attempts``); the accept rate is recorded in ``report.faithfulness_accept_rate``.
@@ -153,9 +180,44 @@ class SCM:
         Returns
         -------
         CausalDataset
+
+        Raises
+        ------
+        ValueError
+            If ``scale`` is not one of the modes, a temporal functional is given a mode other than
+            ``"standardize"`` or ``"raw"``, ``"unitless"`` is given a functional other than linear,
+            heteroscedastic noise, or more than 1,000 nodes.
+
+        References
+        ----------
+        Reisach, A. G., Seiler, C., and Weichwald, S. (2021). Beware of the Simulated DAG! Causal
+        Discovery Benchmarks May Be Easy to Game. Advances in Neural Information Processing
+        Systems 34.
+
+        Reisach, A. G., Tami, M., Seiler, C., Chambaz, A., and Weichwald, S. (2023). A
+        Scale-Invariant Sorting Criterion to Find a Causal Order in Additive Noise Models.
+        Advances in Neural Information Processing Systems 36.
+
+        Herman, R. J., Wahl, J., Ninad, U., and Runge, J. (2025). Unitless Unrestricted
+        Markov-Consistent SCM Generation: Better Benchmark Datasets for Causal Discovery.
+        Proceedings of the Fourth Conference on Causal Learning and Reasoning, PMLR 275,
+        1506-1531.
         """
         if scale not in _SCALES:
             raise ValueError(f"scale must be one of {_SCALES}, got {scale!r}")
+        if self.functional.is_temporal and scale not in _TEMPORAL_SCALES:
+            raise ValueError(
+                f"temporal functionals take scale in {_TEMPORAL_SCALES}, got {scale!r}"
+            )
+        if scale == "unitless" and not isinstance(self.functional, Linear):
+            raise ValueError(
+                f"scale='unitless' takes the linear functional, got {self.functional.name!r}"
+            )
+        if scale == "unitless" and self.noise.heteroscedastic:
+            raise ValueError(
+                "scale='unitless' draws the noise scales itself; use noise without "
+                "heteroscedastic=True"
+            )
         if not isinstance(self.graph, GraphSpec):
             raise NotImplementedError(
                 "SCM.sample currently supports a GraphSpec; concrete-graph input is not supported"
@@ -192,9 +254,14 @@ class SCM:
         shuffle: bool,
     ) -> CausalDataset:
         _, draw = self.graph.materialize(_component_rng(root, _GRAPH))
-        weights = self.functional.draw_weights(draw, _component_rng(root, _WEIGHTS))
         noise_rng = _component_rng(root, _NOISE)
-        scales = self.noise.draw_scales(draw.d, noise_rng)
+        if scale == "unitless":
+            weights, scales = self.functional.draw_unitless(  # ty: ignore[unresolved-attribute]  # checked in sample: Linear only
+                draw, _component_rng(root, _WEIGHTS)
+            )
+        else:
+            weights = self.functional.draw_weights(draw, _component_rng(root, _WEIGHTS))
+            scales = self.noise.draw_scales(draw.d, noise_rng)
         if self.functional.is_temporal:
             return self._sample_temporal(
                 n, draw, weights, scales, noise_rng, root, scale, dtype, shuffle
@@ -267,12 +334,12 @@ class SCM:
             raise NotImplementedError(
                 "latent confounders are not supported for temporal functionals"
             )
-        if scale != "raw":
-            raise ValueError("temporal functionals support only scale='raw'")
         innovations = self.noise.draw(n + _TEMPORAL_BURN_IN, scales, noise_rng)
         series, temporal_truth = self.functional.generate_temporal(  # ty: ignore[unresolved-attribute]  # gated by is_temporal (VAR/VARMA only)
             draw, weights, innovations, _component_rng(root, _LAG), burn_in=_TEMPORAL_BURN_IN
         )
+        if scale == "standardize":
+            series = standardize(series)
         data = series.astype(dtype)
         if not np.all(np.isfinite(data)):
             raise OverflowError(
@@ -355,7 +422,7 @@ def sample_scm(
     n: int,
     seed: int,
     density: float = 4.0,
-    scale: str = "raw",
+    scale: str = "standardize",
     latents: int = 0,
     dtype: npt.DTypeLike = np.float64,
     shuffle: bool = True,
@@ -373,9 +440,13 @@ def sample_scm(
     density : float, default=4.0
         Mean total degree (``2 * |E| / d``), for every ``graph``. Each builder rounds it to the
         nearest value it can draw.
-    scale : {"raw", "standardize", "rescale"}, default="raw"
-        How the columns are scaled; forwarded to :meth:`SCM.sample`. Temporal functionals take
-        only ``"raw"``.
+    scale : {"standardize", "unitless", "rescale", "raw"}, default="standardize"
+        How the generated values are scaled; forwarded to :meth:`SCM.sample`, which describes each
+        mode. ``"standardize"`` z-scores the columns; ``"unitless"`` (linear functional, at most
+        1,000 nodes) gives every node variance 1 by its draw of weights and noise scales, with
+        R^2-sortability near 0.5; ``"rescale"`` divides each node by its sample standard deviation
+        as it is generated; ``"raw"`` keeps the generated values. Temporal functionals take
+        ``"standardize"`` and ``"raw"``.
     latents : int, default=0
         How many of the ``d`` nodes to hide as latent confounders, chosen among nodes with at least
         two children: ``data`` drops them, and the true graph lists them last. Temporal

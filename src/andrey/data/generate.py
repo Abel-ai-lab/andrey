@@ -52,7 +52,11 @@ class Ensemble:
 
 
 def generate(
-    ensemble: Ensemble, *, workers: int = 1, dtype: npt.DTypeLike = np.float64
+    ensemble: Ensemble,
+    *,
+    workers: int = 1,
+    dtype: npt.DTypeLike = np.float64,
+    scale: str = "standardize",
 ) -> list[CausalDataset]:
     """Sample every scenario/seed pair in ``ensemble``.
 
@@ -68,13 +72,16 @@ def generate(
         ``fork`` or ``spawn``, with a warning.
     dtype : npt.DTypeLike, default=np.float64
         Output dtype of every dataset's ``data``; forwarded to :meth:`SCM.sample`.
+    scale : {"standardize", "unitless", "rescale", "raw"}, default="standardize"
+        How every dataset's values are scaled; forwarded to :meth:`SCM.sample`, which describes
+        each mode.
 
     Returns
     -------
     list[CausalDataset]
         One dataset per task, in ``ensemble.tasks`` order.
     """
-    tasks = [(scm, ensemble.n, seed, dtype) for scm, seed in ensemble.tasks]
+    tasks = [(scm, ensemble.n, seed, dtype, scale) for scm, seed in ensemble.tasks]
     if workers <= 1:
         return [_run(t) for t in tasks]
     with ProcessPoolExecutor(max_workers=workers, mp_context=_context()) as pool:
@@ -91,6 +98,6 @@ def _context() -> mp.context.BaseContext:
     return pick_context()
 
 
-def _run(task: tuple[SCM, int, int, npt.DTypeLike]) -> CausalDataset:
-    scm, n, seed, dtype = task
-    return scm.sample(n=n, seed=seed, dtype=dtype)
+def _run(task: tuple[SCM, int, int, npt.DTypeLike, str]) -> CausalDataset:
+    scm, n, seed, dtype, scale = task
+    return scm.sample(n=n, seed=seed, dtype=dtype, scale=scale)

@@ -89,7 +89,7 @@ def test_pc_is_invariant_to_column_order():
 
 def conflicting_orientations() -> np.ndarray:
     """A seed on which Meek's rule R1 directs one edge both ways."""
-    return data.sample_scm(d=10, n=100, seed=9, density=4.0).data
+    return data.sample_scm(d=10, n=100, seed=9, density=4.0, scale="raw").data
 
 
 def test_pc_orientations_are_invariant_to_column_order():
@@ -109,7 +109,7 @@ def test_pc_orientations_are_invariant_to_column_order():
 
 def test_ges_recovery():
     assert_recorded_output(
-        andrey.ges(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA),
+        andrey.ges(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA),
         "GES",
         case="gauss_5v",
     )
@@ -220,12 +220,12 @@ def test_ges_output_contract():
 
 
 def test_pc_rejects_unknown_indep_test():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.pc(datagen.generate("gauss_5v"), indep_test="no_such_test")
 
 
 def test_ges_rejects_unknown_score():
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         andrey.ges(datagen.generate("gauss_5v"), score_func="local_score_CV_general")
 
 

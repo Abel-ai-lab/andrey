@@ -12,13 +12,16 @@ meta:
 
 ### What is Andrey?
 
-An open-source Python package that learns causal graphs from data. Its {{ method_count }}, all
-supported and benchmarked, cover continuous, categorical, and mixed data; independent samples and
-time series; linear and nonlinear relationships; data with hidden common causes; and data from
-interventions or several domains. The searches also take background knowledge: edges that must or
-cannot exist, and the order of tiers in time. They include PC, FCI, GFCI, GES, XGES, BOSS, GRaSP,
-the LiNGAM family, PCMCI, and LPCMCI. Many methods spread their work over CPU cores, and some run
-on a GPU. A command line that answers in JSON and an agent skill make it usable by AI agents.
+An open-source Python package that learns causal graphs from data. Its {{ method_count }}, of
+which {{ n_supported }} are supported and benchmarked and the rest experimental, cover continuous,
+categorical, and mixed data; independent samples and time series; linear and nonlinear
+relationships; data with hidden common causes; and data from interventions or several domains.
+Most take background knowledge: edges that must or cannot exist, and the order of tiers in time.
+The constraint-based methods accept missing values, and `andrey.bootstrap` gives each edge's
+frequency over refits on resampled data. The methods include PC, FCI, GFCI, GES, XGES, BOSS,
+GRaSP, the LiNGAM family, PCMCI, and LPCMCI. Many methods spread their work over CPU cores, and
+some run on a GPU. A command line that answers in JSON and an agent skill make it usable by AI
+agents.
 
 ### How do I install it?
 
@@ -90,7 +93,7 @@ Not always. In the release cards, which use sparse simulated graphs with ten sam
 FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
 causal-learn, so there the limit is the algorithm's, not the software's. The 0.1.0 release card's
 [large graphs](benchmarks/0.1.0.md#large-graphs) section lists every case, including Andrey's GES
-at 200 variables with the default penalty.
+at 200 variables with the standard BIC (`ebic_gamma=0.0`).
 
 ### Why does a result differ from another package's?
 
@@ -163,19 +166,45 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
-text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
-data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
-and exact search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`;
-all but GFCI pick BDeu by default when every column is categorical. For mixed data, with
-continuous and categorical columns, PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
-exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`; GES, hill climbing, BOSS,
-GRaSP, and exact search pick `"local_score_cond_gauss"` by default when some columns are
-categorical. They infer which columns are categorical unless you name them with `categorical`, and
-warn about what they inferred. The [release cards](benchmarks.md) benchmark them on categorical
-and mixed data against causal-learn, Tetrad, bnlearn, and pgmpy.
-[Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
-how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
+text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, and
+RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI,
+hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
+`score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
+the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
+`score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
+the column types you declare, with `categorical` or a DataFrame's `category` columns: `gsq` and
+`bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
+numbers that you have not declared reads as numbers, with a warning. The
+[release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
+Tetrad, bnlearn, and pgmpy. [Data types](guides/getting-started.md#data-types) explains the
+settings. The LiNGAM methods assume continuous non-Gaussian noise.
+
+### Does it handle missing values?
+
+Yes, in PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, LPCMCI, ANM, and PNL. Mark a
+missing value with `NaN` or pandas' `NA`, or leave its field empty in a CSV file. Each
+conditional-independence test then reads only the samples where all of its variables are observed
+(test-wise deletion), so the fit keeps the samples that dropping every incomplete one would lose.
+The other methods refuse missing values with an error that says what to do instead. Test-wise
+deletion is sound when values are missing completely at random; when whether a value is missing
+depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure it
+against dropping incomplete samples, and
+[Missing values](guides/getting-started.md#missing-values) explains it.
+
+### Can I tell it what I already know?
+
+Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
+points from a later tier into an earlier one, such as nothing causing a person's age. Every method
+takes it except IAMB, Inter-IAMB, MMPC, CALM, ANM, PNL, and GIN.
+
+### How sure is each edge?
+
+`andrey.bootstrap(method, data)` refits a method on 100 resamples of the data and counts how often
+each edge appears. It returns each edge's frequency, a table of the edges, and an averaged graph of
+the pairs adjacent in at least half the fits; `andrey bootstrap <method>` does the same from the
+command line. Read the frequencies as a ranking: in the release cards' simulations, edges seen in
+more than nine fits in ten were almost always true. A frequency is not the probability that an
+edge is true: a method that makes the same mistake on every resample gives it a frequency of 1.
 
 ### Time series and several datasets?
 
@@ -214,9 +243,10 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 ### How stable is it?
 
 Andrey is in alpha: any release may change the API, including the supported methods. Pin the
-version you depend on, and read the [changelog](changelog.md) before upgrading. The public API is
-what the [API reference](api.md) documents; names that start with an underscore are private
-and can change in any release.
+version you depend on, and read the [changelog](changelog.md) and the
+[upgrade guide](guides/upgrading.md) before upgrading. The public API is what the
+[API reference](api.md) documents; names that start with an underscore are private and can change
+in any release.
 
 ### What is planned next?
 
@@ -263,7 +293,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.10.0},
+  version = {0.11.0},
   url = {https://andrey.abel.ai},
 }
 ```
