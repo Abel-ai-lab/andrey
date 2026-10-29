@@ -4,10 +4,24 @@ All notable changes to Andrey are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the major version is 0, Andrey is
 in alpha, and any minor release may change the API. From 0.2.0, a release opens with Highlights
-and, when a change breaks the API, Breaking, two sections Keep a Changelog does not define; each
-change names its pull request.
+and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New contributors when
+someone contributes for the first time, sections Keep a Changelog does not define; each change
+names its pull request.
 
 ## [Unreleased]
+
+## [0.11.0] - 2026-10-29
+
+### Highlights
+
+- Ready for real data: eleven methods accept missing values, each conditional-independence test
+  reading the samples where its variables are observed; `andrey.bootstrap` gives each edge's
+  frequency over refits on bootstrap samples; and 27 of the 34 methods take background knowledge.
+  On simulated data with 20 variables, 1,000 samples, and a tenth of the values missing, dropping
+  every incomplete sample keeps about 125, while PC with test-wise deletion keeps them all, with a
+  median of 6.5 errors against 8.5. ([#396], [#410], [#443], [#453])
+- The extended BIC is the default penalty of ten score searches, so a large graph keeps fewer false
+  edges: over 299 simulated datasets, GES's median errors fall from 87 to 25. ([#445])
 
 ### Breaking
 
@@ -331,6 +345,10 @@ change names its pull request.
   in the graph with its weight 0, as `direct_lingam` and `multi_group_direct_lingam` already kept
   theirs. `longitudinal_lingam` builds its graph the same way. Fits without a zero weight on a
   required link return the same graphs as before. ([#524])
+
+### New contributors
+
+- [@petacube](https://github.com/petacube) made their first contribution in [#468].
 
 ## [0.10.0] - 2026-10-27
 
@@ -973,7 +991,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0

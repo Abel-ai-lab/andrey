@@ -18,14 +18,14 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.10.0
+## ⭐ What's new in 0.11.0
 
-How far can each method go? We mapped the boundary of every supported method by variables, samples,
-and graph density: BOSS stays more accurate than the empty graph up to 1,600 variables, GRaSP to
-800, and PC to 400.
+Ready for real data: missing values, mixed types, what you already know, and how sure each edge
+is. On a national health survey of 5,569 adults, a third of them missing a value, PC keeps every
+sample, and the bootstrap ranks each edge by how often it comes back.
 
-**[Read the post](https://andrey.abel.ai/blog/20261027-andrey-0-10-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.10.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.11.0.html)**
 
 ---
 
@@ -198,7 +198,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.10.0},
+  version = {0.11.0},
   url = {https://andrey.abel.ai},
 }
 ```
