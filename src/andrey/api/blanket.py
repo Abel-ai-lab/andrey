@@ -20,9 +20,9 @@ from andrey.api._adapt import (
     structure_output,
 )
 from andrey.api._method import method_spec
-from andrey.core import ARROW, NULL, TAIL
+from andrey.core import NULL, TAIL
 from andrey.core.ci_missing import rows_metadata, rows_tested
-from andrey.core.knowledge import Knowledge, _node, column_position, orient, resolve
+from andrey.core.knowledge import Knowledge, _node, column_position, resolve
 from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
@@ -49,8 +49,7 @@ def _fit(
     max_depth: int | None,
     knowledge: Knowledge | None,
 ) -> StructureOutput:
-    """Check the settings, run the search, and wrap its sets as edges, the decided ones directed."""
-    from andrey.constraint.pc import check_knowledge_cycle
+    """Check the settings, run the search, and wrap its sets as undirected edges."""
     from andrey.search.hybrid import local_graph, local_set
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
@@ -86,12 +85,10 @@ def _fit(
             name = (lambda j: labels[j]) if labels is not None else int
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
     marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-    if constraints is not None:
-        marks = orient(marks, constraints)
-        if method == "mmpc":  # a skeleton, whose edges are adjacencies
-            check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW))
     metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
-    return structure_output(to_structure(marks, kind="cpdag"), labels=labels, metadata=metadata)
+    return structure_output(
+        to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
+    )
 
 
 @method_spec("iamb")
@@ -150,16 +147,15 @@ def iamb(
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
         the other's blanket from the start, and no test removes it. A pair the knowledge makes
-        non-adjacent stays a candidate, since a child's other parent belongs to the blanket without
-        being adjacent, and is left out of the result. The edges the knowledge decides are
-        directed, and no rule directs the others. An edge here need not join adjacent variables,
-        so the directed edges can form a directed cycle, which the result keeps.
+        non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
+        other parent belongs to the blanket without being adjacent, and is left out of the result.
+        Tiers and edges forbidden one way constrain orientation, which an undirected result does
+        not have, so they do not change the result.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are undirected, but
-        those ``knowledge`` directs.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -321,16 +317,15 @@ def inter_iamb(
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
         the other's blanket from the start, and no test removes it. A pair the knowledge makes
-        non-adjacent stays a candidate, since a child's other parent belongs to the blanket without
-        being adjacent, and is left out of the result. The edges the knowledge decides are
-        directed, and no rule directs the others. An edge here need not join adjacent variables,
-        so the directed edges can form a directed cycle, which the result keeps.
+        non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
+        other parent belongs to the blanket without being adjacent, and is left out of the result.
+        Tiers and edges forbidden one way constrain orientation, which an undirected result does
+        not have, so they do not change the result.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are undirected, but
-        those ``knowledge`` directs.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each member of its Markov blanket, which holds
         its parents, its children, and its children's other parents; without, they join each pair
         in each other's blanket, the moral graph. An edge here does not say that the two variables
@@ -492,15 +487,14 @@ def mmpc(
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
         the other's set from the start, and no test removes it; a pair the knowledge makes
-        non-adjacent is never a candidate. The edges the knowledge decides are directed, and no
-        rule directs the others. Knowledge that orients the edges the search kept into a directed
-        cycle raises ``ValueError``.
+        non-adjacent, forbidden both ways or outside ``allowed``, is never a candidate. Tiers and
+        edges forbidden one way constrain orientation, which an undirected result does not have,
+        so they do not change the result.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` whose edges are undirected, but
-        those ``knowledge`` directs.
+        Wraps an ``undirected`` :class:`~andrey.core.GraphStructure`, whose edges have no arrowhead.
         With ``target``, they join ``target`` to each of its parents and children; without, they
         form the skeleton: each pair in each other's set. ``metadata["algorithm"]`` is ``"mmpc"``;
         with ``target``, ``metadata["target"]`` names it and ``metadata["parents_and_children"]``
@@ -520,8 +514,7 @@ def mmpc(
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or orients the edges the search
-        kept into a directed cycle.
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----

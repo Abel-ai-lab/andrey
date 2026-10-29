@@ -11,7 +11,8 @@ Endpoint marks are unsigned: ``NULL`` (0, never stored) / ``TAIL`` (1) / ``ARROW
 two entries (``M[i][j]`` and ``M[j][i]``). A double arrowhead ``ARROW``/``ARROW`` on an
 off-diagonal pair is kind-relative: a bidirected (latent-confounded) edge under ``pag`` but a
 2-cycle (``i -> j`` and ``j -> i``, two directed edges) under ``digraph``, the directed graph kind
-that also carries autoregressive self-loops.
+that also carries autoregressive self-loops. An ``undirected`` graph holds tail-tail pairs only:
+its edges join two variables without a claim about direction or, for a moral graph, adjacency.
 """
 
 from __future__ import annotations
@@ -39,8 +40,8 @@ CIRCLE = 3
 OBSERVED = 0
 LATENT = 1
 
-Kind = Literal["dag", "cpdag", "pag", "mag", "digraph"]
-KINDS: tuple[Kind, ...] = ("dag", "cpdag", "pag", "mag", "digraph")
+Kind = Literal["dag", "cpdag", "pag", "mag", "digraph", "undirected"]
+KINDS: tuple[Kind, ...] = ("dag", "cpdag", "pag", "mag", "digraph", "undirected")
 
 
 def is_ancestral_kind(kind: str) -> bool:
@@ -257,11 +258,11 @@ class GraphStructure(Structure):
             Endpoint marks: ``M[i, j]`` is the mark at node ``i`` on its edge with ``j``, ``0``
             absent, ``1`` tail, ``2`` arrowhead, ``3`` circle. ``i -> j`` is ``M[i, j] = 1`` and
             ``M[j, i] = 2``. Every edge needs a mark in both cells.
-        kind : {"dag", "cpdag", "pag", "mag", "digraph"} or None, default=None
+        kind : {"dag", "cpdag", "pag", "mag", "digraph", "undirected"} or None, default=None
             Graph type. ``None`` infers ``"pag"`` from any circle or ``(2, 2)`` pair, else
-            ``"cpdag"`` from any ``(1, 1)`` pair, else ``"dag"``; it never infers ``"mag"`` or
-            ``"digraph"``, so pass it for a MAG or a graph with 2-cycles. The marks are not
-            checked against ``kind``; call ``validate()``.
+            ``"cpdag"`` from any ``(1, 1)`` pair, else ``"dag"``; it never infers ``"mag"``,
+            ``"digraph"``, or ``"undirected"``, so pass it for a MAG, a graph with 2-cycles, or an
+            undirected graph. The marks are not checked against ``kind``; call ``validate()``.
         labels : tuple[str, ...] or None, default=None
             Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
             nodes from 0.
@@ -281,7 +282,7 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If ``kind`` is not one of the five kinds, ``M`` is not square, has a nonzero diagonal
+            If ``kind`` is not one of the six kinds, ``M`` is not square, has a nonzero diagonal
             without ``allow_self_loops`` or a diagonal value other than ``0`` or ``2`` with it,
             holds a value outside ``0..3``, has a mark in ``M[i, j]`` but not in ``M[j, i]``,
             ``labels`` does not have ``n`` entries or has two that are equal as text, such as ``1``
@@ -332,7 +333,7 @@ class GraphStructure(Structure):
             ``mark_j`` the mark at ``j``. A row with ``i == j`` is a self-loop.
         n_nodes : int
             Number of nodes, including nodes without edges.
-        kind : {"dag", "cpdag", "pag", "mag", "digraph"} or None, default=None
+        kind : {"dag", "cpdag", "pag", "mag", "digraph", "undirected"} or None, default=None
             Graph type; ``None`` infers it as ``from_numpy`` does.
         labels : tuple[str, ...] or None, default=None
             Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
@@ -380,7 +381,7 @@ class GraphStructure(Structure):
         ----------
         g : networkx.DiGraph or networkx.MultiDiGraph
             The graph to read.
-        kind : {"dag", "cpdag", "pag", "mag", "digraph"} or None, default=None
+        kind : {"dag", "cpdag", "pag", "mag", "digraph", "undirected"} or None, default=None
             Graph type; ``None`` infers it as ``from_numpy`` does.
 
         Returns
@@ -492,8 +493,8 @@ class GraphStructure(Structure):
 
     @property
     def kind(self) -> Kind:
-        """Graph type: ``"dag"``, ``"cpdag"``, ``"pag"``, ``"mag"``, or ``"digraph"`` (cycles
-        allowed)."""
+        """Graph type: ``"dag"``, ``"cpdag"``, ``"pag"``, ``"mag"``, ``"digraph"`` (cycles
+        allowed), or ``"undirected"`` (no edge has an arrowhead)."""
         return self._kind
 
     @property
@@ -992,8 +993,8 @@ class GraphStructure(Structure):
         ------
         ValueError
             If a circle appears outside a ``pag``, a ``dag`` or ``cpdag`` has an edge with two
-            arrowheads, a ``dag`` or ``digraph`` has an undirected edge, or an edge has a mark at
-            one end only.
+            arrowheads, a ``dag`` or ``digraph`` has an undirected edge, an ``undirected`` graph
+            has an arrowhead, or an edge has a mark at one end only.
         """
         indptr, indices, marks = self._sym_csr()
         if self._kind != "pag" and (marks == CIRCLE).any():
@@ -1007,7 +1008,11 @@ class GraphStructure(Structure):
                     f"kind='digraph' (2-cycle)"
                 )
             if self._kind in ("dag", "digraph") and mi == TAIL and mj == TAIL:
-                raise ValueError(f"undirected edge {i}--{j} requires kind='cpdag', 'pag', or 'mag'")
+                raise ValueError(
+                    f"undirected edge {i}--{j} requires kind='cpdag', 'pag', 'mag', or 'undirected'"
+                )
+            if self._kind == "undirected" and (mi, mj) != (TAIL, TAIL):
+                raise ValueError(f"edge {i}-{j} has an arrowhead, which kind='undirected' forbids")
         # Support symmetry: every stored (i, j) has a matching (j, i).
         n = self._n_nodes
         rows = np.repeat(np.arange(n, dtype=np.intp), np.diff(indptr))
@@ -1827,7 +1832,7 @@ def _lookup(indptr: np.ndarray, indices: np.ndarray, marks: np.ndarray, a: int, 
 def _try_compact(
     n: int, indptr: np.ndarray, indices: np.ndarray, marks: np.ndarray, kind: Kind
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
-    """Halved dag/cpdag store (one entry per edge) if the marks conform, else ``None`` (stay full).
+    """Halved dag/cpdag/undirected store (one entry per edge) if the marks conform, else ``None``.
 
     A directed edge ``i -> j`` keeps a single entry ``(i, j)`` carrying the far mark ``ARROW``; an
     undirected ``i -- j`` a single ``(min, max)`` entry with ``TAIL``; a self-loop the diagonal.
@@ -1836,7 +1841,7 @@ def _try_compact(
     ``NULL``-bearing CSR) so ``validate()`` still flags it. The public views reconstruct the
     symmetric matrix via ``_expand_compact``.
     """
-    if kind not in ("dag", "cpdag"):
+    if kind not in ("dag", "cpdag", "undirected"):
         return None
     import scipy.sparse
 
@@ -1867,7 +1872,10 @@ def _try_compact(
     fwd = (mi == TAIL) & (mj == ARROW)  # r -> c
     bwd = (mi == ARROW) & (mj == TAIL)  # c -> r
     und = (mi == TAIL) & (mj == TAIL)  # r -- c (cpdag only)
-    ok = fwd | bwd | (und if kind == "cpdag" else np.zeros_like(und))
+    if kind == "undirected":
+        ok = und
+    else:
+        ok = fwd | bwd | (und if kind == "cpdag" else np.zeros_like(und))
     if not bool(ok.all()):
         return None  # a bidirected pair, or an undirected edge under dag
     r_up, c_up = rows[upper], cols[upper]

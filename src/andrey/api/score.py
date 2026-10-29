@@ -1250,12 +1250,13 @@ def exact_search(
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn the globally optimal DAG for a decomposable score by exact search.
+    """Learn the CPDAG of the globally optimal DAGs for a decomposable score by exact search.
 
-    The optimum is identified up to its Markov equivalence class, and A*
-    (``search_method="astar"``) [1]_ and dynamic programming (``"dp"``) [2]_ return the same DAG of
-    that class. Runtime is exponential in the variable count, so keep the problem small (roughly
-    <= 20 variables).
+    The optimum is identified up to its Markov equivalence class, so the search returns the class's
+    CPDAG, as the other score searches do; A* (``search_method="astar"``) [1]_ and dynamic
+    programming (``"dp"``) [2]_ find the same DAG of that class, which ``metadata["dag"]`` keeps.
+    Runtime is exponential in the variable count, so keep the problem small (roughly <= 20
+    variables).
 
     Parameters
     ----------
@@ -1286,9 +1287,9 @@ def exact_search(
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the search scores only parent sets within it
-        and returns the best-scoring DAG whose every node keeps within it, so no DAG the returned
-        DAG represents gives a node more than ``max_parents`` parents (every DAG of a class has the
-        same largest number of parents). ``None`` sets no cap.
+        and finds the best-scoring DAG whose every node keeps within it, so no DAG the returned
+        CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
+        the same largest number of parents). ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -1304,15 +1305,18 @@ def exact_search(
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
         the forbidden parents and include the required ones, so the DAG found is the best one that
-        satisfies the knowledge.
+        satisfies the knowledge, and the returned graph directs the edges the knowledge decides.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` (one DAG of the optimal equivalence
-        class); ``metadata["algorithm"]`` is ``"exact_search"``. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
-        0-based position.
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the optimal equivalence class:
+        directed marks (``->``) are the edges every DAG of the class shares, or the knowledge
+        directs, and undirected (``--``) the ones the class leaves open. ``metadata["dag"]`` lists
+        the edges of the DAG the search found as ``[i, j]`` pairs for ``i -> j``, 0-based column
+        positions in ascending order; ``metadata["algorithm"]`` is ``"exact_search"``. Under a
+        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read, by
+        name or 0-based position.
 
     Raises
     ------
@@ -1345,8 +1349,9 @@ def exact_search(
     optimum.
 
     **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
-    own pick among them would follow last-bit rounding and the column order. Exact search instead
-    reports one fixed member of the class it found: it keeps the edges every DAG of the class
+    own pick among them would follow last-bit rounding and the column order. The returned CPDAG
+    does not depend on the pick; for ``metadata["dag"]``, exact search reports one fixed member of
+    the class it found: it keeps the edges every DAG of the class
     shares, and those the knowledge directs, and orients the others by a rank computed from each
     column's own data, as :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so
     reordering the columns reorders the graph's nodes and changes nothing else, unless two columns
@@ -1423,8 +1428,13 @@ def exact_search(
     >>> y = x + 0.1 * rng.standard_normal(500)
     >>> z = y + 0.1 * rng.standard_normal(500)
     >>> exact_search(np.column_stack([x, y, z])).structure.kind
-    'dag'
+    'cpdag'
     """
+    import numpy as np
+
+    from andrey.core.knowledge import mpdag
+    from andrey.core.orient import dag2cpdag, to_structure
+    from andrey.core.structure import ARROW, TAIL
     from andrey.search.exact import exact_search as _exact
 
     score_func, categorical = default_score(data, score_func, categorical=categorical)
@@ -1449,10 +1459,15 @@ def exact_search(
             constraints=constraints,
             max_parents=max_parents,
         )
+    marks = dag.to_numpy()
+    cpdag = dag2cpdag(marks)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    edges = np.argwhere((marks == TAIL) & (marks.T == ARROW))
     return structure_output(
-        dag,
+        to_structure(cpdag, kind="cpdag"),
         labels=labels,
-        metadata={**categorical_metadata(mask, data)},
+        metadata={"dag": edges, **categorical_metadata(mask, data)},
     )
 
 
@@ -1545,7 +1560,7 @@ def calm(
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
         coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"calm"``), the
-        ``"seed"`` used, ``"n_edges"``, ``"objective"`` (half the sum of the log residual
+        ``"seed"`` used, ``"objective"`` (half the sum of the log residual
         variances plus ``lambda1`` times the edge count; lower is better), and ``"h_final"`` (the
         acyclicity residual of the returned graph, ``0`` when it is acyclic).
 
@@ -1678,7 +1693,6 @@ def calm(
         labels=labels,
         weighted_adjacency=result.weighted_adjacency,
         metadata={
-            "n_edges": int((result.weighted_adjacency != 0).sum()),
             "h_final": json_safe(result.h_final),
             "objective": json_safe(result.objective),
         },

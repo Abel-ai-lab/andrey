@@ -345,15 +345,16 @@ of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI
 The result honors every part: a required edge is there and directed, a forbidden one is not, and a
 pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
 Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
-of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC, whose sets are not
-an equivalence class, direct only the edges the knowledge decides. In a PAG, a forbidden `a -> b`
-puts an arrowhead at `a` and can leave a circle at `b`. Knowledge that contradicts itself, such as a
-required edge into an earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD,
-FCI, and MMPC, knowledge whose directions close a cycle over the edges the search kept raises one
-after the adjacency search. Labels stay attached to their columns, so the same knowledge fits the
-table in any column order. A label is the column name as text: name a column called `1` with `"1"`,
-as the integer `1` is the second column. On the command line, give a JSON object inline or as a
-file: `andrey run pc --data data.csv knowledge=knowledge.json`.
+of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
+graphs: a required edge is there without a direction, and tiers and edges forbidden one way, which
+constrain orientation, do not change them. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
+and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
+earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
+directions close a cycle over the edges the search kept raises one after the adjacency search.
+Labels stay attached to their columns, so the same knowledge fits the table in any column order. A
+label is the column name as text: name a column called `1` with `"1"`, as the integer `1` is the
+second column. On the command line, give a JSON object inline or as a file:
+`andrey run pc --data data.csv knowledge=knowledge.json`.
 
 PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
 lagged variables. A third entry

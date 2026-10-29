@@ -9,7 +9,7 @@ import pytest
 
 import andrey
 from andrey.constraint.cdnod import _orient_with_context
-from andrey.constraint.pc import _orient_colliders, _undirect_conflicts
+from andrey.constraint.pc import _orient_colliders, _undirect_conflicts, collider_conflicts
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.orient import meek
 
@@ -60,6 +60,25 @@ def test_an_exact_tie_leaves_the_disputed_edge_undirected():
     # Undirected before Meek, R1 would orient 1 - 2 from 0 -> 1 or from 3 -> 2.
     np.testing.assert_array_equal(out, marks(4, directed=[(0, 1), (3, 2)], undirected=[(1, 2)]))
     assert [r["edges"] for r in trace if r["step"] == "conflict"] == [[(1, 2)]]
+
+
+def test_a_conflict_is_the_edge_two_colliders_ask_to_orient_both_ways():
+    assert collider_conflicts(CHAIN, CHAIN_SEPSETS) == {(1, 2)}
+    assert collider_conflicts(CHAIN, {(0, 2): (1,), (1, 3): ()}) == set()  # 1 separates 0 and 2
+    assert collider_conflicts(CHAIN, CHAIN_SEPSETS, ambiguous={(0, 1, 2)}) == set()
+
+
+@pytest.mark.parametrize("method", ["pc", "cdnod"])
+def test_pc_and_cdnod_report_the_conflicts_they_resolve(method):
+    # A hidden common cause of 1 and 2 gives the chain 0 - 1 - 2 - 3 with empty separating sets.
+    rng = np.random.default_rng(0)
+    x0, x3, hidden = rng.standard_normal((3, 3000))
+    x1 = x0 + hidden + 0.5 * rng.standard_normal(3000)
+    x2 = x3 + hidden + 0.5 * rng.standard_normal(3000)
+    data = np.column_stack([x0, x1, x2, x3])
+    args = (data,) if method == "pc" else (data, np.zeros(3000))
+    assert getattr(andrey, method)(*args).metadata["conflicts"] == [[1, 2]]
+    assert andrey.pc(data[:, :2]).metadata["conflicts"] == []
 
 
 @pytest.mark.parametrize("ranks", [(0.9, 0.3), (0.3, 0.9), (0.5, 0.5)])

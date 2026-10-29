@@ -25,7 +25,7 @@ def dag_extension(
 ) -> GraphStructure:
     """Return a DAG of ``structure``'s class, chosen by ``tie_break`` or ``seed``."""
     if structure.kind not in ("dag", "cpdag"):
-        raise ValueError(f"to_dag takes a dag or a cpdag, not a {structure.kind}")
+        raise ValueError(f"to_dag takes a dag or a cpdag, not kind {structure.kind!r}")
     if tie_break not in ("label", None):
         raise ValueError(f'tie_break must be "label" or None, got {tie_break!r}')
     if tie_break is not None and seed is not None:
@@ -66,7 +66,7 @@ def mag_of(
 ) -> GraphStructure:
     """Return the MAG of a ``dag`` over the nodes neither ``latent`` nor ``selection`` names."""
     if structure.kind != "dag":
-        raise ValueError(f"to_mag takes a dag, not a {structure.kind}")
+        raise ValueError(f"to_mag takes a dag, not kind {structure.kind!r}")
     digraph = _causal_dag(structure)
     observed, selected = _split(structure, latent, selection)
     return _named(_project(digraph, observed, selected, "mag"), structure, observed)
@@ -83,7 +83,7 @@ def pag_of(
         observed, selected = _split(structure, latent, selection)
         return _named(_project(digraph, observed, selected, "pag"), structure, observed)
     if not is_ancestral_kind(structure.kind):
-        raise ValueError(f"to_pag takes a dag or a mag, not a {structure.kind}")
+        raise ValueError(f"to_pag takes a dag or a mag, not kind {structure.kind!r}")
     digraph, added_selection = _canonical_dag(structure)
     observed, selected = _split(structure, latent, selection)
     return _named(

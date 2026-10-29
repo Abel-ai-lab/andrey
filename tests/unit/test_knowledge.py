@@ -52,6 +52,8 @@ SERIES_CASES = [
     ),
 ]
 PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
+# Undirected results: the knowledge sets which pairs are adjacent, and orients nothing.
+UNDIRECTED = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "undirected"}
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
 # A short schedule: the knowledge holds whether or not the fit has converged.
 SHORT_CALM = {"max_iter": 2, "subproblem_iter": 200}
@@ -116,6 +118,10 @@ def _assert_required_forbidden_and_tiers_hold(name: str, marks: np.ndarray, labe
     def directed(x, y):
         return marks[at(x), at(y)] == TAIL and marks[at(y), at(x)] == ARROW
 
+    if name in UNDIRECTED:
+        assert marks[at("b"), at("f")] == TAIL, marks
+        assert np.isin(marks, (NULL, TAIL)).all(), marks
+        return
     assert directed("b", "f") or "required" not in REGISTRY[name].knowledge, marks
     assert not directed("c", "d") and not directed("e", "d")
     for early in EARLY:
@@ -376,11 +382,6 @@ def test_names_need_column_labels():
         resolve(Knowledge(required=[("a", "b")]), 3, None, method="pc")
 
 
-def test_bottom_up_parce_lingam_rejects_required_edges(data):
-    with pytest.raises(NotImplementedError, match="required"):
-        andrey.bottom_up_parce_lingam(data, knowledge=Knowledge(required=[("a", "c")]))
-
-
 def test_a_part_a_method_does_not_honor_raises():
     with pytest.raises(NotImplementedError, match="does not honor"):
         resolve(Knowledge(tiers=[[0], [1]]), 2, None, method="m", honors=("required",))
@@ -566,7 +567,8 @@ def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edg
     data = pd.DataFrame({"a": a, "b": 0.8 * a + rng.uniform(-1.0, 1.0, 1000)})
     marks, labels = _marks(_fit(name, data, knowledge=Knowledge(required=[edge])))
     cause, effect = (labels.index(v) for v in edge)
-    assert marks[cause, effect] == TAIL and marks[effect, cause] == ARROW
+    head = TAIL if name in UNDIRECTED else ARROW
+    assert marks[cause, effect] == TAIL and marks[effect, cause] == head
 
 
 @pytest.mark.parametrize(
@@ -607,13 +609,25 @@ def test_rcd_raises_on_required_edges_that_close_a_cycle():
 def test_bottom_up_parce_lingam_reads_the_knowledge_in_the_unordered_block(forbidden):
     data = _confounded()
     plain = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    assert plain.metadata["causal_order"] == [[0, 1], 2, 3]
+    assert plain.metadata["partial_order"] == [[0, 1], 2, 3]
     out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(forbidden=forbidden))
     marks = from_structure(out.structure)
     if len(forbidden) == 2:
         assert marks[0, 1] == NULL and marks[1, 0] == NULL
     else:  # an arrowhead at the cause of the forbidden edge, a circle at its effect
         assert marks[0, 1] == ARROW and marks[1, 0] == CIRCLE
+
+
+@pytest.mark.parametrize(
+    "edge", [(0, 1), (1, 0), (1, 3)], ids=["in the block", "reversed", "resolved"]
+)
+def test_bottom_up_parce_lingam_keeps_every_required_edge(edge):
+    data = _confounded()  # the unordered block holds 0 and 1, then 2 and 3 follow
+    out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(required=[edge]))
+    i, j = edge
+    marks = from_structure(out.structure)
+    assert (marks[i, j], marks[j, i]) == (TAIL, ARROW)
+    assert out.metadata["partial_order"][0] == [0, 1]  # the order keeps the block
 
 
 def test_every_group_honors_the_knowledge(data):
@@ -658,8 +672,8 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
 @pytest.mark.parametrize(
     ("name", "knowledge"),
     [
-        *((name, CYCLE) for name in ("pc", "cdnod", "mmpc")),
-        *((name, ANCESTOR) for name in ("pc", "cdnod", "fci", "mmpc")),
+        *((name, CYCLE) for name in ("pc", "cdnod")),
+        *((name, ANCESTOR) for name in ("pc", "cdnod", "fci")),
     ],
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
@@ -667,13 +681,12 @@ def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
         _fit(name, _triangle(), knowledge=knowledge)
 
 
-@pytest.mark.parametrize("name", ["iamb", "inter_iamb"])
-def test_the_blanket_searches_keep_directions_that_close_a_cycle(name):
-    # No raise: a moral-graph edge need not join adjacent variables, so such a cycle can fit a DAG.
-    marks, labels = _marks(_fit(name, _triangle(), knowledge=CYCLE))
-    a, b, c = (labels.index(v) for v in "abc")
-    for x, y in [(a, b), (b, c), (c, a)]:
-        assert marks[x, y] == TAIL and marks[y, x] == ARROW
+@pytest.mark.parametrize("name", sorted(UNDIRECTED))
+@pytest.mark.parametrize("knowledge", [CYCLE, Knowledge(tiers=[["c"], ["a", "b"]])])
+def test_tiers_and_one_way_forbidden_edges_leave_an_undirected_result(name, knowledge):
+    # They constrain orientation only, which an undirected result does not have.
+    plain = _fit(name, _triangle()).structure.oriented_edges()
+    assert _fit(name, _triangle(), knowledge=knowledge).structure.oriented_edges() == plain
 
 
 @pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc", "calm"])

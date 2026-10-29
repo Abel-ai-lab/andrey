@@ -59,8 +59,8 @@ Loss = Callable[[np.ndarray, np.ndarray], tuple[float, np.ndarray]]
 #: A penalty: ``weights -> (value of each entry, gradient of each entry)``.
 Penalty = Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]]
 
-# A residual variance below this fraction of the mean column variance counts as that fraction, so
-# the logarithm stays finite for a cyclic fit that explains a column exactly.
+# A residual variance below this fraction of its column's variance counts as that fraction, so the
+# logarithm stays finite for a cyclic fit that explains a column exactly.
 _VARIANCE_FLOOR = 1e-12
 
 
@@ -70,7 +70,8 @@ def gaussian_likelihood(cov: np.ndarray, weights: np.ndarray) -> tuple[float, np
     This is the Gaussian negative log-likelihood of the linear model with one noise variance per
     variable (the variances at their maximum-likelihood values), up to a constant; the determinant
     term is zero for a DAG. Rescaling a column adds a constant to the value (Deng et al. 2024).
-    A singular ``I - W`` gives an infinite value and a zero gradient.
+    A residual variance below ``1e-12`` of its column's variance counts as that much, so the floor
+    rescales with its column. A singular ``I - W`` gives an infinite value and a zero gradient.
     """
     d = cov.shape[0]
     residual = np.eye(d) - weights
@@ -79,7 +80,7 @@ def gaussian_likelihood(cov: np.ndarray, weights: np.ndarray) -> tuple[float, np
         return np.inf, np.zeros_like(weights)
     product = cov @ residual
     variances = np.einsum("ij,ij->j", residual, product)
-    variances = np.maximum(variances, _VARIANCE_FLOOR * float(np.trace(cov)) / d)
+    variances = np.maximum(variances, _VARIANCE_FLOOR * np.diagonal(cov))
     value = 0.5 * float(np.log(variances).sum()) - logdet
     return value, -product / variances + np.linalg.inv(residual).T
 

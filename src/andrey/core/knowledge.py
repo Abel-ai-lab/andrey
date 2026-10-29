@@ -165,13 +165,14 @@ class Knowledge:
         required edge that is forbidden, directly, by the tiers, or by ``allowed``, or required
         edges forming a cycle. ``boss``, ``grasp``, and the LiNGAM methods that search a causal
         order also raise it when the required edges and the tiers admit no causal order, through a
-        column in no tier. ``pc``, ``cdnod``, ``mmpc``, and ``pcmciplus`` raise it when the edges
-        the knowledge orients form a directed cycle over the adjacencies the search kept; ``fci``
-        when a directed path of required edges leads from ``a`` to ``b`` while ``forbidden`` or
-        ``tiers`` put an arrowhead at ``a`` on the edge between them. ``rcd`` raises it when the
-        required edges close a directed cycle with the parents it found. A time-series search raises
-        it for a required link without a lag, or at a lag the search does not learn;
-        ``varma_lingam`` also for a forbidden lagged link with ``prune=False``.
+        column in no tier. ``pc``,
+        ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a directed
+        cycle over the adjacencies the search kept; ``fci`` when a directed path of required edges
+        leads from ``a`` to ``b`` while ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the
+        edge between them. ``rcd`` raises it when the required edges close a directed cycle with
+        the parents it found. A time-series search raises it for a required link without a lag, or
+        at a lag the search does not learn; ``varma_lingam`` also for a forbidden lagged link with
+        ``prune=False``.
     NotImplementedError
         A method that learns no time lags raises it for an edge with a lag.
 
@@ -185,14 +186,17 @@ class Knowledge:
     within ``max_depth``, no rule reads its unshielded triples as colliders or non-colliders.
 
     A method whose result is a CPDAG directs every edge the knowledge decides and then applies
-    Meek's rules R1-R4 [1]_, R4 being needed only with background knowledge. ``iamb``,
-    ``inter_iamb``, and ``mmpc``, whose sets are not an equivalence class, direct those edges alone.
-    For a CPDAG and knowledge consistent with it, the result is the maximally oriented PDAG (MPDAG)
-    [2]_, which stands for the DAGs of the equivalence class that satisfy the knowledge; it keeps
-    the ``cpdag`` tag. On sample data the tests can disagree with the knowledge; the rules then skip
-    the orientations that conflict, so the result can leave undirected an edge the MPDAG would
-    direct. ``pcmciplus`` applies its rules R1-R3 only, so its lag-0 graph can also leave undirected
-    an edge R4 would direct.
+    Meek's rules R1-R4 [1]_, R4 being needed only with background knowledge. For a CPDAG and
+    knowledge consistent with it, the result is the maximally oriented PDAG (MPDAG) [2]_, which
+    stands for the DAGs of the equivalence class that satisfy the knowledge; it keeps the ``cpdag``
+    tag. On sample data the tests can disagree with the knowledge; the rules then skip the
+    orientations that conflict, so the result can leave undirected an edge the MPDAG would direct.
+    ``pcmciplus`` applies its rules R1-R3 only, so its lag-0 graph can also leave undirected an
+    edge R4 would direct.
+
+    ``iamb``, ``inter_iamb``, and ``mmpc`` return an undirected graph, so the knowledge sets only
+    which pairs their sets hold: tiers and edges forbidden one way constrain orientation, which the
+    graph does not have, and do not change it.
 
     In a PAG, the edges are those of an ancestral graph over the measured variables, where
     ``a -> b`` says that ``a`` is an ancestor of ``b``, not necessarily its direct cause. A

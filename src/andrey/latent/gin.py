@@ -299,9 +299,8 @@ def _structure_from_result(
         marks, kind="dag", labels=all_labels, node_types=node_types
     )
     metadata = {
-        "n_latents": n_latent,
         "clusters": [list(c) for c in result.clusters],
-        "causal_order": [list(c) for c in ordered],
+        "cluster_order": [list(c) for c in ordered],
         "unordered": [list(c) for c in result.unordered],
     }
     return StructureOutput.new(structure, metadata=metadata)

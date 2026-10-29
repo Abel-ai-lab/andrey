@@ -16,7 +16,7 @@ import pytest
 
 import andrey
 from andrey import data
-from andrey.core import ARROW, TAIL, ci
+from andrey.core import ci
 from andrey.core.ci import register_indep_test
 from tests.recovery.helpers.oracle import DSeparation
 
@@ -158,7 +158,7 @@ def test_without_a_target_the_moral_graph_joins_a_childs_parents():
 
 # ---- background knowledge ------------------------------------------------------------------------
 
-# On _collider: a -> d is not a true edge, c - d is, and the tiers forbid every edge into a or b.
+# On _collider: a - d is not a true edge and c - d is; the tiers constrain orientation only.
 KNOWLEDGE = andrey.Knowledge(
     required=[("a", "d")], forbidden=[("c", "d"), ("d", "c")], tiers=[["a", "b"], ["c", "d"]]
 )
@@ -169,18 +169,15 @@ def _edges(out: andrey.StructureOutput) -> dict[frozenset, tuple[str, str, str]]
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_required_forbidden_and_tier_edges_hold_with_and_without_a_target(method):
+def test_a_required_pair_joins_and_a_pair_kept_apart_leaves_with_and_without_a_target(method):
     plain = _edges(getattr(andrey, method)(_collider()))
     assert frozenset("cd") in plain and frozenset("ad") not in plain
     edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE))
-    assert edges[frozenset("ad")] == ("a", "d", "directed")
-    assert frozenset("cd") not in edges
-    for a, b, kind in edges.values():
-        if {a, b} & {"a", "b"} and {a, b} & {"c", "d"}:
-            assert kind == "directed" and a in "ab", (a, b, kind)
+    assert frozenset("ad") in edges and frozenset("cd") not in edges
+    assert {kind for *_, kind in edges.values()} == {"undirected"}
     out = getattr(andrey, method)(_collider(), target="d", knowledge=KNOWLEDGE)
     assert out.metadata[KEY[method]] == ["a"]
-    assert out.structure.oriented_edges() == [("a", "d", "directed")]
+    assert out.structure.oriented_edges() == [("a", "d", "undirected")]
 
 
 @pytest.mark.parametrize("seed", range(3))
@@ -209,10 +206,3 @@ def test_true_knowledge_leaves_the_true_sets_under_an_oracle(method, seed, oracl
         assert set(out.metadata[KEY[method]]) == want, v
     out = getattr(andrey, method)(sample.data, indep_test="dsep", alpha=0.5, knowledge=knowledge)
     np.testing.assert_array_equal(_adjacency(out), kept)
-    marks = out.structure.to_numpy()
-    for i, j in edges[:3]:
-        assert (marks[i, j], marks[j, i]) == (TAIL, ARROW)
-    early = set(order[:5])
-    for i, j, kind in out.structure.oriented_edges(index=True):
-        if (i in early) != (j in early):
-            assert kind == "directed" and i in early, (i, j, kind)

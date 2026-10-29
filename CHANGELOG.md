@@ -78,13 +78,26 @@ change names its pull request.
   maps to `"bic"`; `alpha` is the level that decides the returned edges, so `pcmci`'s
   `alpha_level`, `pcmciplus`'s and `lpcmci`'s `pc_alpha`, and `rcd`'s `ind_alpha` are `alpha`.
   ([#501])
+- `exact_search` returns the CPDAG of the optimal equivalence class, as the other score searches
+  do; `metadata["dag"]` keeps the DAG it found. `iamb`, `inter_iamb`, and `mmpc` return the new
+  graph kind `undirected` instead of `cpdag`, with the same edges: their edges claim no direction,
+  and a moral graph's do not even claim adjacency. `andrey.metrics` scores an undirected graph on
+  its skeleton, so its `shd` is the skeleton SHD, and refuses to orient or convert it. ([#509])
+- Metadata keys share one name and shape across methods, and each method's spec lists its keys
+  (`output.metadata` in `andrey --help --json`): `anm` and `pnl` report `p_values` and `statistics`,
+  each with `forward` and `backward`, instead of `pval_forward`, `pval_backward`, `stat_forward`,
+  and `stat_backward`; `bottom_up_parce_lingam` reports `partial_order` and `gin` `cluster_order`
+  instead of `causal_order`; `pcmciplus` lists `conflicts` as `[i, 0, j]` links, the shape
+  `lpcmci`'s take. `n_edges` (`calm`, `notears`, `dagma`), `robust` (`notears`, `dagma`),
+  `restrict` and `maximize` (`mmhc`, `rsmax2`), `n_groups` (`multi_group_direct_lingam`), and
+  `n_latents` (`gin`) are gone: each repeated an argument or a count of the result. ([#509])
 
 ### Added
 
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
-  searches do: a required edge is always in the result, a forbidden edge, an edge into an earlier
-  tier, and a pair outside `allowed` never are, and `iamb`, `inter_iamb`, and `mmpc` direct the
-  edges the knowledge decides. ([#521])
+  searches do: a required edge is always in the result, a pair forbidden both ways or outside
+  `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
+  tier. ([#521])
 - `pcmci`, `pcmciplus`, and `lpcmci` take every `indep_test` the other conditional-independence
   searches take: `"chisq"` and `"gsq"` for categorical series, `"degen_gauss"` and `"cond_gauss"`
   for mixed ones, and the nonlinear `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`, each on the lagged
@@ -108,6 +121,9 @@ change names its pull request.
   knowledge forbids and keeps the ones it requires unpenalized, and the lasso selects among the
   others. `varma_lingam` and `multi_group_direct_lingam` take `measure`, as `direct_lingam` and
   `longitudinal_lingam` do; `"pwling"` is the only measure. ([#510])
+- `pc` and `cdnod` report `metadata["conflicts"]`, the edges two colliders ask to orient both ways.
+  `bottom_up_parce_lingam` honors required edges in its `knowledge`, as the other LiNGAM methods
+  do. ([#509])
 - Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
   `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
   or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
@@ -254,6 +270,8 @@ change names its pull request.
   numbers. These searches followed `ANDREY_SEED` before, so a call that gives `seed` no longer
   depends on it. At the default seed the graphs are unchanged, and `metadata["seed"]` records the
   seed of a fit that uses one of those tests. ([#499])
+- `print(out)` leaves out a metadata entry whose value is an empty list or dict, such as
+  `conflicts: []`; the entry stays in `output.metadata`. ([#509])
 
 ### Fixed
 
@@ -278,6 +296,10 @@ change names its pull request.
   default `max_iter=100`, and a fit that ends on it without converging warns with
   `andrey.SearchLimitWarning` like one that ends on `max_iter`. Fits at the default `max_iter`
   return the same values as before. ([#505])
+- `notears(robust=True)` and `dagma(robust=True)` floor each residual variance of the likelihood at
+  `1e-12` of its column's variance instead of `1e-12` of the mean column variance, which could
+  exceed the whole variance of a column in much smaller units than the others. On standardized
+  data the fits return the same values as before. ([#517])
 
 ## [0.10.0] - 2026-10-27
 
@@ -1063,8 +1085,10 @@ First alpha release.
 [#500]: https://github.com/Abel-ai-lab/andrey/pull/500
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
+[#509]: https://github.com/Abel-ai-lab/andrey/pull/509
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
 [#515]: https://github.com/Abel-ai-lab/andrey/pull/515
 [#516]: https://github.com/Abel-ai-lab/andrey/pull/516
+[#517]: https://github.com/Abel-ai-lab/andrey/pull/517
 [#520]: https://github.com/Abel-ai-lab/andrey/pull/520
 [#521]: https://github.com/Abel-ai-lab/andrey/pull/521
