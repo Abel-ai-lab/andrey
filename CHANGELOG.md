@@ -27,6 +27,9 @@ names its pull request.
 
 ### Added
 
+- `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
+  random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
+  graphs these methods returned before. ([#550])
 - `bootstrap` takes `resampling`, `"subsample"` or `"bootstrap"`, and `sample_fraction`, the share
   of rows in a subsample; for a time-series method on one series a subsample is one stretch of
   consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
@@ -1190,3 +1193,4 @@ First alpha release.
 [#524]: https://github.com/Abel-ai-lab/andrey/pull/524
 [#526]: https://github.com/Abel-ai-lab/andrey/pull/526
 [#544]: https://github.com/Abel-ai-lab/andrey/pull/544
+[#550]: https://github.com/Abel-ai-lab/andrey/pull/550

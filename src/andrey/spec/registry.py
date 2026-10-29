@@ -94,6 +94,7 @@ _SEED = concept_param(
     "seed",
     doc="Seed for the search's random orders. null uses ANDREY_SEED, or 0 when it is unset.",
 )
+_N_STARTS = concept_param("n_starts")
 _TEST_SEED = concept_param(
     "seed",
     doc="Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc make; the "
@@ -1116,6 +1117,7 @@ _add(
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
             _SEED,
+            _N_STARTS,
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),
@@ -1157,6 +1159,7 @@ _add(
                 "search more chains and run longer.",
             ),
             _SEED,
+            _N_STARTS,
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),
