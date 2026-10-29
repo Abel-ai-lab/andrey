@@ -460,7 +460,7 @@ def test_a_refused_text_category_names_the_method():
     frame["b"] = frame["b"].map({0.0: "low", 1.0: "mid", 2.0: "high"})
     frame.loc[3, "b"] = None
     with pytest.raises(ValueError, match=r"^hc does not accept .* column 'b' has a missing value"):
-        andrey.hc(frame, score_func="local_score_BDeu")
+        andrey.hc(frame, score_func="bdeu")
 
 
 def test_the_refusal_lists_every_supported_method_but_the_pair_tests():

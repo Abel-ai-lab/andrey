@@ -115,8 +115,8 @@ def test_each_test_and_window_is_a_solution_of_its_own() -> None:
 def test_both_packages_run_the_same_settings() -> None:
     andrey_params = andrey_pcmci_adapters(2)[0].params()
     tigramite_params = TigramitePCMCI().params()
-    for name in ("tau_max", "pc_alpha", "alpha_level"):
-        assert andrey_params[name] == tigramite_params[name]
+    for name, tigramite_name in (("tau_max",) * 2, ("pc_alpha",) * 2, ("alpha", "alpha_level")):
+        assert andrey_params[name] == tigramite_params[tigramite_name]
     # Lag 0 is PCMCI+'s scope: tigramite tests it at its own tau_min=0.
     assert tigramite_params["tau_min"] == 1
     assert tigramite_params["fdr_method"] == "none"
@@ -142,9 +142,9 @@ def test_the_same_step_solutions_are_named_for_their_window_and_share_settings()
         assert isinstance(adapter, SolutionAdapter)
         assert adapter.params()["tau_max"] == 2
     plus, tig_plus, lp, tig_lp = (a.params() for a in field[:4])
-    assert plus["pc_alpha"] == tig_plus["pc_alpha"] == 0.01
+    assert plus["alpha"] == tig_plus["pc_alpha"] == 0.01
     assert plus["collider_rule"] == tig_plus["contemp_collider_rule"] == "majority"
-    assert lp["pc_alpha"] == tig_lp["pc_alpha"] == 0.05
+    assert lp["alpha"] == tig_lp["pc_alpha"] == 0.05
     assert lp["n_preliminary_iterations"] == tig_lp["n_preliminary_iterations"] == 1
     assert tig_plus["tau_min"] == tig_lp["tau_min"] == 0
     assert field[1].python_env == field[3].python_env == PYTHON_ENV_VAR

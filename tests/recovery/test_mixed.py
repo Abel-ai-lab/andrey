@@ -50,28 +50,16 @@ def _independent(seed: int = 20261013, n: int = 3000) -> np.ndarray:
 CPDAG_FITS = {
     "pc-degen_gauss": lambda x, c: andrey.pc(x, indep_test="degen_gauss", categorical=c),
     "pc-cond_gauss": lambda x, c: andrey.pc(x, indep_test="cond_gauss", categorical=c),
-    "ges-degen_gauss": lambda x, c: andrey.ges(
-        x, score_func="local_score_degen_gauss", categorical=c
-    ),
-    "ges-cond_gauss": lambda x, c: andrey.ges(
-        x, score_func="local_score_cond_gauss", categorical=c
-    ),
-    "hc-degen_gauss": lambda x, c: andrey.hc(
-        x, score_func="local_score_degen_gauss", categorical=c
-    ),
-    "hc-cond_gauss": lambda x, c: andrey.hc(x, score_func="local_score_cond_gauss", categorical=c),
-    "boss-degen_gauss": lambda x, c: andrey.boss(
-        x, score_func="local_score_degen_gauss", categorical=c
-    ),
-    "boss-cond_gauss": lambda x, c: andrey.boss(
-        x, score_func="local_score_cond_gauss", categorical=c
-    ),
-    "grasp-degen_gauss": lambda x, c: andrey.grasp(
-        x, score_func="local_score_degen_gauss", categorical=c
-    ),
-    "grasp-cond_gauss": lambda x, c: andrey.grasp(
-        x, score_func="local_score_cond_gauss", categorical=c
-    ),
+    "ges-degen_gauss": lambda x, c: andrey.ges(x, score_func="degen_gauss", categorical=c),
+    "ges-cond_gauss": lambda x, c: andrey.ges(x, score_func="cond_gauss", categorical=c),
+    "hc-degen_gauss": lambda x, c: andrey.hc(x, score_func="degen_gauss", categorical=c),
+    "hc-cond_gauss": lambda x, c: andrey.hc(x, score_func="cond_gauss", categorical=c),
+    "tabu-degen_gauss": lambda x, c: andrey.tabu(x, score_func="degen_gauss", categorical=c),
+    "tabu-cond_gauss": lambda x, c: andrey.tabu(x, score_func="cond_gauss", categorical=c),
+    "boss-degen_gauss": lambda x, c: andrey.boss(x, score_func="degen_gauss", categorical=c),
+    "boss-cond_gauss": lambda x, c: andrey.boss(x, score_func="cond_gauss", categorical=c),
+    "grasp-degen_gauss": lambda x, c: andrey.grasp(x, score_func="degen_gauss", categorical=c),
+    "grasp-cond_gauss": lambda x, c: andrey.grasp(x, score_func="cond_gauss", categorical=c),
     "cdnod-cond_gauss": lambda x, c: andrey.cdnod(
         x, np.zeros(len(x)), indep_test="cond_gauss", categorical=c
     ),
@@ -80,10 +68,10 @@ PAG_FITS = {
     "fci-degen_gauss": lambda x, c: andrey.fci(x, indep_test="degen_gauss", categorical=c),
     "fci-cond_gauss": lambda x, c: andrey.fci(x, indep_test="cond_gauss", categorical=c),
     "gfci-degen_gauss": lambda x, c: andrey.gfci(
-        x, score_func="local_score_degen_gauss", indep_test="degen_gauss", categorical=c
+        x, score_func="degen_gauss", indep_test="degen_gauss", categorical=c
     ),
     "gfci-cond_gauss": lambda x, c: andrey.gfci(
-        x, score_func="local_score_cond_gauss", indep_test="cond_gauss", categorical=c
+        x, score_func="cond_gauss", indep_test="cond_gauss", categorical=c
     ),
 }
 
@@ -109,7 +97,7 @@ def test_pag_methods_find_the_skeleton_and_the_collider(fit):
     assert marks[2, 0] == ARROW and marks[2, 1] == ARROW  # M[i, j] is the mark at i
 
 
-@pytest.mark.parametrize("score_func", ["local_score_degen_gauss", "local_score_cond_gauss"])
+@pytest.mark.parametrize("score_func", ["degen_gauss", "cond_gauss"])
 def test_exact_search_finds_a_dag_in_the_true_class(score_func):
     out = andrey.exact_search(_network(), score_func=score_func, categorical=CATEGORICAL)
     assert out.structure.kind == "cpdag"
@@ -207,7 +195,7 @@ def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     assert shd(CPDAG_FITS[fit](random_network.data, categorical).structure, truth) <= _MARGIN
 
 
-@pytest.mark.parametrize("score_func", ["local_score_degen_gauss", "local_score_cond_gauss"])
+@pytest.mark.parametrize("score_func", ["degen_gauss", "cond_gauss"])
 def test_hc_gives_no_categorical_node_a_continuous_parent(score_func):
     """Hill climbing keeps to conditional linear Gaussian networks, as the data were drawn."""
     ds = sample_mixed(d=6, n=1000, seed=2)

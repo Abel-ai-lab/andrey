@@ -179,8 +179,8 @@ def rsmax2(
     maximize: str = "hc",
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    score_func: str = "local_score_BIC_from_cov",
-    lambda_value: float = 1.0,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
@@ -214,7 +214,7 @@ def rsmax2(
         cpdag, score = hc(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             max_iter=max_iter,
             categorical=categorical,
@@ -225,11 +225,12 @@ def rsmax2(
         cpdag, score = tabu(
             X,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
+            categorical=categorical,
             constraints=limits,
             max_parents=max_parents,
         )

@@ -24,7 +24,7 @@ The driver uses the same benchmark procedure as ``ges_cpu.py`` with a different 
 environment. Both environments are recorded in ``provenance.json``. ``benchmarks/start_xges.sh``
 builds the XGES environment; a run started without it fails at launch.
 
-``--xges-alpha`` sets XGES's BIC penalty weight. ``alpha`` and Andrey's ``lambda_value`` scale the
+``--xges-alpha`` sets XGES's BIC penalty weight. ``alpha`` and Andrey's ``penalty_discount`` scale the
 same ``log n`` per-parameter term (see the adapter). Their package defaults are 2.0 and 1.0,
 respectively, so comparing those defaults mixes the effect of the search algorithm with the
 effect of penalizing extra edges more heavily. This benchmark defaults to matching the weights.

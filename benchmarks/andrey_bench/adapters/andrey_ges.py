@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, andrey_score
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC"
 #: Matches causal-learn's 0.5 penalty after conversion to deviance units.
@@ -107,8 +107,8 @@ class AndreyGES:
         with andrey.config(backend=self.backend, num_workers=workers):
             cpdag, _score = _ges(
                 X,
-                score_func=score_func,
-                lambda_value=lambda_value,
+                score_func=andrey_score(score_func),
+                penalty_discount=lambda_value,
                 ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
                 max_parents=max_parents,
                 _parent_rule=parent_rule,

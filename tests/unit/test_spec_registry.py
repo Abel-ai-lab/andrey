@@ -327,15 +327,31 @@ def test_indep_test_choices_track_the_tests_each_method_dispatches():
         assert p.choices == expected, name
 
 
-def test_every_score_search_offers_both_names_of_the_linear_gaussian_bic():
-    """One name means the same score in every search that takes a score, so the schema and the
-    command line offer both names of the linear-Gaussian BIC."""
-    from andrey.core.score import LINEAR_SCORES
+def test_a_score_search_aliases_the_score_names_it_took_before_the_rename():
+    """The former `local_score_*` names keep working for one release on the searches that took
+    them, and only on those: a score a search gained later has no former name."""
+    from andrey.spec.concepts import SCORE_ALIASES
 
-    params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "score_func"}
-    assert params
-    for name, p in params.items():
-        assert set(LINEAR_SCORES) <= set(p.choices), name
+    former = {old for old, _ in SCORE_ALIASES}
+    linear = {old for old, new in SCORE_ALIASES if new == "bic"}
+    categorical = linear | {old for old, new in SCORE_ALIASES if new in ("bdeu", "discrete_bic")}
+    took = {
+        "gfci": former,
+        "ges": former,
+        "hc": former,
+        "boss": former,
+        "grasp": former,
+        "exact_search": former,
+        "tabu": categorical,
+        "xges": linear,
+    }
+    aliased = {}
+    for name, spec in REGISTRY.items():
+        for p in spec.params:
+            if p.name == "score_func" and p.choice_aliases:
+                aliased[name] = {old for old, _ in p.choice_aliases}
+    assert aliased == took
+    assert len(former) == len(SCORE_ALIASES)
 
 
 # --- support status -------------------------------------------------------------------------------

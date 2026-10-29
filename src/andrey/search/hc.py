@@ -455,8 +455,8 @@ def _apply_move(
 def hc(
     data: np.ndarray,
     *,
-    score_func: str = "local_score_BIC_from_cov",
-    lambda_value: float = 1.0,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
@@ -480,14 +480,14 @@ def hc(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"`` (linear-Gaussian BIC),
-        ``"local_score_BDeu"`` (BDeu on category codes,
+        Local score: ``"bic"`` (linear-Gaussian BIC),
+        ``"bdeu"`` (BDeu on category codes,
         :class:`~andrey.core.score.BDeuScore` with its default priors),
-        ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
+        ``"discrete_bic"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
-        ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
-        ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
-    lambda_value : float
+        ``"degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        ``"cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
@@ -518,7 +518,11 @@ def hc(
     if score_func not in HC_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
     score = make_score(
-        score_func, X, lambda_value=lambda_value, ebic_gamma=ebic_gamma, categorical=categorical
+        score_func,
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        categorical=categorical,
     )
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     forbidden = None

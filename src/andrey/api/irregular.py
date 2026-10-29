@@ -338,7 +338,7 @@ def rcd(
     *,
     max_depth: int = 2,
     cor_alpha: float = 0.01,
-    ind_alpha: float = 0.01,
+    alpha: float = 0.01,
     shapiro_alpha: float = 0.01,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -361,8 +361,10 @@ def rcd(
         variables.
     cor_alpha : float, default=0.01
         Significance level of the Pearson correlation tests, in ``(0, 1)``.
-    ind_alpha : float, default=0.01
-        Significance level of the HSIC independence tests, in ``(0, 1)``.
+    alpha : float, default=0.01
+        Significance level of the HSIC independence tests, in ``(0, 1)``, which decide the
+        ancestors and so the returned edges. The default is the level of the method's published
+        experiments [1]_, as are those of ``cor_alpha`` and ``shapiro_alpha``.
     shapiro_alpha : float, default=0.01
         Significance level of the Shapiro-Wilk tests that decide whether a residual is
         non-Gaussian, in ``(0, 1)``.
@@ -447,7 +449,7 @@ def rcd(
         X,
         max_explanatory_num=max_depth,
         cor_alpha=cor_alpha,
-        ind_alpha=ind_alpha,
+        ind_alpha=alpha,
         shapiro_alpha=shapiro_alpha,
         constraints=constraints,
     )
@@ -456,7 +458,7 @@ def rcd(
 
 @method_spec("bottom_up_parce_lingam")
 def bottom_up_parce_lingam(
-    data: npt.ArrayLike, *, alpha: float = 0.1, knowledge: Knowledge | None = None
+    data: npt.ArrayLike, *, alpha: float = 0.05, knowledge: Knowledge | None = None
 ) -> StructureOutput:
     """Learn a linear non-Gaussian causal order that tolerates hidden common causes.
 
@@ -469,9 +471,10 @@ def bottom_up_parce_lingam(
     data : array-like of shape (n_samples, n_variables)
         Observations, one variable per column. A DataFrame's column names become the structure's
         ``labels``.
-    alpha : float, default=0.1
+    alpha : float, default=0.05
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
-        across the remaining variables, in ``(0, 1)``.
+        across the remaining variables, in ``(0, 1)``. The default is the level of the method's
+        published experiments [1]_.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. A variable is taken as a sink only

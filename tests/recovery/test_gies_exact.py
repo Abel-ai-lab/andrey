@@ -26,7 +26,7 @@ _BASELINE_LAMBDA = 2.0
 
 def test_gies_recovery():
     assert_recorded_output(
-        andrey.gies(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA),
+        andrey.gies(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA),
         "GIES",
         case="gauss_5v",
     )
@@ -68,7 +68,7 @@ def _interventional_sem(
 def test_gies_orients_the_edges_the_interventions_identify():
     """Intervening on 1 and 6 orients 0 -> 1, 5 -> 6, and 6 -> 7; 0 -- 2 stays open."""
     X, mask = _interventional_sem([[1], [6]], n=3000, seed=0)
-    found = andrey.gies(X, mask, lambda_value=_BASELINE_LAMBDA).structure
+    found = andrey.gies(X, mask, penalty_discount=_BASELINE_LAMBDA).structure
     assert sorted(found.oriented_edges(index=True)) == [
         (0, 1, "directed"),
         (0, 2, "undirected"),
@@ -85,7 +85,7 @@ def test_gies_orients_the_edges_the_interventions_identify():
 
 def test_gies_on_observational_data_returns_the_cpdag():
     X, _ = _interventional_sem([], n=3000, seed=0)
-    found = andrey.gies(X, lambda_value=_BASELINE_LAMBDA).structure
+    found = andrey.gies(X, penalty_discount=_BASELINE_LAMBDA).structure
     assert sorted(found.oriented_edges(index=True)) == [
         (0, 1, "undirected"),
         (0, 2, "undirected"),
@@ -376,7 +376,7 @@ def test_exact_search_fits_full_rank_columns_of_mixed_scale():
 
 
 def test_gfci_recovery():
-    out = andrey.gfci(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA)
+    out = andrey.gfci(datagen.generate("gauss_5v"), penalty_discount=_BASELINE_LAMBDA)
     assert_recorded_output(out, "GFCI", case="gauss_5v")
 
 

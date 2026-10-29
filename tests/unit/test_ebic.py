@@ -1,6 +1,6 @@
 """Test the extended BIC (``ebic_gamma``) against its formula on every engine path.
 
-The reference family score is ``n log R + lambda_value k log n + 2 gamma log C(d - 1, k)``, with
+The reference family score is ``n log R + penalty_discount k log n + 2 gamma log C(d - 1, k)``, with
 ``R`` the residual variance of the node on its parents from the sample covariance and the count
 from :func:`math.comb`. Each fast path (full scores, the scalar and batched Schur deltas, their
 full-score fallbacks, the Gram score of exact search) is compared with it directly, and each
@@ -53,10 +53,10 @@ def _log_count(d: int, k: int) -> float:
 class _Reference:
     """The extended BIC from its formula, with no shortcut: one least-squares fit per family."""
 
-    def __init__(self, x: np.ndarray, *, lambda_value: float = 1.0, ebic_gamma: float = 0.0):
+    def __init__(self, x: np.ndarray, *, penalty_discount: float = 1.0, ebic_gamma: float = 0.0):
         self.cov = np.atleast_2d(np.cov(x, rowvar=False))
         self.n, self.d = x.shape
-        self.lam, self.gamma = lambda_value, ebic_gamma
+        self.lam, self.gamma = penalty_discount, ebic_gamma
 
     def score(self, node, parents) -> float:
         pa = sorted(int(p) for p in parents)
@@ -101,8 +101,8 @@ def test_the_term_is_the_log_count_of_parent_sets(gamma):
 def test_every_fast_path_matches_the_formula(gamma, cond):
     """Full scores, the scalar delta, the delta vectors, and both batched surfaces; ``cond=0``
     sends every non-empty base to the two-full-score fallback."""
-    ref = _Reference(_X, lambda_value=1.5, ebic_gamma=gamma)
-    score = BICScore(_X, lambda_value=1.5, ebic_gamma=gamma)
+    ref = _Reference(_X, penalty_discount=1.5, ebic_gamma=gamma)
+    score = BICScore(_X, penalty_discount=1.5, ebic_gamma=gamma)
     engine = DeltaBICScore(score, cond_threshold=cond)
     d = _X.shape[1]
     for v, base in _CASES:
@@ -162,9 +162,11 @@ def _module(name: str):
 
 
 def _reference_score(monkeypatch, module: str, gamma: float) -> None:
-    def build(score_func, data, *, lambda_value=1.0, ebic_gamma=0.0, categorical=None):
+    def build(score_func, data, *, penalty_discount=1.0, ebic_gamma=0.0, categorical=None):
         assert ebic_gamma == gamma
-        return _Reference(np.asarray(data), lambda_value=lambda_value, ebic_gamma=ebic_gamma)
+        return _Reference(
+            np.asarray(data), penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
+        )
 
     monkeypatch.setattr(_module(module), "make_score", build)
 
@@ -253,4 +255,4 @@ def test_exact_search_finds_the_optimum_of_the_formula(gamma):
 
 def test_make_score_checks_the_weight_under_every_score():
     with pytest.raises(ValueError, match="ebic_gamma"):
-        make_score("local_score_BDeu", np.zeros((4, 2)), ebic_gamma=-1.0)
+        make_score("bdeu", np.zeros((4, 2)), ebic_gamma=-1.0)

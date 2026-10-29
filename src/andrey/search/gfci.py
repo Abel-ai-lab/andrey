@@ -49,8 +49,8 @@ if TYPE_CHECKING:
 def gfci(
     data: np.ndarray,
     *,
-    score_func: str = "local_score_BIC",
-    lambda_value: float = 1.0,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
@@ -94,7 +94,7 @@ def gfci(
     cpdag_structure, _score = ges(
         X,
         score_func=score_func,
-        lambda_value=lambda_value,
+        penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         categorical=categorical,
         constraints=constraints,

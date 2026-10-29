@@ -21,7 +21,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.adapters.andrey_ges import _andrey_version
-from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA
+from andrey_bench.adapters.bic_penalty import ANDREY_EBIC_GAMMA, andrey_score
 
 _SCORE_FUNC = "local_score_BIC"
 
@@ -65,8 +65,8 @@ class AndreyXGES:
 
         cpdag, _score = xges(
             np.asarray(data, dtype=np.float64),
-            score_func=params.get("score_func", _SCORE_FUNC),
-            lambda_value=float(params.get("lambda_value", self.lambda_value)),
+            score_func=andrey_score(params.get("score_func", _SCORE_FUNC)),
+            penalty_discount=float(params.get("lambda_value", self.lambda_value)),
             ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
             extended_search=bool(params.get("extended_search", self.extended_search)),
         )

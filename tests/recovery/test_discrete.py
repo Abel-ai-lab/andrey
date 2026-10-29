@@ -33,31 +33,29 @@ TRUTH = datagen.to_columns(CASE, {(0, 2), (1, 2), (2, 3), (3, 4)})
 CPDAG_FITS = {
     "pc-chisq": lambda x: andrey.pc(x, indep_test="chisq"),
     "pc-gsq": lambda x: andrey.pc(x, indep_test="gsq"),
-    "ges-bdeu": lambda x: andrey.ges(x, score_func="local_score_BDeu"),
-    "hc-bdeu": lambda x: andrey.hc(x, score_func="local_score_BDeu"),
-    "ges-bic": lambda x: andrey.ges(x, score_func="local_score_BIC_categorical"),
-    "hc-bic": lambda x: andrey.hc(x, score_func="local_score_BIC_categorical"),
-    "tabu-bdeu": lambda x: andrey.tabu(x, score_func="local_score_BDeu"),
-    "tabu-bic": lambda x: andrey.tabu(x, score_func="local_score_BIC_categorical"),
-    "boss-bdeu": lambda x: andrey.boss(x, score_func="local_score_BDeu"),
-    "grasp-bdeu": lambda x: andrey.grasp(x, score_func="local_score_BDeu"),
-    "boss-bic": lambda x: andrey.boss(x, score_func="local_score_BIC_categorical"),
-    "grasp-bic": lambda x: andrey.grasp(x, score_func="local_score_BIC_categorical"),
+    "ges-bdeu": lambda x: andrey.ges(x, score_func="bdeu"),
+    "hc-bdeu": lambda x: andrey.hc(x, score_func="bdeu"),
+    "ges-bic": lambda x: andrey.ges(x, score_func="discrete_bic"),
+    "hc-bic": lambda x: andrey.hc(x, score_func="discrete_bic"),
+    "tabu-bdeu": lambda x: andrey.tabu(x, score_func="bdeu"),
+    "tabu-bic": lambda x: andrey.tabu(x, score_func="discrete_bic"),
+    "boss-bdeu": lambda x: andrey.boss(x, score_func="bdeu"),
+    "grasp-bdeu": lambda x: andrey.grasp(x, score_func="bdeu"),
+    "boss-bic": lambda x: andrey.boss(x, score_func="discrete_bic"),
+    "grasp-bic": lambda x: andrey.grasp(x, score_func="discrete_bic"),
     "cdnod-chisq": lambda x: andrey.cdnod(x, np.zeros(len(x)), indep_test="chisq"),
 }
 PAG_FITS = {
     "fci-chisq": lambda x: andrey.fci(x, indep_test="chisq"),
     "fci-gsq": lambda x: andrey.fci(x, indep_test="gsq"),
-    "gfci-bdeu-chisq": lambda x: andrey.gfci(x, score_func="local_score_BDeu", indep_test="chisq"),
-    "gfci-bic-gsq": lambda x: andrey.gfci(
-        x, score_func="local_score_BIC_categorical", indep_test="gsq"
-    ),
+    "gfci-bdeu-chisq": lambda x: andrey.gfci(x, score_func="bdeu", indep_test="chisq"),
+    "gfci-bic-gsq": lambda x: andrey.gfci(x, score_func="discrete_bic", indep_test="gsq"),
 }
 
 # Each exact search, which returns one DAG of the optimal class.
 DAG_FITS = {
     f"exact-{method}-{name}": partial(andrey.exact_search, search_method=method, score_func=score)
-    for name, score in (("bdeu", "local_score_BDeu"), ("bic", "local_score_BIC_categorical"))
+    for name, score in (("bdeu", "bdeu"), ("bic", "discrete_bic"))
     for method in ("astar", "dp")
 }
 
@@ -119,7 +117,7 @@ def test_a_dataframe_names_the_nodes():
 def test_bdeu_fits_one_or_two_columns(fit, d):
     """With two or fewer variables the structure prior is left out, so the score stays finite."""
     x = datagen.generate(CASE)[:, COLUMN[[2, 3][:d]]]  # x2, and x3 with its parent x2
-    out = getattr(andrey, fit)(x, score_func="local_score_BDeu")
+    out = getattr(andrey, fit)(x, score_func="bdeu")
     assert np.isfinite(out.metadata["score"])
     assert len(out.structure.oriented_edges()) == d - 1
 
@@ -165,7 +163,7 @@ def test_a_fractional_value_is_refused_by_the_categorical_bic():
     x = datagen.generate(CASE)
     x[0, 0] = 0.5
     with pytest.raises(ValueError, match="whole number"):
-        andrey.ges(x, score_func="local_score_BIC_categorical")
+        andrey.ges(x, score_func="discrete_bic")
 
 
 @pytest.mark.parametrize("fit", list(DAG_FITS))
@@ -177,7 +175,7 @@ def test_exact_search_returns_the_categorical_network(fit):
     assert {(a, b) for a, b, _ in found_dag(out).oriented_edges()} == TRUTH
 
 
-@pytest.mark.parametrize("score_func", ["local_score_BDeu", "local_score_BIC_categorical"])
+@pytest.mark.parametrize("score_func", ["bdeu", "discrete_bic"])
 def test_the_searches_order_by_score_on_one_categorical_score(score_func):
     """Exact search finds the lowest total score, and tabu search never ends above hill climbing.
     On this draw, dense and with few rows, hill climbing stops short of the optimum."""
@@ -197,16 +195,11 @@ def test_the_searches_order_by_score_on_one_categorical_score(score_func):
     assert total(found_dag(exact)) < hc.metadata["score"] - 1.0
 
 
-def test_tabu_takes_no_mixed_data_score():
-    with pytest.raises(ValueError, match="tabu: score_func must be one of"):
-        andrey.tabu(datagen.generate("discrete_5v"), score_func="local_score_cond_gauss")
-
-
 # Draws of sample_discrete, as (d, n, seed), whose optimal class is unique under BDeu and under the
 # multinomial BIC: the next-best class scores far above the search tolerance. Hill climbing stops
 # above the optimum on each.
 _UNIQUE_OPTIMA = [(6, 5000, 2), (7, 2000, 1), (8, 5000, 2)]
-_SCORES = {"bdeu": "local_score_BDeu", "bic": "local_score_BIC_categorical"}
+_SCORES = {"bdeu": "bdeu", "bic": "discrete_bic"}
 
 
 @pytest.mark.parametrize("fit", ["boss-bdeu", "grasp-bdeu", "boss-bic", "grasp-bic"])

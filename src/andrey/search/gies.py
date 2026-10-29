@@ -83,7 +83,7 @@ def cut_pairs(mask: np.ndarray) -> np.ndarray:
 class InterventionalBICScore:
     """Linear-Gaussian BIC with each variable scored on the rows where it was not intervened on.
 
-    A variable's local score is ``n_v * log(R) + lambda_value * log(n) * len(parents)`` plus the
+    A variable's local score is ``n_v * log(R) + penalty_discount * log(n) * len(parents)`` plus the
     extended-BIC term :func:`~andrey.core.score.ebic_penalty` of ``len(parents)`` among the ``d``
     variables: ``n_v`` counts the rows without an intervention on the variable, ``R`` is the
     residual variance of its regression on its parents over those rows, and ``n`` counts every
@@ -98,7 +98,7 @@ class InterventionalBICScore:
         Data matrix; rows are observations, columns are variables.
     mask : ndarray of bool, shape (n, d), or None
         True where the row's value of the variable was set by an intervention; None for none.
-    lambda_value : float, default=1.0
+    penalty_discount : float, default=1.0
         Weight on the BIC complexity term of the deviance the search minimizes.
     ebic_gamma : float, default=0.0
         Weight on the extended-BIC term, ``2 * ebic_gamma * log C(d - 1, len(parents))`` per
@@ -112,20 +112,22 @@ class InterventionalBICScore:
         data: np.ndarray,
         mask: np.ndarray | None,
         *,
-        lambda_value: float = 1.0,
+        penalty_discount: float = 1.0,
         ebic_gamma: float = 0.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        lambda_value = float(lambda_value)
-        if not np.isfinite(lambda_value) or lambda_value < 0.0:
-            raise ValueError(f"lambda_value must be finite and non-negative, got {lambda_value}")
+        penalty_discount = float(penalty_discount)
+        if not np.isfinite(penalty_discount) or penalty_discount < 0.0:
+            raise ValueError(
+                f"penalty_discount must be finite and non-negative, got {penalty_discount}"
+            )
         X = np.asarray(data, dtype=np.float64)
         n, d = X.shape
         check_columns(np.atleast_2d(stats.cov(X, rowvar=False)), n)
         if mask is None:
             mask = np.zeros((n, d), dtype=bool)
         self.n = n
-        self.lambda_value = lambda_value
+        self.penalty_discount = penalty_discount
         self.ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
         self.log_n = float(np.log(n))
         self._groups: list[BICScore] = []
@@ -139,7 +141,7 @@ class InterventionalBICScore:
                 group = BICScore.from_cov(
                     cov,
                     int(rows.sum()),
-                    lambda_value=lambda_value,
+                    penalty_discount=penalty_discount,
                     ebic_gamma=ebic_gamma,
                     cache_size=cache_size,
                 )
@@ -702,7 +704,7 @@ def gies(
     data: np.ndarray,
     mask: np.ndarray | None = None,
     *,
-    lambda_value: float = 1.0,
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -721,7 +723,7 @@ def gies(
     mask : ndarray of bool, shape (n_samples, n_features), or None
         True where the row's value of the variable was set by an intervention, as
         :func:`intervention_mask` returns; None for observational data.
-    lambda_value : float
+    penalty_discount : float
         Weight on the BIC complexity term of the deviance the search minimizes.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
@@ -746,7 +748,9 @@ def gies(
     """
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
-    score = InterventionalBICScore(X, mask, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
+    score = InterventionalBICScore(
+        X, mask, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
+    )
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)
     ranks = tie_ranks(X).tolist()
     start = None

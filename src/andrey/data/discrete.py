@@ -4,7 +4,7 @@
 probability table with one Dirichlet-distributed row per configuration of its parents, and samples
 the network forward in causal order. The data hold each variable's category code, ``0..k-1``, as
 ``float64``, the input the discrete tests and scores read (``indep_test="chisq"`` or ``"gsq"``,
-``score_func="local_score_BDeu"``).
+``score_func="bdeu"``).
 
 As in :mod:`andrey.data.scm`, the graph, the tables, and the samples each come from their own
 stream of the seed, so a change to one leaves the others' draws unchanged.

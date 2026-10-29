@@ -1,13 +1,14 @@
 """Andrey PCMCI, PCMCI+, and LPCMCI solution adapters.
 
-PCMCI calls the public facade ``andrey.pcmci(X, tau_max=..., pc_alpha=0.2, alpha_level=0.05,
-indep_test=...)``, one solution per partial-correlation test. ``pc_alpha`` and ``alpha_level`` are
+PCMCI calls the public facade ``andrey.pcmci(X, tau_max=..., pc_alpha=0.2, alpha=0.05,
+indep_test=...)``, one solution per partial-correlation test. ``pc_alpha`` and ``alpha`` are
 Andrey's defaults, which are also tigramite's ``run_pcmci`` settings in
 :mod:`~andrey_bench.adapters.tigramite_pcmci`. Andrey's PCMCI tests lags ``1..tau_max`` and no lag 0.
 
-PCMCI+ calls ``andrey.pcmciplus(X, tau_max=..., pc_alpha=0.01, collider_rule="majority")`` and
-LPCMCI ``andrey.lpcmci(X, tau_max=..., pc_alpha=0.05, n_preliminary_iterations=1)``, both with the
-Student-t test and both Andrey's defaults, which are also tigramite's. They test lags
+PCMCI+ calls ``andrey.pcmciplus(X, tau_max=..., alpha=0.01, collider_rule="majority")`` and
+LPCMCI ``andrey.lpcmci(X, tau_max=..., alpha=0.05, n_preliminary_iterations=1)``, both Andrey's
+defaults and tigramite's settings, with the Student-t test of the authors' reference
+implementation. They test lags
 ``0..tau_max``, and their ``fit`` returns the ``(tau_max + 1, n, n)`` window marks of
 :mod:`andrey_bench.window`, read from the same three-character link strings tigramite returns, so
 both packages' graphs are compared mark for mark.
@@ -30,7 +31,7 @@ import numpy as np
 #: Andrey's endpoint marks, as the structures' ``to_numpy`` returns them.
 TAIL, ARROW = 1, 2
 
-#: The two ``indep_test`` values ``andrey.pcmci`` accepts; ``student_t`` is its default.
+#: The two ``indep_test`` values ``andrey.pcmci`` accepts.
 INDEP_TESTS = ("student_t", "fisherz")
 
 #: The largest lag tested unless a driver says otherwise.
@@ -81,7 +82,7 @@ class AndreyPCMCI:
         return {
             "tau_max": self.tau_max,
             "pc_alpha": DEFAULT_PC_ALPHA,
-            "alpha_level": DEFAULT_ALPHA_LEVEL,
+            "alpha": DEFAULT_ALPHA_LEVEL,
             "indep_test": self.indep_test,
         }
 
@@ -94,7 +95,7 @@ class AndreyPCMCI:
             np.asarray(data, dtype=np.float64),
             tau_max=int(params["tau_max"]),
             pc_alpha=float(params["pc_alpha"]),
-            alpha_level=float(params["alpha_level"]),
+            alpha=float(params["alpha"]),
             indep_test=str(params["indep_test"]),
         )
         return links_from_temporal(out.structure)
@@ -186,7 +187,7 @@ class AndreyPCMCIPlus:
         """The lag window, the significance level, the collider rule, and the test."""
         return {
             "tau_max": self.tau_max,
-            "pc_alpha": PCMCIPLUS_PC_ALPHA,
+            "alpha": PCMCIPLUS_PC_ALPHA,
             "collider_rule": PCMCIPLUS_COLLIDER_RULE,
             "indep_test": "student_t",
         }
@@ -199,7 +200,7 @@ class AndreyPCMCIPlus:
         out = andrey.pcmciplus(
             np.asarray(data, dtype=np.float64),
             tau_max=int(params["tau_max"]),
-            pc_alpha=float(params["pc_alpha"]),
+            alpha=float(params["alpha"]),
             collider_rule=str(params["collider_rule"]),
             indep_test=str(params["indep_test"]),
         )
@@ -238,7 +239,7 @@ class AndreyLPCMCI:
         """The lag window, the significance level, the preliminary rounds, and the test."""
         return {
             "tau_max": self.tau_max,
-            "pc_alpha": LPCMCI_PC_ALPHA,
+            "alpha": LPCMCI_PC_ALPHA,
             "n_preliminary_iterations": LPCMCI_PRELIMINARY_ITERATIONS,
             "indep_test": "student_t",
         }
@@ -251,7 +252,7 @@ class AndreyLPCMCI:
         out = andrey.lpcmci(
             np.asarray(data, dtype=np.float64),
             tau_max=int(params["tau_max"]),
-            pc_alpha=float(params["pc_alpha"]),
+            alpha=float(params["alpha"]),
             n_preliminary_iterations=int(params["n_preliminary_iterations"]),
             indep_test=str(params["indep_test"]),
         )
