@@ -165,12 +165,12 @@ set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other meth
 deterministic and takes no seed.
 
 % concept: n_starts
-`boss` and `grasp`, the permutation searches, take `n_starts`, the number of searches a fit runs:
-the first from the starting order the method describes, each later one from a random order drawn
-from `seed` and the search's index. The fit returns the best-scoring search; a later one replaces
-an earlier one only when it scores better by more than `1e-6`. Each search builds its own caches
-and drops the previous one's, so more starts take more time but little more memory. `1`, the
-default, runs one search, as the methods' papers do.
+`boss` and `grasp` take `n_starts`, the number of searches a fit runs: the first from the start
+the method describes, each later one from a random start drawn from `seed` and the search's index.
+The fit returns the best-scoring search; a later one replaces an earlier one only when it scores
+better by more than `1e-6`. Each search builds its own caches and drops the previous one's, so more
+starts take more time but little more memory. `1`, the default, runs one search, as the methods'
+papers do.
 
 % concept: num_workers
 No method takes the number of workers or the device as an argument. Set them for every call in a

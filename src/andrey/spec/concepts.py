@@ -514,19 +514,19 @@ _CONCEPTS = (
     ),
     Concept(
         key="n_starts",
-        summary="The number of searches of a permutation search, each from its own starting "
-        "order; the best-scoring one is returned, and 1, the default, runs one search.",
+        summary="The number of searches a fit runs, each later one from a random start drawn "
+        "from seed; the best-scoring one is returned, and 1, the default, runs one search.",
         param=_template(
             "n_starts",
             "int",
             1,
-            "Number of searches, the first from the usual starting order and each later one from a "
-            "random order drawn from seed and its index; returns the best-scoring one.",
+            "Number of searches, the first from the method's usual start and each later one from a "
+            "random start drawn from seed and its index; returns the best-scoring one.",
             minimum=1,
         ),
         fragment="best-scoring search",
         suitable=("boss", "grasp"),
-        others_exempt="Not a permutation search.",
+        others_exempt="Runs one search per fit.",
     ),
     Concept(
         key="num_workers",
