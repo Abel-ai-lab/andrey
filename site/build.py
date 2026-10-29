@@ -2249,7 +2249,8 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 # (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1). Hooks for
 # custom tests or scores do not count as implementations. Features only on a development branch
 # do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
-# benchmarks use each package's README, documentation, and release notes.
+# benchmarks use each package's README, documentation, and release notes. A real-data feature is
+# a yes when the package's main learners have it, and partly when only some do.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -2259,7 +2260,7 @@ MARKS = {
     "no": ("x", "No", "\u2717"),
 }
 # Table sections in order, each with measured rows (``measured_rows``) followed by feature marks.
-SECTIONS = ("Coverage", "Speed", "Agentic")
+SECTIONS = ("Coverage", "Real data", "Speed", "Agentic")
 # Each entry holds a section, an attribute, marks in PEERS order, and notes keyed by package
 # for every "part" mark. Attribute labels are brief; the notes give details.
 COMPARISON = (
@@ -2274,6 +2275,28 @@ COMPARISON = (
         },
     ),
     ("Coverage", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Real data",
+        "Missing values",
+        ("yes", "part", "yes", "no", "yes"),
+        {"causal-learn": "PC and CD-NOD only, with the Fisher-z test."},
+    ),
+    (
+        "Real data",
+        "Background knowledge",
+        ("yes", "part", "yes", "part", "yes"),
+        {
+            "causal-learn": "PC, FCI, CD-NOD, the LiNGAM methods, and exact search; GES, BOSS, "
+            "and GRaSP take none.",
+            "pcalg": "Fixed adjacencies only, with no directions or tiers.",
+        },
+    ),
+    (
+        "Real data",
+        "Edge confidence",
+        ("yes", "part", "yes", "no", "yes"),
+        {"causal-learn": "Bootstrap edge probabilities for the LiNGAM methods only."},
+    ),
     (
         "Speed",
         "CPU parallelization",

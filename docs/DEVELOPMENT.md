@@ -154,7 +154,9 @@ in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never
 
 [`docs/benchmarks.md`](docs/benchmarks.md), the Release cards page, leads with the latest release as
 a cover beside its TL;DR (the abstract, three numbers, and a button to the card), then lists the
-earlier releases, newest first. To add a release:
+earlier releases, newest first, nine to a page (`_static/paginate.js`, which pages the blog's
+earlier posts too; without scripts every row shows). The sidebar folds the five newest cards under
+Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release:
 
 1. Move the current latest release to the top of "Earlier releases" (a copied row with its
    version, title, methods sentence, facts, release date, and links).
