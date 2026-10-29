@@ -76,7 +76,7 @@ names its pull request.
   At 80 or more variables with 1,000 steps the uncorrected tests return more errors than the empty
   graph, as the docstring's Limitations say. The lasso, its `cv` argument, and its worker threads
   are gone: `cv` is ignored with an `andrey.DeprecatedArgumentWarning` and stops being accepted in
-  the next release. ([#PR])
+  the next release. ([#556])
 
   | Method | Former argument | Now |
   | --- | --- | --- |
@@ -1286,3 +1286,4 @@ First alpha release.
 [#551]: https://github.com/Abel-ai-lab/andrey/pull/551
 [#553]: https://github.com/Abel-ai-lab/andrey/pull/553
 [#554]: https://github.com/Abel-ai-lab/andrey/pull/554
+[#556]: https://github.com/Abel-ai-lab/andrey/pull/556
