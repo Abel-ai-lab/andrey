@@ -89,8 +89,8 @@ def _codes(monkeypatch):
     return np.random.default_rng(0).integers(0, 3, (200, 3)).astype(float)
 
 
-def _inferred_categories(monkeypatch):
-    data = _codes(monkeypatch)
+def _no_categorical_column(monkeypatch):
+    data = np.random.default_rng(0).standard_normal((200, 3))
     return lambda: andrey.pc(data, indep_test="cond_gauss")
 
 
@@ -107,7 +107,7 @@ TRIGGERS = {
     "past the boundary": (_past_the_boundary, andrey.BoundaryWarning),
     "search limit": (_search_limit, andrey.SearchLimitWarning),
     "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
-    "inferred categorical columns": (_inferred_categories, andrey.DataTypeWarning),
+    "no categorical column": (_no_categorical_column, andrey.DataTypeWarning),
     "category code hint": (_category_code_hint, andrey.DataTypeWarning),
 }
 

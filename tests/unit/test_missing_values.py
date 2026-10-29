@@ -17,7 +17,7 @@ import pytest
 
 import andrey
 from andrey.cli import main
-from andrey.core import ci
+from andrey.core import ci, warning_policy
 from andrey.core.ci import (
     FisherZ,
     StudentT,
@@ -351,10 +351,16 @@ def test_pandas_na_is_a_missing_value():
         andrey.ges(frame)
 
 
-def test_categories_are_inferred_from_the_observed_values():
+def test_the_category_code_warning_reads_the_observed_values():
+    """Column a holds three codes and gaps: the warning names it, and declaring it reads it as
+    categorical with its gaps."""
     x, _ = _mixed()
-    x = _gaps(x, 0.1)
-    out = andrey.pc(pd.DataFrame(x, columns=list("abcde")), indep_test="cond_gauss")
+    frame = pd.DataFrame(_gaps(x, 0.1), columns=list("abcde"))
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DataTypeWarning, match="columns 'a' hold at most 10"):
+        out = andrey.pc(frame, indep_test="cond_gauss")
+    assert out.metadata["categorical"] == []
+    out = andrey.pc(frame, indep_test="cond_gauss", categorical=["a"])
     assert out.metadata["categorical"] == ["a"]
 
 
