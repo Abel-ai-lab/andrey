@@ -109,18 +109,26 @@ def local_graph(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """Every variable's MMPC (``"mmpc"``), IAMB (``"iamb"``), or Inter-IAMB (``"inter_iamb"``) set
     under the AND rule: MMPC's skeleton or the moral graph, a symmetric boolean matrix. ``seed``
     fixes the draws of a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every
-    test's conditioning set."""
+    test's conditioning set; ``constraints`` set the members as :mod:`andrey.constraint.blanket`
+    describes."""
     test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
-            return mmpc_skeleton(test, d, alpha, ranks, max_depth)
+            return mmpc_skeleton(test, d, alpha, ranks, max_depth, constraints)
         return blanket_graph(
-            test, d, alpha, ranks, interleaved=method == "inter_iamb", max_depth=max_depth
+            test,
+            d,
+            alpha,
+            ranks,
+            interleaved=method == "inter_iamb",
+            max_depth=max_depth,
+            constraints=constraints,
         )
 
 
@@ -134,6 +142,7 @@ def local_set(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> list[int]:
     """``target``'s set in the order its members joined, by MMPC (``"mmpc"``), IAMB (``"iamb"``),
     or Inter-IAMB (``"inter_iamb"``).
@@ -141,18 +150,27 @@ def local_set(
     MMPC keeps the members of ``target``'s parents and children whose own set holds ``target``
     (the symmetry check); IAMB and Inter-IAMB return the Markov blanket. ``seed`` fixes the draws of
     a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning
-    set.
+    set; ``constraints`` set the members as :mod:`andrey.constraint.blanket` describes.
     """
     test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
-            found = parents_children(test, target, d, alpha, ranks, max_depth)
+            found = parents_children(test, target, d, alpha, ranks, max_depth, constraints)
             return [
-                x for x in found if target in parents_children(test, x, d, alpha, ranks, max_depth)
+                x
+                for x in found
+                if target in parents_children(test, x, d, alpha, ranks, max_depth, constraints)
             ]
         return markov_blanket(
-            test, target, d, alpha, ranks, interleaved=method == "inter_iamb", max_depth=max_depth
+            test,
+            target,
+            d,
+            alpha,
+            ranks,
+            interleaved=method == "inter_iamb",
+            max_depth=max_depth,
+            constraints=constraints,
         )
 
 

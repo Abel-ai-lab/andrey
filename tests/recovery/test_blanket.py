@@ -1,14 +1,15 @@
 """Recovery checks for the local-structure calls: IAMB, Inter-IAMB, and MMPC.
 
 Under a d-separation oracle each call returns the true set of each variable, and without a target
-the moral graph or the skeleton. On seeded linear-Gaussian data from sparse graphs the sets are
-close to the true ones.
+the moral graph or the skeleton, with background knowledge that fits the truth as well. On seeded
+linear-Gaussian data from sparse graphs the sets are close to the true ones.
 """
 
 from __future__ import annotations
 
 import warnings
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
@@ -153,3 +154,55 @@ def test_without_a_target_the_moral_graph_joins_a_childs_parents():
         assert spouses in {frozenset(e[:2]) for e in out.structure.oriented_edges()}
     skeleton = {frozenset(e[:2]) for e in andrey.mmpc(frame).structure.oriented_edges()}
     assert skeleton == {frozenset(("a", "c")), frozenset(("b", "c")), frozenset(("c", "d"))}
+
+
+# ---- background knowledge ------------------------------------------------------------------------
+
+# On _collider: a - d is not a true edge and c - d is; the tiers constrain orientation only.
+KNOWLEDGE = andrey.Knowledge(
+    required=[("a", "d")], forbidden=[("c", "d"), ("d", "c")], tiers=[["a", "b"], ["c", "d"]]
+)
+
+
+def _edges(out: andrey.StructureOutput) -> dict[frozenset, tuple[str, str, str]]:
+    return {frozenset(e[:2]): e for e in out.structure.oriented_edges()}
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_a_required_pair_joins_and_a_pair_kept_apart_leaves_with_and_without_a_target(method):
+    plain = _edges(getattr(andrey, method)(_collider()))
+    assert frozenset("cd") in plain and frozenset("ad") not in plain
+    edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE))
+    assert frozenset("ad") in edges and frozenset("cd") not in edges
+    assert {kind for *_, kind in edges.values()} == {"undirected"}
+    out = getattr(andrey, method)(_collider(), target="d", knowledge=KNOWLEDGE)
+    assert out.metadata[KEY[method]] == ["a"]
+    assert out.structure.oriented_edges() == [("a", "d", "undirected")]
+
+
+@pytest.mark.parametrize("seed", range(3))
+@pytest.mark.parametrize("method", METHODS)
+def test_true_knowledge_leaves_the_true_sets_under_an_oracle(method, seed, oracle_test):
+    """Knowledge that fits the truth: required true edges, the tiers of a causal order, and every
+    pair of a child's parents that are not adjacent forbidden both ways. MMPC returns the true
+    sets; IAMB and Inter-IAMB the true blankets less those pairs, which they still condition on."""
+    sample = _er_sample(15, seed)
+    oracle = oracle_test["oracle"] = DSeparation(sample.graph)
+    edges = [(i, j) for i, j, _ in sample.graph.oriented_edges()]
+    order = list(nx.topological_sort(oracle.graph))
+    apart = np.argwhere(np.triu(oracle.moral_graph() & ~oracle.skeleton()))
+    assert len(apart), "the graph has no unshielded collider"
+    knowledge = andrey.Knowledge(
+        required=edges[:3],
+        forbidden=[(int(i), int(j)) for i, j in apart] + [(int(j), int(i)) for i, j in apart],
+        tiers=[order[:5], order[5:]],
+    )
+    kept = oracle.skeleton()
+    for v in range(15):
+        out = getattr(andrey, method)(
+            sample.data, target=v, indep_test="dsep", alpha=0.5, knowledge=knowledge
+        )
+        want = {u for u in _truth(oracle, method, v) if kept[v, u]}
+        assert set(out.metadata[KEY[method]]) == want, v
+    out = getattr(andrey, method)(sample.data, indep_test="dsep", alpha=0.5, knowledge=knowledge)
+    np.testing.assert_array_equal(_adjacency(out), kept)

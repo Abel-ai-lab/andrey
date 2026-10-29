@@ -94,6 +94,10 @@ change names its pull request.
 
 ### Added
 
+- `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
+  searches do: a required edge is always in the result, a pair forbidden both ways or outside
+  `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
+  tier. ([#521])
 - `pcmci`, `pcmciplus`, and `lpcmci` take every `indep_test` the other conditional-independence
   searches take: `"chisq"` and `"gsq"` for categorical series, `"degen_gauss"` and `"cond_gauss"`
   for mixed ones, and the nonlinear `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`, each on the lagged
@@ -1087,3 +1091,4 @@ First alpha release.
 [#516]: https://github.com/Abel-ai-lab/andrey/pull/516
 [#517]: https://github.com/Abel-ai-lab/andrey/pull/517
 [#520]: https://github.com/Abel-ai-lab/andrey/pull/520
+[#521]: https://github.com/Abel-ai-lab/andrey/pull/521

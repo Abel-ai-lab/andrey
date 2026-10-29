@@ -22,7 +22,7 @@ from andrey.api._adapt import (
 from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL
 from andrey.core.ci_missing import rows_metadata, rows_tested
-from andrey.core.knowledge import _node, column_position
+from andrey.core.knowledge import Knowledge, _node, column_position, resolve
 from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
@@ -47,6 +47,7 @@ def _fit(
     max_categories: int,
     seed: int | None,
     max_depth: int | None,
+    knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the search, and wrap its sets as undirected edges."""
     from andrey.search.hybrid import local_graph, local_set
@@ -64,12 +65,14 @@ def _fit(
     labels = column_labels(data)
     d = X.shape[1]
     t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
+    constraints = resolve(knowledge, d, labels, method=method)
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,
         "categorical": mask,
         "seed": seed,
         "max_depth": max_depth,
+        "constraints": constraints,
     }
     metadata: dict[str, object] = {}
     with copies_named(labels), rows_tested() as rows:
@@ -99,6 +102,7 @@ def iamb(
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with incremental association (IAMB).
 
@@ -138,7 +142,15 @@ def iamb(
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep variables that a larger conditioning set would remove. Every test
         conditions on the whole current blanket, so the blanket stops growing once it holds more
-        than ``max_depth`` members.
+        than ``max_depth`` members, counting those ``knowledge`` requires.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
+        the other's blanket from the start, and no test removes it. A pair the knowledge makes
+        non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
+        other parent belongs to the blanket without being adjacent, and is left out of the result.
+        Tiers and edges forbidden one way constrain orientation, which an undirected result does
+        not have, so they do not change the result.
 
     Returns
     -------
@@ -156,14 +168,16 @@ def iamb(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position, or ``categorical`` is not a list of
-        column names and positions.
+        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
+        column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``target``
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift.
+        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -244,6 +258,7 @@ def iamb(
         max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
+        knowledge=knowledge,
     )
 
 
@@ -258,6 +273,7 @@ def inter_iamb(
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a variable's Markov blanket with interleaved IAMB (Inter-IAMB).
 
@@ -296,7 +312,15 @@ def inter_iamb(
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep variables that a larger conditioning set would remove. Every test
         conditions on the whole current blanket, so the blanket stops growing once it holds more
-        than ``max_depth`` members.
+        than ``max_depth`` members, counting those ``knowledge`` requires.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
+        the other's blanket from the start, and no test removes it. A pair the knowledge makes
+        non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
+        other parent belongs to the blanket without being adjacent, and is left out of the result.
+        Tiers and edges forbidden one way constrain orientation, which an undirected result does
+        not have, so they do not change the result.
 
     Returns
     -------
@@ -314,14 +338,16 @@ def inter_iamb(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position, or ``categorical`` is not a list of
-        column names and positions.
+        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
+        column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``target``
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift.
+        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -402,6 +428,7 @@ def inter_iamb(
         max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
+        knowledge=knowledge,
     )
 
 
@@ -416,6 +443,7 @@ def mmpc(
     max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a variable's parents and children with max-min parents and children (MMPC).
 
@@ -455,6 +483,13 @@ def mmpc(
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
         tests and can keep variables that a larger conditioning set would remove. A test
         conditions on a subset of the current set; the set itself may grow larger.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
+        the other's set from the start, and no test removes it; a pair the knowledge makes
+        non-adjacent, forbidden both ways or outside ``allowed``, is never a candidate. Tiers and
+        edges forbidden one way constrain orientation, which an undirected result does not have,
+        so they do not change the result.
 
     Returns
     -------
@@ -470,14 +505,16 @@ def mmpc(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position, or ``categorical`` is not a list of
-        column names and positions.
+        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
+        column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``target``
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift.
+        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -564,4 +601,5 @@ def mmpc(
         max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
+        knowledge=knowledge,
     )

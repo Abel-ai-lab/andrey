@@ -1490,6 +1490,7 @@ def calm(
     rho_max: float = 1e16,
     h_tol: float = 1e-8,
     seed: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a weighted DAG with CALM, a continuous-optimization structure learner.
 
@@ -1546,6 +1547,13 @@ def calm(
         The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc` (the
         :doc:`column-order guide </docs/guides/column-order>`). ``metadata["seed"]`` records the
         seed used.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The candidate edges are the pairs
+        the moral-graph screen keeps and the pairs of the required edges; the screen reads the data
+        alone. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set have
+        their gates held at zero. A required edge's gate is held at one, so the acyclicity term
+        counts it, the penalty and both thresholds leave it, and the cycle repair never removes it.
 
     Returns
     -------
@@ -1560,11 +1568,14 @@ def calm(
     ------
     ImportError
         If the ``[torch]`` extra is not installed.
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if the fit's
         loss or weights stop being finite, for example when the data's scale overflows its
-        covariance; ``standardize=True`` rescales the columns.
+        covariance; ``standardize=True`` rescales the columns. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -1656,6 +1667,7 @@ def calm(
 
     X = data_matrix(data, method="calm")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="calm")
     with copies_named(labels):
         result = _calm(
             X,
@@ -1674,6 +1686,7 @@ def calm(
             standardize=standardize,
             use_moral_graph=use_moral_graph,
             seed=seed,  # ty: ignore[invalid-argument-type]  # an int here
+            constraints=constraints,
         )
     return structure_output(
         result.dag,

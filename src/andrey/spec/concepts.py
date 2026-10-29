@@ -541,16 +541,6 @@ _CONCEPTS = (
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
         ),
-        deviations=(
-            *_absent(
-                "0.12.0",
-                "Required pairs join the set; a pair forbidden both ways leaves it.",
-                "iamb",
-                "inter_iamb",
-                "mmpc",
-            ),
-            *_absent("0.12.0", "A mask in the gated objective.", "calm"),
-        ),
     ),
     Concept(
         key="categorical",
