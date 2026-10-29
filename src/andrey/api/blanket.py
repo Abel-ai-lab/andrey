@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
-    MAX_CATEGORIES,
     categorical_metadata,
     checked_data,
     column_labels,
@@ -44,7 +43,6 @@ def _fit(
     alpha: float,
     indep_test: str | None,
     categorical: Sequence[str | int] | None,
-    max_categories: int,
     seed: int | None,
     max_depth: int | None,
     knowledge: Knowledge | None,
@@ -58,7 +56,6 @@ def _fit(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method=method,
         missing=True,
     )
@@ -99,7 +96,6 @@ def iamb(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -129,16 +125,13 @@ def iamb(
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
-        other tests take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -187,8 +180,8 @@ def iamb(
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data test infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -257,7 +250,6 @@ def iamb(
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         knowledge=knowledge,
@@ -272,7 +264,6 @@ def inter_iamb(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -301,16 +292,13 @@ def inter_iamb(
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
-        other tests take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -359,8 +347,8 @@ def inter_iamb(
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data test infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -429,7 +417,6 @@ def inter_iamb(
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         knowledge=knowledge,
@@ -444,7 +431,6 @@ def mmpc(
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -474,16 +460,13 @@ def mmpc(
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
-        other tests take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
+        continuous test raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -528,8 +511,8 @@ def mmpc(
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data test infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
+        setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -604,7 +587,6 @@ def mmpc(
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         knowledge=knowledge,

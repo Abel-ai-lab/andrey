@@ -59,7 +59,7 @@ def _default_pool_cutoff(monkeypatch):
     data = np.random.default_rng(0).standard_normal((60, 6))
 
     def fit():
-        with andrey.config(num_workers=2):
+        with andrey.config(n_jobs=2):
             andrey.ges(data)
 
     return fit

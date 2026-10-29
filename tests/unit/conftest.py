@@ -19,7 +19,7 @@ def _reset_backend_state():
     warning_policy._warned.clear()
     yield
     backend.config._backend = None
-    backend.config._num_workers = None
+    backend.config._n_jobs = None
     backend.config._tie_break = None
     warning_policy._warned.clear()
     backend._dispatch_counts.clear()

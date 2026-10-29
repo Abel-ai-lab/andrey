@@ -76,13 +76,13 @@ class AndreyGRaSP:
         seed = int(params.get("seed", SEARCH_SEED))
 
         X = np.asarray(data, dtype=np.float64)
-        with andrey.config(backend=self.backend, num_workers=1):
+        with andrey.config(backend=self.backend, n_jobs=1):
             out = andrey.grasp(
                 X,
                 score_func=andrey_score(score_func),
                 penalty_discount=lambda_value,
                 ebic_gamma=ebic_gamma,
-                depth=depth,
+                grasp_depth=depth,
                 seed=seed,
             )
         return np.asarray(out.structure.to_numpy())
@@ -143,12 +143,12 @@ class AndreyGRaSPDegenGauss(AndreyGRaSP):
         import andrey
 
         X = np.asarray(data, dtype=np.float64)
-        with andrey.config(backend=self.backend, num_workers=1):
+        with andrey.config(backend=self.backend, n_jobs=1):
             out = andrey.grasp(
                 X,
                 score_func=andrey_score(str(params["score_func"])),
                 penalty_discount=float(params["lambda_value"]),
-                depth=int(params["depth"]),
+                grasp_depth=int(params["depth"]),
                 seed=int(params["seed"]),
                 categorical=list(range(X.shape[1])),
             )

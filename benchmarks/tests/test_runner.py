@@ -138,14 +138,14 @@ class StubDtypeEchoAdapter(_BaseStub):
 class EnvEchoAdapter(_BaseStub):
     """Return a 1x3 array of child environment values.
 
-    Columns are ``ANDREY_NUM_WORKERS``, ``OMP_NUM_THREADS`` and whether
+    Columns are ``ANDREY_N_JOBS``, ``OMP_NUM_THREADS`` and whether
     ``ANDREY_GES_PARALLEL_MIN_WORK`` is set.
     """
 
     def fit(self, data, params):
         import os as _os
 
-        nw = int(_os.environ.get("ANDREY_NUM_WORKERS", "-1"))
+        nw = int(_os.environ.get("ANDREY_N_JOBS", "-1"))
         omp = int(_os.environ.get("OMP_NUM_THREADS", "-1"))
         has_minwork = 1 if "ANDREY_GES_PARALLEL_MIN_WORK" in _os.environ else 0
         return np.array([[nw, omp, has_minwork]], dtype=np.int64)
@@ -550,14 +550,14 @@ def test_forkserver_pool_cpu_and_rss_are_captured():
 
 
 # --------------------------------------------------------------------------------------------------
-# The cap-tier worker budget reaches the child as ANDREY_NUM_WORKERS, scrubbed of inherited state.
+# The cap-tier worker budget reaches the child as ANDREY_N_JOBS, scrubbed of inherited state.
 # --------------------------------------------------------------------------------------------------
 
 
 def test_inherited_andrey_env_is_scrubbed(monkeypatch):
     from andrey_bench.runner import run_task
 
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "97")
+    monkeypatch.setenv("ANDREY_N_JOBS", "97")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
 
     res = run_task(
@@ -568,7 +568,7 @@ def test_inherited_andrey_env_is_scrubbed(monkeypatch):
         repeats=1,
         warmup=0,
         threads=1,
-        num_workers=4,
+        n_jobs=4,
     )
     nw, omp, has_minwork = (int(x) for x in res[0]["adj"][0])
     assert (nw, omp, has_minwork) == (4, 1, 0), res[0][
@@ -587,7 +587,7 @@ def test_extra_env_overlays_child_env():
         repeats=1,
         warmup=0,
         threads=1,
-        num_workers=4,
+        n_jobs=4,
         extra_env={"ANDREY_GES_PARALLEL_MIN_WORK": "0"},
     )
     nw, omp, has_minwork = (int(x) for x in res[0]["adj"][0])

@@ -225,7 +225,7 @@ def test_the_parallel_path_returns_the_serial_answer(tmp_path, tiny_keys):
     # Applied to BOTH sides, so mode and worker count are the only things that differ.
     force_pool = {"ANDREY_GES_PARALLEL_MIN_WORK": "0"}
 
-    def run(adapter, num_workers):
+    def run(adapter, n_jobs):
         return run_task(
             adapter,
             path,
@@ -234,7 +234,7 @@ def test_the_parallel_path_returns_the_serial_answer(tmp_path, tiny_keys):
             repeats=1,
             warmup=0,
             threads=1,  # the pin: equal BLAS threads on both sides
-            num_workers=num_workers,
+            n_jobs=n_jobs,
             extra_env=force_pool,
         )[0]
 

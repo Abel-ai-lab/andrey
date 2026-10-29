@@ -737,12 +737,15 @@ def _current_names(layer: dict, former: dict[str, str], errors: list[dict]) -> d
 
 def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tuple[dict, dict]:
     """Layer spec defaults < --config < key=value overrides; coerce / validate against the spec. All
-    problems collect into one `invalid_params` envelope (a `details` list)."""
+    problems collect into one `invalid_params` envelope (a `details` list).
+
+    Returns the arguments the call passes, those --config and the overrides set, as a call from
+    Python passes only the ones it names, and the manifest of every parameter's value."""
     specs = {p.name: p for p in spec.params}
     former = {alias: p.name for p in spec.params for alias in p.aliases}
     input_names = {name for i in spec.data.inputs for name in (i.name, *i.aliases)}
     raw_overrides, errors = _parse_overrides(tokens)
-    fkwargs: dict = {p.name: p.default for p in spec.params}  # manifest = defaults + config + CLI
+    fkwargs: dict = {}  # the arguments set by --config and the overrides
     config = _current_names(config, former, errors)
     raw_overrides = _current_names(raw_overrides, former, errors)
 
@@ -786,7 +789,7 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
         )
     resolved = {
         k: (list(v) if isinstance(v, tuple) else v)
-        for k, v in fkwargs.items()
+        for k, v in {**{p.name: p.default for p in spec.params}, **fkwargs}.items()
         if k not in spec.dropped_args
     }
     return fkwargs, resolved
@@ -1153,7 +1156,7 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
             "Bootstrap flags: --n-boot <n> (default 100), --seed <int>, --threshold <share> "
             "(default 0.5),",
             "  --block-length <rows> (time-series methods on one series). Workers follow "
-            "ANDREY_NUM_WORKERS.",
+            "ANDREY_N_JOBS.",
         ]
     lines += [
         "",
@@ -1270,7 +1273,7 @@ def config_report() -> dict:
         "andrey_version": andrey.__version__,
         "configuration": {
             "backend": state["backend"],
-            "num_workers": state["num_workers"],
+            "n_jobs": state["n_jobs"],
             "tie_break": andrey.config.tie_break,
         },
         "available_backends": state["available_backends"],
@@ -1290,7 +1293,7 @@ def render_config(report: dict) -> str:
     system = report["system"]
     lines = [
         f"Backend preference: {settings['backend']}",
-        f"Worker setting: {settings['num_workers']}",
+        f"Worker setting: {settings['n_jobs']}",
         f"Tie break: {settings['tie_break']}",
         f"Available backends: {available}",
         *[f"  {name}: {why}" for name, why in system["unavailable_backends"].items()],
@@ -1485,7 +1488,7 @@ def cmd_calibrate(
     workers: Optional[int] = typer.Option(
         None,
         "--workers",
-        help="Pool size to measure; default: ANDREY_NUM_WORKERS if above 1, else all usable CPUs.",
+        help="Pool size to measure; default: ANDREY_N_JOBS if above 1, else all usable CPUs.",
     ),
     method: Optional[list[str]] = typer.Option(
         None,
@@ -1552,7 +1555,7 @@ def calibration_report(results: dict, workers: int) -> dict:
         }
         for m, c in results.items()
     }
-    settings = {"ANDREY_NUM_WORKERS": str(workers)}
+    settings = {"ANDREY_N_JOBS": str(workers)}
     settings.update({v["variable"]: str(v["cutoff"]) for v in methods.values()})
     return {
         "schema_version": SCHEMA_VERSION,

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core import backend, stats
+from andrey.core import backend, stats, warning_policy
 from andrey.core.env import BACKENDS
 
 
@@ -82,7 +82,7 @@ def test_importing_core_does_not_import_torch():
     assert proc.stdout.strip() == "ok"
 
 
-# ---- the two-layer grammar: backend + num_workers, layered selection ----
+# ---- the two-layer grammar: backend + n_jobs, layered selection ----
 
 
 def test_backend_precedence_context_over_config_over_env(monkeypatch):
@@ -134,15 +134,35 @@ def test_unknown_tie_break_names_the_allowed_values(monkeypatch):
         _ = andrey.config.tie_break
 
 
-def test_num_workers_resolution(monkeypatch):
-    monkeypatch.delenv("ANDREY_NUM_WORKERS", raising=False)
-    assert andrey.config.num_workers == 1  # serial default
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "4")
-    assert andrey.config.num_workers == 4
-    with andrey.config(num_workers=8):
-        assert andrey.config.num_workers == 8
-    with pytest.raises(ValueError, match="num_workers"):
-        andrey.config.num_workers = -2
+def test_n_jobs_resolution(monkeypatch):
+    monkeypatch.delenv("ANDREY_N_JOBS", raising=False)
+    assert andrey.config.n_jobs == 1  # serial default
+    monkeypatch.setenv("ANDREY_N_JOBS", "4")
+    assert andrey.config.n_jobs == 4
+    with andrey.config(n_jobs=8):
+        assert andrey.config.n_jobs == 8
+    with pytest.raises(ValueError, match="n_jobs"):
+        andrey.config.n_jobs = -2
+
+
+def test_the_former_worker_names_set_n_jobs_for_one_release_with_one_warning(monkeypatch):
+    """``num_workers`` on ``andrey.config`` and ``ANDREY_NUM_WORKERS`` set ``n_jobs``, each with
+    a ``DeprecatedArgumentWarning``; ``ANDREY_N_JOBS`` wins over the former variable."""
+    monkeypatch.delenv("ANDREY_N_JOBS", raising=False)
+    monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="ANDREY_NUM_WORKERS is now"):
+        assert andrey.config.n_jobs == 3
+    monkeypatch.setenv("ANDREY_N_JOBS", "2")
+    assert andrey.config.n_jobs == 2
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=r"config\(num_workers=...\) is now"):
+        with andrey.config(num_workers=5):
+            assert andrey.config.n_jobs == 5
+    with pytest.raises(ValueError, match="pass only n_jobs"):
+        andrey.config(n_jobs=2, num_workers=2)
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="config.num_workers is now"):
+        andrey.config.num_workers = 4
+    assert andrey.config.n_jobs == andrey.config.num_workers == 4
 
 
 def test_bad_backend_value_raises():
@@ -170,8 +190,8 @@ def test_describe_reports_state(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     d = andrey.describe()
-    assert d.backend == "auto" and d.num_workers == 1
-    assert set(d.as_dict()) == {"backend", "num_workers", "available_backends"}
+    assert d.backend == "auto" and d.n_jobs == 1
+    assert set(d.as_dict()) == {"backend", "n_jobs", "available_backends"}
     assert set(d.as_dict()["available_backends"]) == set(BACKENDS) - {"auto"}
 
 

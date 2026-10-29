@@ -95,6 +95,14 @@ def _domains(x: np.ndarray) -> Any:
     return andrey.cdnod(x, index, alpha=_CDNOD["alpha"], indep_test=_CDNOD["indep_test"])
 
 
+def _pcmci(x: np.ndarray) -> StructureOutput:
+    """PCMCI with the gate adapter's settings; the adapter names the PC1 level ``pc_alpha``, as
+    tigramite does."""
+    params = qg.AndreyPCMCI("pcmci", "student_t", tau_max=2).params()
+    params["pc1_alpha"] = params.pop("pc_alpha")
+    return andrey.pcmci(x, **params)
+
+
 #: The gate's settings, with each method's full output: the benchmark adapters' parameters for the
 #: methods the gate fits through an adapter, which returns only the graph.
 FITS: dict[str, Fit] = {
@@ -129,9 +137,7 @@ FITS: dict[str, Fit] = {
     "GIN": Fit(andrey.gin),
     "ANM": Fit(andrey.anm),
     "PNL": Fit(andrey.pnl),
-    "PCMCI": Fit(
-        lambda x: andrey.pcmci(x, **qg.AndreyPCMCI("pcmci", "student_t", tau_max=2).params())
-    ),
+    "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
     "VARMA-LiNGAM": Fit(
@@ -145,7 +151,7 @@ FITS: dict[str, Fit] = {
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS, cv=5)),
 }
 
-#: The methods that run on ``andrey.config(num_workers=...)``: GES, GFCI's GES phase, and the
+#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
 #: skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase in worker processes, Granger's
 #: regressions and PNL's two directions on threads.
 WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "Granger", "PNL")
@@ -612,7 +618,7 @@ THREAD_VARIABLES = (
     "OPENBLAS_NUM_THREADS",
     "MKL_NUM_THREADS",
     "VECLIB_MAXIMUM_THREADS",
-    "ANDREY_NUM_WORKERS",
+    "ANDREY_N_JOBS",
     "ANDREY_GES_PARALLEL_MIN_WORK",
 )
 ROOT = Path(__file__).resolve().parents[1]
@@ -649,7 +655,7 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
         "threads": {
             "backend": "numpy",
             "blas_threads": 1,
-            "num_workers": 1,
+            "n_jobs": 1,
             **{name: os.environ.get(name) for name in THREAD_VARIABLES},
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
@@ -717,7 +723,7 @@ def run(
     reported as ``("graph" | "bits", description)``, naming the parts that changed.
     """
     rows, findings = [], []
-    with andrey.config(backend="numpy", num_workers=1), threadpool_limits(limits=1):
+    with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         for method, dataset, seed, x in corpus(methods, seeds):
             fit = FITS[method]
             with counting(fit.alpha) as counts:
@@ -732,7 +738,7 @@ def run(
                 refits.append((k, 1, unpermute(out, np.arange(n_vars)), refit))
             if workers > 1 and method in WORKER_METHODS:
                 with (
-                    andrey.config(num_workers=workers),
+                    andrey.config(n_jobs=workers),
                     _environ("ANDREY_GES_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),

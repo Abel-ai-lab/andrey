@@ -85,7 +85,7 @@ __all__ = [
     "BootstrapOutput",
     # Seeds random, NumPy's global generator, and torch for the caller's own draws.
     "seed_all",
-    # Backend grammar: pick the backend + num_workers, layered selection (see ANDREY_BACKEND).
+    # Backend grammar: pick the backend + n_jobs, layered selection (see ANDREY_BACKEND).
     "config",
     "describe",
     # Warning categories: every warning Andrey raises is an AndreyWarning.

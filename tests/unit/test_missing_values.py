@@ -412,7 +412,7 @@ def test_more_workers_give_the_same_result_on_missing_values(name, monkeypatch):
     monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "1")
     x = _gaps(_continuous(400), 0.1)
     serial = _fit(name, x)
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         assert _fit(name, x) == serial
 
 

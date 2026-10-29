@@ -155,7 +155,7 @@ def test_granger_equals_lassocv_on_each_variable(workers):
     design = np.hstack([data[2 - k : n - k] for k in (1, 2)])
     with threadpool_limits(limits=1):  # BLAS reductions may round by thread count
         expected = np.vstack([LassoCV(cv=5).fit(design, data[2:, i]).coef_ for i in range(d)])
-        with andrey.config(num_workers=workers):
+        with andrey.config(n_jobs=workers):
             assert np.array_equal(granger_lasso(data), expected)
 
 

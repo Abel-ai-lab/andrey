@@ -100,13 +100,20 @@ def _param_schema(p: ParamSpec) -> dict:
 
 
 def concepts_dict() -> dict:
-    """The package-wide parameter concepts: each one's meaning and the name each method uses."""
+    """The package-wide parameter concepts: each one's meaning, its template parameter's schema
+    (type, default, bounds, choices), the name each method uses, and each method that differs from
+    the template, with the reason."""
     return {
         key: {
             "parameter": concept.param.name,
             "description": concept.summary,
+            "template": _param_schema(concept.param),
             "methods": {
                 spec.name: p.name for spec in list_specs() for p in spec.params if p.concept == key
+            },
+            "deviations": {
+                d.method: {"parameter": d.name, "default": d.default, "reason": d.reason}
+                for d in concept.deviations
             },
         }
         for key, concept in CONCEPTS.items()
@@ -285,7 +292,7 @@ def cli_meta() -> dict:
                 "time-series method on one series) and reports how often each edge appears; "
                 "takes the inputs, params, --config, -o, --json, and --full of `run`, and not "
                 "gin. The method's own seed= is the bootstrap's --seed. Workers follow "
-                "ANDREY_NUM_WORKERS and the result does not depend on their number."
+                "ANDREY_N_JOBS and the result does not depend on their number."
             ),
             "envelope": (
                 "the result envelope of `run`, with `structure` the averaged graph, plus "
@@ -360,7 +367,6 @@ EDGE_MEANINGS = {
 
 def _data_types_section() -> str:
     """The agent guide's paragraph on column types, from the registry's mixed-data settings."""
-    from andrey.api._adapt import MAX_CATEGORIES
     from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
     from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES
 
@@ -380,15 +386,14 @@ def _data_types_section() -> str:
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
         "and name the categorical columns with `categorical=[col,...]` (header names or 0-based "
         "positions), or `categorical=[]` for none. Without `categorical`, a mixed-data setting "
-        "passed explicitly infers them: "
-        "a DataFrame's `category`, `bool`, and text columns, and every column of at most "
-        f"`max_categories` (default {MAX_CATEGORIES}) distinct whole numbers. `andrey run` reads "
-        "numbers only, so its data file codes each category as a whole number. The result's "
-        "`metadata.categorical` lists the categorical columns read, and `run.warnings` holds a "
-        "`DataTypeWarning` that names the inferred columns, or says that none was found and the "
-        "setting ran as its linear-Gaussian form. Every method that reads columns as numbers "
-        "raises a `DataTypeWarning` naming whole-number columns that may be category codes: "
-        "declare them, or check them before reading the graph."
+        "reads a DataFrame's `category`, `bool`, and text columns as categorical, never a column "
+        "by its values. A continuous setting passed by name raises on a declared column. `andrey "
+        "run` reads numbers only, so its data file codes each category as a whole number and "
+        "`categorical=[...]` names those columns. The result's `metadata.categorical` lists the "
+        "categorical columns read, and `run.warnings` holds a `DataTypeWarning` when a mixed-data "
+        "setting found none and ran as its linear-Gaussian form. Every method that reads columns "
+        "as numbers raises a `DataTypeWarning` naming whole-number columns that may be category "
+        "codes: declare them, or check them before reading the graph."
     )
 
 
@@ -469,7 +474,7 @@ def render_skill() -> str:
         "`source`, `target`, `type`, `count`, and `frequency` (a time-series method adds `lag`). "
         "Report an edge with its frequency: 0.95 is stable, 0.3 is not. A time-series method on "
         "one series resamples blocks of `--block-length` rows. Set `--seed` when the result must "
-        "repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without changing it."
+        "repeat; `ANDREY_N_JOBS` spreads the fits over processes without changing it."
     )
     a("")
     a("## Data types")
@@ -529,7 +534,7 @@ def render_skill() -> str:
         "Before a large run, read `andrey config --json` once. Its `system` section gives the "
         "platform's support tier, the usable CPU cores, each optional extra with the command that "
         "installs it, and why each unavailable backend is off. Suggest a missing extra to the user "
-        "rather than installing it. On many cores, `ANDREY_NUM_WORKERS=-1` runs GES on all "
+        "rather than installing it. On many cores, `ANDREY_N_JOBS=-1` runs GES on all "
         "of them, and `andrey calibrate` measures the pool cutoffs of GES and the skeleton "
         "search on this machine. Set "
         "`ANDREY_SEED` when a stochastic method's result must repeat."

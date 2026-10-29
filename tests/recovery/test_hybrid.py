@@ -171,7 +171,7 @@ def test_rsmax2_with_pc_gives_the_same_graph_on_more_workers():
 
     x = _er_sample(20, 1).data
     first = andrey.rsmax2(x, restrict="pc")
-    with backend.config(num_workers=3):
+    with backend.config(n_jobs=3):
         again = andrey.rsmax2(x, restrict="pc")
     assert _edges(again) == _edges(first) and again.metadata == first.metadata
 

@@ -419,13 +419,18 @@ continuous parent.
 **Marking the categorical columns.** Name them with `categorical`, by label (the column name as
 text) or 0-based position:
 `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without `categorical`,
-a mixed-data setting you pass reads a DataFrame's `category`, `bool`, and text columns as
-categorical, since their type declares them, and infers every other column whose values, over all
-its rows, are at most `max_categories` distinct whole numbers (10 by default). pandas does not mark
-such a column as categorical by itself, so this follows the rule Tetrad applies when it loads mixed
-data. A `DataTypeWarning` names the columns inferred from their values, and none of the declared
-ones; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
-for none. The result's `metadata["categorical"]` lists the categorical columns it read.
+a mixed-data setting reads a DataFrame's `category`, `bool`, and text columns as categorical, since
+their type declares them. Values never declare a column: a column of whole numbers that you have
+not declared is continuous, so `andrey.pc(df, indep_test="cond_gauss")` reads the same columns as
+`andrey.pc(df)` does when it picks `cond_gauss`. Pass `categorical=[]` for no categorical column.
+The result's `metadata["categorical"]` lists the categorical columns it read.
+
+**A declared column needs a test or score that reads categories.** A test or score for continuous
+data, such as `fisherz` or `bic`, raises `ValueError` on a column you declare categorical, whether
+`categorical` names it or its type does, since it would read the categories as numbers. Leave the
+setting as `None` to pick a categorical or mixed-data one, or pass `categorical=[]` to read every
+column as numbers. A categorical test or score, such as `chisq` or `bdeu`, reads every column as
+categorical, declared or not.
 
 **No categorical column.** A mixed-data setting that finds no categorical column, or gets
 `categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio
@@ -434,16 +439,16 @@ the BIC.
 
 **Integer-coded columns.** Every method that reads columns as numbers, the default test and the
 linear-Gaussian BIC included, reads a column of codes such as 0, 1, 2 as numbers, which assumes
-the categories are ordered and evenly spaced. When columns of at most `max_categories` distinct
-whole numbers (10 by default) reach such a method, a one-time `DataTypeWarning` names those
-columns; if they are categories, declare them with `categorical=[...]` or a pandas `category`, and
-the default test or score switches to a categorical or mixed-data one.
+the categories are ordered and evenly spaced. When columns of at most 10 distinct whole numbers
+reach such a method, or the continuous part of a mixed-data setting, a one-time `DataTypeWarning`
+names those columns; if they are categories, declare them with `categorical=[...]` or a pandas
+`category`, and the default test or score switches to a categorical or mixed-data one.
 
 From the command line, the same settings are `key=value` arguments, such as
-`andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
-`max_categories=5`. The data file holds numbers only, so code each category as a whole number. The
-JSON result lists the categorical columns under `metadata.categorical` and the warnings under
-`run.warnings`.
+`andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'`. The data file
+holds numbers only, so code each category as a whole number and name those columns in
+`categorical`. The JSON result lists the categorical columns under `metadata.categorical` and the
+warnings under `run.warnings`.
 
 ## Missing values
 
@@ -490,7 +495,7 @@ VARMA-LiNGAM and Granger, fill in the missing steps first.
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
-`ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
+`ANDREY_BACKEND` and `ANDREY_N_JOBS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
 serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
@@ -500,7 +505,7 @@ with one worker.
 guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
-more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry
+more than one worker (`ANDREY_N_JOBS` above 1, or `-1` for every core) must put its entry
 point under the `__main__` guard:
 
 ```python

@@ -60,9 +60,10 @@ used. Values never decide: a column of a few whole numbers reads as numbers, wit
 hold category codes, from every method that reads columns as numbers, as [Data
 types](guides/getting-started.md#data-types) describes. The mixed-data settings,
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
-the categorical columns that `categorical` lists, or read a DataFrame's `category`, `bool`, and text
-columns and infer the columns of a few whole numbers when you pass the setting yourself; a
-categorical column of numbers needs whole numbers. Methods that score with BIC also reject a
+the categorical columns that `categorical` lists, or a DataFrame's `category`, `bool`, and text
+columns, and never a column by its values; a categorical column of numbers needs whole numbers. A
+test or score for continuous data, such as `"fisherz"` or `"bic"`, raises a `ValueError` on a
+column declared categorical, by `categorical` or by its type. Methods that score with BIC also reject a
 column that repeats another up to scale and shift or, given more rows than columns, is a linear
 function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
 every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
@@ -144,8 +145,8 @@ that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006
 and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
 triple the vote cannot decide is ambiguous: no rule orients through it, and
 `metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. `pcmciplus`
-takes `collider_rule` for its same-step colliders, with `"majority"`, its default,
-`"conservative"`, and `"none"`, which reads the one separating set.
+takes the same three rules for its same-step colliders, with `"majority"` as its default, as in
+tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
 `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, and
@@ -158,30 +159,34 @@ gives a node more than that many parents. `None`, the default, sets no cap. `ges
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
 `pcmciplus`, `lpcmci`, `boss`, `grasp`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
-draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
+draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a
+fresh random one, so a call repeats exactly.
 The methods that test independence draw random numbers only under `indep_test="rcot"`,
 `"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not
 set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
 deterministic and takes no seed.
 
-% concept: num_workers
+% concept: n_jobs
 No method takes the number of workers or the device as an argument. Set them for every call in a
-block with `andrey.config(num_workers=...)`, or with the `ANDREY_*` variables of
+block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
 take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of Ramsey et al.
 (2017): larger values give sparser graphs, and `1.0`, the default, with `ebic_gamma=0.0` is the
-standard BIC.
+standard BIC. Every score but `"bdeu"` has this penalty, and `metadata["penalty_discount"]` records
+the value the score used.
 
 % concept: ebic_gamma
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `ebic_gamma`, the weight of the extended BIC: their linear-Gaussian BIC adds
-`2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows
-with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the standard BIC, and the others
-to `1.0`; {py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its
-default differs.
+take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
+linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's
+score, a penalty that grows with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the
+standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice and
+{py:func}`~andrey.gfci` says why its default differs. Only `score_func="bic"` adds the term, so
+passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
+`metadata["ebic_gamma"]` records the value a `"bic"` fit used.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -403,7 +408,7 @@ DoWhy for effect estimation.
 and the graph that keeps the pairs that are adjacent often enough. It takes a method's name, such
 as `"pc"`, or the method itself, and the method's own arguments. Each resample draws the rows
 with replacement from a generator that depends on `seed` and the resample's number alone, so a seed
-gives the same result at any `num_workers`, and a longer run begins with the shorter run's fits.
+gives the same result at any `n_jobs`, and a longer run begins with the shorter run's fits.
 A method that takes a row-aligned input (`cdnod`'s `domain_index`, `gies`'s `interventions`)
 resamples it with the rows; `multi_group_direct_lingam` resamples each dataset on its own and
 returns one result per dataset; `longitudinal_lingam` resamples the units, the same rows of every
@@ -441,8 +446,8 @@ probability. `andrey bootstrap` runs the same from the shell
 ```
 
 `andrey.config` holds the process-wide backend preference, worker count, and tie-break rule. Assign
-`andrey.config.backend`, `andrey.config.num_workers`, or `andrey.config.tie_break` to change the
-default for every later call, or use `with andrey.config(backend=..., num_workers=...,
+`andrey.config.backend`, `andrey.config.n_jobs`, or `andrey.config.tie_break` to change the
+default for every later call, or use `with andrey.config(backend=..., n_jobs=...,
 tie_break=...):` for one block. [Configuration](configuration.md) lists the `ANDREY_*`
 environment variables and the order in which the settings apply, and
 [Column order and machines](guides/column-order.md) describes `tie_break`.

@@ -72,7 +72,7 @@ class AndreyBOSS:
         seed = int(params.get("seed", SEARCH_SEED))
 
         X = np.asarray(data, dtype=np.float64)
-        with andrey.config(backend=self.backend, num_workers=1):
+        with andrey.config(backend=self.backend, n_jobs=1):
             out = andrey.boss(
                 X,
                 score_func=andrey_score(score_func),
@@ -132,7 +132,7 @@ class AndreyBOSSDegenGauss(AndreyBOSS):
         import andrey
 
         X = np.asarray(data, dtype=np.float64)
-        with andrey.config(backend=self.backend, num_workers=1):
+        with andrey.config(backend=self.backend, n_jobs=1):
             out = andrey.boss(
                 X,
                 score_func=andrey_score(str(params["score_func"])),

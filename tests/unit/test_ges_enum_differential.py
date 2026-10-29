@@ -129,10 +129,10 @@ def _run(
             patch.setattr(ops, "apply_insert", record_insert)
             patch.setattr(ops, "apply_delete", record_delete)
             patch.setattr(pg, "_breaks_cap", check_cap)
-        # Pin serial: the reference paths never reach pool workers, so under ANDREY_NUM_WORKERS > 1
+        # Pin serial: the reference paths never reach pool workers, so under ANDREY_N_JOBS > 1
         # a pooled pass would silently run the kept path inside the reference run and the
         # comparison would be kept-vs-kept.
-        with backend.config(num_workers=1):
+        with backend.config(n_jobs=1):
             struct, score = ges(
                 x,
                 penalty_discount=penalty_discount,

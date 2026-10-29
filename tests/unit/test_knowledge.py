@@ -924,10 +924,10 @@ def test_a_method_without_lags_rejects_a_lagged_link():
         andrey.pc(_sample(), knowledge=Knowledge(forbidden=[("a", "b", 1)]))
 
 
-@pytest.mark.parametrize("collider_rule", ["majority", "none"])
+@pytest.mark.parametrize("collider_rule", ["majority", "sepsets"])
 def test_pcmciplus_orients_a_collider_over_a_pair_kept_apart_only_from_a_test(collider_rule):
     # x -> y <- z within one step, with x and z kept apart. The majority rule tests them for the
-    # sets that separate them and finds the collider; "none" reads the separating set of the
+    # sets that separate them and finds the collider; "sepsets" reads the separating set of the
     # skeleton phase, which never tested them, so the triple stays ambiguous.
     rng = np.random.default_rng(0)
     x, z, noise = rng.standard_normal((3, 1000))

@@ -158,7 +158,7 @@ A method that draws random numbers sets `seeded=True` and takes `seed` (`concept
 and the wrapper resolves it and records `metadata["seed"]`. A search that tests independence
 passes the seed to `make_indep_test`, which gives it to the tests in `STOCHASTIC_INDEP_TESTS` and
 only to them, at every place the search builds a test. A method takes no execution setting such as
-`num_workers`; it reads them from `andrey.config`.
+`n_jobs`; it reads them from `andrey.config`.
 
 ### Publish a boundary lane
 

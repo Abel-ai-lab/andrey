@@ -45,7 +45,7 @@ def test_the_row_schema_is_what_it_says():
         "gpu_energy_j", "gpu_peak_alloc_mb", "latents", "machine_id", "mem_route",
         "metrics",
         "mode", "n", "name",
-        "noise", "num_workers", "oom_source", "output_hash", "output_type", "package",
+        "noise", "n_jobs", "oom_source", "output_hash", "output_type", "package",
         "package_version", "params", "peak_rss_mb", "process_s", "r2_sortability", "repeat",
         "run_id",
         "scheduler", "setup_s", "shuffle",
@@ -59,7 +59,7 @@ def test_the_environment_legs_are_what_they_say():
     """A field leaving or joining silently re-partitions every `run_id`."""
     assert RUN_ENV_FIELDS == (
         "backend", "mode", "dtype", "device", "cap_mem_mb",
-        "cap_wall_s", "warmup", "machine_id", "threads", "num_workers",
+        "cap_wall_s", "warmup", "machine_id", "threads", "n_jobs",
     )  # fmt: skip
 
 

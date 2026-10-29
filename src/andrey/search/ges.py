@@ -137,7 +137,7 @@ def ges(
         result is that class narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
     workers : int or None
         Worker processes for the BIC passes above the work threshold; ``None`` reads
-        ``andrey.config.num_workers``.
+        ``andrey.config.n_jobs``.
     _parent_rule : {"cap", "gate"}
         Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than

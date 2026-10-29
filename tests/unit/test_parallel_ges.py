@@ -187,8 +187,8 @@ def _force_pool():
 
 
 def _parallel(x: np.ndarray, workers: int, max_parents: float | None = None):
-    """Run ``ges`` on the pool-backed path (gate forced open) via the ``num_workers`` axis."""
-    with _force_pool(), backend.config(num_workers=workers):
+    """Run ``ges`` on the pool-backed path (gate forced open) via the ``n_jobs`` axis."""
+    with _force_pool(), backend.config(n_jobs=workers):
         return ges(x, max_parents=max_parents)
 
 
@@ -345,7 +345,7 @@ def test_collect_wraps_broken_pool():
 
     fut: Future = Future()
     fut.set_exception(BrokenProcessPool("worker died"))
-    with pytest.raises(RuntimeError, match="ANDREY_NUM_WORKERS=1"):
+    with pytest.raises(RuntimeError, match="ANDREY_N_JOBS=1"):
         par.collect([fut])
 
 
@@ -362,7 +362,7 @@ def test_no_pool_below_work_gate(monkeypatch):
     monkeypatch.setattr(pg, "_create_pool", _boom)
     x = _gaussian_sem(0, 600, 10, 0.4)
     serial_struct, serial_score = ges(x)
-    with backend.config(num_workers=4):
+    with backend.config(n_jobs=4):
         par_struct, par_score = ges(x)  # gate never crossed -> in-process path, no pool
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
     assert serial_score == par_score
@@ -377,7 +377,7 @@ def test_parity_mixed_gate(monkeypatch):
     monkeypatch.setattr(pg, "_create_pool", lambda *a, **k: (created.append(1), real(*a, **k))[1])
     x = _gaussian_sem(0, 600, 30, 0.3)
     serial_struct, serial_score = ges(x)  # workers=1: the serial oracle
-    with backend.config(num_workers=4):
+    with backend.config(n_jobs=4):
         mixed_struct, mixed_score = ges(x)
     assert created, "no pass crossed the gate -- not a mixed run"
     assert np.array_equal(serial_struct.to_numpy(), mixed_struct.to_numpy())
@@ -479,7 +479,7 @@ def test_pool_created_once_spans_passes(monkeypatch):
 
     monkeypatch.setattr(pg, "_create_pool", counting)
     x = _gaussian_sem(0, 400, 40, 0.1)  # many passes: a per-pass pool would show many calls
-    with _force_pool(), backend.config(num_workers=4):
+    with _force_pool(), backend.config(n_jobs=4):
         ges(x)
     assert sum(calls) == 1  # created lazily once, reused -> not re-spawned per pass
 
@@ -495,7 +495,7 @@ def test_gies_gfci_transitive_parity(facade_name):
     facade = getattr(andrey, facade_name)
     x = _gaussian_sem(0, 600, 10, 0.4)
     serial = facade(x)
-    with _force_pool(), backend.config(num_workers=4):
+    with _force_pool(), backend.config(n_jobs=4):
         parallel = facade(x)
     assert np.array_equal(serial.structure.to_numpy(), parallel.structure.to_numpy()), facade_name
     assert serial.structure.kind == parallel.structure.kind
@@ -553,7 +553,7 @@ def test_workers_are_live_at_construction(d):
 
 def test_broken_worker_surfaces_at_construction():
     """A worker that cannot boot fails the constructor, not the first mid-pass dispatch."""
-    with pytest.raises(RuntimeError, match="ANDREY_NUM_WORKERS=1"):
+    with pytest.raises(RuntimeError, match="ANDREY_N_JOBS=1"):
         par.StableWorkerSet(4, 2, pg._init_worker, ("not a cov",))  # wrong arity: the boot dies
 
 
@@ -587,7 +587,7 @@ def test_script_without_main_guard(tmp_path, d, guarded):
     env = {
         **os.environ,
         "PYTHONPATH": os.pathsep.join(filter(None, [src_dir, os.environ.get("PYTHONPATH")])),
-        "ANDREY_NUM_WORKERS": "2",
+        "ANDREY_N_JOBS": "2",
         "ANDREY_GES_PARALLEL_MIN_WORK": "0",
     }
     proc = subprocess.run(
@@ -605,7 +605,7 @@ def test_script_without_main_guard(tmp_path, d, guarded):
     last = proc.stderr.strip().splitlines()[-1]
     assert last.startswith("RuntimeError: parallel-search workers failed to start"), last
     assert last.index('if __name__ == "__main__":') < last.index("out of memory"), last
-    assert "ANDREY_NUM_WORKERS=1" in last, last
+    assert "ANDREY_N_JOBS=1" in last, last
 
 
 # --- the forkserver's socket on a file system that rejects chmod ----------------------------------
@@ -730,7 +730,7 @@ if __name__ == "__main__":
     X = np.random.default_rng(0).standard_normal((300, 10))
     X[:, 1:] += 0.6 * X[:, :-1]
     serial = andrey.ges(X)
-    with andrey.config(num_workers=2), warnings.catch_warnings(record=True) as caught:
+    with andrey.config(n_jobs=2), warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         pooled = andrey.ges(X)
     print(np.array_equal(serial.structure.to_numpy(), pooled.structure.to_numpy()))

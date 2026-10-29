@@ -13,17 +13,17 @@ import andrey
 from andrey.core import backend
 
 
-def test_num_workers_invalid_env_names_the_variable(monkeypatch):
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "four")
-    with pytest.raises(ValueError, match="ANDREY_NUM_WORKERS"):
+def test_n_jobs_invalid_env_names_the_variable(monkeypatch):
+    monkeypatch.setenv("ANDREY_N_JOBS", "four")
+    with pytest.raises(ValueError, match="ANDREY_N_JOBS"):
         backend.worker_count()
 
 
 def test_worker_count_resolution(monkeypatch):
-    monkeypatch.delenv("ANDREY_NUM_WORKERS", raising=False)
+    monkeypatch.delenv("ANDREY_N_JOBS", raising=False)
     assert backend.worker_count() == 1  # serial default
     assert backend.worker_count(-1) == backend.usable_cpus()
-    with andrey.config(num_workers=3):
+    with andrey.config(n_jobs=3):
         assert backend.worker_count() == 3
 
 
@@ -173,7 +173,7 @@ def test_cgroup_rel_paths_leaves_the_absent_generation_empty(monkeypatch, tmp_pa
 
 @pytest.mark.parametrize("proc_self", [_V1_PROC, _V2_PROC], ids=["v1-only", "v2-only"])
 def test_usable_cpus_survives_either_cgroup_generation(monkeypatch, tmp_path, proc_self):
-    """``num_workers=-1`` through the public path never hits an unbound name."""
+    """``n_jobs=-1`` through the public path never hits an unbound name."""
     if proc_self is _V1_PROC:
         _fake_cgroup_v1(monkeypatch, tmp_path, proc_self=proc_self, files={".": ("max", "100000")})
     else:
