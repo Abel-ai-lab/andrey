@@ -418,7 +418,7 @@ def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_pa
 def test_example_prints_the_recovered_edges():
     source, printed, svg = build.run_example()
     assert "andrey.pc(df)" in source
-    assert printed.splitlines() == [
+    assert printed.splitlines()[:10] == [  # then the metadata it prints
         "pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)",
         "",
         "  raf -- mek",
