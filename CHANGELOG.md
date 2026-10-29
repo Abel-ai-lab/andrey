@@ -190,6 +190,10 @@ change names its pull request.
   name or value still works, for one release. ([#496])
 - `tabu` takes `categorical`, `max_categories`, and the mixed-data scores `"cond_gauss"` and
   `"degen_gauss"`; `exact_search` takes `penalty_discount`; `gies` takes `score_func`. ([#501])
+- `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score a fit used, as
+  the current short name, in every method with a test or a score: the one you passed, or, for
+  `None`, the one picked from the declared column types, so a default choice is visible. A
+  registered test is recorded under its registered name. ([#524])
 
 ### Changed
 
@@ -277,6 +281,16 @@ change names its pull request.
   `1e-12` of its column's variance instead of `1e-12` of the mean column variance, which could
   exceed the whole variance of a column in much smaller units than the others. On standardized
   data the fits return the same values as before. ([#517])
+- Naming `indep_test="cond_gauss"` or `"degen_gauss"`, or the same scores, on a DataFrame with a
+  pandas `category`, `bool`, or text column no longer raises a `DataTypeWarning` that the column
+  was inferred as categorical: its type declares it. The warning stays for columns without such a
+  type that hold at most `max_categories` distinct whole numbers, and names only those. ([#524])
+- Every method that takes `required` keeps each required edge in its output. `granger` and
+  `varma_lingam(prune=True)` left out a required lagged link whose least-squares weight came out
+  exactly 0, such as a link into a series that does not vary over the fitted rows; the link is now
+  in the graph with its weight 0, as `direct_lingam` and `multi_group_direct_lingam` already kept
+  theirs. `longitudinal_lingam` builds its graph the same way. Fits without a zero weight on a
+  required link return the same graphs as before. ([#524])
 
 ## [0.10.0] - 2026-10-27
 
@@ -1065,3 +1079,4 @@ First alpha release.
 [#509]: https://github.com/Abel-ai-lab/andrey/pull/509
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
 [#517]: https://github.com/Abel-ai-lab/andrey/pull/517
+[#524]: https://github.com/Abel-ai-lab/andrey/pull/524

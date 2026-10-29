@@ -8,6 +8,7 @@ removes one fails here until it deletes the record.
 from __future__ import annotations
 
 import functools
+import importlib
 import inspect
 import pathlib
 import re
@@ -22,7 +23,7 @@ from andrey.api import _method as method_wrapper
 from andrey.core import ci, warning_policy
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, Concept
+from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, SCORE_ALIASES, Concept
 from tests.recovery.helpers import datagen
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
@@ -340,6 +341,143 @@ def andrey_warnings(method: str) -> bool:
     return all(issubclass(category, andrey.AndreyWarning) for category in caught)
 
 
+def typed_frame(kind: str, n: int = N) -> pd.DataFrame:
+    """A chain x -> y -> z of one kind of columns: continuous; all pandas ``category``; or mixed,
+    x a ``category`` and y and z continuous."""
+    rng = np.random.default_rng(5)
+    if kind == "categorical":
+        x = rng.integers(0, 3, n)
+        y = np.where(rng.random(n) < 0.8, x, rng.integers(0, 3, n))
+        z = np.where(rng.random(n) < 0.8, y, rng.integers(0, 3, n))
+        return pd.DataFrame({c: pd.Categorical(v) for c, v in zip("xyz", (x, y, z), strict=True)})
+    table = frame(5, codes=kind == "mixed")
+    if kind == "mixed":
+        table["x"] = pd.Categorical(table["x"].astype(int))
+    return table
+
+
+def args_for(method: str, tables: list[pd.DataFrame]) -> list:
+    """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
+    domain column for CD-NOD."""
+    kinds = (i.kind for i in REGISTRY[method].data.inputs if i.required)
+    domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
+    return [
+        tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
+    ]
+
+
+def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
+    """Record the name of every test and score the fits that follow build, by argument name."""
+    from andrey.temporal import pcmci
+
+    names: dict[str, list[str]] = {"indep_test": [], "score_func": []}
+
+    def spy(table: dict, key: str, argument: str):
+        def build(*args, _factory=table[key], **options):
+            names[argument].append(key)
+            return _factory(*args, **options)
+
+        monkeypatch.setitem(table, key, build)
+
+    for key in list(ci._CI_REGISTRY):
+        spy(ci._CI_REGISTRY, key, "indep_test")
+    for key in list(pcmci.INDEP_TESTS):
+        spy(pcmci.INDEP_TESTS, key, "indep_test")
+    for module in ("ges", "exact", "hc", "boss", "tabu"):
+        engine = importlib.import_module(f"andrey.search.{module}")
+
+        def make_score(score_func, *args, _make=engine.make_score, **options):
+            names["score_func"].append(score_func)
+            return _make(score_func, *args, **options)
+
+        monkeypatch.setattr(engine, "make_score", make_score)
+    return names
+
+
+def used_settings(method: str, table: pd.DataFrame, **kwargs) -> dict[str, tuple[str, set[str]]]:
+    """For each of the method's test and score arguments, the metadata it records and the names
+    the engines built."""
+    with pytest.MonkeyPatch.context() as mp:
+        names = spy_on_builds(mp)
+        warning_policy._warned.clear()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            out = getattr(andrey, method)(*args_for(method, [table] * 3), **kwargs)
+    keys = [k for k in ("indep_test", "score_func") if k in out.metadata]
+    return {k: (out.metadata[k], set(names[k])) for k in keys}
+
+
+def agrees(found: dict[str, tuple[str, set[str]]], wanted: set[str]) -> bool:
+    """Whether the fit recorded each of ``wanted`` and built exactly the name it recorded.
+
+    The linear-Gaussian BIC runs without a build by name in ``gies``, ``xges``, and the continuous
+    fit of ``exact_search``: the record says ``bic``.
+    """
+    if set(found) != wanted:
+        return False
+    for key, (recorded, built_names) in found.items():
+        if built_names:
+            if built_names != {recorded}:
+                return False
+        elif (key, recorded) != ("score_func", "bic"):
+            return False
+    return True
+
+
+def wanted_settings(method: str) -> set[str]:
+    return {k for k in ("indep_test", "score_func") if tagged(CONCEPTS[k], method)}
+
+
+def records_the_test_and_score_it_used(method: str) -> bool:
+    """Whether a default fit on continuous, categorical, and mixed columns records what it built."""
+    return all(
+        agrees(used_settings(method, typed_frame(kind)), wanted_settings(method))
+        for kind in ("continuous", "categorical", "mixed")
+    )
+
+
+#: A required edge, its data, and the settings that make a method fit it: a series or panel
+#: method's link is x -> y at lag 1.
+SERIES_SETTINGS = {"varma_lingam": {"order": (1, 0), "prune": True}}
+
+
+def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
+    """Columns x, y, z of independent noise; with ``kind="flat"``, y is constant after its first
+    row, so every least-squares weight into y is exactly 0 and no test finds a dependence."""
+    table = pd.DataFrame(rng.standard_normal((60, 3)), columns=list("xyz"))
+    if kind == "flat":
+        table["y"] = 0.0
+        table.loc[0, "y"] = 1.0
+    return table
+
+
+def required_edge_is_kept(method: str, kind: str) -> bool:
+    """Whether a fit with the required edge x -> y keeps it on data that do not support it."""
+    spec = REGISTRY[method]
+    series = spec.output.structure_type == "temporal"
+    knowledge = andrey.Knowledge(required=[("x", "y", 1) if series else ("x", "y")])
+    rng = np.random.default_rng(3)
+    tables = [unsupported_data(kind, rng) for _ in range(3)]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out = getattr(andrey, method)(
+            *args_for(method, tables), knowledge=knowledge, **SERIES_SETTINGS.get(method, {})
+        )
+    out = out[0] if isinstance(out, list) else out
+    s = out.structure
+    if not series:
+        return ("x", "y", "directed") in s.oriented_edges()
+    graphs = [s.at(t, 1) for t in s.times] if s.n_times else [s.lag(1)]
+    return all(("x", "y", "directed") in g.oriented_edges() for g in graphs)
+
+
+def keeps_the_required_edge(method: str) -> bool:
+    """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
+    a constant column, on data where its weight is exactly 0."""
+    flat = () if method in PCMCI_FAMILY else ("flat",)
+    return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
+
+
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
     "missing": (lambda m: REGISTRY[m].data.missing, True),
@@ -353,6 +491,8 @@ OBSERVE = {
     "cap_warning": (stopped_at_cap, "SearchLimitWarning"),
     "invalid_choice": (non_value_errors, ""),
     "metadata": (declared_metadata, True),
+    "chosen_settings": (records_the_test_and_score_it_used, True),
+    "required_edges": (keeps_the_required_edge, True),
     "warnings": (andrey_warnings, True),
     "units": (unit_free, True),
 }
@@ -447,6 +587,35 @@ def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     for method in CI_SEARCHES:
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
+
+
+def named_setting(method: str, key: str) -> str:
+    """A test or score of ``method`` that the default does not pick on mixed columns."""
+    choices = tagged(CONCEPTS[key], method).choices  # ty: ignore[possibly-missing-attribute]
+    return next((c for c in ("cond_gauss", "degen_gauss", "student_t") if c in choices), choices[0])
+
+
+@pytest.mark.parametrize("method", CONCEPTS["chosen_settings"].suitable)
+def test_a_named_test_or_score_is_the_one_recorded_and_built(method):
+    named = {key: named_setting(method, key) for key in wanted_settings(method)}
+    found = used_settings(method, typed_frame("mixed"), **named)
+    assert agrees(found, set(named))
+    assert {key: recorded for key, (recorded, _) in found.items()} == named
+
+
+def test_a_registered_test_is_recorded_by_its_registered_name(monkeypatch):
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
+    out = andrey.pc(*inputs("pc", codes=False), indep_test="fisherz_copy")
+    assert out.metadata["indep_test"] == "fisherz_copy"
+
+
+@pytest.mark.parametrize(("former", "current"), [("local_score_BIC", "bic")])
+def test_a_former_score_name_is_recorded_as_the_current_one(former, current):
+    assert dict(SCORE_ALIASES)[former] == current
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning):
+        out = andrey.ges(*inputs("ges", codes=False), score_func=former)
+    assert out.metadata["score_func"] == current
 
 
 # --- randomness -----------------------------------------------------------------------------------

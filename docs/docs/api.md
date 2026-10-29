@@ -54,13 +54,15 @@ boolean, and `category` columns as categories and need whole numbers in a column
 distinct value of a column one category. Every method defaults to `indep_test=None` and
 `score_func=None`, which pick from the column types you declare, with `categorical` or a DataFrame's
 `category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
-`"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`. Values
-never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
+`"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`; the
+result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score the fit
+used. Values never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
 hold category codes, from every method that reads columns as numbers, as [Data
 types](guides/getting-started.md#data-types) describes. The mixed-data settings,
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
-the categorical columns that `categorical` lists, or infer them when you pass the setting yourself;
-a categorical column of numbers needs whole numbers. Methods that score with BIC also reject a
+the categorical columns that `categorical` lists, or read a DataFrame's `category`, `bool`, and text
+columns and infer the columns of a few whole numbers when you pass the setting yourself; a
+categorical column of numbers needs whole numbers. Methods that score with BIC also reject a
 column that repeats another up to scale and shift or, given more rows than columns, is a linear
 function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
 every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
@@ -99,9 +101,9 @@ from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmci
 `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
 `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
 required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. `bottom_up_parce_lingam` honors every part but
-required edges. For the time-series methods, an edge `(cause, effect, lag)` is the link from
-`cause` at time `t - lag` to `effect` at time `t`.
+`knowledge` parameter says how it honors them. Every required edge is in the result, whatever
+its weight, test, or score says. For the time-series methods, an edge `(cause, effect, lag)` is the
+link from `cause` at time `t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -458,7 +460,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
 | {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |
-| {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred its categorical columns or found none. |
+| {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred categorical columns from their values or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
 the largest number of variables any measured mean degree finished there, since the data's density
