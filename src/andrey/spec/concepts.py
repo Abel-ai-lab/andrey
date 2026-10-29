@@ -640,6 +640,47 @@ _CONCEPTS = (
         others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
     ),
     Concept(
+        key="threshold",
+        summary="The share of fits in which a pair of andrey.bootstrap's averaged graph must be "
+        "adjacent, on top of its most frequent edge outnumbering no edge. An argument of the "
+        "bootstrap function, not of a method.",
+        param=_template(
+            "threshold",
+            "float",
+            0.5,
+            "A pair of the averaged graph must be adjacent in more than this share of the fits, "
+            "or in all of them, in [0.5, 1].",
+            minimum=0.5,
+            maximum=1,
+        ),
+        suitable=(),
+        others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
+        key="strict",
+        summary="What andrey.bootstrap does when the vote of the fits has no valid graph of the "
+        "method's kind: return the resample graph nearest the others with a warning (False), or "
+        "raise (True). An argument of the bootstrap function, not of a method.",
+        param=_template(
+            "strict",
+            "bool",
+            False,
+            "Raise when the vote of the fits has no valid graph of the method's kind, instead of "
+            "returning the resample graph nearest the others with a warning.",
+        ),
+        suitable=(),
+        others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
+        key="averaged_graph",
+        summary="BootstrapOutput.metadata['averaged_graph'] records which graph is the averaged "
+        "graph: 'vote', the vote of the fits made a valid graph of the method's kind, or "
+        "'nearest_resample', the resample graph nearest the others when the vote has no valid "
+        "graph of that kind.",
+        suitable=(),
+        others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
         key="knowledge",
         summary="Background knowledge, an andrey.Knowledge, every part honored.",
         param=_template(
@@ -900,8 +941,10 @@ def concept_param(key: str, **update: Any) -> ParamSpec:
     return param.model_copy(update=update)
 
 
-#: The resampling arguments of ``andrey.bootstrap``, the "bootstrap spec" its wrapper checks.
+#: The resampling and averaging arguments of ``andrey.bootstrap``, the "bootstrap spec" it checks.
 BOOTSTRAP_PARAMS: dict[str, ParamSpec] = {
     "resampling": concept_param("resampling"),
     "sample_fraction": concept_param("sample_fraction"),
+    "threshold": concept_param("threshold"),
+    "strict": concept_param("strict"),
 }

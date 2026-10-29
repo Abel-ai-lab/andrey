@@ -433,7 +433,7 @@ DoWhy for effect estimation.
 ## Bootstrap
 
 `andrey.bootstrap` refits a method on resamples of the rows and reports how often each edge appears,
-and the graph that keeps the pairs that are adjacent often enough. It takes a method's name, such
+and the averaged graph, a valid graph of the method's kind. It takes a method's name, such
 as `"pc"`, or the method itself, and the method's own arguments. Each resample is a subsample by
 default: `sample_fraction` (0.5) of the rows, drawn without replacement. `resampling="bootstrap"`
 draws as many rows as `data` has, with replacement, instead. The generator depends on `seed` and the
@@ -450,9 +450,16 @@ take, since its number of latent nodes differs from fit to fit.
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
 `"<->"`, `"o->"`, `"<-o"`, `"o-o"`, `"-o"`, `"o-"`, and `"absent"`; `table()` lists every edge that
 appeared; `structure` is the averaged graph, and `average(threshold)` builds it at another
-threshold without refitting. A pair is in the averaged graph when it is adjacent in at least
-`threshold` of the fits, and it takes the edge it has most often; two edges that tie give `--`
-(`o-o` for a PAG). A bootstrap resample repeats rows, so a conditional-independence test sees
+threshold without refitting. The averaged graph starts from a vote: each pair takes its most
+frequent state, no edge counted as one, so it keeps its most frequent edge when more fits have that
+edge than have no edge; `threshold` (0.5 to 1) asks the pair to be adjacent in more than that share
+of the fits, or in all of them, and two edges that tie give `--` (`o-o` for a PAG). The vote is
+then made a valid graph of the method's kind: a DAG with its edges and no cycle, the CPDAG of such
+a DAG, or the PAG of a MAG built from it. A tie between the two directions of a DAG method's edge
+points by the columns' `tie_break` ranks, so the graph relabels with the columns. When no such graph exists, the averaged graph is the
+resample graph nearest the others, with a warning, and `metadata["averaged_graph"]` says
+`"nearest_resample"` instead of `"vote"`; `strict=True` raises instead. A bootstrap resample
+repeats rows, so a conditional-independence test sees
 more evidence than the resample holds; a subsample does not, which is why we make it the default
 (the `bootstrap` docstring gives the measurements). Either way, read a frequency as a ranking of
 the edges, not as a probability. `andrey bootstrap` runs the same from the shell
@@ -754,7 +761,8 @@ configuration file and never executes the method, while `andrey run hc --data da
 HC. Configuration reports list detected backends, not the backend an operation will use.
 
 `andrey bootstrap <method>` takes the inputs, parameters, and options of `andrey run`, and
-`--n-resamples`, `--seed`, `--threshold`, `--resampling`, `--sample-fraction`, and `--block-length`.
+`--n-resamples`, `--seed`, `--threshold`, `--strict`, `--resampling`, `--sample-fraction`, and
+`--block-length`.
 Its result is a run's, with the averaged graph as `structure`, plus `bootstrap` (the settings) and
 `frequencies` (each edge that appeared in a fit, most frequent first); see
 [Bootstrap](#bootstrap).

@@ -156,6 +156,18 @@ Pass what you already know to a search: tiers in time, and required or forbidden
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Bootstrap: how stable is each edge?
+:link: bootstrap
+:link-type: doc
+:img-top: /_generated/thumbs/bootstrap.svg
+:img-alt: The averaged graph of PC over 50 subsamples of data on the ALARM network
+
+Refit a method on resamples of the rows: edge frequencies, the averaged graph, and which edges to
+trust.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -184,5 +196,6 @@ bottom_up_parce_lingam
 pairwise
 time_series
 knowledge
+bootstrap
 viz
 ```

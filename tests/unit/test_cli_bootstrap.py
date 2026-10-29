@@ -54,6 +54,8 @@ def test_the_envelope_is_the_runs_with_the_averaged_graph_and_the_frequencies(cs
     assert env["bootstrap"] == {
         "n_resamples": 6,
         "threshold": 0.5,
+        "strict": False,
+        "averaged_graph": "vote",
         "seed": 3,
         "resampling": "subsample",
         "sample_fraction": 0.5,
@@ -85,10 +87,11 @@ def test_the_threshold_flag_sets_the_averaged_graph(csv_path, capsys):
         "1",
         "--json",
     ]
-    _, loose, _ = _run([*base, "--threshold", "0.2"], capsys)
-    _, strict, _ = _run([*base, "--threshold", "1"], capsys)
+    _, loose, _ = _run([*base, "--threshold", "0.5"], capsys)
+    _, strict, _ = _run([*base, "--threshold", "1", "--strict"], capsys)
     loose, strict = json.loads(loose), json.loads(strict)
-    assert loose["bootstrap"]["threshold"] == 0.2 and strict["bootstrap"]["threshold"] == 1.0
+    assert loose["bootstrap"]["threshold"] == 0.5 and strict["bootstrap"]["threshold"] == 1.0
+    assert not loose["bootstrap"]["strict"] and strict["bootstrap"]["strict"]
     assert strict["structure"]["n_edges"] <= loose["structure"]["n_edges"]
     assert loose["frequencies"] == strict["frequencies"]
 
@@ -132,6 +135,7 @@ def test_the_bootstrap_seeds_a_seeded_method_and_rejects_its_own_seed(csv_path, 
     [
         ["--n-resamples", "0"],
         ["--threshold", "0"],
+        ["--threshold", "0.3"],
         ["--threshold", "1.5"],
         ["--seed", "-1"],
         ["--sample-fraction", "0"],
@@ -273,6 +277,8 @@ def test_the_help_and_the_contract_describe_the_command(capsys):
     for flag in ("--resampling", "--sample-fraction"):
         assert flag in cli["invocation"] and flag in out
     params = cli["parameters"]
+    assert params["threshold"]["minimum"] == 0.5 and params["threshold"]["maximum"] == 1
+    assert params["strict"]["default"] is False
     assert params["resampling"]["enum"][:2] == ["subsample", "bootstrap"]
     assert params["sample_fraction"]["exclusiveMinimum"] == 0
     assert params["sample_fraction"]["maximum"] == 1 and params["sample_fraction"]["default"] == 0.5

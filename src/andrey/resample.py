@@ -2,7 +2,7 @@
 
 :func:`bootstrap` refits one method on resamples of the rows and counts, for every pair of
 variables, how often each endpoint-mark pair appears. :class:`BootstrapOutput` holds those counts
-and the graph that takes each pair's most frequent edge.
+and the averaged graph: the vote of the fits, made a valid graph of the method's kind.
 
 Resample ``b`` draws from ``SeedSequence(seed, spawn_key=(b, 0))``, and a seeded method fits with
 a seed from ``spawn_key=(b, 1)``, so a resample depends on ``seed`` and ``b`` only: the result is
@@ -26,6 +26,10 @@ from andrey import api
 from andrey.api._adapt import flag, int_in_range
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput
 from andrey.core import backend as _backend
+from andrey.core._convert import extend_in_order, mag_of_pag
+from andrey.core.knowledge import mpdag
+from andrey.core.knowledge import orient as knowledge_orient
+from andrey.core.orient import _cpdag_of_pdag
 from andrey.core.structure import (
     _EDGE_TYPES,
     EDGE_GLYPHS,
@@ -34,12 +38,14 @@ from andrey.core.structure import (
     TemporalStructure,
     is_ancestral_kind,
 )
-from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
+from andrey.core.warning_policy import AndreyWarning, DeprecatedArgumentWarning, warn_once
 from andrey.search._parallel import pick_context
+from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from andrey.core.knowledge import Constraints
     from andrey.core.output import JSONValue
     from andrey.spec.models import MethodSpec
 
@@ -66,6 +72,7 @@ _TIE_EDGE: dict[Kind, tuple[int, int]] = {
     "undirected": (TAIL, TAIL),
 }
 _STATES = 16  # a pair's mark pairs, coded near * 4 + far
+_MADE_VALID: tuple[Kind, ...] = ("dag", "cpdag", "pag")  # the kinds a vote is made a valid graph of
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +114,10 @@ class BootstrapOutput:
     _slices: tuple[_Slice, ...]
     _metadata: Mapping[str, JSONValue]
     _fits: tuple[StructureOutput, ...] | None = None
+    _strict: bool = False
+    _nearest: tuple[int, Structure] | None = None  # the fit nearest the others, by resample
+    _constraints: Constraints | None = None
+    _ranks: np.ndarray | None = None  # the nodes' tie ranks: the data's, from bootstrap
 
     # ---- construction ---------------------------------------------------------------------
 
@@ -116,6 +127,7 @@ class BootstrapOutput:
         fits: Sequence[StructureOutput],
         *,
         threshold: float = 0.5,
+        strict: bool = False,
         keep_fits: bool = False,
         metadata: Mapping[str, JSONValue] | None = None,
     ) -> BootstrapOutput:
@@ -129,8 +141,11 @@ class BootstrapOutput:
         fits : Sequence[StructureOutput]
             The results to count, at least one.
         threshold : float, default=0.5
-            The share of fits in which a pair must be adjacent for the averaged graph to hold it,
-            in ``(0, 1]``.
+            A pair of the averaged graph must be adjacent in more than this share of the fits, or
+            in all of them, in ``[0.5, 1]``.
+        strict : bool, default=False
+            Raise when the vote of the fits has no valid graph of their kind, instead of returning
+            the fit nearest the others with a warning.
         keep_fits : bool, default=False
             Keep ``fits`` in the ``fits`` property.
         metadata : Mapping[str, JSONValue] or None, default=None
@@ -139,22 +154,51 @@ class BootstrapOutput:
         Returns
         -------
         BootstrapOutput
-            The counts and the averaged graph. A pair is adjacent in the averaged graph when it is
-            adjacent in at least ``threshold`` of the fits; it then takes the edge it has most
-            often, or, when two edges tie for most often, the least committal one: ``--``, or
-            ``o-o`` for a ``pag``. A ``digraph`` lag graph takes each directed edge that appears
-            in at least ``threshold`` of the fits. The graph's kind is the widest kind among the
-            fits (``dag``, ``cpdag``, ``pag``, with a ``mag`` read as a ``pag``), widened to
-            ``cpdag`` by a ``--``; an ``undirected`` graph stays ``undirected``.
+            The counts and the averaged graph. The vote gives a pair its most frequent edge when
+            more fits have that edge than have no edge and the pair is adjacent in more than
+            ``threshold`` of the fits, or in all of them; otherwise the pair has no edge. When two
+            edges tie for most frequent, the pair takes the least committal one: ``--``, or
+            ``o-o`` for a ``pag``. A ``digraph`` lag graph takes each directed edge that more than
+            ``threshold`` of the fits have, or all of them. The vote is then made a valid graph of
+            the fits' kind, the widest among them (``dag``, ``cpdag``, ``pag``, with a ``mag`` read
+            as a ``pag``), as ``bootstrap``'s Notes describe. ``metadata["averaged_graph"]`` is
+            ``"vote"``, or ``"nearest_resample"`` when the vote has no valid graph of that kind and
+            the averaged graph is the fit nearest the others. ``from_fits`` has no data to rank
+            the nodes by, so a ``dag`` vote with a tie edge becomes a ``cpdag`` that leaves the
+            tie edge undirected; ``bootstrap`` points it by the ranks of its data.
 
         Raises
         ------
         TypeError
             If a fit is not a ``StructureOutput``.
         ValueError
-            If ``fits`` is empty, ``threshold`` is not in ``(0, 1]``, the fits differ in graph
+            If ``fits`` is empty, ``threshold`` is not in ``[0.5, 1]``, the fits differ in graph
             type, node count, labels, or lags, a graph is a ``digraph`` or ``undirected`` in some
-            fits and another kind in others, or a fit has latent nodes.
+            fits and another kind in others, a fit has latent nodes, or ``strict`` is ``True`` and
+            the vote has no valid graph of the fits' kind.
+
+        Warns
+        -----
+        AndreyWarning
+            When ``strict`` is ``False`` and the vote has no valid graph of the fits' kind.
+        """
+        return cls._count(fits, threshold, strict, keep_fits, metadata, None, None)
+
+    @classmethod
+    def _count(
+        cls,
+        fits: Sequence[StructureOutput],
+        threshold: float,
+        strict: bool,
+        keep_fits: bool,
+        metadata: Mapping[str, JSONValue] | None,
+        constraints: Constraints | None,
+        ranks: np.ndarray | None,
+    ) -> BootstrapOutput:
+        """``from_fits``, for fits made under the knowledge ``constraints`` (``None``: none).
+
+        ``ranks`` holds each node's :func:`~andrey.search.hc.tie_ranks` rank on the data the fits
+        ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data.
         """
         fits = tuple(fits)
         if not fits:
@@ -163,6 +207,7 @@ class BootstrapOutput:
             if not isinstance(fit, StructureOutput):
                 raise TypeError(f"fits must hold StructureOutput results, got {type(fit).__name__}")
         threshold = _check_threshold(threshold)
+        strict = _check_strict(strict)
         first = fits[0].structure
         n, labels = first.n_nodes, first.labels
         lags = first.lags if isinstance(first, TemporalStructure) else None
@@ -189,14 +234,25 @@ class BootstrapOutput:
         for k in range(n_slices):
             codes, counts = np.unique(np.concatenate(coded[k]), return_counts=True)
             slices.append(_Slice(_widest(kinds[k]), codes, counts.astype(np.int64)))
+        nearest = None
+        if lags is None and slices[0].kind in _MADE_VALID:
+            index = _nearest(slices[0], coded[0], len(fits))
+            nearest = (index, fits[index].structure)
+        structure, source = _average(
+            slices, len(fits), threshold, lags, n, labels, nearest, strict, constraints, ranks
+        )
         return cls(
-            _structure=_average(slices, len(fits), threshold, lags, n, labels),
+            _structure=structure,
             _n_resamples=len(fits),
             _threshold=threshold,
             _lags=lags,
             _slices=tuple(slices),
-            _metadata=dict(metadata) if metadata is not None else {},
+            _metadata={**(metadata or {}), "averaged_graph": source},
             _fits=fits if keep_fits else None,
+            _strict=strict,
+            _nearest=nearest,
+            _constraints=constraints,
+            _ranks=ranks,
         )
 
     # ---- surface --------------------------------------------------------------------------
@@ -226,8 +282,13 @@ class BootstrapOutput:
 
     @property
     def threshold(self) -> float:
-        """The share of fits in which a pair must be adjacent to be in ``structure``."""
+        """The share of fits in which a pair of ``structure`` must be adjacent: more, or all."""
         return self._threshold
+
+    @property
+    def strict(self) -> bool:
+        """Whether a vote with no valid graph of the fits' kind raises, rather than warns."""
+        return self._strict
 
     @property
     def fits(self) -> tuple[StructureOutput, ...] | None:
@@ -245,27 +306,42 @@ class BootstrapOutput:
         Parameters
         ----------
         threshold : float, default=0.5
-            The share of fits in which a pair must be adjacent, in ``(0, 1]``.
+            A pair must be adjacent in more than this share of the fits, or in all of them, in
+            ``[0.5, 1]``.
 
         Returns
         -------
         Structure
-            The graph ``from_fits`` describes, at this threshold.
+            The graph ``from_fits`` describes, at this threshold, with the ``strict`` this result
+            was built with. When the vote has no valid graph of the fits' kind, it is the fit
+            nearest the others, as ``structure`` would be.
 
         Raises
         ------
         ValueError
-            If ``threshold`` is not in ``(0, 1]``.
+            If ``threshold`` is not in ``[0.5, 1]``, or the result was built with ``strict=True``
+            and the vote at ``threshold`` has no valid graph of the fits' kind.
+
+        Warns
+        -----
+        AndreyWarning
+            When the result was built with ``strict=False`` and the vote at ``threshold`` has no
+            valid graph of the fits' kind.
         """
         structure = self._structure
-        return _average(
+        graph, _ = _average(
             self._slices,
             self._n_resamples,
             _check_threshold(threshold),
             self._lags,
             structure.n_nodes,
             structure.labels,
+            self._nearest,
+            self._strict,
+            self._constraints,
+            self._ranks,
         )
+        return graph
 
     def frequency(self, edge: str, *, lag: int | None = None) -> np.ndarray:
         """Return the share of fits in which each pair has ``edge``, as an ``(n, n)`` array.
@@ -423,43 +499,153 @@ def _average(
     lags: tuple[int, ...] | None,
     n: int,
     labels: tuple[str, ...] | None,
-) -> Structure:
-    """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``."""
-    graphs = [_average_slice(s, n_resamples, threshold, n, labels) for s in slices]
-    if lags is None:
-        return graphs[0]
-    return TemporalStructure.from_lag_graphs(graphs, lags=lags, labels=labels)
+    nearest: tuple[int, Structure] | None,
+    strict: bool,
+    constraints: Constraints | None,
+    ranks: np.ndarray | None,
+) -> tuple[Structure, str]:
+    """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``.
+
+    Returns the graph and its ``metadata["averaged_graph"]``: ``"vote"`` or ``"nearest_resample"``.
+    """
+    if lags is not None:
+        graphs = [_vote_graph(s, n_resamples, threshold, n, labels) for s in slices]
+        return TemporalStructure.from_lag_graphs(graphs, lags=lags, labels=labels), "vote"
+    s = slices[0]
+    if s.kind not in _MADE_VALID:
+        return _vote_graph(s, n_resamples, threshold, n, labels), "vote"
+    try:
+        return _valid_graph(
+            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints, ranks
+        ), "vote"
+    except ValueError as exc:
+        reason = f"the vote of the fits has no valid {s.kind}: {exc}"
+    if strict:
+        raise ValueError(f"{reason}. strict=False returns the fit nearest the others instead")
+    assert nearest is not None  # computed for every kind made valid
+    index, graph = nearest
+    warn_once(
+        f"{reason}. The averaged graph is resample {index}, the fit nearest the others; "
+        "strict=True raises instead",
+        AndreyWarning,
+    )
+    return graph, "nearest_resample"
 
 
-def _average_slice(
+def _vote(s: _Slice, n_resamples: int, threshold: float, n: int) -> np.ndarray:
+    """Return the marks of the vote of a slice that counts mark pairs.
+
+    A pair takes its most frequent edge when more fits have it than have no edge and the pair is
+    adjacent in more than ``threshold`` of the fits, or in all of them; a tie between edges takes
+    the kind's tie edge.
+    """
+    marks = np.zeros((n, n), dtype=np.int8)
+    pair, state = np.divmod(s.codes, _STATES)
+    breaks = (np.flatnonzero(np.diff(pair)) + 1).tolist()
+    for lo, hi in zip([0, *breaks], [*breaks, len(pair)]) if len(pair) else ():
+        counts = s.counts[lo:hi]
+        adjacent = int(counts.sum())
+        if counts.max() <= n_resamples - adjacent or not _often(adjacent, n_resamples, threshold):
+            continue
+        top = np.flatnonzero(counts == counts.max())
+        near, far = divmod(int(state[lo + top[0]]), 4) if len(top) == 1 else _TIE_EDGE[s.kind]
+        i, j = divmod(int(pair[lo]), n)
+        marks[i, j], marks[j, i] = near, far
+    return marks
+
+
+def _often(count: int, n_resamples: int, threshold: float) -> bool:
+    """Whether ``count`` of the fits is more than ``threshold`` of them, or all of them."""
+    return count > threshold * n_resamples or count == n_resamples
+
+
+def _vote_graph(
     s: _Slice, n_resamples: int, threshold: float, n: int, labels: tuple[str, ...] | None
 ) -> GraphStructure:
-    """Build one graph from one slice's counts."""
-    marks = np.zeros((n, n), dtype=np.int8)
+    """Return the vote of a slice as a graph, with no step to the slice's kind.
+
+    A ``dag`` vote that holds a tie edge ``--`` is a ``cpdag``.
+    """
     if s.kind == "digraph":
         src, dst = np.divmod(s.codes, n)
-        keep = s.counts / n_resamples >= threshold
+        keep = np.array([_often(int(c), n_resamples, threshold) for c in s.counts], dtype=bool)
         edge = np.zeros((n, n), dtype=bool)
         edge[src[keep], dst[keep]] = True
+        marks = np.zeros((n, n), dtype=np.int8)
         marks[edge] = TAIL
         marks[edge.T] = ARROW  # a 2-cycle and a self-loop end as arrowheads
         return GraphStructure.from_numpy(
             marks, kind="digraph", labels=labels, allow_self_loops=True
         )
-    pair, state = np.divmod(s.codes, _STATES)
-    breaks = (np.flatnonzero(np.diff(pair)) + 1).tolist()
+    marks = _vote(s, n_resamples, threshold, n)
     kind = s.kind
-    for lo, hi in zip([0, *breaks], [*breaks, len(pair)]):
-        counts = s.counts[lo:hi]
-        if counts.sum() / n_resamples < threshold:
-            continue
-        top = np.flatnonzero(counts == counts.max())
-        near, far = divmod(int(state[lo + top[0]]), 4) if len(top) == 1 else _TIE_EDGE[kind]
-        i, j = divmod(int(pair[lo]), n)
-        marks[i, j], marks[j, i] = near, far
-        if (near, far) == (TAIL, TAIL) and kind == "dag":
-            kind = "cpdag"
+    if kind == "dag" and ((marks == TAIL) & (marks.T == TAIL)).any():
+        kind = "cpdag"
     return GraphStructure.from_numpy(marks, kind=kind, labels=labels)
+
+
+def _valid_graph(
+    vote: np.ndarray,
+    kind: Kind,
+    labels: tuple[str, ...] | None,
+    constraints: Constraints | None,
+    ranks: np.ndarray | None,
+) -> GraphStructure:
+    """Return the valid graph of ``kind`` that the published steps make of ``vote``.
+
+    A ``dag``: its consistent extension (Dor and Tarsi), which takes the nodes of ``ranks`` in
+    their rank order, so a tie edge points as the data's ranks decide. Without ``ranks``, a
+    ``dag`` vote with a tie edge has no such order and takes the ``cpdag`` step. A
+    ``cpdag``: the CPDAG (Chickering) of its consistent extension; every extension gives the same
+    CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
+    ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
+    MPDAG, and a ``pag`` gets the knowledge's endpoints.
+    Raises ``ValueError``, saying why, when no extension or no MAG exists.
+    """
+    if kind == "pag":
+        pag = GraphStructure.from_numpy(mag_of_pag(vote), kind="mag", labels=labels).to_pag()
+        if constraints is None:
+            return pag
+        marks = np.array(pag.to_numpy(), dtype=np.int8)
+        from andrey.constraint.fci import _knowledge_marks
+
+        _knowledge_marks(marks, constraints)
+        return GraphStructure.from_numpy(marks, kind="pag", labels=labels)
+    if ((vote == ARROW) & (vote.T == ARROW)).any():
+        raise ValueError("it has a bidirected edge, which no DAG has")
+    if constraints is not None:
+        vote = knowledge_orient(vote, constraints)
+    if kind == "dag" and (ranks is not None or not ((vote == TAIL) & (vote.T == TAIL)).any()):
+        order = np.arange(len(vote)) if ranks is None else np.argsort(ranks, kind="stable")
+        return GraphStructure.from_numpy(extend_in_order(vote, order), kind="dag", labels=labels)
+    cpdag = _cpdag_of_pdag(vote)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
+
+
+def _nearest(s: _Slice, coded: list[np.ndarray], n_resamples: int) -> int:
+    """Return the fit nearest the others: the first with the highest agreement (Tetrad's Median).
+
+    A fit's agreement sums, over the pairs, the number of fits that give the pair the fit's own
+    state, no edge included; the highest agreement is the least mean SHD to the fits. ``coded``
+    holds each fit's codes, as ``_codes`` makes them.
+    """
+    pair = s.codes // _STATES
+    pairs, where = np.unique(pair, return_inverse=True)
+    adjacent = np.bincount(where, weights=s.counts).astype(np.int64)
+    # A pair a fit leaves out agrees with the fits that leave it out too; summed over every pair,
+    # that is a constant less, for each pair the fit has, the fits that leave that pair out.
+    agreement = [
+        int(
+            (
+                s.counts[np.searchsorted(s.codes, codes)]
+                - (n_resamples - adjacent[np.searchsorted(pairs, codes // _STATES)])
+            ).sum()
+        )
+        for codes in coded
+    ]
+    return int(np.argmax(agreement))
 
 
 def _graphs(s: Structure, lags: tuple[int, ...] | None) -> list[GraphStructure] | None:
@@ -474,12 +660,21 @@ def _graphs(s: Structure, lags: tuple[int, ...] | None) -> list[GraphStructure] 
 
 
 def _check_threshold(threshold: float) -> float:
-    """Return ``threshold`` as a ``float`` in ``(0, 1]``; raise ``ValueError`` otherwise."""
-    if isinstance(threshold, bool) or not isinstance(threshold, (int, float, np.number)):
-        raise TypeError(f"threshold must be a number, got {type(threshold).__name__}")
-    if not 0 < threshold <= 1:
-        raise ValueError(f"threshold must lie in (0, 1], got {threshold}")
-    return float(threshold)
+    """Return ``threshold`` as a ``float`` in ``[0.5, 1]``; raise as the method wrapper does."""
+    from andrey.spec.concepts import BOOTSTRAP_PARAMS
+
+    checked = BOOTSTRAP_PARAMS["threshold"].check(threshold, "bootstrap")
+    assert isinstance(checked, float)
+    return checked
+
+
+def _check_strict(strict: bool) -> bool:
+    """Return ``strict``; raise ``TypeError`` when it is not a ``bool``."""
+    from andrey.spec.concepts import BOOTSTRAP_PARAMS
+
+    checked = BOOTSTRAP_PARAMS["strict"].check(strict, "bootstrap")
+    assert isinstance(checked, bool)
+    return checked
 
 
 def _check_resampling(resampling: str, sample_fraction: float) -> tuple[str, float]:
@@ -666,6 +861,7 @@ def bootstrap(
     n_resamples: int = _N_RESAMPLES_DEFAULT,
     seed: int | None = None,
     threshold: float = 0.5,
+    strict: bool = False,
     resampling: str = "subsample",
     sample_fraction: float = 0.5,
     block_length: int | None = None,
@@ -677,8 +873,9 @@ def bootstrap(
     Each resample is a subsample, ``sample_fraction`` of the rows of ``data`` drawn without
     replacement, or a bootstrap resample, as many rows drawn with replacement (``resampling``), and
     ``method`` is fitted on it. The result counts, for every pair of variables, the fits that give
-    each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds one graph
-    from the pairs that are adjacent often enough [1]_ [2]_ [3]_. A method with a row-aligned input
+    each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds the averaged
+    graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
+    with a row-aligned input
     (``cdnod``'s ``domain_index``, ``gies``'s ``interventions``) resamples that input with the
     rows. A time-series method on one series subsamples one stretch of consecutive rows (and
     bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
@@ -700,8 +897,13 @@ def bootstrap(
         ``seed`` fits resample ``b`` with a seed derived from this one and ``b``, so the method's
         own ``seed`` cannot be set here.
     threshold : float, default=0.5
-        The share of fits in which a pair must be adjacent to be in the averaged graph, in
-        ``(0, 1]``.
+        A pair of the averaged graph must be adjacent in more than this share of the fits, or in
+        all of them, in ``[0.5, 1]``. Its most frequent edge must also be in more fits than no edge
+        is, which needs more than half of them, so a value below 0.5 would change nothing.
+    strict : bool, default=False
+        What happens when the vote of the fits has no valid graph of the method's kind: ``False``
+        returns the resample graph nearest the others with a warning, and ``True`` raises
+        ``ValueError``.
     resampling : {"subsample", "bootstrap"}, default="subsample"
         How a resample is drawn. ``"subsample"`` draws ``round(sample_fraction * n_samples)``
         distinct rows, kept in their original order; for a time-series method on one series it is
@@ -730,15 +932,18 @@ def bootstrap(
     -------
     BootstrapOutput or list[BootstrapOutput]
         The frequencies and the averaged graph; for ``multi_group_direct_lingam``, one per group.
-        ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, and the
-        ``block_length`` of a block bootstrap.
+        ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, the
+        ``block_length`` of a block bootstrap, the ``tie_break`` rule in effect
+        (:data:`andrey.config`), and ``averaged_graph``: ``"vote"``, or ``"nearest_resample"``
+        when the averaged graph is the resample graph nearest the others.
 
     Raises
     ------
     ValueError
         If ``method`` is not a method of Andrey, an argument is out of range, a row-aligned input
         has a different number of rows from ``data``, ``block_length`` is given for a resampling
-        that does not use blocks, or a fit raises it: the error then names the resample in a note.
+        that does not use blocks, ``strict=True`` and the vote has no valid graph of the method's
+        kind, or a fit raises it: the error then names the resample in a note.
     NotImplementedError
         For ``gin``, whose number of latent nodes varies from fit to fit.
     RuntimeError
@@ -747,7 +952,9 @@ def bootstrap(
     Warns
     -----
     AndreyWarning
-        Each distinct warning the fits raised, once.
+        Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
+        no valid graph of the method's kind, so the averaged graph is the resample graph nearest the
+        others.
 
     Notes
     -----
@@ -782,10 +989,51 @@ def bootstrap(
     9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter
     than ten times the longest lag.
 
+    **The averaged graph.** Each pair of variables takes its most frequent state in the fits, no
+    edge counted as one of the states: the pair gets its most frequent edge when more fits have
+    that edge than have no edge, which needs the pair adjacent in more than half of them, and
+    ``threshold`` can ask for more. When two edges tie, the pair takes the least committal one,
+    ``--``, or ``o-o`` for a ``pag``. This vote is the graph with the least mean structural Hamming
+    distance to the fits. It is the ``Highest`` ensemble of Tetrad [6]_, with a tie between an edge
+    and no edge going to no edge, as in tigramite's majority vote [7]_.
+
+    A vote of CPDAGs or PAGs is often not a valid CPDAG or PAG: it can direct an edge that no
+    v-structure compels. So the vote is then made a valid graph of the method's kind by the
+    published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
+    v-structures, and directed edges [8]_: the vote itself when it has no directed cycle, with a
+    tie edge pointing as the columns' :func:`~andrey.search.hc.tie_ranks` on ``data`` decide
+    (``tie_break``, :data:`andrey.config`: ranks computed from each column's own data, or the
+    column order under ``"position"``), so reordering the columns relabels the graph. A ``cpdag``
+    becomes the CPDAG [9]_ of a consistent extension, so an edge that no v-structure compels is
+    undirected. A ``pag`` becomes
+    the PAG of the MAG that Zhang's construction builds from it [10]_. With ``knowledge``, the
+    edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
+    gets the endpoints the knowledge sets, as ``fci`` sets them. A time-series result's lag graphs
+    keep the vote, as tigramite's does [7]_: a lag-0 graph is oriented with the lagged edges, which
+    the steps for one graph do not see.
+
+    The vote has no consistent extension or MAG when, for example, its directed edges form a
+    cycle or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``,
+    the averaged graph is then the resample graph nearest the others, a graph the method returned:
+    the fit whose state of each pair the most fits share, summed over the pairs, which is the fit
+    with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). A
+    warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is
+    ``"vote"`` otherwise. ``strict=True`` raises instead, as bnlearn's ``cextend`` does by default
+    [11]_. Either way, ``frequency`` and ``table`` keep the whole vote.
+
+    On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
+    ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with
+    ``resampling="bootstrap"``), the averaged graph had fewer errors (SHD) than the rule of 0.11.0
+    (a pair adjacent in at least half the fits takes its most frequent edge) in 11 of the 24
+    cells, by an interval below 0, and more in none. It had fewer errors than the fit on all the
+    rows in 14 cells and more in one, ``ges`` with 20 variables and 1,000 rows. The vote had a
+    valid graph of the method's kind in 111 of the 120 datasets of ``pc``, 114 of ``fci``, and all
+    of ``ges`` and ``direct_lingam``; the rule of 0.11.0 gave a valid CPDAG or PAG in 0 to 13 of
+    the 20 datasets of a cell.
+
     A frequency is a ranking of the edges, not a probability, and no error bound comes with the
     averaged graph. Resampling can also make a column constant; a fit that raises stops the run,
-    and its row numbers count the rows of the resample. The averaged graph can contain a directed
-    cycle.
+    and its row numbers count the rows of the resample.
 
     **Workers.** The fits run on the worker processes ``andrey.config.n_jobs`` and
     ``ANDREY_N_JOBS`` set, as for every method: ``-1`` uses every usable core, and ``0`` or
@@ -810,6 +1058,21 @@ def bootstrap(
     .. [4] Meinshausen, N., and Buhlmann, P. (2010). Stability selection. Journal of the Royal
        Statistical Society: Series B, 72(4), 417-473.
     .. [5] Politis, D. N., Romano, J. P., and Wolf, M. (1999). Subsampling. Springer.
+    .. [6] Tetrad, ``edu.pitt.dbmi.algo.resampling.ResamplingEdgeEnsemble`` and
+       ``edu.cmu.tetrad.util.GraphSampling``, github.com/cmu-phil/tetrad, development branch,
+       2026-08-13. ``Median`` is not in release 7.6.10.
+    .. [7] Debeire, K., Gerhardus, A., Runge, J., and Eyring, V. (2024). Bootstrap aggregation and
+       confidence measures to improve time series causal discovery. Proceedings of the Third
+       Conference on Causal Learning and Reasoning, PMLR 236.
+    .. [8] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension
+       of a partially oriented graph. Technical Report R-185, Cognitive Systems Laboratory, UCLA.
+    .. [9] Chickering, D. M. (2002). Learning equivalence classes of Bayesian-network structures.
+       Journal of Machine Learning Research, 2, 445-498.
+    .. [10] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence, 172(16-17),
+       1873-1896.
+    .. [11] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
+       Statistical Software, 35(3), 1-22.
 
     Examples
     --------
@@ -842,6 +1105,7 @@ def bootstrap(
     spec = _method_spec(method)
     n_resamples = int_in_range(n_resamples, "n_resamples", 1)
     threshold = _check_threshold(threshold)
+    strict = _check_strict(strict)
     resampling, sample_fraction = _check_resampling(resampling, sample_fraction)
     keep_fits = flag(keep_fits, "keep_fits")
     if spec.output.has_latents:
@@ -854,26 +1118,67 @@ def bootstrap(
     job = _job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
     workers = min(_backend.worker_count(None), n_resamples)
     results = _fit_all(job, n_resamples, workers)
+    ranks = _column_ranks(job.data, job.unit == "groups")
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
     metadata: dict[str, JSONValue] = {
         "method": spec.name,
         "seed": root,
+        "tie_break": job.tie_break,
         "resampling": job.resampling,
         "sample_fraction": job.sample_fraction if job.resampling == "subsample" else None,
         "block_length": job.block_length,
     }
     fits = [out for out, _ in results]
-    if spec.output.multi:
-        return [
-            BootstrapOutput.from_fits(
-                group, threshold=threshold, keep_fits=keep_fits, metadata=metadata
-            )
-            for group in zip(*fits)
-        ]
-    return BootstrapOutput.from_fits(
-        fits, threshold=threshold, keep_fits=keep_fits, metadata=metadata
-    )
+    groups = list(zip(*fits)) if spec.output.multi else [fits]
+    outs = [
+        BootstrapOutput._count(
+            group,
+            threshold,
+            strict,
+            keep_fits,
+            metadata,
+            _constraints(spec, method_kwargs.get("knowledge"), group[0].structure),
+            ranks,
+        )
+        for group in groups
+    ]
+    return outs if spec.output.multi else outs[0]
+
+
+def _column_ranks(data: Any, groups: bool) -> np.ndarray:
+    """Return the columns' :func:`~andrey.search.hc.tie_ranks` on all of ``data``.
+
+    ``data`` is a table or an array, or, for ``groups``, a list of them stacked as the methods
+    over groups stack them. A column that does not hold numbers is numbered by its sorted values,
+    as the fits read its categories; its pattern is then a function of the column alone.
+    """
+    stacked = np.vstack([_numbers(table) for table in (data if groups else [data])])
+    return tie_ranks(stacked)
+
+
+def _numbers(table: Any) -> np.ndarray:
+    """Return ``table`` as a float matrix, numbering each column that does not hold numbers."""
+    columns = []
+    for column in np.asarray(table).T:
+        try:
+            columns.append(column.astype(np.float64))
+        except (TypeError, ValueError):
+            columns.append(np.unique(column.astype(str), return_inverse=True)[1].astype(np.float64))
+    return np.column_stack(columns)
+
+
+def _constraints(spec: MethodSpec, knowledge: Any, structure: Structure) -> Constraints | None:
+    """Return the constraints ``knowledge`` sets on a static result's nodes, or ``None``.
+
+    A time-series result's averaged graph takes no step that knowledge could change, so it gets
+    ``None``. The fits ran with ``knowledge``, so it resolves.
+    """
+    from andrey.core.knowledge import resolve
+
+    if knowledge is None or isinstance(structure, TemporalStructure):
+        return None
+    return resolve(knowledge, structure.n_nodes, structure.labels, method=spec.name)
 
 
 def _method_spec(method: str | Callable[..., Any]) -> MethodSpec:
