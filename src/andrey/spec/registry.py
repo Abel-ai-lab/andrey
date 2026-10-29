@@ -1397,20 +1397,13 @@ _add(
         references=("Kadowaki, Shimizu & Washio 2013",),
     )
 )
-_SERIES_TEST = concept_param(
-    "indep_test",
-    doc="Conditional-independence test behind every p-value, a partial-correlation test: "
-    "fisherz = Fisher's z-transform; student_t = Student-t distribution, as in the authors' "
-    "reference implementation. null picks fisherz.",
-    choices=("student_t", "fisherz"),
-)
 _add(
     MethodSpec(
         name="pcmci",
         family="temporal",
-        summary="PCMCI for a single multivariate time series: lagged causal links, tested with "
-        "partial correlation given the parents of both ends, which controls false links from "
-        "autocorrelation. No same-step links. Returns a temporal structure.",
+        summary="PCMCI for a single multivariate time series: lagged causal links, each tested "
+        "given the parents of both ends, which controls false links from autocorrelation. No "
+        "same-step links. Returns a temporal structure.",
         data=DataSpec(
             inputs=(
                 InputSpec(
@@ -1426,7 +1419,8 @@ _add(
             doc="lag graphs for lags 1..tau_max; MCI p_values and statistics, and the PC1 parents, "
             "in metadata.",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
+        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1453,7 +1447,10 @@ _add(
                 "links; a link is kept when its p-value is at most this.",
                 aliases=("alpha_level",),
             ),
-            _SERIES_TEST,
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            _TEST_SEED,
         ),
         references=("Runge et al. 2019",),
     )
@@ -1480,7 +1477,8 @@ _add(
             doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max; p_values, statistics, the "
             "lagged parents, conflicting and ambiguous orientations in metadata.",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
+        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1509,7 +1507,10 @@ _add(
                 "is not in the one separating set found.",
                 concept="collider_rule",
             ),
-            _SERIES_TEST,
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            _TEST_SEED,
             concept_param(
                 "max_p_global",
                 doc="The most conditions a skeleton or collider test takes beyond the default "
@@ -1544,7 +1545,8 @@ _add(
             "with its marks, p_values, statistics, the preliminary parents, and the conflicting "
             "marks in metadata.",
         ),
-        determinism="deterministic",
+        determinism="stochastic",
+        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1568,7 +1570,10 @@ _add(
                 doc="Preliminary rounds before the final one; each passes the parents it found "
                 "to the next as conditions.",
             ),
-            _SERIES_TEST,
+            _INDEP_TEST,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            _TEST_SEED,
             concept_param(
                 "max_p_global",
                 doc="The most conditions a test takes beyond the default conditions, the parents "

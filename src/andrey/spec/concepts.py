@@ -236,18 +236,6 @@ _CONCEPTS = (
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger"),
         ),
-        deviations=tuple(
-            Deviation(
-                method=m,
-                name="indep_test",
-                default=None,
-                choices=("student_t", "fisherz"),
-                fixed_in="0.12.0",
-                reason="The partial-correlation tests only; the categorical and nonlinear tests "
-                "come in 0.12.0.",
-            )
-            for m in PCMCI_FAMILY
-        ),
     ),
     Concept(
         key="score_func",
@@ -507,13 +495,8 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="ANDREY_SEED",
-        suitable=(*CI_SEARCHES, "boss", "grasp", "calm", "ica_lingam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "boss", "grasp", "calm", "ica_lingam"),
         exempt=(
-            *_exempt(
-                "Deterministic: student_t and fisherz draw no random numbers. It becomes suitable "
-                "with the nonlinear tests.",
-                *PCMCI_FAMILY,
-            ),
             *_exempt(
                 "Deterministic.",
                 *(m for m in _PURE_SCORE if m not in ("boss", "grasp")),
@@ -607,7 +590,6 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
         ),
         others_exempt="A continuous model.",
-        deviations=_absent("0.12.0", "Discrete conditional-independence tests.", *PCMCI_FAMILY),
     ),
     Concept(
         key="max_categories",
@@ -635,7 +617,6 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
         ),
         others_exempt="A continuous model.",
-        deviations=_absent("0.12.0", "Discrete conditional-independence tests.", *PCMCI_FAMILY),
     ),
     Concept(
         key="category_codes",

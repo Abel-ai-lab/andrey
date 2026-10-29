@@ -311,20 +311,15 @@ def test_every_env_var_has_one_parser():
     assert set(SETTINGS) == {v.name for v in ENV_VARS}
 
 
-def test_indep_test_choices_track_the_tests_each_method_dispatches():
-    """Every method's ``indep_test`` choices are the names it dispatches, so the CLI/JSON schema
-    the registry renders cannot drift from what the facades actually accept: the shipped CI-registry
-    names for the constraint methods, and PCMCI's own test table for PCMCI, PCMCI+, and LPCMCI."""
+def test_every_indep_test_takes_the_shipped_tests():
+    """Every method's ``indep_test`` choices are the shipped CI-registry names it dispatches, so
+    the CLI/JSON schema the registry renders cannot drift from what the facades accept."""
     from andrey.core.ci import SHIPPED_INDEP_TESTS
-    from andrey.temporal.pcmci import INDEP_TESTS
 
     params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "indep_test"}
-    assert params
+    assert {"pc", "pcmci", "pcmciplus", "lpcmci"} <= set(params)
     for name, p in params.items():
-        expected = (
-            tuple(INDEP_TESTS) if name in ("pcmci", "pcmciplus", "lpcmci") else SHIPPED_INDEP_TESTS
-        )
-        assert p.choices == expected, name
+        assert p.choices == SHIPPED_INDEP_TESTS, name
 
 
 def test_a_score_search_aliases_the_score_names_it_took_before_the_rename():
