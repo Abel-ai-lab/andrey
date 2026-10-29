@@ -63,9 +63,9 @@ types](guides/getting-started.md#data-types) describes. The mixed-data settings,
 the categorical columns that `categorical` lists, or a DataFrame's `category`, `bool`, and text
 columns, and never a column by its values; a categorical column of numbers needs whole numbers. A
 test or score for continuous data, such as `"fisherz"` or `"bic"`, raises a `ValueError` on a
-column declared categorical, by `categorical` or by its type. Methods that score with BIC also reject a
-column that repeats another up to scale and shift or, given more rows than columns, is a linear
-function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
+column declared categorical, by `categorical` or by its type. Methods that score with BIC also
+reject a column that repeats another up to scale and shift or, given more rows than columns, is a
+linear function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
 every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
 group and read its edges as the group's; no option drops or merges the copies for you. `pc`, `fci`,
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
