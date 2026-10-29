@@ -1214,6 +1214,7 @@ def granger(
     *,
     tau_max: int = 1,
     alpha: float = 0.05,
+    fdr_method: str = "none",
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged causal graph of a multivariate time series by Granger causality.
@@ -1236,6 +1237,17 @@ def granger(
     alpha : float, default=0.05
         Significance level of the test of each lagged coefficient, in the open interval (0, 1): a
         larger value returns more edges.
+    fdr_method : {"none", "fdr_bh"}, default="none"
+        How the p-values are corrected for the number of links tested. ``"none"`` keeps each
+        p-value as tested. ``"fdr_bh"`` replaces them with their Benjamini-Hochberg adjusted values
+        [3]_ over all the links together, every lag and every ordered pair of variables, a
+        variable's link to its own past included. A link is then an edge when its adjusted p-value
+        is at most ``alpha``, which holds the false discovery rate, the expected share of false
+        edges among the returned edges, at or below ``alpha`` when the tests are independent or
+        positively dependent. The adjusted p-value is never below the tested one, so ``"fdr_bh"``
+        can remove edges and never adds one. ``metadata["p_values"]`` holds the adjusted values. A
+        link the knowledge forbids is no test: it is not counted and keeps p-value ``1``; a
+        required link is counted with p-value ``0``. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``1`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -1258,8 +1270,8 @@ def granger(
         ``structure.lag_weights[k - 1][i, j]`` is that regression coefficient, in the data's units,
         and ``0`` where there is no edge. ``ordering`` is ``None``, and ``metadata["algorithm"]``
         is ``"granger"``. ``metadata["p_values"][k - 1][i][j]`` is the p-value of the link
-        ``i -> j`` at lag ``k``, for every pair, significant or not; a link the knowledge forbids
-        reads p-value 1, and a required one 0.
+        ``i -> j`` at lag ``k``, for every pair, significant or not, adjusted under
+        ``fdr_method="fdr_bh"``; a link the knowledge forbids reads p-value 1, and a required one 0.
 
     Raises
     ------
@@ -1284,12 +1296,21 @@ def granger(
     t-ratio against the Student ``t`` distribution with the regression's residual degrees of
     freedom, which is exact for Gaussian noise; statsmodels' ``VARResults.pvalues`` takes the same
     t-ratio against the normal distribution, which gives the same p-values as the series grows.
-    Each link is tested on its own at ``alpha``, with no correction for the
+    Each link is tested at ``alpha``, and ``fdr_method="none"`` makes no correction for the
     ``n_variables**2 * tau_max`` tests, so on a series with many variables about ``alpha`` of the
-    absent links appear as edges: lower ``alpha``, or judge the edges by their p-values and
-    weights. The regressions are fitted on standardized variables, so the edges do not depend on
-    the units of any variable; the coefficients are converted back to the data's units. The fit is
-    deterministic and has no random component.
+    absent links appear as edges: set ``fdr_method="fdr_bh"``, lower ``alpha``, or judge the edges
+    by their p-values and weights. The regressions are fitted on standardized variables, so the
+    edges do not depend on the units of any variable; the coefficients are converted back to the
+    data's units. The fit is deterministic and has no random component.
+
+    **Choosing fdr_method.** The method tests ``n_variables ** 2 * tau_max`` links, each at level
+    ``alpha``, so absent links are returned by chance, more of them as the number of variables
+    grows. ``"fdr_bh"`` [3]_ sorts the ``m`` p-values of the links and gives the one of rank ``k``
+    the smallest value, over its rank and every higher one, of ``p * m / rank``, at most ``1``;
+    equal p-values get equal results. It returns fewer edges than ``"none"``: the false ones, and
+    also true ones whose p-value is not small enough for the number of tests (see Limitations).
+    The guarantee of [3]_ needs independent or positively dependent tests, which the coefficient
+    tests of one vector autoregression are not shown to be.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's regression
     reads every row of the lagged design, so a step with a missing value has no place in it. Fill
@@ -1297,21 +1318,29 @@ def granger(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
     rows per test.
 
-    **Limitations.** Measured on simulated linear-Gaussian VAR(2) series with no same-step links,
-    standardized, with 1,000 time steps and ``tau_max=2``, at the default ``alpha``. Its median
-    errors (missing and extra lagged edges) were below the empty graph's at 10 and 20 variables (24
-    against 56.5, and 69 against 124), above it on half the series at 40 variables, and above it on
-    all of them at 80 and 160, where the many uncorrected tests add false edges: about ``alpha`` of
-    the ``2 * n_variables**2`` absent links. It assumes linear effects and tests no same-step
-    effects. The work grows with ``tau_max`` and with the square of the number of variables. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    **Limitations.** Measured on 10 simulated linear-Gaussian VAR(2) series per size, with no
+    same-step links, standardized, with 1,000 time steps, ``tau_max=2``, and the default
+    ``alpha``. With the default ``fdr_method="none"``, the median errors (missing and extra lagged
+    edges) were below the empty graph's at 10 and 20 variables (24 against 56.5, and 69 against
+    124), above it on half the series at 40 variables, and above it on all of them at 80 and 160
+    (762.5 against 494, and 2,855 against 973), where the many uncorrected tests add false edges:
+    about ``alpha`` of the ``2 * n_variables**2`` absent links. With ``fdr_method="fdr_bh"`` they
+    were below the empty graph's on every series at 40, 80, and 160 variables (123.5 against
+    246.5, 266.5 against 494, and 546 against 973): the mean number of extra edges fell from 148,
+    595, and 2,530 to 5.8, 11.5, and 22.9, and the mean number of missed true edges rose from 84,
+    175, and 347 to 115, 253, and 526. It assumes linear effects and tests no same-step effects.
+    The work grows with ``tau_max`` and with the square of the number of variables. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
     .. [1] Granger, C. W. J. (1969). Investigating causal relations by econometric models and
        cross-spectral methods. Econometrica 37(3), 424-438.
     .. [2] Lutkepohl, H. (2005). New Introduction to Multiple Time Series Analysis. Springer.
+    .. [3] Benjamini, Y., and Hochberg, Y. (1995). Controlling the false discovery rate: a
+       practical and powerful approach to multiple testing. Journal of the Royal Statistical
+       Society B 57(1), 289-300.
 
     Examples
     --------
@@ -1348,6 +1377,7 @@ def granger(
         (X / peak - (X / peak).mean(axis=0)) / spread,
         maxlag=tau_max,
         alpha=alpha,
+        fdr_method=fdr_method,
         forbidden=None if constraints is None else constraints.forbidden[1:],
         required=required,
     )

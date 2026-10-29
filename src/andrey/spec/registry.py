@@ -1610,6 +1610,13 @@ _add(
                 "1.",
             ),
             _ALPHA,
+            concept_param(
+                "fdr_method",
+                doc="How the p-values of the lagged links are corrected for the number of links "
+                "tested: none keeps them as tested; fdr_bh replaces them with their "
+                "Benjamini-Hochberg adjusted values over all the lagged links together, and a "
+                "link is kept when its adjusted p-value is at most alpha.",
+            ),
         ),
         dropped_args=("cv",),
         references=("Granger 1969", "Lutkepohl 2005"),
