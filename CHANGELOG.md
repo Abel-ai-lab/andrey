@@ -16,7 +16,7 @@ names its pull request.
   the package; the former ones still work in this release, in Python and on the command line, but
   give an `andrey.DeprecatedArgumentWarning` that names the replacement, and they stop working in
   the next release. The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows
-  the calls before and after. ([#PRNUM])
+  the calls before and after. ([#551])
 
   | Method | Former name | Name now |
   | --- | --- | --- |
@@ -34,7 +34,7 @@ names its pull request.
   `categorical` or by a DataFrame's `category`, `bool`, or text type, as `indep_test=None` does, so
   a call that names the test the default recorded fits the same graph. An undeclared column of a
   few whole numbers reads as numbers, with the `DataTypeWarning` that it may hold category codes.
-  For the former results, name those columns in `categorical`. ([#PRNUM])
+  For the former results, name those columns in `categorical`. ([#551])
 - A declared categorical column behaves the same by either route. A test or score for continuous
   data, such as `"fisherz"` or `"bic"`, raises `ValueError` on a column of a pandas `category`,
   `bool`, or text type, as it did on one that `categorical` named, where it read the column as
@@ -42,12 +42,12 @@ names its pull request.
   or score, such as `"chisq"` or `"bdeu"`, accepts `categorical`, where it raised, as it accepts
   the same columns by type, and reads every column as categorical. A `categorical` that is not a
   list raises `TypeError`, where it raised `ValueError` with a test or score for continuous or
-  categorical data. ([#PRNUM])
+  categorical data. ([#551])
 - `ebic_gamma` takes values from 0 to 1, the range of the extended BIC (Chen and Chen 2008), where
   it took any value of at least 0, and a call that passes it with a score that does not add the
-  extended-BIC term, any but `"bic"`, raises `ValueError`, where the score ignored it. ([#PRNUM])
+  extended-BIC term, any but `"bic"`, raises `ValueError`, where the score ignored it. ([#551])
 - `andrey config --json` and `andrey.describe()` report the worker count as `n_jobs`,
-  and `andrey calibrate` exports `ANDREY_N_JOBS`. ([#PRNUM])
+  and `andrey calibrate` exports `ANDREY_N_JOBS`. ([#551])
 
 ### Added
 
@@ -83,18 +83,18 @@ names its pull request.
 - A score search records the penalties its score used: `metadata["penalty_discount"]` for every
   score but `"bdeu"`, and `metadata["ebic_gamma"]` for `"bic"`. Every fit whose result
   `andrey.config`'s `tie_break` can change records the rule in `metadata["tie_break"]`, so the
-  metadata names every setting a default or the configuration chose. ([#PRNUM])
+  metadata names every setting a default or the configuration chose. ([#551])
 - `andrey --help --json` gives each package-wide concept its template parameter, with its default
   and bounds, such as `alpha` in the open interval (0, 1), and each method that differs from it,
   with the reason, such as the `alpha` of 0.01 that `pcmciplus` and `rcd` take from their papers.
-  ([#PRNUM])
+  ([#551])
 
 ### Fixed
 
 - The `max_depth` of `pcmci` and `pcmciplus` says in `andrey --help --json` that it caps the PC1
-  step, as their docstrings do, where it said every test. ([#PRNUM])
+  step, as their docstrings do, where it said every test. ([#551])
 - Every `seed` says first that `None` is the configured seed, `ANDREY_SEED` or 0 when it is unset,
-  not a fresh random one, so a fit repeats. ([#PRNUM])
+  not a fresh random one, so a fit repeats. ([#551])
 
 ## [0.11.0] - 2026-10-29
 
@@ -1231,3 +1231,4 @@ First alpha release.
 [#524]: https://github.com/Abel-ai-lab/andrey/pull/524
 [#526]: https://github.com/Abel-ai-lab/andrey/pull/526
 [#550]: https://github.com/Abel-ai-lab/andrey/pull/550
+[#551]: https://github.com/Abel-ai-lab/andrey/pull/551
