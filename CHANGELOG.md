@@ -255,6 +255,10 @@ change names its pull request.
   default `max_iter=100`, and a fit that ends on it without converging warns with
   `andrey.SearchLimitWarning` like one that ends on `max_iter`. Fits at the default `max_iter`
   return the same values as before. ([#505])
+- `notears(robust=True)` and `dagma(robust=True)` floor each residual variance of the likelihood at
+  `1e-12` of its column's variance instead of `1e-12` of the mean column variance, which could
+  exceed the whole variance of a column in much smaller units than the others. On standardized
+  data the fits return the same values as before. ([#517])
 
 ## [0.10.0] - 2026-10-27
 
@@ -1041,3 +1045,4 @@ First alpha release.
 [#501]: https://github.com/Abel-ai-lab/andrey/pull/501
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
+[#517]: https://github.com/Abel-ai-lab/andrey/pull/517
