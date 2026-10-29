@@ -1,6 +1,7 @@
-"""``fdr_method`` on the PCMCI family: ``"none"`` is the call without the argument, and
-``"fdr_bh"`` adjusts the lagged links' p-values over the links tested, by the Benjamini-Hochberg
-procedure, which is computed here by SciPy."""
+"""``fdr_method`` on the methods that test a family of lagged links (``pcmci``, ``pcmciplus``,
+``granger``): ``"none"`` is the call without the argument, and ``"fdr_bh"`` adjusts the lagged
+links' p-values over the links tested, by the Benjamini-Hochberg procedure, which is computed here
+by SciPy."""
 
 from __future__ import annotations
 
@@ -33,11 +34,13 @@ def series(seed: int, n_steps: int = 300) -> np.ndarray:
 
 
 DATA = series(0)
-METHODS = ("pcmci", "pcmciplus")
+METHODS = ("pcmci", "pcmciplus", "granger")
 KNOWLEDGE = Knowledge(required=[(0, 1, 1)], forbidden=[(4, 0), (2, 4)])
 
 
 def fit(method: str, **kwargs):
+    if method == "granger":
+        return andrey.granger(DATA, tau_max=TAU_MAX, alpha=ALPHA, **kwargs)
     alpha = {"alpha": ALPHA} if method == "pcmci" else {"alpha": 0.01}
     return getattr(andrey, method)(DATA, tau_max=TAU_MAX, indep_test="student_t", **alpha, **kwargs)
 
@@ -103,8 +106,10 @@ def test_none_is_the_call_without_the_argument(method, knowledge):
     named = fit(method, knowledge=knowledge, fdr_method="none")
     assert all(map(np.array_equal, graphs(plain), graphs(named)))
     assert plain.metadata.keys() == named.metadata.keys()
-    for key in ("p_values", "statistics"):
+    for key in plain.metadata.keys() & {"p_values", "statistics"}:
         assert np.array_equal(plain.metadata[key], named.metadata[key])
+    if method == "granger":
+        assert np.array_equal(plain.structure.lag_weights, named.structure.lag_weights)
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -164,3 +169,32 @@ def test_a_forbidden_link_is_not_counted_and_a_required_one_is(method):
     assert p_adjusted[0, 0, 1] == 0.0  # required: p-value 0, counted among the links
     expected = stats.false_discovery_control(p_raw[~forbidden])
     np.testing.assert_allclose(p_adjusted[~forbidden], expected, rtol=1e-12)
+
+
+def test_granger_adjusts_the_p_values_of_all_its_links_together():
+    raw, adjusted = fit("granger"), fit("granger", fdr_method="fdr_bh")
+    expected = stats.false_discovery_control(np.asarray(raw.metadata["p_values"]).ravel())
+    np.testing.assert_allclose(
+        np.asarray(adjusted.metadata["p_values"]).ravel(), expected, rtol=1e-12
+    )
+
+
+def test_granger_keeps_the_links_whose_adjusted_p_value_is_at_most_alpha():
+    raw, adjusted = fit("granger"), fit("granger", fdr_method="fdr_bh")
+    p = np.asarray(adjusted.metadata["p_values"])
+    assert links(adjusted) == {(i, j, k + 1) for k, i, j in np.argwhere(p <= ALPHA)}
+    assert links(adjusted) < links(raw)  # a correction removes links on this series, adds none
+    for weights_raw, weights_adjusted in zip(
+        raw.structure.lag_weights, adjusted.structure.lag_weights, strict=True
+    ):
+        kept = weights_adjusted != 0
+        assert np.array_equal(weights_adjusted[kept], weights_raw[kept])  # the fit is not changed
+
+
+def test_granger_on_noise_returns_the_links_that_chance_adds_only_without_a_correction():
+    noise = np.random.default_rng(1).standard_normal((1000, 20))
+    raw = andrey.granger(noise, tau_max=TAU_MAX)
+    adjusted = andrey.granger(noise, tau_max=TAU_MAX, fdr_method="fdr_bh")
+    n_links = 20 * 20 * TAU_MAX
+    assert len(links(raw)) > ALPHA * n_links / 2  # about alpha of the absent links appear
+    assert len(links(adjusted)) <= 1

@@ -5,7 +5,9 @@ columns at times ``t-1 .. t-maxlag``) and fits one ordinary least-squares regres
 variable. The test of each lagged coefficient is the F-test of the target's regression with and
 without that regressor, which is the square of the coefficient's t-ratio: ``p[i, j + d*k]`` is the
 p-value of variable ``j`` at lag ``k+1`` given every other lagged variable, the coefficient p-values
-of a vector autoregression. A link is significant when ``p <= alpha``.
+of a vector autoregression. A link is significant when ``p <= alpha``; with ``fdr_method="fdr_bh"``
+the p-values of all the links are first replaced by their Benjamini-Hochberg adjusted values
+(:mod:`andrey.core.fdr`).
 
 References
 ----------
@@ -20,6 +22,8 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 from scipy.linalg import solve_triangular
+
+from andrey.core.fdr import check_fdr_method, corrected_pvalues
 
 
 def _ols(design: np.ndarray, targets: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -57,6 +61,7 @@ def granger_f_test(
     *,
     maxlag: int,
     alpha: float = 0.05,
+    fdr_method: str = "none",
     forbidden: np.ndarray | None = None,
     required: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -70,11 +75,19 @@ def granger_f_test(
     the directed lag adjacency. Each target row is an independent regression, so the rows are fitted
     together for the targets that share a design.
 
+    ``fdr_method`` corrects the p-values of all the links together before ``alpha`` decides which
+    are significant (:func:`~andrey.core.fdr.corrected_pvalues`): ``"none"`` leaves them as tested,
+    and ``"fdr_bh"`` returns their Benjamini-Hochberg adjusted values, and keeps the links whose
+    adjusted value is at most ``alpha``.
+
     With background knowledge, ``forbidden[k, j, i]`` leaves the lag-``k + 1`` regressor ``j`` out
     of target ``i``'s regression (coefficient ``0``, p-value ``1``), and ``required[k, j, i]`` keeps
     it in the graph whatever its test says (p-value ``0``); both are boolean arrays of shape
     ``(maxlag, d, d)``. The other regressors are tested given the ones that stay in the regression.
+    A forbidden link is no test: the correction does not count it, and it keeps p-value ``1``; a
+    required link is counted with p-value ``0``.
     """
+    check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     n_samples, d = data.shape
     targets = data[maxlag:]
@@ -93,8 +106,8 @@ def granger_f_test(
         fit, p = _ols(design[:, [0, *(1 + kept)]], targets[:, rows])
         coeff[np.ix_(rows, kept)] = fit.T
         p_values[np.ix_(rows, kept)] = p.T
-    coeff = np.where((p_values <= alpha) | force, coeff, 0.0)
-    return coeff, np.where(force, 0.0, p_values)
+    p_values = corrected_pvalues(np.where(force, 0.0, p_values), fdr_method, drop)
+    return np.where((p_values <= alpha) | force, coeff, 0.0), p_values
 
 
 def _by_target(links: np.ndarray) -> np.ndarray:
