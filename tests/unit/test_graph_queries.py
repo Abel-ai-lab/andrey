@@ -81,8 +81,8 @@ def test_mag_and_pag_separation_match_the_dag_with_hidden_nodes(seed):
     mag, pag = dag.to_mag(latent=hidden), dag.to_pag(latent=hidden)
     for x, y, given in _queries(len(observed)):
         truth = oracle(observed[x], observed[y], [observed[z] for z in given]) == 1.0
-        assert mag.d_separated(x, y, given) == truth
-        assert pag.d_separated(x, y, given) == truth
+        assert mag.m_separated(x, y, given) == truth
+        assert pag.m_separated(x, y, given) == truth
         assert truth == (not _open_path(mag, x, y, given))
 
 
@@ -99,8 +99,8 @@ def test_selection_variables_join_the_conditioning_set(seed):
     for x, y, given in _queries(len(observed)):
         z = [observed[k] for k in given] + selection
         truth = oracle(observed[x], observed[y], z) == 1.0
-        assert mag.d_separated(x, y, given) == truth
-        assert pag.d_separated(x, y, given) == truth
+        assert mag.m_separated(x, y, given) == truth
+        assert pag.m_separated(x, y, given) == truth
 
 
 def test_a_graph_that_is_not_ancestral_is_refused():
@@ -110,7 +110,7 @@ def test_a_graph_that_is_not_ancestral_is_refused():
     two[1, 2], two[2, 1] = ARROW, ARROW  # 1 <-> 2
     two[0, 2], two[2, 0] = ARROW, 1  # 2 -> 0
     with pytest.raises(ValueError, match="not ancestral"):
-        GraphStructure.from_numpy(two, kind="mag").d_separated(0, 1)
+        GraphStructure.from_numpy(two, kind="mag").m_separated(0, 1)
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -120,6 +120,7 @@ def test_a_cpdag_answers_as_every_dag_of_its_class(seed):
     members = [dag, *(cpdag.to_dag(seed=s) for s in range(3))]
     for x, y, given in _queries(6):
         assert len({g.d_separated(x, y, given) for g in [cpdag, *members]}) == 1
+        assert len({g.m_separated(x, y, given) for g in members}) == 1
     for v in range(6):
         assert len({tuple(g.markov_blanket(v)) for g in [cpdag, *members]}) == 1
 
@@ -139,10 +140,11 @@ def test_markov_blanket_is_the_smallest_separating_set(kind):
         for v in range(graph.n_nodes):
             blanket = graph.markov_blanket(v)
             rest = [w for w in range(graph.n_nodes) if w != v and w not in blanket]
+            separated = graph.d_separated if kind in ("dag", "cpdag") else graph.m_separated
             if rest:
-                assert graph.d_separated(v, rest, blanket)
+                assert separated(v, rest, blanket)
             for w in blanket:
-                assert not graph.d_separated(v, w, [b for b in blanket if b != w])
+                assert not separated(v, w, [b for b in blanket if b != w])
 
 
 def test_dag_queries_match_networkx():
@@ -179,8 +181,9 @@ def test_digraph_two_cycles_and_self_loops():
     assert g.parents(0) == [1] and g.children(0) == [1]
     assert g.parents(2) == [1, 2] and g.children(2) == [2]
     assert g.ancestors(0) == [1] and g.descendants(0) == [1, 2] and g.descendants(2) == []
-    with pytest.raises(ValueError, match="digraph"):
-        g.d_separated(0, 2)
+    for query in (g.d_separated, g.m_separated):
+        with pytest.raises(ValueError, match="digraph"):
+            query(0, 2)
     with pytest.raises(ValueError, match="digraph"):
         g.markov_blanket(0)
 
@@ -190,18 +193,20 @@ def test_undirected_graph_separation_and_blanket():
     for a, b in [(0, 1), (1, 2), (2, 3)]:
         M[a, b] = M[b, a] = 1
     g = GraphStructure.from_numpy(M, kind="undirected")
-    assert g.d_separated(0, 3, [2]) and not g.d_separated(0, 3)
+    assert g.m_separated(0, 3, [2]) and not g.m_separated(0, 3)
     assert g.markov_blanket(1) == [0, 2]
     assert g.parents(1) == [] and g.ancestors(3) == []
 
 
 def test_node_arguments():
     M = np.array([[0, 1, 0], [2, 0, 2], [0, 1, 0]])  # a -> b <- c
-    g = GraphStructure.from_numpy(M, labels=("a", "b", "c"))
+    g = GraphStructure.from_numpy(M, kind="dag", labels=("a", "b", "c"))
     assert g.parents("b") == g.parents(1) == g.parents(np.int64(1)) == ["a", "c"]
     assert g.parents("b", index=True) == [0, 2]
     assert g.neighbors("b").tolist() == [0, 2] and g.endpoints("a", "b") == g.endpoints(0, 1)
-    assert g.d_separated({"a"}, ["c"]) and not g.d_separated("a", "c", given=("b",))
+    for query in (g.d_separated, g.m_separated):
+        assert query({"a"}, ["c"]) and not query("a", "c", given=("b",))
+        assert query(0, "c") == query("a", 2)
     with pytest.raises(ValueError, match="lacks"):
         g.parents("z")
     with pytest.raises(ValueError, match="3 nodes"):
@@ -210,10 +215,37 @@ def test_node_arguments():
         g.parents(True)
     with pytest.raises(TypeError):
         g.parents(["a"])
-    with pytest.raises(ValueError, match="disjoint"):
-        g.d_separated("a", "c", given=["a"])
-    with pytest.raises(ValueError, match="more than once"):
-        g.d_separated(["a", "a"], "c")
+    for query in (g.d_separated, g.m_separated):
+        with pytest.raises(ValueError, match="disjoint"):
+            query("a", "c", given=["a"])
+        with pytest.raises(ValueError, match="more than once"):
+            query(["a", "a"], "c")
+
+
+def test_each_separation_query_names_the_other_for_a_kind_it_does_not_define():
+    dag = _dag(5, 0)
+    graphs = {
+        "dag": dag,
+        "cpdag": to_cpdag(dag),
+        "mag": dag.to_mag(latent=[0]),
+        "pag": dag.to_pag(latent=[0]),
+        "undirected": GraphStructure.from_numpy(
+            np.array([[0, 1], [1, 0]], dtype=np.int8), kind="undirected"
+        ),
+    }
+    defined = {
+        "d_separated": {"dag", "cpdag"},
+        "m_separated": {"dag", "mag", "pag", "undirected"},
+    }
+    other = {"d_separated": "m_separated", "m_separated": "d_separated"}
+    for kind, graph in graphs.items():
+        for query, kinds in defined.items():
+            if kind in kinds:
+                assert isinstance(getattr(graph, query)(0, 1), bool)
+                continue
+            with pytest.raises(ValueError, match=other[query]) as refused:
+                getattr(graph, query)(0, 1)
+            assert kind in str(refused.value)
 
 
 def test_a_dag_with_a_directed_cycle_is_refused():
@@ -221,8 +253,9 @@ def test_a_dag_with_a_directed_cycle_is_refused():
     for a, b in [(0, 1), (1, 2), (2, 0)]:
         M[a, b], M[b, a] = 1, ARROW
     g = GraphStructure.from_numpy(M, kind="dag")
-    with pytest.raises(ValueError, match="directed cycle"):
-        g.d_separated(0, 1)
+    for query in (g.d_separated, g.m_separated):
+        with pytest.raises(ValueError, match="directed cycle"):
+            query(0, 1)
 
 
 def test_answers_follow_labels_not_column_order():

@@ -1,5 +1,5 @@
 """Graph queries behind ``GraphStructure.parents``, ``children``, ``ancestors``, ``descendants``,
-``markov_blanket``, and ``d_separated``.
+``markov_blanket``, ``d_separated``, and ``m_separated``.
 
 The methods' docstrings define each query for each graph kind and cite the definitions.
 """
@@ -85,9 +85,22 @@ def descendants(graph: GraphStructure, x: int) -> list[int]:
     return sorted(_reach(graph, incident(graph), [x], up=False) - {x})
 
 
+# The graph kinds each separation query defines: d-separation is the criterion of a DAG and, by
+# its class, of a CPDAG; m-separation is that of an ancestral graph (a MAG, a PAG through its
+# MAGs), of which a DAG and an undirected graph are special cases.
+_SEPARATION_KINDS = {
+    "d_separated": ("dag", "cpdag"),
+    "m_separated": ("dag", "mag", "pag", "undirected"),
+}
+_OTHER = {"d_separated": "m_separated", "m_separated": "d_separated"}
+
+
 def member(graph: GraphStructure, what: str) -> GraphStructure:
     """The graph a separation or blanket query reads: one member of a ``cpdag``'s or ``pag``'s
     class, whose answers every member shares, or the graph itself.
+
+    ``what`` names the query. ``d_separated`` and ``m_separated`` raise ``ValueError`` for a kind
+    they do not define, naming the other query.
 
     Raises ``ValueError`` for a ``digraph``, for a ``dag`` with a directed cycle, and for a ``mag``
     that is not ancestral or a ``pag`` whose MAG (Zhang 2008) is not.
@@ -96,6 +109,12 @@ def member(graph: GraphStructure, what: str) -> GraphStructure:
         raise ValueError(
             f"{what} is not defined here for a digraph: its directed cycles need a separation "
             "criterion for cyclic models, which depends on the model's assumptions"
+        )
+    if what in _SEPARATION_KINDS and graph.kind not in _SEPARATION_KINDS[what]:
+        kinds = ", ".join(repr(k) for k in _SEPARATION_KINDS[what])
+        raise ValueError(
+            f"{what} is defined for graphs of kind {kinds}, not {graph.kind!r}; "
+            f"use {_OTHER[what]} for that kind"
         )
     if graph.kind == "cpdag":
         return graph.to_dag(tie_break="label")
@@ -183,6 +202,25 @@ def separated(graph: GraphStructure, xs: list[int], ys: list[int], zs: list[int]
             if (v in opened) if collider else (v not in given):
                 stack.append((w, there == ARROW))
     return True
+
+
+def separation(
+    graph: GraphStructure,
+    what: str,
+    x: str | int | Collection[str | int],
+    y: str | int | Collection[str | int],
+    given: Collection[str | int],
+) -> bool:
+    """The answer of ``d_separated`` or ``m_separated`` (``what``) for nodes named by label or
+    position: the kind check comes first, then the node arguments, then the walk."""
+    read = member(graph, what)
+    xs, ys, zs = nodes(graph, x, "x"), nodes(graph, y, "y"), nodes(graph, given, "given")
+    shared = (set(xs) & set(ys)) | (set(xs) & set(zs)) | (set(ys) & set(zs))
+    if shared:
+        raise ValueError(
+            f"x, y, and given must be disjoint; they share {named(graph, sorted(shared), False)}"
+        )
+    return separated(read, xs, ys, zs)
 
 
 def collider_connected(graph: GraphStructure, x: int) -> list[int]:

@@ -1135,15 +1135,15 @@ class GraphStructure(Structure):
     def markov_blanket(self, x: str | int, *, index: bool = False) -> list[str | int]:
         """Return the Markov blanket of ``x``: the fewest nodes that separate it from the rest.
 
-        Given its Markov blanket, the Markov boundary, ``x`` is separated (``d_separated``) from
-        every other node, and given any smaller set it is not. In a ``dag`` the blanket is the
-        parents, the children, and the children's other parents (Pearl 1988). In a ``mag`` it is
-        every node joined to ``x`` by a path whose inner nodes are all colliders: the parents, the
-        children, the spouses, and the nodes joined to ``x`` or its children by bidirected paths,
-        with their parents (Pellet and Elisseeff 2008). A ``cpdag`` or ``pag`` has the blanket
-        every member of its class has, since the members share their separations; it is computed
-        on one member. In an ``undirected`` graph it is the neighbors, as in a Markov network, so
-        for ``iamb``'s graph it is the blanket the method found.
+        Given its Markov blanket, the Markov boundary, ``x`` is separated (``d_separated`` or
+        ``m_separated``, by kind) from every other node, and given any smaller set it is not. In a
+        ``dag`` the blanket is the parents, the children, and the children's other parents (Pearl
+        1988). In a ``mag`` it is every node joined to ``x`` by a path whose inner nodes are all
+        colliders: the parents, the children, the spouses, and the nodes joined to ``x`` or its
+        children by bidirected paths, with their parents (Pellet and Elisseeff 2008). A ``cpdag``
+        or ``pag`` has the blanket every member of its class has, since the members share their
+        separations; it is computed on one member. In an ``undirected`` graph it is the neighbors,
+        as in a Markov network, so for ``iamb``'s graph it is the blanket the method found.
 
         Parameters
         ----------
@@ -1194,18 +1194,17 @@ class GraphStructure(Structure):
         y: str | int | Collection[str | int],
         given: Collection[str | int] = (),
     ) -> bool:
-        """Return whether ``given`` separates ``x`` from ``y``: no path between them is open.
+        """Return whether ``given`` d-separates ``x`` from ``y`` in a ``dag`` or ``cpdag``.
 
-        A path is open given ``given`` when each of its colliders, a node that both of its edges
-        on the path point into, is in ``given`` or an ancestor of a node in it, and each of its
-        other inner nodes is not in ``given``. On a ``dag`` this is d-separation (Pearl 1988), and
-        on a ``mag`` its generalization, m-separation (Richardson and Spirtes 2002). A ``cpdag``
-        answers as every DAG of its class does, since they share their d-separations, and a
-        ``pag`` as every MAG of its class does; each is computed on one member (``to_dag``, or
-        Zhang's MAG of the class). An ``undirected`` graph has no colliders, so this is plain
-        separation (Lauritzen 1996): every path between ``x`` and ``y`` passes through ``given``.
-        An undirected skeleton without a claim about direction, such as ``mmpc``'s, implies no
-        independence by it.
+        A path between ``x`` and ``y`` is open given ``given`` when each of its colliders, a node
+        that both of its edges on the path point into, is in ``given`` or an ancestor of a node in
+        it, and each of its other inner nodes is not in ``given``; ``x`` and ``y`` are
+        d-separated when no path is open (Pearl 1988). A ``cpdag`` answers as every DAG of its
+        class does, since they share their d-separations (Verma and Pearl 1990); the answer is
+        computed on one of them (``to_dag``).
+
+        A ``mag``, a ``pag``, and an ``undirected`` graph have ``m_separated`` instead, which
+        equals this on a ``dag``.
 
         Parameters
         ----------
@@ -1224,11 +1223,11 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If a node is not in the graph or is named twice; if ``x``, ``y``, and ``given``
-            overlap; for a ``digraph``, whose directed cycles need a separation criterion that
-            depends on the model; for a ``dag`` with a directed cycle; for a ``cpdag`` that no DAG
-            fits; for a ``mag`` that is not ancestral; or for a ``pag`` from which Zhang's
-            construction builds no ancestral graph.
+            For a kind other than ``dag`` and ``cpdag``, naming ``m_separated`` for ``mag``,
+            ``pag``, and ``undirected``; for a ``digraph``, whose directed cycles need a separation
+            criterion that depends on the model; if a node is not in the graph or is named twice;
+            if ``x``, ``y``, and ``given`` overlap; for a ``dag`` with a directed cycle; or for a
+            ``cpdag`` that no DAG fits (see ``to_dag``).
         TypeError
             If a node is neither a label nor an integer position.
 
@@ -1236,12 +1235,8 @@ class GraphStructure(Structure):
         ----------
         Pearl, J. (1988). Probabilistic Reasoning in Intelligent Systems. Morgan Kaufmann.
 
-        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
-        Statistics 30(4), 962-1030.
-
-        Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
-        presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
-        1873-1896.
+        Verma, T., and Pearl, J. (1990). Equivalence and synthesis of causal models. Proceedings of
+        the Sixth Conference on Uncertainty in Artificial Intelligence, 255-270.
 
         Examples
         --------
@@ -1254,15 +1249,78 @@ class GraphStructure(Structure):
         """
         from . import _queries
 
-        xs = _queries.nodes(self, x, "x")
-        ys = _queries.nodes(self, y, "y")
-        zs = _queries.nodes(self, given, "given")
-        shared = (set(xs) & set(ys)) | (set(xs) & set(zs)) | (set(ys) & set(zs))
-        if shared:
-            names = _queries.named(self, sorted(shared), False)
-            raise ValueError(f"x, y, and given must be disjoint; they share {names}")
-        graph = _queries.member(self, "d_separated")
-        return _queries.separated(graph, xs, ys, zs)
+        return _queries.separation(self, "d_separated", x, y, given)
+
+    def m_separated(
+        self,
+        x: str | int | Collection[str | int],
+        y: str | int | Collection[str | int],
+        given: Collection[str | int] = (),
+    ) -> bool:
+        """Return whether ``given`` m-separates ``x`` from ``y`` in a ``mag``, ``pag``, ``dag``, or
+        ``undirected`` graph.
+
+        A path between ``x`` and ``y`` is open given ``given`` when each of its colliders, a node
+        that both of its edges on the path have an arrowhead at, is in ``given`` or an ancestor of
+        a node in it, and each of its other inner nodes is not in ``given``; ``x`` and ``y`` are
+        m-separated when no path is open (Richardson and Spirtes 2002). A ``pag`` answers as every
+        MAG of its class does, since Markov-equivalent MAGs share their m-separations; the answer
+        is computed on one of them, Zhang's MAG of the class (2008). On a ``dag`` this equals
+        ``d_separated``, and on an ``undirected`` graph, which has no colliders, it is plain
+        separation (Lauritzen 1996): every path between ``x`` and ``y`` passes through ``given``.
+        An undirected skeleton that makes no claim about direction, such as ``mmpc``'s, implies no
+        independence this way.
+
+        A ``cpdag`` has ``d_separated`` instead.
+
+        Parameters
+        ----------
+        x : str, int, or a collection of them
+            A node, or a set of nodes, by label or by 0-based position.
+        y : str, int, or a collection of them
+            Another node or set of nodes, disjoint from ``x``.
+        given : collection of str or int, default=()
+            The conditioning set, disjoint from ``x`` and ``y``.
+
+        Returns
+        -------
+        bool
+            ``True`` when every path between a node of ``x`` and a node of ``y`` is blocked.
+
+        Raises
+        ------
+        ValueError
+            For a ``cpdag``, naming ``d_separated``; for a ``digraph``, whose directed cycles need
+            a separation criterion that depends on the model; if a node is not in the graph or is
+            named twice; if ``x``, ``y``, and ``given`` overlap; for a ``dag`` with a directed
+            cycle; for a ``mag`` that is not ancestral; or for a ``pag`` from which Zhang's
+            construction builds no ancestral graph.
+        TypeError
+            If a node is neither a label nor an integer position.
+
+        References
+        ----------
+        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+        Statistics 30(4), 962-1030.
+
+        Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+        presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+        1873-1896.
+
+        Lauritzen, S. L. (1996). Graphical Models. Oxford University Press.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [2, 0, 2], [0, 1, 0]])  # a -> b <- c
+        >>> g = GraphStructure.from_numpy(M, labels=("a", "b", "c"))
+        >>> g.m_separated("a", "c"), g.m_separated("a", "c", given=["b"])
+        (True, False)
+        """
+        from . import _queries
+
+        return _queries.separation(self, "m_separated", x, y, given)
 
     # ---- validation -----------------------------------------------------------------------
 

@@ -134,10 +134,11 @@ names its pull request.
 ### Added
 
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
-  `markov_blanket`, and `d_separated`, each taking a node by label or by position. `d_separated` is
-  d-separation on a DAG, m-separation on a MAG, and graph separation on an undirected graph; a
-  CPDAG or PAG answers as every member of its class does. `neighbors` and `endpoints` also take a
-  label. ([#560])
+  `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
+  `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,
+  or a DAG, and graph separation on an undirected graph; each raises on the kinds the other one
+  defines. A CPDAG or PAG answers as every member of its class does. `neighbors` and `endpoints`
+  also take a label. ([#560])
 - `pcmci` and `pcmciplus` take `fdr_method`, as tigramite's `run_pcmci` and `run_pcmciplus` do:
   `"fdr_bh"` replaces the p-values of the lagged links with their Benjamini-Hochberg adjusted
   values over all those links together. `pcmci` keeps a link when its adjusted p-value is at most

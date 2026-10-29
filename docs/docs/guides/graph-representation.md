@@ -278,14 +278,17 @@ g.d_separated("a", "d", ["c"])    # False: c is a collider
 | `parents(x)`, `children(x)` | the nodes joined to `x` by a directed edge into it, or out of it |
 | `ancestors(x)`, `descendants(x)` | the nodes with a directed path to `x`, or from it; `x` left out |
 | `markov_blanket(x)` | the fewest nodes given which `x` is separated from every other node |
-| `d_separated(x, y, given)` | whether every path between `x` and `y` is blocked given `given` |
+| `d_separated(x, y, given)` | for a DAG or CPDAG: whether every path between `x` and `y` is blocked given `given` |
+| `m_separated(x, y, given)` | the same for a MAG, a PAG, an undirected graph, or a DAG, where it equals `d_separated` |
 
 Only directed edges make parents and ancestors, so in a CPDAG or a PAG they are the ones every
-member of the class shares; `neighbors` lists every adjacent node. `d_separated` takes a node or a
-set of nodes for `x` and `y`. On a DAG it is d-separation, on a MAG m-separation, and on an
-undirected graph plain separation. A CPDAG answers as every DAG of its class does, and a PAG as
-every MAG of its class does, since the members share their separations, and so does
-`markov_blanket`. A `digraph` may have directed cycles, so it has neither query.
+member of the class shares; `neighbors` lists every adjacent node. The separation queries take a
+node or a set of nodes for `x` and `y`. `d_separated` is d-separation on a DAG, and a CPDAG answers
+as every DAG of its class does; `m_separated` is m-separation on a MAG, and a PAG answers as every
+MAG of its class does, since the members of a class share their separations. On an undirected
+graph, which has no colliders, `m_separated` is plain separation. Each raises a `ValueError` on a
+kind the other one defines, naming it, and so do both on a `digraph`, which may have directed
+cycles. `markov_blanket` answers for every kind but the `digraph`.
 
 ## Hand a graph to DoWhy
 
