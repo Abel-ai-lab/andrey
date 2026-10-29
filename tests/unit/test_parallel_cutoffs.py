@@ -19,6 +19,7 @@ import pytest
 import andrey
 from andrey.cli import calibration_report, main, render_calibration
 from andrey.constraint._skeleton import scan_pairs
+from andrey.core import backend
 from andrey.search import calibrate as cal
 
 pg = importlib.import_module("andrey.search._parallel_ges")
@@ -420,7 +421,7 @@ def test_calibrate_command_measures_every_cutoff_by_default(capsys, monkeypatch)
     monkeypatch.setattr(cal, "calibrate", fake)
     assert main(["calibrate", "--workers", "4", "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
-    assert seen["methods"] == ["ges", "skeleton"]
+    assert seen["methods"] == list(cal.METHODS)
     assert set(report["settings"]) == {
         "ANDREY_NUM_WORKERS",
         *(m.variable for m in cal.METHODS.values()),
@@ -437,3 +438,142 @@ def test_the_skeleton_cutoff_defaults_to_the_built_in_when_the_pool_never_wins()
     c = cal.bracket(lambda d: 1.0, lambda d: 2.0, grid=(16,), method="skeleton", work=lambda d: d)
     assert c.below == cal._MAX_D and c.above is None
     assert c.cutoff == sk.MIN_POOL_QUERIES  # the largest probe's work is far below the default
+
+
+# --- the RCoT cutoff -------------------------------------------------------------------------
+#
+# The RCoT probe over six variables is a complete graph: 15 pairs of 6 tests at conditioning size
+# 2, on cal.RCOT_ROWS rows.
+
+RCOT_VARIABLE = cal.METHODS["rcot"].variable
+
+
+@pytest.fixture(scope="module")
+def rcot_probe():
+    return cal.rcot_pass(6)
+
+
+def _rcot(probe, rows=None):
+    """A copy of the probe's test with empty caches, or one on its first ``rows`` rows."""
+    from andrey.core.ci_kernel import RCoT
+
+    if rows is None:
+        return RCoT._from_state(*probe.test._state())
+    return RCoT(cal.sample(6, rows=cal.RCOT_ROWS)[:rows])
+
+
+def _rcot_scan(test, probe, workers=2):
+    pool = sk.RCoTWorkerPool(test, workers)
+    try:
+        return _scan(pool, probe)
+    finally:
+        pool.close()
+
+
+def test_the_rcot_probe_counts_tests_times_rows(rcot_probe):
+    assert rcot_probe.tests == 15 * 6 * cal.RCOT_ROWS
+
+
+@pytest.mark.parametrize("rows, pooled", [(cal.RCOT_ROWS, True), (cal.RCOT_ROWS // 2, False)])
+def test_the_rcot_cutoff_weighs_each_test_by_the_rows(rows, pooled, rcot_probe, monkeypatch):
+    """At a cutoff of the probe's work, the same tests on half the rows stay in this process."""
+    monkeypatch.setenv(RCOT_VARIABLE, str(rcot_probe.tests))
+    test = _rcot(rcot_probe, rows)
+    removals = _rcot_scan(test, rcot_probe)
+    assert (removals is not None) is pooled
+    if pooled:
+        with backend.one_blas_thread():  # as a fit's pass runs, and as a worker does
+            serial = scan_pairs(_rcot(rcot_probe, rows), *_pass_args(rcot_probe))
+        assert removals == serial  # every separating set and p-value, bit for bit
+
+
+def _pass_args(p):
+    return p.pairs, p.neighbors, p.size, 0.05
+
+
+@pytest.mark.parametrize("offset, pooled", [(0, True), (1, False)])
+def test_the_rcot_override_sets_the_pass_work_that_uses_the_pool(
+    offset, pooled, rcot_probe, monkeypatch
+):
+    monkeypatch.setenv(RCOT_VARIABLE, str(rcot_probe.tests + offset))
+    assert (_rcot_scan(_rcot(rcot_probe), rcot_probe) is not None) is pooled
+
+
+def test_a_failing_rcot_share_falls_back_to_this_process(rcot_probe, monkeypatch):
+    """A share that raises in a worker (here: a stale run token) leaves the stack to the caller's
+    test, which returns the in-process p-values."""
+    monkeypatch.setenv(RCOT_VARIABLE, "0")
+    pool = sk.RCoTWorkerPool(_rcot(rcot_probe), 2)
+    try:
+        pool._ensure()
+        pool._token = "another run"
+        removals = _scan(pool, rcot_probe)
+    finally:
+        pool.close()
+    assert removals == scan_pairs(_rcot(rcot_probe), *_pass_args(rcot_probe))
+
+
+def _rcot_warnings(probe, scans=2):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(scans):
+            assert _rcot_scan(_rcot(probe), probe) is None  # the pass stays in this process
+    return _cutoff_warnings(caught)
+
+
+@pytest.mark.parametrize("factor, warns", [(8, True), (20, False)])
+def test_the_default_rcot_cutoff_warns_once_a_pass_reaches_a_tenth_of_it(
+    factor, warns, rcot_probe, monkeypatch
+):
+    monkeypatch.setattr(sk, "MIN_POOL_RCOT_WORK", factor * rcot_probe.tests)
+    caught = _rcot_warnings(rcot_probe)  # two pools, at most one warning
+    assert len(caught) == warns
+    if warns:
+        message = str(caught[0].message)
+        assert f"{RCOT_VARIABLE}={factor * rcot_probe.tests}" in message
+        assert "`andrey calibrate`" in message
+
+
+def test_an_explicit_rcot_cutoff_never_warns(rcot_probe, monkeypatch):
+    monkeypatch.setattr(sk, "MIN_POOL_RCOT_WORK", 8 * rcot_probe.tests)
+    monkeypatch.setenv(RCOT_VARIABLE, str(8 * rcot_probe.tests))
+    assert not _rcot_warnings(rcot_probe)
+
+
+def test_each_test_gets_its_own_pool_or_none(rcot_probe):
+    from andrey.core.ci import FisherZ, StudentT
+    from andrey.core.ci_kernel import KCI, RCoT
+
+    class _RCoT(RCoT):
+        pass
+
+    x = cal.sample(6)
+    rcot = _rcot(rcot_probe)
+    assert sk.skeleton_pool(rcot, 1) is None
+    assert type(sk.skeleton_pool(rcot, 2)) is sk.RCoTWorkerPool
+    assert type(sk.skeleton_pool(FisherZ(x), 2)) is sk.SkeletonWorkerPool
+    assert type(sk.skeleton_pool(StudentT(x), 2)) is sk.SkeletonWorkerPool
+    assert sk.skeleton_pool(_RCoT._from_state(*rcot._state()), 2) is None
+    assert sk.skeleton_pool(KCI(x), 2) is None
+
+
+def test_a_pooled_rcot_pass_warns_of_few_rows_in_the_caller(rcot_probe, monkeypatch):
+    monkeypatch.setenv(RCOT_VARIABLE, "0")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert _rcot_scan(_rcot(rcot_probe, rows=300), rcot_probe) is not None
+    assert [w for w in caught if w.category is andrey.SampleSizeWarning]
+
+
+@pytest.mark.parametrize("method", ["pc", "fci"])
+def test_rcot_fits_return_the_same_bits_with_one_and_two_workers(method, monkeypatch):
+    from qa import identity
+
+    monkeypatch.setenv(RCOT_VARIABLE, "0")
+    x = cal.sample(6, rows=600)
+    x[:, 1] += np.sin(2 * x[:, 0])
+    outs = []
+    for workers in (1, 2):
+        with andrey.config(num_workers=workers):
+            outs.append(identity.digest(getattr(andrey, method)(x, indep_test="rcot")))
+    assert outs[0] == outs[1]

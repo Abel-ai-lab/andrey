@@ -446,7 +446,7 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
-        assert "drop the units that hold one from every dataset of data_list" in str(error.value)
+        assert "drop the units that hold one from every dataset of data" in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
         assert "fill in the missing steps first" in str(error.value)
         assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
@@ -460,7 +460,7 @@ def test_a_refused_text_category_names_the_method():
     frame["b"] = frame["b"].map({0.0: "low", 1.0: "mid", 2.0: "high"})
     frame.loc[3, "b"] = None
     with pytest.raises(ValueError, match=r"^hc does not accept .* column 'b' has a missing value"):
-        andrey.hc(frame, score_func="local_score_BDeu")
+        andrey.hc(frame, score_func="bdeu")
 
 
 def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
@@ -534,7 +534,7 @@ def test_the_cli_reads_na_and_na_with_a_slash_as_missing_values(tmp_path, capsys
     path.write_text("\n".join(rows) + "\n")  # no header: the first row may hold a missing value
     code = main(["run", "pc", "--data", str(path), "--json"])
     out = json.loads(capsys.readouterr().out)
-    assert code == 0 and out["metadata"] == andrey.pc(gappy).metadata | {"algorithm": "PC"}
+    assert code == 0 and out["metadata"] == andrey.pc(gappy).metadata
 
 
 def test_the_cli_reports_a_refusal_as_a_data_error(tmp_path, capsys):

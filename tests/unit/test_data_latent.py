@@ -280,3 +280,25 @@ def test_pag_no_latents_is_cpdag():
     assert (
         cpdag.endpoints(0, 2)[1] == ARROW and cpdag.endpoints(1, 2)[1] == ARROW
     )  # oriented collider
+
+
+def test_dsep_oracle_equals_d_separation():
+    """The oracle's answer is networkx's d-separation, through its node map and fixed givens."""
+    import networkx as nx
+
+    rng = np.random.default_rng(0)
+    for n, p in ((8, 0.3), (12, 0.25), (16, 0.15)):
+        order = rng.permutation(n).tolist()
+        dag = nx.DiGraph(
+            (order[i], order[j]) for i in range(n) for j in range(i + 1, n) if rng.random() < p
+        )
+        dag.add_nodes_from(range(n))
+        nodes, given = order[2:], order[:2]
+        oracle = data.latent.DSepOracle(dag, nodes, given)
+        for _ in range(200):
+            x, y, *rest = rng.permutation(len(nodes)).tolist()
+            z = rest[: int(rng.integers(0, len(rest) + 1))]
+            want = nx.is_d_separator(
+                dag, {nodes[x]}, {nodes[y]}, {nodes[k] for k in z} | set(given)
+            )
+            assert oracle(x, y, z) == float(want)

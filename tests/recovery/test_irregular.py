@@ -84,9 +84,11 @@ def test_pnl_output_contract():
     x = datagen.generate("anm_pair_cubic")
     out = pnl_facade(x)
     assert out.structure.type == "graph"
-    keys = ("pval_forward", "pval_backward", "stat_forward", "stat_backward")
-    assert set(out.metadata) == {"algorithm", *keys}
-    assert tuple(out.metadata[key] for key in keys) == pnl(x[:, 0], x[:, 1])
+    md = out.metadata
+    assert set(md) == {"algorithm", "p_values", "statistics"}
+    tests = (md["p_values"], md["statistics"])
+    found = tuple(test[direction] for test in tests for direction in ("forward", "backward"))
+    assert found == pnl(x[:, 0], x[:, 1])
 
 
 @pytest.mark.parametrize("method", ["anm", "pnl"])
@@ -97,10 +99,10 @@ def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method):
 
     angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
     out = getattr(irregular, method)(np.column_stack([np.cos(angle), np.sin(angle)]))
-    md = out.metadata
-    assert md["pval_forward"] == md["pval_backward"] == 0.0
-    assert md["stat_forward"] != md["stat_backward"]
-    edge = (0, 1) if md["stat_forward"] < md["stat_backward"] else (1, 0)
+    p, stat = out.metadata["p_values"], out.metadata["statistics"]
+    assert p["forward"] == p["backward"] == 0.0
+    assert stat["forward"] != stat["backward"]
+    edge = (0, 1) if stat["forward"] < stat["backward"] else (1, 0)
     assert out.structure.oriented_edges() == [(*edge, "directed")]
 
 
@@ -110,9 +112,9 @@ def test_pnl_draws_no_edge_when_the_statistics_tie_too():
 
     x = datagen.generate("anm_pair_cubic")[:, 0]
     out = pnl_facade(np.column_stack([x, x]))
-    md = out.metadata
-    assert md["pval_forward"] == md["pval_backward"]
-    assert md["stat_forward"] == md["stat_backward"]
+    p, stat = out.metadata["p_values"], out.metadata["statistics"]
+    assert p["forward"] == p["backward"]
+    assert stat["forward"] == stat["backward"]
     assert out.structure.oriented_edges() == []
 
 
@@ -173,8 +175,7 @@ def test_anm_resolves_the_planted_direction():
     )
     assert out.structure.type == "graph"
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
-    keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
-    assert set(out.metadata) == {"algorithm", *keys}
+    assert set(out.metadata) == {"p_values", "statistics"}  # the method wrapper adds "algorithm"
 
 
 def test_anm_matches_the_recorded_output():
@@ -227,12 +228,11 @@ def test_anm_names_the_planted_direction_in_any_units_and_column_order():
     planted = datagen.generate("anm_pair_cubic")
     first = anm_facade(planted)
     assert first.structure.oriented_edges() == _PLANTED
-    keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
-    assert set(first.metadata) == {"algorithm", *keys}
-    pvalues = (first.metadata["pval_forward"], first.metadata["pval_backward"])
+    assert set(first.metadata) == {"algorithm", "p_values", "statistics"}
+    pvalues = tuple(first.metadata["p_values"].values())
     for scale in (100.0, 0.01, 1e-200):  # 1e-200: squared deviations would underflow
         out = anm_facade(planted * np.array([scale, 1 / scale]))
-        assert np.allclose((out.metadata["pval_forward"], out.metadata["pval_backward"]), pvalues)
+        assert np.allclose(tuple(out.metadata["p_values"].values()), pvalues)
     names = [("cause", "effect")[v] for v in datagen.column_order("anm_pair_cubic")]
     df = pd.DataFrame(planted, columns=names)
     for columns in (["cause", "effect"], ["effect", "cause"]):

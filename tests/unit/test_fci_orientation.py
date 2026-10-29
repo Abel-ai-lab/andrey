@@ -16,6 +16,7 @@ from andrey.constraint.fci import (
     _fci_orient,
     _neighbor_lists,
     _orient_colliders,
+    _r10_connects,
     _rule_r7,
     _rule_r9,
     _rule_r10,
@@ -278,12 +279,35 @@ def test_r10_needs_two_children():
     np.testing.assert_array_equal(marks, expected)
 
 
-def test_r10_skips_path_searches_for_adjacent_children(monkeypatch):
-    fci = importlib.import_module("andrey.constraint.fci")
+def test_r10_skips_path_searches_for_adjacent_children():
     a, c, b, d, x, y = range(6)
     marks = _circle_graph(6, [(a, c), (a, x), (a, y), (x, y), (x, b), (y, d)])
     calls = []
-    monkeypatch.setattr(fci, "_exists_uncovered_pd_path", lambda *args: calls.append(args) or True)
 
-    assert fci._r10_connects(marks, [x, y], b, d, a, _neighbor_lists(marks)) is False
+    assert (
+        _r10_connects(marks, [x, y], [b, d], a, lambda *args: calls.append(args) or True) is False
+    )
     assert calls == []
+
+
+def test_r10_searches_each_path_once_per_call(monkeypatch):
+    """Two colliders with the same ``a`` and tails share R10's path searches."""
+    fci = importlib.import_module("andrey.constraint.fci")
+    a, c1, c2, b, d, x, y = range(7)
+    marks = _circle_graph(7, [(a, c1), (a, c2), (a, x), (a, y), (x, b), (y, d)])
+    for c in (c1, c2):
+        marks[c, a] = ARROW
+        for parent in (b, d):
+            marks[parent, c], marks[c, parent] = TAIL, ARROW
+    search, searches = fci._exists_uncovered_pd_path, []
+
+    def counted(marks, a, child, tail, *args, **kwargs):
+        searches.append((a, child, tail))
+        return search(marks, a, child, tail, *args, **kwargs)
+
+    monkeypatch.setattr(fci, "_exists_uncovered_pd_path", counted)
+    implied = fci._Implied()
+
+    assert fci._rule_r10(marks, False, out=implied)
+    assert implied.marks == {(a, c1): {TAIL}, (c1, a): {ARROW}, (a, c2): {TAIL}, (c2, a): {ARROW}}
+    assert len(searches) == len(set(searches))

@@ -87,8 +87,8 @@ def test_minimal_protocol_is_the_guaranteed_floor(clean_registry):
 
 
 def test_unknown_indep_test_raises():
-    """An unregistered name raises NotImplementedError, naming what is available."""
-    with pytest.raises(NotImplementedError, match="unknown indep_test"):
+    """An unregistered name raises ValueError, naming what is available."""
+    with pytest.raises(ValueError, match="indep_test must be one of .*'fisherz'"):
         andrey.pc(_chain_data(), indep_test="does_not_exist")
 
 

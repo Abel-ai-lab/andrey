@@ -87,7 +87,7 @@ def ges_inprocess(
     X = np.asarray(x, dtype=np.float64)
     n = X.shape[1]
     gate, cap = _parent_limits(n, max_parents, parent_rule)
-    score = BICScore(X, lambda_value=1.0, ebic_gamma=ebic_gamma)
+    score = BICScore(X, penalty_discount=1.0, ebic_gamma=ebic_gamma)
     delta_engine = engine(score)
     adj = np.zeros((n, n), dtype=np.int8)
     with threadpool_limits(limits=1):

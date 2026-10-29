@@ -101,7 +101,8 @@ def classify_edge(mark_i: int, mark_j: int, kind: str) -> str:
         The endpoint marks at nodes ``i`` and ``j``: ``TAIL``, ``ARROW``, or ``CIRCLE`` from
         :mod:`andrey.core.structure`.
     kind : str
-        The graph kind (``dag`` / ``cpdag`` / ``pag`` / ``mag`` / ``digraph``). Only
+        The graph kind (``dag`` / ``cpdag`` / ``pag`` / ``mag`` / ``digraph`` /
+        ``undirected``). Only
         ``ARROW``/``ARROW`` reads differently across kinds.
 
     Returns
@@ -114,7 +115,7 @@ def classify_edge(mark_i: int, mark_j: int, kind: str) -> str:
     Raises
     ------
     ValueError
-        If a mark is not ``TAIL``, ``ARROW``, or ``CIRCLE``, or ``kind`` is not one of the five
+        If a mark is not ``TAIL``, ``ARROW``, or ``CIRCLE``, or ``kind`` is not one of the six
         kinds.
 
     Notes
@@ -265,9 +266,10 @@ def draw(
     Parameters
     ----------
     structure : GraphStructure
-        Any kind (``dag`` / ``cpdag`` / ``pag`` / ``digraph``). Its ``.node_types`` flag latent
-        variables, which are drawn hollow and dashed. If every label has at most two characters,
-        all labels sit inside nodes; otherwise, all labels sit below them.
+        Any kind (``dag`` / ``cpdag`` / ``pag`` / ``mag`` / ``digraph`` / ``undirected``). Its
+        ``.node_types`` flag latent variables, which are drawn hollow and dashed. If every label
+        has at most two characters, all labels sit inside nodes; otherwise, all labels sit below
+        them.
     dark : bool, default=False
         Select the built-in dark palette instead of the light one. Ignored when ``palette`` is set.
     palette : Palette or None, default=None

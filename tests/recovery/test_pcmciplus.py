@@ -126,5 +126,5 @@ def test_independent_autocorrelated_series_give_only_self_loops(indep_test):
 
 
 def test_matches_the_recorded_output():
-    out = andrey.pcmciplus(datagen.generate("var_4v_stable"), tau_max=2)
+    out = andrey.pcmciplus(datagen.generate("var_4v_stable"), tau_max=2, indep_test="student_t")
     assert_recorded_output(out, "PCMCIplus", case="var_4v_stable")

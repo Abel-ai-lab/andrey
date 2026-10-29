@@ -23,6 +23,7 @@ from andrey.constraint.blanket import blanket_graph
 from andrey.core import GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
 from andrey.core.orient import dag2cpdag, to_structure
+from andrey.core.warning_policy import warn_search_limit
 from andrey.search.continuous import (
     break_cycles,
     endpoint_marks,
@@ -167,6 +168,8 @@ def _optimize_gated_dag(
         if h_val <= h_tol or rho >= rho_max:
             break
         rho *= rho_mult
+    else:
+        warn_search_limit("calm", "max_iter", max_outer, "penalty rounds")
 
     with torch.no_grad():
         gate_prob = (torch.sigmoid(logit / tau) * mask_t).cpu().numpy()
@@ -267,7 +270,6 @@ def calm(
         dag,
         weighted_adjacency=weighted,
         metadata={
-            "algorithm": "calm",
             "n_edges": int(support.sum()),
             "h_final": h_final,
             "objective": objective,

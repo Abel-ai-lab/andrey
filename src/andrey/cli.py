@@ -38,6 +38,7 @@ from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES, node_labels
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.generate import (
+    concepts_dict,
     env_dict,
     grammar_default,
     grammar_example,
@@ -494,7 +495,9 @@ def _bracket_items(value: str, key: str) -> list[str]:
 
 
 def _check_choice(value: str, param: ParamSpec) -> str:
-    """A string value must be one of the param's choices, when it enumerates any."""
+    """A string value must be one of the param's choices, when it enumerates any; a former value
+    maps to its current one."""
+    value = dict(param.choice_aliases).get(value, value)
     if param.choices and value not in param.choices:
         raise CliError(
             "unsupported_value",
@@ -502,6 +505,14 @@ def _check_choice(value: str, param: ParamSpec) -> str:
             EXIT_USAGE,
             valid_options=list(param.choices),
         )
+    return value
+
+
+def _check_range(value: float, param: ParamSpec) -> float:
+    """A number must lie within the param's bounds."""
+    reason = param.out_of_range(value)
+    if reason is not None:
+        raise CliError("bad_value", reason, EXIT_USAGE)
     return value
 
 
@@ -534,14 +545,14 @@ def _coerce(raw: str, param: ParamSpec) -> object:
         )
     if kind == "int":
         try:
-            return int(value)
+            return _check_range(int(value), param)
         except ValueError:
             raise CliError(
                 "bad_value", f"{param.name} expects an integer, got {value!r}", EXIT_USAGE
             ) from None
     if kind == "float":
         try:
-            return float(value)
+            return _check_range(float(value), param)
         except ValueError:
             raise CliError(
                 "bad_value", f"{param.name} expects a number, got {value!r}", EXIT_USAGE
@@ -606,28 +617,6 @@ def _knowledge_object(value: object, name: str) -> dict:
     return value
 
 
-def _coerce_passthrough(raw: str) -> object:
-    """Sniff an open passthrough value (only where there is no spec, such as CALM): quoted -> str,
-    then null, true/false, int, float, [list], else str."""
-    value, quoted = _unquote(raw)
-    if quoted:
-        return value
-    if value == "":
-        raise CliError("bad_value", "empty value (use key=null for none)", EXIT_USAGE)
-    if value.lower() == "null":
-        return None
-    if value.lower() in ("true", "false"):
-        return value.lower() == "true"
-    for cast in (int, float):
-        try:
-            return cast(value)
-        except ValueError:
-            continue
-    if value.startswith("[") and value.endswith("]"):
-        return [_coerce_passthrough(item) for item in _bracket_items(value, "value")]
-    return value
-
-
 def _validate_config_value(value: object, param: ParamSpec) -> object:
     """A `--config` value is already typed (YAML/JSON): validate against the spec, do not coerce a
     string. Returns tuples for int_pair / str_list."""
@@ -653,13 +642,10 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         raise CliError(
             "bad_value", f"{param.name} in --config is not a valid {param.type}", EXIT_USAGE
         )
-    if param.type == "str" and param.choices and value not in param.choices:
-        raise CliError(
-            "unsupported_value",
-            f"{param.name} must be one of: {', '.join(param.choices)}",
-            EXIT_USAGE,
-            valid_options=list(param.choices),
-        )
+    if param.type == "str":
+        return _check_choice(value, param)  # ty: ignore[invalid-argument-type]  # a str above
+    if param.type in ("int", "float"):
+        return _check_range(value, param)  # ty: ignore[invalid-argument-type]  # a number above
     if param.type in ("int_pair", "str_list"):
         return tuple(value)  # ty: ignore[invalid-argument-type]  # validated list/tuple above
     return value
@@ -734,13 +720,31 @@ def _load_config(path: str) -> dict:
     return data
 
 
+def _current_names(layer: dict, former: dict[str, str], errors: list[dict]) -> dict:
+    """One layer's keys with each former name replaced by its current one; a layer that sets both
+    names of one param is an error."""
+    renamed: dict = {}
+    for key, value in layer.items():
+        name = former.get(key, key)
+        if name in renamed:
+            errors.append(
+                {"param": key, "message": f"{key} and {name} name one param; set it once"}
+            )
+        else:
+            renamed[name] = value
+    return renamed
+
+
 def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tuple[dict, dict]:
     """Layer spec defaults < --config < key=value overrides; coerce / validate against the spec. All
     problems collect into one `invalid_params` envelope (a `details` list)."""
     specs = {p.name: p for p in spec.params}
-    input_names = {i.name for i in spec.data.inputs}
+    former = {alias: p.name for p in spec.params for alias in p.aliases}
+    input_names = {name for i in spec.data.inputs for name in (i.name, *i.aliases)}
     raw_overrides, errors = _parse_overrides(tokens)
     fkwargs: dict = {p.name: p.default for p in spec.params}  # manifest = defaults + config + CLI
+    config = _current_names(config, former, errors)
+    raw_overrides = _current_names(raw_overrides, former, errors)
 
     def _assign(key: str, value: object, *, from_config: bool) -> None:
         # A data array or `method` reaches the facade positionally; letting it also arrive as a
@@ -750,17 +754,17 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
                 {"param": key, "message": f"{key} is a data input / reserved, not a param"}
             )
             return
+        if key in spec.dropped_args:  # the facade ignores it with a DeprecatedArgumentWarning
+            fkwargs[key] = value
+            return
         param = specs.get(key)
-        if param is None and not spec.passthrough:
+        if param is None:
             errors.append(
                 {"param": key, "message": f"unknown param {key!r}", "valid_options": sorted(specs)}
             )
             return
         try:
-            if param is None:  # passthrough (CALM)
-                # a CLI override value is always str (raw_overrides); a config value is pre-typed
-                fkwargs[key] = value if from_config else _coerce_passthrough(value)  # ty: ignore[invalid-argument-type]
-            elif from_config:
+            if from_config:
                 fkwargs[key] = _validate_config_value(value, param)
             else:
                 fkwargs[key] = _coerce(value, param)  # ty: ignore[invalid-argument-type]
@@ -780,8 +784,29 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             details=errors,
             next=[f"andrey run {spec.name} --help --json"],
         )
-    resolved = {k: (list(v) if isinstance(v, tuple) else v) for k, v in fkwargs.items()}
+    resolved = {
+        k: (list(v) if isinstance(v, tuple) else v)
+        for k, v in fkwargs.items()
+        if k not in spec.dropped_args
+    }
     return fkwargs, resolved
+
+
+def _merge_former_inputs(spec: MethodSpec, provided: dict[str, list[str] | None]) -> None:
+    """Move the paths given under a former flag of ``spec``'s first input onto ``--data``.
+
+    A flag that is not a former name of the method's input stays in ``provided``, where
+    :func:`_load_method_inputs` refuses it. Raises ``CliError`` when a call passes both names.
+    """
+    for old in ("data_groups", "data_list"):
+        if provided.get(old) and old in spec.data.inputs[0].aliases:
+            if provided.get("data"):
+                raise CliError(
+                    "bad_input",
+                    f"--{old.replace('_', '-')} is the former name of --data; pass only --data",
+                    EXIT_USAGE,
+                )
+            provided["data"] = provided.pop(old)
 
 
 def _load_method_inputs(
@@ -849,17 +874,11 @@ def _prepare_call(
 ) -> tuple[list, dict, dict, tuple[str, ...] | None]:
     """Shape the loaded inputs and coerced params into what the facade takes.
 
-    A method with its own ``labels`` param (GIN, whose graph adds latent nodes) takes the data's
-    header there, unless ``labels=`` was given. ``categorical=`` names become positions and
-    ``knowledge=`` becomes an ``andrey.Knowledge``. A method that reads column types or knowledge
-    gets the data as a DataFrame, so its warnings name the header's columns. Returns the inputs,
-    params, resolved params, and the labels still to apply to the result.
+    ``categorical=`` names become positions and ``knowledge=`` becomes an ``andrey.Knowledge``. A
+    method that reads column types or knowledge, or whose graph adds latent nodes (GIN), gets the
+    data as a DataFrame, so its warnings and its graph name the header's columns. Returns the
+    inputs, params, resolved params, and the labels still to apply to the result.
     """
-    if labels is not None and any(p.name == "labels" for p in spec.params):
-        if fkwargs["labels"] is None:
-            fkwargs = {**fkwargs, "labels": labels}
-            resolved = {**resolved, "labels": list(labels)}
-        labels = None
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
     if fkwargs.get("target") is not None:
@@ -869,9 +888,12 @@ def _prepare_call(
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
         except (TypeError, ValueError) as exc:
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
-    if labels is not None and any(p.name in ("categorical", "knowledge") for p in spec.params):
+    named = any(p.name in ("categorical", "knowledge") for p in spec.params)
+    if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"]; knowledge names them too, in each group of a panel.
+        # metadata["categorical"]; knowledge names them too, in each group of a panel. A graph
+        # with latent nodes names its observed variables from the table, so no label is left to
+        # apply to the result.
         import pandas as pd
 
         first = positional[0]
@@ -880,6 +902,8 @@ def _prepare_call(
         else:
             first = pd.DataFrame(first, columns=list(labels))
         positional = [first, *positional[1:]]
+        if spec.output.has_latents:
+            labels = None
     return positional, fkwargs, resolved, labels
 
 
@@ -896,7 +920,7 @@ def _fit_errors() -> Generator[None]:
         raise CliError("unsupported_value", str(exc), EXIT_USAGE) from exc
     except KnowledgeError as exc:  # knowledge the data's columns or the search cannot satisfy
         raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
-    except TypeError as exc:  # an unknown passthrough knob reaches the facade as a bad kwarg
+    except TypeError as exc:  # an argument of the wrong type
         raise CliError("unsupported_value", f"{exc}", EXIT_USAGE) from exc
     except (ValueError, ArithmeticError) as exc:  # bad shape / NaN / singular / numeric breakdown
         raise CliError("data_error", f"{type(exc).__name__}: {exc}", EXIT_DATA) from exc
@@ -953,8 +977,7 @@ def execute_run(
 ) -> None:
     """Call the facade on the loaded inputs + coerced params, then emit the result (shell-aware).
 
-    ``labels`` (the data's header) name the result's nodes. A method with its own ``labels`` param
-    (GIN, whose graph adds latent nodes) takes them there, unless ``labels=`` was given.
+    ``labels`` (the data's header) name the result's nodes.
     """
     import time
 
@@ -975,10 +998,9 @@ def execute_run(
         out = with_labels(out, labels)
 
     run = _run_info(positional, resolved, elapsed, caught)
-    if spec.seeded:  # report the *effective* seed (resolve_seed applies the ANDREY_SEED fallback)
-        from andrey.core.seeding import resolve_seed
-
-        run["seed"] = resolve_seed(resolved.get("seed", resolved.get("random_state")))
+    seed = (out[0] if isinstance(out, list) else out).metadata.get("seed")
+    if seed is not None:  # the effective seed: resolve_seed applied the ANDREY_SEED fallback
+        run["seed"] = seed
     env = envelope(spec, out, run)
     _emit(
         env,
@@ -1124,8 +1146,6 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
         for p in spec.params:
             choices = f"  [{', '.join(p.choices)}]" if p.choices else ""
             lines.append(f"  {p.name}={grammar_default(p)}{choices}   {p.doc}")
-    if spec.passthrough:
-        lines += ["", "  <key>=<value>   extra optimizer knobs (passthrough)"]
     flags = "--config <file> (YAML/JSON base), -o <file>, --json, --full"
     if command == "bootstrap":
         lines += [
@@ -1448,6 +1468,7 @@ def cmd_config(
                         "schema_version": SCHEMA_VERSION,
                         "andrey_version": andrey.__version__,
                         "environment": env_dict(),
+                        "concepts": concepts_dict(),
                     },
                     indent=2,
                 )
@@ -1469,15 +1490,16 @@ def cmd_calibrate(
     method: Optional[list[str]] = typer.Option(
         None,
         "--method",
-        help="Measure only this method (ges or skeleton); repeatable. Default: both.",
+        help="Measure only this method (ges, skeleton, or rcot); repeatable. Default: all.",
     ),
     as_json: bool = typer.Option(False, "--json", help="Use JSON even on a terminal."),
 ) -> None:
     """Measure the worker-pool cutoffs on this machine and print the settings to use.
 
     Times serial runs against pooled ones for a few sizes, whole fits for GES and single passes for
-    the skeleton search of PC, FCI, GFCI, and CD-NOD, and sets nothing. It takes a minute or two,
-    and several minutes when the pool never wins (the search then runs up to 256 variables).
+    the skeleton search of PC, FCI, GFCI, and CD-NOD, with Fisher-z and with RCoT, and sets
+    nothing. It takes a few minutes, and longer when the pool never wins (the search then runs up
+    to 256 variables).
     """
     from andrey.core import backend
     from andrey.search import calibrate as cal
@@ -1610,7 +1632,8 @@ _DataOption = Annotated[
         "--data",
         metavar="PATH|-",
         help="Data file, one row per sample: CSV, TSV, or whitespace-separated text (a header row "
-        "names the nodes), or .npy. - reads text from stdin.",
+        "names the nodes), or .npy. - reads text from stdin. A method that takes several datasets "
+        "(a panel) needs the flag once per dataset.",
     ),
 ]
 _DomainIndexOption = Annotated[
@@ -1632,19 +1655,11 @@ _InterventionsOption = Annotated[
 ]
 _DataGroupsOption = Annotated[
     Optional[list[str]],
-    typer.Option(
-        "--data-groups",
-        metavar="PATH",
-        help="multi_group_direct_lingam only: one data file per group; repeat the flag.",
-    ),
+    typer.Option("--data-groups", metavar="PATH", hidden=True, help="Former name of --data."),
 ]
 _DataListOption = Annotated[
     Optional[list[str]],
-    typer.Option(
-        "--data-list",
-        metavar="PATH",
-        help="longitudinal_lingam only: one data file per time point; repeat the flag.",
-    ),
+    typer.Option("--data-list", metavar="PATH", hidden=True, help="Former name of --data."),
 ]
 _ConfigOption = Annotated[
     Optional[str],
@@ -1711,6 +1726,7 @@ def cmd_run(
         "data_groups": data_groups,
         "data_list": data_list,
     }
+    _merge_former_inputs(spec, provided)
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
@@ -1780,6 +1796,7 @@ def cmd_bootstrap(
         "data_groups": data_groups,
         "data_list": data_list,
     }
+    _merge_former_inputs(spec, provided)
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O

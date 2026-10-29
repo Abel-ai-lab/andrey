@@ -9,9 +9,9 @@ fits are spawned in ``.venv-xges`` instead (``benchmarks/start_xges.sh``). Only 
 line: it returns a plain adjacency array, and :meth:`to_structure` runs back in the parent, so
 there is still one graph model and one scorer over the whole table.
 
-Penalty. ``alpha`` scales the same quantity as Andrey's ``lambda_value``. XGES's local score is
+Penalty. ``alpha`` scales the same quantity as Andrey's ``penalty_discount``. XGES's local score is
 ``-0.5*n*(1 + log sigma) - 0.5*log(n)*(k+1)*alpha`` in log-likelihood units; Andrey's is
-``n*log(R) + log(n)*k*lambda_value`` in deviance units, which is the same expression times ``-0.5``
+``n*log(R) + log(n)*k*penalty_discount`` in deviance units, which is the same expression times ``-0.5``
 apart from terms that do not vary with the parent set (the ``-0.5*n``, the ``+1`` in ``(k+1)``, and
 the covariance ``ddof``). Those cancel in every insert, delete, and reverse delta, so matching the
 two knobs numerically matches the two penalties. XGES's own default is ``alpha=2.0``, twice
@@ -42,8 +42,8 @@ import numpy as np
 #: variable; the adapter only names it, because the path is a fact about the machine.
 PYTHON_ENV_VAR = "ANDREY_BENCH_XGES_PYTHON"
 
-#: BIC penalty weight, on Andrey's ``lambda_value`` scale (see the module docstring). This is the
-#: value that matches ``andrey.ges``'s shipped ``lambda_value=1.0``.
+#: BIC penalty weight, on Andrey's ``penalty_discount`` scale (see the module docstring). This is the
+#: value that matches ``andrey.ges``'s shipped ``penalty_discount=1.0``.
 DEFAULT_ALPHA = 1.0
 
 #: What ``pip install xges`` searches under, which is twice the penalty Andrey ships.

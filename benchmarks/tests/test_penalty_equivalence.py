@@ -58,10 +58,10 @@ def _score_deltas(node: int, covs, cl_lambda: float, andrey_lam: float):
     cl_cov, andrey_cov = covs
     sets = [[p for p in parents if p != node] for parents in _PARENT_SETS]
     cl_base = local_score_BIC_from_cov((cl_cov, _N), node, sets[0], {"lambda_value": cl_lambda})
-    andrey_base = local_score_bic(andrey_cov, _N, node, sets[0], lambda_value=andrey_lam)
+    andrey_base = local_score_bic(andrey_cov, _N, node, sets[0], penalty_discount=andrey_lam)
     for parents in sets[1:]:
         cl = local_score_BIC_from_cov((cl_cov, _N), node, parents, {"lambda_value": cl_lambda})
-        andrey = local_score_bic(andrey_cov, _N, node, parents, lambda_value=andrey_lam)
+        andrey = local_score_bic(andrey_cov, _N, node, parents, penalty_discount=andrey_lam)
         yield cl - cl_base, andrey - andrey_base
 
 

@@ -157,7 +157,7 @@ def _delta_via_full_score(
     u: int,
     op: str,
     *,
-    lambda_value: float,
+    penalty_discount: float,
     log_n: float,
     ebic_gamma: float = 0.0,
 ) -> float:
@@ -172,10 +172,16 @@ def _delta_via_full_score(
     else:
         raise ValueError(f"unknown op: {op!r} (expected 'add' or 'remove')")
     s_old = local_score_bic(
-        cov, n, v, list(S_old), lambda_value=lambda_value, ebic_gamma=ebic_gamma, log_n=log_n
+        cov,
+        n,
+        v,
+        list(S_old),
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        log_n=log_n,
     )
     s_new = local_score_bic(
-        cov, n, v, S_new, lambda_value=lambda_value, ebic_gamma=ebic_gamma, log_n=log_n
+        cov, n, v, S_new, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma, log_n=log_n
     )
     return _difference(s_new, s_old)
 
@@ -195,7 +201,7 @@ def local_score_bic_delta(
     u: int,
     op: str,
     *,
-    lambda_value: float,
+    penalty_discount: float,
     log_n: float,
     ebic_gamma: float = 0.0,
     inv_cov_cache: dict[Any, Any],
@@ -225,7 +231,7 @@ def local_score_bic_delta(
         Variable being added or removed.
     op : {"add", "remove"}
         Move direction.
-    lambda_value : float
+    penalty_discount : float
         Penalty discount on the BIC complexity term.
     log_n : float
         Precomputed ``log(n)``.
@@ -260,7 +266,7 @@ def local_score_bic_delta(
                     list(S_old_sorted),
                     u,
                     op,
-                    lambda_value=lambda_value,
+                    penalty_discount=penalty_discount,
                     log_n=log_n,
                     ebic_gamma=ebic_gamma,
                 )
@@ -277,7 +283,7 @@ def local_score_bic_delta(
             list(S_old_sorted),
             u,
             op,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             log_n=log_n,
             ebic_gamma=ebic_gamma,
         )
@@ -299,7 +305,7 @@ def local_score_bic_delta(
                     list(S_old_sorted),
                     u,
                     op,
-                    lambda_value=lambda_value,
+                    penalty_discount=penalty_discount,
                     log_n=log_n,
                     ebic_gamma=ebic_gamma,
                 )
@@ -319,7 +325,7 @@ def local_score_bic_delta(
                 list(S_old_sorted),
                 u,
                 op,
-                lambda_value=lambda_value,
+                penalty_discount=penalty_discount,
                 log_n=log_n,
                 ebic_gamma=ebic_gamma,
             )
@@ -332,11 +338,11 @@ def local_score_bic_delta(
                 list(S_old_sorted),
                 u,
                 op,
-                lambda_value=lambda_value,
+                penalty_discount=penalty_discount,
                 log_n=log_n,
                 ebic_gamma=ebic_gamma,
             )
-        delta = n * (_log(R_v_new) - _log(R_v_old)) + log_n * lambda_value
+        delta = n * (_log(R_v_new) - _log(R_v_old)) + log_n * penalty_discount
         if ebic_gamma:
             delta += ebic_step(len(S_old_sorted), cov.shape[0], ebic_gamma)
         S_new_sorted = _insert_sorted(S_old_sorted, u)
@@ -361,7 +367,7 @@ def local_score_bic_delta(
                     list(S_old_sorted),
                     u,
                     op,
-                    lambda_value=lambda_value,
+                    penalty_discount=penalty_discount,
                     log_n=log_n,
                     ebic_gamma=ebic_gamma,
                 )
@@ -381,7 +387,7 @@ def local_score_bic_delta(
                 list(S_old_sorted),
                 u,
                 op,
-                lambda_value=lambda_value,
+                penalty_discount=penalty_discount,
                 log_n=log_n,
                 ebic_gamma=ebic_gamma,
             )
@@ -394,11 +400,11 @@ def local_score_bic_delta(
                 list(S_old_sorted),
                 u,
                 op,
-                lambda_value=lambda_value,
+                penalty_discount=penalty_discount,
                 log_n=log_n,
                 ebic_gamma=ebic_gamma,
             )
-        delta = n * (_log(R_v_new) - _log(R_v_old)) - log_n * lambda_value
+        delta = n * (_log(R_v_new) - _log(R_v_old)) - log_n * penalty_discount
         if ebic_gamma:
             delta -= ebic_step(len(S_new_sorted), cov.shape[0], ebic_gamma)
         residual_cache[(v, S_new_sorted)] = float(R_v_new)
@@ -523,7 +529,7 @@ def _penalty_size(score_obj: BICScore, s: int) -> float:
     It is the linear penalty of ``s + 1`` parents, plus, when ``ebic_gamma`` is not 0, the largest
     extended-BIC term, that of half the other variables.
     """
-    penalty = score_obj.log_n * (s + 1) * score_obj.lambda_value
+    penalty = score_obj.log_n * (s + 1) * score_obj.penalty_discount
     if score_obj.ebic_gamma:
         n_vars = score_obj.cov.shape[0]
         penalty += ebic_penalty((n_vars - 1) // 2, n_vars, score_obj.ebic_gamma)
@@ -575,7 +581,7 @@ def score_many_with_base(
     cov = score_obj.cov
     n = score_obj.n
     log_n = score_obj.log_n
-    lam = score_obj.lambda_value
+    lam = score_obj.penalty_discount
     gamma = score_obj.ebic_gamma
     n_vars = cov.shape[0]
     cov_diag = score_obj._cov_diag
@@ -966,7 +972,7 @@ def delta_many_with_base(
     Parameters
     ----------
     score_obj : BICScore
-        The base score supplying ``cov``, ``n``, ``log_n``, and ``lambda_value``.
+        The base score supplying ``cov``, ``n``, ``log_n``, and ``penalty_discount``.
     i : int
         Target node whose local score is differenced.
     base_parents : sequence of int
@@ -987,7 +993,7 @@ def delta_many_with_base(
     cov = score_obj.cov
     n = score_obj.n
     log_n = score_obj.log_n
-    lam = score_obj.lambda_value
+    lam = score_obj.penalty_discount
     gamma = score_obj.ebic_gamma
     n_vars = cov.shape[0]
     cov_diag = score_obj._cov_diag
@@ -1157,7 +1163,7 @@ def add_deltas(
     Parameters
     ----------
     score_obj : BICScore
-        The base score supplying ``cov``, ``n``, ``log_n``, and ``lambda_value``.
+        The base score supplying ``cov``, ``n``, ``log_n``, and ``penalty_discount``.
     i : int
         Target node whose local score is differenced.
     base_parents : sequence of int
@@ -1190,7 +1196,7 @@ def add_deltas(
         e = cov[i] - cov[i, S_list] @ beta
         R_u = score_obj._cov_diag - np.einsum("ij,ij->j", cs, beta)
     R_v = float(e[i])  # e_ii is R(i | base)
-    penalty = score_obj.log_n * score_obj.lambda_value
+    penalty = score_obj.log_n * score_obj.penalty_discount
     if score_obj.ebic_gamma:
         penalty += ebic_step(len(S_list), cov.shape[0], score_obj.ebic_gamma)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -1226,7 +1232,7 @@ def remove_deltas(
     Parameters
     ----------
     score_obj : BICScore
-        The base score supplying ``cov``, ``n``, ``log_n``, and ``lambda_value``.
+        The base score supplying ``cov``, ``n``, ``log_n``, and ``penalty_discount``.
     i : int
         Target node whose local score is differenced.
     base_parents : sequence of int
@@ -1253,7 +1259,7 @@ def remove_deltas(
     b = M @ cs_i
     R_v = float(cov[i, i] - cs_i @ b)
     M_diag = np.diag(M)
-    penalty = score_obj.log_n * score_obj.lambda_value
+    penalty = score_obj.log_n * score_obj.penalty_discount
     if score_obj.ebic_gamma:
         penalty += ebic_step(len(S_list) - 1, cov.shape[0], score_obj.ebic_gamma)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -1273,7 +1279,7 @@ class DeltaBICScore:
     Wraps a :class:`BICScore` and owns the caches that amortize repeated moves: the inv-cov cache
     that every surface shares, and the residual cache of the scalar :meth:`delta`. It exposes
     :meth:`delta` (scalar) and :meth:`score_many_with_base` (batched) for HC/GST. All BIC
-    constants (covariance, sample count, ``log_n``, ``lambda_value``, ``ebic_gamma``) are read
+    constants (covariance, sample count, ``log_n``, ``penalty_discount``, ``ebic_gamma``) are read
     from the wrapped score. The batched scores come with a bound on their distance from
     :meth:`BICScore.score` (:func:`score_many_with_base`); the scalar :meth:`delta` routes only
     near-singular parent sets to full scores.
@@ -1303,7 +1309,7 @@ class DeltaBICScore:
             S_old_sorted,
             u,
             op,
-            lambda_value=self.score_obj.lambda_value,
+            penalty_discount=self.score_obj.penalty_discount,
             log_n=self.score_obj.log_n,
             ebic_gamma=self.score_obj.ebic_gamma,
             inv_cov_cache=self.inv_cov_cache,

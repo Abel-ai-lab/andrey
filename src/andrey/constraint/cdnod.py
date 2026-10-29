@@ -55,6 +55,7 @@ from andrey.constraint.pc import (
     _undirect_conflicts,
     check_collider_order,
     check_knowledge_cycle,
+    collider_conflicts,
     vote_colliders,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
@@ -84,7 +85,9 @@ def cdnod(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
+    _conflicts: set[tuple[int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -109,10 +112,14 @@ def cdnod(
     step, which orients only undirected edges, so it never orients against them. ``workers``
     worker processes share the skeleton search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions
+    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
+    ``GraphStructure`` tagged ``"cpdag"``: its directions
     include those the index identifies, so it is not an observational CPDAG. The private
     ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
-    ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``.
+    ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``, and the private
+    ``_conflicts`` sink the edges between variables that colliders ask to orient both ways
+    (:func:`~andrey.constraint.pc.collider_conflicts`).
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -143,10 +150,11 @@ def cdnod(
             workers=workers,
             max_depth=max_depth,
             constraints=constraints,
+            seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
         if collider_rule != "sepsets":
-            test = make_indep_test(indep_test, X, categorical=categorical)
+            test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
             ambiguous |= vote_colliders(
                 skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
             )
@@ -172,10 +180,11 @@ def cdnod(
             workers=workers,
             max_depth=max_depth,
             constraints=padded,
+            seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
         if collider_rule != "sepsets":
-            test = make_indep_test(indep_test, augmented, categorical=mask)
+            test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()
             through_context = {(a, d, c) for a, c in combinations(sources, 2)}
             ambiguous |= vote_colliders(
@@ -208,6 +217,9 @@ def cdnod(
             )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
+    if _conflicts is not None:
+        found = collider_conflicts(skeleton, sepsets, ambiguous)
+        _conflicts.update((a, b) for a, b in found if b < d)
     completed = _undirect_conflicts(
         meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
     )

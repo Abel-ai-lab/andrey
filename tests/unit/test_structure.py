@@ -526,6 +526,17 @@ def test_validate_rejects_undirected_in_digraph():
         _undirected_graph([(0, 1)], 2, kind="digraph").validate()
 
 
+def test_an_undirected_graph_holds_undirected_edges_only():
+    graph = _undirected_graph([(0, 1), (1, 2)], 3, kind="undirected")
+    graph.validate()
+    assert graph.oriented_edges() == [(0, 1, "undirected"), (1, 2, "undirected")]
+    assert graph == GraphStructure.from_numpy(graph.to_numpy(), kind="undirected")
+    M = np.zeros((2, 2), dtype=np.int8)
+    M[0, 1], M[1, 0] = TAIL, ARROW
+    with pytest.raises(ValueError, match="arrowhead"):
+        GraphStructure.from_numpy(M, kind="undirected").validate()
+
+
 def test_validate_rejects_circle_in_digraph():
     M = np.zeros((2, 2), dtype=np.int8)
     M[0, 1], M[1, 0] = CIRCLE, ARROW

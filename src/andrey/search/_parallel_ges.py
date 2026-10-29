@@ -518,7 +518,7 @@ def _init_worker(
     cov: np.ndarray,
     n_samples: int,
     n_vars: int,
-    lambda_value: float,
+    penalty_discount: float,
     ebic_gamma: float,
     run_token: object,
     ranks: list[int],
@@ -529,7 +529,7 @@ def _init_worker(
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
     Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a pure function
     of the parent set, so it persists across tasks and passes for free. ``n_samples`` is the
-    observation count the BIC penalty uses, ``lambda_value`` and ``ebic_gamma`` its weights;
+    observation count the BIC penalty uses, ``penalty_discount`` and ``ebic_gamma`` its weights;
     ``n_vars`` is the graph's node count; ``ranks`` holds each column's tie rank.
     """
     global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS, _WORKER_RANKS
@@ -537,7 +537,7 @@ def _init_worker(
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _WORKER_DELTA = DeltaBICScore(
-        BICScore.from_cov(cov, n_samples, lambda_value=lambda_value, ebic_gamma=ebic_gamma)
+        BICScore.from_cov(cov, n_samples, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
     )
     _WORKER_N = n_vars
     _WORKER_TOKEN = run_token
@@ -659,7 +659,7 @@ def _create_pool(
     cov: np.ndarray,
     n_samples: int,
     n_vars: int,
-    lambda_value: float,
+    penalty_discount: float,
     ebic_gamma: float,
     run_token: object,
     workers: int,
@@ -670,7 +670,7 @@ def _create_pool(
         n_vars,
         workers,
         _init_worker,
-        (cov, n_samples, n_vars, lambda_value, ebic_gamma, run_token, ranks),
+        (cov, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
         context=_pick_context(),
     )
 
@@ -696,12 +696,14 @@ class _LazyWorkerSet:
     def get(self) -> par.StableWorkerSet:
         if self._wset is None:
             score = self._score
-            self.token = hash((score.cov.tobytes(), score.n, score.lambda_value, score.ebic_gamma))
+            self.token = hash(
+                (score.cov.tobytes(), score.n, score.penalty_discount, score.ebic_gamma)
+            )
             self._wset = _create_pool(
                 score.cov,
                 score.n,
                 self._n_vars,
-                score.lambda_value,
+                score.penalty_discount,
                 score.ebic_gamma,
                 self.token,
                 self._workers,

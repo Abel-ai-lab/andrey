@@ -197,7 +197,7 @@ FIXED_PAIRS = {"anm": _anm_pair, "pnl": _pnl_pair}
 @pytest.mark.parametrize("name", PAIRS)
 def test_the_fixed_pair_tells_its_direction_clearly(name):
     out = getattr(andrey, name)(FIXED_PAIRS[name]())
-    assert out.metadata["pval_forward"] > 0.5 and out.metadata["pval_backward"] < 0.05
+    assert out.metadata["p_values"]["forward"] > 0.5 > 0.05 > out.metadata["p_values"]["backward"]
 
 
 @pytest.mark.parametrize("rate", RATES)

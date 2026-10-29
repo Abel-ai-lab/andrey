@@ -81,8 +81,8 @@ def test_calm_recovers_the_true_class() -> None:
 def test_calm_is_deterministic() -> None:
     pytest.importorskip("torch")
     X, _ = _random_sem(6, 800, 0.35, seed=3)
-    first = andrey.calm(X, seed=0, subproblem_iter=100, max_outer=2)
-    second = andrey.calm(X, seed=0, subproblem_iter=100, max_outer=2)
+    first = andrey.calm(X, seed=0, subproblem_iter=100, max_iter=2)
+    second = andrey.calm(X, seed=0, subproblem_iter=100, max_iter=2)
     assert first.structure.oriented_edges() != []
     assert first == second
 
@@ -90,7 +90,7 @@ def test_calm_is_deterministic() -> None:
 def test_calm_output_contract(tree_fit) -> None:
     assert isinstance(tree_fit.structure, GraphStructure)
     assert tree_fit.structure.kind == "dag"
-    assert tree_fit.metadata["algorithm"] == "CALM"
+    assert tree_fit.metadata["algorithm"] == "calm"
     assert tree_fit.metadata["seed"] == 0
     assert tree_fit.weighted_adjacency.shape == (5, 5)
 
@@ -100,7 +100,7 @@ def test_calm_rejects_a_non_finite_loss() -> None:
     pytest.importorskip("torch")
     X, _ = _random_sem(4, 300, 0.4, seed=1)
     with pytest.raises(ValueError, match="not finite"):
-        andrey.calm(X * 1e170, use_moral_graph=False, subproblem_iter=100, max_outer=2)
+        andrey.calm(X * 1e170, use_moral_graph=False, subproblem_iter=100, max_iter=2)
 
 
 def test_calm_leaves_the_global_torch_generator_alone() -> None:
@@ -110,5 +110,5 @@ def test_calm_leaves_the_global_torch_generator_alone() -> None:
     torch.manual_seed(123)
     expected = torch.rand(3)
     torch.manual_seed(123)
-    andrey.calm(X, seed=0, subproblem_iter=60, max_outer=1)
+    andrey.calm(X, seed=0, subproblem_iter=60, max_iter=1)
     assert torch.equal(torch.rand(3), expected)
