@@ -41,7 +41,14 @@ def test_the_envelope_is_the_runs_with_the_averaged_graph_and_the_frequencies(cs
     assert code == 0
     assert env["schema_version"] == SCHEMA_VERSION
     assert (env["method"], env["status"]) == ("pc", "supported")
-    assert env["bootstrap"] == {"n_boot": 6, "threshold": 0.5, "seed": 3, "block_length": None}
+    assert env["bootstrap"] == {
+        "n_boot": 6,
+        "threshold": 0.5,
+        "seed": 3,
+        "resampling": "subsample",
+        "sample_fraction": 0.5,
+        "block_length": None,
+    }
     assert env["structure"]["labels"] == ["a", "b", "c", "d"]
     assert env["structure"]["kind"] == "cpdag" and env["structure"]["n_edges"] == 2
     assert env["run"]["params"]["alpha"] == 0.01 and "seed" not in env["run"]["params"]
@@ -66,6 +73,22 @@ def test_the_threshold_flag_sets_the_averaged_graph(csv_path, capsys):
     assert loose["frequencies"] == strict["frequencies"]
 
 
+def test_the_resampling_flags_reach_the_fits_and_the_envelope(csv_path, capsys):
+    base = ["bootstrap", "hc", "--data", str(csv_path), "--n-boot", "5", "--seed", "1", "--json"]
+    data = pd.read_csv(csv_path)
+    for flags, kwargs in (
+        ([], {}),
+        (["--sample-fraction", "0.8"], {"sample_fraction": 0.8}),
+        (["--resampling", "bootstrap"], {"resampling": "bootstrap"}),
+    ):
+        code, out, _ = _run([*base, *flags], capsys)
+        env = json.loads(out)
+        api = andrey.bootstrap("hc", data, n_boot=5, seed=1, **kwargs)
+        assert code == 0 and env["frequencies"] == api.table(index=True)
+        assert env["bootstrap"]["resampling"] == api.metadata["resampling"]
+        assert env["bootstrap"]["sample_fraction"] == api.metadata["sample_fraction"]
+
+
 def test_the_bootstrap_seeds_a_seeded_method_and_rejects_its_own_seed(csv_path, capsys):
     base = ["bootstrap", "boss", "--data", str(csv_path), "--n-boot", "3", "--json"]
     code, _out, err = _run([*base, "seed=2"], capsys)
@@ -76,7 +99,15 @@ def test_the_bootstrap_seeds_a_seeded_method_and_rejects_its_own_seed(csv_path, 
 
 @pytest.mark.parametrize(
     "flags",
-    [["--n-boot", "0"], ["--threshold", "0"], ["--threshold", "1.5"], ["--seed", "-1"]],
+    [
+        ["--n-boot", "0"],
+        ["--threshold", "0"],
+        ["--threshold", "1.5"],
+        ["--seed", "-1"],
+        ["--sample-fraction", "0"],
+        ["--sample-fraction", "1.5"],
+        ["--resampling", "jackknife"],
+    ],
 )
 def test_a_flag_out_of_range_is_a_usage_error(csv_path, capsys, flags):
     code, _out, err = _run(["bootstrap", "pc", "--data", str(csv_path), *flags], capsys)
@@ -112,7 +143,12 @@ def test_a_time_series_names_the_lag_of_each_frequency(tmp_path, capsys):
     code, out, _ = _run([*argv, "--json"], capsys)
     env = json.loads(out)
     assert code == 0 and env["structure"]["type"] == "temporal"
-    assert env["bootstrap"]["block_length"] == 30
+    assert env["bootstrap"]["block_length"] == 30 and env["bootstrap"]["resampling"] == "bootstrap"
+    code, out, _ = _run([*argv[:-2], "--resampling", "subsample", "--json"], capsys)
+    stretch = json.loads(out)["bootstrap"]
+    assert code == 0 and stretch["resampling"] == "subsample" and stretch["block_length"] is None
+    code, _out, err = _run([*argv, "--resampling", "subsample"], capsys)
+    assert code == 2 and "--block-length" in json.loads(err)["error"]["message"]
     assert env["frequencies"][0]["lag"] == 1 and env["frequencies"][0]["frequency"] == 1.0
 
 
@@ -178,6 +214,12 @@ def test_the_help_and_the_contract_describe_the_command(capsys):
     cli = help_schema()["cli"]["bootstrap"]
     assert cli["invocation"].startswith("andrey bootstrap <method> --data")
     assert "frequencies" in cli["envelope"] and "gin" in cli["what"]
+    for flag in ("--resampling", "--sample-fraction"):
+        assert flag in cli["invocation"] and flag in out
+    params = cli["parameters"]
+    assert params["resampling"]["enum"][:2] == ["subsample", "bootstrap"]
+    assert params["sample_fraction"]["exclusiveMinimum"] == 0
+    assert params["sample_fraction"]["maximum"] == 1 and params["sample_fraction"]["default"] == 0.5
 
 
 def test_the_agent_guide_explains_when_to_bootstrap_and_how_to_read_it():

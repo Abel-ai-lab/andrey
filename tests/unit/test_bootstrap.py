@@ -240,7 +240,13 @@ def test_a_seed_gives_the_same_resamples_whatever_the_number_of_fits():
     assert all(not np.array_equal(w, weights[0]) for w in weights[1:])  # the resamples differ
     assert any(not np.array_equal(f.weighted_adjacency, g.weighted_adjacency)
                for f, g in zip(short.fits, other.fits))  # fmt: skip
-    assert short.metadata == {"method": "direct_lingam", "seed": 7, "block_length": None}
+    assert short.metadata == {
+        "method": "direct_lingam",
+        "seed": 7,
+        "resampling": "subsample",
+        "sample_fraction": 0.5,
+        "block_length": None,
+    }
     assert short.fits is not None and bootstrap("hc", data, n_boot=2).fits is None
 
 
@@ -358,8 +364,15 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
         bootstrap("pc", lingam_data(), n_boot=2).frequency("->", lag=1)
 
 
+def job_of(name, data, unit, resampling, fraction=0.5, *, seed=0, block_length=None):
+    """The job a worker draws a resample from, without the call that builds it."""
+    return _Job(
+        name, data, {}, {}, seed, unit, block_length, False, "auto", "rank", resampling, fraction
+    )
+
+
 def test_the_blocks_are_consecutive_rows_of_the_series():
-    job = _Job("pcmci", np.zeros((50, 2)), {}, {}, 0, "blocks", 8, None, "auto", "rank")
+    job = job_of("pcmci", np.zeros((50, 2)), "blocks", "bootstrap", block_length=8)
     for b in range(5):
         (idx,) = _draw(job, b)
         assert len(idx) == 50 and idx.min() >= 0 and idx.max() < 50
@@ -377,6 +390,95 @@ def test_a_panel_of_time_points_resamples_the_units():
     assert isinstance(out.structure, TemporalStructure)
     with pytest.raises(ValueError, match="same units"):
         bootstrap("longitudinal_lingam", [panel[0], panel[1].iloc[:100]], n_boot=2)
+
+
+# ---- resampling ----------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("n", "fraction"), [(100, 0.5), (101, 0.5), (7, 0.5), (240, 0.9), (60, 0.35), (50, 1.0)]
+)
+def test_a_subsample_draws_the_rounded_share_of_distinct_rows_in_their_order(n, fraction):
+    job = job_of("pc", np.zeros((n, 2)), "rows", "subsample", fraction, seed=3)
+    draws = [_draw(job, b)[0] for b in range(20)]
+    for idx in draws:
+        assert len(idx) == round(fraction * n) and len(set(idx.tolist())) == len(idx)
+        assert idx.min() >= 0 and idx.max() < n and np.all(np.diff(idx) > 0)
+    assert (len({tuple(idx) for idx in draws}) == 1) == (fraction == 1)  # the resamples differ
+    assert all(np.array_equal(_draw(job, b)[0], draws[b]) for b in range(20))  # (seed, b) alone
+
+
+def test_a_bootstrap_resample_is_n_rows_drawn_with_replacement_from_the_seed():
+    job = job_of("pc", np.zeros((80, 2)), "rows", "bootstrap", seed=3)
+    for b in range(5):
+        rng = np.random.default_rng(np.random.SeedSequence(3, spawn_key=(b, 0)))
+        assert np.array_equal(_draw(job, b)[0], rng.integers(0, 80, size=80))
+
+
+@pytest.mark.parametrize("resampling", ["bootstrap", "subsample"])
+def test_each_fit_is_the_method_on_the_rows_its_resample_draws(resampling):
+    data = lingam_data(150)
+    out = bootstrap("hc", data, n_boot=4, seed=5, resampling=resampling, keep_fits=True)
+    job = job_of("hc", data, "rows", resampling, seed=5)
+    assert out.fits is not None
+    for b, fit in enumerate(out.fits):
+        assert fit == andrey.hc(data.iloc[_draw(job, b)[0]].reset_index(drop=True))
+    if resampling == "bootstrap":  # the scheme of every release before sample_fraction
+        for b in range(4):
+            rng = np.random.default_rng(np.random.SeedSequence(5, spawn_key=(b, 0)))
+            assert np.array_equal(_draw(job, b)[0], rng.integers(0, 150, size=150))
+
+
+def test_a_series_subsample_is_one_stretch_of_consecutive_rows():
+    job = job_of("pcmci", np.zeros((50, 2)), "blocks", "subsample", 0.4, seed=1)
+    starts = set()
+    for b in range(20):
+        (idx,) = _draw(job, b)
+        assert len(idx) == 20 and np.array_equal(np.diff(idx), np.ones(19, dtype=int))
+        assert idx.min() >= 0 and idx.max() < 50
+        starts.add(int(idx[0]))
+    assert len(starts) > 1
+
+
+def test_a_panel_subsample_keeps_the_same_units_in_every_dataset_and_each_groups_own_rows():
+    units = job_of("longitudinal_lingam", [np.zeros((30, 2))] * 4, "units", "subsample", 0.5)
+    idx = _draw(units, 0)
+    assert len(idx) == 4 and all(np.array_equal(ix, idx[0]) for ix in idx)
+    assert len(idx[0]) == 15 and len(set(idx[0].tolist())) == 15
+    groups = job_of(
+        "multi_group_direct_lingam", [np.zeros((120, 2)), np.zeros((180, 2))], "groups", "subsample"
+    )
+    first, second = _draw(groups, 0)
+    assert (len(first), len(second)) == (60, 90) and len(set(second.tolist())) == 90
+
+
+def test_resampling_defaults_to_a_subsample_and_a_single_series_keeps_its_blocks():
+    data = lingam_data()
+    default = bootstrap("hc", data, n_boot=2)
+    assert (default.metadata["resampling"], default.metadata["sample_fraction"]) == (
+        "subsample",
+        0.5,
+    )
+    drawn = bootstrap("hc", data, n_boot=2, resampling="bootstrap", sample_fraction=0.2)
+    assert drawn.metadata["resampling"] == "bootstrap" and drawn.metadata["sample_fraction"] is None
+    assert bootstrap("hc", data, n_boot=2, sample_fraction=0.2).metadata["sample_fraction"] == 0.2
+    blocks = bootstrap("pcmci", series(), n_boot=2, tau_max=1)
+    assert blocks.metadata["resampling"] == "bootstrap" and blocks.metadata["block_length"] == 7
+    assert blocks.metadata["sample_fraction"] is None
+    stretch = bootstrap("pcmci", series(), n_boot=2, tau_max=1, resampling="subsample")
+    assert (
+        stretch.metadata["resampling"] == "subsample" and stretch.metadata["block_length"] is None
+    )
+    panel = [lingam_data(120, seed) for seed in range(3)]
+    assert bootstrap("longitudinal_lingam", panel, n_boot=2).metadata["resampling"] == "subsample"
+
+
+def test_a_subsample_of_every_row_gives_every_fit_the_fit_on_the_data():
+    data = lingam_data(200)
+    out = bootstrap("direct_lingam", data, n_boot=3, seed=0, sample_fraction=1.0, keep_fits=True)
+    assert out.fits is not None
+    for fit in out.fits:
+        assert np.array_equal(fit.weighted_adjacency, andrey.direct_lingam(data).weighted_adjacency)
 
 
 # ---- the call ------------------------------------------------------------------------------------
@@ -407,6 +509,17 @@ def test_the_arguments_are_checked_before_any_fit():
         bootstrap("hc", data, n_boot=2, block_length=5)
     with pytest.raises(TypeError, match="keep_fits"):
         bootstrap("hc", data, n_boot=2, keep_fits=1)
+    with pytest.raises(ValueError, match="resampling must be one of"):
+        bootstrap("hc", data, n_boot=2, resampling="jackknife")
+    for fraction in (0, -0.5, 1.5, float("nan")):
+        with pytest.raises(ValueError, match="sample_fraction must be a number in"):
+            bootstrap("hc", data, n_boot=2, sample_fraction=fraction)
+    with pytest.raises(TypeError, match="sample_fraction"):
+        bootstrap("hc", data, n_boot=2, sample_fraction="half")
+    with pytest.raises(ValueError, match="at least 2 rows"):
+        bootstrap("hc", data.iloc[:20], n_boot=2, sample_fraction=0.05)
+    with pytest.raises(ValueError, match="block_length is for resampling='bootstrap'"):
+        bootstrap("pcmci", series(), n_boot=2, resampling="subsample", block_length=5)
 
 
 @pytest.mark.parametrize("workers", [1, 2])

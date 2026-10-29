@@ -43,8 +43,8 @@ def test_pc_bootstrap_recovers_the_cpdag():
     absent = out.frequency("absent")
     assert all(absent[i, j] <= 0.05 for i, j in EDGES)  # every true pair is adjacent in the fits
     for source, target in EDGES[:3]:
-        # Duplicated rows make a test see more evidence than the sample holds, so some resamples
-        # keep a spurious edge between the collider's parents and leave the orientation open.
+        # Some resamples keep a spurious edge between the collider's parents and leave the
+        # orientation open.
         assert out.frequency("->")[source, target] >= 0.7
         assert graph.endpoints(source, target) == (TAIL, ARROW)
     assert out.frequency("--")[4, 5] >= 0.9 and graph.endpoints(4, 5) == (TAIL, TAIL)
@@ -57,11 +57,20 @@ def test_pc_bootstrap_recovers_the_cpdag():
 
 @pytest.mark.parametrize("method", ["ges", "boss"])
 def test_score_and_permutation_searches_recover_the_cpdag(method):
-    out = andrey.bootstrap(method, simulate(gaussian), n_boot=N_BOOT, seed=0)
+    # BOSS keeps an edge between the collider's parents on some samples (seed 0 is one) in the fit
+    # on the data itself; this sample is one where that fit is right, so the test is whether the
+    # resamples keep it.
+    data = simulate(gaussian, seed=3)
+    truth = {tuple(sorted(edge)) for edge in EDGES}
+
+    def adjacencies(graph):
+        return {tuple(sorted(pair)) for pair in zip(*np.nonzero(graph.to_numpy()))}
+
+    assert adjacencies(getattr(andrey, method)(data).structure) == truth
+    out = andrey.bootstrap(method, data, n_boot=N_BOOT, seed=0)
     present = 1 - out.frequency("absent")
     assert all(present[i, j] >= 0.9 for i, j in EDGES)
-    adjacencies = {tuple(sorted(pair)) for pair in zip(*np.nonzero(out.structure.to_numpy()))}
-    assert adjacencies == {tuple(sorted(edge)) for edge in EDGES}
+    assert adjacencies(out.structure) == truth
 
 
 def test_lingam_bootstrap_recovers_the_dag_and_its_directions():

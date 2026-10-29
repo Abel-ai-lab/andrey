@@ -886,15 +886,14 @@ def _job(
                 f"sample_fraction {sample_fraction} of {too_few[0]} rows is "
                 f"{_kept(too_few[0], sample_fraction)}; a subsample needs at least 2 rows"
             )
+    if unit != "blocks" and block_length is not None:
+        raise ValueError(f"block_length is for a time-series method on one series, not {spec.name}")
     if unit == "blocks" and resampling == "bootstrap":
         n = sizes[0]
         length = math.ceil(n ** (1 / 3)) if block_length is None else block_length
         block_length = int_in_range(length, "block_length", 1, n)
     elif block_length is not None:
-        raise ValueError(
-            "block_length is for resampling='bootstrap' of a time-series method on one series, "
-            f"not {spec.name} with resampling={resampling!r}"
-        )
+        raise ValueError("block_length is for resampling='bootstrap', not resampling='subsample'")
     aligned = {}
     for entry in spec.data.inputs[1:]:
         value = kwargs.pop(entry.name, None)

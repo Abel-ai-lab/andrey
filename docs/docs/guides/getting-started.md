@@ -271,8 +271,8 @@ methods, and draw the learned graph beside the known one.
 ### Resampling
 
 One run gives one graph, and a different sample of cells could give another. `andrey.bootstrap`
-refits PC on resamples of the cells, drawn with replacement, and counts how often each link
-appears. `seed` fixes the resamples, so a rerun gives the same counts:
+refits PC on subsamples, each a random half of the cells, and counts how often each link appears.
+`seed` fixes the subsamples, so a rerun gives the same counts:
 
 ```{code-cell} ipython3
 boot = andrey.bootstrap("pc", sachs.data, n_boot=100, seed=0)
@@ -280,8 +280,8 @@ pd.DataFrame(boot.table()[:8]).round(2)
 ```
 
 `table()` lists every link that appeared in some resample, with the direction it had there, most
-frequent first. The four undirected links appear in 79 to 96 of the 100 resamples. Directions are
-less stable: each arrow of the collider at pkc appears in 56 resamples, and `plc -> pip3` in 41.
+frequent first. The four undirected links appear in 91 to 100 of the 100 resamples. Directions are
+less stable: each arrow of the collider at pkc appears in 86 resamples, and `plc -> pip3` in 31.
 
 `boot.structure` is the averaged graph. A pair is in it when it is adjacent in at least half of the
 resamples (`threshold=0.5`), with the edge it has most often. It holds the same eight links as
@@ -299,16 +299,17 @@ table = pd.DataFrame(boot.table())
 assert table.iloc[:4]["type"].eq("undirected").all()
 assert table.iloc[:4]["count"].between(75, 100).all()
 arrows = table[table["target"].eq("pkc") & table["type"].eq("directed")]
-assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(50, 65).all()
-assert 70 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 90
+assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(80, 90).all()
+assert 50 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 60
 assert links(boot.structure) == links(out.structure)
 assert links(boot.average(0.9)) < links(out.structure)
 assert len(links(out.structure) - links(boot.average(0.9))) == 1
 ```
 
-That drops the link between plc and pip3, which is in 81 of the 100 resamples. Treat the counts as a
-ranking of the links, not as probabilities. A resample repeats some cells, so PC's tests see more
-evidence than it holds and keep weak links more often than they do on the data.
+That drops the link between plc and pip3, which is in 54 of the 100 resamples. Treat the counts as a
+ranking of the links, not as probabilities. `resampling="bootstrap"` draws all the cells with
+replacement instead; a resample then repeats some cells, so PC's tests see more evidence than it
+holds and keep weak links more often than they do on the data.
 
 ## Your own data
 

@@ -37,6 +37,7 @@ from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES, node_labels
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
+from andrey.spec.concepts import BOOTSTRAP_PARAMS
 from andrey.spec.generate import (
     concepts_dict,
     env_dict,
@@ -335,6 +336,8 @@ def bootstrap_envelope(
         "n_boot": first.n_boot,
         "threshold": first.threshold,
         "seed": first.metadata["seed"],
+        "resampling": first.metadata["resampling"],
+        "sample_fraction": first.metadata["sample_fraction"],
         "block_length": first.metadata["block_length"],
     }
     views = [
@@ -1032,6 +1035,8 @@ def execute_bootstrap(
     n_boot: int,
     seed: int | None,
     threshold: float,
+    resampling: str | None,
+    sample_fraction: float,
     block_length: int | None,
     output: str | None,
     as_json: bool,
@@ -1059,9 +1064,21 @@ def execute_bootstrap(
                 block_length is None or (spec.family == "temporal" and not panel),
                 f"--block-length is for a time-series method on one series, not {spec.name}",
             ),
+            (
+                block_length is None or resampling != "subsample",
+                "--block-length is for --resampling bootstrap, not subsample",
+            ),
         )
         if not ok
     ]
+    for flag_, param, value in (
+        ("--resampling", BOOTSTRAP_PARAMS["resampling"], resampling),
+        ("--sample-fraction", BOOTSTRAP_PARAMS["sample_fraction"], sample_fraction),
+    ):
+        try:
+            param.check(value, "bootstrap")
+        except (TypeError, ValueError) as exc:
+            bad.append(str(exc).replace(f"bootstrap: {param.name}", flag_, 1))
     if bad:
         raise CliError("bad_value", "; ".join(bad), EXIT_USAGE)
     fkwargs = {k: v for k, v in fkwargs.items() if k != "seed"}
@@ -1081,6 +1098,8 @@ def execute_bootstrap(
                 n_boot=n_boot,
                 seed=seed,
                 threshold=threshold,
+                resampling=resampling,
+                sample_fraction=sample_fraction,
                 block_length=block_length,
                 **aligned,
                 **fkwargs,
@@ -1152,8 +1171,11 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
             "",
             "Bootstrap flags: --n-boot <n> (default 100), --seed <int>, --threshold <share> "
             "(default 0.5),",
-            "  --block-length <rows> (time-series methods on one series). Workers follow "
-            "ANDREY_NUM_WORKERS.",
+            "  --resampling subsample|bootstrap (default subsample; bootstrap for a time-series "
+            "method on one series),",
+            "  --sample-fraction <share> (default 0.5, a subsample's rows), --block-length <rows> "
+            "(the block bootstrap of a",
+            "  time-series method on one series). Workers follow ANDREY_NUM_WORKERS.",
         ]
     lines += [
         "",
@@ -1768,11 +1790,25 @@ def cmd_bootstrap(
         "--threshold",
         help="Share of fits in which a pair must be adjacent to be in the averaged graph (0, 1].",
     ),
+    resampling: Optional[str] = typer.Option(
+        None,
+        "--resampling",
+        metavar="subsample|bootstrap",
+        help="How a resample is drawn: a subsample (without replacement) or a bootstrap resample "
+        "(with replacement). Default subsample; bootstrap for a time-series method on one series.",
+    ),
+    sample_fraction: float = typer.Option(
+        0.5,
+        "--sample-fraction",
+        metavar="SHARE",
+        help="Share of the rows in a subsample, in (0, 1]. Not used by bootstrap resampling.",
+    ),
     block_length: Optional[int] = typer.Option(
         None,
         "--block-length",
         metavar="ROWS",
-        help="Time-series methods on one series: rows per block. Default ceil(rows ** (1/3)).",
+        help="Block bootstrap of a time-series method on one series: rows per block. "
+        "Default ceil(rows ** (1/3)).",
     ),
     config: _ConfigOption = None,
     output: _OutputOption = None,
@@ -1810,6 +1846,8 @@ def cmd_bootstrap(
         n_boot=n_boot,
         seed=seed,
         threshold=threshold,
+        resampling=resampling,
+        sample_fraction=sample_fraction,
         block_length=block_length,
         output=output,
         as_json=as_json,
