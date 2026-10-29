@@ -272,6 +272,7 @@ def default_score(
     score_func: str | None,
     *,
     categorical: Sequence[str | int] | None = None,
+    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
     """Return the score of a score search on ``data`` and the ``categorical`` it reads.
 
@@ -279,11 +280,12 @@ def default_score(
     column types (:func:`declared_columns`): ``"bdeu"`` when every column is categorical,
     ``"cond_gauss"``, the conditional Gaussian BIC, when some are, returned with those columns by
     position so that :func:`checked_data` reads exactly them, else ``"bic"``, the linear-Gaussian
-    BIC.
+    BIC. A search that takes only some scores passes them as ``choices``: a pick outside them gives
+    ``"bic"``.
     """
     if score_func is not None:
         return score_func, categorical
-    return _by_declared_types(data, categorical, ("bic", "bdeu", "cond_gauss"))
+    return _by_declared_types(data, categorical, ("bic", "bdeu", "cond_gauss"), choices)
 
 
 def default_test(
@@ -291,30 +293,42 @@ def default_test(
     indep_test: str | None,
     *,
     categorical: Sequence[str | int] | None = None,
+    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
     """Return the conditional-independence test on ``data`` and the ``categorical`` it reads.
 
     A given ``indep_test`` returns as it is, with ``categorical``. ``None`` picks from the declared
     column types (:func:`declared_columns`): ``"gsq"``, the G-square test, when every column is
     categorical, ``"cond_gauss"``, the conditional Gaussian likelihood-ratio test, when some are,
-    returned with those columns by position, else ``"fisherz"``.
+    returned with those columns by position, else ``"fisherz"``. A search that takes only some
+    tests passes them as ``choices``: a pick outside them gives ``"fisherz"``.
     """
     if indep_test is not None:
         return indep_test, categorical
-    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"))
+    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"), choices)
 
 
 def _by_declared_types(
-    data: npt.ArrayLike, categorical: Sequence[str | int] | None, names: tuple[str, str, str]
+    data: npt.ArrayLike,
+    categorical: Sequence[str | int] | None,
+    names: tuple[str, str, str],
+    choices: Sequence[str] | None = None,
 ) -> tuple[str, Sequence[str | int] | None]:
-    """Pick the continuous, categorical, or mixed-data setting of ``names`` by declared types."""
+    """Pick the continuous, categorical, or mixed-data setting of ``names`` by declared types.
+
+    A pick that ``choices`` leaves out is the continuous setting.
+    """
     continuous, every, some = names
     mask = declared_columns(data, categorical)
     if mask is None:
         return continuous, categorical
     if mask.all():
-        return every, None
-    return some, np.flatnonzero(mask).tolist()
+        picked, columns = every, None
+    else:
+        picked, columns = some, np.flatnonzero(mask).tolist()
+    if choices is not None and picked not in choices:
+        return continuous, categorical
+    return picked, columns
 
 
 def _listed_mask(data: npt.ArrayLike, categorical: Sequence[str | int]) -> np.ndarray:
@@ -449,13 +463,14 @@ def mixed_matrix(
     ``categorical`` lists the categorical columns by label (a string) or 0-based position (an
     integer), as :func:`~andrey.core.knowledge.column_position` reads them; ``[]`` lists none.
     ``None`` infers them: a pandas DataFrame's ``category``, ``bool``, ``object``, and ``string``
-    columns, and every column whose values, over all its rows, are at
+    columns, which their type declares, and every column whose values, over all its rows, are at
     most ``max_categories`` distinct whole numbers. A :class:`~andrey.DataTypeWarning` names the
-    inferred columns and why. A categorical column that does not hold numbers has its values
-    numbered, each distinct value one category; a numeric one must hold whole numbers, as
-    :func:`check_categories` checks. Then :func:`data_matrix` checks the whole matrix, with
-    ``method`` and ``missing``; ``missing`` keeps a missing value, a categorical column's included,
-    as ``NaN``, and the inference counts the observed values only.
+    columns inferred from their values; a column of a declared type raises none. A categorical
+    column that does not hold numbers has its values numbered, each distinct value one category; a
+    numeric one must hold whole numbers, as :func:`check_categories` checks. Then
+    :func:`data_matrix` checks the whole matrix, with ``method`` and ``missing``; ``missing`` keeps
+    a missing value, a categorical column's included, as ``NaN``, and the inference counts the
+    observed values only.
 
     With no categorical column, the setting runs as its linear-Gaussian form, and a
     :class:`~andrey.DataTypeWarning` says so, unless ``index_categorical``: a setting that adds a
@@ -478,14 +493,16 @@ def mixed_matrix(
         )
         X = data_matrix(table, name=name, method=method, missing=missing, reads_categories=True)
         counts = _category_counts(X, max_categories)
-        mask = (counts > 0) | (typed if typed.size else False)
-        if mask.any():
-            listed = _listed_columns(data, np.flatnonzero(mask).tolist(), typed, counts)
+        declared = typed if typed.size else np.zeros(X.shape[1], dtype=bool)
+        mask = (counts > 0) | declared
+        inferred = np.flatnonzero((counts > 0) & ~declared).tolist()
+        if inferred:
+            listed = _listed_columns(data, inferred, counts)
             warn_once(
-                f"{setting} reads {name} columns {listed} as categorical, inferred from a "
-                "category, bool, or text type or from at most "
-                f"max_categories={max_categories} distinct whole numbers; name the categorical "
-                "columns with categorical=[...], or pass categorical=[] for none",
+                f"{setting} reads {name} columns {listed} as categorical, inferred from at most "
+                f"max_categories={max_categories} distinct whole numbers each; declare the "
+                "categorical columns with a pandas category type or categorical=[...], or pass "
+                "categorical=[] for none",
                 DataTypeWarning,
             )
     elif names is None:
@@ -545,24 +562,9 @@ def _category_counts(X: np.ndarray, max_categories: int) -> np.ndarray:
     return counts
 
 
-def _listed_columns(data: object, columns: list[int], typed: np.ndarray, counts: np.ndarray) -> str:
-    """Name each of ``columns`` with why it is categorical: its type, or its count of values."""
-    return ", ".join(
-        f"{_column_name(data, j)} ("
-        + (_dtype_word(data, j) if typed.size and typed[j] else f"{counts[j]} values")
-        + ")"
-        for j in columns
-    )
-
-
-def _dtype_word(data: object, j: int) -> str:
-    """Name a DataFrame column's categorical type: ``category``, ``bool``, or ``text``."""
-    import pandas as pd
-
-    dtype = pd.DataFrame(data).dtypes.iloc[j]
-    if isinstance(dtype, pd.CategoricalDtype):
-        return "category"
-    return "bool" if pd.api.types.is_bool_dtype(dtype) else "text"
+def _listed_columns(data: object, columns: list[int], counts: np.ndarray) -> str:
+    """Name each of ``columns`` with its count of distinct values."""
+    return ", ".join(f"{_column_name(data, j)} ({counts[j]} values)" for j in columns)
 
 
 def _categorical_dtypes(data: object) -> np.ndarray:

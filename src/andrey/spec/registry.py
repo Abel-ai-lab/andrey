@@ -1996,13 +1996,16 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
 }
-# The shared keys: the name, the seed of a seeded fit, the column types a mixed-data setting read,
-# the fewest rows a test used, and the triples a collider vote left ambiguous.
+# The shared keys: the name, the seed of a seeded fit, the test and the score it used, the column
+# types a mixed-data setting read, the fewest rows a test used, and the triples a collider vote left
+# ambiguous.
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
         "algorithm",
         *(("seed",) if _spec.seeded else ()),
+        *(("indep_test",) if "indep_test" in _concepts else ()),
+        *(("score_func",) if "score_func" in _concepts else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
         *(("rows_tested",) if _spec.data.missing else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
