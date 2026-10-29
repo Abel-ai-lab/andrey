@@ -157,20 +157,29 @@ gives a node more than that many parents. `None`, the default, sets no cap. `ges
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
-draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
-The methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not
-set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
-deterministic and takes no seed.
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole
+number from 0 to 2**32 - 1 that fixes their random draws; `None`, the default, uses `ANDREY_SEED`,
+or 0 when it is unset, so a call repeats exactly. The methods that test independence draw random
+numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, and `hc` and `tabu` only with
+`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
+that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes
+no seed.
 
 % concept: n_starts
-`boss` and `grasp` take `n_starts`, the number of searches a fit runs: the first from the start
-the method describes, each later one from a random start drawn from `seed` and the search's index.
-The fit returns the best-scoring search; a later one replaces an earlier one only when it scores
-better by more than `1e-6`. Each search builds its own caches and drops the previous one's, so more
-starts take more time but little more memory. `1`, the default, runs one search, as the methods'
-papers do.
+`boss`, `grasp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs: the first
+from the start the method describes, each later one from a start drawn from `seed` and the
+search's index. `boss` and `grasp` start it from a random order, and `hc` and `tabu` from the best
+DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring search; a
+later one replaces an earlier one only when it scores better by more than `1e-6`. Each search
+builds its own caches and drops the previous one's, so more starts take more time but little more
+memory. `1`, the default, runs one search.
+
+% concept: n_perturbations
+`hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
+reversals made to the best DAG so far before each search after the first. Each change keeps the
+knowledge, `max_parents`, the rule of the mixed-data scores, and acyclicity. `None`, the default,
+uses the number of variables; with one start it changes nothing. With `n_starts` above 1,
+`metadata["n_perturbations"]` records the number used.
 
 % concept: num_workers
 No method takes the number of workers or the device as an argument. Set them for every call in a

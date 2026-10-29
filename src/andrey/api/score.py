@@ -836,6 +836,9 @@ def hc(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
+    seed: int | None = None,
+    n_starts: int = 1,
+    n_perturbations: int | None = None,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -873,9 +876,24 @@ def hc(
         standard BIC. Must be finite and non-negative. The other scores ignore it. See
         Notes.
     max_iter : int or None, default=None
-        Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
-        each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
-        adds at most one edge.
+        Maximum moves of each climb, at least ``1``; ``None`` sets no limit. The search still
+        terminates, since each move lowers the score. A given ``max_iter`` also bounds the edge
+        count of the first climb, as each move adds at most one edge.
+    seed : int or None, default=None
+        Seed for the random edge changes that begin each climb after the first, which only
+        ``n_starts`` above ``1`` makes. ``None`` uses the ``ANDREY_SEED`` environment variable, or
+        ``0`` when it is unset, so repeated calls return the same graph.
+    n_starts : int, default=1
+        Number of climbs, at least ``1``. The first starts from the empty graph, or the required
+        edges of ``knowledge``; each later one from the best DAG so far after ``n_perturbations``
+        random edge changes drawn from ``seed`` and the climb's index. The result is the
+        best-scoring search; a later one replaces an earlier one only when it scores better by more
+        than ``1e-6``. Each climb builds its own caches and drops the previous one's, so more starts
+        take more time but little more memory. See Notes.
+    n_perturbations : int or None, default=None
+        Number of random edge additions, removals, or reversals made to the best DAG so far before
+        each climb after the first, at least ``1``; ``None`` uses the number of variables. It
+        changes nothing when ``n_starts`` is ``1``. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the search takes no move that gives a node
         more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
@@ -907,7 +925,8 @@ def hc(
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        position. With ``n_starts`` above ``1``, ``metadata["seed"]`` is the seed used and
+        ``metadata["n_perturbations"]`` the number of changes before each later climb.
 
     Raises
     ------
@@ -928,8 +947,8 @@ def hc(
     Warns
     -----
     SearchLimitWarning
-        When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
-        graph.
+        When a climb takes a given ``max_iter`` moves, once per call; a larger ``max_iter`` may
+        find a better graph.
     DataTypeWarning
         When a mixed-data score infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -938,8 +957,9 @@ def hc(
     Notes
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
-    after ``max_iter`` moves when set. Under a mixed-data score, no move gives a categorical column
-    a continuous parent, so the DAG found is a conditional linear Gaussian network.
+    after ``max_iter`` moves when set; with ``n_starts``, each climb stops so. Under a mixed-data
+    score, no move gives a categorical column a continuous parent, so the DAG found is a
+    conditional linear Gaussian network.
 
     Under a score-equivalent score, adding ``x -> y`` or ``y -> x`` from the empty graph gives the
     same score. Such ties recur during search, and choosing one move can change later moves and
@@ -998,6 +1018,9 @@ def hc(
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
     .. [3] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [4] Scutari, M., Graafland, C. E., and Gutierrez, J. M. (2019). Who learns better Bayesian
+       network structures: accuracy and speed of structure learning algorithms. International
+       Journal of Approximate Reasoning 115, 235-253. https://doi.org/10.1016/j.ijar.2019.10.003
 
     Examples
     --------
@@ -1021,6 +1044,7 @@ def hc(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="hc")
+    changes = X.shape[1] if n_perturbations is None else n_perturbations
     with copies_named(labels):
         cpdag, score = _hc(
             X,
@@ -1031,8 +1055,13 @@ def hc(
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
+            n_starts=n_starts,
+            n_perturbations=changes,
+            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    if n_starts > 1:
+        metadata["n_perturbations"] = changes
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
@@ -1046,6 +1075,9 @@ def tabu(
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
+    seed: int | None = None,
+    n_starts: int = 1,
+    n_perturbations: int | None = None,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -1089,9 +1121,24 @@ def tabu(
         Non-improving moves allowed without a better DAG, from ``1`` to ``tabu_length``. ``None``
         uses ``tabu_length``.
     max_iter : int or None, default=None
-        Maximum moves, improving or not, at least ``1``; ``None`` sets no limit. The search still
-        terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
-        strictly lower.
+        Maximum moves of each search, improving or not, at least ``1``; ``None`` sets no limit. The
+        search still terminates: non-improving runs are bounded by ``max_tabu``, and each new best
+        DAG scores strictly lower.
+    seed : int or None, default=None
+        Seed for the random edge changes that begin each search after the first, which only
+        ``n_starts`` above ``1`` makes. ``None`` uses the ``ANDREY_SEED`` environment variable, or
+        ``0`` when it is unset, so repeated calls return the same graph.
+    n_starts : int, default=1
+        Number of searches, at least ``1``. The first starts from the empty graph, or the required
+        edges of ``knowledge``; each later one from the best DAG so far after ``n_perturbations``
+        random edge changes drawn from ``seed`` and the search's index, with an empty tabu list.
+        The result is the best-scoring search; a later one replaces an earlier one only when it
+        scores better by more than ``1e-6``. Each search builds its own caches and drops the
+        previous one's, so more starts take more time but little more memory. See Notes.
+    n_perturbations : int or None, default=None
+        Number of random edge additions, removals, or reversals made to the best DAG so far before
+        each search after the first, at least ``1``; ``None`` uses the number of variables. It
+        changes nothing when ``n_starts`` is ``1``. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the search takes no move that gives a node
         more, so no DAG the returned CPDAG represents gives a node more than ``max_parents`` parents
@@ -1121,7 +1168,9 @@ def tabu(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open.
+        (``--``) the ones the equivalence class leaves open. With ``n_starts`` above ``1``,
+        ``metadata["seed"]`` is the seed used and ``metadata["n_perturbations"]`` the number of
+        changes before each later search.
 
     Raises
     ------
@@ -1141,8 +1190,8 @@ def tabu(
     Warns
     -----
     SearchLimitWarning
-        When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
-        graph.
+        When a search takes a given ``max_iter`` moves, once per call; a larger ``max_iter`` may
+        find a better graph.
     DataTypeWarning
         When a mixed-data score infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -1155,11 +1204,11 @@ def tabu(
     list. Without one, it stops if ``max_tabu`` non-improving moves have occurred since the best
     score last improved; otherwise it takes the best non-improving move, leaving the score unchanged
     or worse. It also stops when every legal move leads into the list, or after ``max_iter`` moves
-    when set.
+    when set; with ``n_starts``, each search stops so.
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
-    so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
-    moves break as they do for :func:`andrey.hc`.
+    so with the same ``max_iter`` and one start its score is never worse than hill climbing's. Ties
+    between moves break as they do for :func:`andrey.hc`.
 
     **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
     parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [4]_,
@@ -1208,6 +1257,11 @@ def tabu(
        Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
     .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [5] Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks:
+       search methods and experimental results. AISTATS, PMLR R0, 112-128.
+    .. [6] Scutari, M., Graafland, C. E., and Gutierrez, J. M. (2019). Who learns better Bayesian
+       network structures: accuracy and speed of structure learning algorithms. International
+       Journal of Approximate Reasoning 115, 235-253. https://doi.org/10.1016/j.ijar.2019.10.003
 
     Examples
     --------
@@ -1230,6 +1284,7 @@ def tabu(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
+    changes = X.shape[1] if n_perturbations is None else n_perturbations
     with copies_named(labels):
         cpdag, score = _tabu(
             X,
@@ -1242,8 +1297,13 @@ def tabu(
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
+            n_starts=n_starts,
+            n_perturbations=changes,
+            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    if n_starts > 1:
+        metadata["n_perturbations"] = changes
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 

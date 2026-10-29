@@ -29,6 +29,7 @@ from andrey.core.score import (
     make_score,
 )
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.seeding import start_rng
 from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
@@ -88,19 +89,6 @@ def ranked_score(
         )
         raise
     return score, ranks
-
-
-def start_rng(random_state: int, start: int) -> random.Random:
-    """The private RNG of start ``start`` of a permutation search seeded by ``random_state``.
-
-    Start ``0`` draws from ``random_state`` itself, so a one-start search draws what it drew before
-    starts existed. Start ``k > 0`` draws from a child seed of ``SeedSequence(random_state,
-    spawn_key=(k,))``, so each start depends on ``random_state`` and ``k`` only.
-    """
-    if start == 0:
-        return random.Random(random_state)
-    child = np.random.SeedSequence(random_state, spawn_key=(start,))
-    return random.Random(int(child.generate_state(1)[0]))
 
 
 def precedence_sort(order: Sequence[int], before: np.ndarray) -> list[int]:
@@ -895,7 +883,7 @@ def boss(
         ignore it.
     random_state : int
         Seed for the sweep-order RNG of every start and the start orders after the first
-        (:func:`start_rng`).
+        (:func:`~andrey.core.seeding.start_rng`).
     n_starts : int
         Number of searches, at least ``1``: the first from the tie-rank order, each later one from
         an order its own RNG shuffles. The returned order is the best-scoring one; a later start

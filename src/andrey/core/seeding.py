@@ -1,7 +1,8 @@
 """Unified seeding for reproducible stochastic runs, across every backend.
 
 Some algorithms draw randomness from more than one place -- stdlib ``random`` (the permutation
-searches BOSS / GRaSP), numpy's global RNG, and torch (CALM's optimizer). :func:`seed_all` seeds all
+searches BOSS / GRaSP and the later starts of hill climbing and tabu search, each start from
+:func:`start_rng`), numpy's global RNG, and torch (CALM's optimizer). :func:`seed_all` seeds all
 of them from one number, torch-style: one call, everything reproducible on a fixed machine. The
 effective seed comes from :func:`resolve_seed` -- an explicit ``seed`` wins, else the global
 ``ANDREY_SEED`` (default ``0``) -- so ``ANDREY_SEED=42`` makes every stochastic adapter reproducible
@@ -67,3 +68,16 @@ def seed_all(seed: int | None = None) -> int:
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(s)
     return s
+
+
+def start_rng(seed: int, start: int) -> random.Random:
+    """The private RNG of start ``start`` of a search with several starts, seeded by ``seed``.
+
+    Start ``0`` draws from ``seed`` itself, so a one-start search draws what it drew before starts
+    existed. Start ``k > 0`` draws from a child seed of ``SeedSequence(seed, spawn_key=(k,))``, so
+    each start depends on ``seed`` and ``k`` only.
+    """
+    if start == 0:
+        return random.Random(seed)
+    child = np.random.SeedSequence(seed, spawn_key=(start,))
+    return random.Random(int(child.generate_state(1)[0]))

@@ -19,12 +19,12 @@ from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.seeding import start_rng
 from andrey.search.boss import (
     PERMUTATION_SCORES,
     parent_knowledge,
     precedence_sort,
     ranked_score,
-    start_rng,
 )
 
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
@@ -595,7 +595,7 @@ def grasp(
         Most tucks in one chain of moves, at least ``1``.
     random_state : int
         Seed for the private RNG of each start, which fixes its initial permutation and DFS
-        shuffles (:func:`~andrey.search.boss.start_rng`).
+        shuffles (:func:`~andrey.core.seeding.start_rng`).
     n_starts : int
         Number of searches, each from its own seeded initial permutation, at least ``1``. The
         returned DAG is the best-scoring one; a later start replaces an earlier one only when it
