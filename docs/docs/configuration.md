@@ -105,8 +105,8 @@ already running in the process, so a CPU fit never pays to start a GPU.
 ## Reproducibility
 
 - `ANDREY_SEED`: the seed of every method that draws random numbers (BOSS, GRaSP, ICA-LiNGAM, CALM,
-  and the searches that test independence, with the `rcot`, `cmiknn`, and `gpdc` tests) when the
-  call gives no `seed=`. The default is `0`; it takes any integer from `0` to `2**32 - 1`. A call
+  hill climbing and tabu search with `n_starts` above 1, and the searches that test independence,
+  with the `rcot`, `cmiknn`, and `gpdc` tests) when the call gives no `seed=`. The default is `0`; it takes any integer from `0` to `2**32 - 1`. A call
   that gives `seed=` does not depend on it. Deterministic methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from each column's own data, so reordering the columns relabels the

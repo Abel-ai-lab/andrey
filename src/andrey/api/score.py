@@ -979,6 +979,21 @@ def hc(
     Its mean errors stayed below the empty graph's in each of the 65 settings, where the standard
     BIC's exceeded it in 37.
 
+    **Choosing n_starts.** The search can stop at a DAG that no single move improves but that scores
+    worse than the true one, most often on dense graphs. Each later start climbs again from the best
+    DAG so far after ``n_perturbations`` random edge additions, removals, or reversals, and the fit
+    keeps the best score: hill climbing with random restarts, which changes many edges at each
+    restart [1]_ [4]_. No change breaks the knowledge, ``max_parents``, the rule of the mixed-data
+    scores, or acyclicity: a draw that would close a cycle changes nothing, and at most
+    ``3 * n_perturbations`` draws are made. bnlearn's ``hc`` [2]_ makes one change per restart by
+    default, which the next climb most often undoes, so ``n_perturbations`` defaults to the number
+    of variables.
+
+    On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
+    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 161.6 to 94.6 and took a
+    median of 7.4 times as long as one start. On categorical data drawn from the ALARM network with
+    1,000 rows, under BDeu, they lowered them from 29.6 to 17.4.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
@@ -1219,6 +1234,22 @@ def tabu(
     variables and rows measured: 85 against 276 with 200 variables and 2,000 rows (200 true edges).
     Its mean errors stayed below the empty graph's in each of the 65 settings, where the standard
     BIC's exceeded it in 35.
+
+    **Choosing n_starts.** The tabu list lets the search leave a local optimum only for the moves
+    ``max_tabu`` allows, so it can still stop at a DAG that scores worse than the true one, most
+    often on dense graphs. Each later start searches again, with an empty tabu list, from the best
+    DAG so far after ``n_perturbations`` random edge additions, removals, or reversals, and the fit
+    keeps the best score: tabu search with the random restarts of hill climbing, which change many
+    edges at each restart [5]_ [6]_. No change breaks the knowledge, ``max_parents``, the rule of
+    the mixed-data scores, or acyclicity: a draw that would close a cycle changes nothing, and at
+    most ``3 * n_perturbations`` draws are made. bnlearn's ``hc`` [3]_ makes one change per restart
+    by default, which the next search most often undoes, so ``n_perturbations`` defaults to the
+    number of variables.
+
+    On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
+    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.2 and took a
+    median of 6.1 times as long as one start. On categorical data drawn from the ALARM network with
+    1,000 rows, under BDeu, they lowered them from 23.8 to 12.3.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
