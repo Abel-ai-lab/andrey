@@ -21,6 +21,7 @@ from andrey.api._adapt import default_score, default_test
 from andrey.api._experimental import warn_experimental
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
+from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
 from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
@@ -46,9 +47,11 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     """Run the facade of method ``name`` inside the steps its spec defines.
 
     Before the facade: a former argument name or value becomes the current one, and a dropped
-    argument is removed, with one :class:`~andrey.DeprecatedArgumentWarning` for each; every
-    argument the call passes is checked and converted by
-    :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or ``ValueError``; a
+    argument is removed, with one :class:`~andrey.DeprecatedArgumentWarning` for each; an argument
+    or a choice that an earlier release removed raises as an unknown one does, and the message
+    gives its current name (:mod:`andrey.core.removed`); every argument the call passes is checked
+    and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
+    ``ValueError``; a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
     an int; a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with a score that does
     not use it raises ``ValueError`` (:func:`check_penalties`); an experimental method warns
@@ -67,13 +70,17 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
         @functools.wraps(facade)
         def run(*args: Any, **kwargs: Any) -> Any:
             spec = spec_of(name)
-            bound = signature.bind(*args, **current_names(spec, kwargs))
+            current = current_names(spec, kwargs)
+            try:
+                bound = signature.bind(*args, **current)
+            except TypeError:
+                if (hinted := removed_name_error(name, signature, current)) is None:
+                    raise
+                raise hinted from None
             params = {p.name: p for p in spec.params}
             for key, value in bound.arguments.items():
                 if key in params:
-                    param = params[key]
-                    choices = runtime_choices(param)
-                    bound.arguments[key] = param.check(value, name, choices=choices)
+                    bound.arguments[key] = check_argument(params[key], value, name)
             stamp: dict[str, object] = {"algorithm": name}
             if spec.seeded:
                 seed = bound.arguments["seed"] = resolve_seed(bound.arguments.get("seed"))
@@ -95,6 +102,37 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
 
     return decorate
+
+
+def removed_name_error(
+    method: str, signature: inspect.Signature, kwargs: dict[str, Any]
+) -> TypeError | None:
+    """Return the error for the first argument in ``kwargs`` that a release removed, else ``None``.
+
+    The message is Python's for an unknown argument, with what the name is called now
+    (:func:`~andrey.core.removed.removal_hint`).
+    """
+    for key in kwargs:
+        hint = None if key in signature.parameters else removal_hint(method, key)
+        if hint is not None:
+            return TypeError(f"{method}() got an unexpected keyword argument {key!r}; {hint}")
+    return None
+
+
+def check_argument(param: ParamSpec, value: Any, method: str) -> object:
+    """Return ``value`` checked and converted by ``param``.
+
+    Raises what :meth:`~andrey.spec.models.ParamSpec.check` raises; when ``value`` is a choice that
+    a release removed, the ``ValueError`` adds what the choice is called now
+    (:func:`~andrey.core.removed.removal_hint`).
+    """
+    try:
+        return param.check(value, method, choices=runtime_choices(param))
+    except ValueError as error:
+        hint = removal_hint(method, param.name, value)
+        if hint is None:
+            raise
+        raise ValueError(f"{error}; {hint}") from None
 
 
 def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
@@ -208,9 +246,9 @@ def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return ``kwargs`` with the former names and values of ``spec``'s arguments made current.
 
-    The arguments are the data inputs and the parameters. Each former name or value warns once at
-    the caller's line, and so does each dropped argument, which is removed. Raises ``ValueError``
-    when a call passes an argument under both its former and its current name.
+    Each former name or value of a parameter warns once at the caller's line, and so does each
+    dropped argument, which is removed. Raises ``ValueError`` when a call passes a parameter under
+    both its former and its current name.
     """
     kwargs = dict(kwargs)
     for old in spec.dropped_args:
@@ -221,18 +259,17 @@ def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
                 "release; drop it",
                 DeprecatedArgumentWarning,
             )
-    for argument in (*spec.data.inputs, *spec.params):
-        for old in argument.aliases:
+    for param in spec.params:
+        for old in param.aliases:
             if old not in kwargs:
                 continue
-            if argument.name in kwargs:
+            if param.name in kwargs:
                 raise ValueError(
-                    f"{spec.name}: {old} is the former name of {argument.name}; pass only "
-                    f"{argument.name}"
+                    f"{spec.name}: {old} is the former name of {param.name}; pass only {param.name}"
                 )
-            kwargs[argument.name] = kwargs.pop(old)
+            kwargs[param.name] = kwargs.pop(old)
             warn_once(
-                f"andrey.{spec.name}: {old} is now {argument.name}; the former name stops working "
+                f"andrey.{spec.name}: {old} is now {param.name}; the former name stops working "
                 "in the next release",
                 DeprecatedArgumentWarning,
             )

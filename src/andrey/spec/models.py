@@ -52,8 +52,6 @@ class InputSpec(Spec):
     kind: InputKind
     doc: str
     required: bool = True
-    # Former names, accepted for one release after a rename.
-    aliases: tuple[str, ...] = ()
 
     @property
     def flag(self) -> str:

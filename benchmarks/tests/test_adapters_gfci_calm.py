@@ -32,7 +32,7 @@ needs_tetrad = pytest.mark.skipif(
     reason=f"no causal-cmd jar (${tetrad_cmd.JAR_ENV}) or no java",
 )
 #: A few hundred optimizer steps: enough to reach the conversion, far from a converged answer.
-_SHORT = {"subproblem_iter": 200, "max_outer": 3}
+_SHORT = {"subproblem_iter": 200, "max_iter": 3}
 
 
 def test_every_solution_has_its_own_name() -> None:
