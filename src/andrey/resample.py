@@ -26,7 +26,7 @@ from andrey import api
 from andrey.api._adapt import flag, int_in_range
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput
 from andrey.core import backend as _backend
-from andrey.core._convert import mag_of_pag
+from andrey.core._convert import extend_in_order, mag_of_pag
 from andrey.core.knowledge import mpdag
 from andrey.core.knowledge import orient as knowledge_orient
 from andrey.core.orient import _cpdag_of_pdag
@@ -40,6 +40,7 @@ from andrey.core.structure import (
 )
 from andrey.core.warning_policy import AndreyWarning, DeprecatedArgumentWarning, warn_once
 from andrey.search._parallel import pick_context
+from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -116,6 +117,7 @@ class BootstrapOutput:
     _strict: bool = False
     _nearest: tuple[int, Structure] | None = None  # the fit nearest the others, by resample
     _constraints: Constraints | None = None
+    _ranks: np.ndarray | None = None  # the nodes' tie ranks: the data's, from bootstrap
 
     # ---- construction ---------------------------------------------------------------------
 
@@ -161,7 +163,9 @@ class BootstrapOutput:
             the fits' kind, the widest among them (``dag``, ``cpdag``, ``pag``, with a ``mag`` read
             as a ``pag``), as ``bootstrap``'s Notes describe. ``metadata["averaged_graph"]`` is
             ``"vote"``, or ``"nearest_resample"`` when the vote has no valid graph of that kind and
-            the averaged graph is the fit nearest the others.
+            the averaged graph is the fit nearest the others. ``from_fits`` has no data to rank
+            the nodes by, so a ``dag`` vote with a tie edge becomes a ``cpdag`` that leaves the
+            tie edge undirected; ``bootstrap`` points it by the ranks of its data.
 
         Raises
         ------
@@ -178,7 +182,7 @@ class BootstrapOutput:
         AndreyWarning
             When ``strict`` is ``False`` and the vote has no valid graph of the fits' kind.
         """
-        return cls._count(fits, threshold, strict, keep_fits, metadata, None)
+        return cls._count(fits, threshold, strict, keep_fits, metadata, None, None)
 
     @classmethod
     def _count(
@@ -189,8 +193,13 @@ class BootstrapOutput:
         keep_fits: bool,
         metadata: Mapping[str, JSONValue] | None,
         constraints: Constraints | None,
+        ranks: np.ndarray | None,
     ) -> BootstrapOutput:
-        """``from_fits``, for fits made under the knowledge ``constraints`` (``None``: none)."""
+        """``from_fits``, for fits made under the knowledge ``constraints`` (``None``: none).
+
+        ``ranks`` holds each node's :func:`~andrey.search.hc.tie_ranks` rank on the data the fits
+        ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data.
+        """
         fits = tuple(fits)
         if not fits:
             raise ValueError("fits is empty; at least one fit is needed")
@@ -230,7 +239,7 @@ class BootstrapOutput:
             index = _nearest(slices[0], coded[0], len(fits))
             nearest = (index, fits[index].structure)
         structure, source = _average(
-            slices, len(fits), threshold, lags, n, labels, nearest, strict, constraints
+            slices, len(fits), threshold, lags, n, labels, nearest, strict, constraints, ranks
         )
         return cls(
             _structure=structure,
@@ -243,6 +252,7 @@ class BootstrapOutput:
             _strict=strict,
             _nearest=nearest,
             _constraints=constraints,
+            _ranks=ranks,
         )
 
     # ---- surface --------------------------------------------------------------------------
@@ -329,6 +339,7 @@ class BootstrapOutput:
             self._nearest,
             self._strict,
             self._constraints,
+            self._ranks,
         )
         return graph
 
@@ -491,6 +502,7 @@ def _average(
     nearest: tuple[int, Structure] | None,
     strict: bool,
     constraints: Constraints | None,
+    ranks: np.ndarray | None,
 ) -> tuple[Structure, str]:
     """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``.
 
@@ -504,7 +516,7 @@ def _average(
         return _vote_graph(s, n_resamples, threshold, n, labels), "vote"
     try:
         return _valid_graph(
-            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints
+            _vote(s, n_resamples, threshold, n), s.kind, labels, constraints, ranks
         ), "vote"
     except ValueError as exc:
         reason = f"the vote of the fits has no valid {s.kind}: {exc}"
@@ -573,14 +585,21 @@ def _vote_graph(
 
 
 def _valid_graph(
-    vote: np.ndarray, kind: Kind, labels: tuple[str, ...] | None, constraints: Constraints | None
+    vote: np.ndarray,
+    kind: Kind,
+    labels: tuple[str, ...] | None,
+    constraints: Constraints | None,
+    ranks: np.ndarray | None,
 ) -> GraphStructure:
     """Return the valid graph of ``kind`` that the published steps make of ``vote``.
 
-    A ``dag``: its consistent extension (Dor and Tarsi), ranked by label for a tie edge. A
-    ``cpdag``: the CPDAG (Chickering) of its consistent extension. A ``pag``: the PAG of the MAG
-    Zhang's construction builds. Under ``constraints``, the edges the knowledge decides are
-    directed first, a ``cpdag`` becomes its MPDAG, and a ``pag`` gets the knowledge's endpoints.
+    A ``dag``: its consistent extension (Dor and Tarsi), which takes the nodes of ``ranks`` in
+    their rank order, so a tie edge points as the data's ranks decide. Without ``ranks``, a
+    ``dag`` vote with a tie edge has no such order and takes the ``cpdag`` step. A
+    ``cpdag``: the CPDAG (Chickering) of its consistent extension; every extension gives the same
+    CPDAG, so no order is needed. A ``pag``: the PAG of the MAG Zhang's construction builds. Under
+    ``constraints``, the edges the knowledge decides are directed first, a ``cpdag`` becomes its
+    MPDAG, and a ``pag`` gets the knowledge's endpoints.
     Raises ``ValueError``, saying why, when no extension or no MAG exists.
     """
     if kind == "pag":
@@ -596,9 +615,9 @@ def _valid_graph(
         raise ValueError("it has a bidirected edge, which no DAG has")
     if constraints is not None:
         vote = knowledge_orient(vote, constraints)
-    if kind == "dag":
-        partial = GraphStructure.from_numpy(vote, kind="cpdag", labels=labels)
-        return partial.to_dag(tie_break="label")
+    if kind == "dag" and (ranks is not None or not ((vote == TAIL) & (vote.T == TAIL)).any()):
+        order = np.arange(len(vote)) if ranks is None else np.argsort(ranks, kind="stable")
+        return GraphStructure.from_numpy(extend_in_order(vote, order), kind="dag", labels=labels)
     cpdag = _cpdag_of_pdag(vote)
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
@@ -914,8 +933,9 @@ def bootstrap(
     BootstrapOutput or list[BootstrapOutput]
         The frequencies and the averaged graph; for ``multi_group_direct_lingam``, one per group.
         ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, the
-        ``block_length`` of a block bootstrap, and ``averaged_graph``: ``"vote"``, or
-        ``"nearest_resample"`` when the averaged graph is the resample graph nearest the others.
+        ``block_length`` of a block bootstrap, the ``tie_break`` rule in effect
+        (:data:`andrey.config`), and ``averaged_graph``: ``"vote"``, or ``"nearest_resample"``
+        when the averaged graph is the resample graph nearest the others.
 
     Raises
     ------
@@ -981,8 +1001,11 @@ def bootstrap(
     v-structure compels. So the vote is then made a valid graph of the method's kind by the
     published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
     v-structures, and directed edges [8]_: the vote itself when it has no directed cycle, with a
-    tie edge oriented as the node labels decide. A ``cpdag`` becomes the CPDAG [9]_ of a
-    consistent extension, so an edge that no v-structure compels is undirected. A ``pag`` becomes
+    tie edge pointing as the columns' :func:`~andrey.search.hc.tie_ranks` on ``data`` decide
+    (``tie_break``, :data:`andrey.config`: ranks computed from each column's own data, or the
+    column order under ``"position"``), so reordering the columns relabels the graph. A ``cpdag``
+    becomes the CPDAG [9]_ of a consistent extension, so an edge that no v-structure compels is
+    undirected. A ``pag`` becomes
     the PAG of the MAG that Zhang's construction builds from it [10]_. With ``knowledge``, the
     edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
     gets the endpoints the knowledge sets, as ``fci`` sets them. A time-series result's lag graphs
@@ -1095,11 +1118,13 @@ def bootstrap(
     job = _job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
     workers = min(_backend.worker_count(None), n_resamples)
     results = _fit_all(job, n_resamples, workers)
+    ranks = _column_ranks(job.data, job.unit == "groups")
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
     metadata: dict[str, JSONValue] = {
         "method": spec.name,
         "seed": root,
+        "tie_break": job.tie_break,
         "resampling": job.resampling,
         "sample_fraction": job.sample_fraction if job.resampling == "subsample" else None,
         "block_length": job.block_length,
@@ -1114,10 +1139,33 @@ def bootstrap(
             keep_fits,
             metadata,
             _constraints(spec, method_kwargs.get("knowledge"), group[0].structure),
+            ranks,
         )
         for group in groups
     ]
     return outs if spec.output.multi else outs[0]
+
+
+def _column_ranks(data: Any, groups: bool) -> np.ndarray:
+    """Return the columns' :func:`~andrey.search.hc.tie_ranks` on all of ``data``.
+
+    ``data`` is a table or an array, or, for ``groups``, a list of them stacked as the methods
+    over groups stack them. A column that does not hold numbers is numbered by its sorted values,
+    as the fits read its categories; its pattern is then a function of the column alone.
+    """
+    stacked = np.vstack([_numbers(table) for table in (data if groups else [data])])
+    return tie_ranks(stacked)
+
+
+def _numbers(table: Any) -> np.ndarray:
+    """Return ``table`` as a float matrix, numbering each column that does not hold numbers."""
+    columns = []
+    for column in np.asarray(table).T:
+        try:
+            columns.append(column.astype(np.float64))
+        except (TypeError, ValueError):
+            columns.append(np.unique(column.astype(str), return_inverse=True)[1].astype(np.float64))
+    return np.column_stack(columns)
 
 
 def _constraints(spec: MethodSpec, knowledge: Any, structure: Structure) -> Constraints | None:

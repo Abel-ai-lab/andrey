@@ -455,7 +455,8 @@ frequent state, no edge counted as one, so it keeps its most frequent edge when 
 edge than have no edge; `threshold` (0.5 to 1) asks the pair to be adjacent in more than that share
 of the fits, or in all of them, and two edges that tie give `--` (`o-o` for a PAG). The vote is
 then made a valid graph of the method's kind: a DAG with its edges and no cycle, the CPDAG of such
-a DAG, or the PAG of a MAG built from it. When no such graph exists, the averaged graph is the
+a DAG, or the PAG of a MAG built from it. A tie between the two directions of a DAG method's edge
+points by the columns' `tie_break` ranks, so the graph relabels with the columns. When no such graph exists, the averaged graph is the
 resample graph nearest the others, with a warning, and `metadata["averaged_graph"]` says
 `"nearest_resample"` instead of `"vote"`; `strict=True` raises instead. A bootstrap resample
 repeats rows, so a conditional-independence test sees

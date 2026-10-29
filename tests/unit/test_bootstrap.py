@@ -146,17 +146,19 @@ def test_a_pair_takes_its_most_frequent_state_with_no_edge_one_of_them():
 
 
 def test_a_tie_between_edges_takes_the_least_committal_one_then_a_graph_of_the_kind():
-    # a dag's tie edge is oriented as its labels decide, whatever the column order
-    for labels in (("a", "b"), ("b", "a")):
-        fits = [
-            StructureOutput.new(
-                GraphStructure.from_numpy(f.structure.to_numpy(), kind="dag", labels=labels)
-            )
-            for f in dags(4, 4, 2)
-        ]
-        tied = BootstrapOutput.from_fits(fits).structure
-        assert tied.kind == "dag"
-        assert tied.oriented_edges() == [("b", "a", "directed")]
+    fits = dags(4, 4, 2)
+    # fits with no data to rank the nodes leave a dag's tie edge undirected, as a cpdag does
+    tied = BootstrapOutput.from_fits(fits).structure
+    assert tied.kind == "cpdag" and edge_set(tied) == {(0, 1, "undirected")}
+    # the ranks of the data point it, and the reversed ranks point it the other way
+    points = {}
+    for ranks in (np.array([0, 1]), np.array([1, 0])):
+        ranked = BootstrapOutput._count(fits, 0.5, False, False, None, None, ranks)
+        assert ranked.structure.kind == "dag" and ranked.metadata["averaged_graph"] == "vote"
+        points[tuple(ranks)] = edge_set(ranked.structure)
+        assert edge_set(ranked.average(0.5)) == points[tuple(ranks)]
+    forward, backward = points.values()
+    assert len(forward) == len(backward) == 1 and forward != backward
     pags = [graph(2, [(0, 1, CIRCLE, ARROW)], "pag"), graph(2, [directed(0, 1)], "pag")]
     tied = BootstrapOutput.from_fits(pags)
     assert tied.structure.kind == "pag" and tied.structure.endpoints(0, 1) == (CIRCLE, CIRCLE)
@@ -183,7 +185,8 @@ def random_fits(kind, seed, n=6, count=15):
 @pytest.mark.parametrize("kind", ["dag", "cpdag", "pag"])
 @pytest.mark.parametrize("seed", range(6))
 def test_the_averaged_graph_is_a_valid_graph_of_the_fits_kind(kind, seed):
-    out = BootstrapOutput.from_fits(random_fits(kind, seed))
+    ranks = np.random.default_rng(seed).permutation(6)  # a dag vote with a tie edge needs them
+    out = BootstrapOutput._count(random_fits(kind, seed), 0.5, False, False, None, None, ranks)
     graph_ = out.structure
     marks = graph_.to_numpy()
     assert graph_.kind == kind
@@ -327,6 +330,7 @@ def test_a_seed_gives_the_same_resamples_whatever_the_number_of_fits():
     assert short.metadata == {
         "method": "direct_lingam",
         "seed": 7,
+        "tie_break": andrey.config.tie_break,
         "resampling": "subsample",
         "sample_fraction": 0.5,
         "block_length": None,
@@ -691,3 +695,67 @@ def test_an_edge_the_knowledge_directs_stays_directed_in_the_averaged_graph(meth
     out = bootstrap(method, lingam_data(), n_resamples=5, seed=0, knowledge=knowledge)
     assert out.metadata["averaged_graph"] == "vote"
     assert out.structure.endpoints(2, 3) == (TAIL, ARROW)
+
+
+def tie_data(n, seed):
+    """Six columns as an array: `x1 -> x3 <- x2`, `x3 -> x4`, and the separate pair `x5 -> x6`.
+
+    The pair is an edge that nothing else orients, so a tie on it is the rank's to decide.
+    """
+    rng = np.random.default_rng(seed)
+    x1, x2 = rng.uniform(-1, 1, (2, n))
+    x3 = 0.9 * x1 + 0.9 * x2 + 0.5 * rng.uniform(-1, 1, n)
+    x4 = 0.8 * x3 + 0.5 * rng.uniform(-1, 1, n)
+    x5 = rng.uniform(-1, 1, n)
+    x6 = 0.7 * x5 + 0.5 * rng.uniform(-1, 1, n)
+    return np.column_stack([x1, x2, x3, x4, x5, x6])
+
+
+def tied_pairs(out):
+    """The pairs whose most frequent edges tie, and more fits have them than have no edge."""
+    n = out.structure.n_nodes
+    found = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            counts = [round(out.frequency(e)[i, j] * out.n_resamples) for e in EDGES]
+            absent = round(out.frequency("absent")[i, j] * out.n_resamples)
+            if max(counts) > absent and counts.count(max(counts)) > 1:
+                found.append((i, j))
+    return found
+
+
+@pytest.mark.parametrize("table", [False, True], ids=["array", "table"])
+@pytest.mark.parametrize(
+    "method, kind, n, n_resamples, seed",
+    [("direct_lingam", "dag", 40, 6, 27), ("pc", "cpdag", 60, 4, 5)],
+)
+def test_a_tie_in_the_vote_does_not_depend_on_the_column_order(
+    method, kind, n, n_resamples, seed, table
+):
+    """The fits tie on a pair, and the averaged graph is the same up to relabeling whatever the
+    column order, for the array that carries no labels and the table that does."""
+    data = tie_data(n, seed)
+    perm = [5, 2, 0, 4, 3, 1]
+    shuffled_data = data[:, perm]
+    if table:
+        data = pd.DataFrame(data, columns=[f"x{k}" for k in range(1, 7)])
+        shuffled_data = data.iloc[:, perm]
+    plain = bootstrap(method, data, n_resamples=n_resamples, seed=seed)
+    shuffled = bootstrap(method, shuffled_data, n_resamples=n_resamples, seed=seed)
+    assert tied_pairs(plain) and plain.structure.kind == shuffled.structure.kind == kind
+    assert np.array_equal(
+        shuffled.structure.to_numpy(), plain.structure.to_numpy()[np.ix_(perm, perm)]
+    )
+
+
+def test_the_tie_break_rule_is_recorded_and_ranks_the_columns_by_it():
+    data = tie_data(40, 27)
+    perm = [5, 2, 0, 4, 3, 1]
+    plain = bootstrap("direct_lingam", data, n_resamples=2, seed=0)
+    shuffled = bootstrap("direct_lingam", data[:, perm], n_resamples=2, seed=0)
+    assert plain.metadata["tie_break"] == shuffled.metadata["tie_break"] == "rank"
+    assert np.array_equal(shuffled._ranks, plain._ranks[perm])  # a rank moves with its column
+    with andrey.config(tie_break="position"):
+        by_position = bootstrap("direct_lingam", data[:, perm], n_resamples=2, seed=0)
+    assert by_position.metadata["tie_break"] == "position"
+    assert np.array_equal(by_position._ranks, np.arange(6))

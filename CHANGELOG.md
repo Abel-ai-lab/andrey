@@ -71,7 +71,10 @@ names its pull request.
   a valid graph of the method's kind by the published steps: the CPDAG (Chickering 2002) of a
   consistent DAG extension (Dor and Tarsi 1992) for a CPDAG method, the PAG of Zhang's (2008) MAG
   for a PAG method, and a DAG without a cycle for a DAG method, where the vote could be a partially
-  directed graph labeled `cpdag`, a graph that is not a PAG, or a graph with a cycle. On linear
+  directed graph labeled `cpdag`, a graph that is not a PAG, or a graph with a cycle. A DAG
+  method's fits that split evenly between the two directions of an edge point it by the columns'
+  `tie_break` ranks, so reordering the columns relabels the averaged graph, and
+  `metadata["tie_break"]` records the rule. On linear
   data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
   the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
   graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,

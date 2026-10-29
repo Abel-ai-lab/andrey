@@ -51,12 +51,21 @@ def dag_extension(
         rank = np.arange(n)
     else:
         rank = np.argsort(np.array(structure.labels, dtype=object), kind="stable")
-    extension = pdag2dag(marks[np.ix_(rank, rank)])
-    back = np.empty(n, dtype=np.intp)
-    back[rank] = np.arange(n)
     return GraphStructure.from_numpy(
-        extension[np.ix_(back, back)], kind="dag", labels=structure.labels
+        extend_in_order(marks, rank), kind="dag", labels=structure.labels
     )
+
+
+def extend_in_order(marks: np.ndarray, order: np.ndarray) -> np.ndarray:
+    """Return the consistent extension (Dor and Tarsi) of a PDAG's marks that ``order`` picks.
+
+    ``order`` lists the nodes in the order the extension removes them when more than one is
+    removable, so it decides the tied edges. Raises ``ValueError`` when no extension exists.
+    """
+    extension = pdag2dag(marks[np.ix_(order, order)])
+    back = np.empty(len(order), dtype=np.intp)
+    back[order] = np.arange(len(order))
+    return extension[np.ix_(back, back)]
 
 
 def mag_of(
