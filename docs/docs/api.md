@@ -414,7 +414,10 @@ one DAG, it asks you to choose how to pick one, with `tie_break="label"` or `see
 projects a DAG with hidden and selection variables onto its other nodes as a maximal ancestral
 graph, of kind `mag`; and `to_pag` returns the PAG of a DAG or of a MAG, which `fci` would return
 with an exact test. `andrey.metrics.to_cpdag` returns a DAG's CPDAG. A result reaches them through
-its graph, as in `out.structure.to_dag(tie_break="label")`.
+its graph, as in `out.structure.to_dag(tie_break="label")`. It also answers graph queries:
+`parents`, `children`, `ancestors`, `descendants`, `markov_blanket`, and `d_separated`, which is
+d-separation on a DAG and m-separation on a MAG; a CPDAG or PAG answers as every member of its
+class does ([Query a graph](guides/graph-representation.md#query-a-graph)).
 [Graph representation](guides/graph-representation.md) gives the conventions, and
 [Hand a graph to DoWhy](guides/graph-representation.md#hand-a-graph-to-dowhy) passes a result to
 DoWhy for effect estimation.

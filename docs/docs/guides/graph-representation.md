@@ -171,7 +171,7 @@ mixes numbers with text is an error.
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
 | `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
 | `to_dot()` | Graphviz DOT text, named by `labels` when set |
-| `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
+| `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes, by index |
 
 `GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
 take each label or NetworkX node as text, `str(label)`, and raise a `ValueError` when two are the
@@ -254,6 +254,38 @@ gives the PAG that `fci` returns with an exact conditional-independence test, th
 score `fci` against. `andrey.metrics.to_cpdag` returns a DAG's CPDAG. `from_numpy` never infers
 `mag`, so pass `kind="mag"` for one; `to_pcalg` writes a MAG as `amat.pag`, and
 `from_pcalg(amat, "mag")` reads it back.
+
+## Query a graph
+
+`GraphStructure` answers the usual questions about a node, taking it by label or by 0-based
+position and naming the nodes it returns as `oriented_edges()` does:
+
+```python
+import numpy as np
+from andrey import GraphStructure
+
+M = np.array([[0, 1, 0, 0], [2, 0, 1, 0], [0, 2, 0, 2], [0, 0, 1, 0]])  # a -> b -> c <- d
+g = GraphStructure.from_numpy(M, labels=("a", "b", "c", "d"))
+g.parents("c")                    # ["b", "d"]
+g.ancestors("c")                  # ["a", "b", "d"]
+g.markov_blanket("b")             # ["a", "c", "d"]
+g.d_separated("a", "d")           # True
+g.d_separated("a", "d", ["c"])    # False: c is a collider
+```
+
+| Call | Returns |
+|---|---|
+| `parents(x)`, `children(x)` | the nodes joined to `x` by a directed edge into it, or out of it |
+| `ancestors(x)`, `descendants(x)` | the nodes with a directed path to `x`, or from it; `x` left out |
+| `markov_blanket(x)` | the fewest nodes given which `x` is separated from every other node |
+| `d_separated(x, y, given)` | whether every path between `x` and `y` is blocked given `given` |
+
+Only directed edges make parents and ancestors, so in a CPDAG or a PAG they are the ones every
+member of the class shares; `neighbors` lists every adjacent node. `d_separated` takes a node or a
+set of nodes for `x` and `y`. On a DAG it is d-separation, on a MAG m-separation, and on an
+undirected graph plain separation. A CPDAG answers as every DAG of its class does, and a PAG as
+every MAG of its class does, since the members share their separations, and so does
+`markov_blanket`. A `digraph` may have directed cycles, so it has neither query.
 
 ## Hand a graph to DoWhy
 
