@@ -285,11 +285,11 @@ def cli_meta() -> dict:
                 "refits the method on resamples of the rows and reports how often each edge "
                 "appears: by default subsamples of --sample-fraction (0.5) of the rows drawn "
                 "without replacement, or with --resampling bootstrap, bootstrap resamples drawn "
-                "with replacement. A time-series method on one series keeps the moving block "
-                "bootstrap (blocks of rows) by default. Takes the inputs, params, --config, -o, "
-                "--json, and --full of `run`, and not gin. The method's own seed= is the "
-                "bootstrap's --seed. Workers follow ANDREY_NUM_WORKERS and the result does not "
-                "depend on their number."
+                "with replacement. A time-series method on one series subsamples one stretch of "
+                "consecutive rows, or bootstraps blocks of rows. Takes the inputs, params, "
+                "--config, -o, --json, and --full of `run`, and not gin. The method's own seed= is "
+                "the bootstrap's --seed. Workers follow ANDREY_NUM_WORKERS and the result does "
+                "not depend on their number."
             ),
             "parameters": {name: _param_schema(param) for name, param in BOOTSTRAP_PARAMS.items()},
             "envelope": (
@@ -475,10 +475,10 @@ def render_skill() -> str:
         "frequent first, with its `source`, `target`, `type`, `count`, and `frequency` (a "
         "time-series method adds `lag`). Report an edge with its frequency: 0.95 is stable, 0.3 "
         "is not; a frequency ranks the edges and is not a probability. Each resample is a "
-        "subsample of `--sample-fraction` (default 0.5) of the rows, drawn without replacement; "
-        "`--resampling bootstrap` draws as many rows with replacement. A time-series method on "
-        "one series keeps the moving block bootstrap, blocks of `--block-length` rows, unless "
-        "`--resampling subsample` takes one stretch of consecutive rows. Set `--seed` when the "
+        "subsample of `--sample-fraction` (default 0.5) of the rows, drawn without replacement "
+        "(one stretch of consecutive rows for a time-series method on one series); "
+        "`--resampling bootstrap` draws as many rows with replacement (blocks of "
+        "`--block-length` rows for such a method). Set `--seed` when the "
         "result must repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without "
         "changing it."
     )

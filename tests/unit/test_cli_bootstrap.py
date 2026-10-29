@@ -139,17 +139,20 @@ def test_a_time_series_names_the_lag_of_each_frequency(tmp_path, capsys):
         x[t, 1] += 0.9 * x[t - 1, 0]
     path = tmp_path / "series.csv"
     pd.DataFrame(x, columns=["u", "v"]).to_csv(path, index=False)
-    argv = ["bootstrap", "pcmci", "--data", str(path), "--n-boot", "3", "--block-length", "30"]
-    code, out, _ = _run([*argv, "--json"], capsys)
+    argv = ["bootstrap", "pcmci", "--data", str(path), "--n-boot", "3", "--json"]
+    code, out, _ = _run(argv, capsys)
     env = json.loads(out)
     assert code == 0 and env["structure"]["type"] == "temporal"
-    assert env["bootstrap"]["block_length"] == 30 and env["bootstrap"]["resampling"] == "bootstrap"
-    code, out, _ = _run([*argv[:-2], "--resampling", "subsample", "--json"], capsys)
-    stretch = json.loads(out)["bootstrap"]
-    assert code == 0 and stretch["resampling"] == "subsample" and stretch["block_length"] is None
-    code, _out, err = _run([*argv, "--resampling", "subsample"], capsys)
-    assert code == 2 and "--block-length" in json.loads(err)["error"]["message"]
+    assert (
+        env["bootstrap"]["resampling"] == "subsample" and env["bootstrap"]["block_length"] is None
+    )
     assert env["frequencies"][0]["lag"] == 1 and env["frequencies"][0]["frequency"] == 1.0
+    blocks = ["--resampling", "bootstrap", "--block-length", "30"]
+    code, out, _ = _run([*argv, *blocks], capsys)
+    drawn = json.loads(out)["bootstrap"]
+    assert code == 0 and drawn["resampling"] == "bootstrap" and drawn["block_length"] == 30
+    code, _out, err = _run([*argv, "--block-length", "30"], capsys)
+    assert code == 2 and "--block-length" in json.loads(err)["error"]["message"]
 
 
 def test_a_method_with_a_result_per_group_gives_a_result_per_group(tmp_path, capsys):

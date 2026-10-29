@@ -12,7 +12,8 @@ import pytest
 import andrey
 from andrey import BootstrapOutput, bootstrap
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
-from andrey.resample import EDGES, _draw, _Job
+from andrey.resample import EDGES, _default_block_length, _draw, _Job
+from andrey.spec import REGISTRY
 
 
 def with_workers(workers, *args, **kwargs):
@@ -353,13 +354,15 @@ def series(n=300, seed=0):
 
 
 def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
-    out = bootstrap("pcmci", series(), n_boot=4, seed=0, block_length=20, tau_max=1)
+    out = bootstrap(
+        "pcmci", series(), n_boot=4, seed=0, resampling="bootstrap", block_length=20, tau_max=1
+    )
     assert isinstance(out.structure, TemporalStructure) and out.structure.lags == (1,)
     assert out.metadata["block_length"] == 20
     assert out.frequency("->", lag=1).shape == (3, 3)
     assert {row["lag"] for row in out.table()} == {1}
-    default = bootstrap("granger", series(), n_boot=2, seed=0, tau_max=1)
-    assert default.metadata["block_length"] == 7  # ceil(300 ** (1 / 3))
+    default = bootstrap("granger", series(), n_boot=2, seed=0, resampling="bootstrap", tau_max=1)
+    assert default.metadata["block_length"] == 10  # 10 * tau_max, above ceil(300 ** (1 / 3))
     with pytest.raises(ValueError, match="lag is for a time-series result"):
         bootstrap("pc", lingam_data(), n_boot=2).frequency("->", lag=1)
 
@@ -381,7 +384,11 @@ def test_the_blocks_are_consecutive_rows_of_the_series():
     assert not np.array_equal(_draw(job, 0)[0], _draw(job, 1)[0])
     assert np.array_equal(_draw(job, 3)[0], _draw(job, 3)[0])
     with pytest.raises(ValueError, match="block_length must be an int from 1 to 50"):
-        bootstrap("pcmci", series(50), n_boot=2, block_length=51)
+        bootstrap("pcmci", series(50), n_boot=2, resampling="bootstrap", block_length=51)
+
+
+def test_the_default_block_is_at_most_the_series():
+    assert _default_block_length(REGISTRY["pcmci"], {"tau_max": 30}, 100) == 100
 
 
 def test_a_panel_of_time_points_resamples_the_units():
@@ -452,7 +459,7 @@ def test_a_panel_subsample_keeps_the_same_units_in_every_dataset_and_each_groups
     assert (len(first), len(second)) == (60, 90) and len(set(second.tolist())) == 90
 
 
-def test_resampling_defaults_to_a_subsample_and_a_single_series_keeps_its_blocks():
+def test_resampling_defaults_to_a_subsample_for_every_method():
     data = lingam_data()
     default = bootstrap("hc", data, n_boot=2)
     assert (default.metadata["resampling"], default.metadata["sample_fraction"]) == (
@@ -462,15 +469,30 @@ def test_resampling_defaults_to_a_subsample_and_a_single_series_keeps_its_blocks
     drawn = bootstrap("hc", data, n_boot=2, resampling="bootstrap", sample_fraction=0.2)
     assert drawn.metadata["resampling"] == "bootstrap" and drawn.metadata["sample_fraction"] is None
     assert bootstrap("hc", data, n_boot=2, sample_fraction=0.2).metadata["sample_fraction"] == 0.2
-    blocks = bootstrap("pcmci", series(), n_boot=2, tau_max=1)
-    assert blocks.metadata["resampling"] == "bootstrap" and blocks.metadata["block_length"] == 7
-    assert blocks.metadata["sample_fraction"] is None
-    stretch = bootstrap("pcmci", series(), n_boot=2, tau_max=1, resampling="subsample")
-    assert (
-        stretch.metadata["resampling"] == "subsample" and stretch.metadata["block_length"] is None
-    )
+    stretch = bootstrap("pcmci", series(), n_boot=2, tau_max=1)
+    assert stretch.metadata["resampling"] == "subsample"
+    assert stretch.metadata["sample_fraction"] == 0.5 and stretch.metadata["block_length"] is None
     panel = [lingam_data(120, seed) for seed in range(3)]
     assert bootstrap("longitudinal_lingam", panel, n_boot=2).metadata["resampling"] == "subsample"
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "n", "block"),
+    [
+        ("varma_lingam", {}, 300, 7),  # no lag: ceil(300 ** (1 / 3))
+        ("pcmci", {"tau_max": 1}, 300, 10),  # ten times the longest lag
+        ("pcmciplus", {"tau_max": 3}, 300, 30),
+        ("granger", {"maxlag": 2}, 300, 20),  # a former name of tau_max counts
+        ("pcmci", {}, 300, 10),  # the method's own tau_max
+    ],
+)
+def test_the_default_block_is_ten_times_the_longest_lag_or_the_cube_root_of_the_length(
+    method, settings, n, block
+):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out = bootstrap(method, series(n), n_boot=1, resampling="bootstrap", **settings)
+    assert out.metadata["block_length"] == block
 
 
 def test_a_subsample_of_every_row_gives_every_fit_the_fit_on_the_data():

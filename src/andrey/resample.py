@@ -469,13 +469,13 @@ def _check_threshold(threshold: float) -> float:
     return float(threshold)
 
 
-def _check_resampling(resampling: str | None, sample_fraction: float) -> tuple[str | None, float]:
+def _check_resampling(resampling: str, sample_fraction: float) -> tuple[str, float]:
     """Return the checked ``(resampling, sample_fraction)``; raise as the method wrapper does."""
     from andrey.spec.concepts import BOOTSTRAP_PARAMS
 
     checked = BOOTSTRAP_PARAMS["resampling"].check(resampling, "bootstrap")
     fraction = BOOTSTRAP_PARAMS["sample_fraction"].check(sample_fraction, "bootstrap")
-    assert checked is None or isinstance(checked, str)
+    assert isinstance(checked, str)
     assert isinstance(fraction, float)
     return checked, fraction
 
@@ -651,7 +651,7 @@ def bootstrap(
     n_boot: int = 100,
     seed: int | None = None,
     threshold: float = 0.5,
-    resampling: str | None = None,
+    resampling: str = "subsample",
     sample_fraction: float = 0.5,
     block_length: int | None = None,
     keep_fits: bool = False,
@@ -665,8 +665,9 @@ def bootstrap(
     each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds one graph
     from the pairs that are adjacent often enough [1]_ [2]_ [3]_. A method with a row-aligned input
     (``cdnod``'s ``domain_index``, ``gies``'s ``interventions``) resamples that input with the
-    rows. ``longitudinal_lingam`` resamples whole units, and ``multi_group_direct_lingam`` resamples
-    each dataset on its own.
+    rows. A time-series method on one series subsamples one stretch of consecutive rows (and
+    bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
+    ``multi_group_direct_lingam`` resamples each dataset on its own.
 
     Parameters
     ----------
@@ -685,25 +686,24 @@ def bootstrap(
     threshold : float, default=0.5
         The share of fits in which a pair must be adjacent to be in the averaged graph, in
         ``(0, 1]``.
-    resampling : {"subsample", "bootstrap"} or None, default=None
+    resampling : {"subsample", "bootstrap"}, default="subsample"
         How a resample is drawn. ``"subsample"`` draws ``round(sample_fraction * n_samples)``
         distinct rows, kept in their original order; for a time-series method on one series it is
-        one stretch of consecutive rows at a random start. ``"bootstrap"`` draws ``n_samples``
-        rows with replacement; for a time-series method on one series it draws blocks of
-        ``block_length`` consecutive rows (a moving block bootstrap). ``None`` is ``"subsample"``
-        for every method but a time-series method on one series, which keeps ``"bootstrap"`` until
-        subsampling is measured on it.
+        one stretch of consecutive rows at a random start [4]_ [5]_. ``"bootstrap"`` draws
+        ``n_samples`` rows with replacement; for a time-series method on one series it draws blocks
+        of ``block_length`` consecutive rows (a moving block bootstrap).
     sample_fraction : float, default=0.5
         The share of the rows in a subsample, in ``(0, 1]``, so that ``round(sample_fraction *
         n_samples)`` is at least 2; for ``longitudinal_lingam``, the share of the units, and for
         ``multi_group_direct_lingam``, the share of each dataset's rows. Not used by
         ``"bootstrap"``.
     block_length : int or None, default=None
-        For the moving block bootstrap of a time-series method on one series, the number of
-        consecutive rows in a block, from 1 to ``n_samples``; ``None`` uses
-        ``ceil(n_samples ** (1/3))``. A block break puts rows that were not neighbors side by side,
-        which weakens a link of that many steps or more, so use a block of at least ten times the
-        longest lag. Not for any other resampling.
+        For ``resampling="bootstrap"`` of a time-series method on one series, the number of
+        consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
+        ``max(ceil(n_samples ** (1/3)), 10 * tau_max)`` for a method with a ``tau_max``, and
+        ``ceil(n_samples ** (1/3))`` for the others, at most ``n_samples``. A block break puts rows
+        that were not neighbors side by side, which weakens a link that many steps long or longer,
+        so a block should be at least ten times the longest lag. Not for any other resampling.
     keep_fits : bool, default=False
         Keep every fit in the ``fits`` property.
     **method_kwargs
@@ -714,8 +714,8 @@ def bootstrap(
     -------
     BootstrapOutput or list[BootstrapOutput]
         The frequencies and the averaged graph; for ``multi_group_direct_lingam``, one per group.
-        ``metadata`` records the ``resampling`` used (the resolved scheme, never ``None``), the
-        ``sample_fraction`` of a subsample, and the ``block_length`` of a block bootstrap.
+        ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, and the
+        ``block_length`` of a block bootstrap.
 
     Raises
     ------
@@ -758,6 +758,14 @@ def bootstrap(
     larger ``sample_fraction`` gives fits closer to the fit on ``data``, so the resamples agree
     more and the frequencies say less about how much the fit varies.
 
+    For a time-series method on one series, a subsample is one stretch of consecutive rows, which
+    keeps the lags inside it [5]_. With ``pcmci``, ``pcmciplus``, ``lpcmci``, and ``varma_lingam``
+    on simulated series with 5 and 10 variables and 500 and 1,000 rows (10 series per cell, 14
+    cells; 30 series per cell, 12 cells, for the first three), a stretch of half of the series had
+    no more errors (SHD) than the block bootstrap in any cell, and fewer, by an interval below 0, in
+    9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter
+    than ten times the longest lag.
+
     A frequency is a ranking of the edges, not a probability, and no error bound comes with the
     averaged graph. Resampling can also make a column constant; a fit that raises stops the run,
     and its row numbers count the rows of the resample. The averaged graph can contain a directed
@@ -770,7 +778,8 @@ def bootstrap(
 
     **Limitations.** Not benchmarked yet. Refitting is the cost: ``n_boot`` times the method's own,
     shared across the workers. A moving block bootstrap weakens a link that spans a block
-    break and keeps the series' own order, so it understates what a very short series can show.
+    break, and a stretch holds only ``sample_fraction`` of the series, so each understates what a
+    very short series can show.
 
     References
     ----------
@@ -784,6 +793,7 @@ def bootstrap(
        contexts. arXiv:2503.15436.
     .. [4] Meinshausen, N., and Buhlmann, P. (2010). Stability selection. Journal of the Royal
        Statistical Society: Series B, 72(4), 417-473.
+    .. [5] Politis, D. N., Romano, J. P., and Wolf, M. (1999). Subsampling. Springer.
 
     Examples
     --------
@@ -851,20 +861,31 @@ def _method_spec(method: str | Callable[..., Any]) -> MethodSpec:
     return get_spec(name)
 
 
+def _default_block_length(spec: MethodSpec, kwargs: dict[str, Any], n: int) -> int:
+    """Return ``max(ceil(n ** (1/3)), 10 * tau_max)``, at most ``n``.
+
+    The lag is the call's ``tau_max`` (or a former name of it), else the method's default. A method
+    without a ``tau_max`` has the first term only.
+    """
+    length = math.ceil(n ** (1 / 3))
+    lag = next((p for p in spec.params if p.concept == "tau_max"), None)
+    if lag is not None:
+        given = next((kwargs[k] for k in (lag.name, *lag.aliases) if k in kwargs), lag.default)
+        if isinstance(given, (int, np.integer)) and not isinstance(given, bool):
+            length = max(length, 10 * int(given))
+    return min(length, n)
+
+
 def _job(
     spec: MethodSpec,
     data: Any,
     kwargs: dict[str, Any],
     block_length: int | None,
     seed: int,
-    resampling: str | None,
+    resampling: str,
     sample_fraction: float,
 ) -> _Job:
-    """Check the call against ``spec`` and bundle it for the workers.
-
-    ``resampling=None`` becomes ``"subsample"``, or ``"bootstrap"`` for a time-series method on one
-    series.
-    """
+    """Check the call against ``spec`` and bundle it for the workers."""
     kwargs = dict(kwargs)
     panel = spec.data.inputs[0].kind == "panel"
     temporal = spec.family == "temporal"
@@ -877,8 +898,6 @@ def _job(
     else:
         sizes = [len(data)]
         unit = "blocks" if temporal else "rows"
-    if resampling is None:
-        resampling = "bootstrap" if unit == "blocks" else "subsample"
     if resampling == "subsample":
         too_few = [n for n in sizes if _kept(n, sample_fraction) < 2]
         if too_few:
@@ -890,7 +909,7 @@ def _job(
         raise ValueError(f"block_length is for a time-series method on one series, not {spec.name}")
     if unit == "blocks" and resampling == "bootstrap":
         n = sizes[0]
-        length = math.ceil(n ** (1 / 3)) if block_length is None else block_length
+        length = _default_block_length(spec, kwargs, n) if block_length is None else block_length
         block_length = int_in_range(length, "block_length", 1, n)
     elif block_length is not None:
         raise ValueError("block_length is for resampling='bootstrap', not resampling='subsample'")

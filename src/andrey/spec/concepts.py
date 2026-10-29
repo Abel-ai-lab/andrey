@@ -541,18 +541,6 @@ _CONCEPTS = (
         ),
         suitable=(),
         others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
-        deviations=(
-            Deviation(
-                method="bootstrap",
-                name="resampling",
-                default=None,
-                choices=("subsample", "bootstrap"),
-                fixed_in=None,
-                reason="time series: block bootstrap until measured. None is subsample for every "
-                "method but a time-series method on one series, which keeps the moving block "
-                "bootstrap until subsampling one stretch of the series is measured on it.",
-            ),
-        ),
     ),
     Concept(
         key="sample_fraction",
@@ -850,9 +838,8 @@ def concept_param(key: str, **update: Any) -> ParamSpec:
     return param.model_copy(update=update)
 
 
-#: The resampling arguments of ``andrey.bootstrap``, the "bootstrap spec" its wrapper checks. The
-#: ``resampling`` cell is the concept's recorded deviation: ``None`` picks the family's scheme.
+#: The resampling arguments of ``andrey.bootstrap``, the "bootstrap spec" its wrapper checks.
 BOOTSTRAP_PARAMS: dict[str, ParamSpec] = {
-    "resampling": concept_param("resampling", default=None, nullable=True),
+    "resampling": concept_param("resampling"),
     "sample_fraction": concept_param("sample_fraction"),
 }

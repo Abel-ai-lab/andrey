@@ -408,10 +408,10 @@ resample's number alone, so a seed gives the same result at any `num_workers`, a
 begins with the shorter run's fits. A method that takes a row-aligned input (`cdnod`'s
 `domain_index`, `gies`'s `interventions`) resamples it with the rows; `multi_group_direct_lingam`
 resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
-resamples the units, the same rows of every dataset. A time-series method on one series keeps the
-moving block bootstrap by default, blocks of `block_length` consecutive rows;
-`resampling="subsample"` takes one stretch of consecutive rows instead. `gin` is the one method it
-does not take, since its number of latent nodes differs from fit to fit.
+resamples the units, the same rows of every dataset. A time-series method on one series subsamples
+one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
+consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
+take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,

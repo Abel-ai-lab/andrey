@@ -19,15 +19,16 @@ names its pull request.
   subsampling half of the rows performs as well as the best correction. On linear data with 20 and
   50 variables and 1,000 and 5,000 rows, the averaged graph had no more errors (SHD) than the
   bootstrap's in any of 10 cells and fewer in 5, `ges` with 50 variables and 1,000 rows had 5.0
-  fewer, and a fit takes 0.56 to 0.95 of the time. A time-series method on one series keeps the
-  moving block bootstrap by default. Pass `resampling="bootstrap"` for the results of before.
-  ([#544])
+  fewer, and a fit takes 0.56 to 0.95 of the time. A time-series method on one series subsamples
+  one stretch of consecutive rows, which had no more errors than the block bootstrap in any of 14
+  cells of simulated series. Pass `resampling="bootstrap"` for the resampling of before; the moving
+  block bootstrap's default block is now `max(ceil(n ** (1/3)), 10 * tau_max)` rows for a method
+  with a `tau_max`, instead of `ceil(n ** (1/3))`. ([#544])
 
 ### Added
 
 - `bootstrap` takes `resampling`, `"subsample"` or `"bootstrap"`, and `sample_fraction`, the share
-  of rows in a subsample; `None` for `resampling` is `"subsample"`, or `"bootstrap"` for a
-  time-series method on one series, and `resampling="subsample"` there takes one stretch of
+  of rows in a subsample; for a time-series method on one series a subsample is one stretch of
   consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
   records both. ([#544])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other

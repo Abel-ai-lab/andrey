@@ -1035,7 +1035,7 @@ def execute_bootstrap(
     n_boot: int,
     seed: int | None,
     threshold: float,
-    resampling: str | None,
+    resampling: str,
     sample_fraction: float,
     block_length: int | None,
     output: str | None,
@@ -1171,11 +1171,10 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
             "",
             "Bootstrap flags: --n-boot <n> (default 100), --seed <int>, --threshold <share> "
             "(default 0.5),",
-            "  --resampling subsample|bootstrap (default subsample; bootstrap for a time-series "
-            "method on one series),",
-            "  --sample-fraction <share> (default 0.5, a subsample's rows), --block-length <rows> "
-            "(the block bootstrap of a",
-            "  time-series method on one series). Workers follow ANDREY_NUM_WORKERS.",
+            "  --resampling subsample|bootstrap (default subsample), --sample-fraction <share> "
+            "(default 0.5, a subsample's rows),",
+            "  --block-length <rows> (--resampling bootstrap of a time-series method on one "
+            "series). Workers follow ANDREY_NUM_WORKERS.",
         ]
     lines += [
         "",
@@ -1790,12 +1789,13 @@ def cmd_bootstrap(
         "--threshold",
         help="Share of fits in which a pair must be adjacent to be in the averaged graph (0, 1].",
     ),
-    resampling: Optional[str] = typer.Option(
-        None,
+    resampling: str = typer.Option(
+        "subsample",
         "--resampling",
         metavar="subsample|bootstrap",
-        help="How a resample is drawn: a subsample (without replacement) or a bootstrap resample "
-        "(with replacement). Default subsample; bootstrap for a time-series method on one series.",
+        help="How a resample is drawn: a subsample (without replacement; one stretch of rows for a "
+        "time-series method on one series) or a bootstrap resample (with replacement; blocks of "
+        "rows for such a method).",
     ),
     sample_fraction: float = typer.Option(
         0.5,
@@ -1807,8 +1807,8 @@ def cmd_bootstrap(
         None,
         "--block-length",
         metavar="ROWS",
-        help="Block bootstrap of a time-series method on one series: rows per block. "
-        "Default ceil(rows ** (1/3)).",
+        help="Block bootstrap of a time-series method on one series: rows per block. Default "
+        "max(ceil(rows ** (1/3)), 10 * tau_max), at most the rows.",
     ),
     config: _ConfigOption = None,
     output: _OutputOption = None,

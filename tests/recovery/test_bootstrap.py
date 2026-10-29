@@ -89,7 +89,13 @@ def test_a_block_bootstrap_of_pcmci_recovers_the_lagged_links():
     for t in range(1, 800):
         x[t] += A @ x[t - 1]
     out = andrey.bootstrap(
-        "pcmci", pd.DataFrame(x), n_boot=N_BOOT, seed=0, block_length=40, tau_max=1
+        "pcmci",
+        pd.DataFrame(x),
+        n_boot=N_BOOT,
+        seed=0,
+        resampling="bootstrap",
+        block_length=40,
+        tau_max=1,
     )
     truth = {(0, 0), (0, 1), (1, 2)}  # (cause, effect)
     assert out.structure.lags == (1,)
