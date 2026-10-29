@@ -13,6 +13,7 @@ from itertools import combinations
 
 import numpy as np
 import pytest
+from scipy.special import chdtrc
 from scipy.stats import chi2, chi2_contingency
 
 from andrey.core import categorical
@@ -147,6 +148,129 @@ def test_every_fast_path_returns_the_scalar_p_values(
         assert test.first_order_pvalues(b, a, others).tolist() == [test(a, b, (c,)) for c in others]
 
 
+def _dense_tables(data: np.ndarray, x: int, y: int, conds: list[tuple[int, ...]], g_square: bool):
+    """Statistic, degrees of freedom, and p-value of each set, from one table per possible
+    configuration of the set, counted together in one ``bincount``, the empty ones dropped.
+
+    Every set has the same size. The arithmetic after the counting is the batched path's: each
+    set's statistic is one ``np.sum`` over its occupied cells, in configuration, ``x``, ``y`` order.
+    """
+    codes, cards = categorical.encode(data)
+    n = codes.shape[0]
+    kx, ky = int(cards[x]), int(cards[y])
+    cells = kx * ky
+    sets = np.array(conds, dtype=np.intp).reshape(len(conds), -1)
+    radix = cards[sets]
+    q = radix.prod(axis=1)
+    offset = np.cumsum(q) - q
+    total = int(q.sum())
+    index = np.repeat(offset[:, None], n, axis=1)
+    for j in range(sets.shape[1]):
+        stride = np.prod(radix[:, j + 1 :], axis=1)
+        index += codes[:, sets[:, j]].T * stride[:, None]
+    index = index * cells + codes[:, x] * ky + codes[:, y]
+    tables = np.bincount(index.ravel(), minlength=total * cells).reshape(total, kx, ky)
+    occurs = tables.reshape(total, cells).any(axis=1)
+    bounds = np.concatenate(([0], np.cumsum(np.add.reduceat(occurs.astype(np.int64), offset))))
+    tables = tables[occurs]
+    n_sx = tables.sum(axis=2)
+    n_sy = tables.sum(axis=1)
+    n_s = n_sx.sum(axis=1)
+    flat = tables.reshape(-1)
+    occupied = np.flatnonzero(flat)
+    observed = flat[occupied]
+    s, rest = np.divmod(occupied, cells)
+    sx, sy = np.divmod(rest, ky)
+    expected = n_sx[s, sx] * n_sy[s, sy] / n_s[s]
+    if g_square:
+        values = observed * np.log(observed / expected)
+    else:
+        values = observed * (observed / expected)
+    cuts = np.searchsorted(occupied, bounds * cells).tolist()
+    sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
+    statistic = 2.0 * sums if g_square else sums - float(n)
+    per_table = ((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)
+    dof = np.add.reduceat(per_table, bounds[:-1])
+    pvalue = np.ones(len(dof))
+    live = dof != 0
+    pvalue[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
+    return statistic, dof, pvalue
+
+
+def _occupied_tables_data(case: str) -> np.ndarray:
+    """Categorical columns whose conditioning sets leave many configurations empty.
+
+    ``"empty configurations"``: more configurations than rows. ``"one value per configuration"``:
+    column 0 takes one value wherever column 2 is 0, so those tables have an empty row and fewer
+    degrees of freedom. ``"one category"``: column 1 has one category. ``"many categories"``:
+    twelve categories per conditioning column, so a set of four has 20,736 configurations against
+    150 rows. ``"two rows"``: every table has one cell per row, so no degree of freedom.
+    """
+    if case == "empty configurations":
+        return _codes(seed=4, n=200, cards=(2, 3, 4, 3, 5, 2))
+    if case == "one value per configuration":
+        x = _codes(seed=5, n=300, cards=(3, 3, 3, 4, 2, 3))
+        x[:, 0] = np.where(x[:, 2] == 0, 0.0, x[:, 0])
+        return x
+    if case == "one category":
+        x = _codes(seed=6, n=120, cards=(3, 2, 4, 3, 2))
+        x[:, 1] = 1.0
+        return x
+    if case == "many categories":
+        return _codes(seed=7, n=150, cards=(3, 3, 12, 12, 12, 12))
+    return _codes(seed=8, n=2, cards=(2, 2, 3, 3))
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "empty configurations",
+        "one value per configuration",
+        "one category",
+        "many categories",
+        "two rows",
+    ],
+)
+@pytest.mark.parametrize("batch", [1 << 22, 64], ids=["one count", "a count per set"])
+def test_batched_counts_equal_the_tables_of_every_configuration(monkeypatch, g_square, case, batch):
+    """Counting only the configurations that occur gives every set the statistic, degrees of
+    freedom, and p-value, bit for bit, of counting a table for every possible configuration and
+    dropping the empty ones, whatever the set's size."""
+    from andrey.core import ci
+
+    monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
+    monkeypatch.setattr(ci, "_TABLE_MIN", 1 << 24)  # every set on the batched path
+    recorded: list[tuple[np.ndarray, np.ndarray]] = []
+
+    def recording_chdtrc(dof, statistic):
+        recorded.append((np.asarray(dof).copy(), np.asarray(statistic).copy()))
+        return chdtrc(dof, statistic)
+
+    monkeypatch.setattr(ci, "chdtrc", recording_chdtrc)
+    x = _occupied_tables_data(case)
+    d = x.shape[1]
+    test = ChiSquare(x, g_square=g_square)
+    for a, b in [(0, 1), (1, d - 1), (0, d - 1)]:
+        others = [c for c in range(d) if c not in (a, b)]
+        for size in range(min(len(others), 4) + 1):
+            sets = list(combinations(others, size))
+            if len(sets) == 1:
+                sets = sets * 2  # a batch holds at least two sets
+            statistic, dof, pvalue = _dense_tables(x, a, b, sets, g_square)
+            recorded.clear()
+            got = np.array(test.batched_call(b, a, sets))
+            assert np.array_equal(got.view(np.int64), pvalue.view(np.int64))
+            live = dof != 0
+            got_dof = np.concatenate([r[0] for r in recorded]) if recorded else np.array([])
+            got_statistic = np.concatenate([r[1] for r in recorded]) if recorded else np.array([])
+            assert sorted(zip(got_dof.tolist(), got_statistic.view(np.int64).tolist())) == sorted(
+                zip(dof[live].tolist(), np.maximum(statistic[live], 0.0).view(np.int64).tolist())
+            )
+    if case == "two rows":
+        assert (test.batched_call(0, 1, [(2,), (3,), (2, 3)]) == np.ones(3)).all()
+
+
 def _bdeu(counts: np.ndarray, q: int, a: float = 1.0) -> float:
     """Log BDeu marginal likelihood of ``counts`` (one row per parent configuration)."""
     r = counts.shape[1]
@@ -269,7 +393,7 @@ def test_categorical_bic_counts_the_parameters_of_unseen_configurations():
     free parameters in each, whether or not a row falls in it."""
     x = np.array([[0, 0, 0], [1, 1, 1], [2, 0, 2], [0, 1, 0], [1, 0, 2], [2, 1, 1]], float)
     x = np.vstack([x, [[0, 0, 1], [0, 0, 2]]])  # parent configuration (0, 0) seen; (1, 2) never
-    score = CategoricalBICScore(x, lambda_value=0.0)
+    score = CategoricalBICScore(x, penalty_discount=0.0)
     assert score.score(0, [1, 2]) - CategoricalBICScore(x).score(0, [1, 2]) == pytest.approx(
         -2 * 3 * 2 * math.log(len(x))
     )
@@ -277,16 +401,16 @@ def test_categorical_bic_counts_the_parameters_of_unseen_configurations():
 
 def test_categorical_bic_without_a_penalty_is_minus_twice_the_log_likelihood():
     x = _codes()
-    score = CategoricalBICScore(x, lambda_value=0.0)
+    score = CategoricalBICScore(x, penalty_discount=0.0)
     counts = np.zeros((2, 3))
     np.add.at(counts, (x[:, 0].astype(int), x[:, 1].astype(int)), 1)
     assert score.score(1, [0]) == pytest.approx(-2 * _multinomial_loglik(counts), rel=1e-12)
 
 
-def test_categorical_bic_penalty_scales_with_lambda_value():
+def test_categorical_bic_penalty_scales_with_penalty_discount():
     x = _codes()
-    plain, double = CategoricalBICScore(x), CategoricalBICScore(x, lambda_value=2.0)
-    free = CategoricalBICScore(x, lambda_value=0.0)
+    plain, double = CategoricalBICScore(x), CategoricalBICScore(x, penalty_discount=2.0)
+    free = CategoricalBICScore(x, penalty_discount=0.0)
     for parents in ([], [0], [0, 2]):
         penalty = plain.score(1, parents) - free.score(1, parents)
         assert double.score(1, parents) - free.score(1, parents) == pytest.approx(2 * penalty)
@@ -315,16 +439,16 @@ def test_categorical_bic_and_bdeu_agree_on_which_parent_explains_a_copy():
 
 
 @pytest.mark.parametrize("value", [-1.0, float("nan"), float("inf")])
-def test_categorical_bic_lambda_value_must_be_finite_and_non_negative(value):
-    with pytest.raises(ValueError, match="lambda_value"):
-        CategoricalBICScore(_codes(), lambda_value=value)
+def test_categorical_bic_penalty_discount_must_be_finite_and_non_negative(value):
+    with pytest.raises(ValueError, match="penalty_discount"):
+        CategoricalBICScore(_codes(), penalty_discount=value)
 
 
 def test_make_score_builds_the_categorical_bic_with_its_weight():
     x = _codes()
-    built = make_score("local_score_BIC_categorical", x, lambda_value=2.0)
+    built = make_score("discrete_bic", x, penalty_discount=2.0)
     assert isinstance(built, CategoricalBICScore)
-    assert built.score(1, [0]) == CategoricalBICScore(x, lambda_value=2.0).score(1, [0])
+    assert built.score(1, [0]) == CategoricalBICScore(x, penalty_discount=2.0).score(1, [0])
 
 
 def _configuration_counts(x: np.ndarray, node: int, parents: tuple[int, ...]) -> np.ndarray:

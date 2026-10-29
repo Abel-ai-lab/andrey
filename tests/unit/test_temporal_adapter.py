@@ -63,7 +63,6 @@ def test_var_lingam_stack_and_ordering():
     assert np.array_equal(out.structure.lag_weights, ar.transpose(0, 2, 1))
     assert out.structure.lag_weights_ma is None
     assert out.ordering == (0, 1, 2)
-    assert out.metadata["algorithm"] == "varlingam"
 
 
 def test_var_lingam_json_roundtrip(tmp_path):
@@ -99,7 +98,6 @@ def test_varma_lingam_dual_stack():
     assert t.lag(0).endpoints(0, 1) == (TAIL, ARROW)
     assert t.lag(1).endpoints(1, 2) == (TAIL, ARROW)
     assert out.ordering == (2, 0, 1)
-    assert out.metadata["algorithm"] == "varmalingam"
 
 
 def test_varma_lingam_json_roundtrip(tmp_path):
@@ -142,7 +140,6 @@ def test_granger_lag_topology_and_count():
     assert ar[0, 0, 0] == 0.4  # canonical self-loop weight W[0->0] at lag 1 (raw block[0, 0])
     assert ar[1, 2, 1] == -0.5  # canonical W[1->2] at lag 2 (raw block[2, 1])
     assert out.ordering is None
-    assert out.metadata["algorithm"] == "granger"
 
 
 def test_granger_json_roundtrip(tmp_path):
@@ -209,7 +206,6 @@ def test_longitudinal_adapter_stores_the_time_axis_losslessly():
     # per-time causal orders (with the t=0 placeholder) ride in metadata; no envelope ordering.
     assert out.metadata["causal_orders"][0] == []
     assert out.ordering is None
-    assert out.metadata["algorithm"] == "longitudinallingam"
 
 
 def test_longitudinal_adapter_json_roundtrip(tmp_path):

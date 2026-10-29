@@ -15,12 +15,13 @@ from andrey.api._adapt import (
     column_labels,
     copies_named,
     data_kind,
+    default_score,
+    default_test,
     int_in_range,
     json_safe,
-    open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
+from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -38,47 +39,37 @@ def _fit(
     restrict: str,
     maximize: str,
     alpha: float,
-    indep_test: str,
-    score_func: str,
-    lambda_value: float,
+    indep_test: str | None,
+    score_func: str | None,
+    penalty_discount: float,
     ebic_gamma: float,
     max_iter: int | None,
     tabu_length: int,
     max_tabu: int | None,
     categorical: Sequence[str | int] | None,
     max_categories: int,
+    seed: int | None,
+    max_depth: int | None,
+    max_parents: int | None,
     knowledge: Knowledge | None,
 ) -> StructureOutput:
     """Check the settings, run the restrict and maximize phases, and wrap the CPDAG."""
-    from andrey.search.hc import HC_SCORES
-    from andrey.search.hybrid import MAXIMIZES, RESTRICTS
     from andrey.search.hybrid import rsmax2 as _rsmax2
-    from andrey.search.tabu import TABU_SCORES
 
-    if restrict not in RESTRICTS:
-        raise ValueError(f"restrict must be one of {RESTRICTS}, got {restrict!r}")
-    if maximize not in MAXIMIZES:
-        raise ValueError(f"maximize must be one of {MAXIMIZES}, got {maximize!r}")
-    scores = HC_SCORES if maximize == "hc" else TABU_SCORES
-    if score_func not in scores:
-        raise NotImplementedError(
-            f"{name} with maximize={maximize!r} supports score_func {scores}, not {score_func!r}"
-        )
+    score_func, _ = default_score(data, score_func, categorical=categorical)
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     # Both phases read the same data, so the score and the test must agree on its type.
     if data_kind(score_func) != data_kind(indep_test):
         raise ValueError(
-            f"{name}'s score and test must read the data alike: score_func='local_score_BDeu' or "
-            "'local_score_BIC_categorical' with indep_test 'chisq' or 'gsq' for categories, "
-            "'local_score_degen_gauss' or 'local_score_cond_gauss' with 'degen_gauss' or "
-            "'cond_gauss' for mixed data, or 'local_score_BIC_from_cov' with a test of continuous "
+            f"{name}'s score and test must read the data alike: score_func='bdeu' or "
+            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
+            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
+            "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
             f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories, method=name
     )
-    alpha = open_unit_interval(alpha, "alpha")
-    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
-    tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
@@ -92,35 +83,39 @@ def _fit(
             alpha=alpha,
             indep_test=indep_test,
             score_func=score_func,
-            lambda_value=lambda_value,
+            penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
             max_iter=max_iter,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             categorical=mask,
             constraints=constraints,
+            seed=seed,
+            max_depth=max_depth,
+            max_parents=max_parents,
         )
     metadata = {
-        "algorithm": name.upper(),
         "score": json_safe(score),
-        "restrict": restrict,
-        "maximize": maximize,
         **categorical_metadata(mask, data),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("mmhc")
 def mmhc(
     data: npt.ArrayLike,
     *,
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
-    score_func: str = "local_score_BIC_from_cov",
-    lambda_value: float = 1.0,
+    indep_test: str | None = None,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with max-min hill climbing (MMHC).
@@ -138,18 +133,18 @@ def mmhc(
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser
         skeletons, so the score search considers fewer pairs.
-    indep_test : str, default="fisherz"
+    indep_test : str or None, default=None
         Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``
         or ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
         ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test. It must read the
-        same kind of data as ``score_func``.
-    score_func : str, default="local_score_BIC_from_cov"
-        Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s:
-        ``"local_score_BIC_from_cov"`` or its other name ``"local_score_BIC"`` (Gaussian BIC) for
-        continuous data, ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"`` for
-        categorical data, ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"`` for mixed
-        data.
-    lambda_value : float, default=1.0
+        same kind of data as ``score_func``. ``None`` picks from the declared column types, as for
+        :func:`~andrey.pc`.
+    score_func : str or None, default=None
+        Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
+        BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
+        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``None`` picks from the declared
+        column types, as for :func:`~andrey.ges`.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
@@ -164,6 +159,20 @@ def mmhc(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test in the MMPC phase,
+        at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller
+        cap runs fewer tests and can keep pairs that a larger conditioning set would remove.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the score search takes no move that gives a
+        node more than ``max_parents`` parents, so no DAG the returned CPDAG represents does (every
+        DAG of a class has the same largest number of parents). A cap can stop the search short of
+        the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The score search considers the
@@ -175,24 +184,23 @@ def mmhc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"MMHC"``, ``metadata["score"]`` the score of the DAG found, computed as for
-        :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
-        ``metadata["maximize"]`` are ``"mmpc"`` and ``"hc"``. Under a mixed-data setting,
+        ``"mmhc"``, ``metadata["score"]`` the score of the DAG found, computed as for
+        :func:`andrey.ges` (lower is better). Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` or ``score_func`` names no available test or score.
     TypeError
-        If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
-        positions, or ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None``
-        nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, if ``score_func`` and ``indep_test`` read different
-        kinds of data, if a given ``max_iter`` is less than ``1``, or if ``data`` or
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``score_func`` and ``indep_test`` read different kinds of data, or if ``data`` or
         ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
-        :func:`~andrey.hc`. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
+        ``max_parents`` parents, or if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -229,15 +237,15 @@ def mmhc(
     each method.
 
     **Choosing the penalty.** The hill-climbing phase scores as :func:`~andrey.hc` does: the
-    linear-Gaussian BIC charges a variable ``lambda_value * log(n_samples)`` per parent plus the
+    linear-Gaussian BIC charges a variable ``penalty_discount * log(n_samples)`` per parent plus the
     extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [2]_, and
-    :func:`~andrey.ges` describes the choice. ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the
-    standard BIC. On simulated linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows,
-    the default ``ebic_gamma=1.0`` made fewer or as many errors (SHD) as the standard BIC on average
-    in 64 of 65 settings of graph, variables, and rows, and 0.2 more in the last (7.0 against 6.8
-    with 20 variables, mean degree 2, ``scale="unitless"``, and 1,000 rows); with 200 variables and
-    2,000 rows it made 49 errors against 73 (200 true edges). The gain is smaller than hill
-    climbing's, since the MMPC phase has already left out most false edges.
+    :func:`~andrey.ges` describes the choice. ``ebic_gamma=0.0`` with ``penalty_discount=1.0`` is
+    the standard BIC. On simulated linear-Gaussian data with 20 to 400 variables and 200 to 4,000
+    rows, the default ``ebic_gamma=1.0`` made fewer or as many errors (SHD) as the standard BIC on
+    average in 64 of 65 settings of graph, variables, and rows, and 0.2 more in the last (7.0
+    against 6.8 with 20 variables, mean degree 2, ``scale="unitless"``, and 1,000 rows); with 200
+    variables and 2,000 rows it made 49 errors against 73 (200 true edges). The gain is smaller than
+    hill climbing's, since the MMPC phase has already left out most false edges.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its hill-climbing phase scores
     every variable over the same rows, and score terms over different rows do not add up to the
@@ -271,7 +279,6 @@ def mmhc(
     >>> out.structure.kind
     'cpdag'
     """
-    warn_experimental("mmhc")
     return _fit(
         "mmhc",
         data,
@@ -280,32 +287,39 @@ def mmhc(
         alpha=alpha,
         indep_test=indep_test,
         score_func=score_func,
-        lambda_value=lambda_value,
+        penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         max_iter=max_iter,
         tabu_length=10,
         max_tabu=None,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
+        max_parents=max_parents,
         knowledge=knowledge,
     )
 
 
+@method_spec("rsmax2")
 def rsmax2(
     data: npt.ArrayLike,
     *,
     restrict: str = "mmpc",
     maximize: str = "hc",
     alpha: float = 0.05,
-    indep_test: str = "fisherz",
-    score_func: str = "local_score_BIC_from_cov",
-    lambda_value: float = 1.0,
+    indep_test: str | None = None,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with a restrict phase and a maximize phase.
@@ -329,13 +343,14 @@ def rsmax2(
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
         Significance level of the restrict phase's tests. Smaller values keep fewer pairs.
-    indep_test : str, default="fisherz"
+    indep_test : str or None, default=None
         Conditional-independence test of the restrict phase, any of :func:`~andrey.pc`'s. It must
-        read the same kind of data as ``score_func``.
-    score_func : str, default="local_score_BIC_from_cov"
-        Local score of the maximize phase, any of :func:`~andrey.hc`'s; with ``maximize="tabu"``,
-        any of :func:`~andrey.tabu`'s, which take no mixed data.
-    lambda_value : float, default=1.0
+        read the same kind of data as ``score_func``. ``None`` picks from the declared column types,
+        as for :func:`~andrey.pc`.
+    score_func : str or None, default=None
+        Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``None`` picks from the
+        declared column types, as for :func:`~andrey.ges`.
+    penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
@@ -356,6 +371,20 @@ def rsmax2(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``, as for :func:`~andrey.pc`.
+    seed : int or None, default=None
+        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
+        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
+        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
+        seed used.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test in the restrict
+        phase, at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A
+        smaller cap runs fewer tests and can keep pairs that a larger conditioning set would remove.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the score search takes no move that gives a
+        node more than ``max_parents`` parents, so no DAG the returned CPDAG represents does (every
+        DAG of a class has the same largest number of parents). A cap can stop the search short of
+        the lowest-scoring graph. ``None`` sets no cap.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
@@ -367,26 +396,25 @@ def rsmax2(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"RSMAX2"``, ``metadata["score"]`` the score of the DAG found, computed as for
-        :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
-        ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
+        ``"rsmax2"``, ``metadata["score"]`` the score of the DAG found, computed as for
+        :func:`andrey.ges` (lower is better). Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read.
+        With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
-    NotImplementedError
-        If ``indep_test`` names no available test, or ``score_func`` no score ``maximize`` takes.
     TypeError
-        If ``tabu_length``, a given ``max_tabu``, or a given ``max_iter`` is not an int,
-        ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``restrict`` or ``maximize`` is not one of its choices, which the message lists, if
-        ``alpha`` is not in ``(0, 1)``, if ``score_func`` and ``indep_test`` read different kinds
-        of data, if ``tabu_length`` or a given ``max_iter`` is less than ``1``, if ``max_tabu`` is
-        outside ``1..tabu_length``, or if ``data`` or ``categorical`` does not suit the test or
-        score, as for :func:`~andrey.pc` and :func:`~andrey.hc`. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if
+        ``score_func`` is not a score ``maximize`` takes, if ``score_func`` and ``indep_test`` read
+        different kinds of data, if ``max_tabu`` is greater than ``tabu_length``, or if ``data`` or
+        ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
+        :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
+        ``max_parents`` parents, or if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -423,13 +451,13 @@ def rsmax2(
     identical.
 
     **Choosing the penalty.** The maximize phase scores as :func:`~andrey.hc` does: the
-    linear-Gaussian BIC charges a variable ``lambda_value * log(n_samples)`` per parent plus the
+    linear-Gaussian BIC charges a variable ``penalty_discount * log(n_samples)`` per parent plus the
     extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, and
-    :func:`~andrey.ges` describes the choice. ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the
-    standard BIC. With ``restrict="pc"`` and ``maximize="tabu"``, on simulated linear-Gaussian data
-    with 20 to 400 variables and 200 to 4,000 rows, the default ``ebic_gamma=1.0`` made fewer or as
-    many errors (SHD) as the standard BIC on average in 63 of 65 settings of graph, variables, and
-    rows, and more in two: 38.0 against 36.3 on the 46-variable ECOLI70 network with 1,000
+    :func:`~andrey.ges` describes the choice. ``ebic_gamma=0.0`` with ``penalty_discount=1.0`` is
+    the standard BIC. With ``restrict="pc"`` and ``maximize="tabu"``, on simulated linear-Gaussian
+    data with 20 to 400 variables and 200 to 4,000 rows, the default ``ebic_gamma=1.0`` made fewer
+    or as many errors (SHD) as the standard BIC on average in 63 of 65 settings of graph, variables,
+    and rows, and more in two: 38.0 against 36.3 on the 46-variable ECOLI70 network with 1,000
     simulated rows, where one of three draws moved by 7, and 39.2 against 38.8 with 50 variables,
     mean degree 4, ``scale="unitless"``, and 1,000 rows. With 200 variables and 2,000 rows it made
     42 errors against 65 (200 true edges). The default ``restrict="mmpc"`` with ``maximize="hc"``
@@ -473,10 +501,9 @@ def rsmax2(
     >>> with warnings.catch_warnings():
     ...     warnings.simplefilter("ignore")
     ...     out = rsmax2(np.column_stack([x, y]), restrict="pc", maximize="tabu")
-    >>> out.metadata["restrict"], out.metadata["maximize"]
-    ('pc', 'tabu')
+    >>> out.structure.kind
+    'cpdag'
     """
-    warn_experimental("rsmax2")
     return _fit(
         "rsmax2",
         data,
@@ -485,12 +512,15 @@ def rsmax2(
         alpha=alpha,
         indep_test=indep_test,
         score_func=score_func,
-        lambda_value=lambda_value,
+        penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         max_iter=max_iter,
         tabu_length=tabu_length,
         max_tabu=max_tabu,
         categorical=categorical,
         max_categories=max_categories,
+        seed=seed,
+        max_depth=max_depth,
+        max_parents=max_parents,
         knowledge=knowledge,
     )

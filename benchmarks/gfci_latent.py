@@ -2,7 +2,7 @@
 """Benchmark GFCI implementations on data with hidden confounders.
 
 Runs Andrey's and Tetrad's GFCI on identical data with Fisher-Z at ``alpha = 0.05`` and the BIC
-penalty at ``lambda_value = 1.0``. Andrey's FCI runs beside them, as the test-only search GFCI
+penalty at ``penalty_discount = 1.0``. Andrey's FCI runs beside them, as the test-only search GFCI
 improves on, and the empty graph provides a quality baseline. Tetrad runs through its causal-cmd
 jar, named by ``ANDREY_BENCH_TETRAD_JAR``, through the driver of the mixed-data lane, which times
 Tetrad's search inside its JVM. Andrey's GFCI runs twice, in one process and with the fit's cores

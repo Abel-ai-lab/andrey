@@ -15,6 +15,12 @@ from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, Te
 from andrey.resample import EDGES, _draw, _Job
 
 
+def with_workers(workers, *args, **kwargs):
+    """``bootstrap`` run on ``workers`` worker processes, set the way every method sets them."""
+    with andrey.config(num_workers=workers):
+        return bootstrap(*args, **kwargs)
+
+
 def graph(n, edges, kind=None):
     """A graph on ``n`` nodes from ``(i, j, mark at i, mark at j)`` rows."""
     M = np.zeros((n, n), dtype=np.int8)
@@ -192,6 +198,11 @@ def test_from_fits_rejects_what_cannot_be_counted(counted):
     other = [graph(2, [directed(0, 1)]), StructureOutput.new(lagged)]
     with pytest.raises(ValueError, match="digraph"):
         BootstrapOutput.from_fits(other)
+    joined = np.array([[0, TAIL], [TAIL, 0]], dtype=np.int8)
+    undirected = StructureOutput.new(GraphStructure.from_numpy(joined, kind="undirected"))
+    with pytest.raises(ValueError, match="undirected"):
+        BootstrapOutput.from_fits([graph(2, [directed(0, 1)]), undirected])
+    assert BootstrapOutput.from_fits([undirected, undirected]).structure.kind == "undirected"
 
 
 def test_the_labels_of_the_fits_name_the_nodes():
@@ -246,19 +257,35 @@ def test_the_default_seed_follows_andrey_seed(monkeypatch):
 @pytest.mark.parametrize("method", ["pc", "direct_lingam", "boss"])
 def test_workers_do_not_change_the_result(method):
     data = lingam_data()
-    serial = bootstrap(method, data, n_boot=6, seed=3, num_workers=1, keep_fits=True)
-    pooled = bootstrap(method, data, n_boot=6, seed=3, num_workers=2, keep_fits=True)
+    serial = with_workers(1, method, data, n_boot=6, seed=3, keep_fits=True)
+    pooled = with_workers(2, method, data, n_boot=6, seed=3, keep_fits=True)
     assert serial.fits == pooled.fits and serial.table() == pooled.table()
     assert serial.structure == pooled.structure
 
 
-def test_a_seeded_method_fits_each_resample_with_its_own_seed_unless_given_one():
+@pytest.mark.parametrize(
+    ("method", "settings"),
+    [("pc", {"indep_test": "rcot"}), ("boss", {}), ("ica_lingam", {})],
+)
+@pytest.mark.filterwarnings("ignore::andrey.SampleSizeWarning")
+def test_a_seeded_method_fits_each_resample_with_a_seed_derived_from_the_bootstraps(
+    method, settings
+):
     data = lingam_data()
-    derived = bootstrap("ica_lingam", data, n_boot=3, seed=1, keep_fits=True)
-    pinned = bootstrap("ica_lingam", data, n_boot=3, seed=1, random_state=4, keep_fits=True)
-    again = bootstrap("ica_lingam", data, n_boot=3, seed=1, random_state=4, keep_fits=True)
-    assert pinned.fits == again.fits
-    assert derived.fits != pinned.fits
+
+    def seeds(**kwargs):
+        out = bootstrap(method, data, n_boot=3, keep_fits=True, **settings, **kwargs)
+        return [fit.metadata["seed"] for fit in out.fits]
+
+    derived = seeds(seed=1)
+    assert len(set(derived)) == 3
+    assert derived == seeds(seed=1)
+    assert derived != seeds(seed=2)
+
+
+def test_the_bootstrap_does_not_take_a_seed_the_method_has_renamed():
+    with pytest.raises(ValueError, match="random_state cannot be set"):
+        bootstrap("ica_lingam", lingam_data(), n_boot=2, random_state=4)
 
 
 @pytest.mark.parametrize("method", ["pc", "fci", "ges", "boss", "direct_lingam"])
@@ -325,7 +352,7 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
     assert out.metadata["block_length"] == 20
     assert out.frequency("->", lag=1).shape == (3, 3)
     assert {row["lag"] for row in out.table()} == {1}
-    default = bootstrap("granger", series(), n_boot=2, seed=0, maxlag=1)
+    default = bootstrap("granger", series(), n_boot=2, seed=0, tau_max=1)
     assert default.metadata["block_length"] == 7  # ceil(300 ** (1 / 3))
     with pytest.raises(ValueError, match="lag is for a time-series result"):
         bootstrap("pc", lingam_data(), n_boot=2).frequency("->", lag=1)
@@ -385,7 +412,7 @@ def test_the_arguments_are_checked_before_any_fit():
 @pytest.mark.parametrize("workers", [1, 2])
 def test_a_failed_fit_stops_the_run_and_names_its_resample(workers):
     with pytest.raises(TypeError, match="bogus") as raised:
-        bootstrap("hc", lingam_data(), n_boot=3, num_workers=workers, bogus=1)
+        with_workers(workers, "hc", lingam_data(), n_boot=3, bogus=1)
     assert any("bootstrap resample 0" in note for note in raised.value.__notes__)
 
 
@@ -395,7 +422,7 @@ def test_each_warning_of_the_fits_is_raised_once():
     for workers in (1, 2):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            bootstrap("ges", codes, n_boot=4, seed=0, num_workers=workers)
+            with_workers(workers, "ges", codes, n_boot=4, seed=0)
         kinds = [w for w in caught if issubclass(w.category, andrey.DataTypeWarning)]
         assert len(kinds) == 1, workers
 
@@ -404,7 +431,7 @@ def test_the_workers_follow_the_configured_count_and_never_nest():
     data = lingam_data()
     with andrey.config(num_workers=2):
         configured = bootstrap("pc", data, n_boot=4, seed=0, keep_fits=True)
-    serial = bootstrap("pc", data, n_boot=4, seed=0, num_workers=1, keep_fits=True)
+    serial = with_workers(1, "pc", data, n_boot=4, seed=0, keep_fits=True)
     assert configured.fits == serial.fits
     assert andrey.config.num_workers == 1 or "ANDREY_NUM_WORKERS" in os.environ
 
@@ -412,7 +439,7 @@ def test_the_workers_follow_the_configured_count_and_never_nest():
 def test_knowledge_travels_to_the_workers():
     data = lingam_data()
     knowledge = andrey.Knowledge(required=[("c", "d")])
-    serial = bootstrap("pc", data, n_boot=3, seed=0, num_workers=1, knowledge=knowledge)
-    pooled = bootstrap("pc", data, n_boot=3, seed=0, num_workers=2, knowledge=knowledge)
+    serial = with_workers(1, "pc", data, n_boot=3, seed=0, knowledge=knowledge)
+    pooled = with_workers(2, "pc", data, n_boot=3, seed=0, knowledge=knowledge)
     assert serial.table() == pooled.table()
     assert serial.frequency("->")[2, 3] == 1.0  # the required edge is in every fit

@@ -465,7 +465,7 @@ def _adapted(adapter: Any) -> Callable[[Any], Any]:
 def _granger(x: np.ndarray) -> np.ndarray:
     """The lagged edges of ``andrey.granger`` with the published settings, as ``(lag, cause,
     effect)``."""
-    out = andrey.granger(x, maxlag=GRANGER_LAGS, cv=5)
+    out = andrey.granger(x, tau_max=GRANGER_LAGS, cv=5)
     return np.stack([np.asarray(w) != 0 for w in out.structure.lag_weights])
 
 
@@ -488,7 +488,7 @@ SUPPORTED: dict[str, Method] = {
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),
-    "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, random_state=0), "dag", LINGAM_DATA),
+    "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, seed=0), "dag", LINGAM_DATA),
     "MultiGroupDirectLiNGAM": Method(
         _adapted(AndreyMultiGroupDirectLiNGAM()), "dag", _models("multi_group_er")
     ),

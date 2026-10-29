@@ -30,6 +30,7 @@ Edit the spec, not the surfaces.
 |---|---|
 | `src/andrey/spec/models.py` | The frozen Pydantic models: `MethodSpec`, `DataSpec`, `InputSpec`, `ParamSpec`, `OutputSpec`, `EnvVarSpec`. |
 | `src/andrey/spec/registry.py` | One `MethodSpec` per public method; parameter defaults are the source of truth. |
+| `src/andrey/spec/concepts.py` | The package-wide parameter rules: one `Concept` per shared parameter or behavior, with its template `ParamSpec`, the suitable and exempt methods, and each cell that still differs. |
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
 | `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
@@ -64,9 +65,14 @@ repository.
 
 - The registry and `andrey.api.__all__` name the same methods.
 - Each spec's data inputs, keyword parameters, and **defaults** match `inspect.signature`
-  (positional-or-keyword -> a `DataSpec` input, keyword-only -> a `ParamSpec`, `**params` ->
-  `passthrough=True`).
+  (positional-or-keyword -> a `DataSpec` input, keyword-only -> a `ParamSpec`; no facade takes
+  `**params`).
 - Shared concepts stay consistent: `alpha` is a float; seeds are nullable ints.
+- `tests/unit/test_concepts.py` checks every concept in `src/andrey/spec/concepts.py` against
+  every method: a suitable method has the template's name, type, default, and bounds, or the
+  deviation recorded for it, and its docstring entry states the concept; an exempt method lacks
+  it; each recorded deviation still holds; and every paragraph of `docs/docs/api.md` marked
+  `% concept: <key>` names exactly the methods that take the concept.
 - Every `ANDREY_*` variable the source reads has an `EnvVarSpec` and one parser in
   `andrey.core.env`.
 - Every method has a status and a **Limitations.** paragraph; the status checks are listed under
@@ -100,20 +106,27 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 
 ### Add a method
 
-1. Implement the facade in `src/andrey/api/<family>.py` and add its name to `andrey.api.__all__`.
+1. Implement the facade in `src/andrey/api/<family>.py`, decorated with `@method_spec("<name>")`,
+   and add its name to `andrey.api.__all__`. The wrapper (`src/andrey/api/_method.py`) checks every
+   argument against the method's `ParamSpec`, resolves a seeded method's seed, gives the
+   experimental warning, and sets `metadata["algorithm"]` and `metadata["seed"]`, so the facade
+   holds only the method's own logic.
    End the docstring's Notes with a **Limitations.** paragraph: "Not benchmarked yet.", the largest
    problem its tests run it on (variables, and rows where they matter), and any known structural
    limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
-   identical to the signature), with `status="experimental"`, and call
-   `warn_experimental("<name>")` first in the facade until the method is supported. A method whose
-   tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True` to its data
-   check; every other method passes its name as `method=`, so its refusal of `NaN` names it.
+   identical to the signature), with `status="experimental"` until the method is supported. A
+   method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`
+   to its data check. Every data check passes the method's name as `method=`, so a refusal of
+   `NaN` names it and data past the measured boundary warn.
    `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
    `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
    `tests/unit/test_column_labels.py` checks both fields on every method.
+   List the method in `src/andrey/spec/concepts.py` under each concept, as suitable (taking the
+   template with `concept_param`, or a recorded deviation) or exempt with the reason;
+   `tests/unit/test_concepts.py` names each concept that does not list it.
 3. Run `uv run pytest tests/unit/test_spec_registry.py`, which names whatever is missing. The CLI,
    the schema, and the skill pick up the method on their own.
 4. Test it as [Test a method](#test-a-method) describes.
@@ -131,7 +144,29 @@ commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#ide
 
 Change the facade **and** its `ParamSpec` in the same commit; the signature-agreement test fails
 when they differ. A new enumerated value goes in `ParamSpec.choices`, so the schema, the CLI's
-`key=value` coercion, and `andrey run <method> --help` all learn it at once.
+`key=value` coercion, and `andrey run <method> --help` all learn it at once. A parameter that
+implements a concept changes in `src/andrey/spec/concepts.py`: bringing a method to the template
+deletes its deviation, and `tests/unit/test_concepts.py` fails until it does. A parameter or a
+choice renamed after a release keeps its former name in `ParamSpec.aliases` or
+`ParamSpec.choice_aliases` for one release, which `method_spec` maps with a
+`DeprecatedArgumentWarning`; the deviation's `aliases` lists the names that shipped. A parameter
+removed after a release goes in `MethodSpec.dropped_args` for one release: the wrapper drops it
+with the same warning. Bounds go in the `ParamSpec`, which the wrapper checks; a facade checks only
+what depends on the data or on another parameter.
+
+A method that draws random numbers sets `seeded=True` and takes `seed` (`concept_param("seed")`),
+and the wrapper resolves it and records `metadata["seed"]`. A search that tests independence
+passes the seed to `make_indep_test`, which gives it to the tests in `STOCHASTIC_INDEP_TESTS` and
+only to them, at every place the search builds a test. A method takes no execution setting such as
+`num_workers`; it reads them from `andrey.config`.
+
+### Publish a boundary lane
+
+A release summary with `boundary.ladders` sets where each method's `BoundaryWarning` starts:
+regenerate its table with `uv run python scripts/boundary_table.py`, which writes
+`src/andrey/api/_boundary_table.py` from the newest such summary. `tests/unit/test_boundary.py`
+fails until the table matches it. Every method's data check applies the table, after the input
+checks and before the fit.
 
 ### Add an environment variable
 
@@ -260,8 +295,8 @@ One pull request switches the method to supported, since the checks tie these ch
 (the quality gate covers exactly the supported methods, and the published summaries list exactly
 them):
 
-- `status="supported"` in its `MethodSpec`, with the `warn_experimental` call and the docstring's
-  `ExperimentalWarning` entry removed;
+- `status="supported"` in its `MethodSpec`, with the docstring's `ExperimentalWarning` entry
+  removed;
 - a **Limitations.** paragraph from the campaign: the data and sizes measured, the sizes where its
   median errors reach the empty graph's, its fit times with the core count, and the size where it
   stops being practical, if the report shows one;

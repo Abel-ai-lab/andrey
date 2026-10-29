@@ -17,8 +17,17 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
 exceptions: `cdnod` also takes a domain index, `gies` also takes which variables were intervened on
 in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes
-a list of datasets and returns one result per dataset. Each method is either supported or
-experimental; `andrey list` prints the status.
+a list of datasets and returns one result per dataset. The first argument of every method is
+`data`; `andrey run` reads it from `--data`, which a method that takes a list of datasets needs
+once per dataset. Each method is either supported or experimental; `andrey list` prints the
+status.
+
+Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
+outside its range or not one of its choices raises `ValueError`, each with a message that names the
+method, the argument, what it accepts, and the value, such as
+`pc: alpha must be a number in (0, 1), got 1.5`. `andrey --help --json` lists each
+argument's type, range, and choices. Where `indep_test` takes the shipped tests, it also takes the
+ones you register with `register_indep_test`.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no infinity, no constant column, and, for a DataFrame, column names that differ as
@@ -31,28 +40,38 @@ A constant column holds no information about the other variables, so one `ValueE
 constant column and asks you to drop them; resampling or subsetting rows can make a column
 constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also need at least
 `n_variables + 1` rows in each dataset, the fewest with which their pruning step can estimate the
-edge weights.
-The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
-`"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
-whole numbers in a column of numbers, each distinct value of a column one category. `ges`, `hc`,
-`tabu`, `boss`, `grasp`, and `exact_search` default to `score_func=None`, which picks the
-linear-Gaussian BIC, `"local_score_BDeu"` when every column is categorical, or
-`"local_score_cond_gauss"` when some are (not for `tabu`), the last two with a `DataTypeWarning`, as
-[Data types](guides/getting-started.md#data-types) describes. The mixed-data
-settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
-`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
-[Data types](guides/getting-started.md#data-types) describes; a categorical column of numbers
-needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
-scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
-one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
-and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
-group's; no option drops or merges the copies for you. `pc`, `fci`, `gfci`, and `cdnod` with a
-partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the same way before any test
-runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that repeats another up
-to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. Other
-data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
-single column gives a one-node graph.
+edge weights. That pruning step, an adaptive Lasso in `direct_lingam`, `ica_lingam`,
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, and `bottom_up_parce_lingam`,
+picks the edges by BIC over the whole Lasso path, so for a given causal order it keeps the same
+edges in any unit of the data. A step that would read the units only through a numerical shortcut,
+such as a least-squares rank cutoff, the linear combination that `gin` tests, or the VARMA fit of
+`varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
+units. The causal order of `ica_lingam` still reads the magnitudes of its unmixing matrix, and the
+least-squares score of `notears` and `dagma` reads the units, as their pages describe.
+The categorical
+settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_bic"`, read text,
+boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
+distinct value of a column one category. Every method defaults to `indep_test=None` and
+`score_func=None`, which pick from the column types you declare, with `categorical` or a DataFrame's
+`category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
+`"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`. Values
+never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
+hold category codes, from every method that reads columns as numbers, as [Data
+types](guides/getting-started.md#data-types) describes. The mixed-data settings,
+`indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
+the categorical columns that `categorical` lists, or infer them when you pass the setting yourself;
+a categorical column of numbers needs whole numbers. Methods that score with BIC also reject a
+column that repeats another up to scale and shift or, given more rows than columns, is a linear
+function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
+every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
+group and read its edges as the group's; no option drops or merges the copies for you. `pc`, `fci`,
+`gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
+same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series
+that repeats another up to `2 * tau_max` steps back and name its lagged value, such as
+`'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
+cell, its row and column. A single column gives a one-node graph.
 
+% concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
 missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
@@ -65,34 +84,91 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 as [Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say
 why.
 
+% concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
-`indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
+`indep_test` choices: `"fisherz"` and `"student_t"` for continuous data, `"chisq"`
 and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
 nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)).
+([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
+from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
+`lpcmci` take `"fisherz"`, which `None` picks, and `"student_t"`.
 
+% concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
-`grasp`, `exact_search`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
-`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `rcd`, and
-`bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and
-forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
-parameter says how it honors them. `bottom_up_parce_lingam` honors every part but required edges.
-For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time
-`t - lag` to `effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`, the
-maximum conditioning-set size of their conditional-independence tests.
+`grasp`, `exact_search`, `notears`, `dagma`, `direct_lingam`, `ica_lingam`,
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
+`granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
+required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`knowledge` parameter says how it honors them. `bottom_up_parce_lingam` honors every part but
+required edges. For the time-series methods, an edge `(cause, effect, lag)` is the link from
+`cause` at time `t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
+% concept: tau_max
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, and `longitudinal_lingam` take `tau_max`, the largest
+lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points of the
+panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its name.
+
+% concept: measure
+`direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
+DirectLiNGAM's order search and take `measure`, how it picks the most exogenous variable at each
+step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the only one.
+
+% concept: max_depth
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, and `rcd` take `max_depth`, the maximum conditioning-set size of their
+conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2` cap their
+restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and `inter_iamb`
+stop growing at the cap.
+`rcd`'s cap is the most variables it regresses out together, with a default of 2, its paper's
+setting.
+
+% concept: max_p_global
+`lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test takes
+beyond the default conditions, the parents of both ends, which every test includes. `lpcmci` caps
+all of its removal phases with it. `pcmciplus` splits its caps by phase: `max_depth` caps the
+lagged phase, whose sets hold no default conditions, and `max_p_global` caps the same-step
+skeleton and collider phases, whose sets add the lagged parents of both ends.
+
+% concept: collider_rule
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
 an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
 that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"`
 (Colombo and Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors
 and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
 triple the vote cannot decide is ambiguous: no rule orients through it, and
-`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
+`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. `pcmciplus`
+takes `collider_rule` for its same-step colliders, with `"majority"`, its default,
+`"conservative"`, and `"none"`, which reads the one separating set.
 
-`ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
-gives a node more than that many parents, and some graph reaches each node's count.
+% concept: max_parents
+`ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, and `rsmax2` take `max_parents`, a
+cap on every node's parents: no DAG the returned graph represents gives a node more than that
+many parents. `None`, the default, sets no cap. `hc`, `tabu`, and the score phase of `mmhc` and
+`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, and
+`exact_search` scores only the parent sets within it.
 
+% concept: seed
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `boss`, `grasp`,
+`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+draws; `None`, the default, uses `ANDREY_SEED`, or 0 when it is unset, so a call repeats exactly.
+The methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`; with another test `seed` changes nothing, and `metadata["seed"]` is not
+set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is
+deterministic and takes no seed.
+
+% concept: num_workers
+No method takes the number of workers or the device as an argument. Set them for every call in a
+block with `andrey.config(num_workers=...)`, or with the `ANDREY_*` variables of
+[Configuration](configuration.md); `bootstrap` follows them too.
+
+% concept: penalty_discount
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of Ramsey et al.
+(2017): larger values give sparser graphs, and `1.0`, the default, with `ebic_gamma=0.0` is the
+standard BIC.
+
+% concept: ebic_gamma
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
 take `ebic_gamma`, the weight of the extended BIC: their linear-Gaussian BIC adds
 `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows
@@ -196,11 +272,11 @@ its first call in a process.
 ```
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they return every variable's set as undirected edges, joining a pair when
-each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
-runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
-keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
-its maximize phase runs hill climbing or tabu search among them.
+`target`; without one, they return every variable's set as an `undirected` graph, joining a pair
+when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests,
+then runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict
+phase keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's
+skeleton, and its maximize phase runs hill climbing or tabu search among them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
@@ -366,19 +442,32 @@ environment variables and the order in which the settings apply, and
 
 ## Warnings
 
-Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`. A warning
-never changes a result. Each distinct message warns once per process, at the line in your code that
-made the call. A warning from a dependency keeps its own category, such as scikit-learn's
-`ConvergenceWarning` from `ica_lingam`.
+Every warning Andrey raises is an {py:class}`~andrey.AndreyWarning`, a `UserWarning`, and each
+situation has one category, the one the table names, in every method. A warning never changes a
+result. Each distinct message warns once per process, at the line in your code that
+made the call; a `BoundaryWarning` warns once per method. A warning from a dependency keeps its own
+category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, raised again as a
+`SearchLimitWarning`.
 
 | Category | When |
 |---|---|
 | {py:class}`~andrey.ExperimentalWarning` | The first call of an experimental method. |
-| {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
+| {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests, PNL on fewer worker threads than asked to stay within its memory, worker processes that start without the forkserver's local socket, or a search's worker-pool cutoff left at its default. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
-| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
+| {py:class}`~andrey.SearchLimitWarning` | A fit stopped at its iteration cap, such as `max_iter`, rather than on its own stopping rule, or FastICA or LARS did not converge. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
-| {py:class}`~andrey.DataTypeWarning` | A score search's default picked BDeu because every column is categorical or the conditional Gaussian score because some are, a mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
+| {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
+| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |
+| {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred its categorical columns or found none. |
+
+A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
+the largest number of variables any measured mean degree finished there, since the data's density
+is unknown; `anm` and `pnl` count rows instead. It warns when the data have more and that ladder
+ended on the time or memory cap. Past a ladder that ended on accuracy, an error, or its last
+planned size, the method was not measured, so it does not warn, and a method with no ladder never
+does. The sizes are a reference, not a hard limit: they change with the data, the density, the
+settings, and the machine. The method's **Limitations** paragraph and the release card give them,
+and `warnings.filterwarnings("ignore", category=andrey.BoundaryWarning)` silences the warning.
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -415,6 +504,8 @@ name.
    SearchLimitWarning
    SampleSizeWarning
    DataTypeWarning
+   BoundaryWarning
+   DeprecatedArgumentWarning
 ```
 
 ## Datasets
@@ -514,6 +605,7 @@ a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
 
 | `family` | When | `score` returns |
 |---|---|---|
+| `undirected` | either graph is `undirected` | the skeleton scores and `shd`, the skeleton SHD: the pairs adjacent in one graph and not in the other |
 | `dag` | both graphs are DAGs | skeleton and arrowhead precision, recall, and F1; `shd`; `mec_shd` and `mec_arrowhead_f1`, scored through the CPDAGs; the causal-order scores when the result has an ordering; `coefficient_mae` when both carry weights |
 | `cpdag` | either graph is a CPDAG | the skeleton and arrowhead scores and `shd`, with a DAG converted to its CPDAG first |
 | `pag` | either graph is a PAG or a MAG | the skeleton and arrowhead scores and `shd`, plus `shd_endpoint` and the scores for bidirected pairs |
@@ -606,6 +698,12 @@ and `rc_params` return plain data and need no import.
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
 | `andrey calibrate` | Measured GES and skeleton worker-pool cutoffs for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
+
+In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or
+`exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the
+former names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json`
+and `andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name
+each method gives it. `andrey run` rejects a value out of range before the fit.
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs

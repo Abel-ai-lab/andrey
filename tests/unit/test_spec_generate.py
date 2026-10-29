@@ -42,10 +42,10 @@ def test_method_schema_matches_spec(name):
     schema = to_json_schema(spec)
     json.dumps(schema)
 
-    # Param properties are exactly the spec params, and passthrough drives additionalProperties.
+    # Param properties are exactly the spec params, and no other param is accepted.
     props = schema["params"]["properties"]
     assert set(props) == {p.name for p in spec.params}
-    assert schema["params"]["additionalProperties"] is spec.passthrough
+    assert schema["params"]["additionalProperties"] is False
 
     for p in spec.params:
         entry = props[p.name]

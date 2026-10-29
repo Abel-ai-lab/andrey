@@ -121,6 +121,7 @@ _FORKSERVER_PRELOAD = (
     "andrey.search._parallel_ges",
     "andrey.constraint._parallel_skeleton",
     "andrey.resample",
+    "andrey.core.ci_kernel",
 )
 
 

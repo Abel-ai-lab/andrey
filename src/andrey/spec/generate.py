@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import andrey
 from andrey.core.structure import EDGE_GLYPHS
 
+from .concepts import CONCEPTS
 from .environment import ENV_VARS, PRECEDENCE
 from .registry import REGISTRY, get_spec, list_specs
 
@@ -87,8 +88,30 @@ def _param_schema(p: ParamSpec) -> dict:
     if p.nullable and isinstance(schema.get("type"), str):
         schema["type"] = [schema["type"], "null"]
     schema["default"] = list(p.default) if isinstance(p.default, tuple) else p.default
+    if p.minimum is not None:
+        schema["exclusiveMinimum" if p.exclusive_minimum else "minimum"] = p.minimum
+    if p.maximum is not None:
+        schema["exclusiveMaximum" if p.exclusive_maximum else "maximum"] = p.maximum
     schema["description"] = p.doc
+    schema["concept"] = p.concept
+    schema["aliases"] = list(p.aliases)
+    schema["choice_aliases"] = dict(p.choice_aliases)
     return schema
+
+
+def concepts_dict() -> dict:
+    """The package-wide parameter concepts: each one's meaning and the name each method uses."""
+    return {
+        key: {
+            "parameter": concept.param.name,
+            "description": concept.summary,
+            "methods": {
+                spec.name: p.name for spec in list_specs() for p in spec.params if p.concept == key
+            },
+        }
+        for key, concept in CONCEPTS.items()
+        if concept.param is not None
+    }
 
 
 def grammar_default(p: ParamSpec) -> str:
@@ -155,6 +178,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "determinism": spec.determinism,
         "accel": spec.accel,
         "seeded": spec.seeded,
+        "dropped_args": list(spec.dropped_args),
         "data": {
             "layout": spec.data.layout,
             "notes": spec.data.notes,
@@ -165,6 +189,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
                     "flag": inp.flag,
                     "kind": inp.kind,
                     "required": inp.required,
+                    "aliases": list(inp.aliases),
                     "description": inp.doc,
                 }
                 for inp in spec.data.inputs
@@ -173,7 +198,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
         "params": {
             "type": "object",
             "properties": {p.name: _param_schema(p) for p in spec.params},
-            "additionalProperties": spec.passthrough,
+            "additionalProperties": False,
         },
         "output": {
             "structure_type": spec.output.structure_type,
@@ -182,6 +207,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
             "has_ordering": spec.output.has_ordering,
             "has_latents": spec.output.has_latents,
             "multi": spec.output.multi,
+            "metadata": list(spec.output.metadata),
             "description": spec.output.doc,
         },
         "knowledge": list(spec.knowledge),
@@ -295,6 +321,7 @@ def help_schema(name: str | None = None) -> dict:
     }
     if name is None:
         ctx["methods"] = {n: to_json_schema(s) for n, s in REGISTRY.items()}
+        ctx["concepts"] = concepts_dict()
     else:
         ctx["method"] = to_json_schema(get_spec(name))
     return ctx
@@ -344,24 +371,24 @@ def _data_types_section() -> str:
         name for name, spec in REGISTRY.items() if any(p.name == "categorical" for p in spec.params)
     ]
     return (
-        "The default tests read every column as continuous. A score search left at "
-        "`score_func=null` picks `local_score_BDeu` when every column is categorical and "
-        "`local_score_cond_gauss` when some are (`tabu`, with no mixed-data score, keeps the BIC), "
-        "inferring the columns by the rule below and saying so in a `DataTypeWarning`; otherwise "
-        "it picks the linear-Gaussian BIC. For categorical columns "
+        "`indep_test=null` and `score_func=null` pick from the declared column types, a column "
+        "`categorical=[...]` names or a DataFrame's `category`, `bool`, or text column: `gsq` and "
+        "`bdeu` when every column is categorical, `cond_gauss` when some are, else `fisherz` and "
+        "the linear-Gaussian BIC `bic`; values never decide. For categorical columns "
         f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
         f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
         "and name the categorical columns with `categorical=[col,...]` (header names or 0-based "
-        "positions), or `categorical=[]` for none. Without `categorical`, the setting infers them: "
+        "positions), or `categorical=[]` for none. Without `categorical`, a mixed-data setting "
+        "passed explicitly infers them: "
         "a DataFrame's `category`, `bool`, and text columns, and every column of at most "
         f"`max_categories` (default {MAX_CATEGORIES}) distinct whole numbers. `andrey run` reads "
         "numbers only, so its data file codes each category as a whole number. The result's "
         "`metadata.categorical` lists the categorical columns read, and `run.warnings` holds a "
         "`DataTypeWarning` that names the inferred columns, or says that none was found and the "
-        "setting ran as its linear-Gaussian form. Under a continuous setting, a `DataTypeWarning` "
-        "names whole-number columns that may be category codes: check them before reading the "
-        "graph."
+        "setting ran as its linear-Gaussian form. Every method that reads columns as numbers "
+        "raises a `DataTypeWarning` naming whole-number columns that may be category codes: "
+        "declare them, or check them before reading the graph."
     )
 
 

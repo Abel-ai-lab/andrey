@@ -81,9 +81,9 @@ def test_output_contract():
     x = datagen.generate("gauss_7v")
     out = andrey.xges(x)
     assert out.structure.kind == "cpdag"
-    assert out.metadata["algorithm"] == "XGES"
+    assert out.metadata["algorithm"] == "xges"
     assert np.isfinite(out.metadata["score"])
-    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "XGES"
+    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "xges"
 
 
 # ---- ground truth --------------------------------------------------------------------------------
@@ -178,13 +178,13 @@ def test_repeat_runs_are_identical():
     assert first.metadata["score"] == second.metadata["score"]
 
 
-def test_lambda_value_is_the_penalty_ges_uses():
-    """At the same lambda_value, XGES without the extended search and GES search the same score: on
-    a graph both recover, the reported scores agree."""
+def test_penalty_discount_is_the_penalty_ges_uses():
+    """At the same penalty_discount, XGES without the extended search and GES search the same
+    score: on a graph both recover, the reported scores agree."""
     ds = _sparse(0)
     for lam in (1.0, 2.0):
-        ges = andrey.ges(ds.data, lambda_value=lam)
-        xges = andrey.xges(ds.data, lambda_value=lam, extended_search=False)
+        ges = andrey.ges(ds.data, penalty_discount=lam)
+        xges = andrey.xges(ds.data, penalty_discount=lam, extended_search=False)
         assert shd(ges.structure, xges.structure) == 0
         assert xges.metadata["score"] == pytest.approx(ges.metadata["score"], rel=1e-12)
 

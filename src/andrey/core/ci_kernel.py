@@ -444,9 +444,10 @@ class RCoT:
     own. PC removes an edge when any conditioning set gives a p-value above ``alpha``, and features
     shared by those queries would make them reject together, which keeps edges between
     conditionally independent variables. Queries on the same variable and conditioning set share
-    its features, and the test object keeps them, and the residuals, for later queries. A p-value
-    does not depend on the order of the queries, of the arguments, or of the columns, and the same
-    seed reproduces it.
+    its features, and the test object keeps them, and the residuals, for later queries. The
+    skeleton searches hand the test a pass's queries in stacks, which it runs one conditioning set
+    at a time, so each set's features are built once per stack. A p-value does not depend on the
+    order of the queries, of the arguments, or of the columns, and the same seed reproduces it.
 
     **Limitations.** Measured in PC on simulated data from sparse random graphs (mean degree 2),
     each variable a weighted sum of ``z + sin(z)``, or of ``cos(z)``, over its parents plus Gaussian
@@ -514,7 +515,11 @@ class RCoT:
         self._n_features = int(n_features)
         self._n_features_cond = int(n_features_cond)
         self._seed = resolve_seed(seed)
-        # Bandwidths, features, and residuals depend only on their columns, so queries share them.
+        self._start_caches()
+
+    def _start_caches(self) -> None:
+        """Empty caches of bandwidths, features, and residuals, which depend only on their columns,
+        so queries share them."""
         n = self._n
         self._scale = lru_cache(maxsize=None)(
             lambda column: _median_distance(self._data[:, [column]])
@@ -522,15 +527,42 @@ class RCoT:
         self._residual = lru_cache(_cache_entries(n * self._n_features))(self._fit_residual)
         self._cond_factor = lru_cache(_cache_entries(n * self._n_features_cond))(self._factor)
 
-    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
-        """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
-        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
-        if cond and self._n < _RCOT_MIN_ROWS:
+    def _state(self) -> tuple[np.ndarray, list[int], int, int, int]:
+        """What :meth:`_from_state` rebuilds this test from: the ranked, standardized data, the
+        column ranks, the two feature counts, and the resolved seed."""
+        return self._data, self._tie_rank, self._n_features, self._n_features_cond, self._seed
+
+    @classmethod
+    def _from_state(
+        cls, data: np.ndarray, tie_rank: list[int], n_features: int, n_features_cond: int, seed: int
+    ) -> RCoT:
+        """A test that holds :meth:`_state`'s arrays and settings as they are, with empty caches,
+        so its p-values are those of the test the state came from, bit for bit."""
+        test = cls.__new__(cls)
+        test._data, test._tie_rank, test._n = data, tie_rank, data.shape[0]
+        test._n_features, test._n_features_cond, test._seed = n_features, n_features_cond, seed
+        test._start_caches()
+        return test
+
+    def _condition_key(self, condition_set: Iterable[int]) -> tuple[int, ...]:
+        """The conditioning set as the features' caches and seeds read it: its columns' ranks,
+        ascending."""
+        return tuple(sorted(self._tie_rank[c] for c in condition_set))
+
+    def _warn_few_rows(self) -> None:
+        """Warn once that a test with a conditioning set has fewer rows than [1]_ evaluates."""
+        if self._n < _RCOT_MIN_ROWS:
             warn_once(
                 f"RCoT on fewer than {_RCOT_MIN_ROWS} rows may reject a true conditional "
                 "independence more often than alpha.",
                 SampleSizeWarning,
             )
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        if cond:
+            self._warn_few_rows()
         n = self._n
         a, b = self._residual(x_int, tuple(cond)), self._residual(y_int, tuple(cond))
         cross_cov = a.T @ b / (n - 1)
@@ -538,6 +570,28 @@ class RCoT:
         products = (a[:, :, None] * b[:, None, :]).reshape(n, -1)
         weights = np.clip(np.linalg.eigvalsh(products.T @ products / n), 0.0, None)
         return _hall_buckley_eagleson_pvalue(statistic, weights)
+
+    def _canonical_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> np.ndarray:
+        """P-values of many queries sharing one conditioning-set size, grouped by conditioning set.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of the
+        conditioning sets, as the skeleton searches build their queries. The queries run through
+        :meth:`__call__` one conditioning set at a time, so the set's features and factor are built
+        once for all its queries, and entry ``i`` is ``self(x[i], y[i], conditions[i])`` exactly.
+        When a query raises, the queries run again in their order, so the error is the one the
+        first failing query raises.
+        """
+        queries = list(zip(x.tolist(), y.tolist(), map(tuple, conditions.tolist())))
+        order = sorted(range(len(queries)), key=lambda i: self._condition_key(queries[i][2]))
+        pvalues = np.empty(len(queries))
+        try:
+            for i in order:
+                pvalues[i] = self(*queries[i])
+        except Exception:
+            return np.array([self(*query) for query in queries])
+        return pvalues
 
     def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
         """Standardized features of ``column``, sampled from a generator seeded by the seed,

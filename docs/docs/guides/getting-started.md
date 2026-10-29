@@ -378,37 +378,30 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `local_score_BIC` (the default when no column is categorical) |
-| Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
-| Mixed | `degen_gauss`, `cond_gauss` | `local_score_cond_gauss` (the default when some columns are categorical), `local_score_degen_gauss` |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`; for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
+| Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
+| Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
-`ges`, `gfci`, `hc`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score, and
-`tabu` the continuous and categorical ones. `gfci`, `mmhc`, and `rsmax2` take a score and a test
+`ges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every
+score. `gfci`, `mmhc`, and `rsmax2` take a score and a test
 that read the same kind of data, such as
-`andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
+`andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
 numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
 
-**The default score.** `ges`, `hc`, `tabu`, `boss`, `grasp`, and `exact_search` pick their score
-from the columns: a DataFrame's `category`, `bool`, or text column, or a column of at most
-`max_categories` distinct whole numbers (10 by default), is categorical. When every column is
-categorical, they score with `local_score_BDeu`; when some are, with `local_score_cond_gauss`, the
-conditional Gaussian score. `tabu` has no mixed-data score and keeps the linear-Gaussian BIC on
-mixed data. Either switch says so with a one-time `DataTypeWarning`, which names the categorical
-columns of mixed data. A column of counts or ratings with that few values counts as categorical too;
-to read such columns as numbers, pass the linear-Gaussian BIC, `score_func="local_score_BIC"` or
-`"local_score_BIC_from_cov"`; every one of these searches takes both names. A `score_func` you pass
-is always the one used. To name the categorical columns yourself, pass `categorical=[...]`
-instead of the inference: naming every column picks `local_score_BDeu`, and naming some picks
-`local_score_cond_gauss`, each with the same warning. Data with no categorical column keep the
-linear-Gaussian BIC. The tests do not switch: `pc`, `fci`, `gfci`, and `cdnod` take
-`indep_test="chisq"` or `"gsq"` for categorical data and a mixed-data test for mixed data.
+**The default test and score.** `indep_test=None` and `score_func=None`, the defaults, pick from
+the column types you declare: a column is categorical when `categorical=[...]` names it, by label
+or 0-based position, or when it is a DataFrame's `category`, `bool`, or text column. When every
+column is categorical, the tests default to `gsq` and the scores to `bdeu`; when some are, both
+default to `cond_gauss`, the conditional Gaussian; otherwise to `fisherz` and `bic`. Values never
+decide: a column of counts or ratings stays numbers until you declare it. An `indep_test` or
+`score_func` you pass is always the one used.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or
-`andrey.ges(data, score_func="local_score_cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
+`andrey.ges(data, score_func="cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
 turns each categorical column into indicator columns and treats every column as Gaussian, so it
 suits effects that are linear and add up across categories. The conditional Gaussian
 (`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
@@ -418,23 +411,25 @@ continuous parent.
 
 **Marking the categorical columns.** Name them with `categorical`, by label (the column name as
 text) or 0-based position:
-`andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
-`categorical`, a mixed-data setting infers them: a DataFrame's `category`, `bool`, and text columns,
-and every column whose values, over all its rows, are at most `max_categories` distinct whole
-numbers (10 by default). pandas does not mark a column as categorical by itself, so this follows
-the rule Tetrad applies when it loads mixed data. A `DataTypeWarning` names the inferred columns and
-why; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
-for none. The result's `metadata["categorical"]` lists the categorical columns it read.
+`andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without `categorical`,
+a mixed-data setting you pass infers them: a DataFrame's `category`, `bool`, and text columns, and
+every column whose values, over all its rows, are at most `max_categories` distinct whole numbers
+(10 by default). pandas does not mark a column as categorical by itself, so this follows the rule
+Tetrad applies when it loads mixed data. A `DataTypeWarning` names the inferred columns and why;
+check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]` for
+none. The result's `metadata["categorical"]` lists the categorical columns it read.
 
 **No categorical column.** A mixed-data setting that finds no categorical column, or gets
 `categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio
 form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
 the BIC.
 
-**Integer-coded columns.** The default test and the linear-Gaussian BIC read a column of codes
-such as 0, 1, 2 as numbers, which assumes the categories are ordered and evenly spaced. When columns
-of at most `max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names
-those columns; if they are categories, choose a mixed-data setting.
+**Integer-coded columns.** Every method that reads columns as numbers, the default test and the
+linear-Gaussian BIC included, reads a column of codes such as 0, 1, 2 as numbers, which assumes
+the categories are ordered and evenly spaced. When columns of at most `max_categories` distinct
+whole numbers (10 by default) reach such a method, a one-time `DataTypeWarning` names those
+columns; if they are categories, declare them with `categorical=[...]` or a pandas `category`, and
+the default test or score switches to a categorical or mixed-data one.
 
 From the command line, the same settings are `key=value` arguments, such as
 `andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
@@ -474,9 +469,9 @@ allows for selection and stays sound when no missingness mechanism causally affe
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
 with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
 `ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
-with `max_depth` in PC, FCI, and CD-NOD. A column with no observed value, or with one value
-throughout, raises before the fit, and so does infinity, which is not a missing value. CD-NOD needs
-a complete domain index.
+with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A column with no
+observed value, or with one value throughout, raises before the fit, and so does infinity, which is
+not a missing value. CD-NOD needs a complete domain index.
 
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with

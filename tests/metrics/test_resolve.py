@@ -54,6 +54,17 @@ def test_digraph_family_scores_base_trio_only():
     assert "confounder_f1" not in result  # nor a latent-confounder claim
 
 
+def test_undirected_family_scores_the_skeleton_only():
+    marks = np.zeros((3, 3), dtype=np.int8)
+    marks[0, 1] = marks[1, 0] = marks[1, 2] = marks[2, 1] = 1
+    estimate = GraphStructure.from_numpy(marks, kind="undirected")
+    truth = np.array([[0, 1, 0], [0, 0, 0], [0, 1, 0]])  # 0 -> 1 <- 2
+    result = score(estimate, truth)
+    assert result["family"] == "undirected"
+    assert result["shd"] == 0 and result["skeleton_f1"] == 1.0
+    assert not any(key.startswith(("arrowhead", "mec")) for key in result)
+
+
 def test_digraph_family_from_truth_side_and_scores_self_loops():
     # precedence holds from the truth side too: a dag estimate vs a cyclic (digraph) truth still
     # routes to the digraph family (k_true == "digraph"), with no MEC pair.

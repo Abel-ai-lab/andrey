@@ -14,6 +14,10 @@ import os
 import sys
 import threading
 import warnings
+from collections.abc import Callable
+from typing import TypeVar
+
+_T = TypeVar("_T")
 
 _PACKAGE_DIR = os.path.dirname(os.path.dirname(__file__)) + os.sep
 
@@ -42,9 +46,11 @@ class BackendFallbackWarning(AndreyWarning):
 
 
 class SearchLimitWarning(AndreyWarning):
-    """A search stopped at its move limit, so a longer search might find a better graph.
+    """An iterative fit stopped at its iteration cap rather than on its own stopping rule, so a
+    longer run might find a better graph.
 
-    ``hc`` and ``tabu`` warn when they take ``max_iter`` moves.
+    Every method with ``max_iter`` warns when it stops on the cap (:func:`warn_search_limit`), and
+    a scikit-learn ``ConvergenceWarning`` from FastICA or LARS is raised again as this warning.
     """
 
 
@@ -60,20 +66,63 @@ class DataTypeWarning(AndreyWarning):
     """How a call reads its columns' types: inferred, missing, or possibly mistaken.
 
     A mixed-data test or score warns when it infers the categorical columns or finds none, and so
-    runs as its linear-Gaussian form; a continuous one warns once when columns look like category
-    codes. A score search left at ``score_func=None`` warns once when it picks BDeu because every
-    column is categorical, or the conditional Gaussian BIC because some are.
+    runs as its linear-Gaussian form; every method that reads columns as numbers warns once when
+    columns look like category codes.
     """
 
 
-def warn_once(message: str, category: type[AndreyWarning]) -> None:
-    """Warn with ``message`` the first time this process sees it, at the caller's line."""
-    key = (category, message)
+class BoundaryWarning(AndreyWarning):
+    """A fit larger than the largest size the method finished within the caps of the published
+    boundary lane, at the nearest measured setting.
+
+    Each method warns once per process, whatever the size.
+    """
+
+
+class DeprecatedArgumentWarning(AndreyWarning):
+    """A former argument name or value, which works for one more release as the current one."""
+
+
+def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = None) -> None:
+    """Warn with ``message`` the first time this process sees it, at the caller's line.
+
+    With ``key``, the warning is seen once per ``key`` instead, whatever the message.
+    """
+    seen = (category, message if key is None else key)
     with _lock:
-        if key in _warned:
+        if seen in _warned:
             return
         warnings.warn(message, category, stacklevel=_caller_stacklevel())
-        _warned.add(key)
+        _warned.add(seen)
+
+
+def warn_search_limit(method: str, parameter: str, value: int, unit: str) -> None:
+    """Warn once that ``method`` stopped at ``parameter=value`` ``unit`` (its iteration cap)."""
+    warn_once(
+        f"{method} stopped at its limit of {parameter}={value} {unit}; a longer search may find a "
+        f"better graph, so raise {parameter}",
+        SearchLimitWarning,
+    )
+
+
+def convergence_as_search_limit(source: str, fit: Callable[[], _T]) -> _T:
+    """Run ``fit``, one scikit-learn call, and return its result; raise each scikit-learn
+    ``ConvergenceWarning`` it gives again as a :class:`SearchLimitWarning`, its text after
+    ``source``. Other warnings pass through unchanged.
+
+    One call only: :func:`warnings.catch_warnings` is not thread-safe.
+    """
+    from sklearn.exceptions import ConvergenceWarning
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", ConvergenceWarning)
+        result = fit()
+    for item in caught:
+        if issubclass(item.category, ConvergenceWarning):
+            warn_once(f"{source}: {item.message}", SearchLimitWarning)
+        else:
+            warnings.warn_explicit(item.message, item.category, item.filename, item.lineno)
+    return result
 
 
 def _reset_after_fork() -> None:

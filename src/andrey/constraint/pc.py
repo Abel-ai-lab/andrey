@@ -13,11 +13,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+from andrey.constraint._parallel_skeleton import skeleton_pool
 from andrey.constraint._skeleton import (
     Removal,
     adjacent_pairs,
-    canonical_capable,
     check_collider_rule,
     first_order_removals,
     marginal_removals,
@@ -54,8 +53,10 @@ def pc(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    seed: int | None = None,
     _trace: list[dict] | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
+    _conflicts: set[tuple[int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
 
@@ -76,8 +77,9 @@ def pc(
     Meek's rules one at a time in column order instead of in order-free rounds
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
     larger conditioning-size passes (:func:`_discover_skeleton`); ``None`` reads
-    ``andrey.config.num_workers``. Returns the CPDAG, or the MPDAG with ``constraints``, as a
-    ``GraphStructure`` of kind ``"cpdag"``.
+    ``andrey.config.num_workers``. ``seed`` fixes the draws of a stochastic ``indep_test``
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns the
+    CPDAG, or the MPDAG with ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -85,7 +87,9 @@ def pc(
     with the fields :func:`~andrey.core.orient.meek` records), and, when colliders of equal rank
     conflict, the edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
     The tests of a collider vote are not recorded. The private ``_ambiguous`` sink receives the
-    triples no rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``.
+    triples no rule reads as a collider or a non-collider, keyed ``(a, b, c)`` with ``a < c``, and
+    the private ``_conflicts`` sink the edges colliders ask to orient both ways
+    (:func:`collider_conflicts`).
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -100,17 +104,20 @@ def pc(
         warn_expensive=True,
         max_depth=max_depth,
         constraints=constraints,
+        seed=seed,
         _trace=_trace,
     )
     rule4 = constraints is not None
     ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
     if collider_rule != "sepsets":
-        test = make_indep_test(indep_test, X, categorical=categorical)
+        test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
         ambiguous |= vote_colliders(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
+    if _conflicts is not None:
+        _conflicts.update(collider_conflicts(skeleton, sepsets, ambiguous))
     if constraints is not None:
         skeleton = orient(skeleton, constraints)
         check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
@@ -324,6 +331,32 @@ def _orient_colliders(
     return pdag
 
 
+def collider_conflicts(
+    skeleton: np.ndarray,
+    sepsets: Mapping[tuple[int, int], Iterable[int] | None],
+    ambiguous: Collection[tuple[int, int, int]] = frozenset(),
+) -> set[tuple[int, int]]:
+    """Return the edges two unshielded colliders ask to orient both ways, as ``(x, y)``, ``x < y``.
+
+    A triple ``x - y - z`` of ``skeleton`` (``x`` and ``z`` not adjacent, with a recorded
+    separating set, and not in ``ambiguous``) whose middle node ``y`` is not in that set asks for
+    an arrowhead at ``y`` on ``x - y`` and on ``z - y``. An edge asked for an arrowhead at both ends
+    is a conflict, whichever collider the orientation order then keeps.
+    """
+    asked = np.zeros(skeleton.shape, dtype=bool)
+    for y in range(skeleton.shape[0]):
+        nbrs = np.flatnonzero(skeleton[y] != NULL).tolist()
+        for x, z in combinations(nbrs, 2):
+            if (
+                skeleton[x, z] == NULL
+                and ((x, z) in sepsets or (z, x) in sepsets)
+                and (x, y, z) not in ambiguous
+                and y not in _lookup_sepset(sepsets, x, z)
+            ):
+                asked[y, x] = asked[y, z] = True
+    return {(int(x), int(y)) for x, y in np.argwhere(np.triu(asked & asked.T))}
+
+
 def _undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
     """Make every bidirected edge, where two colliders of equal rank conflict, undirected.
 
@@ -367,6 +400,7 @@ def _discover_skeleton(
     warn_expensive: bool = False,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
+    seed: int | None = None,
     _trace: list[dict] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
     """Learn the undirected skeleton and, for every removed pair, its separating set and p-value.
@@ -380,7 +414,8 @@ def _discover_skeleton(
     separating set is the union of every conditioning set that made it independent, and its p-value
     the largest among those sets' tests; both are keyed ``(x, y)`` with ``x < y``. ``indep_test``
     selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
-    marks the categorical columns for a mixed-data test. With ``record_pvalues`` false, as for the
+    marks the categorical columns for a mixed-data test; ``seed`` fixes the draws of a stochastic
+    test (``None`` uses ``ANDREY_SEED``). With ``record_pvalues`` false, as for the
     column collider order, which ranks nothing, no p-value is compared or kept and the returned
     p-value dict is empty; the skeleton and the separating sets are the same.
 
@@ -396,7 +431,11 @@ def _discover_skeleton(
     :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the result, a raised error included, is
-    identical to the serial scan whatever the partition.
+    identical to the serial scan whatever the partition. With ``workers > 1`` and an RCoT test, a
+    pass whose tests times rows reach
+    :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_RCOT_WORK`, or the
+    ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it, runs each conditioning set's queries in one
+    worker process, with the serial scan's p-values bit for bit.
 
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
@@ -408,7 +447,7 @@ def _discover_skeleton(
     trace needs every p-value in this process, so tracing scans serially.
     """
     d = X.shape[1]
-    test = make_indep_test(indep_test, X, categorical=categorical)
+    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
     keep = None
@@ -419,8 +458,7 @@ def _discover_skeleton(
     pvalues: dict[tuple[int, int], float] = {}
 
     can_prescreen = prescreen_capable(test)
-    parallel = workers > 1 and canonical_capable(test) and _trace is None
-    pool = SkeletonWorkerPool(test, workers) if parallel else None
+    pool = skeleton_pool(test, workers) if _trace is None else None
     try:
         size = 0
         while True:

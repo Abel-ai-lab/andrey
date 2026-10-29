@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata
 from andrey.core.knowledge import Knowledge, resolve
 
@@ -19,8 +20,6 @@ from ._adapt import (
     column_labels,
     column_namer,
     data_matrix,
-    int_in_range,
-    open_unit_interval,
     with_labels,
 )
 from ._irregular import (
@@ -64,6 +63,7 @@ def _complete_pairs(
     return kept, rows_metadata({rows: 2})
 
 
+@method_spec("anm")
 def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the additive noise model (ANM).
 
@@ -86,15 +86,17 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"ANM"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-        divided by its mean under independence.
+        edge, or no edge. ``metadata["algorithm"]`` is ``"anm"``. ``metadata["p_values"]`` holds
+        the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``; ``metadata["statistics"]`` holds the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
 
     Raises
     ------
     ValueError
-        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        does not have 2 columns.
 
     Notes
     -----
@@ -165,7 +167,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out = anm(np.column_stack([x, y]))
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
-    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    >>> out.metadata["p_values"]["forward"] > 0.05 >= out.metadata["p_values"]["backward"]
     True
     """
     from andrey.irregular.anm import anm as _native
@@ -175,8 +177,6 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
             f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
     X = data_matrix(data, method="anm", missing=True)
-    if alpha is not None:
-        alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     X, rows = _complete_pairs(X, labels, "anm")
     X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
@@ -193,6 +193,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     )
 
 
+@method_spec("pnl")
 def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the post-nonlinear (PNL) model.
 
@@ -214,15 +215,17 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
-        edge, or no edge. ``metadata["algorithm"]`` is ``"PNL"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-        divided by its mean under independence.
+        edge, or no edge. ``metadata["algorithm"]`` is ``"pnl"``. ``metadata["p_values"]`` holds
+        the independence p-value for ``x -> y`` under ``"forward"`` and for ``y -> x`` under
+        ``"backward"``; ``metadata["statistics"]`` holds the HSIC statistics of the same two tests,
+        each divided by its mean under independence, under the same keys.
 
     Raises
     ------
     ValueError
-        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        does not have 2 columns.
 
     Notes
     -----
@@ -305,7 +308,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out = pnl(np.column_stack([x, y]))
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
-    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    >>> out.metadata["p_values"]["forward"] > 0.05 >= out.metadata["p_values"]["backward"]
     True
     """
     from andrey.irregular.pnl import pnl as _native
@@ -315,8 +318,6 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
             f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
         )
     X = data_matrix(data, method="pnl", missing=True)
-    if alpha is not None:
-        alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     X, rows = _complete_pairs(X, labels, "pnl")
     pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
@@ -331,12 +332,13 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     )
 
 
+@method_spec("rcd")
 def rcd(
     data: npt.ArrayLike,
     *,
-    max_explanatory_vars: int = 2,
+    max_depth: int = 2,
     cor_alpha: float = 0.01,
-    ind_alpha: float = 0.01,
+    alpha: float = 0.01,
     shapiro_alpha: float = 0.01,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -351,13 +353,18 @@ def rcd(
     data : array-like of shape (n_samples, n_variables)
         Observations, one variable per column. A DataFrame's column names become the structure's
         ``labels``.
-    max_explanatory_vars : int, default=2
-        Most variables regressed out together when testing whether one variable is an ancestor of
-        another, at least 1. Larger values find more ancestors and take longer.
+    max_depth : int, default=2
+        The maximum conditioning-set size of an ancestor test, at least ``1``: the most variables
+        regressed out together when testing whether one variable is an ancestor of another. Larger
+        values find more ancestors and take longer. The default ``2`` is the setting of Maeda and
+        Shimizu's experiments [1]_, who advise a small value when there are fewer rows than
+        variables.
     cor_alpha : float, default=0.01
         Significance level of the Pearson correlation tests, in ``(0, 1)``.
-    ind_alpha : float, default=0.01
-        Significance level of the HSIC independence tests, in ``(0, 1)``.
+    alpha : float, default=0.01
+        Significance level of the HSIC independence tests, in ``(0, 1)``, which decide the
+        ancestors and so the returned edges. The default is the level of the method's published
+        experiments [1]_, as are those of ``cor_alpha`` and ``shapiro_alpha``.
     shapiro_alpha : float, default=0.01
         Significance level of the Shapiro-Wilk tests that decide whether a residual is
         non-Gaussian, in ``(0, 1)``.
@@ -374,20 +381,20 @@ def rcd(
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
-        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"RCD"``;
+        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"rcd"``;
         ``metadata["confounded_pairs"]`` lists the ``<->`` pairs as sorted ``[i, j]`` lists;
         ``weighted_adjacency`` holds the edge coefficients.
 
     Raises
     ------
     TypeError
-        If ``max_explanatory_vars`` is not an int, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
-        significance level is not in ``(0, 1)``. Also if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists, or if its required
-        edges close a directed cycle with the parents the search found.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than 6 rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle
+        with the parents the search found.
 
     Notes
     -----
@@ -411,7 +418,7 @@ def rcd(
     degree 2 with 10,000 rows, where the ladder ended when three fits of the next size ran out of
     the 28 GB, and at mean degree 4 with 10,000 rows, where the ladder ended when three fits of the
     next size ran past 1 h. The median fit took 45 s at 60 variables (mean degree 2, 2,000 rows).
-    The work grows with the number of variables and with ``max_explanatory_vars``. The numbers are a
+    The work grows with the number of variables and with ``max_depth``. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 
@@ -436,21 +443,22 @@ def rcd(
     from andrey.irregular.rcd import fit_rcd
 
     X = data_matrix(data, min_rows=6, method="rcd")  # HSIC's null variance has (n - 4)(n - 5)
-    max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="rcd")
     model = fit_rcd(
         X,
-        max_explanatory_num=max_explanatory_vars,
-        cor_alpha=open_unit_interval(cor_alpha, "cor_alpha"),
-        ind_alpha=open_unit_interval(ind_alpha, "ind_alpha"),
-        shapiro_alpha=open_unit_interval(shapiro_alpha, "shapiro_alpha"),
-        constraints=resolve(knowledge, X.shape[1], labels, method="rcd"),
+        max_explanatory_num=max_depth,
+        cor_alpha=cor_alpha,
+        ind_alpha=alpha,
+        shapiro_alpha=shapiro_alpha,
+        constraints=constraints,
     )
     return with_labels(_adapt_rcd(model), labels)
 
 
+@method_spec("bottom_up_parce_lingam")
 def bottom_up_parce_lingam(
-    data: npt.ArrayLike, *, alpha: float = 0.1, knowledge: Knowledge | None = None
+    data: npt.ArrayLike, *, alpha: float = 0.05, knowledge: Knowledge | None = None
 ) -> StructureOutput:
     """Learn a linear non-Gaussian causal order that tolerates hidden common causes.
 
@@ -463,38 +471,39 @@ def bottom_up_parce_lingam(
     data : array-like of shape (n_samples, n_variables)
         Observations, one variable per column. A DataFrame's column names become the structure's
         ``labels``.
-    alpha : float, default=0.1
+    alpha : float, default=0.05
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
-        across the remaining variables, in ``(0, 1)``.
+        across the remaining variables, in ``(0, 1)``. The default is the level of the method's
+        published experiments [1]_.
     knowledge : Knowledge or None, default=None
-        Background knowledge, a :class:`~andrey.Knowledge`; honors forbidden, allowed, tiers:
-        forbidden edges, the pairs allowed to be adjacent, and temporal tiers. Required edges are
-        not honored (see Notes). A variable
-        is taken as a sink only when no remaining variable belongs to a later tier, so the order
-        keeps the tiers, and each regression drops the parents the knowledge forbids, an edge
-        into an earlier tier and a pair outside ``allowed`` included. In the unordered block, a
-        pair forbidden in both directions is not adjacent, and an ``o-o`` pair forbidden in one
-        direction gets an arrowhead at the cause, as in :func:`~andrey.fci`.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is taken as a sink only
+        when no remaining variable belongs to a later tier or is the effect of one of its required
+        edges, so the order keeps the tiers and the required edges, and each regression drops the
+        parents the knowledge forbids, an edge into an earlier tier and a pair outside ``allowed``
+        included, and keeps the required ones unpenalized. In the unordered block, a pair
+        forbidden in both directions is not adjacent, an ``o-o`` pair forbidden in one direction
+        gets an arrowhead at the cause, as in :func:`~andrey.fci`, and a required edge is directed
+        (see Notes).
 
     Returns
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
-        ``metadata["algorithm"]`` is ``"BottomUpParceLiNGAM"``; ``metadata["causal_order"]`` gives
-        the order, with the unordered variables nested in one list; ``weighted_adjacency`` holds
-        the edge coefficients.
+        ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["partial_order"]``
+        gives the order, with the unordered variables nested in one list; ``weighted_adjacency``
+        holds the edge coefficients.
 
     Raises
     ------
-    NotImplementedError
-        If ``knowledge`` requires an edge.
     TypeError
         If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
-        ``(0, 1)``. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        fewer than 6 rows or no more rows than columns. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -507,9 +516,12 @@ def bottom_up_parce_lingam(
     weights come from an adaptive-Lasso regression of each variable on those before it, which needs
     more rows than columns.
 
-    **Knowledge.** ``knowledge`` honors forbidden edges, ``allowed``, and tiers. It does not honor
-    required edges: the two ends of a required edge can both end in the unordered block, where no
-    edge is directed, so a required edge raises ``NotImplementedError`` rather than be dropped.
+    **Knowledge.** ``knowledge`` honors required and forbidden edges, ``allowed``, and tiers. The
+    order puts each required edge's cause first and keeps the tiers, and each regression drops the
+    forbidden parents and keeps the required ones unpenalized, so a required parent's weight is
+    estimated and can be ``0``. A required edge whose two ends both stay in the unordered block is
+    directed there, with the least-squares weight of the child on its required parents in the
+    block, while the block's other pairs stay ``o-o``. Every required edge is in the graph.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
@@ -545,7 +557,7 @@ def bottom_up_parce_lingam(
     >>> x0, x1 = 1.5 * h + u(), 1.5 * h + u()
     >>> data = np.column_stack([x0, x1, x1 + u(), x0 + u()])
     >>> out = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    >>> out.metadata["causal_order"]
+    >>> out.metadata["partial_order"]
     [[0, 1], 2, 3]
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
@@ -557,15 +569,11 @@ def bottom_up_parce_lingam(
             f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"
         )
     labels = column_labels(data)
-    constraints = resolve(
-        knowledge,
-        X.shape[1],
-        labels,
-        method="bottom_up_parce_lingam",
-        honors=("forbidden", "allowed", "tiers"),
-    )
-    model = _native(X, alpha=open_unit_interval(alpha, "alpha"), constraints=constraints)
+    constraints = resolve(knowledge, X.shape[1], labels, method="bottom_up_parce_lingam")
+    model = _native(X, alpha=alpha, constraints=constraints)
     if constraints is None:
         return with_labels(_adapt_bottom_up_parce(model), labels)
     one_way = constraints.forbidden & ~constraints.forbidden.T
-    return with_labels(_adapt_bottom_up_parce(model, one_way), labels)
+    return with_labels(
+        _adapt_bottom_up_parce(model, one_way, required=constraints.required), labels
+    )
