@@ -94,14 +94,14 @@ from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmci
 `lpcmci` take `"fisherz"`, which `None` picks, and `"student_t"`.
 
 % concept: knowledge
-`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
-`grasp`, `exact_search`, `notears`, `dagma`, `direct_lingam`, `ica_lingam`,
-`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
-`granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
-required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. `bottom_up_parce_lingam` honors every part but
-required edges. For the time-series methods, an edge `(cause, effect, lag)` is the link from
-`cause` at time `t - lag` to `effect` at time `t`.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
+`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `direct_lingam`,
+`ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`,
+`pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
+{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
+temporal tiers; each method's `knowledge` parameter says how it honors them.
+`bottom_up_parce_lingam` honors every part but required edges. For the time-series methods, an edge
+`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -274,10 +274,11 @@ its first call in a process.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they return every variable's set as undirected edges, joining a pair when
-each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
-runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
-keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
-its maximize phase runs hill climbing or tabu search among them.
+each is in the other's set, and direct the edges `knowledge` decides. MMHC learns a skeleton with
+MMPC's conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
+RSMAX2 generalizes it: its restrict phase keeps the pairs of MMPC's skeleton, of IAMB's or
+Inter-IAMB's moral graph, or of PC's skeleton, and its maximize phase runs hill climbing or tabu
+search among them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit

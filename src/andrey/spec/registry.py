@@ -328,9 +328,9 @@ _TARGET = ParamSpec(
     nullable=True,
 )
 _LOCAL_OUTPUT_DOC = (
-    "undirected edges only, from target to each member, or between each pair in each other's "
-    "set when target is null; metadata['target'] names the target and metadata['{key}'] lists the "
-    "members in the order they joined"
+    "undirected edges, but those knowledge directs, from target to each member, or between each "
+    "pair in each other's set when target is null; metadata['target'] names the target and "
+    "metadata['{key}'] lists the members in the order they joined"
 )
 for _name, _summary, _key, _refs in (
     (
@@ -1882,6 +1882,23 @@ _MASK_RULE = (
     "zero in the fit; a required edge leaves the penalty and the threshold, and the cycle repair "
     "never removes it. "
 )
+_GATE_RULE = (
+    "The candidate edges are the pairs the moral-graph screen keeps and the pairs of the required "
+    "edges; the screen reads the data alone. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set have their gates held at zero; a required edge's gate is held "
+    "at one, so the penalty and the thresholds leave it, and the cycle repair never removes it."
+)
+_MEMBER_RULE = (
+    "Each end of a required edge is in the other's set from the start, and no test removes it. "
+)
+_DIRECTED_RULE = "The edges the knowledge decides are directed, and no rule directs the others. "
+_BLANKET_RULE = (
+    _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent stays a candidate, since a child's other parent "
+    "belongs to the blanket, and is left out of the result. "
+    + _DIRECTED_RULE
+    + "They can close a cycle, since an edge here need not join adjacent variables."
+)
 _REGRESSION_RULE = (
     "The regression drops forbidden parents and does not penalize required ones; every required "
     "edge is in the DAG."
@@ -1907,6 +1924,13 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
+    "iamb": _BLANKET_RULE,
+    "inter_iamb": _BLANKET_RULE,
+    "mmpc": _MEMBER_RULE
+    + "A pair the knowledge makes non-adjacent is never a candidate. "
+    + _DIRECTED_RULE
+    + "Knowledge that orients the kept edges into a directed cycle raises.",
+    "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,

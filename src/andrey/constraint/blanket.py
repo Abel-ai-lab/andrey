@@ -5,7 +5,10 @@
 forward and backward phases of MMPC. :func:`blanket_graph` and :func:`mmpc_skeleton` run them for
 every variable and keep a pair when each lies in the other's set (the AND rule), which gives the
 moral graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and
-:func:`andrey.rsmax2` search within. Each takes any :class:`~andrey.core.ci.CITest`.
+:func:`andrey.rsmax2` search within. Each takes any :class:`~andrey.core.ci.CITest`, and
+background knowledge as :class:`~andrey.core.knowledge.Constraints`: each end of a required edge
+is a member of the other's set from the start and never leaves it, and a pair the knowledge makes
+non-adjacent is never in a returned set.
 
 Candidates are compared by the strength of their dependence on the target: the absolute partial
 correlation for a test that reports one (``statistic_pvalue``), else the p-value. Strengths that
@@ -22,6 +25,7 @@ import numpy as np
 
 from andrey.constraint._skeleton import scan_conditioning_sets
 from andrey.core.ci import CITest
+from andrey.core.knowledge import Constraints
 from andrey.search._parallel import _KEY_DP
 
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
@@ -47,6 +51,15 @@ def _dependence(test: CITest) -> _Dependence:
     return by_pvalue
 
 
+def _required(constraints: Constraints | None, target: int, ranks: Sequence[int]) -> list[int]:
+    """The variables a required edge joins to ``target``, in rank order; none without
+    ``constraints``."""
+    if constraints is None:
+        return []
+    joined = constraints.required[target] | constraints.required[:, target]
+    return sorted(np.flatnonzero(joined).tolist(), key=lambda x: ranks[x])
+
+
 def markov_blanket(
     test: CITest,
     target: int,
@@ -56,6 +69,7 @@ def markov_blanket(
     *,
     interleaved: bool = False,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> list[int]:
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
@@ -68,9 +82,15 @@ def markov_blanket(
     the whole blanket, so with ``max_depth`` the grow phase also stops once the blanket holds more
     than ``max_depth`` members, and every test conditions on at most ``max_depth`` variables.
     Returns the members in the order they joined.
+
+    With ``constraints``, each variable a required edge joins to ``target`` is a member from the
+    start, in rank order, and no shrink tests it. A pair they make non-adjacent stays a candidate,
+    since a child's other parent belongs to the blanket without being adjacent and the later tests
+    condition on it, and is dropped from the returned set.
     """
     dependence = _dependence(test)
-    blanket: list[int] = []
+    required = _required(constraints, target, ranks)
+    blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
     while max_depth is None or len(blanket) <= max_depth:
         best_key, best_x = None, None
@@ -85,19 +105,27 @@ def markov_blanket(
             break
         blanket.append(best_x)
         if interleaved:
-            _shrink(test, target, alpha, blanket)
+            _shrink(test, target, alpha, blanket, required)
             state = frozenset(blanket)
             if state in seen:
                 break
             seen.add(state)
     if not interleaved:
-        _shrink(test, target, alpha, blanket)
-    return blanket
+        _shrink(test, target, alpha, blanket, required)
+    if constraints is None:
+        return blanket
+    support = constraints.support()[target]
+    return [x for x in blanket if support[x]]
 
 
-def _shrink(test: CITest, target: int, alpha: float, blanket: list[int]) -> None:
-    """Drop, in place and in joining order, each member independent of ``target`` given the rest."""
+def _shrink(
+    test: CITest, target: int, alpha: float, blanket: list[int], keep: Sequence[int] = ()
+) -> None:
+    """Drop, in place and in joining order, each member independent of ``target`` given the rest;
+    the members in ``keep`` are not tested."""
     for x in list(blanket):
+        if x in keep:
+            continue
         rest = [z for z in blanket if z != x]
         if test(target, x, rest) > alpha:
             blanket.remove(x)
@@ -111,16 +139,24 @@ def blanket_graph(
     *,
     interleaved: bool = False,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """The moral graph: ``[i, j]`` when each of ``i`` and ``j`` is in the other's Markov blanket.
 
-    Runs :func:`markov_blanket` for every variable; the result is a symmetric boolean ``(d, d)``
-    matrix with a ``False`` diagonal.
+    Runs :func:`markov_blanket` for every variable, with ``constraints``; the result is a symmetric
+    boolean ``(d, d)`` matrix with a ``False`` diagonal.
     """
     raw = np.zeros((d, d), dtype=bool)
     for i in range(d):
         for j in markov_blanket(
-            test, i, d, alpha, ranks, interleaved=interleaved, max_depth=max_depth
+            test,
+            i,
+            d,
+            alpha,
+            ranks,
+            interleaved=interleaved,
+            max_depth=max_depth,
+            constraints=constraints,
         ):
             raw[i, j] = True
     return raw & raw.T
@@ -172,6 +208,7 @@ def parents_children(
     alpha: float,
     ranks: Sequence[int],
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> list[int]:
     """Estimate ``target``'s parents and children with the forward and backward phases of MMPC.
 
@@ -187,12 +224,39 @@ def parents_children(
     ``max_depth``, both phases test only the conditioning sets of at most ``max_depth`` variables;
     the set itself may grow larger. Returns the members in the order they joined.
 
+    With ``constraints``, each variable a required edge joins to ``target`` is a member from the
+    start, in rank order, and neither phase tests it; a pair they make non-adjacent is never a
+    candidate, as it cannot be adjacent.
+
     This is MMPC without its symmetry check: :func:`mmpc_skeleton` keeps ``x`` in ``target``'s set
     only when ``target`` is in ``x``'s.
     """
-    others = [x for x in range(d) if x != target]
+    required = _required(constraints, target, ranks)
+    allowed = None if constraints is None else constraints.support()[target]
+    others = [
+        x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
+    ]
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
     members: list[int] = []
+
+    def admit(new: int, pool: dict[int, tuple[float, float]]) -> None:
+        """Weaken each association in ``pool`` by the conditioning sets that hold ``new``, then
+        add ``new`` to the members."""
+        top = len(members) if max_depth is None else min(len(members), max_depth - 1)
+        conds = [
+            tuple(sorted((*rest, new)))
+            for size in range(top + 1)
+            for rest in combinations(members, size)
+        ]
+        xs = list(pool)
+        if conds:  # none when max_depth is 0
+            for x, (p, strength) in zip(xs, _weakest(test, target, xs, conds), strict=True):
+                pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
+        members.append(new)
+
+    for new in required:
+        weakest = {x: w for x, w in weakest.items() if w[0] <= alpha}
+        admit(new, weakest)
     while True:
         open_ = {x: w for x, w in weakest.items() if w[0] <= alpha}
         if not open_:
@@ -202,19 +266,11 @@ def parents_children(
             key=lambda x: (round(open_[x][0], _KEY_DP), -round(open_[x][1], _KEY_DP), ranks[x]),
         )
         del open_[best]
-        top = len(members) if max_depth is None else min(len(members), max_depth - 1)
-        conds = [
-            tuple(sorted((*rest, best)))
-            for size in range(top + 1)
-            for rest in combinations(members, size)
-        ]
-        xs = list(open_)
-        if conds:  # none when max_depth is 0
-            for x, (p, strength) in zip(xs, _weakest(test, target, xs, conds), strict=True):
-                open_[x] = (max(open_[x][0], p), min(open_[x][1], strength))
-        members.append(best)
+        admit(best, open_)
         weakest = open_
     for x in list(members):
+        if x in required:
+            continue
         before = set(members[: members.index(x)])
         rest = sorted(z for z in members if z != x)
         top = len(rest) if max_depth is None else min(len(rest), max_depth)
@@ -226,11 +282,17 @@ def parents_children(
 
 
 def mmpc_skeleton(
-    test: CITest, d: int, alpha: float, ranks: Sequence[int], max_depth: int | None = None
+    test: CITest,
+    d: int,
+    alpha: float,
+    ranks: Sequence[int],
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """MMPC's skeleton: ``[i, j]`` when each of ``i`` and ``j`` is in the other's parents and
-    children (:func:`parents_children`), a symmetric boolean ``(d, d)`` matrix."""
+    children (:func:`parents_children`, with ``constraints``), a symmetric boolean ``(d, d)``
+    matrix."""
     raw = np.zeros((d, d), dtype=bool)
     for i in range(d):
-        raw[i, parents_children(test, i, d, alpha, ranks, max_depth)] = True
+        raw[i, parents_children(test, i, d, alpha, ranks, max_depth, constraints)] = True
     return raw & raw.T

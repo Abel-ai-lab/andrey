@@ -53,6 +53,8 @@ SERIES_CASES = [
 ]
 PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
+# A short schedule: the knowledge holds whether or not the fit has converged.
+SHORT_CALM = {"max_iter": 2, "subproblem_iter": 200}
 LABELS = list("abcdef")
 # a -> c <- b, c -> d -> e, a -> f.
 TRUTH = {("a", "c"), ("b", "c"), ("c", "d"), ("d", "e"), ("a", "f")}
@@ -88,6 +90,9 @@ def _gaps(table, missing: bool):
 
 
 def _fit(name: str, data: pd.DataFrame, **kwargs):
+    if name == "calm":
+        pytest.importorskip("torch")
+        kwargs = {**SHORT_CALM, **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         if name == "cdnod":
@@ -652,11 +657,39 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
 
 @pytest.mark.parametrize(
     ("name", "knowledge"),
-    [("pc", CYCLE), ("cdnod", CYCLE), ("pc", ANCESTOR), ("cdnod", ANCESTOR), ("fci", ANCESTOR)],
+    [
+        *((name, CYCLE) for name in ("pc", "cdnod", "mmpc")),
+        *((name, ANCESTOR) for name in ("pc", "cdnod", "fci", "mmpc")),
+    ],
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
     with pytest.raises(KnowledgeError):
         _fit(name, _triangle(), knowledge=knowledge)
+
+
+@pytest.mark.parametrize("name", ["iamb", "inter_iamb"])
+def test_the_blanket_searches_keep_directions_that_close_a_cycle(name):
+    # No raise: a moral-graph edge need not join adjacent variables, so such a cycle can fit a DAG.
+    marks, labels = _marks(_fit(name, _triangle(), knowledge=CYCLE))
+    a, b, c = (labels.index(v) for v in "abc")
+    for x, y in [(a, b), (b, c), (c, a)]:
+        assert marks[x, y] == TAIL and marks[y, x] == ARROW
+
+
+@pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc", "calm"])
+@pytest.mark.parametrize(
+    ("knowledge", "error"),
+    [
+        ({"required": [("a", "c")]}, TypeError),
+        (Knowledge(required=[("a", "z")]), KnowledgeError),
+        (Knowledge(required=[("a", "c")], forbidden=[("a", "c")]), KnowledgeError),
+        (Knowledge(forbidden=[("a", "c", 1)]), NotImplementedError),
+    ],
+    ids=["not knowledge", "missing column", "contradiction", "lagged link"],
+)
+def test_the_local_and_gated_searches_check_their_knowledge(name, knowledge, error, data):
+    with pytest.raises(error):
+        _fit(name, data, knowledge=knowledge)
 
 
 def test_fci_reads_a_cycle_of_arrowheads_as_a_pag():

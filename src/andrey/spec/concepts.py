@@ -571,14 +571,6 @@ _CONCEPTS = (
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
         ),
         deviations=(
-            *_absent(
-                "0.12.0",
-                "Required pairs join the set; a pair forbidden both ways leaves it.",
-                "iamb",
-                "inter_iamb",
-                "mmpc",
-            ),
-            *_absent("0.12.0", "A mask in the gated objective.", "calm"),
             Deviation(
                 method="bottom_up_parce_lingam",
                 name="knowledge",
