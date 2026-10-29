@@ -990,9 +990,9 @@ def hc(
     of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
-    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 161.6 to 94.6 and took a
-    median of 7.4 times as long as one start. On categorical data drawn from the ALARM network with
-    1,000 rows, under BDeu, they lowered them from 29.6 to 17.4.
+    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 161.6 to 93.5 and took a
+    median of 5.3 times as long as one start. On categorical data drawn from the ALARM network with
+    1,000 rows, under BDeu, they lowered them from 29.6 to 16.9.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
@@ -1247,9 +1247,9 @@ def tabu(
     number of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
-    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.3 and took a
-    median of 6.1 times as long as one start. On categorical data drawn from the ALARM network with
-    1,000 rows, under BDeu, they lowered them from 23.8 to 12.3.
+    defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.6 and took a
+    median of 4.8 times as long as one start. On categorical data drawn from the ALARM network with
+    1,000 rows, under BDeu, they lowered them from 23.8 to 13.0.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
