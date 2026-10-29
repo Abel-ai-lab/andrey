@@ -227,21 +227,43 @@ def markov_check(
     rejected in 96% to 99% of the datasets at 1,000 rows (98% to 100% on all rows) and in 72% to
     82% at 200 rows (89% to 93%). The verdict also depends on ``seed``, because the row draws do.
 
+    **The uniformity p-value.** The Anderson-Darling p-value is exact for one tested independence.
+    For two or more it is Marsaglia and Marsaglia's approximation [2]_, which was within 0.002 of
+    the level at 0.01, 0.05, and 0.2 in 200,000 or more simulated sets of uniform p-values for each
+    of 2 to 400 independences, and looser in the middle of its range (off by up to 0.017 at two).
+
     **What a pass shows.** A graph with extra edges also passes, since an added edge removes
     independences without making any other false, so a pass is not evidence that the edges are right
     [1]_; compare graphs of the same data by the check and by their number of edges. Missing edges
-    and wrongly oriented v-structures are rejected. A test that misses a dependence, such as
-    ``"fisherz"`` on a nonlinear one, makes the check miss the missing edge too. Which independences
-    are tested follows a topological order broken by the nodes' labels (their positions without
-    labels), so the order that fixed them is in ``metadata["order"]``.
+    and wrongly oriented v-structures are rejected. Which independences are tested follows a
+    topological order broken by the nodes' labels (their positions without labels), so the order
+    that fixed them is in ``metadata["order"]``.
 
     **Tests on categorical data.** The G-square test (``"gsq"``) and the chi-square test
     (``"chisq"``) reject true independences more often than ``alpha`` on tables with few rows per
     cell, so the check does too: with 3 to 5 categories per variable and 500 to 2,000 rows, 69% to
-    86% of the true graphs were rejected. A warning names the case. A mixed-data or kernel test is
-    allowed and was not measured; a test whose p-values are discrete or concentrated at 1 departs
-    from the uniform
+    86% of the true graphs were rejected, and with 2 to 3 categories, 24% at 500 rows, 12% at 2,000,
+    and 10% at 5,000. A warning names the case. A mixed-data or kernel test is allowed and was not
+    measured; a test whose p-values are discrete or concentrated at 1 departs from the uniform
     distribution the check assumes.
+
+    **Limitations.** Measured on linear data with Gaussian and uniform noise simulated on random
+    graphs (10 to 40 variables, average degree 2 and 4, 200 to 2,000 rows, ``"fisherz"``), at
+    ``alpha=0.05``, with every test on all rows unless noted. A graph in the true graph's
+    equivalence class passes, as it must: reversing an edge without changing the CPDAG was rejected
+    in 0% to 24% of the datasets in cells of 25 or more, and a reversal that changes it in 70% to
+    100%. Two extra edges were rejected in 6% to 20%, the rate of the true graph. The DAG of the
+    observed variables of a model with hidden confounders was rejected in every one of 500
+    datasets. ``pc`` outputs were rejected in 57% to 70% of the datasets (89% to 94% when an
+    adjacency was missing, 15% to 26% when none was); ``ges`` outputs near the rate of a true
+    graph, since its misses are weak edges whose loss leaves no detectable independence; and
+    ``direct_lingam`` outputs on Gaussian data near that rate too. Many tests dilute one false
+    independence: one missing edge among 740 tests (40 variables) was rejected in 75% to 80% of the
+    datasets, against 97% to 100% among 35 to 170. The pairwise tests miss a dependence that shows
+    only in a set of variables [1]_, and a test misses a dependence it cannot see, such as
+    ``"fisherz"`` on a nonlinear one, so the check misses that missing edge too. The check was not
+    measured on data with mixed types, on small categorical tables beyond the cases above, or for
+    effect sizes.
 
     References
     ----------
