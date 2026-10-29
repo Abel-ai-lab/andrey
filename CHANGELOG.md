@@ -78,7 +78,9 @@ names its pull request.
   data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
   the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
   graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,
-  Tetrad's `Median`, with an `andrey.AndreyWarning`. ([#555])
+  Tetrad's `Median`, with an `andrey.AndreyWarning`. Under `knowledge`, a PAG method's averaged
+  graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's rules until
+  no endpoint changes. ([#555], [#564])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -1316,4 +1318,5 @@ First alpha release.
 [#554]: https://github.com/Abel-ai-lab/andrey/pull/554
 [#555]: https://github.com/Abel-ai-lab/andrey/pull/555
 [#556]: https://github.com/Abel-ai-lab/andrey/pull/556
+[#564]: https://github.com/Abel-ai-lab/andrey/pull/564
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565

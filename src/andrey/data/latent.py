@@ -11,12 +11,16 @@ the observed truth nodes.
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
 
 from .graphs import csr_from_endpoints
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 
 def latent_order(edges: np.ndarray, d: int, n_latent: int, rng: np.random.Generator) -> np.ndarray:
@@ -374,19 +378,22 @@ def _pag_projection(
     anc: Mapping[int, set[int]],
     selection: Collection[int] = (),
     anc_selection: Collection[int] = (),
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Build the true PAG over ``observed`` via MAG-first orientation: oracle skeleton, FCI rules.
 
     The skeleton and separating sets are :func:`_mag_projection`'s; ``_orient_colliders`` fixes the
     unshielded colliders and ``_fci_orient`` runs Zhang's rules to a fixed point, its R4
     discriminating-path collider answered by the same d-separation oracle, which conditions on
-    ``selection`` in every query.
+    ``selection`` in every query. ``constraints``, over the positions of ``observed``, set their
+    endpoints first, as ``fci`` sets them before its orientation rules (``_knowledge_marks``).
     """
-    from andrey.constraint.fci import _circle_pag, _fci_orient, _orient_colliders
+    from andrey.constraint.fci import _circle_pag, _fci_orient, _knowledge_marks, _orient_colliders
 
     support = _ancestral_adjacency(dag, observed, selection)
     sepsets = _AncestorSepsets(support, observed, anc, set(anc_selection))
     marks = _circle_pag(support)
+    _knowledge_marks(marks, constraints)
     _orient_colliders(marks, sepsets)
     _fci_orient(marks, DSepOracle(dag, observed, selection), 0.5, sepsets)
     return GraphStructure.from_numpy(marks, kind="pag")
