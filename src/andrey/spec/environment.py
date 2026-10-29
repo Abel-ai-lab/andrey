@@ -43,7 +43,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         effect=(
             "Worker processes for GES, GFCI (its GES phase), and the skeleton searches of PC, "
             "FCI, GFCI, and CD-NOD with `fisherz`, `student_t`, or `rcot`, and worker threads for "
-            "the regressions of `granger` and the two directions of `pnl`; `0` or `1` runs "
+            "the two directions of `pnl`; `0` or `1` runs "
             "serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),

@@ -39,6 +39,7 @@ working in the next release:
 | `andrey.config` | `num_workers` | `n_jobs` |
 | environment | `ANDREY_NUM_WORKERS` | `ANDREY_N_JOBS` |
 | every method with `categorical` | `max_categories` | none: ignored; declare the column types |
+| `granger` | `cv` | none: ignored; `alpha` sets the level of the test of each link |
 
 ```python
 # 0.11
@@ -53,6 +54,11 @@ out = andrey.pcmci(series, pc1_alpha=0.1)
 with andrey.config(n_jobs=8):
     boot = andrey.bootstrap(andrey.pc, data, n_resamples=200)
 ```
+
+`granger` no longer fits a cross-validated lasso. It fits each variable on the past `tau_max` steps
+of every variable by least squares and returns the lagged links whose coefficient has a p-value of
+at most `alpha`, 0.05 by default; `metadata["p_values"]` holds the p-values. `cv` is ignored, with
+the warning.
 
 A bootstrap result counts its fits as `n_resamples` too: `BootstrapOutput.n_boot` still works for
 one release, but the key `bootstrap.n_boot` of `andrey bootstrap --json` is now

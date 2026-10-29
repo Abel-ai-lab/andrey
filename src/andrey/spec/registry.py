@@ -1608,8 +1608,9 @@ _add(
     MethodSpec(
         name="granger",
         family="temporal",
-        summary="Lasso Granger causality for a single multivariate time series: lagged effects "
-        "only, one cross-validated lasso per variable. Returns a temporal structure.",
+        summary="Granger causality for a single multivariate time series: lagged effects only, "
+        "a t-test on each lagged coefficient of a vector autoregression at the level alpha. "
+        "Returns a temporal structure.",
         data=DataSpec(
             inputs=(
                 InputSpec(
@@ -1621,7 +1622,8 @@ _add(
         output=OutputSpec(
             structure_type="temporal",
             graph_kind=None,
-            doc="lag_weights at lags 1..tau_max (the lasso coefficients, no lag 0); no ordering.",
+            doc="lag_weights at lags 1..tau_max (the regression coefficients of the significant "
+            "links, no lag 0); no ordering.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1634,16 +1636,10 @@ _add(
                 "1.",
                 aliases=("maxlag",),
             ),
-            ParamSpec(
-                name="cv",
-                minimum=2,
-                type="int",
-                default=5,
-                doc="Cross-validation folds that choose each regression's lasso penalty, at "
-                "least 2.",
-            ),
+            _ALPHA,
         ),
-        references=("Granger 1969", "Arnold, Liu & Abe 2007", "Shojaie & Michailidis 2010"),
+        dropped_args=("cv",),
+        references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
 
@@ -2061,6 +2057,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),
     "multi_group_direct_lingam": ("group_index",),
     "longitudinal_lingam": ("causal_orders",),
+    "granger": ("p_values",),
     "pcmci": ("p_values", "statistics", "parents"),
     "pcmciplus": ("p_values", "statistics", "parents", "conflicts"),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),

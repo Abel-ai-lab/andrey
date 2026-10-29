@@ -44,7 +44,7 @@ requested backend uses `auto`, without a warning.
 ## Parallel search
 
 - `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the
-  per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
+  two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
   also use the worker processes for their skeleton search with the `fisherz`, `student_t`, and
   `rcot` tests, and send a conditioning-set size to them only when it has enough tests to repay
   them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap` fits

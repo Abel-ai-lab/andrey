@@ -1210,14 +1210,21 @@ def lpcmci(
 
 @method_spec("granger")
 def granger(
-    data: npt.ArrayLike, *, tau_max: int = 1, cv: int = 5, knowledge: Knowledge | None = None
+    data: npt.ArrayLike,
+    *,
+    tau_max: int = 1,
+    alpha: float = 0.05,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn the lagged causal graph of a multivariate time series by lasso Granger causality.
+    """Learn the lagged causal graph of a multivariate time series by Granger causality.
 
     A variable Granger-causes another when its past improves the prediction of the other's
-    present [1]_. Each variable is regressed on the past ``tau_max`` steps of every variable by the
-    lasso [2]_, with the penalty chosen by cross-validation; a nonzero coefficient is a lagged
-    edge. Use it for one multivariate series whose effects take at least one time step.
+    present [1]_. Each variable is regressed by least squares on the past ``tau_max`` steps of every
+    variable, a vector autoregression [2]_, and each lagged coefficient is tested against zero
+    given every other lagged variable: the F-test of the regression with and without that
+    regressor, the square of the coefficient's t-ratio. A lagged edge is a coefficient whose
+    p-value is at most ``alpha``. Use it for one multivariate series whose effects take at least
+    one time step.
 
     Parameters
     ----------
@@ -1226,8 +1233,9 @@ def granger(
         column names become the structure's ``labels``.
     tau_max : int, default=1
         The largest lag: each regression uses the past ``tau_max`` time steps, at least ``1``.
-    cv : int, default=5
-        Number of cross-validation folds that choose each regression's penalty, at least 2.
+    alpha : float, default=0.05
+        Significance level of the test of each lagged coefficient, in the open interval (0, 1): a
+        larger value returns more edges.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``1`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -1235,21 +1243,23 @@ def granger(
         from ``cause`` at time ``t - lag`` to ``effect`` at time ``t``; a forbidden
         ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
         ``1`` to ``tau_max`` (the method learns no same-step links). Each variable's regression
-        drops its forbidden lagged regressors and keeps its required ones unpenalized: the lasso
-        selects among the other regressors on what the required ones leave of the variable, and a
-        required link's weight is the least-squares weight of what the selected regressors leave of
-        the variable, and the link is in the graph even where that weight is ``0``. Tiers forbid
-        every link from a later tier into an earlier one, and a pair left out of ``allowed`` has no
-        link at any lag; a variable's links to its own past stay allowed.
+        leaves out its forbidden lagged regressors, so the others are tested given the ones that
+        stay, and a required link is in the graph whatever its test says, with the regression's
+        coefficient as its weight. Tiers forbid every link from a later tier into an earlier one,
+        and a pair left out of ``allowed`` has no link at any lag; a variable's links to its own
+        past stay allowed.
 
     Returns
     -------
     StructureOutput
         Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to ``tau_max``
         and no lag 0. ``structure.lag(k)`` is a ``digraph`` with the edge ``i -> j`` when
-        ``x_i(t - k)`` has a nonzero coefficient in the regression of ``x_j(t)``, self-loops
-        included; ``structure.lag_weights[k - 1][i, j]`` is that coefficient, in the data's units.
-        ``ordering`` is ``None``, and ``metadata["algorithm"]`` is ``"granger"``.
+        ``x_i(t - k)`` is significant in the regression of ``x_j(t)``, self-loops included;
+        ``structure.lag_weights[k - 1][i, j]`` is that regression coefficient, in the data's units,
+        and ``0`` where there is no edge. ``ordering`` is ``None``, and ``metadata["algorithm"]``
+        is ``"granger"``. ``metadata["p_values"][k - 1][i][j]`` is the p-value of the link
+        ``i -> j`` at lag ``k``, for every pair, significant or not; a link the knowledge forbids
+        reads p-value 1, and a required one 0.
 
     Raises
     ------
@@ -1258,9 +1268,10 @@ def granger(
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than ``tau_max + cv`` rows, so that some fold would hold no time step, or if ``data``
-        has fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks, contradicts
-        itself, or requires a link without a lag or beyond ``tau_max``.
+        fewer than ``(n_variables + 1) * tau_max + 2`` rows, so that the regression has no degree of
+        freedom left, or fewer than 2 columns, or if a regression is singular, as when one variable
+        is a linear combination of others. Also if ``knowledge`` names a column ``data`` lacks,
+        contradicts itself, or requires a link without a lag or beyond ``tau_max``.
 
     Notes
     -----
@@ -1268,58 +1279,64 @@ def granger(
     variable in ``data``. Granger causality misses effects within one time step, and a common
     cause left out of ``data`` can produce edges.
 
-    Each regression is fitted on standardized variables, so the edges do not depend on the units of
-    any variable; the coefficients are converted back to the data's units. Cross-validation chooses
-    the penalty that predicts best, which often keeps small coefficients on lags with no effect:
-    judge the edges by the size of their weights. The folds are consecutive blocks of time steps,
-    and the fit is deterministic. With ``andrey.config(n_jobs=k)``, the regressions run on
-    ``k`` threads and return the same coefficients.
+    The test of each coefficient is the F-test of one regressor in Granger's regression [1]_, the
+    test a vector autoregression reports for a coefficient [2]_. Its p-value takes the coefficient's
+    t-ratio against the Student ``t`` distribution with the regression's residual degrees of
+    freedom, which is exact for Gaussian noise; statsmodels' ``VARResults.pvalues`` takes the same
+    t-ratio against the normal distribution, which gives the same p-values as the series grows.
+    Each link is tested on its own at ``alpha``, with no correction for the
+    ``n_variables**2 * tau_max`` tests, so on a series with many variables about ``alpha`` of the
+    absent links appear as edges: lower ``alpha``, or judge the edges by their p-values and
+    weights. The regressions are fitted on standardized variables, so the edges do not depend on
+    the units of any variable; the coefficients are converted back to the data's units. The fit is
+    deterministic and has no random component.
 
-    The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
-    truncating lasso penalty that also selects the lag order; it is not implemented here.
-
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's lasso
-    regression reads every row of the lagged design, so a step with a missing value has no place in
-    it. Fill in the missing steps first, as dropping one would join the steps around it, or use
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's regression
+    reads every row of the lagged design, so a step with a missing value has no place in it. Fill
+    in the missing steps first, as dropping one would join the steps around it, or use
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
     rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian VAR(2) series with no same-step links,
-    standardized, from 10 to 160 variables with 1,000 time steps, with ``tau_max=2``. It found most
-    true lagged edges but returned many false ones, so its median errors (missing and extra lagged
-    edges) exceeded the empty graph's at every size: on half the series at 10 variables and on all
-    of them from 20 on. It assumes linear effects and tests no same-step effects. Each variable's
-    regression takes ``tau_max`` lags of every variable as inputs, so the work grows with
-    ``tau_max`` and with the square of the number of variables. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    standardized, with 1,000 time steps and ``tau_max=2``, at the default ``alpha``. Its median
+    errors (missing and extra lagged edges) were below the empty graph's at 10 and 20 variables (24
+    against 56.5, and 69 against 124), above it on half the series at 40 variables, and above it on
+    all of them at 80 and 160, where the many uncorrected tests add false edges: about ``alpha`` of
+    the ``2 * n_variables**2`` absent links. It assumes linear effects and tests no same-step
+    effects. The work grows with ``tau_max`` and with the square of the number of variables. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
     .. [1] Granger, C. W. J. (1969). Investigating causal relations by econometric models and
        cross-spectral methods. Econometrica 37(3), 424-438.
-    .. [2] Arnold, A., Liu, Y., and Abe, N. (2007). Temporal causal modeling with graphical Granger
-       methods. KDD, 66-75.
-    .. [3] Shojaie, A., and Michailidis, G. (2010). Discovering graphical Granger causality using
-       the truncating lasso penalty. Bioinformatics 26(18), i517-i523.
+    .. [2] Lutkepohl, H. (2005). New Introduction to Multiple Time Series Analysis. Springer.
 
     Examples
     --------
     >>> import numpy as np
     >>> from andrey import granger
     >>> rng = np.random.default_rng(0)
-    >>> x = rng.standard_normal(500)
-    >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
+    >>> x = rng.standard_normal(2000)
+    >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(2000)
     >>> out = granger(np.column_stack([x, y]))
     >>> round(float(out.structure.lag_weights[0][0, 1]), 1)
     0.8
+    >>> bool(out.metadata["p_values"][0][0][1] < 0.05)
+    True
     """
-    from andrey.temporal.granger import granger_lasso
+    from andrey.temporal.granger import granger_f_test
 
-    # LassoCV needs a time step in every fold.
-    X = data_matrix(data, min_rows=tau_max + cv, method="granger", fix=FILL_STEPS)
+    X = data_matrix(data, min_rows=2, method="granger", fix=FILL_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
+    min_rows = (X.shape[1] + 1) * tau_max + 2  # a degree of freedom left in every regression
+    if X.shape[0] < min_rows:
+        raise ValueError(
+            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
+            f"{X.shape[1]} variables, got {X.shape[0]}"
+        )
     labels = column_labels(data)
     constraints = resolve_lagged(
         knowledge, X.shape[1], labels, tau_max, method="granger", contemporaneous=False
@@ -1327,10 +1344,10 @@ def granger(
     required = None if constraints is None else constraints.required[1:]
     peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
     spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
-    coeff = granger_lasso(
+    coeff, p_values = granger_f_test(
         (X / peak - (X / peak).mean(axis=0)) / spread,
         maxlag=tau_max,
-        cv=cv,
+        alpha=alpha,
         forbidden=None if constraints is None else constraints.forbidden[1:],
         required=required,
     )
@@ -1340,4 +1357,4 @@ def granger(
     with np.errstate(over="ignore", invalid="ignore"):
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required), labels)
+    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required, p_values), labels)

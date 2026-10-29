@@ -286,24 +286,10 @@ def test_time_series_methods_need_two_variables(fit):
         fit(_data(d=1))
 
 
-@pytest.mark.parametrize(
-    ("setting", "value", "error"),
-    [
-        ("tau_max", 0, ValueError),
-        ("tau_max", 1.5, TypeError),
-        ("cv", 1, ValueError),
-        ("cv", 2.5, TypeError),
-    ],
-)
-def test_granger_checks_tau_max_and_cv(setting, value, error):
-    with pytest.raises(error, match=setting):
-        andrey.granger(_data(), **{setting: value})
-
-
-def test_granger_needs_a_time_step_in_every_fold():
-    with pytest.raises(ValueError, match="data needs at least 8 rows"):
-        andrey.granger(_data()[:7], tau_max=3, cv=5)
-    assert andrey.granger(_data()[:8], tau_max=3, cv=5).structure.lags == (1, 2, 3)
+@pytest.mark.parametrize(("value", "error"), [(0, ValueError), (1.5, TypeError)])
+def test_granger_checks_tau_max(value, error):
+    with pytest.raises(error, match="tau_max"):
+        andrey.granger(_data(), tau_max=value)
 
 
 LINGAM_PRUNED = {

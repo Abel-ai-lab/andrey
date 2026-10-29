@@ -148,13 +148,13 @@ FITS: dict[str, Fit] = {
     "LongitudinalLiNGAM": Fit(
         lambda x: andrey.longitudinal_lingam(list(x), **qg.AndreyLongitudinalLiNGAM().params())
     ),
-    "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS, cv=5)),
+    "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
 }
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
-#: skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase in worker processes, Granger's
-#: regressions and PNL's two directions on threads.
-WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "Granger", "PNL")
+#: skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase in worker processes, and PNL's
+#: two directions on threads.
+WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
 
 #: The gate datasets of the experimental methods, which the quality gate does not fit.
 EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(
