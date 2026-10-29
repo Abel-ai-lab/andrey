@@ -15,7 +15,7 @@ change names its pull request.
   the first table still works in this release, in Python and in `andrey run` and
   `andrey bootstrap`, with an `andrey.DeprecatedArgumentWarning`, and stops working in the next.
   The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the common calls
-  before and after. ([#496], [#499], [#501], [#505], [#509], [#510])
+  before and after. ([#496], [#499], [#501], [#505], [#509], [#510], [#526])
 
   Renamed arguments and values:
 
@@ -1116,3 +1116,4 @@ First alpha release.
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
 [#517]: https://github.com/Abel-ai-lab/andrey/pull/517
 [#524]: https://github.com/Abel-ai-lab/andrey/pull/524
+[#526]: https://github.com/Abel-ai-lab/andrey/pull/526
