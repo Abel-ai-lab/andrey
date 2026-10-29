@@ -99,6 +99,38 @@ names its pull request.
   | --- | --- | --- |
   | `granger` | `cv` | none: `alpha` sets the level of the test of each link |
 
+- The former argument names and values that 0.11.0 kept for one release no longer work, as its
+  changelog announced. A call that passes one raises `TypeError`, as for any argument a method does
+  not take, and a former score name raises `ValueError`, which lists the scores the method takes;
+  each message adds what the name or value is called now. `andrey run` and `andrey bootstrap`
+  refuse the flags and the `key=value` names the same way, with the same hint, and
+  the data inputs in `andrey --help --json` no longer list `aliases`. The
+  [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) gives the current calls.
+  ([#559])
+
+  | Method | Removed name or value | Name now |
+  | --- | --- | --- |
+  | `ica_lingam` | `random_state` | `seed` |
+  | `direct_lingam`, `multi_group_direct_lingam` | `random_state` | none: it set nothing |
+  | `pcmci` | `alpha_level` | `alpha` |
+  | `pcmciplus`, `lpcmci` | `pc_alpha` | `alpha` |
+  | `rcd` | `ind_alpha` | `alpha` |
+  | `calm` | `alpha` | `screen_alpha` |
+  | `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` | `lambda_value` | `penalty_discount` |
+  | `gfci`, `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC"`, `"local_score_BIC_from_cov"` | `score_func="bic"` |
+  | `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC_categorical"` | `score_func="discrete_bic"` |
+  | `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BDeu"` | `score_func="bdeu"` |
+  | `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_cond_gauss"` | `score_func="cond_gauss"` |
+  | `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_degen_gauss"` | `score_func="degen_gauss"` |
+  | `granger` | `maxlag` | `tau_max` |
+  | `longitudinal_lingam` | `n_lags` | `tau_max` |
+  | `rcd` | `max_explanatory_vars` | `max_depth` |
+  | `calm` | `max_outer` | `max_iter` |
+  | `multi_group_direct_lingam` | `data_groups` | `data` |
+  | `longitudinal_lingam` | `data_list` | `data` |
+  | `andrey run`, `andrey bootstrap` | `--data-groups`, `--data-list` | `--data`, once per dataset |
+  | `gin`, `calm` | `labels` | none: the labels come from a DataFrame's columns, or, in `andrey run`, from the data file's header |
+
 - The default `fdr_method` of `pcmci`, `pcmciplus`, and `granger` is `"fdr_bh"`, where it was
   `"none"` in the pull requests that added it ([#554], [#565]), so a link is kept when its
   Benjamini-Hochberg adjusted p-value over all the lagged links is at most `alpha`. On simulated
@@ -1338,6 +1370,7 @@ First alpha release.
 [#554]: https://github.com/Abel-ai-lab/andrey/pull/554
 [#555]: https://github.com/Abel-ai-lab/andrey/pull/555
 [#556]: https://github.com/Abel-ai-lab/andrey/pull/556
+[#559]: https://github.com/Abel-ai-lab/andrey/pull/559
 [#564]: https://github.com/Abel-ai-lab/andrey/pull/564
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567

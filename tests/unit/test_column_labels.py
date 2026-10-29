@@ -175,12 +175,6 @@ def test_reversed_columns_give_the_same_named_edges_on_torch(monkeypatch):
     assert sorted(forward.oriented_edges()) == [("x", "y", "directed"), ("z", "y", "directed")]
 
 
-def test_gin_ignores_the_former_labels_argument_with_a_warning():
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="labels is ignored"):
-        out = andrey.gin(frame(), labels=("a", "b", "c"))
-    assert out.structure.labels[:3] == ("x", "y", "z")
-
-
 @pytest.mark.parametrize(
     ("columns", "message"), [(["a", "a", "b"], r"'a' names columns \[0, 1\]"), ([1, "1", 2], "'1'")]
 )

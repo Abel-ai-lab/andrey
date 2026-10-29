@@ -403,7 +403,7 @@ def multi_group_direct_lingam(
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
         order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
         j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
-        ``metadata["group_index"]`` is the group's position in ``data_groups``.
+        ``metadata["group_index"]`` is the group's position in ``data``.
 
     Raises
     ------
