@@ -1,5 +1,5 @@
-"""Generate the README's claims, chart, methods, and quick start blocks and its images, or check
-them for drift.
+"""Generate the README's claims, package card, methods, and quick start blocks and its images, or
+check them for drift.
 
 The images live in the repository, under ``.github/readme/``, so each commit's README shows its own.
 PyPI cannot follow the relative paths; the package build rewrites them to the release tag
@@ -16,6 +16,7 @@ import io
 import re
 import runpy
 import textwrap
+from html import escape
 from pathlib import Path
 
 import numpy as np
@@ -30,13 +31,77 @@ IMAGES = ".github/readme"  # the README's images, relative to the repository roo
 BANNER = "banner.svg"
 
 
-def readme_charts(summary) -> dict[str, str]:
-    """The README's speedup chart in both themes, by file name."""
-    builder = site_builder()
-    return {
-        builder.README_CHART.format(theme=theme): builder.readme_chart(summary, palette)
-        for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK))
-    }
+CARD = "package-card-{theme}.svg"  # in IMAGES; the README links both themes
+CARD_TITLE = "Accelerated, accurate, agentic"
+# The package card's rows: what Andrey supports, a label and a line each.
+CARD_ROWS = (
+    ("Data types", "continuous, categorical, mixed, time series, nonlinear"),
+    ("Real data processing", "missing values, background knowledge, edge confidence"),
+    ("Graphs", "DAG, CPDAG, PAG, temporal; hidden confounders"),
+    ("Acceleration", "parallel CPU; GPU with PyTorch (CUDA, MPS)"),
+    ("Portability", "NetworkX, pcalg, Graphviz DOT, NumPy"),
+    ("Interface", "Python, CLI, skill"),
+)
+CARD_FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+CARD_MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+
+
+def supported_count() -> int:
+    """The registry's supported methods, the ones every release benchmarks."""
+    return sum(spec.status == "supported" for spec in list_specs())
+
+
+def card_alt() -> str:
+    """The package card's alt text: everything it says, in reading order."""
+    rows = ". ".join(f"{label}: {line}" for label, line in CARD_ROWS)
+    return f"Andrey: {CARD_TITLE.lower()}. {supported_count()} supported methods. {rows}."
+
+
+def package_card(theme: str) -> str:
+    """The README's package card as a standalone SVG: the wordmark, the line under it, the number
+    of supported methods, and the install command on the left; ``CARD_ROWS`` on the right. Light is
+    ink on paper, dark pale ink on night, each on an opaque ground with a hairline edge."""
+    palette = andrey.viz.LIGHT if theme == "light" else andrey.viz.DARK
+    ink, accent, line = palette.ink, palette.accent, palette.line
+    width, height, left, right = 960, 480, 56, 470
+    mark = (ROOT / "site" / "brand" / f"wordmark-{theme}.svg").read_text()
+    view = re.search(r'viewBox="([^"]+)"', mark)[1]
+    mark_w = 52 * float(view.split()[2]) / float(view.split()[3])
+    paths = mark[mark.index(">") + 1 : mark.rindex("</svg>")]
+
+    def text(x, y, content, size, fill=ink, weight=400, spacing=0, font=CARD_FONT):
+        return (
+            f'<text x="{x}" y="{y}" font-family="{escape(font)}" font-size="{size}" '
+            f'font-weight="{weight}" letter-spacing="{spacing}" fill="{fill}">'
+            f"{escape(content)}</text>"
+        )
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" role="img" aria-labelledby="card-title card-desc">',
+        '<title id="card-title">Andrey</title>',
+        f'<desc id="card-desc">{escape(card_alt())}</desc>',
+        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="18" '
+        f'fill="{palette.paper}" stroke="{line}"/>',
+        f'<svg x="{left}" y="56" width="{mark_w:.1f}" height="52" viewBox="{view}">{paths}</svg>',
+        text(left, 166, CARD_TITLE, 23, weight=600),
+        text(left, 320, str(supported_count()), 120, weight=600, spacing=-4),
+        text(left + 4, 354, "SUPPORTED METHODS", 13, accent, 600, 2),
+        text(left + 4, 420, "pip install andrey-core", 16, font=CARD_MONO),
+    ]
+    for i, (label, content) in enumerate(CARD_ROWS):
+        y = 74 + i * 64
+        parts += [
+            text(right, y, label.upper(), 12, accent, 600, 1.6),
+            text(right, y + 24, content, 16),
+            f'<line x1="{right}" y1="{y + 42}" x2="{width - left}" y2="{y + 42}" stroke="{line}"/>',
+        ]
+    return "".join([*parts, "</svg>"]) + "\n"
+
+
+def readme_cards() -> dict[str, str]:
+    """The README's package card in both themes, by file name."""
+    return {CARD.format(theme=theme): package_card(theme) for theme in ("light", "dark")}
 
 
 def write_banner():
@@ -212,16 +277,15 @@ def quickstart_block():
     )
 
 
-def chart_block(summary):
-    """The speedup chart in both themes, its alt text from the same slides, and the report link."""
-    builder = site_builder()
-    alt = textwrap.wrap(builder.readme_chart_alt(summary), 88)
-    light, dark = (builder.README_CHART.format(theme=theme) for theme in ("light", "dark"))
-    start, end = markers("CHART")
+def card_block():
+    """The package card in both themes, its alt text, and the release cards link."""
+    alt = textwrap.wrap(card_alt(), 88)
+    light, dark = (CARD.format(theme=theme) for theme in ("light", "dark"))
+    start, end = markers("CARD")
     return "\n".join(
         [
             start,
-            "<!-- Generated from the release summaries by apps/build_launch.py; do not edit. -->",
+            "<!-- Generated from andrey.spec by apps/build_launch.py; do not edit. -->",
             "",
             '<p align="center">',
             "  <picture>",
@@ -266,7 +330,7 @@ def update_readme(summary, check=False):
     updated = source
     blocks = (
         ("PITCH", pitch_block(summary)),
-        ("CHART", chart_block(summary)),
+        ("CARD", card_block()),
         ("WHY_FAST", why_fast_block()),
         ("METHODS", methods_block()),
         ("QUICKSTART", quickstart_block()),
@@ -283,13 +347,13 @@ def update_readme(summary, check=False):
         )
     if not check:
         path.write_text(updated)
-    for name, chart in readme_charts(summary).items():
+    for name, card in readme_cards().items():
         target = ROOT / IMAGES / name
-        if check and (not target.is_file() or target.read_text() != chart):
-            raise ValueError(f"{IMAGES}/{name} differs from the release summaries.")
+        if check and (not target.is_file() or target.read_text() != card):
+            raise ValueError(f"{IMAGES}/{name} differs from andrey.spec.")
         if not check:
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(chart)
+            target.write_text(card)
 
 
 if __name__ == "__main__":

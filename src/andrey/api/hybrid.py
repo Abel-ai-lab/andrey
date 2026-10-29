@@ -139,11 +139,15 @@ def mmhc(
         ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test. It must read the
         same kind of data as ``score_func``. ``None`` picks from the declared column types, as for
         :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
         ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``None`` picks from the declared
         column types, as for :func:`~andrey.ges`.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0
@@ -347,9 +351,13 @@ def rsmax2(
         Conditional-independence test of the restrict phase, any of :func:`~andrey.pc`'s. It must
         read the same kind of data as ``score_func``. ``None`` picks from the declared column types,
         as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``None`` picks from the
         declared column types, as for :func:`~andrey.ges`.
+        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0

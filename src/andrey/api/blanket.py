@@ -126,6 +126,8 @@ def iamb(
         for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
         ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
         column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -296,6 +298,8 @@ def inter_iamb(
         for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
         ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
         column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.
@@ -467,6 +471,8 @@ def mmpc(
         for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
         ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
         column types, as for :func:`~andrey.pc`.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. The
         other tests take no column types and reject it.

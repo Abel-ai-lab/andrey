@@ -322,7 +322,9 @@ returns.
 ## Background knowledge
 
 What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
-naming each column by its label, a string, or by its 0-based position, an integer:
+naming each column by its label, a string, or by its 0-based position, an integer. The
+[background knowledge notebook](../examples/knowledge) shows tiers orienting a graph that the data
+alone leave undirected.
 
 ```python
 from andrey import Knowledge, pc
@@ -400,7 +402,9 @@ or 0-based position, or when it is a DataFrame's `category`, `bool`, or text col
 column is categorical, the tests default to `gsq` and the scores to `bdeu`; when some are, both
 default to `cond_gauss`, the conditional Gaussian; otherwise to `fisherz` and `bic`. Values never
 decide: a column of counts or ratings stays numbers until you declare it. An `indep_test` or
-`score_func` you pass is always the one used.
+`score_func` you pass is always the one used. The result's `metadata["indep_test"]` and
+`metadata["score_func"]` name the test and the score the fit used, the one picked for `None`
+included.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or
@@ -415,12 +419,13 @@ continuous parent.
 **Marking the categorical columns.** Name them with `categorical`, by label (the column name as
 text) or 0-based position:
 `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without `categorical`,
-a mixed-data setting you pass infers them: a DataFrame's `category`, `bool`, and text columns, and
-every column whose values, over all its rows, are at most `max_categories` distinct whole numbers
-(10 by default). pandas does not mark a column as categorical by itself, so this follows the rule
-Tetrad applies when it loads mixed data. A `DataTypeWarning` names the inferred columns and why;
-check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]` for
-none. The result's `metadata["categorical"]` lists the categorical columns it read.
+a mixed-data setting you pass reads a DataFrame's `category`, `bool`, and text columns as
+categorical, since their type declares them, and infers every other column whose values, over all
+its rows, are at most `max_categories` distinct whole numbers (10 by default). pandas does not mark
+such a column as categorical by itself, so this follows the rule Tetrad applies when it loads mixed
+data. A `DataTypeWarning` names the columns inferred from their values, and none of the declared
+ones; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
+for none. The result's `metadata["categorical"]` lists the categorical columns it read.
 
 **No categorical column.** A mixed-data setting that finds no categorical column, or gets
 `categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio

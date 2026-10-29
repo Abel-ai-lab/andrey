@@ -758,10 +758,11 @@ def test_inference_reads_every_row():
     assert "column 0" not in str(caught[0].message) and "0 (" not in str(caught[0].message)
 
 
-def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
+def _typed_frame():
+    """Columns: a ``category``, a continuous one, a ``bool``, and a text column."""
     pd = pytest.importorskip("pandas")
     x = _mixed_data()
-    frame = pd.DataFrame(
+    return pd.DataFrame(
         {
             "group": pd.Categorical(x[:, 0].astype(int)),
             "u": x[:, 1],
@@ -769,12 +770,28 @@ def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
             "label": np.array(["p", "q"])[x[:, 2].astype(int)],
         }
     )
-    with pytest.warns(andrey.DataTypeWarning) as caught:
-        out = andrey.ges(frame, score_func="cond_gauss")
-    message = str(caught[0].message)
-    assert "'group' (category)" in message and "'flag' (bool)" in message
-    assert "'label' (text)" in message
+
+
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_dataframe_type_declares_a_column_so_a_mixed_setting_does_not_warn(setting):
+    """A ``category``, ``bool``, or text column is declared, so reading it as categorical, as the
+    setting named by the call does, is no guess to warn of."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.DataTypeWarning)
+        out = MIXED[setting](_typed_frame())
     assert out.metadata["categorical"] == ["group", "flag", "label"]
+
+
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_warns_of_the_undeclared_columns_it_infers_only(setting):
+    """Next to the declared columns, a column of whole numbers without a type is a guess."""
+    frame = _typed_frame().assign(count=_mixed_data()[:, 0])
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        out = MIXED[setting](frame)
+    [message] = [str(w.message) for w in caught]
+    assert "'count' (3 values)" in message
+    assert not any(f"'{declared}'" in message for declared in ("group", "flag", "label"))
+    assert out.metadata["categorical"] == ["group", "flag", "label", "count"]
 
 
 @pytest.mark.parametrize(

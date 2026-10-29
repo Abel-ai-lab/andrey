@@ -109,8 +109,9 @@ def varma_lingam(
         puts the cause of each required link, and each earlier tier, first, and the regression
         drops forbidden parents and keeps required ones unpenalized. With ``prune=True``, each
         variable's regression also drops its forbidden lagged regressors and keeps its required
-        ones unpenalized. With ``prune=False`` every lagged weight stays, so a required lagged
-        link is in the graph, and a forbidden lagged link raises. Tiers forbid every link from a
+        ones unpenalized; a required lagged link is in the graph even where its estimated weight
+        is ``0``. With ``prune=False`` every lagged weight stays, so a required lagged link is in
+        the graph, and a forbidden lagged link raises. Tiers forbid every link from a
         later tier into an earlier one, and a pair left out of ``allowed`` has no link at any
         lag; a variable's links to its own past stay allowed. The moving-average weights are not
         constrained.
@@ -225,7 +226,8 @@ def varma_lingam(
         name=column_namer(labels),
     )
     model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
-    return with_labels(_adapt_varma_lingam(model), labels)
+    required = None if constraints is None else constraints.required
+    return with_labels(_adapt_varma_lingam(model, required), labels)
 
 
 @method_spec("longitudinal_lingam")
@@ -267,9 +269,9 @@ def longitudinal_lingam(
         link, and each earlier tier, first, and the regression drops forbidden parents and keeps
         required ones unpenalized. A forbidden lagged link is left out of the least-squares fit
         of its effect's lagged weights, so its weight is ``0``; every other lagged weight stays,
-        so a required lagged link is in the graph. Tiers forbid every link from a later tier into
-        an earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's
-        links to its own past stay allowed.
+        and a required lagged link is in the graph even where its least-squares weight is ``0``.
+        Tiers forbid every link from a later tier into an earlier one, and a pair left out of
+        ``allowed`` has no link at any lag; a variable's links to its own past stay allowed.
 
     Returns
     -------
@@ -352,7 +354,8 @@ def longitudinal_lingam(
         knowledge, panel[0].shape[1], labels, tau_max, method="longitudinal_lingam"
     )
     model = LongitudinalLiNGAM(n_lags=tau_max, measure=measure, constraints=constraints).fit(panel)
-    return with_labels(_adapt_longitudinal_lingam(model), labels)
+    required = None if constraints is None else constraints.required
+    return with_labels(_adapt_longitudinal_lingam(model, required), labels)
 
 
 @method_spec("pcmci")
@@ -407,6 +410,8 @@ def pcmci(
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
         column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
         ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -663,6 +668,8 @@ def pcmciplus(
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
         column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
         ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -938,6 +945,8 @@ def lpcmci(
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
         column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
         ``bool``, or text type, never by its values.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
@@ -1194,9 +1203,9 @@ def granger(
         drops its forbidden lagged regressors and keeps its required ones unpenalized: the lasso
         selects among the other regressors on what the required ones leave of the variable, and a
         required link's weight is the least-squares weight of what the selected regressors leave of
-        the variable. Tiers forbid every link from a later tier into an earlier one, and a pair
-        left out of ``allowed`` has no link at any lag; a variable's links to its own past stay
-        allowed.
+        the variable, and the link is in the graph even where that weight is ``0``. Tiers forbid
+        every link from a later tier into an earlier one, and a pair left out of ``allowed`` has no
+        link at any lag; a variable's links to its own past stay allowed.
 
     Returns
     -------
@@ -1280,6 +1289,7 @@ def granger(
     constraints = resolve_lagged(
         knowledge, X.shape[1], labels, tau_max, method="granger", contemporaneous=False
     )
+    required = None if constraints is None else constraints.required[1:]
     peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
     spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
     coeff = granger_lasso(
@@ -1287,7 +1297,7 @@ def granger(
         maxlag=tau_max,
         cv=cv,
         forbidden=None if constraints is None else constraints.forbidden[1:],
-        required=None if constraints is None else constraints.required[1:],
+        required=required,
     )
     scale = spread * peak
     # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units.
@@ -1295,4 +1305,4 @@ def granger(
     with np.errstate(over="ignore", invalid="ignore"):
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
-    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max), labels)
+    return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required), labels)

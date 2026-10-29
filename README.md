@@ -18,14 +18,14 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.10.0
+## ⭐ What's new in 0.11.0
 
-How far can each method go? We mapped the boundary of every supported method by variables, samples,
-and graph density: BOSS stays more accurate than the empty graph up to 1,600 variables, GRaSP to
-800, and PC to 400.
+Ready for real data: missing values, mixed types, what you already know, and how sure each edge
+is. On a national health survey of 5,569 adults, a third of them missing a value, PC keeps every
+sample, and the bootstrap ranks each edge by how often it comes back.
 
-**[Read the post](https://andrey.abel.ai/blog/20261027-andrey-0-10-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.10.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.11.0.html)**
 
 ---
 
@@ -58,23 +58,25 @@ You install andrey-core and then `import andrey`.
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
 
-<!-- CHART:START -->
-<!-- Generated from the release summaries by apps/build_launch.py; do not edit. -->
+<!-- CARD:START -->
+<!-- Generated from andrey.spec by apps/build_launch.py; do not edit. -->
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)"
-      srcset=".github/readme/benchmark-chart-dark.svg">
-    <img alt="Andrey's speedup over the slowest package on the same data: PC 941x at 400 variables,
-      Tabu search 561x at 800 variables, GES 325x at 150 variables, XGES 140x at 200
-      variables, DirectLiNGAM 8.9x at 100 variables, FCI 8.7x at 800 variables"
-      src=".github/readme/benchmark-chart-light.svg" width="100%">
+      srcset=".github/readme/package-card-dark.svg">
+    <img alt="Andrey: accelerated, accurate, agentic. 27 supported methods. Data types: continuous,
+      categorical, mixed, time series, nonlinear. Real data processing: missing values,
+      background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
+      confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA, MPS). Portability:
+      NetworkX, pcalg, Graphviz DOT, NumPy. Interface: Python, CLI, skill."
+      src=".github/readme/package-card-light.svg" width="100%">
   </picture>
 </p>
 
 <p align="center"><a href="https://andrey.abel.ai/docs/benchmarks.html">Release cards</a></p>
 
-<!-- CHART:END -->
+<!-- CARD:END -->
 
 <!-- WHY_FAST:START -->
 <!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->
@@ -144,6 +146,8 @@ pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
   akt -- pka
   p38 -> pkc
   jnk -> pkc
+
+  indep_test: fisherz
 {'shd': 11, 'skeleton_precision': 1.0, 'skeleton_recall': 0.47}
 ```
 
@@ -173,9 +177,9 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 - [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
-- [Release cards](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
-- [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
-  [FAQ](https://andrey.abel.ai/docs/faq.html), and
+- [Release cards](https://andrey.abel.ai/docs/benchmarks.html): benchmark details for each
+  release.
+- [FAQ](https://andrey.abel.ai/docs/faq.html) and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
 - [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.
 
@@ -193,7 +197,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.10.0},
+  version = {0.11.0},
   url = {https://andrey.abel.ai},
 }
 ```

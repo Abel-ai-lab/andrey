@@ -107,7 +107,7 @@ comparison's errors in the measure its summary records (`ERRORS`). The README, t
 the homepage's description state `CLAIM`, a speed claim with no number. The build fails unless the
 first summary's headline is `claim_sentence()` of its numbers: the largest ratio rounded down to a
 power of ten on its method, then whether the other supported methods are faster ("the other", "most
-other", or nothing). The README chart shows one card per `PANEL` method, at most six.
+other", or nothing).
 
 The homepage's description names PC, GES, and FCI, counts the other methods, and states `CLAIM`.
 Every other page's description is the `description` in its front matter; without one, its first
@@ -154,7 +154,9 @@ in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never
 
 [`docs/benchmarks.md`](docs/benchmarks.md), the Release cards page, leads with the latest release as
 a cover beside its TL;DR (the abstract, three numbers, and a button to the card), then lists the
-earlier releases, newest first. To add a release:
+earlier releases, newest first, nine to a page (`_static/paginate.js`, which pages the blog's
+earlier posts too; without scripts every row shows). The sidebar folds the five newest cards under
+Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release:
 
 1. Move the current latest release to the top of "Earlier releases" (a copied row with its
    version, title, methods sentence, facts, release date, and links).

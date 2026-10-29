@@ -18,6 +18,8 @@ Practical guides for using Andrey.
   convert it, how other packages' matrices differ, and how to hand it to DoWhy.
 - [Column order and machines](column-order.md): what each method keeps when you reorder the columns
   or change machines, and the `tie_break` setting.
+- [Upgrading](upgrading.md): what to change in your code for a new release, with the common calls
+  before and after.
 - [Contributing](contributing.md): set up a development environment, run the checks, and add a
   method.
 
@@ -28,5 +30,6 @@ getting-started
 graph-types
 graph-representation
 column-order
+upgrading
 contributing
 ```
