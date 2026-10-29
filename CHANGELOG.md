@@ -178,7 +178,7 @@ names its pull request.
   `pcmciplus`'s links do not change; its lagged `metadata["p_values"]` are the adjusted ones.
   `fdr_method="none"` returns `pcmci`'s results of 0.11.0 and `granger`'s uncorrected test. The
   quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
-  to 6.5 and 4. ([#TBD])
+  to 6.5 and 4. ([#567])
 - A score search records the penalties its score used: `metadata["penalty_discount"]` for every
   score but `"bdeu"`, and `metadata["ebic_gamma"]` for `"bic"`. Every fit whose result
   `andrey.config`'s `tie_break` can change records the rule in `metadata["tie_break"]`, so the
@@ -1339,3 +1339,4 @@ First alpha release.
 [#556]: https://github.com/Abel-ai-lab/andrey/pull/556
 [#564]: https://github.com/Abel-ai-lab/andrey/pull/564
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565
+[#567]: https://github.com/Abel-ai-lab/andrey/pull/567
