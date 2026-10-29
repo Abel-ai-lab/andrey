@@ -5,7 +5,9 @@ them and writes ``src/andrey/api/_boundary_table.py``: per method, one entry per
 setting (label, rows or rows per variable, mean degree), the largest size its fits finished within
 the caps, and the stop that ended it. The size is counted as the method's data see it: the
 columns, the observed ones where the generator hides some nodes, or the rows for the pair methods,
-whose ladders step rows. ``andrey.api._boundary`` picks the warning's threshold from these entries.
+whose ladders step rows. ``andrey.api._boundary`` picks the warning's threshold from these entries. A summary whose lane
+carries ``carried_over_from`` holds an earlier release's lane unchanged, so the table keeps the
+release that measured it.
 
     uv run python scripts/boundary_table.py
 
@@ -41,11 +43,12 @@ PER_VARIABLE = re.compile(r"deg\d+-n(\d+)d")
 
 
 def newest() -> Path:
-    """Return the summary of the newest release that has a boundary lane."""
+    """Return the summary of the newest release that measured a boundary lane."""
     releases = []
     for path in PUBLISHED.glob("*/summary.json"):
         version = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", path.parent.name)
-        if version and "ladders" in (json.loads(path.read_text()).get("boundary") or {}):
+        lane = json.loads(path.read_text()).get("boundary") or {}
+        if version and "ladders" in lane and "carried_over_from" not in lane:
             releases.append((tuple(map(int, version.groups())), path))
     if not releases:
         raise SystemExit(f"no summary under {PUBLISHED} has boundary.ladders")

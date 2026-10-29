@@ -121,6 +121,18 @@ def test_the_table_is_generated_from_the_newest_boundary_lane():
     assert {name: getattr(_boundary_table, name) for name in expected} == expected
 
 
+def test_a_carried_lane_does_not_replace_the_release_that_measured_it(tmp_path, monkeypatch):
+    lane = {"ladders": []}
+    for release, boundary in (
+        ("0.10.0", lane),
+        ("0.11.0", {**lane, "carried_over_from": "0.10.0"}),
+    ):
+        (tmp_path / release).mkdir()
+        (tmp_path / release / "summary.json").write_text(json.dumps({"boundary": boundary}))
+    monkeypatch.setattr(generator, "PUBLISHED", tmp_path)
+    assert generator.newest().parent.name == "0.10.0"
+
+
 class _Checked(Exception):
     """Raised by the check, so the fit does not run."""
 

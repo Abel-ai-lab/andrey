@@ -94,10 +94,10 @@ change names its pull request.
   `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, with
   `ebic_gamma=1.0` (Chen and Chen 2008), a penalty that grows with the number of variables, so the
   graphs keep fewer false edges. On simulated linear-Gaussian data with 20 to 400 variables and 200
-  to 4,000 rows, the mean errors (SHD) per true edge fell by 0.74 to 0.82 for GES, XGES, GIES, hill
+  to 4,000 rows, the mean errors (SHD) per true edge fell by 0.74 to 0.83 for GES, XGES, GIES, hill
   climbing, Tabu search, BOSS, and GRaSP, and by 0.10 for MMHC and RSMAX2, whose skeleton phase
-  already leaves out most false edges; exact search's fell by 0.24 at 20 variables. With 200
-  variables and 2,000 rows, GES's errors fell from 211 to 24. `gfci` keeps `ebic_gamma=0.0`: its
+  already leaves out most false edges; exact search's fell by 0.24 at 20 variables. GES's median
+  errors fell from 87 to 25 over 299 datasets. `gfci` keeps `ebic_gamma=0.0`: its
   errors fell by only 0.06 per true edge, and rose on some dense graphs. Pass `ebic_gamma=0.0` for
   the graphs the others returned before. ([#445])
 - Every method checks its arguments in one shared step before it reads the data: a value of the
