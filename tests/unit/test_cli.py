@@ -781,9 +781,7 @@ def test_header_names_gin_observed_nodes(capsys, named_path):
     assert code == 0 and env["structure"]["labels"][:4] == ["a", "b", "c", "d"]
     assert "labels" not in env["run"]["params"]
     code, out, _ = _run(["run", "gin", "--data", str(named_path), "labels=[w,x,y,z]"], capsys)
-    env = json.loads(out)  # the former labels argument is ignored with a warning
-    assert code == 0 and env["structure"]["labels"][:4] == ["a", "b", "c", "d"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in env["run"]["warnings"]}
+    assert code == 2  # the former labels argument is an unknown param
 
 
 def test_panel_headers_name_every_group(capsys, tmp_path, named_path):
