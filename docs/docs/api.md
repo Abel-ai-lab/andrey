@@ -128,7 +128,7 @@ p-values for the number of links tested. `"none"`, the default, keeps each p-val
 together, which holds the false discovery rate at or below the level when the tests are independent
 or positively dependent. `pcmci` keeps a link when its adjusted p-value is at most `alpha`;
 `pcmciplus` decides its links in the skeleton phase and reports the adjusted values in
-`metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's does not.
+`metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
