@@ -35,6 +35,10 @@ CPDAG_FITS = {
     "ges-bdeu": lambda x: andrey.ges(x, score_func="bdeu"),
     "hc-bdeu": lambda x: andrey.hc(x, score_func="bdeu"),
     "ges-bic": lambda x: andrey.ges(x, score_func="discrete_bic"),
+    "gies-bdeu": lambda x: andrey.gies(x, score_func="bdeu"),
+    "gies-bic": lambda x: andrey.gies(x, score_func="discrete_bic"),
+    "xges-bdeu": lambda x: andrey.xges(x, score_func="bdeu"),
+    "xges-bic": lambda x: andrey.xges(x, score_func="discrete_bic"),
     "hc-bic": lambda x: andrey.hc(x, score_func="discrete_bic"),
     "tabu-bdeu": lambda x: andrey.tabu(x, score_func="bdeu"),
     "tabu-bic": lambda x: andrey.tabu(x, score_func="discrete_bic"),
@@ -112,7 +116,7 @@ def test_a_dataframe_names_the_nodes():
 
 
 @pytest.mark.parametrize("d", [1, 2])
-@pytest.mark.parametrize("fit", ["ges", "hc", "boss", "grasp"])
+@pytest.mark.parametrize("fit", ["ges", "gies", "xges", "hc", "boss", "grasp"])
 def test_bdeu_fits_one_or_two_columns(fit, d):
     """With two or fewer variables the structure prior is left out, so the score stays finite."""
     x = datagen.generate(CASE)[:, COLUMN[[2, 3][:d]]]  # x2, and x3 with its parent x2
@@ -150,7 +154,11 @@ def random_network():
 
 
 @pytest.mark.parametrize(
-    "fit", ["pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic", "boss-bdeu", "boss-bic", "grasp-bic"]
+    "fit",
+    [
+        *("pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic", "gies-bdeu", "gies-bic"),
+        *("xges-bdeu", "xges-bic", "boss-bdeu", "boss-bic", "grasp-bic"),
+    ],
 )
 def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     truth = to_cpdag(random_network.graph)

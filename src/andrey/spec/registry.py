@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
-from andrey.core.score import LINEAR_SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, SCORE_ALIASES, concept_param
@@ -427,7 +426,9 @@ _add(
         family="score",
         summary="Greedy interventional equivalence search: GES for data that mixes observation "
         "with interventions, scoring each variable on the rows where it was not intervened on. "
-        "Returns the interventional essential graph + score.",
+        "BIC by default, BDeu when every column is categorical, conditional Gaussian when some "
+        "are; score_func=bdeu or discrete_bic for categorical data, degen_gauss or cond_gauss for "
+        "mixed data. Returns the interventional essential graph + score.",
         data=DataSpec(
             inputs=(
                 _DATA_MATRIX,
@@ -443,7 +444,10 @@ _add(
             layout=_MATRIX_LAYOUT,
         ),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -453,26 +457,32 @@ _add(
         params=(
             concept_param(
                 "score_func",
-                doc="Local score: bic = linear-Gaussian BIC, the only score GIES supports; null "
-                "picks it.",
-                choices=LINEAR_SCORES,
+                doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
+                "on it.",
             ),
             _PENALTY_DISCOUNT_RENAMED,
             _EBIC_GAMMA,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
-        references=("Hauser & Buhlmann 2012",),
+        references=("Hauser & Buhlmann 2012", "Cooper & Yoo 1999"),
     )
 )
 _add(
     MethodSpec(
         name="xges",
         family="score",
-        summary="Extremely greedy equivalence search: GES's moves and BIC score, deleting an edge "
-        "before reversing one and reversing before adding, then retrying each deletion. Returns a "
-        "CPDAG + score.",
+        summary="Extremely greedy equivalence search: GES's moves and scores, deleting an edge "
+        "before reversing one and reversing before adding, then retrying each deletion. BIC by "
+        "default, BDeu when every column is categorical, conditional Gaussian when some are; "
+        "score_func=bdeu or discrete_bic for categorical data, degen_gauss or cond_gauss for mixed "
+        "data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -482,9 +492,8 @@ _add(
         params=(
             concept_param(
                 "score_func",
-                doc="Local score: bic = linear-Gaussian BIC, the only score XGES supports; null "
-                "picks it.",
-                choices=LINEAR_SCORES,
+                doc=_SCORE_DOC,
+                # Before 0.11.0 xges took the linear-Gaussian BIC only.
                 choice_aliases=SCORE_ALIASES[:2],
             ),
             _PENALTY_DISCOUNT_RENAMED,
@@ -497,6 +506,8 @@ _add(
                 "in turn, forbid adding it back, search again, and keep a better result. "
                 "false returns the converged graph.",
             ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Nazaret & Blei 2024",),
     )

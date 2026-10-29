@@ -25,7 +25,7 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
-from andrey.core.score import LINEAR_SCORES, SCORES
+from andrey.core.score import SCORES
 
 from .models import ParamSpec, ParamType, Spec
 
@@ -251,18 +251,6 @@ _CONCEPTS = (
         fragment="score",
         suitable=SCORE_SEARCHES,
         others_exempt="Not a search over parent sets scored by a decomposable score.",
-        deviations=tuple(
-            Deviation(
-                method=m,
-                name="score_func",
-                default=None,
-                choices=LINEAR_SCORES,
-                fixed_in="0.12.0",
-                reason="The linear-Gaussian BIC only; the categorical scores are published and "
-                "come in 0.12.0.",
-            )
-            for m in ("gies", "xges")
-        ),
     ),
     Concept(
         key="penalty_discount",
@@ -602,9 +590,6 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
         ),
         others_exempt="A continuous model.",
-        deviations=(
-            *_absent("0.12.0", "Categorical scores are published; engine work.", "gies", "xges"),
-        ),
     ),
     Concept(
         key="max_categories",
@@ -632,9 +617,6 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
         ),
         others_exempt="A continuous model.",
-        deviations=(
-            *_absent("0.12.0", "Categorical scores are published; engine work.", "gies", "xges"),
-        ),
     ),
     Concept(
         key="category_codes",

@@ -17,7 +17,8 @@ score (:func:`_add_error_bounds`). :func:`local_score_bic_delta` scores one move
 :func:`score_many_with_base` many, :func:`add_deltas` and :func:`remove_deltas` every add or every
 removal against one base at once, and :class:`DeltaBICScore` keeps the caches a search reuses.
 :class:`FullScoreDelta` differences two full local scores of any :class:`~andrey.core.score.Score`,
-for a score with no rank-one update, such as BDeu.
+for a score with no rank-one update, such as BDeu, and :func:`full_add_deltas` scores every add
+against one base that way.
 """
 
 from __future__ import annotations
@@ -1426,6 +1427,25 @@ class FullScoreDelta:
     def move_bound(self, i: int, base_parents: Sequence[int], op: str, u: int) -> float:
         """Return 0: every score is a full score."""
         return 0.0
+
+
+def full_add_deltas(
+    score_obj: LocalScore, i: int, base_parents: Iterable[int], d: int
+) -> np.ndarray:
+    """:func:`add_deltas` for a score with no rank-one update, from two full local scores.
+
+    ``score(i, base + u) - score(i, base)`` for each of the ``d`` variables ``u``, with every parent
+    set scored in one ``score_many`` call (:meth:`FullScoreDelta.delta_many_with_base`); ``inf`` for
+    ``i`` and the members of ``base``.
+    """
+    base = sorted(int(p) for p in base_parents)
+    taken = {int(i), *base}
+    others = [u for u in range(d) if u not in taken]
+    out = np.full(d, np.inf)
+    if others:
+        moves = [("add", u) for u in others]
+        out[others] = FullScoreDelta(score_obj).delta_many_with_base(i, base, moves)
+    return out
 
 
 def _moved(base: list[int], deltas: Sequence[tuple[str, int]]) -> list[list[int]]:

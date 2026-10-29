@@ -802,7 +802,11 @@ SCORE_SEARCHES = {
     "exact_search": (andrey.exact_search, "andrey.search.exact", "exact_search", "bic"),
     "boss": (andrey.boss, "andrey.search.boss", "boss", "bic"),
     "grasp": (andrey.grasp, "andrey.search.grasp", "grasp", "bic"),
+    "gies": (andrey.gies, "andrey.search.gies", "gies", "bic"),
+    "xges": (andrey.xges, "andrey.search.xges", "xges", "bic"),
 }
+#: The score searches that took the former linear-Gaussian score names before 0.11.0.
+FORMER_LINEAR_NAMES = ("ges", "hc", "tabu", "exact_search", "boss", "grasp", "xges", "gfci")
 
 
 def _scores_used(monkeypatch, name):
@@ -857,7 +861,7 @@ def _mixed_frame():
     )
 
 
-@pytest.mark.parametrize("name", [*SCORE_SEARCHES, "xges", "gfci"])
+@pytest.mark.parametrize("name", FORMER_LINEAR_NAMES)
 def test_a_former_score_name_maps_to_the_current_one_with_one_warning(name):
     fit = getattr(andrey, name)
     x = _normal_data()
