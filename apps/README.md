@@ -63,9 +63,9 @@ uv run --group docs python apps/build_launch.py --readme
 uv run --group docs python apps/build_launch.py --check-readme
 ```
 
-The README's images are in `.github/readme/`: the speedup chart in both themes, which `--readme`
-writes from the summary and `--check-readme` checks, and the banner, which only `--banner` redraws
-(it needs the docs group's renderer). The README is also the package-index description, so every
+The README's images are in `.github/readme/`: the package card in both themes, which `--readme`
+writes from the method registry and `--check-readme` checks, and the banner, which only `--banner`
+redraws (it needs the docs group's renderer). The README is also the package-index description, so every
 link is absolute, and the package build points each image at the release tag on GitHub. The
 recording is not linked.
 
