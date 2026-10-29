@@ -213,9 +213,10 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 ### How stable is it?
 
 Andrey is in alpha: any release may change the API, including the supported methods. Pin the
-version you depend on, and read the [changelog](changelog.md) before upgrading. The public API is
-what the [API reference](api.md) documents; names that start with an underscore are private
-and can change in any release.
+version you depend on, and read the [changelog](changelog.md) and the
+[upgrade guide](guides/upgrading.md) before upgrading. The public API is what the
+[API reference](api.md) documents; names that start with an underscore are private and can change
+in any release.
 
 ### What is planned next?
 
