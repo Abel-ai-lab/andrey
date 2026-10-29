@@ -94,11 +94,12 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
 
 def test_the_readme_package_card_counts_the_registry_in_both_themes(monkeypatch):
     # The README shows both themes' cards from .github/readme/, each self-contained, with the
-    # registry's method count and every row in its alt text, and the release cards link below.
+    # registry's supported-method count and every row in its alt text, and the release cards link
+    # below.
     monkeypatch.syspath_prepend(str(ROOT / "apps"))
     launch = runpy.run_path(str(ROOT / "apps" / "build_launch.py"))
     readme = README.read_text()
-    count = len(andrey.spec.list_specs())
+    count = sum(spec.status == "supported" for spec in andrey.spec.list_specs())
     for name, card in launch["readme_cards"]().items():
         assert f'"{IMAGES}/{name}"' in readme
         assert ET.fromstring(card).tag == "{http://www.w3.org/2000/svg}svg"
@@ -106,7 +107,7 @@ def test_the_readme_package_card_counts_the_registry_in_both_themes(monkeypatch)
         assert f">{count}</text>" in card
     alt = launch["card_alt"]()
     assert f'alt="{alt}"' in " ".join(readme.split())
-    assert f"{count} methods" in alt
+    assert f"{count} supported methods" in alt
     assert all(f"{label}: {line}" in alt for label, line in launch["CARD_ROWS"])
     assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
 

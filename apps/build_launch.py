@@ -46,16 +46,21 @@ CARD_FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
 CARD_MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
 
 
+def supported_count() -> int:
+    """The registry's supported methods, the ones every release benchmarks."""
+    return sum(spec.status == "supported" for spec in list_specs())
+
+
 def card_alt() -> str:
     """The package card's alt text: everything it says, in reading order."""
     rows = ". ".join(f"{label}: {line}" for label, line in CARD_ROWS)
-    return f"Andrey: {CARD_TITLE.lower()}. {len(list_specs())} methods. {rows}."
+    return f"Andrey: {CARD_TITLE.lower()}. {supported_count()} supported methods. {rows}."
 
 
 def package_card(theme: str) -> str:
     """The README's package card as a standalone SVG: the wordmark, the line under it, the number
-    of methods, and the install command on the left; ``CARD_ROWS`` on the right. Light is ink on
-    paper, dark pale ink on night, each on an opaque ground with a hairline edge."""
+    of supported methods, and the install command on the left; ``CARD_ROWS`` on the right. Light is
+    ink on paper, dark pale ink on night, each on an opaque ground with a hairline edge."""
     palette = andrey.viz.LIGHT if theme == "light" else andrey.viz.DARK
     ink, accent, line = palette.ink, palette.accent, palette.line
     width, height, left, right = 960, 480, 56, 470
@@ -80,8 +85,8 @@ def package_card(theme: str) -> str:
         f'fill="{palette.paper}" stroke="{line}"/>',
         f'<svg x="{left}" y="56" width="{mark_w:.1f}" height="52" viewBox="{view}">{paths}</svg>',
         text(left, 166, CARD_TITLE, 23, weight=600),
-        text(left, 320, str(len(list_specs())), 120, weight=600, spacing=-4),
-        text(left + 4, 354, "METHODS", 13, accent, 600, 2),
+        text(left, 320, str(supported_count()), 120, weight=600, spacing=-4),
+        text(left + 4, 354, "SUPPORTED METHODS", 13, accent, 600, 2),
         text(left + 4, 420, "pip install andrey-core", 16, font=CARD_MONO),
     ]
     for i, (label, content) in enumerate(CARD_ROWS):

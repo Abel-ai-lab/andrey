@@ -65,11 +65,11 @@ You install andrey-core and then `import andrey`.
   <picture>
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/package-card-dark.svg">
-    <img alt="Andrey: accelerated, accurate, agentic. 34 methods. Data types: continuous, categorical,
-      mixed, time series, nonlinear. Real data processing: missing values, background
-      knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden confounders.
-      Acceleration: parallel CPU; GPU with PyTorch (CUDA, MPS). Portability: NetworkX, pcalg,
-      Graphviz DOT, NumPy. Interface: Python, CLI, skill."
+    <img alt="Andrey: accelerated, accurate, agentic. 27 supported methods. Data types: continuous,
+      categorical, mixed, time series, nonlinear. Real data processing: missing values,
+      background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
+      confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA, MPS). Portability:
+      NetworkX, pcalg, Graphviz DOT, NumPy. Interface: Python, CLI, skill."
       src=".github/readme/package-card-light.svg" width="100%">
   </picture>
 </p>
