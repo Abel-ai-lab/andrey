@@ -148,6 +148,12 @@ names its pull request.
 
 ### Added
 
+- `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
+  `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
+  `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,
+  or a DAG, and graph separation on an undirected graph; each raises on the kinds the other one
+  defines. A CPDAG or PAG answers as every member of its class does. `neighbors` and `endpoints`
+  also take a label. ([#569])
 - `pcmci` and `pcmciplus` take `fdr_method`, as tigramite's `run_pcmci` and `run_pcmciplus` do:
   `"fdr_bh"` replaces the p-values of the lagged links with their Benjamini-Hochberg adjusted
   values over all those links together. `pcmci` keeps a link when its adjusted p-value is at most
@@ -1374,3 +1380,4 @@ First alpha release.
 [#564]: https://github.com/Abel-ai-lab/andrey/pull/564
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
+[#569]: https://github.com/Abel-ai-lab/andrey/pull/569
