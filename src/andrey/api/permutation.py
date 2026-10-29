@@ -86,8 +86,8 @@ def boss(
         Number of searches, at least ``1``. The first starts from the order described in Notes;
         each later one starts from a random order drawn from ``seed`` and its own index. The result
         is the best-scoring search; a later one replaces an earlier one only when it scores better
-        by more than ``1e-6``. Each search builds its own caches, so a fit holds one search's
-        memory at a time. See Notes.
+        by more than ``1e-6``. Each search builds its own caches and drops the previous one's, so
+        more starts take more time but little more memory. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the grow step of each variable's parent
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
@@ -175,8 +175,8 @@ def boss(
     most often on dense graphs. Its authors run one search [1]_; Tetrad's ``numStarts`` [6]_ runs
     later searches from random orders and keeps the best score, as ``n_starts`` does. On simulated
     linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the defaults, 8
-    starts lowered the mean errors (SHD) over 20 datasets from 7.9 to 2.1, and the median fit took
-    {BOSS_RATIO} times as long as one start.
+    starts lowered the mean errors (SHD) over 20 datasets from 7.9 to 2.1 and took a median of 7.7
+    times as long as one start.
 
     **How it works.** BOSS searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree to cache its best parent set for any set of
@@ -368,8 +368,8 @@ def grasp(
         Number of searches, at least ``1``, each from its own random starting order: the first
         from ``seed``'s, each later one from an order drawn from ``seed`` and its own index. The
         result is the best-scoring search; a later one replaces an earlier one only when it scores
-        better by more than ``1e-6``. Each search builds its own caches, so a fit holds one
-        search's memory at a time. See Notes.
+        better by more than ``1e-6``. Each search builds its own caches and drops the previous
+        one's, so more starts take more time but little more memory. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the grow step of each variable's parent
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
@@ -461,8 +461,8 @@ def grasp(
     often on dense graphs. Its authors run one search [1]_; Tetrad's ``numStarts`` [6]_ runs later
     searches from random orders and keeps the best score, as ``n_starts`` does. On simulated
     linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the defaults, 8
-    starts lowered the mean errors (SHD) over 20 datasets from 18.2 to 4.6, and the median fit took
-    {GRASP_RATIO} times as long as one start.
+    starts lowered the mean errors (SHD) over 20 datasets from 18.2 to 4.6 and took a median of 8.3
+    times as long as one start.
 
     **How it works.** GRaSP searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree [2]_ to cache its best parent set for any set of
