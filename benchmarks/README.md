@@ -805,7 +805,7 @@ Where a package's default differs, the adapter overrides it:
 |---|---|---|---|
 | PC test | `chisq`, `gsq` | `x2-adf`, `mi-adf` | |
 | PC level, conditioning-set size | `alpha=0.05`, no limit | `alpha=0.05`, no limit (`max.sx`) | |
-| BDeu equivalent sample size | 1 (`sample_prior`) | `iss=1` | `equivalent_sample_size=1` (default 10) |
+| BDeu equivalent sample size | `equivalent_sample_size=1` | `iss=1` | `equivalent_sample_size=1` (default 10) |
 | BDeu structure prior | each other variable a parent with probability `1 / (d - 1)` | `prior="vsp"`, `beta = 1 / (d - 1)` | the same, added through `structure_prior_ratio` (pgmpy has none) |
 | BIC penalty | `penalty_discount=1`: `log(n)` per parameter, in deviance units | `k = log(n) / 2`, in log-likelihood units | `log(n) / 2`, fixed |
 | parent cap | none | `maxp=Inf` | `max_indegree=None` |

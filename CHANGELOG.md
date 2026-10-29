@@ -67,6 +67,12 @@ names its pull request.
 
 ### Added
 
+- `pcmci` and `pcmciplus` take `fdr_method`, as tigramite's `run_pcmci` and `run_pcmciplus` do:
+  `"fdr_bh"` replaces the p-values of the lagged links with their Benjamini-Hochberg adjusted
+  values over all those links together. `pcmci` keeps a link when its adjusted p-value is at most
+  `alpha`; `pcmciplus` decides its links in the skeleton phase and only reports the adjusted values
+  in `metadata["p_values"]`. The default, `"none"`, returns the results these methods returned
+  before. `lpcmci` takes none, as tigramite's does not. ([#554])
 - `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
   random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
   graphs these methods returned before. ([#550])
@@ -101,6 +107,14 @@ names its pull request.
   in the other score searches; `gies` scores each variable on the rows without an intervention on
   it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
   data. ([#520])
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+  `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman,
+  Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform prior over each
+  variable's conditional distributions is worth. The default, `1.0`, is the weight the score used
+  before, so every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that
+  passes it with another score, named or picked from the declared column types, raises
+  `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
+  ([#553])
 
 ### Changed
 
@@ -1258,3 +1272,5 @@ First alpha release.
 [#550]: https://github.com/Abel-ai-lab/andrey/pull/550
 [#551]: https://github.com/Abel-ai-lab/andrey/pull/551
 [#552]: https://github.com/Abel-ai-lab/andrey/pull/552
+[#553]: https://github.com/Abel-ai-lab/andrey/pull/553
+[#554]: https://github.com/Abel-ai-lab/andrey/pull/554

@@ -394,6 +394,7 @@ def exact_search(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
@@ -429,6 +430,9 @@ def exact_search(
         ``2 * ebic_gamma * log C(n_vars - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     max_parents : int or None
         Caps each node's parent set, required parents included: only parent sets of at most
         ``max_parents`` members are scored, so the DAG is the score-optimal one among those within
@@ -472,6 +476,7 @@ def exact_search(
             X,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             categorical=categorical,
         )
     )

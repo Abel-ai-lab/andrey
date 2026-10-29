@@ -50,8 +50,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     argument the call passes is checked and converted by
     :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or ``ValueError``; a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
-    an int; a call that passes ``ebic_gamma`` with a score that does not use it raises
-    ``ValueError`` (:func:`check_penalties`); an experimental method warns
+    an int; a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with a score that does
+    not use it raises ``ValueError`` (:func:`check_penalties`); an experimental method warns
     :class:`~andrey.ExperimentalWarning`.
     After it: each result's ``metadata["algorithm"]`` is ``name``, ``metadata["indep_test"]`` and
     ``metadata["score_func"]`` are the test and the score the fit used, for a method that takes
@@ -142,7 +142,18 @@ def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, st
 
 
 #: The scores each penalty concept weighs; the other scores ignore it.
-PENALTIES = {"penalty_discount": PENALIZED_SCORES, "ebic_gamma": LINEAR_SCORES}
+PENALTIES = {
+    "penalty_discount": PENALIZED_SCORES,
+    "ebic_gamma": LINEAR_SCORES,
+    "equivalent_sample_size": ("bdeu",),
+}
+#: What each argument that only one score reads weighs; a call that passes it with another score
+#: raises. ``penalty_discount`` is not among them: every score but BDeu uses it, and BDeu ignores
+#: it.
+SCORE_ONLY = {
+    "ebic_gamma": "the extended-BIC term",
+    "equivalent_sample_size": "the Dirichlet prior",
+}
 
 
 def used_penalties(
@@ -150,9 +161,9 @@ def used_penalties(
 ) -> dict[str, float]:
     """Return the penalties the score ``score`` used in a fit of ``spec``, by argument name.
 
-    ``penalty_discount`` weighs every score but BDeu, and ``ebic_gamma`` only the linear-Gaussian
-    BIC (:data:`PENALTIES`); a penalty the score ignores is left out. The value is the call's, or
-    the default.
+    ``penalty_discount`` weighs every score but BDeu, ``ebic_gamma`` only the linear-Gaussian BIC,
+    and ``equivalent_sample_size`` only BDeu (:data:`PENALTIES`); a penalty the score ignores is
+    left out. The value is the call's, or the default.
     """
     return {
         p.name: arguments.get(p.name, p.default)
@@ -162,21 +173,27 @@ def used_penalties(
 
 
 def check_penalties(spec: MethodSpec, arguments: dict[str, Any]) -> None:
-    """Raise ``ValueError`` when the call passes ``ebic_gamma`` with a score that does not use it.
+    """Raise ``ValueError`` when the call passes an argument that only one score reads with another.
 
-    Only the linear-Gaussian BIC, ``"bic"``, adds the extended-BIC term. The score is the one the
-    fit uses: the call's ``score_func``, or, for ``None``, the one picked from the declared column
-    types (:func:`chosen_settings`).
+    ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` alone, and ``equivalent_sample_size``
+    the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). The score is the one the fit uses:
+    the call's ``score_func``, or, for ``None``, the one picked from the declared column types
+    (:func:`chosen_settings`).
     """
-    gamma = next((p.name for p in spec.params if p.concept == "ebic_gamma"), None)
-    if gamma is None or gamma not in arguments:
+    passed = [
+        (p.name, p.concept) for p in spec.params if p.concept in SCORE_ONLY and p.name in arguments
+    ]
+    if not passed:
         return
     score = chosen_settings(spec, arguments).get("score_func")
-    if score not in PENALTIES["ebic_gamma"]:
-        raise ValueError(
-            f"{spec.name}: {gamma} weighs the extended-BIC term of score_func='bic', which "
-            f"score_func={score!r} does not add; drop {gamma}, or pass score_func='bic'"
-        )
+    for name, concept in passed:
+        used = PENALTIES[concept or ""]
+        if score not in used:
+            weighed = SCORE_ONLY[concept or ""]
+            raise ValueError(
+                f"{spec.name}: {name} weighs {weighed} of score_func={used[0]!r}, which "
+                f"score_func={score!r} does not use; drop {name}, or pass score_func={used[0]!r}"
+            )
 
 
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:

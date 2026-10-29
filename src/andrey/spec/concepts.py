@@ -25,6 +25,7 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.fdr import FDR_METHODS
 from andrey.core.score import SCORES
 
 from .models import ParamSpec, ParamType, Spec
@@ -301,6 +302,26 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="equivalent_sample_size",
+        summary="The equivalent sample size of the BDeu score: the weight, in rows, of its uniform "
+        "Dirichlet prior (Heckerman, Geiger and Chickering 1995; Buntine 1991), in (0, inf). A "
+        "call that passes it with another score raises ValueError.",
+        param=_template(
+            "equivalent_sample_size",
+            "float",
+            1.0,
+            "The equivalent sample size of the BDeu score: how many rows the uniform prior over "
+            "each variable's conditional distributions is worth. A larger value weighs the prior "
+            "more against the data, and the graph can change with it. Only bdeu uses it: passing "
+            "it with another score raises ValueError.",
+            minimum=0,
+            exclusive_minimum=True,
+        ),
+        fragment="equivalent sample size",
+        suitable=SCORE_SEARCHES,
+        others_exempt="Does not score with BDeu.",
+    ),
+    Concept(
         key="lambda1",
         summary="The L1 weight of a continuous objective.",
         param=_template(
@@ -328,6 +349,33 @@ _CONCEPTS = (
         fragment="weight magnitude",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No weighted continuous fit to threshold.",
+    ),
+    Concept(
+        key="fdr_method",
+        summary="The correction of the lagged links' p-values for the number of links tested "
+        "(tigramite's name): none leaves them as tested, and fdr_bh replaces them with their "
+        "Benjamini-Hochberg adjusted values over all the lagged links together. A method whose "
+        "graph is thresholded on those p-values (pcmci) thresholds the adjusted ones; a method "
+        "that decides its links before it reports them (pcmciplus) reports the adjusted values "
+        "and keeps its links.",
+        param=_template(
+            "fdr_method",
+            "str",
+            "none",
+            "How the p-values of the lagged links are corrected for the number of links tested: "
+            "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+            "adjusted values over all the lagged links together.",
+            choices=FDR_METHODS,
+        ),
+        fragment="benjamini-hochberg",
+        suitable=("pcmci", "pcmciplus"),
+        exempt=_exempt(
+            "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
+            "The marks come from the removal phases and the orientation rules at alpha, not from "
+            "a threshold on the p-values the method reports.",
+            "lpcmci",
+        ),
+        others_exempt="Reports no p-values of a family of lagged links.",
     ),
     Concept(
         key="max_depth",
@@ -832,8 +880,9 @@ _CONCEPTS = (
         "score. An order that is not a total order of the variables has its own name "
         "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
         "default or the configuration leaves open: seed, indep_test, score_func, the score's "
-        "penalty_discount and ebic_gamma, and n_perturbations hold the value the fit used, and "
-        "tie_break the rule of andrey.config that a fit it can change ran under.",
+        "penalty_discount, ebic_gamma, and equivalent_sample_size, and n_perturbations hold the "
+        "value the fit used, and tie_break the rule of andrey.config that a fit it can change ran "
+        "under.",
         suitable=ALL_METHODS,
     ),
     Concept(
@@ -842,7 +891,8 @@ _CONCEPTS = (
         "metadata['indep_test'] or metadata['score_func'], as its current short name: the name "
         "the call passed, or, for None, the one picked from the declared column types. A "
         "registered test records its registered name. A score search records the penalties its "
-        "score used: penalty_discount for every score but bdeu, and ebic_gamma for bic.",
+        "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
+        "equivalent_sample_size for bdeu.",
         suitable=tuple(
             m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
         ),

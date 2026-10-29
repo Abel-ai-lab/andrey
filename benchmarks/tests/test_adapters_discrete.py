@@ -216,9 +216,9 @@ def test_the_declared_settings_are_the_ones_andreys_hill_climbing_runs_with() ->
     defaults."""
     bdeu = inspect.signature(BDeuScore).parameters
     declared = discrete_cpu._HC_BDEU.params()
-    assert declared["sample_prior"] == bdeu["sample_prior"].default
-    assert declared["structure_prior"] == bdeu["structure_prior"].default
     accepted = inspect.signature(hc).parameters
+    assert declared["sample_prior"] == accepted["equivalent_sample_size"].default
+    assert declared["structure_prior"] == bdeu["structure_prior"].default
     assert discrete_cpu._HC_BIC.params()["lambda_value"] == accepted["penalty_discount"].default
     assert accepted["max_parents"].default is None  # no parent cap
     assert all(a.params()["max_parents"] is None for a in ANDREY_HC)

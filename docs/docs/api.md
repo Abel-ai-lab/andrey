@@ -121,6 +121,15 @@ panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting an
 DirectLiNGAM's order search and take `measure`, how it picks the most exogenous variable at each
 step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the only one.
 
+% concept: fdr_method
+`pcmci` and `pcmciplus` take `fdr_method`, tigramite's name for the correction of the lagged links'
+p-values for the number of links tested. `"none"`, the default, keeps each p-value as tested.
+`"fdr_bh"` replaces them with their Benjamini-Hochberg adjusted values over all the lagged links
+together, which holds the false discovery rate at or below the level when the tests are independent
+or positively dependent. `pcmci` keeps a link when its adjusted p-value is at most `alpha`;
+`pcmciplus` decides its links in the skeleton phase and reports the adjusted values in
+`metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
+
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
 `pcmciplus`, and `rcd` take `max_depth`, the maximum conditioning-set size of their
@@ -203,6 +212,17 @@ standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choi
 {py:func}`~andrey.gfci` says why its default differs. Only `score_func="bic"` adds the term, so
 passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
 `metadata["ebic_gamma"]` records the value a `"bic"` fit used.
+
+% concept: equivalent_sample_size
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
+take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman, Geiger and
+Chickering 1995; Buntine 1991): the number of rows its uniform prior over each variable's
+conditional distributions is worth, a positive number. `1.0`, the default, is what the score used
+before the argument existed. A larger value weighs the prior more against the data, and the learned
+graph can change with it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value.
+Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size` with another score, named or
+picked by `None`, raises a `ValueError`; `metadata["equivalent_sample_size"]` records the value a
+`"bdeu"` fit used.
 
 ```{eval-rst}
 .. currentmodule:: andrey

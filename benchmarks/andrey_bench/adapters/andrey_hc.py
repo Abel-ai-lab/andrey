@@ -101,6 +101,7 @@ class AndreyHC:
                 score_func=andrey_score(score_func),
                 penalty_discount=lambda_value,
                 ebic_gamma=float(params.get("ebic_gamma", ANDREY_EBIC_GAMMA)),
+                equivalent_sample_size=float(params.get("sample_prior", _BDEU_SAMPLE_PRIOR)),
                 max_iter=max_iter,
             )
         return np.asarray(cpdag.to_numpy())
@@ -124,9 +125,9 @@ def andrey_hc_adapters() -> list[AndreyHC]:
     ]
 
 
-#: BDeu's priors, the defaults of :class:`andrey.core.score.BDeuScore`, which ``hc`` builds: an
-#: equivalent sample size of 1, and a structure prior under which each of the other ``d - 1``
-#: variables is a parent with probability ``1 / (d - 1)``.
+#: BDeu's priors, the defaults of :func:`andrey.search.hc.hc` and
+#: :class:`andrey.core.score.BDeuScore`: an equivalent sample size of 1, and a structure prior under
+#: which each of the other ``d - 1`` variables is a parent with probability ``1 / (d - 1)``.
 _BDEU_SAMPLE_PRIOR = 1.0
 _BDEU_STRUCTURE_PRIOR = 1.0
 

@@ -364,6 +364,7 @@ def pcmci(
     tau_max: int = 1,
     pc1_alpha: float = 0.2,
     alpha: float = 0.05,
+    fdr_method: str = "none",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
     seed: int | None = None,
@@ -392,6 +393,17 @@ def pcmci(
     alpha : float, default=0.05
         Significance level of the MCI step, in ``(0, 1)``, the level that decides the returned
         links: a link is in the graph when its p-value is at most ``alpha``.
+    fdr_method : {"none", "fdr_bh"}, default="none"
+        How the MCI p-values are corrected for the number of links tested. ``"none"`` keeps each
+        p-value as tested. ``"fdr_bh"`` replaces them with their Benjamini-Hochberg adjusted
+        values [4]_ over all the links together, every lag and every ordered pair of variables, a
+        variable's link to its own past included. A link is then in the graph when its adjusted
+        p-value is at most ``alpha``, which holds the false discovery rate, the expected share of
+        false links among the returned links, at or below ``alpha`` when the tests are independent
+        or positively dependent. The adjusted p-value is never below the tested one, so ``"fdr_bh"``
+        can remove links and never adds one. ``metadata["p_values"]`` holds the adjusted values. A
+        link the knowledge forbids is no test: it is not counted and keeps p-value ``1``; a
+        required link is counted with p-value ``0``. See Notes.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -446,9 +458,10 @@ def pcmci(
         the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a self-loop
         is a variable's dependence on its own past. The structure has no ``lag_weights``.
         ``metadata["p_values"][k - 1][i][j]`` and ``metadata["statistics"][k - 1][i][j]`` hold the
-        MCI p-value and test statistic of that link (the partial correlation under ``"fisherz"``
-        and ``"student_t"``; see Notes), for every pair, significant or not; a link the knowledge
-        forbids reads p-value 1 and statistic 0, and a required one reads 0 and 1.
+        MCI p-value, adjusted under ``fdr_method="fdr_bh"``, and test statistic of that link (the
+        partial correlation under ``"fisherz"`` and ``"student_t"``; see Notes), for every pair,
+        significant or not; a link the knowledge forbids reads p-value 1 and statistic 0, and a
+        required one reads 0 and 1.
         ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``) that
         PC1 selected for variable ``j``, strongest first. Under a mixed-data test,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
@@ -494,6 +507,16 @@ def pcmci(
     conditions. It is computed from the correlation matrix, and from the residuals themselves when
     the conditions are collinear to working precision, as lagged copies of a strongly
     autocorrelated series can be.
+
+    **Choosing fdr_method.** The MCI step tests ``n_variables ** 2 * tau_max`` links, each at level
+    ``alpha``, so absent links are returned by chance, more of them as the number of variables
+    grows. ``"fdr_bh"`` [4]_ sorts the ``m`` p-values of the links and gives the one of rank ``k``
+    the smallest value, over its rank and every higher one, of ``p * m / rank``, at most ``1``;
+    equal p-values get equal results. The authors' reference implementation, tigramite, corrects
+    the MCI p-values of the same links in the same way with ``fdr_method="fdr_bh"`` and thresholds
+    the adjusted values at ``alpha_level``, as ``alpha`` does here. The PC1 step is not corrected.
+    The guarantee of [4]_ needs independent or positively dependent tests, which the MCI tests of
+    one series are not shown to be.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
     where every lag a test can condition on exists: the MCI test of a link at lag ``k`` conditions
@@ -544,6 +567,9 @@ def pcmci(
     .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
        discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
        1762-1770.
+    .. [4] Benjamini, Y., and Hochberg, Y. (1995). Controlling the false discovery rate: a
+       practical and powerful approach to multiple testing. Journal of the Royal Statistical
+       Society B 57(1), 289-300.
 
     Examples
     --------
@@ -591,6 +617,7 @@ def pcmci(
             tau_max=tau_max,
             pc_alpha=pc1_alpha,
             alpha_level=alpha,
+            fdr_method=fdr_method,
             indep_test=indep_test,
             constraints=constraints,
             max_depth=max_depth,
@@ -607,6 +634,7 @@ def pcmciplus(
     *,
     tau_max: int = 1,
     alpha: float = 0.01,
+    fdr_method: str = "none",
     collider_rule: str = "majority",
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -635,6 +663,17 @@ def pcmciplus(
         Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
         p-value above ``alpha``. The default is the level of the method's published experiments
         [1]_.
+    fdr_method : {"none", "fdr_bh"}, default="none"
+        How the p-values of the lagged links are corrected for the number of links tested.
+        ``"none"`` keeps each p-value as tested. ``"fdr_bh"`` replaces the p-values of lags ``1`` to
+        ``tau_max`` with their Benjamini-Hochberg adjusted values [4]_ over all those links
+        together, every lag and every ordered pair of variables, a variable's link to its own past
+        included; the same-step p-values stay as tested. The adjusted p-value is never below the
+        tested one. The links themselves do not change: the skeleton phase decides them at
+        ``alpha``, so ``"fdr_bh"`` only changes ``metadata["p_values"]``, and a lagged link of the
+        graph whose adjusted p-value is above ``alpha`` is one the correction would not keep. A
+        link the knowledge forbids is no test: it is not counted and keeps p-value ``1``; a
+        required link is counted with p-value ``0``. See Notes.
     collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
         How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a
         collider ``a -> b <- c``. ``"sepsets"`` calls it a collider when ``b`` is not in the one
@@ -717,7 +756,8 @@ def pcmciplus(
         variable ``j`` at time ``t``; a self-loop is a variable's dependence on its own past. The
         structure has no ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value
         among the skeleton-phase tests of the link between variable ``i`` at ``t - k`` and
-        variable ``j`` at ``t`` (the first step's tests for a lagged link that step removed), and
+        variable ``j`` at ``t`` (the first step's tests for a lagged link that step removed; for
+        ``k >= 1`` its Benjamini-Hochberg adjusted value under ``fdr_method="fdr_bh"``), and
         ``metadata["statistics"][k][i][j]`` the statistic of that test (see Notes); lag ``0`` is
         symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never
         tested, reads p-value 1 and statistic 0, and a required one reads 0 and 1. Under a
@@ -765,6 +805,16 @@ def pcmciplus(
     conflict. With the ``"majority"`` or ``"conservative"`` rule the orientations do not depend on
     the order of the variables either; ``"sepsets"`` reads the one separating set the skeleton phase
     stored, which can change with the order.
+
+    **Choosing fdr_method.** The skeleton phase tests each lagged link at level ``alpha`` and keeps
+    the links whose tests all stay at or below it, so absent links are kept by chance, more of them
+    as the number of variables grows. ``"fdr_bh"`` [4]_ sorts the ``m`` lagged-link p-values and
+    gives the one of rank ``k`` the smallest value, over its rank and every higher one, of ``p * m
+    / rank``, at most ``1``; equal p-values get equal results. The authors' reference
+    implementation, tigramite, corrects the lagged p-values it returns in the same way with
+    ``fdr_method="fdr_bh"`` and leaves the graph as the skeleton phase decided it, as this method
+    does. The guarantee of [4]_ needs independent or positively dependent tests, which these tests
+    are not shown to be.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
     Every test reads the lagged values as the columns of one design. ``"fisherz"`` and
@@ -821,6 +871,9 @@ def pcmciplus(
     .. [3] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
        discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
        1762-1770.
+    .. [4] Benjamini, Y., and Hochberg, Y. (1995). Controlling the false discovery rate: a
+       practical and powerful approach to multiple testing. Journal of the Royal Statistical
+       Society B 57(1), 289-300.
 
     Examples
     --------
@@ -866,6 +919,7 @@ def pcmciplus(
             X,
             tau_max=tau_max,
             pc_alpha=alpha,
+            fdr_method=fdr_method,
             collider_rule=collider_rule,
             indep_test=indep_test,
             constraints=constraints,
