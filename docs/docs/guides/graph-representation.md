@@ -88,7 +88,8 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   each two-node graph holds the direction they decide, by the rule the method's `alpha` parameter
   selects. PCMCI reports each lagged link's MCI `p_values` and `statistics`, and the `parents` its
   first step selected; PCMCI+ reports the same for every lag from 0, plus `conflicts` and
-  `ambiguous_triples`. PC, CD-NOD, FCI, and GFCI with `collider_rule="conservative"` or
+  `ambiguous_triples`. With `fdr_method="fdr_bh"`, both report the Benjamini-Hochberg adjusted
+  lagged `p_values`. PC, CD-NOD, FCI, and GFCI with `collider_rule="conservative"` or
   `"majority"` report `ambiguous_triples`, the `[x, z, y]` triples, by column position, whose
   middle node the vote left undecided. `conflicts` lists the links two colliders ask to orient both
   ways: `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]` links (variable `i` at lag `k`, and `j`)
