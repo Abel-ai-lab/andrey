@@ -95,14 +95,13 @@ def test_gcv_fit_keeps_the_parents_and_drops_an_independent_variable(fit, data):
     assert fit.gcv == pytest.approx(len(data) * fit.scale / fit.residual_df)
 
 
-def test_gcv_search_keeps_the_lowest_of_its_starts(fit, data, monkeypatch):
+def test_gcv_search_keeps_the_lowest_of_its_starts(fit, data):
     cache = gam.BasisCache(data)
     bases = [cache(j, 10) for j in range(3)]
-    ends = []
-    for shift in gam._START_SHIFTS:
-        monkeypatch.setattr(gam, "_START_SHIFTS", (shift,))
-        ends.append(gam.fit_additive(data[:, 3], bases).gcv)
-    assert fit.gcv == min(ends)
+    shifts = (0.0, -6.0, 6.0)
+    ends = [gam.fit_additive(data[:, 3], bases, starts=(s,)).gcv for s in shifts]
+    assert gam.fit_additive(data[:, 3], bases, starts=shifts).gcv == min(ends)
+    assert fit.gcv == ends[0]  # one start by default
 
 
 def test_gcv_fit_is_a_local_minimum_of_the_score(fit, data):
@@ -150,7 +149,7 @@ def test_a_duplicated_parent_splits_one_term_equally(data):
 
 
 def test_a_failed_search_refits_without_penalty(data, monkeypatch):
-    def fail(self):
+    def fail(self, starts):
         raise np.linalg.LinAlgError("singular")
 
     monkeypatch.setattr(gam._Problem, "optimize", fail)
