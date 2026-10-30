@@ -194,12 +194,13 @@ def direct_lingam(
     ``"tanh"`` by a paired 95% interval. With exponential noise, skewed with either sign, ``"skew"``
     matched it (0.6) and ``"tanh"`` did worse (4.7). With Laplace noise ``"tanh"`` matched it (0.8)
     and ``"skew"`` did worse (16.2). With Student t noise of 5 degrees of freedom, symmetric and
-    heavy-tailed, ``"tanh"`` had 1.4 and ``"skew"`` 9.8. With uniform noise both were worse, 35.1
-    and 22.4, and ``"tanh"`` put 17% of the true edges in the right order and ``"skew"`` 48%,
-    against 99% for ``"pwling"``. The order search alone took 0.1 to 0.3 of ``"pwling"``'s time, and
-    the whole fit about half to two thirds of it, as the pruning step does not change. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    heavy-tailed, ``"tanh"`` had 1.4 and ``"skew"`` 9.8. With uniform noise, symmetric and
+    sub-Gaussian, both were worse than ``"pwling"``'s 0.8: ``"tanh"``, which assumes sparse
+    (super-Gaussian) noise [2]_, had 35.1 and put 17% of the true edges in the right order, and
+    ``"skew"``, which needs skewed noise, had 22.4 and 48%, against 99% for ``"pwling"``. The order
+    search alone took 0.1 to 0.3 of ``"pwling"``'s time, and the whole fit about half to two thirds
+    of it, as the pruning step does not change. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
