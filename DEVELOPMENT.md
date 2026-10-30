@@ -34,7 +34,7 @@ Edit the spec, not the surfaces.
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
 | `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
-| `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, `bootstrap`, and `markov-check`; `run` and `bootstrap` `<method>` and its `key=value` overrides (and `--config`) against the registry. |
+| `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, `bootstrap`, and `markov-check`; `run` and `bootstrap` validate `<method>` and its `key=value` overrides (and `--config`) against the registry. |
 | `src/andrey/resample.py` | `andrey.bootstrap` and `BootstrapOutput`: the refits on resamples, the counts of each edge by endpoint marks, and the averaged graph, a valid graph of the method's kind. |
 | `src/andrey/markov.py` | `andrey.markov_check` and `MarkovCheckOutput`: the independences a DAG or CPDAG implies, tested against the data. |
 
