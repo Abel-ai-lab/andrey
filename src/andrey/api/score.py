@@ -963,7 +963,7 @@ def hc(
 
     Under a score-equivalent score, adding ``x -> y`` or ``y -> x`` from the empty graph gives the
     same score. Such ties recur during search, and choosing one move can change later moves and
-    the final CPDAG. Each column gets a rank computed from its own data to choose between tied
+    the final CPDAG. Each column gets a rank computed from the data to choose between tied
     moves, and the rank moves with the column. The
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
     column order and on another machine, and how ``andrey.config(tie_break="position")`` orders the
@@ -1455,13 +1455,12 @@ def exact_search(
     own pick among them would follow last-bit rounding and the column order. The returned CPDAG
     does not depend on the pick; for ``metadata["dag"]``, exact search reports one fixed member of
     the class it found: it keeps the edges every DAG of the class
-    shares, and those the knowledge directs, and orients the others by a rank computed from each
-    column's own data, as :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so
-    reordering the columns reorders the graph's nodes and changes nothing else, unless two columns
-    are identical. The rank is arbitrary with respect to causal structure. Rounding differences,
-    such as another CPU's BLAS kernel makes, leave the reported DAG unchanged whenever they leave
-    the class unchanged; the :doc:`column-order guide </docs/guides/column-order>` says what the
-    rank keeps.
+    shares, and those the knowledge directs, and orients the others by a rank computed from the
+    data, as :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so reordering the
+    columns reorders the graph's nodes and changes nothing else, unless two columns are identical.
+    The rank is arbitrary with respect to causal structure. Rounding differences, such as another
+    CPU's BLAS kernel makes, leave the reported DAG unchanged whenever they leave the class
+    unchanged; the :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps.
 
     **Categorical data.** ``"bdeu"`` [5]_ and ``"discrete_bic"`` [6]_
     read each distinct value of a column as one category and score a variable by its counts in

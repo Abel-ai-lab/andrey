@@ -161,9 +161,9 @@ def varma_lingam(
     :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; here they read the
     standardized innovations.
 
-    **Column order.** The fit runs on the columns sorted by a rank computed from each column's own
-    data, as for :func:`~andrey.hc`, so reordering the columns relabels the result and changes
-    nothing else, unless two columns are identical.
+    **Column order.** The fit runs on the columns sorted by a rank computed from the data, as for
+    :func:`~andrey.hc`, so reordering the columns relabels the result and changes nothing else,
+    unless two columns are identical.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the VARMA fit and the LiNGAM
     step on its residuals read every time step, so a step with a missing value has no place in them.
@@ -318,9 +318,9 @@ def longitudinal_lingam(
     :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; here they read the
     standardized columns of each time point.
 
-    **Column order.** The fit runs on the variables sorted by a rank computed from each column's own
-    data over all time points, as for :func:`~andrey.hc`, so reordering the columns relabels the
-    result and changes nothing else, unless two columns are identical.
+    **Column order.** The fit runs on the variables sorted by a rank computed from the data over all
+    time points, as for :func:`~andrey.hc`, so reordering the columns relabels the result and
+    changes nothing else, unless two columns are identical.
 
     **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: each time point's fit compares
     the residuals of every variable over the same units, so a unit with a missing value has no place

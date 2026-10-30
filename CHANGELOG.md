@@ -20,6 +20,18 @@ names its pull request.
 - `andrey.data.load_dataset("child")` and `load_dataset("insurance")`, the bnlearn child network
   (20 variables, 25 arcs) and insurance network (27 variables, 52 arcs). ([#611])
 
+### Changed
+
+- The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
+  on a column's units or sign: it is a hash of each column's relations to the other columns, and a
+  new column order still relabels it; only columns that no row order, unit, or sign tells apart
+  fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
+  `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
+  changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
+  the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
+  restores the former rank; `tie_break="position"` orders ties by column position, a different
+  rule. ([#612])
+
 ## [0.12.0] - 2026-10-30
 
 ### Highlights
@@ -1483,3 +1495,4 @@ First alpha release.
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
 [#596]: https://github.com/Abel-ai-lab/andrey/pull/596
 [#611]: https://github.com/Abel-ai-lab/andrey/pull/611
+[#612]: https://github.com/Abel-ai-lab/andrey/pull/612

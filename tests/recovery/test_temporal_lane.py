@@ -85,10 +85,10 @@ def test_varma_lingam_rejects_max_iter_below_one():
 
 
 def test_varma_lingam_orders_innovations_by_least_squares():
-    """The order comes from least-squares pairwise regressions of the fitted innovations.
-
-    On these 40 steps a slope scaled by ``n / (n - 1)`` orders the innovations [1, 2, 0]; least
-    squares gives the true order, [0, 1, 2].
+    """The order is a causal order of the fitted model: each cause in ``B0`` comes before its
+    effect. It comes from least-squares pairwise regressions of the fitted innovations: on
+    statsmodels' innovations of these 40 steps a slope scaled by ``n / (n - 1)`` gives the order
+    [1, 2, 0], and least squares gives the true order, [0, 1, 2].
     """
     from statsmodels.tsa.statespace.varmax import VARMAX
 
@@ -104,12 +104,15 @@ def test_varma_lingam_orders_innovations_by_least_squares():
         x[t] = inv @ (0.3 * x[t - 1] + e[t] + 0.2 * e[t - 1])
     X = x[50:]
 
-    order, _, _ = varma_lingam(X, order=(1, 1), prune=True, max_iter=2000)
+    order, psis, _ = varma_lingam(X, order=(1, 1), prune=True, max_iter=2000)
+    b0 = psis[0]  # b0[i, j] weighs j -> i
+    assert sorted(order) == [0, 1, 2]
+    assert all(order.index(j) < order.index(i) for i, j in zip(*np.nonzero(b0), strict=True))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         fit = VARMAX(X, order=(1, 1), trend="c").fit(maxiter=2000, disp=False, cov_type="none")
     innovations = np.asarray(fit.resid)
-    assert order == pwling.find_causal_order(innovations) == [0, 1, 2]
+    assert pwling.find_causal_order(innovations) == [0, 1, 2]
 
 
 def test_longitudinal_lingam_output_contract():

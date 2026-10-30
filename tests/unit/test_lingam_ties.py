@@ -1,4 +1,4 @@
-"""The LiNGAM causal-order search breaks score ties by each column's own data.
+"""The LiNGAM causal-order search breaks score ties by each column's tie rank.
 
 Two columns that are interchangeable in the sample have mathematically equal scores, which differ
 only by rounding, and the rounding depends on the CPU's BLAS kernel. A test cannot switch kernels,
