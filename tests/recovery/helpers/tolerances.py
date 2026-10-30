@@ -35,7 +35,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "IAMB": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
     "InterIAMB": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
+    "MMPC": {
         "structural": ["graph"],
         "numeric": {},
     },
