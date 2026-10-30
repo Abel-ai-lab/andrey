@@ -10,6 +10,16 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `iamb` and `mmpc` are supported and join the quality gate: against bnlearn 5.2.1 on simulated
+  linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree 2 and 4,
+  bnlearn makes significantly fewer errors in 2 of 57 judged comparisons, both on the CPDAG, where
+  bnlearn takes the first column among candidates whose p-values underflow to 0 and Andrey the
+  candidate with the strongest test statistic. Three comparisons have under 10 pairs because fits
+  reached the 600 s cap, which Andrey's `mmpc` CPDAG fit did in 25 of 226 cases. The median ratio of
+  bnlearn's fit time to Andrey's is 4.6 for `iamb`'s CPDAG and 18.8 for `mmpc`'s. ([#607])
+
 ## [0.12.0] - 2026-10-30
 
 ### Highlights
@@ -1471,3 +1481,4 @@ First alpha release.
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#607]: https://github.com/Abel-ai-lab/andrey/pull/607
