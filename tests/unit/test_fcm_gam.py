@@ -47,6 +47,16 @@ def test_the_basis_is_centered_and_leaves_the_linear_function_unpenalized(n, max
     assert abs(beta @ b.S @ beta) < 1e-8 * np.abs(b.S).max()
 
 
+def test_a_basis_has_at_most_one_function_per_distinct_value():
+    rng = np.random.default_rng(4)
+    data = np.column_stack([rng.integers(0, 5, 200).astype(float), rng.standard_normal(200)])
+    cache = gam.BasisCache(data)
+    assert cache(0, 10).X.shape == (200, 4) and cache(1, 10).X.shape == (200, 9)
+    assert cache.n_coef([0, 1], 10) == 1 + 4 + 9
+    with pytest.raises(ValueError):
+        gam.BasisCache(np.column_stack([np.repeat([0.0, 1.0], 100), data[:, 1]]))(0, 10)
+
+
 def test_the_basis_needs_k_distinct_values():
     with pytest.raises(ValueError):
         gam.tp_basis(np.repeat(np.arange(5.0), 10), 10)
@@ -83,6 +93,16 @@ def test_gcv_fit_keeps_the_parents_and_drops_an_independent_variable(fit, data):
     assert abs(fit.residuals.sum()) < 1e-8
     assert fit.scale == pytest.approx(fit.residuals @ fit.residuals / fit.residual_df)
     assert fit.gcv == pytest.approx(len(data) * fit.scale / fit.residual_df)
+
+
+def test_gcv_search_keeps_the_lowest_of_its_starts(fit, data, monkeypatch):
+    cache = gam.BasisCache(data)
+    bases = [cache(j, 10) for j in range(3)]
+    ends = []
+    for shift in gam._START_SHIFTS:
+        monkeypatch.setattr(gam, "_START_SHIFTS", (shift,))
+        ends.append(gam.fit_additive(data[:, 3], bases).gcv)
+    assert fit.gcv == min(ends)
 
 
 def test_gcv_fit_is_a_local_minimum_of_the_score(fit, data):
