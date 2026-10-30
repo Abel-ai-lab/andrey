@@ -11,7 +11,7 @@ import andrey
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams, hsic_gamma_log_p
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache
-from andrey.fcm.resit import _gram, _residual, causal_order
+from andrey.fcm.resit import _gram, _log_p, _residual, causal_order
 from andrey.search.hc import tie_ranks
 
 N = 400
@@ -156,6 +156,26 @@ def test_a_large_offset_changes_neither_the_graph_nor_the_order():
     out, shifted = _fit(X), _fit(X + 1e9)
     assert shifted.structure == out.structure
     assert shifted.ordering == out.ordering
+
+
+@pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
+def test_an_independent_grid_tests_as_independent_despite_rounding():
+    # Every pair of four values once: the HSIC statistic of the two columns is exactly 0, which
+    # rounding may move just below 0.
+    values = np.arange(4.0)
+    X = np.array([(a, b) for a in values for b in values])
+    unit = (X - X.mean(axis=0)) / X.std(axis=0)
+    assert hsic_gamma_log_p(_gram(unit[:, [0]]), _gram(unit[:, [1]]), 16, variance="product") == 0
+    assert _edges(_fit(X)) == set()
+
+
+def test_a_statistic_far_below_zero_raises():
+    # A negated gram is not positive semidefinite, so the statistic lies far below a rounded 0.
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(200)
+    centered, mu, sumsq = _gram(x[:, None])
+    with pytest.raises(FloatingPointError):
+        _log_p((-centered, mu, sumsq), np.sin(2 * x) + 0.1 * rng.standard_normal(200))
 
 
 def test_a_non_finite_test_raises_rather_than_steer_a_choice(monkeypatch):

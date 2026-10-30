@@ -326,9 +326,38 @@ def hsic_gamma_log_p(
     keeps its relative precision far below ``1e-16``. Below about ``1e-308`` the tail underflows to
     ``0``, as a strongly dependent pair's does once there are a few thousand rows; its logarithm
     stays finite there and keeps the order of two such tails (:func:`_log_upper_gamma`).
+
+    The statistic, ``tr(Kxc Kyc) / n`` of two positive semidefinite centered grams, is never
+    negative in exact arithmetic. A negative value within :func:`_rounding_bound` of ``0`` is
+    rounding of an exact ``0``, as on a balanced grid of independent values, and gives ``0``, the
+    logarithm of ``p = 1``; one further below ``0``, or a non-finite argument, gives ``nan``.
     """
-    _, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
+    statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
+    if 0.0 > statistic >= -_rounding_bound(gram_x, gram_y, n):
+        x = 0.0
     return _log_upper_gamma(float(shape), float(x))
+
+
+def _sum_of_squares(gram: Gram) -> float:
+    """A gram's ``sum(Kc^2)``: its third element when it carries one, else summed here."""
+    return gram[2] if len(gram) == 3 else np.sum(gram[0] * gram[0])
+
+
+def _rounding_bound(gram_x: Gram, gram_y: Gram, n: int) -> float:
+    """How far rounding can move the statistic ``sum(Kxc.T * Kyc) / n``: ``n^2 eps`` times the
+    largest value it can take.
+
+    The statistic sums ``n^2`` products. A floating-point sum of ``N`` terms errs by at most about
+    ``N eps`` times the sum of the terms' magnitudes (Higham 2002, Section 3.1), and by
+    Cauchy-Schwarz that sum is at most ``sqrt(sum(Kxc^2) sum(Kyc^2))``, which over ``n`` bounds the
+    statistic itself. The rounding of the centered entries, a few ``eps`` each against entries of
+    order one, adds less. The bound is therefore ``n eps sqrt(sum(Kxc^2) sum(Kyc^2))``.
+
+    References
+    ----------
+    Higham (2002). Accuracy and Stability of Numerical Algorithms, 2nd ed. SIAM.
+    """
+    return n * _EPS * math.sqrt(_sum_of_squares(gram_x) * _sum_of_squares(gram_y))
 
 
 def _gamma_arguments(
@@ -347,8 +376,7 @@ def _gamma_arguments(
         var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
         var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
     elif variance == "product":
-        sq_x = gram_x[2] if len(gram_x) == 3 else np.sum(cen_x * cen_x)
-        sq_y = gram_y[2] if len(gram_y) == 3 else np.sum(cen_y * cen_y)
+        sq_x, sq_y = _sum_of_squares(gram_x), _sum_of_squares(gram_y)
         var = 2.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3)
         var *= sq_x / (n - 1) ** 2 * sq_y / (n - 1) ** 2
     else:
@@ -368,6 +396,8 @@ _LOG_TAIL_FLOOR = float(np.finfo(np.float64).tiny)
 _CF_TINY = 1e-300
 _CF_EPS = 1e-16
 _CF_MAX_ITER = 10_000
+#: Machine epsilon of a double, the unit of :func:`_rounding_bound`.
+_EPS = float(np.finfo(np.float64).eps)
 
 
 def _log_upper_gamma(a: float, x: float) -> float:
