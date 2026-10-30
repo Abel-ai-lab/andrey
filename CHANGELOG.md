@@ -18,6 +18,18 @@ names its pull request.
   between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
   ([#596])
 
+### Changed
+
+- The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
+  on a column's units or sign: it is a hash of each column's relations to the other columns, and a
+  new column order still relabels it; only columns that no row order, unit, or sign tells apart
+  fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
+  `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
+  changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
+  the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
+  restores the former rank; `tie_break="position"` orders ties by column position, a different
+  rule. ([#TBD])
+
 ## [0.12.0] - 2026-10-30
 
 ### Highlights
