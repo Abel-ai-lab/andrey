@@ -184,9 +184,9 @@ def methods_block():
 # Methods planned for each family that are not in the registry yet, by their usual names; the
 # registry's experimental methods join them in the roadmap.
 PLANNED = {
-    "constraint": ["JCI"],
+    "constraint": ["FCI-JCI"],
     "score": ["CAM", "FGES", "NOTEARS-MLP", "GraN-DAG"],
-    "permutation": ["UT-IGSP"],
+    "permutation": ["BOSS-FCI", "GRaSP-FCI", "UT-IGSP"],
     "temporal": ["DYNOTEARS", "J-PCMCI+"],
     "latent": ["CAM-UV", "FOFC"],
     "pairwise": ["RESIT"],
