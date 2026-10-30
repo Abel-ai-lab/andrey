@@ -71,13 +71,15 @@ def _residual(bases: BasisCache, child: int, parents: list[int]) -> np.ndarray:
     return fit_gam(bases, child, parents, k=K).residuals
 
 
-def _gram(side: np.ndarray) -> tuple[np.ndarray, float]:
+def _gram(side: np.ndarray) -> tuple[np.ndarray, float, float]:
     """The gamma HSIC gram of ``side``, one column or several read jointly, its median over every
-    row."""
-    return gamma_gram(side, median_rows=None)
+    row, with the centered gram's sum of squares, which the product-form variance reads, so the
+    edge removal's tests against one predecessor gram sum it once."""
+    centered, mu = gamma_gram(side, median_rows=None)
+    return centered, mu, np.sum(centered * centered)
 
 
-def _log_p(gram: tuple[np.ndarray, float], residual: np.ndarray) -> float:
+def _log_p(gram: tuple[np.ndarray, float, float], residual: np.ndarray) -> float:
     """The log HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``, the
     null variance in its product form.
 

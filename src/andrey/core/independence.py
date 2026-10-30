@@ -261,6 +261,11 @@ def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarra
     return _gram_from_sq_dists(_sq_dists(column), width)
 
 
+#: One side of the gamma HSIC: its centered gram and its raw kernel's off-diagonal mean, and
+#: optionally the centered gram's sum of squares, which the product-form variance then reuses.
+Gram = tuple[np.ndarray, float] | tuple[np.ndarray, float, float]
+
+
 def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np.ndarray, float]:
     """Return one side's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
 
@@ -284,8 +289,8 @@ def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np
 
 
 def hsic_gamma_from_grams(
-    gram_x: tuple[np.ndarray, float],
-    gram_y: tuple[np.ndarray, float],
+    gram_x: Gram,
+    gram_y: Gram,
     n: int,
     *,
     variance: str = "bias_corrected",
@@ -302,15 +307,16 @@ def hsic_gamma_from_grams(
     ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
     ``"product"`` uses the variance's product form in that paper,
     ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's ``sum(Kc^2) / (n - 1)^2``,
-    the RESIT paper's.
+    the RESIT paper's; a gram that carries its sum of squares as a third element has it read rather
+    than summed again.
     """
     statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
     return float(statistic), float(gammaincc(shape, x))
 
 
 def hsic_gamma_log_p(
-    gram_x: tuple[np.ndarray, float],
-    gram_y: tuple[np.ndarray, float],
+    gram_x: Gram,
+    gram_y: Gram,
     n: int,
     *,
     variance: str = "bias_corrected",
@@ -326,11 +332,11 @@ def hsic_gamma_log_p(
 
 
 def _gamma_arguments(
-    gram_x: tuple[np.ndarray, float], gram_y: tuple[np.ndarray, float], n: int, variance: str
+    gram_x: Gram, gram_y: Gram, n: int, variance: str
 ) -> tuple[float, float, float]:
     """The statistic of the gamma HSIC and the gamma law's ``(shape, statistic / scale)``."""
-    cen_x, mu_x = gram_x
-    cen_y, mu_y = gram_y
+    cen_x, mu_x = gram_x[0], gram_x[1]
+    cen_y, mu_y = gram_y[0], gram_y[1]
 
     statistic = 1.0 / n * np.sum(cen_x.T * cen_y)
 
@@ -341,8 +347,10 @@ def _gamma_arguments(
         var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
         var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
     elif variance == "product":
+        sq_x = gram_x[2] if len(gram_x) == 3 else np.sum(cen_x * cen_x)
+        sq_y = gram_y[2] if len(gram_y) == 3 else np.sum(cen_y * cen_y)
         var = 2.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3)
-        var *= np.sum(cen_x * cen_x) / (n - 1) ** 2 * np.sum(cen_y * cen_y) / (n - 1) ** 2
+        var *= sq_x / (n - 1) ** 2 * sq_y / (n - 1) ** 2
     else:
         raise ValueError(f"variance must be 'bias_corrected' or 'product', got {variance!r}")
 
