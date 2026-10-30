@@ -52,7 +52,7 @@ _POSSIBLE_DSEP = ParamSpec(
     default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
-    "order_free = by a rank computed from each column's own data, so the result does not depend "
+    "order_free = by a rank computed from the data, so the result does not depend "
     "on the column order unless two columns are identical; fast = column order. null follows "
     "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
     nullable=True,

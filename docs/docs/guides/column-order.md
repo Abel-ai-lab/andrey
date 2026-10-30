@@ -22,11 +22,17 @@ changes the moves that follow. A rule that takes the first candidate by column p
 column order decide the graph, and many datasets list their variables close to causal order, so
 that order would leak into the result.
 
-By default, each column gets a rank computed from its own data: a continuous column ranks by
-whether its values rise, fall, or stay equal from row to row, and a categorical column by which
-rows share a category. A tie goes to the candidate whose columns rank first. The rank moves with
+By default, each column gets a rank computed from the data: a hash of how the column relates to
+the others, through the rank correlations of continuous columns and through which rows share a
+category in categorical ones. A tie goes to the candidate whose columns rank first. The rank stays
+the same when you shuffle the rows, change a column's units, or flip its sign, and it moves with
 its column, so reordering the columns relabels the result and changes nothing else. The rank is
 arbitrary with respect to the causal structure.
+
+Some columns are ones the data cannot tell apart in any row order, unit, or sign: a copy of another
+column in other units or the other sign, or two columns whose rows also appear with the two
+swapped. These rank by their values in row order instead, so for them a row shuffle can change
+which ranks first, while reordering the columns still relabels the result.
 
 Scores are compared at a fixed precision, so candidates whose scores differ only in their last
 bits count as tied and go to the rank.
@@ -65,8 +71,8 @@ causal-order search keeps one column per group and places the other copies right
 
 Two machines can compute the same score with different last bits, because their CPUs run different
 BLAS kernels or the same kernel on a different number of threads. The rounded comparison absorbs
-these differences, and the rank of a continuous column depends only on comparisons between
-consecutive rows, which they rarely change. So a tie goes the same way on every machine, unless
+these differences, and a column's rank comes from exact sums over the ranks of its values, which
+they change only when they reorder two values. So a tie goes the same way on every machine, unless
 two tied scores round to different values.
 
 The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`,

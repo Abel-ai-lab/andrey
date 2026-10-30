@@ -319,10 +319,10 @@ bound. R8 checks each pair of endpoints in both orders, so it does not depend on
 The rules run in rounds, each setting together the marks every rule implies on the graph as it
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
-Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order and is the
-default under `andrey.config(tie_break="position")`.
+Their possible-d-separation step visits the pairs and nodes by a rank computed from the data, so
+with `possible_dsep="order_free"`, the default, their result does not depend on the column order
+unless two columns are identical; `"fast"` visits them in column order and is the default under
+`andrey.config(tie_break="position")`.
 
 ### Experimental methods
 

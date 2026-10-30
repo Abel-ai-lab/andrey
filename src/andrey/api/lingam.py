@@ -158,7 +158,7 @@ def direct_lingam(
     **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
     with the same number of ones, have equal scores up to rounding, which differs between CPUs.
     Each step treats candidates as tied when the square roots of their negated scores lie within
-    ``1e-10`` of the best one, and picks among them by a rank computed from each column's own data,
+    ``1e-10`` of the best one, and picks among them by a rank computed from the data,
     as :func:`~andrey.hc` does. The :doc:`column-order guide </docs/guides/column-order>` says what
     the rank keeps under a new column order and on another machine.
 

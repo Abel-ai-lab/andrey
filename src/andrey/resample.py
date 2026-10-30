@@ -1040,7 +1040,7 @@ def bootstrap(
     published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
     v-structures, and directed edges [8]_: the vote itself when it has no directed cycle, with a
     tie edge pointing as the columns' :func:`~andrey.search.hc.tie_ranks` on ``data`` decide
-    (``tie_break``, :data:`andrey.config`: ranks computed from each column's own data, or the
+    (``tie_break``, :data:`andrey.config`: ranks computed from the data, or the
     column order under ``"position"``), so reordering the columns relabels the graph. A ``cpdag``
     becomes the CPDAG [9]_ of a consistent extension, so an edge that no v-structure compels is
     undirected. A ``pag`` becomes
@@ -1200,7 +1200,7 @@ def _column_ranks(data: Any, groups: bool) -> np.ndarray:
 
     ``data`` is a table or an array, or, for ``groups``, a list of them stacked as the methods
     over groups stack them. A column that does not hold numbers is numbered by its sorted values,
-    as the fits read its categories; its pattern is then a function of the column alone.
+    as the fits read its categories.
     """
     stacked = np.vstack([_numbers(table) for table in (data if groups else [data])])
     return tie_ranks(stacked)

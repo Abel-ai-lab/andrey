@@ -153,7 +153,7 @@ def notears(
     the same DAG structures for the raw and the standardized data; the path finds a local solution,
     and the cost of a step is the number of its Adam iterations times a matrix exponential.
 
-    Ties between equal weights go to the column whose rank, computed from its own data, comes
+    Ties between equal weights go to the column whose rank, computed from the data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
     columns are identical. The :doc:`column-order guide </docs/guides/column-order>` lists what
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
@@ -365,7 +365,7 @@ def dagma(
     raw and the standardized data; the path finds a local solution, and each step repeats the whole
     central path.
 
-    Ties between equal weights go to the column whose rank, computed from its own data, comes
+    Ties between equal weights go to the column whose rank, computed from the data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
     columns are identical. The :doc:`column-order guide </docs/guides/column-order>` lists what
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
