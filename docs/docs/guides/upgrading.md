@@ -152,8 +152,8 @@ another score.
 
 ### Markov-blanket methods
 
-Without a `target`, `iamb` and `inter_iamb` return a CPDAG, kind `cpdag`, where they returned
-the moral graph, an undirected graph. Pass `structure="moral"` for the 0.11 graph. `mmpc` returns the
+Without a `target`, `iamb` and `inter_iamb` return a CPDAG, kind `cpdag`, where they returned the
+moral graph, an undirected graph. Pass `structure="moral"` for the 0.11 graph. `mmpc` returns the
 skeleton, as before, and a CPDAG with `structure="cpdag"`. A call with a `target` does not change:
 
 ```python

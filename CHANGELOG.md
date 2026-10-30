@@ -145,17 +145,17 @@ names its pull request.
   `fdr_method="none"` returns `pcmci`'s results of 0.11.0 and `granger`'s uncorrected test. The
   quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
   to 6.5 and 4. ([#567])
-- `iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`. `iamb`
-  and `inter_iamb` return a CPDAG by default, kind `cpdag`, where they returned the moral graph of
-  the Markov blankets, as the R package bnlearn's `iamb` and `inter.iamb` return one by default;
-  `structure="moral"` returns the 0.11.0 graph bit for bit. `mmpc` returns the skeleton by default,
-  unchanged, as bnlearn's `mmpc` does, and `structure="cpdag"` returns its CPDAG. The CPDAG is the
-  Grow-Shrink structure learner's (Margaritis 2003): each pair of the moral graph that a subset of
-  the smaller blanket separates leaves, which gives the skeleton; each unshielded triple is a
-  collider when its ends stay dependent given the middle node and every subset of the smaller
-  blanket; and Meek's rules orient the rest. `structure="skeleton"` on `iamb` and `inter_iamb` returns
-  the moral graph without the links between a child's parents. With a `target`, each returns the
-  variable's set, as before. ([#572])
+- `iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`.
+  `iamb` and `inter_iamb` return a CPDAG by default, kind `cpdag`, where they returned the moral
+  graph of the Markov blankets, as the R package bnlearn's `iamb` and `inter.iamb` return one by
+  default; `structure="moral"` returns the 0.11.0 graph bit for bit. `mmpc` returns the skeleton by
+  default, unchanged, as bnlearn's `mmpc` does, and `structure="cpdag"` returns its CPDAG. The CPDAG
+  is the Grow-Shrink structure learner's (Margaritis 2003): each pair of the moral graph that a
+  subset of the smaller blanket separates leaves, which gives the skeleton; each unshielded triple
+  is a collider when its ends stay dependent given the middle node and every subset of the smaller
+  blanket; and Meek's rules orient the rest. `structure="skeleton"` on `iamb` and `inter_iamb`
+  returns the moral graph without the links between a child's parents. With a `target`, each returns
+  the variable's set, as before. ([#572])
 
 ### Added
 
