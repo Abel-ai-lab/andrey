@@ -26,10 +26,10 @@ Where the steps here differ from the paper's:
   two are the same, since a common factor leaves a median-bandwidth kernel unchanged.
 - The bandwidth is the median over every pair of rows with a positive distance. The paper's takes
   every pair of up to 1,000 rows, ties included, and a random 1,000 rows of a larger sample.
-- p-values are compared as their logarithms rounded to ``_KEY_DP`` decimal places, as
-  :func:`andrey.hc` compares its score changes, and a tie goes to the earlier column. The paper's
-  takes the first column of an exact tie. A p-value below the smallest float, ``0``, ties with
-  every other ``0``.
+- p-values are compared as their logarithms, computed directly so that a p-value below the
+  smallest double keeps its place, rounded to ``_KEY_DP`` decimal places, as :func:`andrey.hc`
+  compares its score changes, and a tie goes to the earlier column. The paper's takes the first
+  column of an exact tie.
 - The edge removal tries the parents in column order, and :func:`andrey.resit` passes the columns
   in their rank order, so the parents are tried by rank. The paper's code tries them in the data's
   column order. Each removal changes the fits after it, so the two orders can keep different
@@ -54,7 +54,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.independence import gamma_gram, hsic_gamma_log_p
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.search._parallel import _KEY_DP
@@ -81,16 +81,16 @@ def _gram(side: np.ndarray) -> tuple[np.ndarray, float]:
     return gamma_gram(side, median_rows=None)
 
 
-def _p_value(gram: tuple[np.ndarray, float], residual: np.ndarray) -> float:
-    """The HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``, the null
-    variance in its product form."""
+def _log_p(gram: tuple[np.ndarray, float], residual: np.ndarray) -> float:
+    """The log HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``, the
+    null variance in its product form."""
     n = residual.shape[0]
-    return hsic_gamma_from_grams(gram, _gram(residual), n, variance="product")[1]
+    return hsic_gamma_log_p(gram, _gram(residual), n, variance="product")
 
 
-def _key(p: float) -> float:
-    """``log(p)`` rounded to ``_KEY_DP`` decimal places, ``-inf`` for ``0``."""
-    return round(math.log(p), _KEY_DP) if p > 0 else -math.inf
+def _key(log_p: float) -> float:
+    """``log_p`` rounded to ``_KEY_DP`` decimal places."""
+    return round(log_p, _KEY_DP)
 
 
 def causal_order(
@@ -103,7 +103,7 @@ def causal_order(
 
     Each step regresses every candidate on the remaining variables it may have as parents and tests
     its residual against all the other remaining ones; the candidate of largest p-value is the next
-    sink. p-values are compared by :func:`_key`, and a tie goes to the earlier column.
+    sink. The log p-values are compared by :func:`_key`, and a tie goes to the earlier column.
 
     Parameters
     ----------
@@ -132,10 +132,10 @@ def causal_order(
         for k in candidates:
             others = [i for i in remaining if i != k]
             parents = [i for i in others if allowed[i, k]]
-            p = _p_value(_gram(unit[:, others]), _residual(bases, k, parents))
-            _log.debug("%d remaining: sink %d, p-value %.6g", len(remaining), k, p)
-            if best is None or (-_key(p), k) < best:
-                best = (-_key(p), k)
+            log_p = _log_p(_gram(unit[:, others]), _residual(bases, k, parents))
+            _log.debug("%d remaining: sink %d, log p-value %.9g", len(remaining), k, log_p)
+            if best is None or (-_key(log_p), k) < best:
+                best = (-_key(log_p), k)
         assert best is not None
         remaining.remove(best[1])
         sinks.append(best[1])
@@ -172,9 +172,9 @@ def remove_edges(
             if required[parent, child]:
                 continue
             rest = [i for i in parents if i != parent]
-            p = _p_value(gram, _residual(bases, child, rest))
-            _log.debug("edge %d -> %d: p-value without it %.6g", parent, child, p)
-            if p > alpha:
+            log_p = _log_p(gram, _residual(bases, child, rest))
+            _log.debug("edge %d -> %d: log p-value without it %.9g", parent, child, log_p)
+            if log_p > math.log(alpha):
                 parents.remove(parent)
         dag[parents, child] = True
     return dag

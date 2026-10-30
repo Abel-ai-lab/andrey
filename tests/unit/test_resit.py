@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams, hsic_gamma_log_p
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache
-from andrey.fcm.resit import causal_order
+from andrey.fcm.resit import _gram, _residual, causal_order
 from andrey.search.hc import tie_ranks
 
 N = 400
@@ -118,6 +118,32 @@ def test_p_values_far_below_double_precision_stay_positive_and_ordered():
         for s in (0.1, 0.3)
     ]
     assert 0 < p[0] < p[1] < 1e-16
+
+
+def _arc(seed: int = 2, n: int = 1600) -> np.ndarray:
+    """Points near three quarters of a circle: neither coordinate is a function of the other, so
+    both residuals stay dependent, and at this size both p-values lie below the smallest double."""
+    rng = np.random.default_rng(seed)
+    t = rng.uniform(0, 1.5 * np.pi, n)
+    return np.column_stack([np.cos(t), np.sin(t)]) + 0.01 * rng.standard_normal((n, 2))
+
+
+def test_the_sink_follows_p_values_below_the_smallest_double():
+    X = _arc()
+    n = X.shape[0]
+    unit = X * unit_factors(X, standardize=True)
+    bases = BasisCache(X)
+    p, log_p = {}, {}
+    for sink, cause in ((1, 0), (0, 1)):
+        grams = _gram(unit[:, [cause]]), _gram(_residual(bases, sink, [cause]))
+        p[sink] = hsic_gamma_from_grams(*grams, n, variance="product")[1]
+        log_p[sink] = hsic_gamma_log_p(*grams, n, variance="product")
+    sink = max(log_p, key=log_p.get)
+    # Both p-values are 0, and the ranks, which break a tie, would make the other column the sink.
+    assert p == {0: 0.0, 1: 0.0}
+    assert abs(log_p[0] - log_p[1]) > 1
+    assert int(np.argmin(tie_ranks(X))) != sink
+    assert _fit(X).ordering[-1] == sink
 
 
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
