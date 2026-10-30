@@ -86,9 +86,13 @@ def direct_lingam(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    measure : {"pwling"}, default="pwling"
-        How the order search picks the most exogenous remaining variable at each step. Only
-        ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
+    measure : {"pwling", "skew", "tanh"}, default="pwling"
+        How the order search picks the most exogenous remaining variable at each step, by an
+        approximation of the pairwise likelihood ratios [2]_. ``"pwling"`` approximates them by the
+        entropy of each variable and of each regression residual. ``"tanh"`` and ``"skew"`` replace
+        them by a correlation of nonlinear functions of the standardized variables, ``tanh`` for
+        sparse (heavy-tailed) noise and the square after a sign correction for skewed noise, which
+        costs far less; the Notes say when each applies.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
@@ -383,10 +387,10 @@ def multi_group_direct_lingam(
         Two or more datasets over the same ``d`` variables; sample counts may differ per group.
         Each is coerced to ``float64``. DataFrames must name their columns alike; the names become
         the structures' ``labels``.
-    measure : {"pwling"}, default="pwling"
-        How the order search picks the most exogenous variable at each step; ``"pwling"`` is
-        DirectLiNGAM's pairwise likelihood-ratio measure, with the groups' scores weighted by their
-        share of the samples.
+    measure : {"pwling", "skew", "tanh"}, default="pwling"
+        How the order search picks the most exogenous variable at each step, as in
+        :func:`~andrey.direct_lingam` [2]_: the groups' scores, each from the group's own
+        standardized columns, are weighted by their share of the samples.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. It holds for every group. The
@@ -443,6 +447,8 @@ def multi_group_direct_lingam(
     ----------
     .. [1] Shimizu, S. (2012). Joint estimation of linear non-Gaussian acyclic models.
        Neurocomputing 81, 104-107.
+    .. [2] Hyvarinen, A., and Smith, S. M. (2013). Pairwise likelihood ratios for estimation of
+       non-Gaussian structural equation models. JMLR 14, 111-152.
 
     Examples
     --------

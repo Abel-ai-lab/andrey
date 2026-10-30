@@ -829,13 +829,15 @@ _CONCEPTS = (
     ),
     Concept(
         key="measure",
-        summary="The independence measure of a DirectLiNGAM order search.",
+        summary="The pairwise likelihood-ratio measure of a DirectLiNGAM order search.",
         param=_template(
             "measure",
             "str",
             "pwling",
-            "How the order search picks the most exogenous variable.",
-            choices=("pwling",),
+            "How the order search picks the most exogenous variable: pwling = the maximum-entropy "
+            "approximation of the pairwise likelihood ratios; tanh and skew = their first-order "
+            "approximations by a nonlinear correlation (Hyvarinen and Smith 2013).",
+            choices=("pwling", "skew", "tanh"),
         ),
         fragment="most exogenous",
         suitable=(

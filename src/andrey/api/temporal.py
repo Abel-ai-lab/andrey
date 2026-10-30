@@ -94,9 +94,11 @@ def varma_lingam(
         first. With ``criterion`` set, every fit in the grid gets these limits. A fit that reaches
         either without converging warns with :class:`~andrey.SearchLimitWarning`; raise
         ``max_iter`` to let it run on.
-    measure : {"pwling"}, default="pwling"
+    measure : {"pwling", "skew", "tanh"}, default="pwling"
         How the instantaneous order search, DirectLiNGAM on the innovations, picks the most
-        exogenous variable; ``"pwling"`` is DirectLiNGAM's pairwise likelihood-ratio measure.
+        exogenous variable, as in :func:`~andrey.direct_lingam` [3]_: ``"pwling"`` approximates the
+        pairwise likelihood ratios by entropies, and ``"tanh"`` and ``"skew"`` by a correlation of
+        nonlinear functions of the standardized innovations.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
@@ -192,6 +194,8 @@ def varma_lingam(
        2212-2221.
     .. [2] Hyvarinen, A., Zhang, K., Shimizu, S., and Hoyer, P. O. (2010). Estimation of a
        structural vector autoregression model using non-Gaussianity. JMLR 11, 1709-1731.
+    .. [3] Hyvarinen, A., and Smith, S. M. (2013). Pairwise likelihood ratios for estimation of
+       non-Gaussian structural equation models. JMLR 14, 111-152.
 
     Examples
     --------
@@ -253,9 +257,11 @@ def longitudinal_lingam(
     tau_max : int, default=1
         The largest lag: the number of past time points regressed out before the instantaneous
         fit, from ``1`` to the number of time points minus one.
-    measure : {"pwling"}, default="pwling"
-        How the instantaneous order search picks the most exogenous variable; ``"pwling"`` is
-        DirectLiNGAM's pairwise likelihood-ratio measure.
+    measure : {"pwling", "skew", "tanh"}, default="pwling"
+        How the instantaneous order search picks the most exogenous variable, as in
+        :func:`~andrey.direct_lingam` [2]_: ``"pwling"`` approximates the pairwise likelihood ratios
+        by entropies, and ``"tanh"`` and ``"skew"`` by a correlation of nonlinear functions of the
+        standardized columns.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``0`` to ``tau_max``, the same at every time point: required and
@@ -328,6 +334,8 @@ def longitudinal_lingam(
     .. [1] Kadowaki, K., Shimizu, S., and Washio, T. (2013). Estimation of causal structures in
        longitudinal data using non-Gaussianity. IEEE International Workshop on Machine Learning
        for Signal Processing (MLSP), 1-6.
+    .. [2] Hyvarinen, A., and Smith, S. M. (2013). Pairwise likelihood ratios for estimation of
+       non-Gaussian structural equation models. JMLR 14, 111-152.
 
     Examples
     --------
