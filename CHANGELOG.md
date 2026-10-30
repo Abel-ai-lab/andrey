@@ -225,6 +225,16 @@ names its pull request.
   passes it with another score, named or picked from the declared column types, raises
   `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
   ([#553])
+- `andrey.markov_check` tests whether the data contradict a DAG or a CPDAG, such as a method's
+  result: it tests the independences the graph implies, each variable and every earlier non-parent
+  given its parents, and rejects the graph when their p-values are not uniform on (0, 1) by the
+  Anderson-Darling test (Ramsey, Andrews, and Spirtes 2024). `indep_test` is picked from the
+  declared column types as in `pc`, and each test reads its own random half of the rows
+  (`sample_fraction`), which keeps a true graph's rejection rate at 6% to 9% for `alpha=0.05`,
+  against 9% to 21% on all rows. The result lists every tested independence with its p-value
+  (`table()`), and `andrey markov-check GRAPH DATA` runs the check from the command line. The
+  docstring gives the rates measured for missing, extra, and reversed edges and for categorical
+  data. ([#571])
 
 ### Changed
 
@@ -1391,4 +1401,5 @@ First alpha release.
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
 [#569]: https://github.com/Abel-ai-lab/andrey/pull/569
+[#571]: https://github.com/Abel-ai-lab/andrey/pull/571
 [#572]: https://github.com/Abel-ai-lab/andrey/pull/572

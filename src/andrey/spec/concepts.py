@@ -646,8 +646,9 @@ _CONCEPTS = (
     ),
     Concept(
         key="sample_fraction",
-        summary="The share of the rows in a subsample of andrey.bootstrap, drawn without "
-        "replacement; not used by the bootstrap resampling.",
+        summary="The share of the rows in a subsample, drawn without replacement: each resample "
+        "of andrey.bootstrap (not used by the bootstrap resampling) and each test of "
+        "andrey.markov_check. An argument of those functions, not of a method.",
         param=_template(
             "sample_fraction",
             "float",
@@ -658,7 +659,8 @@ _CONCEPTS = (
             exclusive_minimum=True,
         ),
         suitable=(),
-        others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
+        others_exempt="Row subsampling belongs to andrey.bootstrap, which refits any method, and "
+        "andrey.markov_check.",
     ),
     Concept(
         key="threshold",
@@ -1019,4 +1021,15 @@ BOOTSTRAP_PARAMS: dict[str, ParamSpec] = {
     "sample_fraction": concept_param("sample_fraction"),
     "threshold": concept_param("threshold"),
     "strict": concept_param("strict"),
+}
+
+
+#: The arguments of ``andrey.markov_check`` that are package-wide concepts, which it checks.
+MARKOV_CHECK_PARAMS: dict[str, ParamSpec] = {
+    "alpha": concept_param(
+        "alpha", doc="The level of the Anderson-Darling test of the p-values' uniformity."
+    ),
+    "indep_test": concept_param("indep_test"),
+    "seed": concept_param("seed"),
+    "sample_fraction": concept_param("sample_fraction"),
 }
