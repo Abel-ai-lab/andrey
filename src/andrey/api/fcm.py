@@ -643,16 +643,17 @@ def camuv(
     out and failed tests can leave: every edge on a directed cycle is dropped, except a required
     one, and step 3 tests the pair; :func:`~andrey.rcd` raises instead when required edges close a
     cycle with the parents it found. ``metadata["cycle_edges"]`` lists the dropped edges, and an
-    INFO log names them. The child's residual on its reduced parents also enters its other pairs,
-    which can mark them too.
+    INFO log names them. On the simulated data of **Limitations**, the drop fired in 15 of 70 fits,
+    and 81 of the 85 edges it dropped came back as ``o-o``; 17 of the 85 were true edges. The
+    child's residual on its reduced parents also enters its other pairs, which can mark them too.
 
-    Each regression is an additive model of penalized thin
-    plate regression splines with ten basis functions per term and smoothing chosen by GCV [3]_,
-    with ``ceil(n_samples / (3 n_terms))`` functions per term, at least 3, when there are fewer
-    than 30 rows per term, and at most one per distinct value. Each test is the HSIC test [2]_ with
-    Gaussian kernels, each bandwidth the median of the positive squared distances over every pair
-    of rows, a side of several residuals read through their joint distances, and the null
-    approximated by a gamma law matched to its mean and variance.
+    Each regression is an additive model of penalized thin plate regression splines with ten basis
+    functions per term and smoothing chosen by GCV [3]_, with ``ceil(n_samples / (3 n_terms))``
+    functions per term, at least 3, when there are fewer than 30 rows per term, and at most one per
+    distinct value. Each test is the HSIC test [2]_ with Gaussian kernels, each bandwidth the median
+    of the positive squared distances over every pair of rows, a side of several residuals read
+    through their joint distances, and the null approximated by a gamma law matched to its mean and
+    variance.
 
     Every step reads the columns divided by their standard deviations, so rescaling a column
     changes no step; the paper's joint kernel reads raw residuals and so weighs each by its units,
