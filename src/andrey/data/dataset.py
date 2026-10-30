@@ -57,7 +57,8 @@ class SCMParams:
     weights : np.ndarray of shape (m,)
         Structural coefficient of each edge (empty for parameter-free functionals).
     noise_scales : np.ndarray of shape (d,)
-        Per-node exogenous-noise standard deviation.
+        Per-node exogenous-noise standard deviation. Under the location-scale functional the noise
+        of a node is this constant times a scale that depends on its parents.
     functional : str
         Functional-form name (for example, ``"linear"``).
     noise : str

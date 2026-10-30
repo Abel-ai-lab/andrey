@@ -2,9 +2,10 @@
 
 A functional spec draws per-edge parameters and then evaluates the SCM in topological order over the
 sparse edge list -- no dense adjacency. ``linear`` is the causally-sufficient default;
-``additive_noise`` (ANM) and ``post_nonlinear`` (PNL) are the nonlinear identifiable families, and
-``nonmonotone`` an additive-noise family whose effects partial correlation does not see. All four
-share one topological-evaluation loop and differ only in the per-node combine rule.
+``additive_noise`` (ANM) and ``post_nonlinear`` (PNL) are the nonlinear identifiable families,
+``nonmonotone`` an additive-noise family whose effects partial correlation does not see, and
+``location_scale`` (LSNM) a family whose noise scale is a function of the parents. All five share
+one topological-evaluation loop and differ only in the per-node combine rule.
 :meth:`Linear.draw_unitless` draws the weights and noise scales of ``scale="unitless"``.
 """
 
@@ -201,6 +202,62 @@ class NonMonotone(Functional):
 
 
 @dataclass(frozen=True, kw_only=True)
+class LocationScale(Functional):
+    """Location-scale noise model ``X_c = sum_p w_{p,c} g(X_p) + s(pa_c) noise_c``.
+
+    The location is the additive-noise mean, with ``g(z) = z + sin(z)``. The scale is a function of
+    the parents, ``s(pa_c) = lo + (hi - lo) sigmoid(sum_p w_{p,c} X_p)`` with
+    ``(lo, hi) = scale_range``, so it is strictly positive and bounded, and the conditional variance
+    of a child given its parents changes with them (Immer et al. 2023, Definition 1). The scale
+    reuses the edge weights of the location. ``scale_range=(1.0, 1.0)`` gives a constant scale and
+    the data of :class:`AdditiveNoise`.
+
+    The scale argument grows with its parents' variance. Under ``scale="standardize"`` and
+    ``scale="raw"``, which evaluate the model on raw values, a node deep in the causal order has a
+    large argument, so its scale is near ``lo`` or ``hi`` by the sign of the argument and its
+    location outgrows its noise. ``scale="rescale"`` gives every parent unit variance before its
+    children read it, which keeps the scale a smooth function of the parents at every depth.
+    Heteroscedastic noise multiplies the scale by the node's constant noise scale, the one
+    ``params.noise_scales`` records.
+
+    Parameters
+    ----------
+    weight_range : tuple of float, default=(0.5, 2.0)
+        Magnitude range of the edge weights, each drawn with a random sign.
+    scale_range : tuple of float, default=(0.2, 2.0)
+        The bounds ``(lo, hi)`` of the scale, with ``0 < lo <= hi``.
+
+    Raises
+    ------
+    ValueError
+        If ``scale_range`` is not finite with ``0 < lo <= hi``.
+
+    References
+    ----------
+    Immer, A., Schultheiss, C., Vogt, J. E., Scholkopf, B., Buhlmann, P., and Marx, A. (2023). On
+    the Identifiability and Estimation of Causal Location-Scale Noise Models. Proceedings of the
+    40th International Conference on Machine Learning, PMLR 202.
+    """
+
+    name: str = "location_scale"
+    scale_range: tuple[float, float] = (0.2, 2.0)
+
+    def __post_init__(self) -> None:
+        """Check that the scale is strictly positive and its bounds ordered."""
+        lo, hi = self.scale_range
+        if not (np.isfinite(lo) and np.isfinite(hi) and 0 < lo <= hi):
+            raise ValueError(
+                f"scale_range must be finite with 0 < lo <= hi, got {self.scale_range!r}"
+            )
+
+    def _node(self, parent_values, weights, noise_c):
+        lo, hi = self.scale_range
+        # sigmoid(z) = (1 + tanh(z / 2)) / 2, which does not overflow for a large |z|.
+        scale = lo + (hi - lo) * 0.5 * (1.0 + np.tanh(0.5 * (parent_values @ weights)))
+        return _nl(parent_values) @ weights + scale * noise_c
+
+
+@dataclass(frozen=True, kw_only=True)
 class VAR(Functional):
     """Vector-autoregressive temporal model: instantaneous DAG mixing ``B0`` plus lag matrices.
 
@@ -277,6 +334,16 @@ def post_nonlinear(weight_range: tuple[float, float] = (0.5, 2.0)) -> PostNonlin
 def nonmonotone(weight_range: tuple[float, float] = (0.5, 2.0)) -> NonMonotone:
     """Non-monotone additive-noise structural equations (see :class:`NonMonotone`)."""
     return NonMonotone(weight_range=weight_range)
+
+
+def location_scale(
+    weight_range: tuple[float, float] = (0.5, 2.0), scale_range: tuple[float, float] = (0.2, 2.0)
+) -> LocationScale:
+    """Build a location-scale noise (LSNM) spec: a noise scale that depends on the parents.
+
+    See :class:`LocationScale` for the model, ``scale_range``, and the reference.
+    """
+    return LocationScale(weight_range=weight_range, scale_range=scale_range)
 
 
 def var(n_lags: int = 1, lag_density: float = 0.3) -> VAR:

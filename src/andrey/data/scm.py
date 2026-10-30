@@ -28,6 +28,7 @@ from .functional import (
     Linear,
     additive_noise,
     linear,
+    location_scale,
     nonmonotone,
     post_nonlinear,
     var,
@@ -465,6 +466,7 @@ def sample_scm(
         "additive_noise": additive_noise,
         "post_nonlinear": post_nonlinear,
         "nonmonotone": nonmonotone,
+        "location_scale": location_scale,
         "var": var,
         "varma": varma,
     }

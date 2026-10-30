@@ -609,14 +609,16 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
-and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
-time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
-categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
-continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
-true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
-so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
-graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form, and
+noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `functional="location_scale"` gives each variable noise whose scale depends on
+its parents, the location-scale noise model of Immer et al. (2023); with `scale="rescale"` that
+scale stays a smooth function of the parents at every depth of the graph.
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data

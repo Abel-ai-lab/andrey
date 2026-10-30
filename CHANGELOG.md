@@ -215,6 +215,9 @@ names its pull request.
   passes it with another score, named or picked from the declared column types, raises
   `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
   ([#553])
+- `andrey.data.sample_scm(functional="location_scale")` and
+  `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
+  noise scale is a function of its parents, between the bounds of `scale_range`. ([#TBD])
 
 ### Changed
 
