@@ -84,14 +84,12 @@ def _discrete_var(seed: int, n: int = 500) -> pd.DataFrame:
 @pytest.mark.parametrize("indep_test", [None, "gsq", "chisq"])
 def test_a_categorical_test_recovers_a_discrete_var(method, indep_test):
     """A frame of pandas category columns declares every column categorical, so ``None`` runs
-    the chi-square test."""
+    the G-square test."""
     data = _discrete_var(1)
     out = _fit(method, data, indep_test=indep_test)
     assert _links(out) == {(0, 0, 1), (0, 1, 1), (1, 2, 1)}
     if indep_test is None:
-        assert (
-            out.metadata["p_values"] == _fit(method, data, indep_test="chisq").metadata["p_values"]
-        )
+        assert out.metadata["p_values"] == _fit(method, data, indep_test="gsq").metadata["p_values"]
 
 
 def _mixed_var(seed: int, n: int = 500) -> pd.DataFrame:
