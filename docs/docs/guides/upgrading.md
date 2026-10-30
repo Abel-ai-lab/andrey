@@ -170,7 +170,7 @@ out = andrey.pc(df, alpha=0.01)  # fisherz, whatever the column types
 out = andrey.pcmci(series, alpha_level=0.05)
 
 # 0.11
-out = andrey.pc(df, alpha=0.01)  # chisq when every column is categorical, cond_gauss when some are
+out = andrey.pc(df, alpha=0.01)  # gsq when every column is categorical, cond_gauss when some are
 out = andrey.pc(df, alpha=0.01, indep_test="fisherz")  # the test of 0.10
 out.metadata["indep_test"]
 out = andrey.pcmci(series, alpha=0.05)

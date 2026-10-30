@@ -78,10 +78,10 @@ def pc(
         continuous data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
         random-feature approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information
         test; and ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None``
-        picks from the declared column types: ``"chisq"`` when every column is categorical,
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. See Notes. ``None`` picks from the declared column types: ``"chisq"`` when every
+        values. See Notes. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values.
@@ -461,10 +461,10 @@ def fci(
         far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
         approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information test; and
         ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None`` picks from
-        the declared column types: ``"chisq"`` when every column is categorical, ``"cond_gauss"``
-        when some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by
-        a DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes. ``None``
-        picks from the declared column types: ``"chisq"`` when every column is categorical,
+        the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
+        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values.
@@ -804,7 +804,7 @@ def gfci(
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``,
         ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
         data, at a far higher cost per test. Each as for :func:`~andrey.pc`. ``None`` picks from the
-        declared column types: ``"chisq"`` when every column is categorical, ``"cond_gauss"`` when
+        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
         DataFrame's ``category``, ``bool``, or text type, never by its values.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
@@ -1099,7 +1099,7 @@ def cdnod(
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
         and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
         test. Each as for :func:`~andrey.pc`; see Notes for the index. ``None`` picks from the
-        declared column types: ``"chisq"`` when every column is categorical, ``"cond_gauss"`` when
+        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
         DataFrame's ``category``, ``bool``, or text type, never by its values.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the

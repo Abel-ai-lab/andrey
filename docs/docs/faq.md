@@ -170,7 +170,7 @@ XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSM
 `score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
 the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
 `score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
-the column types you declare, with `categorical` or a DataFrame's `category` columns: `chisq` and
+the column types you declare, with `categorical` or a DataFrame's `category` columns: `gsq` and
 `bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
 numbers that you have not declared reads as numbers, with a warning. The
 [release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,

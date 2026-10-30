@@ -146,12 +146,6 @@ names its pull request.
   quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
   to 6.5 and 4. ([#567])
 
-- `indep_test=None` picks `"chisq"` instead of `"gsq"` when every column is categorical. With both
-  tests calibrated, `pc` with `"chisq"` matched `"gsq"` in 13 of 16 cells (paired SHD, bnlearn
-  networks and generated tables, 500 to 5,000 rows), was better in none and worse in 3, and ran
-  2 to 5 times faster. To keep the G-square test, pass `indep_test="gsq"`; the score default,
-  `"bdeu"`, is unchanged. ([#574])
-
 ### Added
 
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,

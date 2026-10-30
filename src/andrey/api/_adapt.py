@@ -295,14 +295,14 @@ def default_test(
     """Return the conditional-independence test on ``data`` and the ``categorical`` it reads.
 
     A given ``indep_test`` returns as it is, with ``categorical``. ``None`` picks from the declared
-    column types (:func:`declared_columns`): ``"chisq"``, the chi-square test, when every column is
+    column types (:func:`declared_columns`): ``"gsq"``, the G-square test, when every column is
     categorical, ``"cond_gauss"``, the conditional Gaussian likelihood-ratio test, when some are,
     returned with those columns by position, else ``"fisherz"``. A search that takes only some
     tests passes them as ``choices``: a pick outside them gives ``"fisherz"``.
     """
     if indep_test is not None:
         return indep_test, categorical
-    return _by_declared_types(data, categorical, ("fisherz", "chisq", "cond_gauss"), choices)
+    return _by_declared_types(data, categorical, ("fisherz", "gsq", "cond_gauss"), choices)
 
 
 def _by_declared_types(

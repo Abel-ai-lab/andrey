@@ -42,7 +42,7 @@ _INDEP_TEST = concept_param(
     "cmiknn = nearest-neighbor conditional mutual information; "
     "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
-    "order. " + _DECLARED.format(every="chisq", fallback="fisherz"),
+    "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
 )
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")

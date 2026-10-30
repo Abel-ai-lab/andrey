@@ -419,7 +419,7 @@ def pcmci(
         test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test, and
         ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
         tests the method was published with; ``"kci"``, the kernel test; and ``"rcot"``, its
-        random-feature approximation. ``None`` picks from the declared column types: ``"chisq"``
+        random-feature approximation. ``None`` picks from the declared column types: ``"gsq"``
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
         column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
         ``bool``, or text type, never by its values.
@@ -714,7 +714,7 @@ def pcmciplus(
         test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test, and
         ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
         tests the method was published with; ``"kci"``, the kernel test; and ``"rcot"``, its
-        random-feature approximation. ``None`` picks from the declared column types: ``"chisq"``
+        random-feature approximation. ``None`` picks from the declared column types: ``"gsq"``
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
         column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
         ``bool``, or text type, never by its values.
@@ -1003,7 +1003,7 @@ def lpcmci(
         test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test, and
         ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
         tests the method was published with; ``"kci"``, the kernel test; and ``"rcot"``, its
-        random-feature approximation. ``None`` picks from the declared column types: ``"chisq"``
+        random-feature approximation. ``None`` picks from the declared column types: ``"gsq"``
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
         column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
         ``bool``, or text type, never by its values.

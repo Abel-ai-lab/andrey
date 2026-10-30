@@ -53,7 +53,7 @@ settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_
 boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
 distinct value of a column one category. Every method defaults to `indep_test=None` and
 `score_func=None`, which pick from the column types you declare, with `categorical` or a DataFrame's
-`category`, `bool`, or text columns: `"chisq"` and `"bdeu"` when every column is categorical,
+`category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
 `"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`; the
 result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score the fit
 used. Values never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
