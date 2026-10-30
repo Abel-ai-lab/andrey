@@ -157,6 +157,10 @@ def varma_lingam(
     first steps serve only as lagged values. No lagged value wraps around from the end of the
     series, so no step is regressed on a later one.
 
+    **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
+    :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; here they read the
+    standardized innovations.
+
     **Column order.** The fit runs on the columns sorted by a rank computed from each column's own
     data, as for :func:`~andrey.hc`, so reordering the columns relabels the result and changes
     nothing else, unless two columns are identical.
@@ -309,6 +313,10 @@ def longitudinal_lingam(
     regression in its ordering takes the least-squares slope, so every residual it scores is
     uncorrelated with its regressor in the sample, and listing every unit twice leaves the causal
     orders unchanged.
+
+    **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
+    :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; here they read the
+    standardized columns of each time point.
 
     **Column order.** The fit runs on the variables sorted by a rank computed from each column's own
     data over all time points, as for :func:`~andrey.hc`, so reordering the columns relabels the

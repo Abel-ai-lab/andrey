@@ -143,6 +143,18 @@ def direct_lingam(
     number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
     GPU once they are large enough.
 
+    **Choosing the measure.** Each measure scores a candidate by how far its pairwise statistics
+    with the other variables fall below zero, and picks the candidate with the fewest violations
+    [2]_; they differ in the statistic. ``"pwling"``, the default, compares the entropies of each
+    variable and of each regression residual, and asks only that the noise is not Gaussian.
+    ``"tanh"`` takes the correlation ``rho * E[x tanh(y) - tanh(x) y]`` of the standardized pair,
+    which needs one matrix product per step; it orients correctly when the noise is sparse, with
+    positive excess kurtosis as for Laplace noise, and backwards when the kurtosis is negative, as
+    for uniform noise. ``"skew"`` takes ``rho * E[x^2 y - x y^2]`` after multiplying each variable
+    by the sign of its skewness; it orients correctly when the noise is skewed, whatever the sign
+    of the skewness, and says little when the noise is symmetric, where the skewness is near zero.
+    All three standardize the columns at each step, so none depends on their units.
+
     **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
     with the same number of ones, have equal scores up to rounding, which differs between CPUs.
     Each step treats candidates as tied when the square roots of their negated scores lie within
@@ -175,8 +187,19 @@ def direct_lingam(
     empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20 variables and 545 s
     at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300 variables did not
     finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a fit took 528 s at
-    300 variables and 1,410 s at 400. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    300 variables and 1,410 s at 400. Measured on simulated linear data with unit-variance noise
+    from Erdos-Renyi graphs of mean degree 2, with 10 and 20 variables and 500 and 2,000 rows, 10
+    datasets in each of 4 cells per noise, on standardized columns, the mean errors (SHD) of
+    ``"pwling"`` were 0.7 to 0.9 for every noise, and no cell had fewer errors with ``"skew"`` or
+    ``"tanh"`` by a paired 95% interval. With exponential noise, skewed with either sign, ``"skew"``
+    matched it (0.6) and ``"tanh"`` did worse (4.7). With Laplace noise ``"tanh"`` matched it (0.8)
+    and ``"skew"`` did worse (16.2). With Student t noise of 5 degrees of freedom, symmetric and
+    heavy-tailed, ``"tanh"`` had 1.4 and ``"skew"`` 9.8. With uniform noise both were worse, 35.1
+    and 22.4, and ``"tanh"`` put 17% of the true edges in the right order and ``"skew"`` 48%,
+    against 99% for ``"pwling"``. The order search alone took 0.1 to 0.3 of ``"pwling"``'s time, and
+    the whole fit about half to two thirds of it, as the pruning step does not change. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -423,6 +446,10 @@ def multi_group_direct_lingam(
 
     Notes
     -----
+    **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
+    :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; each group is
+    standardized, and for ``"skew"`` sign-corrected, on its own.
+
     **Ties.** Each step sums the groups' scores and breaks ties as :func:`~andrey.direct_lingam`
     does, ranking each column by its data stacked over the groups. Columns that are copies in any
     group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
