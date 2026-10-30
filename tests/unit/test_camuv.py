@@ -229,3 +229,12 @@ def test_fewer_rows_than_twice_the_columns_are_refused():
     with pytest.raises(ValueError, match="16"):
         _fit(X)
     assert _fit(X[:, :7]).structure.n_nodes == 7
+
+
+def test_a_balanced_grid_of_independent_columns_fits():
+    """Each value of one column meets each of the other once, so the HSIC statistic is 0 in exact
+    arithmetic and slightly negative after rounding."""
+    X = np.array([(i, j) for i in range(4) for j in range(4)], dtype=float)
+    out = _fit(X)
+    assert out.structure.n_nodes == 2
+    assert out.structure.oriented_edges() == []
