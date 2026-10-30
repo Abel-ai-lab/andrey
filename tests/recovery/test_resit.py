@@ -1,9 +1,11 @@
-"""RESIT recovers nonlinear additive-noise graphs: fixed cases, then seeded ground truth.
+"""RESIT recovers nonlinear additive-noise graphs: fixed cases, seeded ground truth, and a recorded
+output.
 
 The fixed cases have one certain answer: independent columns give no edge, a cause with a
 nonlinear effect and uniform noise points to it in either column order, and a collider of two
 nonlinear causes is found with both edges directed into it. The ground truth is additive-noise data
-from ``andrey.data`` on random graphs.
+from ``andrey.data`` on random graphs. The recorded output pins the graph and the causal order on
+one fixed case.
 """
 
 from __future__ import annotations
@@ -16,6 +18,8 @@ import pytest
 import andrey
 from andrey.data import sample_scm
 from andrey.metrics import shd
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 N = 400
 
@@ -87,3 +91,8 @@ def test_a_fit_repeats(additive_fits):
     again = _fit(case.data)
     assert again.structure == out.structure
     assert again.ordering == out.ordering
+
+
+def test_the_recorded_output_repeats():
+    out = _fit(datagen.generate("nonmonotone_4v"))
+    assert_recorded_output(out, "RESIT", case="nonmonotone_4v")

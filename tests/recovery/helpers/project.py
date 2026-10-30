@@ -28,6 +28,8 @@ _PAIRWISE_FIELDS = {
     "stat_forward": ("statistics", "forward"),
     "stat_backward": ("statistics", "backward"),
 }
+# Order-based DAG searches: candidate = the DAG and the causal order.
+_ORDERED_DAG = frozenset({"RESIT"})
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
@@ -69,6 +71,8 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy()} | {
             field: md[key][direction] for field, (key, direction) in _PAIRWISE_FIELDS.items()
         }
+    if algorithm in _ORDERED_DAG:
+        return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
     if algorithm == "GIN":  # the graph over indicators and latents, and the clusters in order
         return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["cluster_order"]}
     if algorithm in _PCMCI:
