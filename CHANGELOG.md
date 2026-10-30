@@ -12,6 +12,13 @@ names its pull request.
 
 ### Added
 
+- `andrey.data.sample_scm(functional="location_scale")` and
+  `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
+  noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
+  between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
+  ([#596])
+- `andrey.data.load_dataset("child")` and `load_dataset("insurance")`, the bnlearn child network
+  (20 variables, 25 arcs) and insurance network (27 variables, 52 arcs). ([#611])
 - `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014) and the first method of
   a new family, nonlinear additive noise, learns a DAG and a causal order from nonlinear additive
   effects with the paper's settings: boosting preselects each variable's possible parents, a
@@ -1479,4 +1486,6 @@ First alpha release.
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#596]: https://github.com/Abel-ai-lab/andrey/pull/596
 [#597]: https://github.com/Abel-ai-lab/andrey/pull/597
+[#611]: https://github.com/Abel-ai-lab/andrey/pull/611
