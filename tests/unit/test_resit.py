@@ -111,18 +111,18 @@ def test_tiers_order_the_variables_and_forbid_edges_into_an_earlier_tier():
     assert all(j != first and i != last for i, j in _edges(out))
 
 
-def test_p_values_far_below_double_precision_stay_positive_and_ordered():
+def test_p_values_far_below_double_precision_stay_finite_and_ordered():
     rng = np.random.default_rng(3)
     x = rng.uniform(-2, 2, 200)
     noise = rng.standard_normal(200)
     gram = gamma_gram(x, median_rows=None)
-    p = [
-        hsic_gamma_from_grams(
+    log_p = [
+        hsic_gamma_log_p(
             gram, gamma_gram(np.sin(2 * x) + s * noise, median_rows=None), 200, variance="product"
-        )[1]
+        )
         for s in (0.1, 0.3)
     ]
-    assert 0 < p[0] < p[1] < 1e-16
+    assert -np.inf < log_p[0] < log_p[1] < np.log(1e-16)
 
 
 def _arc(seed: int = 2, n: int = 1600) -> np.ndarray:
