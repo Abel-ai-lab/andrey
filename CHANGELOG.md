@@ -249,6 +249,9 @@ names its pull request.
   step, as their docstrings do, where it said every test. ([#551])
 - Every `seed` says first that `None` is the configured seed, `ANDREY_SEED` or 0 when it is unset,
   not a fresh random one, so a fit repeats. ([#551])
+- HSIC p-values below about 1e-14, in `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, and
+  `indep_test="kci"` without conditions, are now computed precisely instead of losing their digits
+  or rounding to 0. ([#TBD])
 
 ## [0.11.0] - 2026-10-29
 

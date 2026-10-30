@@ -55,6 +55,11 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    # CAM records no weights: its DAG and its causal order.
+    "CAM": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
     # CALM's weights come from a torch optimizer, so only the graph is recorded.
     "CALM": {
         "structural": ["graph"],
@@ -134,6 +139,11 @@ SPEC: dict[str, dict] = {
     "Granger": {
         "structural": ["adj"],
         "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
+    },
+    # RESIT: the DAG and the causal order of its sink search, both exact.
+    "RESIT": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
     },
     # GIN: the latent graph and the clusters in causal order, both exact.
     "GIN": {

@@ -138,10 +138,10 @@ def camuv_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
 
     def sink_test(self, child, regressors, y):
         sizes.append(len(y))
-        return 0.0
+        return -1e6
 
-    monkeypatch.setattr(camuv_engine._Tests, "p_fresh", sink_test)
-    monkeypatch.setattr(camuv_engine._Tests, "p_value", lambda self, x, y: 0.0)
+    monkeypatch.setattr(camuv_engine._Tests, "log_p_fresh", sink_test)
+    monkeypatch.setattr(camuv_engine._Tests, "log_p", lambda self, x, y: -1e6)
     data = np.random.default_rng(0).standard_normal((200, 5))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

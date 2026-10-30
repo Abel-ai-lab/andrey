@@ -28,15 +28,16 @@ The settings are those of the paper's experiments: ``alpha = 0.01`` and sets of 
 variables, ``max_depth = 2``; each regression is an additive model of thin plate regression
 splines with ten basis functions per term and GCV smoothing (Wood 2004),
 :func:`andrey.fcm.gam.fit_gam`, which lowers the rank with fewer than 30 rows per term; each test
-is the gamma HSIC test of :func:`andrey.core.independence.hsic_gamma_from_grams`, with Gaussian
-kernels whose bandwidth is the median heuristic and the null moments of Gretton et al. (2007) in
-their product form, as RESIT runs it. A side of several residuals takes one kernel on their joint
+is the gamma HSIC test of :func:`andrey.core.independence.hsic_gamma_log_p`, with Gaussian kernels
+whose bandwidth is the median heuristic and the null moments of Gretton et al. (2007) in their
+product form, as RESIT runs it. A side of several residuals takes one kernel on their joint
 squared distances.
 
 Where the steps here differ from the paper's:
 
 - Every step reads the columns divided by their standard deviations, so the joint kernel of
-  several residuals does not weigh each by its units. On standardized data the two are the same.
+  several residuals does not weigh each by its units; on standardized data the two are the same.
+  The kernels read the residuals centered, so an offset cannot cancel the distances' digits.
 - The paper does not state the kernels' bandwidth; here it is the median of the positive squared
   distances over every pair of rows.
 - The two screens of marginal dependence are the authors' code's; the paper's algorithms test
@@ -49,8 +50,9 @@ Where the steps here differ from the paper's:
 - A set that holds a pair already related, one in the other's candidates, is skipped: Lemma 4
   identifies a sink only with each candidate set outside ``K``. Without the skip, line 18 resets
   ``t`` whenever a known sink is found again, and the search need not end.
-- p-values are compared as their logarithms rounded to ``_KEY_DP`` decimal places, as
-  :func:`andrey.hc` compares its score changes, and a tie goes to the earlier column. The sets
+- p-values are compared as their logarithms, computed directly so that a p-value below the
+  smallest double keeps its place, rounded to ``_KEY_DP`` decimal places, as :func:`andrey.hc`
+  compares its score changes; a tie goes to the earlier column. The sets
   run in lexicographic order and the candidates are tried in column order; :func:`andrey.camuv`
   passes the columns in their rank order, so each order follows the ranks.
 - The paper does not say what to do when the parents form a directed cycle, which its model rules
@@ -80,7 +82,7 @@ from itertools import combinations
 
 import numpy as np
 
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.independence import gamma_gram, hsic_gamma_log_p
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.search._parallel import _KEY_DP
@@ -100,11 +102,14 @@ _GRAM_BYTES = 2**30
 Term = tuple[int, tuple[int, ...]]
 #: One side of a test: the joint residuals of its terms.
 Side = tuple[Term, ...]
+#: One side's kernel: its centered gram, its raw kernel's off-diagonal mean, and the centered gram's
+#: sum of squares.
+Gram = tuple[np.ndarray, float, float]
 
 
-def _key(p: float) -> float:
-    """``log(p)`` rounded to ``_KEY_DP`` decimal places, ``-inf`` for ``0``."""
-    return round(math.log(p), _KEY_DP) if p > 0 else -math.inf
+def _key(log_p: float) -> float:
+    """``log_p`` rounded to ``_KEY_DP`` decimal places."""
+    return round(log_p, _KEY_DP)
 
 
 def _running(variables: tuple[int, ...], candidates: list[set[int]]) -> Side:
@@ -116,18 +121,18 @@ class _Tests:
     """The regressions and HSIC tests of one fit; the only place a test runs.
 
     A residual depends only on its variable and regressors, and a test only on its two sides, so the
-    search's repeated sweeps look up the p-values of the tests they repeat. Each variable's residual
-    on its current candidates is kept, and the kernel matrices of the most recently used sides of
-    such residuals, as many as ``_GRAM_BYTES`` holds.
+    search's repeated sweeps look up the log p-values of the tests they repeat. Each variable's
+    residual on its current candidates is kept, and the kernel matrices of the most recently used
+    sides of such residuals, as many as ``_GRAM_BYTES`` holds.
     """
 
     def __init__(self, data: np.ndarray) -> None:
         self.bases = BasisCache(data)
         n = data.shape[0]
         self._residuals: dict[Term, np.ndarray] = {}
-        self._grams: OrderedDict[Side, tuple[np.ndarray, float]] = OrderedDict()
+        self._grams: OrderedDict[Side, Gram] = OrderedDict()
         self._capacity = max(4, _GRAM_BYTES // (8 * n * n))
-        self._p_values: dict[tuple[Side, Side], float] = {}
+        self._log_p: dict[tuple[Side, Side], float] = {}
 
     def _fit(self, term: Term) -> np.ndarray:
         child, regressors = term
@@ -143,18 +148,32 @@ class _Tests:
         return found
 
     @staticmethod
-    def _gram(residuals: list[np.ndarray]) -> tuple[np.ndarray, float]:
-        """The HSIC kernel of the residuals read jointly, its bandwidth's median over every row."""
-        return gamma_gram(np.column_stack(residuals), median_rows=None)
+    def _gram(residuals: list[np.ndarray]) -> Gram:
+        """The HSIC kernel of the residuals, centered and read jointly, its bandwidth's median over
+        every row, with the centered gram's sum of squares, which the product-form variance reads.
+        """
+        side = np.column_stack(residuals)
+        centered, mu = gamma_gram(side - side.mean(axis=0), median_rows=None)
+        return centered, mu, float(np.sum(centered * centered))
 
     @staticmethod
-    def _hsic(x: tuple[np.ndarray, float], y: tuple[np.ndarray, float]) -> float:
-        """The HSIC p-value of two sides' kernels: the null variance in its product form, the tail
-        as the upper incomplete gamma function."""
-        n = x[0].shape[0]
-        return hsic_gamma_from_grams(x, y, n, variance="product", tail="upper")[1]
+    def _hsic(x: Gram, y: Gram) -> float:
+        """The log HSIC p-value of two sides' kernels, the null variance in its product form.
 
-    def _side_gram(self, side: Side) -> tuple[np.ndarray, float]:
+        Raises
+        ------
+        FloatingPointError
+            If the test's value is not finite, so that no choice rests on it.
+        """
+        log_p = hsic_gamma_log_p(x, y, x[0].shape[0], variance="product")
+        if not math.isfinite(log_p):
+            raise FloatingPointError(
+                "camuv: an HSIC test gave a non-finite p-value; the kernels could not be computed "
+                "from these data"
+            )
+        return log_p
+
+    def _side_gram(self, side: Side) -> Gram:
         found = self._grams.pop(side, None)
         if found is None:
             found = self._gram([self._residual(term) for term in side])
@@ -163,29 +182,29 @@ class _Tests:
         self._grams[side] = found
         return found
 
-    def p_value(self, x: Side, y: Side) -> float:
-        """The HSIC p-value between two sides of residuals on current candidates."""
+    def log_p(self, x: Side, y: Side) -> float:
+        """The log HSIC p-value between two sides of residuals on current candidates."""
         x, y = min(x, y), max(x, y)
         key = (x, y)
-        found = self._p_values.get(key)
+        found = self._log_p.get(key)
         if found is None:
             found = self._hsic(self._side_gram(x), self._side_gram(y))
-            self._p_values[key] = found
+            self._log_p[key] = found
         return found
 
-    def p_fresh(self, child: int, regressors: set[int], y: Side) -> float:
-        """The HSIC p-value of ``child``'s residual on ``regressors`` against the side ``y``.
+    def log_p_fresh(self, child: int, regressors: set[int], y: Side) -> float:
+        """The log HSIC p-value of ``child``'s residual on ``regressors`` against the side ``y``.
 
         The residual is fitted for this test alone, so neither it nor its kernel is kept.
         """
         term = (child, tuple(sorted(regressors)))
         key = ((term,), y)
-        found = self._p_values.get(key)
+        found = self._log_p.get(key)
         if found is None:
             residual = self._residuals.get(term)
             gram = self._gram([self._fit(term) if residual is None else residual])
             found = self._hsic(gram, self._side_gram(y))
-            self._p_values[key] = found
+            self._log_p[key] = found
         return found
 
 
@@ -200,7 +219,7 @@ def marginal_dependence(tests: _Tests, d: int, *, alpha: float) -> np.ndarray:
     """
     dependent = np.zeros((d, d), dtype=bool)
     for i, j in combinations(range(d), 2):
-        if tests.p_value(((i, ()),), ((j, ()),)) < alpha:
+        if tests.log_p(((i, ()),), ((j, ()),)) < math.log(alpha):
             dependent[i, j] = dependent[j, i] = True
     return dependent
 
@@ -227,6 +246,7 @@ def find_candidates(
         ``out[i]``: the candidate parents of variable ``i``.
     """
     candidates = [{int(p) for p in np.flatnonzero(required[:, j])} for j in range(d)]
+    log_alpha = math.log(alpha)
     size = 2
     while size <= min(max_depth + 1, d):
         changed = False
@@ -238,15 +258,16 @@ def find_candidates(
                 rest = tuple(j for j in members if j != child)
                 if forbidden[list(rest), child].any() or not dependent[list(rest), child].all():
                     continue
-                p = tests.p_fresh(child, candidates[child] | set(rest), _running(rest, candidates))
-                if best is None or (-_key(p), child) < best[0]:
-                    best = ((-_key(p), child), child, p)
-            if best is None or not best[2] > alpha:
+                regressors = candidates[child] | set(rest)
+                log_p = tests.log_p_fresh(child, regressors, _running(rest, candidates))
+                if best is None or (-_key(log_p), child) < best[0]:
+                    best = ((-_key(log_p), child), child, log_p)
+            if best is None or not best[2] > log_alpha:
                 continue
             sink = best[1]
             rest = tuple(j for j in members if j != sink)
             own = _running((sink,), candidates)
-            if all(tests.p_value(own, _running((j,), candidates)) < alpha for j in rest):
+            if all(tests.log_p(own, _running((j,), candidates)) < log_alpha for j in rest):
                 _log.debug("sink %d of %s", sink, members)
                 candidates[sink].update(rest)
                 changed = True
@@ -268,7 +289,7 @@ def find_parents(
             if required[parent, child]:
                 continue
             rest = candidates[child] - {parent}
-            if tests.p_fresh(child, rest, _running((parent,), candidates)) > alpha:
+            if tests.log_p_fresh(child, rest, _running((parent,), candidates)) > math.log(alpha):
                 candidates[child] = rest
     return candidates
 
@@ -311,7 +332,7 @@ def find_pairs(
             continue
         if forbidden[i, j] and forbidden[j, i]:
             continue
-        if tests.p_value(_running((i,), parents), _running((j,), parents)) < alpha:
+        if tests.log_p(_running((i,), parents), _running((j,), parents)) < math.log(alpha):
             pairs[i, j] = pairs[j, i] = True
     return pairs
 

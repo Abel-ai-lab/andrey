@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams, hsic_gamma_log_p
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache
-from andrey.fcm.resit import causal_order
+from andrey.fcm.resit import _gram, _residual, causal_order
 from andrey.search.hc import tie_ranks
 
 N = 400
@@ -100,10 +100,15 @@ def test_a_required_edge_stays_on_independent_columns():
 
 
 def test_tiers_order_the_variables_and_forbid_edges_into_an_earlier_tier():
-    # x2 first: no edge may enter it, and no order may place x0 or x1 before it.
-    out = _fit(_chain(), knowledge=andrey.Knowledge(tiers=[[2], [0, 1]]))
-    assert all(j != 2 for _, j in _edges(out))
-    assert out.ordering[0] == 2
+    # The highest-ranked column goes first and the lowest-ranked last, against the rank's own pull.
+    X = np.random.default_rng(5).standard_normal((300, 10))
+    ranks = tie_ranks(X)
+    first, last = int(np.argmax(ranks)), int(np.argmin(ranks))
+    middle = [j for j in range(10) if j not in (first, last)]
+    out = _fit(X, knowledge=andrey.Knowledge(tiers=[[first], middle, [last]]))
+    assert out.ordering[0] == first
+    assert out.ordering[-1] == last
+    assert all(j != first and i != last for i, j in _edges(out))
 
 
 def test_p_values_far_below_double_precision_stay_positive_and_ordered():
@@ -113,27 +118,67 @@ def test_p_values_far_below_double_precision_stay_positive_and_ordered():
     gram = gamma_gram(x, median_rows=None)
     p = [
         hsic_gamma_from_grams(
-            gram,
-            gamma_gram(np.sin(2 * x) + s * noise, median_rows=None),
-            200,
-            variance="product",
-            tail="upper",
+            gram, gamma_gram(np.sin(2 * x) + s * noise, median_rows=None), 200, variance="product"
         )[1]
         for s in (0.1, 0.3)
     ]
     assert 0 < p[0] < p[1] < 1e-16
 
 
+def _arc(seed: int = 2, n: int = 1600) -> np.ndarray:
+    """Points near three quarters of a circle: neither coordinate is a function of the other, so
+    both residuals stay dependent, and at this size both p-values lie below the smallest double."""
+    rng = np.random.default_rng(seed)
+    t = rng.uniform(0, 1.5 * np.pi, n)
+    return np.column_stack([np.cos(t), np.sin(t)]) + 0.01 * rng.standard_normal((n, 2))
+
+
+def test_the_sink_follows_p_values_below_the_smallest_double():
+    X = _arc()
+    n = X.shape[0]
+    unit = X * unit_factors(X, standardize=True)
+    bases = BasisCache(X)
+    p, log_p = {}, {}
+    for sink, cause in ((1, 0), (0, 1)):
+        grams = _gram(unit[:, [cause]]), _gram(_residual(bases, sink, [cause]))
+        p[sink] = hsic_gamma_from_grams(*grams, n, variance="product")[1]
+        log_p[sink] = hsic_gamma_log_p(*grams, n, variance="product")
+    sink = max(log_p, key=log_p.get)
+    # Both p-values are 0, and the ranks, which break a tie, would make the other column the sink.
+    assert p == {0: 0.0, 1: 0.0}
+    assert abs(log_p[0] - log_p[1]) > 1
+    assert int(np.argmin(tie_ranks(X))) != sink
+    assert _fit(X).ordering[-1] == sink
+
+
+def test_a_large_offset_changes_neither_the_graph_nor_the_order():
+    X = np.random.default_rng(0).standard_normal((100, 3))
+    out, shifted = _fit(X), _fit(X + 1e9)
+    assert shifted.structure == out.structure
+    assert shifted.ordering == out.ordering
+
+
+def test_a_non_finite_test_raises_rather_than_steer_a_choice(monkeypatch):
+    import andrey.fcm.resit as fit
+
+    monkeypatch.setattr(fit, "hsic_gamma_log_p", lambda *args, **kwargs: float("nan"))
+    with pytest.raises(FloatingPointError):
+        _fit(_chain())
+
+
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
-def test_a_binary_column_is_named():
-    X = _chain()
-    X[:, 1] = np.arange(N) % 2
-    with pytest.raises(ValueError, match="column 1 has fewer than 3 distinct values; resit"):
-        _fit(X)
+def test_a_binary_column_is_refused_by_name():
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_chain(), columns=["a", "flag", "c"])
+    frame["flag"] = np.arange(N) % 2
+    with pytest.raises(ValueError) as error:
+        _fit(frame)
+    assert "flag" in str(error.value)
+    assert "resit" in str(error.value)
 
 
-def test_fewer_rows_than_twice_the_columns_are_refused():
-    X = np.random.default_rng(4).standard_normal((15, 8))
-    with pytest.raises(ValueError, match=r"needs at least 16 rows \(samples\) over 8 variables"):
-        _fit(X)
-    assert _fit(X[:, :7]).structure.n_nodes == 7
+def test_twice_as_many_rows_as_columns_fit_and_one_fewer_is_refused():
+    X = np.random.default_rng(4).standard_normal((16, 8))
+    assert _fit(X).structure.n_nodes == 8
+    with pytest.raises(ValueError):
+        _fit(X[:15])

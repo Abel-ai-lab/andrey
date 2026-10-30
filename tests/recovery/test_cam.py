@@ -15,6 +15,8 @@ import pytest
 import andrey
 from andrey.data import sample_scm
 from andrey.metrics import shd
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 N = 500
 
@@ -93,3 +95,8 @@ def test_a_fit_repeats(additive_fits):
     again = _fit(case.data)
     assert again.structure == out.structure
     assert again.ordering == out.ordering
+
+
+def test_cam_matches_the_recorded_output():
+    out = _fit(datagen.generate("nonmonotone_4v"))
+    assert_recorded_output(out, "CAM", case="nonmonotone_4v")

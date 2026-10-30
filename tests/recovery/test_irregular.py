@@ -92,11 +92,18 @@ def test_pnl_output_contract():
 
 
 @pytest.mark.parametrize("method", ["anm", "pnl"])
-def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method):
-    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits
-    # and both p-values round to zero; the smaller HSIC statistic over its null mean decides.
+def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method, monkeypatch):
+    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits;
+    # with enough rows both p-values underflow to zero, which the tests' p-values are set to here,
+    # and the smaller HSIC statistic over its null mean decides.
+    import importlib
+
     from andrey.api import irregular
 
+    module = importlib.import_module(f"andrey.irregular.{method}")
+    name = "hsic_statistic_test" if method == "anm" else "_gamma_test"
+    test = getattr(module, name)
+    monkeypatch.setattr(module, name, lambda *args: (test(*args)[0], 0.0))
     angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
     out = getattr(irregular, method)(np.column_stack([np.cos(angle), np.sin(angle)]))
     p, stat = out.metadata["p_values"], out.metadata["statistics"]

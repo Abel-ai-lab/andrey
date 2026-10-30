@@ -11,13 +11,13 @@ plus Gaussian noise, ``x_j = sum_k f_jk(x_k) + e_j``, and runs three steps:
 2. **Greedy order search.** Starting from the empty graph, the search adds the edge ``i -> j``
    whose additive-model fit lowers ``log`` of ``j``'s residual variance the most, among the
    possible parents that close no cycle, and refits only ``j``'s candidates after each addition,
-   until no edge can be added (Section 5.2). Each fit is :func:`andrey.fcm.gam.fit_gam` with ten
+   until no candidate is left (Section 5.2). Each fit is :func:`andrey.fcm.gam.fit_gam` with ten
    basis functions per parent.
 3. **Pruning.** Each variable is fit on its parents in that DAG, and a parent stays when its smooth
    term's p-value is at most the cutoff, ``0.001`` in the paper (Section 5.3,
    :func:`andrey.fcm.pruning.prune`).
 
-The boosting settings are the paper's ``gamboost`` defaults: step size ``0.1``, and per base
+The boosting settings are the paper's: step size ``0.1``, and per base
 learner a cubic B-spline basis on 20 equidistant interior knots over the variable's range (24
 functions), a second-order difference penalty, and the penalty weight that gives the learner 4
 degrees of freedom, ``tr(2S - S'S)`` for its smoother ``S``. Every step is deterministic and unit
@@ -84,20 +84,17 @@ class PSpline:
     index, value : np.ndarray
         ``(n, DEGREE + 1)`` columns and values of each row's nonzero B-splines.
     inverse : np.ndarray
-        ``(m, m)`` inverse ``P`` of ``X'X + lam D'D`` for the ``(n, m)`` design ``X``, or the
-        pseudo-inverse of ``X'X`` when ``lam`` is ``0``.
+        ``(m, m)`` inverse ``P`` of ``X'X + lam D'D`` for the ``(n, m)`` design ``X`` and the
+        penalty weight ``lam``, or the pseudo-inverse of ``X'X`` when ``lam`` is ``0``.
     explained : np.ndarray
         ``(m, m)`` matrix ``2P - P X'X P``: the fit to a response ``u`` lowers the residual sum of
         squares by ``b' explained b`` for ``b = X'u``.
-    lam : float
-        Penalty weight.
     """
 
     index: np.ndarray
     value: np.ndarray
     inverse: np.ndarray
     explained: np.ndarray
-    lam: float
 
 
 def pspline(x: np.ndarray) -> PSpline:
@@ -132,7 +129,7 @@ def pspline(x: np.ndarray) -> PSpline:
     else:
         inverse = linalg.inv(xtx + lam * penalty)
     explained = 2.0 * inverse - inverse @ xtx @ inverse
-    return PSpline(index=index, value=value, inverse=inverse, explained=explained, lam=lam)
+    return PSpline(index=index, value=value, inverse=inverse, explained=explained)
 
 
 def _df_lambda(xtx: np.ndarray, penalty: np.ndarray, *, rank: int) -> float:
@@ -231,6 +228,7 @@ def order_search(
     *,
     required: np.ndarray | None = None,
     precedence: np.ndarray | None = None,
+    max_parents: int | None = None,
     k: int = K,
 ) -> np.ndarray:
     """Greedily add the edges that most lower the sum of log residual variances.
@@ -244,7 +242,8 @@ def order_search(
     rounding tie, and a tie goes to the smallest ``(i, j)``, the cause first; then it
     drops every candidate that would close a cycle or break ``precedence`` and refits ``j``'s
     remaining candidates. It stops when no candidate is left. A candidate whose model would have as
-    many coefficients as rows is never added.
+    many coefficients as rows is never added, and a node with ``max_parents`` parents takes no
+    more.
 
     Parameters
     ----------
@@ -256,6 +255,8 @@ def order_search(
         ``(d, d)`` bool edges present from the start.
     precedence : np.ndarray or None
         ``(d, d)`` bool; ``precedence[a, b]`` puts ``a`` before ``b`` in every order of the result.
+    max_parents : int or None
+        The most parents of any node; ``None`` sets no cap.
     k : int
         Basis rank of each smooth term before :func:`andrey.fcm.gam.effective_k` adjusts it.
 
@@ -263,16 +264,27 @@ def order_search(
     -------
     np.ndarray
         ``(d, d)`` bool DAG; ``out[i, j]`` is the edge ``i -> j``.
+
+    Raises
+    ------
+    ValueError
+        If the required edges give a node more than ``max_parents`` parents.
     """
     X = bases.data
     n, d = X.shape
     adj = np.zeros((d, d), dtype=bool) if required is None else required.copy()
+    if max_parents is not None and adj.sum(axis=0).max(initial=0) > max_parents:
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents"
+        )
     path = np.eye(d, dtype=bool) | adj
     if precedence is not None:
         path |= precedence
     path = _closure(path)
     open_ = candidates & ~adj & ~path.T
     np.fill_diagonal(open_, False)
+    if max_parents is not None:
+        open_[:, adj.sum(axis=0) >= max_parents] = False
     variance = np.empty(d)
     for j in range(d):
         parents = np.flatnonzero(adj[:, j]).tolist()
@@ -307,6 +319,8 @@ def order_search(
         path[np.ix_(before, after)] = True
         open_ &= ~path.T
         open_[i, j] = False
+        if max_parents is not None and adj[:, j].sum() >= max_parents:
+            open_[:, j] = False
         gain[~open_] = -np.inf
         _log.debug("edge %d -> %d, gain %.6g", i, j, best)
         refresh(j)
@@ -337,12 +351,10 @@ def topological_order(adj: np.ndarray) -> np.ndarray:
 
 @dataclass(frozen=True)
 class CAMResult:
-    """A CAM fit: the pruned DAG, the order search's DAG, its order, and the possible parents."""
+    """A CAM fit: the pruned DAG and a causal order of the order search's DAG."""
 
     dag: np.ndarray
-    searched: np.ndarray
     order: np.ndarray
-    candidates: np.ndarray
 
 
 def cam(
@@ -352,14 +364,16 @@ def cam(
     forbidden: np.ndarray | None = None,
     required: np.ndarray | None = None,
     precedence: np.ndarray | None = None,
+    max_parents: int | None = None,
 ) -> CAMResult:
     """Fit CAM to the ``(n, d)`` matrix ``X``.
 
     The possible parents come from :func:`boosting_counts` and :func:`neighbors`, less the
     ``forbidden`` edges; the ``required`` edges are in the order search from the start and in the
-    result whatever their p-values; ``precedence`` goes to :func:`order_search`. A parent stays
-    when its p-value is at most ``alpha``. Ties go to the earlier column throughout, so a caller
-    that orders the columns by rank breaks them by rank.
+    result whatever their p-values; ``precedence`` and ``max_parents`` go to :func:`order_search`.
+    A parent stays when its p-value is at most ``alpha``. The order is a topological order of the
+    searched edges and ``precedence`` together. Ties go to the earlier column throughout, so a
+    caller that orders the columns by rank breaks them by rank.
     """
     d = X.shape[1]
     required = np.zeros((d, d), dtype=bool) if required is None else required
@@ -367,11 +381,9 @@ def cam(
     if forbidden is not None:
         candidates &= ~forbidden
     bases = BasisCache(X)
-    searched = order_search(bases, candidates, required=required, precedence=precedence)
-    dag = prune(X, searched, cutoff=alpha, k=K, bases=bases).astype(bool) | required
-    return CAMResult(
-        dag=dag,
-        searched=searched,
-        order=topological_order(searched),
-        candidates=candidates,
+    searched = order_search(
+        bases, candidates, required=required, precedence=precedence, max_parents=max_parents
     )
+    dag = prune(X, searched, cutoff=alpha, k=K, bases=bases).astype(bool) | required
+    ordered = searched if precedence is None else searched | precedence
+    return CAMResult(dag=dag, order=topological_order(ordered))

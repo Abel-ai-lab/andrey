@@ -2,10 +2,9 @@
 
 Each node with candidate parents is fit as an additive model of them
 (:func:`andrey.fcm.gam.fit_gam`), and a parent stays when its smooth term's p-value is at most
-``cutoff`` (Buhlmann, Peters, Ernest 2014, Section 5.3): significance at p-values "lower or equal"
-to 0.001, for any sample size, with a larger cutoff for small samples. The
-order-based methods that end with this step (CAM, SCORE, NoGAM, DAS, CaPS) prune the complete DAG
-of their estimated order.
+``cutoff`` (Buhlmann, Peters, Ernest 2014, Section 5.3). The paper declares significance at
+p-values "lower or equal" to 0.001 at every sample size and suggests a larger cutoff for small
+samples. CAM prunes the DAG of its order search with this step.
 
 References
 ----------
