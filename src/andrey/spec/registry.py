@@ -328,13 +328,13 @@ _TARGET = ParamSpec(
     nullable=True,
 )
 _LOCAL_OUTPUT_DOC = (
-    "without a target, the graph output names: by default the CPDAG, else the skeleton or the "
-    "moral graph, undirected; with a target, undirected edges from target to each member, "
+    "without a target, the graph output names: the CPDAG, the skeleton, or, for the blankets, the "
+    "moral graph; with a target, undirected edges from target to each member, "
     "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
     "they joined"
 )
 _BLANKET_OUTPUT = concept_param("output")
-for _name, _summary, _key, _output, _refs in (
+for _name, _summary, _key, _output, _kind, _refs in (
     (
         "iamb",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
@@ -343,6 +343,7 @@ for _name, _summary, _key, _output, _refs in (
         "learner, or into the skeleton or the moral graph (output).",
         "markov_blanket",
         _BLANKET_OUTPUT,
+        "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
     ),
     (
@@ -352,23 +353,26 @@ for _name, _summary, _key, _output, _refs in (
         "structure learner, or into the skeleton or the moral graph (output).",
         "markov_blanket",
         _BLANKET_OUTPUT,
+        "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
     ),
     (
         "mmpc",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
-        "check. With target=null, the skeleton that mmhc searches, oriented into a CPDAG by the "
-        "Grow-Shrink structure learner unless output=skeleton.",
+        "check. With target=null, the skeleton that mmhc searches, or, with output=cpdag, that "
+        "skeleton oriented into a CPDAG by the Grow-Shrink structure learner.",
         "parents_and_children",
         concept_param(
             "output",
-            choices=("cpdag", "skeleton"),
-            doc="The graph returned without a target: cpdag = the skeleton with its colliders "
-            "oriented and Meek's rules applied (Margaritis 2003); skeleton = the adjacencies, "
-            "each variable joined to its parents and children. With a target, the target's set, "
-            "whatever the value.",
+            default="skeleton",
+            choices=("skeleton", "cpdag"),
+            doc="The graph returned without a target: skeleton = the adjacencies, each variable "
+            "joined to its parents and children; cpdag = the skeleton with its colliders "
+            "oriented and Meek's rules applied (Margaritis 2003), which costs more. With a "
+            "target, the target's set, whatever the value.",
         ),
+        "undirected",
         ("Tsamardinos, Brown & Aliferis 2006", "Margaritis 2003"),
     ),
 ):
@@ -380,7 +384,7 @@ for _name, _summary, _key, _output, _refs in (
             data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
             output=OutputSpec(
                 structure_type="graph",
-                graph_kind="cpdag",
+                graph_kind=_kind,
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             determinism="stochastic",

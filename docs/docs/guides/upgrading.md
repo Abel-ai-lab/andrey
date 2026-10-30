@@ -152,9 +152,9 @@ another score.
 
 ### Markov-blanket methods
 
-Without a `target`, `iamb`, `inter_iamb`, and `mmpc` return a CPDAG, kind `cpdag`, where they
-returned an undirected graph. Pass `output` for the 0.11 graph; a call with a `target` does not
-change:
+Without a `target`, `iamb` and `inter_iamb` return a CPDAG, kind `cpdag`, where they returned
+the moral graph, an undirected graph. Pass `output="moral"` for the 0.11 graph. `mmpc` returns the
+skeleton, as before, and a CPDAG with `output="cpdag"`. A call with a `target` does not change:
 
 ```python
 # 0.11
@@ -163,8 +163,9 @@ skeleton = andrey.mmpc(data)
 
 # 0.12
 moral = andrey.iamb(data, output="moral")
-skeleton = andrey.mmpc(data, output="skeleton")
+skeleton = andrey.mmpc(data)  # unchanged
 cpdag = andrey.iamb(data)  # the default: spouse links pruned, colliders and Meek's rules
+cpdag = andrey.mmpc(data, output="cpdag")
 ```
 
 ## From 0.10 to 0.11

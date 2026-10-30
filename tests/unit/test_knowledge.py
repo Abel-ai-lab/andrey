@@ -687,8 +687,10 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
     ],
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
+    # A blanket method directs edges only in its CPDAG.
+    settings = {"output": "cpdag"} if name in {"iamb", "inter_iamb", "mmpc"} else {}
     with pytest.raises(KnowledgeError):
-        _fit(name, _triangle(), knowledge=knowledge)
+        _fit(name, _triangle(), knowledge=knowledge, **settings)
 
 
 @pytest.mark.parametrize(("name", "output"), UNDIRECTED_OUTPUTS)

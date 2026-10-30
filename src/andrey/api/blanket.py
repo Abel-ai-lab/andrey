@@ -525,7 +525,7 @@ def mmpc(
     data: npt.ArrayLike,
     *,
     target: str | int | None = None,
-    output: str = "cpdag",
+    output: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -537,8 +537,8 @@ def mmpc(
 
     MMPC [1]_ finds the variables adjacent to a target in the causal graph, its parents and
     children, without telling them apart, by conditional-independence tests. Every variable's
-    set together gives the skeleton :func:`~andrey.mmhc` searches, which, by default, the collider
-    tests of the Grow-Shrink structure learner [2]_ [3]_ orient into a CPDAG.
+    set together gives the skeleton :func:`~andrey.mmhc` searches, which ``output="cpdag"`` orients
+    into a CPDAG by the collider tests of the Grow-Shrink structure learner [2]_ [3]_.
 
     Parameters
     ----------
@@ -549,10 +549,11 @@ def mmpc(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). ``None`` learns every variable's set and keeps a pair when each variable is in
         the other's set.
-    output : {"cpdag", "skeleton"}, default="cpdag"
-        The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
-        the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
-        adjacencies with no directions, each variable joined to its parents and children. A
+    output : {"skeleton", "cpdag"}, default="skeleton"
+        The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
+        directions, each variable joined to its parents and children, the graph the sets give.
+        ``"cpdag"``: the CPDAG, the causal graphs the tests cannot tell apart, whose directed edges
+        they all share, which tests every unshielded triple for a collider and costs more. A
         variable's parents and children hold no child's other parents, so there is no moral graph.
         With ``target``, the result is the target's parents and children, whatever ``output`` is.
     alpha : float, default=0.05
@@ -594,10 +595,10 @@ def mmpc(
     Returns
     -------
     StructureOutput
-        Without ``target``, wraps the graph ``output`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or for ``"skeleton"`` an ``undirected`` one, whose edges have no arrowhead
-        and join each pair in each other's set. With ``target``, an ``undirected`` one whose edges
+        Without ``target``, wraps the graph ``output`` names: an ``undirected``
+        :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
+        join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
+        edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges
         join ``target`` to each of its parents and children; ``metadata["target"]`` names it and
         ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
         label or 0-based position. ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data

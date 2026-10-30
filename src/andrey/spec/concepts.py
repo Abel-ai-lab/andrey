@@ -855,10 +855,12 @@ _CONCEPTS = (
     ),
     Concept(
         key="output",
-        summary="The graph a Markov-blanket search returns without a target, as bnlearn's "
-        "structure learners and learn.mb offer it: cpdag, the default, the CPDAG of the "
-        "Grow-Shrink structure learner (Margaritis 2003); skeleton, its adjacencies "
-        "(undirected=TRUE); moral, the moral graph of the Markov blankets.",
+        summary="The graph a Markov-blanket search returns without a target. The default follows "
+        "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
+        "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
+        "bnlearn's mmpc does (undirected=TRUE). cpdag is the CPDAG of the Grow-Shrink structure "
+        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
+        "Markov blankets.",
         param=_template(
             "output",
             "str",
@@ -876,11 +878,12 @@ _CONCEPTS = (
             Deviation(
                 method="mmpc",
                 name="output",
-                default="cpdag",
-                choices=("cpdag", "skeleton"),
+                default="skeleton",
+                choices=("skeleton", "cpdag"),
                 fixed_in=None,
-                reason="MMPC learns parents and children, which hold no child's other parents, "
-                "so it has no moral graph to return.",
+                reason="bnlearn's mmpc returns the skeleton (undirected=TRUE), which is the graph "
+                "MMPC's sets give; cpdag stays available. MMPC learns parents and children, which "
+                "hold no child's other parents, so it has no moral graph to return.",
             ),
         ),
     ),
@@ -955,7 +958,8 @@ _CONCEPTS = (
         summary="The graph kind names what an edge means: a search identified up to its "
         "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
         "direction is undirected. A fit returns the kind its spec declares; a method with output "
-        "returns cpdag for output=cpdag and undirected for skeleton and moral.",
+        "returns the kind of its default, and cpdag for output=cpdag and undirected for skeleton "
+        "and moral.",
         suitable=ALL_METHODS,
     ),
     Concept(

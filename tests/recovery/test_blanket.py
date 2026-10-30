@@ -196,7 +196,8 @@ def test_a_column_shuffle_leaves_every_set(method, output, seed):
 @pytest.mark.parametrize("method", METHODS)
 def test_the_cpdag_orients_a_collider_and_its_consequence(method):
     """a -> c <- b, c -> d: the collider at c, then c -> d by Meek's first rule."""
-    edges = set(getattr(andrey, method)(_collider()).structure.oriented_edges())
+    out = getattr(andrey, method)(_collider(), output="cpdag")
+    edges = set(out.structure.oriented_edges())
     assert edges == {("a", "c", "directed"), ("b", "c", "directed"), ("c", "d", "directed")}
 
 
@@ -239,6 +240,22 @@ def test_each_output_matches_bnlearn_on_a_recorded_case(method, output):
         for a, b, kind in out.structure.oriented_edges()
     }
     assert edges == BNLEARN_RECORDED[output]
+
+
+#: The graph each of bnlearn 5.2.1's learners returns by default: ``undirected = FALSE`` for
+#: ``iamb`` and ``inter.iamb``, ``TRUE`` for ``mmpc``.
+BNLEARN_DEFAULT = {"iamb": "cpdag", "inter_iamb": "cpdag", "mmpc": "skeleton"}
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_a_call_without_output_returns_the_graph_bnlearn_returns_by_default(method):
+    out = getattr(andrey, method)(_two_colliders())
+    edges = {
+        f"{a} -> {b}" if kind == "directed" else f"{min(a, b)} - {max(a, b)}"
+        for a, b, kind in out.structure.oriented_edges()
+    }
+    assert edges == BNLEARN_RECORDED[BNLEARN_DEFAULT[method]]
+    assert out.structure.kind == REGISTRY[method].output.graph_kind
 
 
 def test_mmpc_has_no_moral_graph():
@@ -284,7 +301,7 @@ def test_a_required_pair_joins_and_a_pair_kept_apart_leaves_with_and_without_a_t
 def test_tiers_direct_the_cpdag_and_leave_the_undirected_outputs(method):
     """The tiers put a and b before c and d: the CPDAG directs every edge between the tiers, and the
     skeleton stays undirected."""
-    edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE))
+    edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, output="cpdag"))
     assert edges[frozenset("ad")] == ("a", "d", "directed")
     assert edges[frozenset("ac")] == ("a", "c", "directed")
     out = getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, output="skeleton")
