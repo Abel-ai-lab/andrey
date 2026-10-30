@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core.independence import hsic_moments_from_grams, median_gram
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache
-from andrey.fcm.resit import _sq_dists, causal_order
+from andrey.fcm.resit import causal_order
 from andrey.search.hc import tie_ranks
 
 N = 400
@@ -110,9 +110,15 @@ def test_p_values_far_below_double_precision_stay_positive_and_ordered():
     rng = np.random.default_rng(3)
     x = rng.uniform(-2, 2, 200)
     noise = rng.standard_normal(200)
-    gram = median_gram(_sq_dists(x))
+    gram = gamma_gram(x, median_rows=None)
     p = [
-        hsic_moments_from_grams(gram, median_gram(_sq_dists(np.sin(2 * x) + s * noise)))[1]
+        hsic_gamma_from_grams(
+            gram,
+            gamma_gram(np.sin(2 * x) + s * noise, median_rows=None),
+            200,
+            variance="product",
+            tail="upper",
+        )[1]
         for s in (0.1, 0.3)
     ]
     assert 0 < p[0] < p[1] < 1e-16

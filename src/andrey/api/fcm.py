@@ -402,14 +402,16 @@ def resit(
     about as ``d^3.3`` up to 50 variables and as ``d^2`` beyond. A fit passes about a minute near
     20 variables, 10 minutes near 40, and an hour near 75; at 100 variables, a fit stopped after
     an hour had run 3,565 of the 5,049 tests of its causal order, and the measured cost per test
-    puts the whole fit near two hours. The edge removal tests each parent against all the
-    variable's predecessors at once, and many of those p-values lie near ``alpha``, so the order
-    the parents are tried in changes the result: trying them in the data's column order instead of
-    by rank gave the same causal orders at 20 variables but graphs a median of 10 to 17 edges
-    apart, at about the same accuracy. The smoothing of each fit is a local minimum of its GCV
-    score, which can have several, so two variables of nearly equal p-value can be taken as the
-    sink in either order. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    puts the whole fit near two hours. Its accuracy ends sooner: over five graphs per size, its
+    median errors are at most half the empty graph's up to 10 variables and 80% or more of it from
+    12 variables. The edge removal tests each parent against all the variable's predecessors at
+    once, and many of those p-values lie near ``alpha``, so the order the parents are tried in
+    changes the result: trying them in the data's column order instead of by rank gave the same
+    causal orders at 20 variables but graphs a median of 10 to 17 edges apart, at about the same
+    accuracy. The smoothing of each fit is a local minimum of its GCV score, which can have
+    several, so two variables of nearly equal p-value can be taken as the sink in either order.
+    The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------

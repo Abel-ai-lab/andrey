@@ -15,9 +15,9 @@ with each noise independent of the variable's non-descendants, and runs two phas
 The settings are those of the paper's experiments: the regression is an additive model of thin
 plate regression splines with ten basis functions per term and GCV smoothing,
 :func:`andrey.fcm.gam.fit_gam`, which lowers the rank with fewer than 30 rows per term; the test is
-the HSIC test with Gaussian kernels on each side's joint squared distances, the bandwidth set by
-the median heuristic and the null approximated by a gamma law with the moments of Gretton et al.
-(2007), :func:`andrey.core.independence.hsic_moments_from_grams`; and ``alpha`` is ``0.05``.
+the gamma HSIC test of :func:`andrey.core.independence.hsic_gamma_from_grams`, with Gaussian kernels
+on each side's joint squared distances, the bandwidth set by the median heuristic, and the null
+moments of Gretton et al. (2007) in the product form the paper uses; and ``alpha`` is ``0.05``.
 
 Where the steps here differ from the paper's:
 
@@ -54,7 +54,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from andrey.core.independence import hsic_moments_from_grams, median_gram
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.search._parallel import _KEY_DP
@@ -67,12 +67,6 @@ ALPHA = 0.05
 K = 10
 
 
-def _sq_dists(z: np.ndarray) -> np.ndarray:
-    """``(n, n)`` squared differences ``(z_i - z_j)^2`` of the ``(n,)`` column ``z``."""
-    diff = z[:, None] - z[None, :]
-    return np.multiply(diff, diff, out=diff)
-
-
 def _residual(bases: BasisCache, child: int, parents: list[int]) -> np.ndarray:
     """The residual of ``child``'s additive fit on ``parents``; with none, ``child`` centered."""
     if not parents:
@@ -81,9 +75,17 @@ def _residual(bases: BasisCache, child: int, parents: list[int]) -> np.ndarray:
     return fit_gam(bases, child, parents, k=K).residuals
 
 
-def _p_value(gram: tuple[np.ndarray, float, float], residual: np.ndarray) -> float:
-    """The HSIC p-value of ``residual`` against the side whose :func:`median_gram` is ``gram``."""
-    return hsic_moments_from_grams(gram, median_gram(_sq_dists(residual)))[1]
+def _gram(side: np.ndarray) -> tuple[np.ndarray, float]:
+    """The gamma HSIC gram of ``side``, one column or several read jointly, its median over every
+    row."""
+    return gamma_gram(side, median_rows=None)
+
+
+def _p_value(gram: tuple[np.ndarray, float], residual: np.ndarray) -> float:
+    """The HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``: the null
+    variance in its product form and the tail as the upper incomplete gamma function."""
+    n = residual.shape[0]
+    return hsic_gamma_from_grams(gram, _gram(residual), n, variance="product", tail="upper")[1]
 
 
 def _key(p: float) -> float:
@@ -123,15 +125,14 @@ def causal_order(
     remaining = list(range(unit.shape[1]))
     sinks: list[int] = []
     while len(remaining) > 1:
-        total = sum(_sq_dists(unit[:, i]) for i in remaining)
         candidates = [
             k for k in remaining if precedence is None or not precedence[k, remaining].any()
         ]
         best: tuple[float, int] | None = None
         for k in candidates:
-            parents = [i for i in remaining if i != k and allowed[i, k]]
-            gram = median_gram(np.maximum(total - _sq_dists(unit[:, k]), 0.0))
-            p = _p_value(gram, _residual(bases, k, parents))
+            others = [i for i in remaining if i != k]
+            parents = [i for i in others if allowed[i, k]]
+            p = _p_value(_gram(unit[:, others]), _residual(bases, k, parents))
             _log.debug("%d remaining: sink %d, p-value %.6g", len(remaining), k, p)
             if best is None or (-_key(p), k) < best:
                 best = (-_key(p), k)
@@ -161,13 +162,11 @@ def remove_edges(
     np.ndarray
         ``(d, d)`` bool DAG; ``out[i, j]`` is the edge ``i -> j``.
     """
-    n, d = unit.shape
+    d = unit.shape[1]
     dag = np.zeros((d, d), dtype=bool)
-    total = np.zeros((n, n))
     for position in range(1, d):
         child = int(order[position])
-        total += _sq_dists(unit[:, order[position - 1]])
-        gram = median_gram(total)
+        gram = _gram(unit[:, order[:position]])
         parents = sorted(int(i) for i in order[:position] if allowed[i, child])
         for parent in list(parents):
             if required[parent, child]:

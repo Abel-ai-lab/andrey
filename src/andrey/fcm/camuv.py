@@ -28,10 +28,10 @@ The settings are those of the paper's experiments: ``alpha = 0.01`` and sets of 
 variables, ``max_depth = 2``; each regression is an additive model of thin plate regression
 splines with ten basis functions per term and GCV smoothing (Wood 2004),
 :func:`andrey.fcm.gam.fit_gam`, which lowers the rank with fewer than 30 rows per term; each test
-is the HSIC test with Gaussian kernels whose bandwidth is the median heuristic and whose null is
-a gamma law with the moments of Gretton et al. (2007),
-:func:`andrey.core.independence.hsic_moments_from_grams`. A side of several residuals takes one
-kernel on their joint squared distances.
+is the gamma HSIC test of :func:`andrey.core.independence.hsic_gamma_from_grams`, with Gaussian
+kernels whose bandwidth is the median heuristic and the null moments of Gretton et al. (2007) in
+their product form, as RESIT runs it. A side of several residuals takes one kernel on their joint
+squared distances.
 
 Where the steps here differ from the paper's:
 
@@ -80,7 +80,7 @@ from itertools import combinations
 
 import numpy as np
 
-from andrey.core.independence import hsic_moments_from_grams, median_gram
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.search._parallel import _KEY_DP
@@ -125,7 +125,7 @@ class _Tests:
         self.bases = BasisCache(data)
         n = data.shape[0]
         self._residuals: dict[Term, np.ndarray] = {}
-        self._grams: OrderedDict[Side, tuple[np.ndarray, float, float]] = OrderedDict()
+        self._grams: OrderedDict[Side, tuple[np.ndarray, float]] = OrderedDict()
         self._capacity = max(4, _GRAM_BYTES // (8 * n * n))
         self._p_values: dict[tuple[Side, Side], float] = {}
 
@@ -143,15 +143,18 @@ class _Tests:
         return found
 
     @staticmethod
-    def _gram(residuals: list[np.ndarray]) -> tuple[np.ndarray, float, float]:
-        """The HSIC kernel of the residuals' joint squared distances."""
-        total = np.zeros((residuals[0].size, residuals[0].size))
-        for r in residuals:
-            diff = r[:, None] - r[None, :]
-            total += np.multiply(diff, diff, out=diff)
-        return median_gram(total)
+    def _gram(residuals: list[np.ndarray]) -> tuple[np.ndarray, float]:
+        """The HSIC kernel of the residuals read jointly, its bandwidth's median over every row."""
+        return gamma_gram(np.column_stack(residuals), median_rows=None)
 
-    def _side_gram(self, side: Side) -> tuple[np.ndarray, float, float]:
+    @staticmethod
+    def _hsic(x: tuple[np.ndarray, float], y: tuple[np.ndarray, float]) -> float:
+        """The HSIC p-value of two sides' kernels: the null variance in its product form, the tail
+        as the upper incomplete gamma function."""
+        n = x[0].shape[0]
+        return hsic_gamma_from_grams(x, y, n, variance="product", tail="upper")[1]
+
+    def _side_gram(self, side: Side) -> tuple[np.ndarray, float]:
         found = self._grams.pop(side, None)
         if found is None:
             found = self._gram([self._residual(term) for term in side])
@@ -166,7 +169,7 @@ class _Tests:
         key = (x, y)
         found = self._p_values.get(key)
         if found is None:
-            found = hsic_moments_from_grams(self._side_gram(x), self._side_gram(y))[1]
+            found = self._hsic(self._side_gram(x), self._side_gram(y))
             self._p_values[key] = found
         return found
 
@@ -181,7 +184,7 @@ class _Tests:
         if found is None:
             residual = self._residuals.get(term)
             gram = self._gram([self._fit(term) if residual is None else residual])
-            found = hsic_moments_from_grams(gram, self._side_gram(y))[1]
+            found = self._hsic(gram, self._side_gram(y))
             self._p_values[key] = found
         return found
 
