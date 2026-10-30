@@ -1627,7 +1627,7 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
     best = max((t for t in family_tiles(summaries) if t["number"]), key=lambda t: t["number"])
     speed, fastest = more_than(best["best"][1]["ratio"])
     accuracy, fewer = more_than(fewest_errors(summaries))
-    count = len(list_specs())
+    count = sum(spec.status == "supported" for spec in list_specs())
     kinds = NUMBER_WORDS[len(graph_kinds())]
     return {
         "accelerated": (
@@ -1644,7 +1644,8 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
         ),
         "all-in-one": (
             f"{count} methods, {kinds} kinds of graph",
-            f"<b>{count} methods</b> for every kind of data, and {kinds} kinds of causal graph.",
+            f"<b>{count} supported methods</b> for every kind of data, and {kinds} kinds of causal"
+            " graph.",
         ),
     }
 
