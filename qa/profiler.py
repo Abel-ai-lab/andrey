@@ -59,7 +59,7 @@ def sample(dataset: str, seed: int) -> np.ndarray:
 @contextmanager
 def single_thread() -> Generator[None]:
     """Fit on the numpy backend with one worker and one BLAS thread."""
-    with andrey.config(backend="numpy", num_workers=1), threadpool_limits(limits=1):
+    with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         yield
 
 

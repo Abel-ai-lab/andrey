@@ -16,6 +16,7 @@ import pytest
 
 import andrey
 from andrey.cli import graph_view, main, render_method_help
+from andrey.core.removed import REMOVED, removal_hint
 from andrey.spec import REGISTRY, SCHEMA_VERSION, get_spec
 
 
@@ -195,22 +196,13 @@ def test_run_multi_group(capsys, nongaussian_path):
     ("method", "former"),
     [("multi_group_direct_lingam", "--data-groups"), ("longitudinal_lingam", "--data-list")],
 )
-def test_a_former_panel_flag_reads_the_datasets_like_data(capsys, nongaussian_path, method, former):
-    path = str(nongaussian_path)
-    _, out, _ = _run(["run", method, "--data", path, "--data", path], capsys)
-    code, former_out, _ = _run(["run", method, former, path, former, path], capsys)
-    assert code == 0
-    drop = ("run",)  # the timing differs
-    assert {k: v for k, v in json.loads(former_out).items() if k not in drop} == {
-        k: v for k, v in json.loads(out).items() if k not in drop
-    }
-    code, _, err = _run(["run", method, "--data", path, former, path, former, path], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "bad_input"
-
-
-def test_a_former_panel_flag_is_refused_by_a_method_that_takes_one_matrix(capsys, csv_path):
-    code, _, err = _run(["run", "pc", "--data-groups", str(csv_path)], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
+def test_a_flag_of_a_removed_input_name_is_refused(capsys, nongaussian_path, method, former):
+    """The panel inputs are read from `--data` alone; the flags 0.11.0 kept for one release are
+    options no command has, and the error says what the flag is called now."""
+    code, _, err = _run(["run", method, former, str(nongaussian_path)], capsys)
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "usage_error" and former in error["message"]
+    assert "`--data`" in error["message"]
 
 
 def test_the_panel_flag_is_data_in_the_help(capsys):
@@ -218,7 +210,6 @@ def test_the_panel_flag_is_data_in_the_help(capsys):
         _, out, _ = _run(["run", method, "--help", "--json"], capsys)
         (entry,) = json.loads(out)["method"]["data"]["inputs"]
         assert entry["flag"] == "--data" and entry["kind"] == "panel"
-        assert entry["aliases"] and entry["flag"] != "--" + entry["aliases"][0].replace("_", "-")
 
 
 # --- run: the error contract ----------------------------------------------------------------------
@@ -373,11 +364,24 @@ def test_former_names_and_values_map_to_current_ones():
 
 def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
     """A removed argument still runs for one release: the fit warns and the run's params omit it."""
-    code, out, _ = _run(["run", "direct_lingam", "--data", str(csv_path), "random_state=3"], capsys)
+    code, out, _ = _run(["run", "granger", "--data", str(csv_path), "cv=3"], capsys)
     env = json.loads(out)
-    assert code == 0 and "random_state" not in env["run"]["params"]
-    assert any("random_state" in w["message"] for w in env["run"]["warnings"])
-    assert "random_state" in get_spec("direct_lingam").dropped_args
+    assert code == 0 and "cv" not in env["run"]["params"]
+    assert any("cv" in w["message"] for w in env["run"]["warnings"])
+    assert "cv" in get_spec("granger").dropped_args
+
+
+@pytest.mark.parametrize(
+    "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
+)
+def test_a_removed_name_or_value_is_refused_with_what_it_is_called_now(capsys, csv_path, row):
+    method = row.methods[0]
+    argument = f"{row.name}={row.value or 3}"
+    code, _, err = _run(["run", method, "--data", str(csv_path), argument], capsys)
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "invalid_params"
+    hint = removal_hint(method, row.name, row.value)
+    assert any(hint in detail["message"] for detail in error["details"])
 
 
 def test_missing_input_error(capsys):
@@ -403,13 +407,10 @@ def test_method_help_defaults_are_grammar_not_repr():
 
 
 def test_input_name_override_is_usage_error(capsys, csv_path):
-    """A `data=...` override, or one under a former input name, is caught in validation (exit 2),
-    not passed to the facade positionally where it would raise a raw TypeError (exit 1)."""
-    for name in ("data", "data_groups"):
-        code, _out, err = _run(
-            ["run", "calm", "--data", str(csv_path), f"{name}=other.csv"], capsys
-        )
-        assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+    """A `data=...` override is caught in validation (exit 2), not passed to the facade
+    positionally where it would raise a raw TypeError (exit 1)."""
+    code, _out, err = _run(["run", "calm", "--data", str(csv_path), "data=other.csv"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
 
 
 def test_param_error_precedes_input_load(capsys):
@@ -789,9 +790,7 @@ def test_header_names_gin_observed_nodes(capsys, named_path):
     assert code == 0 and env["structure"]["labels"][:4] == ["a", "b", "c", "d"]
     assert "labels" not in env["run"]["params"]
     code, out, _ = _run(["run", "gin", "--data", str(named_path), "labels=[w,x,y,z]"], capsys)
-    env = json.loads(out)  # the former labels argument is ignored with a warning
-    assert code == 0 and env["structure"]["labels"][:4] == ["a", "b", "c", "d"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in env["run"]["warnings"]}
+    assert code == 2  # the former labels argument is an unknown param
 
 
 def test_panel_headers_name_every_group(capsys, tmp_path, named_path):
@@ -901,9 +900,9 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     from andrey.core.backend import Backend
     from andrey.spec.generate import env_dict
 
-    state = Backend(backend="auto", num_workers=-1, torch=True, cuda=False, mps=True)
+    state = Backend(backend="auto", n_jobs=-1, torch=True, cuda=False, mps=True)
     monkeypatch.setattr("andrey.describe", lambda: state)
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "-1")
+    monkeypatch.setenv("ANDREY_N_JOBS", "-1")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "90000")
     monkeypatch.setenv("ANDREY_TIE_BREAK", "Position")
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
@@ -912,7 +911,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     report = json.loads(out)
     assert report["configuration"] == {
         "backend": "auto",
-        "num_workers": -1,
+        "n_jobs": -1,
         "tie_break": "position",
     }
     assert report["available_backends"] == {
@@ -922,7 +921,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
         "mps": True,
     }
     variables = {v["name"]: v for v in report["environment"]["variables"]}
-    assert variables["ANDREY_NUM_WORKERS"]["value"] == "-1"
+    assert variables["ANDREY_N_JOBS"]["value"] == "-1"
     assert variables["ANDREY_BACKEND"]["value"] is None
     assert variables["ANDREY_GES_PARALLEL_MIN_WORK"]["value"] == "90000"
     for actual, expected in zip(
@@ -953,7 +952,7 @@ def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: False)
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(backend="numpy", num_workers=1, torch=False, cuda=False, mps=False),
+        lambda: Backend(backend="numpy", n_jobs=1, torch=False, cuda=False, mps=False),
     )
     code, out, err = _run(["config"], capsys)
     assert code == 0 and not err
@@ -972,7 +971,7 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
 
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(backend="auto", num_workers=1, torch=True, cuda=False, mps=False),
+        lambda: Backend(backend="auto", n_jobs=1, torch=True, cuda=False, mps=False),
     )
     monkeypatch.setattr(
         cli,
@@ -984,7 +983,7 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
     )
     monkeypatch.setattr(cli, "_version", {"torch": "2.8.0", "matplotlib": "3.9.0"}.get)
     monkeypatch.setattr(cli.sys, "platform", "linux")
-    # The cores ANDREY_NUM_WORKERS=-1 would use: the same count, cgroup quota included.
+    # The cores ANDREY_N_JOBS=-1 would use: the same count, cgroup quota included.
     monkeypatch.setattr(cli, "usable_cpus", lambda: 2)
     code, out, err = _run(["config", "--json"], capsys)
     assert code == 0 and not err
@@ -1037,7 +1036,7 @@ def test_config_and_describe_report_one_availability_shape(torch, cuda, capsys, 
 # One bad value per parser: backend name, worker count, integer, seed, flag.
 BAD_SETTINGS = [
     ("ANDREY_BACKEND", "quantum"),
-    ("ANDREY_NUM_WORKERS", "-2"),
+    ("ANDREY_N_JOBS", "-2"),
     ("ANDREY_COV_GPU_THRESHOLD", "abc"),
     ("ANDREY_SEED", "4294967296"),
     ("ANDREY_GPU_CALIBRATE", "maybe"),
@@ -1157,15 +1156,22 @@ def test_target_names_a_header_column_or_a_position(capsys, tmp_path):
     assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
 
 
-def test_a_mixed_run_reports_inferred_columns_and_its_warning(capsys, tmp_path):
+def test_a_mixed_run_reads_the_named_columns_and_warns_of_undeclared_codes(capsys, tmp_path):
+    """A data file holds numbers only, so ``categorical`` names the categorical columns; without
+    it, a whole-number column stays continuous and the warning names it."""
     rng = np.random.default_rng(4)
     g = rng.integers(0, 3, 400)
     u = rng.standard_normal(400)
     v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(400)
     path = tmp_path / "mixed.csv"
     path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
-    code, out, _ = _run(["run", "pc", "--data", str(path), "indep_test=cond_gauss"], capsys)
+    base = ["run", "pc", "--data", str(path), "indep_test=cond_gauss"]
+    code, out, _ = _run([*base, "categorical=[g]"], capsys)
     env = json.loads(out)
     assert code == 0 and env["metadata"]["categorical"] == ["g"]
-    [warning] = [w for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
-    assert "'g' (3 values)" in warning["message"]
+    assert not [w for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
+    code, out, _ = _run(base, capsys)
+    env = json.loads(out)
+    assert code == 0 and env["metadata"]["categorical"] == []
+    messages = [w["message"] for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
+    assert any("columns 'g' hold at most 10" in m for m in messages)

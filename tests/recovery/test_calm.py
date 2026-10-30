@@ -1,12 +1,15 @@
-"""CALM checks a fixed case, ground truth, its recorded output, and same-seed determinism.
+"""CALM checks a fixed case, ground truth, its recorded output, background knowledge, and
+same-seed determinism.
 
 The tree fixture has a CPDAG that can be checked by hand. The ground-truth case is a random
-linear-Gaussian SEM whose Markov equivalence class CALM must return. The recorded output holds
-only the graph: the weights come from a torch optimizer.
+linear-Gaussian SEM whose Markov equivalence class CALM must return, and whose DAG it returns with
+the tiers of a causal order. The recorded output holds only the graph: the weights come from a
+torch optimizer.
 """
 
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pytest
 
@@ -38,6 +41,14 @@ def tree_fit():
     return andrey.calm(datagen.generate("gauss_tree_5v"))
 
 
+@pytest.fixture(scope="module")
+def sem():
+    """A random SEM, its weights, and CALM's default fit on it."""
+    pytest.importorskip("torch")
+    X, B = _random_sem(5, 2000, 0.4, seed=7)
+    return X, B, andrey.calm(X)
+
+
 # ---- fixed cases ---------------------------------------------------------------------------------
 
 
@@ -67,12 +78,41 @@ def test_calm_matches_the_recorded_output(tree_fit) -> None:
 # ---- ground truth --------------------------------------------------------------------------------
 
 
-def test_calm_recovers_the_true_class() -> None:
-    pytest.importorskip("torch")
-    X, B = _random_sem(5, 2000, 0.4, seed=7)
-    out = andrey.calm(X)
+def test_calm_recovers_the_true_class(sem) -> None:
+    _, B, out = sem
     assert out.structure.kind == "dag"
     assert markov_equivalent(out.structure, (B != 0).astype(int))  # [i, j] = 1 is i -> j
+
+
+# ---- background knowledge ------------------------------------------------------------------------
+
+
+def _directed(out) -> set[tuple[int, int]]:
+    return {(i, j) for i, j, _ in out.structure.oriented_edges(index=True)}
+
+
+def test_calm_holds_required_forbidden_and_tier_edges(sem) -> None:
+    """A required edge between independent columns is kept, a forbidden true edge is dropped, and
+    no edge points into an earlier tier."""
+    X, B, plain = sem
+    assert B[2, 4] and not (B[3].any() or B[:, 3].any())  # 2 -> 4, and 3 is independent
+    assert (2, 4) in _directed(plain) and not {(3, 4), (4, 3)} & _directed(plain)
+    knowledge = andrey.Knowledge(
+        required=[(3, 4)], forbidden=[(2, 4), (4, 2)], tiers=[[0, 2], [1, 3, 4]]
+    )
+    edges = _directed(andrey.calm(X, knowledge=knowledge))
+    assert (3, 4) in edges
+    assert not {(2, 4), (4, 2)} & edges
+    assert not {(i, j) for i, j in edges if i in (1, 3, 4) and j in (0, 2)}
+
+
+def test_calm_with_the_true_order_as_tiers_returns_the_true_dag(sem) -> None:
+    X, B, _ = sem
+    truth = {(int(i), int(j)) for i, j in zip(*np.nonzero(B), strict=True)}
+    graph = nx.DiGraph(truth)
+    graph.add_nodes_from(range(len(B)))
+    tiers = [[v] for v in nx.topological_sort(graph)]
+    assert _directed(andrey.calm(X, knowledge=andrey.Knowledge(tiers=tiers))) == truth
 
 
 # ---- what the method promises --------------------------------------------------------------------

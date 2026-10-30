@@ -170,7 +170,7 @@ def test_pcmci_parents_ties() -> None:
     x = _swap_symmetric_series(0)
 
     def parents(order: np.ndarray) -> dict[int, list[tuple[int, int]]]:
-        found = andrey.pcmci(x[:, order], tau_max=2, pc_alpha=0.2).metadata["parents"]
+        found = andrey.pcmci(x[:, order], tau_max=2, pc1_alpha=0.2).metadata["parents"]
         return {
             int(order[j]): [(int(order[i]), lag) for i, lag in links]
             for j, links in enumerate(found)

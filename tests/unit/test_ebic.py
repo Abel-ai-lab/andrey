@@ -28,7 +28,7 @@ from andrey.core.score_delta import (
     score_many_with_base,
 )
 from andrey.search.exact import _GramBICScore
-from andrey.search.gies import InterventionalBICScore
+from andrey.search.gies import InterventionalScore
 from tests.recovery.helpers.project import found_dag
 
 GAMMAS = (0.5, 1.0)
@@ -139,7 +139,7 @@ def test_the_other_scores_carry_the_term(gamma):
     n, d = _X.shape
     gram = _GramBICScore(_X, gamma)
     centered = _X - _X.mean(axis=0)
-    gies_score = InterventionalBICScore(_X, None, ebic_gamma=gamma)
+    gies_score = InterventionalScore(_X, None, ebic_gamma=gamma)
     ref = _Reference(_X, ebic_gamma=gamma)
     for v, base in _CASES:
         pa = list(base)
@@ -162,7 +162,7 @@ def _module(name: str):
 
 
 def _reference_score(monkeypatch, module: str, gamma: float) -> None:
-    def build(score_func, data, *, penalty_discount=1.0, ebic_gamma=0.0, categorical=None):
+    def build(score_func, data, *, penalty_discount=1.0, ebic_gamma=0.0, **_):
         assert ebic_gamma == gamma
         return _Reference(
             np.asarray(data), penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
@@ -204,11 +204,22 @@ def test_gies_and_xges_match_their_runs_on_the_formula(monkeypatch):
     with monkeypatch.context() as patch:
         patch.setattr(
             _module("gies"),
-            "InterventionalBICScore",
-            lambda x, mask, **kw: _Reference(x, **kw),
+            "InterventionalScore",
+            lambda x, mask, *, penalty_discount, ebic_gamma, **_: _Reference(
+                x, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
+            ),
         )
-        patch.setattr(_module("xges"), "BICScore", lambda x, **kw: _Reference(x, **kw))
-        patch.setattr(_module("xges"), "add_deltas", lambda score, y, e: score.add_deltas(y, e))
+        patch.setattr(
+            _module("xges"),
+            "make_score",
+            lambda name, x, *, penalty_discount, ebic_gamma, **_: _Reference(
+                x, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
+            ),
+        )
+        # The reference is not a BICScore, so XGES takes its add deltas as a full score's.
+        patch.setattr(
+            _module("xges"), "full_add_deltas", lambda score, y, e, d: score.add_deltas(y, e)
+        )
         slow_gies = andrey.gies(_SEARCH, ebic_gamma=1.0)
         slow_xges = andrey.xges(_SEARCH, ebic_gamma=1.0)
     for fast, slow in ((fast_gies, slow_gies), (fast_xges, slow_xges)):

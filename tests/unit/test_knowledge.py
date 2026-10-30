@@ -20,6 +20,7 @@ from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
+from andrey.spec.concepts import BLANKET_STRUCTURES
 
 # The searches that take knowledge and return a graph over the columns of a table.
 METHODS = [
@@ -52,7 +53,20 @@ SERIES_CASES = [
     ),
 ]
 PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
+# Undirected results: the knowledge sets which pairs are adjacent, and orients nothing.
+UNDIRECTED = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "undirected"}
+#: Each method and structure choice whose graph is undirected.
+UNDIRECTED_STRUCTURES = [
+    (name, choice)
+    for name, spec in REGISTRY.items()
+    for param in spec.params
+    if param.concept == "structure"
+    for choice in param.choices or ()
+    if BLANKET_STRUCTURES[choice] == "undirected"
+]
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
+# A short schedule: the knowledge holds whether or not the fit has converged.
+SHORT_CALM = {"max_iter": 2, "subproblem_iter": 200}
 LABELS = list("abcdef")
 # a -> c <- b, c -> d -> e, a -> f.
 TRUTH = {("a", "c"), ("b", "c"), ("c", "d"), ("d", "e"), ("a", "f")}
@@ -88,6 +102,9 @@ def _gaps(table, missing: bool):
 
 
 def _fit(name: str, data: pd.DataFrame, **kwargs):
+    if name == "calm":
+        pytest.importorskip("torch")
+        kwargs = {**SHORT_CALM, **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         if name == "cdnod":
@@ -111,6 +128,10 @@ def _assert_required_forbidden_and_tiers_hold(name: str, marks: np.ndarray, labe
     def directed(x, y):
         return marks[at(x), at(y)] == TAIL and marks[at(y), at(x)] == ARROW
 
+    if name in UNDIRECTED:
+        assert marks[at("b"), at("f")] == TAIL, marks
+        assert np.isin(marks, (NULL, TAIL)).all(), marks
+        return
     assert directed("b", "f") or "required" not in REGISTRY[name].knowledge, marks
     assert not directed("c", "d") and not directed("e", "d")
     for early in EARLY:
@@ -556,7 +577,8 @@ def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edg
     data = pd.DataFrame({"a": a, "b": 0.8 * a + rng.uniform(-1.0, 1.0, 1000)})
     marks, labels = _marks(_fit(name, data, knowledge=Knowledge(required=[edge])))
     cause, effect = (labels.index(v) for v in edge)
-    assert marks[cause, effect] == TAIL and marks[effect, cause] == ARROW
+    head = TAIL if name in UNDIRECTED else ARROW
+    assert marks[cause, effect] == TAIL and marks[effect, cause] == head
 
 
 @pytest.mark.parametrize(
@@ -659,11 +681,41 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
 
 @pytest.mark.parametrize(
     ("name", "knowledge"),
-    [("pc", CYCLE), ("cdnod", CYCLE), ("pc", ANCESTOR), ("cdnod", ANCESTOR), ("fci", ANCESTOR)],
+    [
+        *((name, CYCLE) for name in ("pc", "cdnod", "iamb", "inter_iamb", "mmpc")),
+        *((name, ANCESTOR) for name in ("pc", "cdnod", "fci")),
+    ],
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
+    # A blanket method directs edges only in its CPDAG.
+    settings = {"structure": "cpdag"} if name in {"iamb", "inter_iamb", "mmpc"} else {}
     with pytest.raises(KnowledgeError):
-        _fit(name, _triangle(), knowledge=knowledge)
+        _fit(name, _triangle(), knowledge=knowledge, **settings)
+
+
+@pytest.mark.parametrize(("name", "structure"), UNDIRECTED_STRUCTURES)
+@pytest.mark.parametrize("knowledge", [CYCLE, Knowledge(tiers=[["c"], ["a", "b"]])])
+def test_tiers_and_one_way_forbidden_edges_leave_an_undirected_result(name, structure, knowledge):
+    # They constrain orientation only, which an undirected result does not have.
+    plain = _fit(name, _triangle(), structure=structure).structure.oriented_edges()
+    with_knowledge = _fit(name, _triangle(), structure=structure, knowledge=knowledge)
+    assert with_knowledge.structure.oriented_edges() == plain
+
+
+@pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc", "calm"])
+@pytest.mark.parametrize(
+    ("knowledge", "error"),
+    [
+        ({"required": [("a", "c")]}, TypeError),
+        (Knowledge(required=[("a", "z")]), KnowledgeError),
+        (Knowledge(required=[("a", "c")], forbidden=[("a", "c")]), KnowledgeError),
+        (Knowledge(forbidden=[("a", "c", 1)]), NotImplementedError),
+    ],
+    ids=["not knowledge", "missing column", "contradiction", "lagged link"],
+)
+def test_the_local_and_gated_searches_check_their_knowledge(name, knowledge, error, data):
+    with pytest.raises(error):
+        _fit(name, data, knowledge=knowledge)
 
 
 def test_fci_reads_a_cycle_of_arrowheads_as_a_pag():
@@ -885,10 +937,10 @@ def test_a_method_without_lags_rejects_a_lagged_link():
         andrey.pc(_sample(), knowledge=Knowledge(forbidden=[("a", "b", 1)]))
 
 
-@pytest.mark.parametrize("collider_rule", ["majority", "none"])
+@pytest.mark.parametrize("collider_rule", ["majority", "sepsets"])
 def test_pcmciplus_orients_a_collider_over_a_pair_kept_apart_only_from_a_test(collider_rule):
     # x -> y <- z within one step, with x and z kept apart. The majority rule tests them for the
-    # sets that separate them and finds the collider; "none" reads the separating set of the
+    # sets that separate them and finds the collider; "sepsets" reads the separating set of the
     # skeleton phase, which never tested them, so the triple stays ambiguous.
     rng = np.random.default_rng(0)
     x, z, noise = rng.standard_normal((3, 1000))

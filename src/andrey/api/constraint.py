@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
-    MAX_CATEGORIES,
     categorical_metadata,
     check_categories,
     checked_data,
@@ -47,7 +46,6 @@ def pc(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
@@ -70,8 +68,11 @@ def pc(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
+        for data whose columns are monotone transformations of Gaussian variables: its p-values do
+        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns, by a likelihood ratio. Four more tests detect nonlinear dependence in
         continuous data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
@@ -105,20 +106,16 @@ def pc(
         up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -161,11 +158,12 @@ def pc(
         too few samples for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``,
         if ``data`` holds a value that is not a whole number; or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
-        up to scale and shift, before any test runs; one message names every group of copies and
-        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        column holds a number that is not whole or a missing value. Also if a continuous test meets
+        a column declared categorical, by ``categorical`` or by its type. With ``"fisherz"`` or
+        ``"student_t"``, also if a column repeats another up to scale and shift, before any test
+        runs; one message names every group of copies and says to keep one column per group. Also if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -173,9 +171,9 @@ def pc(
         When a conditioning pass of size two or greater requires at least ten million CI tests;
         each message warns once per process. The warning does not limit the search.
     DataTypeWarning
-        When a mixed-data test infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     See Also
     --------
@@ -263,9 +261,14 @@ def pc(
     (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
     row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
     at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
-    2,000 rows). The numbers below were measured with ``collider_order="column"``. On the
-    223-variable ANDES network with 1,000 simulated rows, its median errors passed the empty graph's
-    (372 against 338). Its run time grows combinatorially with the largest neighborhood. On
+    2,000 rows). Test errors can make the colliders it finds fit no DAG on the skeleton, and the
+    ``cpdag`` it returns then has no consistent DAG extension, so a graph query such as
+    ``markov_blanket`` raises ``ValueError``. With the default settings, of 200 simulated datasets
+    with 10 variables, mean degree 3, and 2,000 rows, 33 fits with ``"fisherz"`` and 31 with
+    ``"normal_scores"`` returned one. The numbers below were measured with
+    ``collider_order="column"``. On the 223-variable ANDES network with 1,000 simulated rows, its
+    median errors passed the empty graph's (372 against 338). Its run time grows combinatorially
+    with the largest neighborhood. On
     simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
     half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
     rows, its median errors stayed below the empty graph's at every size: at 40 variables, 18.5 with
@@ -283,10 +286,18 @@ def pc(
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
     ``category`` columns are read the same way. A test compares the counts of ``x`` and ``y`` with
     independence within each configuration of the conditioning set that occurs in the data [2]_.
-    Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom, counting only the values
-    of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1. A test needs several rows
-    per cell of its table: with many categories or a large conditioning set, most cells are empty,
-    and the p-value is unreliable.
+    The p-value refers the statistic to a chi-square law whose degrees of freedom are its
+    mean when ``y`` is shuffled within each configuration: ``(r_x - 1) * (r_y - 1)`` per
+    configuration for large counts, with ``r_x`` and ``r_y`` the values present in it [6]_, and
+    more for few rows, where the usual degrees of freedom over-reject a true independence; with
+    none, the p-value is 1. A table with fewer rows than cells has most cells empty: the p-values
+    are then a little too large, ``"gsq"``'s more than ``"chisq"``'s, which loses ``"gsq"`` some
+    power there. Over 35,808 true independences of random discrete networks, with 3 to 5
+    categories, conditioning sets of 0 to 3 variables, and 500 to 5,000 rows, a test at level 0.05
+    rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``); the usual degrees of freedom rejected 11.1%
+    and 21.7%. ``"gsq"``, the default, takes 2 to 5 times as long as ``"chisq"`` for its exact
+    mean; on discrete networks and generated tables of 500 to 5,000 rows the graph it finds was
+    no farther from the truth than ``"chisq"``'s in all 16 settings and nearer in 3.
 
     **Mixed data.** ``"degen_gauss"`` and ``"cond_gauss"`` test data with continuous and categorical
     columns. Each distinct value of a categorical column is one category, and a DataFrame column of
@@ -374,7 +385,6 @@ def pc(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="pc",
         missing=True,
     )
@@ -426,7 +436,6 @@ def fci(
     indep_test: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -450,8 +459,11 @@ def fci(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
+        for data whose columns are monotone transformations of Gaussian variables: its p-values do
+        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns. Four more tests detect nonlinear dependence in continuous data, at a
         far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
@@ -478,15 +490,11 @@ def fci(
         ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other tests
-        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -496,10 +504,10 @@ def fci(
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -548,9 +556,9 @@ def fci(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data test infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     See Also
     --------
@@ -716,7 +724,6 @@ def fci(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         method="fci",
         missing=True,
     )
@@ -752,14 +759,15 @@ def gfci(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     possible_dsep: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
@@ -791,9 +799,15 @@ def gfci(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     indep_test : str or None, default=None
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
-        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
+        ``"student_t"`` (Student-t) test partial correlation, for continuous data, and
+        ``"normal_scores"`` does so on each column's normal scores. ``"chisq"``
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``,
         ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
@@ -819,14 +833,10 @@ def gfci(
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
-        columns; a mixed-data setting passed explicitly also infers every column of at most
-        ``max_categories`` distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks
-        none. The other settings accept only ``None`` or ``[]``. See *Data types* in the
+        columns, never a column by its values. ``[]`` marks none. A categorical setting reads every
+        column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
+        named here or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
@@ -836,10 +846,10 @@ def gfci(
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
         Limitations.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -847,6 +857,13 @@ def gfci(
         the adjacency search, the separating sets for the pairs GES leaves non-adjacent, the
         possible-d-separation step, the conservative and majority rules, and the discriminating-path
         rule, but not the GES phase.
+    max_parents : int or None, default=None
+        A cap on every node's parents in the GES phase, at least ``0``: no DAG the GES CPDAG
+        represents gives a node more than ``max_parents`` parents, as :func:`~andrey.ges` applies
+        it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node of the
+        PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
+        orientation rules put at a node. ``None`` sets no cap; the GES phase then keeps its gate of
+        ``n_variables / 2``.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
@@ -879,15 +896,17 @@ def gfci(
         or if ``data`` or ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the
         BIC score, also if a column repeats another up to scale and shift given more than two rows
         or, with more rows than columns, is a linear function of other columns. One message names
-        every group of copies and says to keep one column per group. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        every group of copies and says to keep one column per group. Also if a given
+        ``max_parents`` is below the parents some graph of the required edges of ``knowledge``
+        gives a node, or if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
-        When the mixed-data score and test infers the categorical columns, or finds none and so runs
-        as the linear-Gaussian form, or when a continuous setting meets columns that look like
-        category codes; each message warns once per process.
+        When the mixed-data score or test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     Notes
     -----
@@ -906,6 +925,10 @@ def gfci(
     ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, such a
     pair's separating set is the first subset found in column order, and ``possible_dsep`` defaults
     to ``"fast"``.
+
+    With ``max_parents``, the GES phase takes no move that gives a node more parents than the cap,
+    as :func:`~andrey.ges` does; the published GFCI [1]_ has no such cap. The test phase only
+    removes edges, but its orientation rules can put more arrowheads at a node than the cap.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -1011,9 +1034,7 @@ def gfci(
             "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
-    X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories, method="gfci"
-    )
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method="gfci")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
     ambiguous: set[tuple[int, int, int]] = set()
@@ -1023,12 +1044,14 @@ def gfci(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             alpha=alpha,
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
             max_depth=max_depth,
+            max_parents=max_parents,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
             seed=seed,
@@ -1051,7 +1074,6 @@ def cdnod(
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1079,7 +1101,8 @@ def cdnod(
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
-        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
+        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
+        column's normal scores. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
         and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
@@ -1106,26 +1129,22 @@ def cdnod(
         triple whose middle node is the index is not voted: the index is never a collider.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The domain index
-        is categorical too, so ``data`` may have no categorical column. The other tests take no
-        column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. The domain index is categorical too, so
+        ``data`` may have no categorical column. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here or
+        by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1183,9 +1202,9 @@ def cdnod(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data test infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When a mixed-data test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
 
     Notes
     -----
@@ -1307,7 +1326,6 @@ def cdnod(
         categorical,
         "indep_test",
         indep_test,
-        max_categories=max_categories,
         index_categorical=True,
         method="cdnod",
         missing=True,

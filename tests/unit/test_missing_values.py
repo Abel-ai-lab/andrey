@@ -17,7 +17,7 @@ import pytest
 
 import andrey
 from andrey.cli import main
-from andrey.core import ci
+from andrey.core import ci, warning_policy
 from andrey.core.ci import (
     FisherZ,
     StudentT,
@@ -28,6 +28,7 @@ from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 SUPPORTED = [name for name, spec in REGISTRY.items() if spec.data.missing]
 REFUSED = [name for name, spec in REGISTRY.items() if not spec.data.missing]
@@ -84,6 +85,7 @@ def _mixed(n: int = 400, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
 TESTS = {
     "fisherz": (_continuous, None),
     "student_t": (_continuous, None),
+    "normal_scores": (_continuous, None),
     "kci": (lambda: _continuous(120), None),
     "rcot": (_continuous, None),
     "cmiknn": (lambda: _continuous(120), None),
@@ -255,6 +257,20 @@ def test_a_small_block_gives_a_p_value_or_raises(name):
                 assert 0.0 <= p <= 1.0
 
 
+def test_a_registered_test_with_p_values_only_reports_statistics_under_deletion(monkeypatch):
+    """Without a many-query method, each query is asked of the test over its own rows and counted
+    in ``rows_tested``; the statistic orders the queries by p-value, smallest first."""
+    monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    test = make_indep_test("p_value_only", _gaps(_continuous(), 0.1))
+    x, y = np.array([0, 0, 1, 4]), np.array([3, 2, 4, 2])
+    conditions = np.array([[2], [4], [3], [1]])
+    with rows_tested() as rows:
+        statistics, p_values = test.statistic_pvalues(x, y, conditions)
+    assert sum(rows.values()) == len(x)
+    assert p_values.tolist() == [test(a, b, c) for a, b, c in zip(x, y, conditions.tolist())]
+    assert np.array_equal(np.argsort(-statistics), np.argsort(p_values))
+
+
 def test_a_registered_test_runs_on_one_blas_thread():
     register_indep_test("pinned", lambda block: FisherZ(block))
     try:
@@ -336,10 +352,16 @@ def test_pandas_na_is_a_missing_value():
         andrey.ges(frame)
 
 
-def test_categories_are_inferred_from_the_observed_values():
+def test_the_category_code_warning_reads_the_observed_values():
+    """Column a holds three codes and gaps: the warning names it, and declaring it reads it as
+    categorical with its gaps."""
     x, _ = _mixed()
-    x = _gaps(x, 0.1)
-    out = andrey.pc(pd.DataFrame(x, columns=list("abcde")), indep_test="cond_gauss")
+    frame = pd.DataFrame(_gaps(x, 0.1), columns=list("abcde"))
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DataTypeWarning, match="columns 'a' hold at most 10"):
+        out = andrey.pc(frame, indep_test="cond_gauss")
+    assert out.metadata["categorical"] == []
+    out = andrey.pc(frame, indep_test="cond_gauss", categorical=["a"])
     assert out.metadata["categorical"] == ["a"]
 
 
@@ -397,7 +419,7 @@ def test_more_workers_give_the_same_result_on_missing_values(name, monkeypatch):
     monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "1")
     x = _gaps(_continuous(400), 0.1)
     serial = _fit(name, x)
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         assert _fit(name, x) == serial
 
 
@@ -503,8 +525,8 @@ def test_a_pair_test_with_too_few_rows_raises(name):
 @pytest.mark.parametrize("name", ["pc", "fci"])
 def test_bootstrap_resamples_rows_with_missing_values(name):
     x = _gaps(_continuous(300), 0.1)
-    boot = andrey.bootstrap(name, x, n_boot=4, seed=0)
-    assert boot.n_boot == 4
+    boot = andrey.bootstrap(name, x, n_resamples=4, seed=0)
+    assert boot.n_resamples == 4
 
 
 # --- the command line -----------------------------------------------------------------------------

@@ -144,16 +144,14 @@ see [Are the classic methods accurate on very large graphs?](#are-the-classic-me
 ### Can it use more CPU cores?
 
 GES and GFCI (in its GES phase) can spread each pass over worker processes: set
-`ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. PC, FCI, GFCI,
+`ANDREY_N_JOBS` above 1. GES's parallel result is identical to its serial one. PC, FCI, GFCI,
 and CD-NOD spread the larger passes of their skeleton search over worker processes with the
 `fisherz` and `student_t` tests, from the same setting, and return the same graph as with one
 worker. A script that does this must put its entry point under `if __name__ == "__main__":`,
 because starting the workers re-imports the script;
 [Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass uses the
 workers only above a work cutoff. The defaults suit one fit per process; for a process that runs
-many fits, `andrey calibrate` measures the cutoffs on your machine and prints the settings. With the
-same setting, `granger` fits its variables on worker threads, which need no `__main__` guard, and
-returns the same coefficients.
+many fits, `andrey calibrate` measures the cutoffs on your machine and prints the settings.
 
 ## Data
 
@@ -167,8 +165,8 @@ row names the nodes) or a `.npy` file.
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
 text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, and
-RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI,
-hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
+RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GIES,
+XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
 `score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
 the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
 `score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
@@ -176,8 +174,9 @@ the column types you declare, with `categorical` or a DataFrame's `category` col
 `bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
 numbers that you have not declared reads as numbers, with a warning. The
 [release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
-Tetrad, bnlearn, and pgmpy. [Data types](guides/getting-started.md#data-types) explains the
-settings. The LiNGAM methods assume continuous non-Gaussian noise.
+Tetrad, bnlearn, and pgmpy; GIES and XGES are not benchmarked on those data yet.
+[Data types](guides/getting-started.md#data-types) explains the settings. The LiNGAM methods
+assume continuous non-Gaussian noise.
 
 ### Does it handle missing values?
 
@@ -195,16 +194,19 @@ against dropping incomplete samples, and
 
 Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
 points from a later tier into an earlier one, such as nothing causing a person's age. Every method
-takes it except IAMB, Inter-IAMB, MMPC, CALM, ANM, PNL, and GIN.
+takes it except ANM, PNL, and GIN.
 
 ### How sure is each edge?
 
 `andrey.bootstrap(method, data)` refits a method on 100 resamples of the data and counts how often
-each edge appears. It returns each edge's frequency, a table of the edges, and an averaged graph of
-the pairs adjacent in at least half the fits; `andrey bootstrap <method>` does the same from the
-command line. Read the frequencies as a ranking: in the release cards' simulations, edges seen in
-more than nine fits in ten were almost always true. A frequency is not the probability that an
-edge is true: a method that makes the same mistake on every resample gives it a frequency of 1.
+each edge appears. It returns each edge's frequency, a table of the edges, and an averaged graph:
+each pair takes the state it has most often, no edge included, and the result is made a valid
+graph of the method's kind; `andrey bootstrap <method>` does the same from the command line. Each
+resample is half of the rows, drawn without replacement; `resampling="bootstrap"` draws all the
+rows with replacement instead. Read the frequencies as a ranking: in the 0.11.0
+release card's simulations, which used that bootstrap resampling, edges seen in more than nine fits
+in ten were almost always true. A frequency is not the probability that an edge is true: a method
+that makes the same mistake on every resample gives it a frequency of 1.
 
 ### Time series and several datasets?
 
@@ -293,7 +295,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.11.0},
+  version = {0.12.0},
   url = {https://andrey.abel.ai},
 }
 ```

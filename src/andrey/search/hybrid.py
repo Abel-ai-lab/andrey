@@ -14,13 +14,16 @@ from contextlib import nullcontext
 import numpy as np
 
 from andrey.constraint.blanket import (
+    blanket_cpdag,
     blanket_graph,
     markov_blanket,
-    mmpc_skeleton,
+    mmpc_sets,
     parents_children,
+    prune_spouses,
+    reach,
 )
 from andrey.constraint.pc import _discover_skeleton
-from andrey.core import NULL, GraphStructure, backend
+from andrey.core import NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import (
     DISCRETE_INDEP_TESTS,
     MIXED_INDEP_TESTS,
@@ -33,8 +36,7 @@ from andrey.core.mixed import column_mask
 from andrey.search.hc import hc, tie_ranks
 from andrey.search.tabu import tabu
 
-#: The restrict phases: MMPC's skeleton, the moral graph of IAMB's or Inter-IAMB's Markov
-#: blankets, or PC's skeleton.
+#: The restrict phases: the skeleton of MMPC, of IAMB, or of Inter-IAMB, or PC's skeleton.
 RESTRICTS: tuple[str, ...] = ("mmpc", "iamb", "inter_iamb", "pc")
 #: The maximize phases: hill climbing or tabu search.
 MAXIMIZES: tuple[str, ...] = ("hc", "tabu")
@@ -52,13 +54,13 @@ def candidate_graph(
 ) -> np.ndarray:
     """The restrict phase: the pairs the maximize phase may join, a symmetric boolean matrix.
 
-    ``"mmpc"`` keeps a pair when each variable is in the other's MMPC set and ``"iamb"`` or
-    ``"inter_iamb"`` when each is in the other's Markov blanket
-    (:mod:`andrey.constraint.blanket`); ``"pc"`` keeps PC's skeleton
-    (:func:`~andrey.constraint.pc._discover_skeleton`). Each runs the ``indep_test`` test at level
-    ``alpha``; ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes
-    the draws of a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every
-    test's conditioning set.
+    ``"mmpc"``, ``"iamb"``, and ``"inter_iamb"`` keep the skeleton :func:`local_structure` returns
+    for them: the pairs each in the other's MMPC set, or each in the other's Markov blanket and
+    not separated by a subset of the smaller blanket (:mod:`andrey.constraint.blanket`). ``"pc"``
+    keeps PC's skeleton (:func:`~andrey.constraint.pc._discover_skeleton`). Each runs the
+    ``indep_test`` test at level ``alpha``; ``categorical`` marks the categorical columns for a
+    mixed-data test; ``seed`` fixes the draws of a stochastic test (``None`` uses
+    ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning set.
     """
     if restrict == "pc":
         adj, _, _ = _discover_skeleton(
@@ -73,15 +75,17 @@ def candidate_graph(
             seed=seed,
         )
         return adj != NULL
-    return local_graph(
+    marks = local_structure(
         X,
         restrict,
+        "skeleton",
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
     )
+    return marks != NULL
 
 
 def _ranked_test(
@@ -100,28 +104,54 @@ def _ranked_test(
     return test, tie_ranks(X, mask).tolist()
 
 
-def local_graph(
+def local_structure(
     X: np.ndarray,
     method: str,
+    structure: str,
     *,
     alpha: float,
     indep_test: str,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
-    """Every variable's MMPC (``"mmpc"``), IAMB (``"iamb"``), or Inter-IAMB (``"inter_iamb"``) set
-    under the AND rule: MMPC's skeleton or the moral graph, a symmetric boolean matrix. ``seed``
-    fixes the draws of a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every
-    test's conditioning set."""
+    """Every variable's MMPC, IAMB, or Inter-IAMB set joined into the graph ``structure`` names, as
+    an endpoint-mark matrix.
+
+    ``"moral"`` (IAMB, Inter-IAMB) joins a pair when each variable is in the other's Markov
+    blanket, undirected. ``"skeleton"`` is MMPC's skeleton under the AND rule, or the moral graph
+    less the pairs :func:`prune_spouses` separates. ``"cpdag"`` orients that skeleton
+    (:func:`~andrey.constraint.blanket.blanket_cpdag`) against the blankets: the moral graph, or
+    for MMPC each variable's set together with its members' sets before the symmetry check
+    (:func:`~andrey.constraint.blanket.reach`). ``seed`` fixes the draws of a stochastic test
+    (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning set;
+    ``constraints`` set the members as :mod:`andrey.constraint.blanket` describes.
+    """
     test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
-            return mmpc_skeleton(test, d, alpha, ranks, max_depth)
-        return blanket_graph(
-            test, d, alpha, ranks, interleaved=method == "inter_iamb", max_depth=max_depth
-        )
+            sets = mmpc_sets(test, d, alpha, ranks, max_depth, constraints)
+            skeleton, blankets = sets & sets.T, reach(sets)
+        else:
+            blankets = blanket_graph(
+                test,
+                d,
+                alpha,
+                ranks,
+                interleaved=method == "inter_iamb",
+                max_depth=max_depth,
+                constraints=constraints,
+            )
+            skeleton = (
+                blankets
+                if structure == "moral"
+                else prune_spouses(test, blankets, alpha, max_depth, constraints)
+            )
+        if structure != "cpdag":
+            return np.where(skeleton, TAIL, NULL).astype(np.int8)
+        return blanket_cpdag(test, skeleton, blankets, alpha, max_depth, constraints)
 
 
 def local_set(
@@ -134,6 +164,7 @@ def local_set(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> list[int]:
     """``target``'s set in the order its members joined, by MMPC (``"mmpc"``), IAMB (``"iamb"``),
     or Inter-IAMB (``"inter_iamb"``).
@@ -141,18 +172,27 @@ def local_set(
     MMPC keeps the members of ``target``'s parents and children whose own set holds ``target``
     (the symmetry check); IAMB and Inter-IAMB return the Markov blanket. ``seed`` fixes the draws of
     a stochastic test (``None`` uses ``ANDREY_SEED``); ``max_depth`` caps every test's conditioning
-    set.
+    set; ``constraints`` set the members as :mod:`andrey.constraint.blanket` describes.
     """
     test, ranks = _ranked_test(X, indep_test, categorical, seed)
     d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
         if method == "mmpc":
-            found = parents_children(test, target, d, alpha, ranks, max_depth)
+            found = parents_children(test, target, d, alpha, ranks, max_depth, constraints)
             return [
-                x for x in found if target in parents_children(test, x, d, alpha, ranks, max_depth)
+                x
+                for x in found
+                if target in parents_children(test, x, d, alpha, ranks, max_depth, constraints)
             ]
         return markov_blanket(
-            test, target, d, alpha, ranks, interleaved=method == "inter_iamb", max_depth=max_depth
+            test,
+            target,
+            d,
+            alpha,
+            ranks,
+            interleaved=method == "inter_iamb",
+            max_depth=max_depth,
+            constraints=constraints,
         )
 
 
@@ -182,6 +222,7 @@ def rsmax2(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,
@@ -216,6 +257,7 @@ def rsmax2(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             max_iter=max_iter,
             categorical=categorical,
             constraints=limits,
@@ -227,6 +269,7 @@ def rsmax2(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,

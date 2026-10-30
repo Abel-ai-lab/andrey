@@ -32,7 +32,7 @@ needs_tetrad = pytest.mark.skipif(
     reason=f"no causal-cmd jar (${tetrad_cmd.JAR_ENV}) or no java",
 )
 #: A few hundred optimizer steps: enough to reach the conversion, far from a converged answer.
-_SHORT = {"subproblem_iter": 200, "max_outer": 3}
+_SHORT = {"subproblem_iter": 200, "max_iter": 3}
 
 
 def test_every_solution_has_its_own_name() -> None:
@@ -55,7 +55,7 @@ def test_both_gfci_solutions_run_one_setting() -> None:
 def test_the_parallel_gfci_returns_the_serial_pag(monkeypatch) -> None:
     from andrey.search import _parallel_ges
 
-    monkeypatch.setenv("ANDREY_NUM_WORKERS", "2")
+    monkeypatch.setenv("ANDREY_N_JOBS", "2")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")  # every GES pass fans out
     pools = []
     get = _parallel_ges._LazyWorkerSet.get

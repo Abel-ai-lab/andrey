@@ -4,7 +4,7 @@ VARMA-LiNGAM calls ``andrey.varma_lingam(X, order=(1, 1), criterion=None, prune=
 autoregressive and one moving-average lag, no order search, and the lag blocks re-estimated by
 adaptive Lasso, which sets small weights to zero, so a link is a nonzero weight.
 :mod:`~andrey_bench.adapters.lingam_ts` passes the same settings to lingam. Longitudinal LiNGAM
-calls ``andrey.longitudinal_lingam(data_list, n_lags=1, measure="pwling")``, Andrey's defaults and
+calls ``andrey.longitudinal_lingam(data, tau_max=1, measure="pwling")``, Andrey's defaults and
 lingam's.
 
 ``fit`` returns the coefficient stack of :mod:`andrey_bench.coefficients` in the ``[effect, cause]``
@@ -93,7 +93,7 @@ class AndreyLongitudinalLiNGAM:
 
         panel = np.asarray(data, dtype=np.float64)
         out = andrey.longitudinal_lingam(
-            list(panel), n_lags=int(params["n_lags"]), measure=str(params["measure"])
+            list(panel), tau_max=int(params["n_lags"]), measure=str(params["measure"])
         )
         # time_weights covers time points 1..T-1 as [cause, effect]; the first is not estimated.
         weights = np.asarray(out.structure.time_weights).transpose(0, 1, 3, 2)

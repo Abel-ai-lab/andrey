@@ -465,11 +465,12 @@ def _adapted(adapter: Any) -> Callable[[Any], Any]:
 def _granger(x: np.ndarray) -> np.ndarray:
     """The lagged edges of ``andrey.granger`` with the published settings, as ``(lag, cause,
     effect)``."""
-    out = andrey.granger(x, tau_max=GRANGER_LAGS, cv=5)
+    out = andrey.granger(x, tau_max=GRANGER_LAGS)
     return np.stack([np.asarray(w) != 0 for w in out.structure.lag_weights])
 
 
-#: Public defaults. A fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's
+#: Public defaults, except RSMAX2: its default restrict phase is MMHC's, so the gate fits its IAMB
+#: restrict phase. A fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's
 #: optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call
 #: the public functions with the published settings: the domain index of four equal blocks of rows,
 #: and three groups of columns.
@@ -478,11 +479,14 @@ SUPPORTED: dict[str, Method] = {
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
     "GFCI": Method(lambda x: andrey.gfci(x), "pag", PAG_DATA),
     "CDNOD": Method(_adapted(AndreyCDNOD()), "essential", _models("domain_shift_er")),
+    "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
     "GIES": Method(lambda x: andrey.gies(*unstack(x)), "essential", INTERVENTION_DATA),
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
+    "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
+    "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
@@ -727,7 +731,7 @@ def evaluate(method: str, dataset: str, fit: Callable[[Draw], object] | None = N
     run = fit or (lambda draw: spec.fit(draw.data))
     shds, empties = [], []
     start = time.perf_counter()
-    with andrey.config(backend="numpy", num_workers=1), threadpool_limits(limits=1):
+    with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         for draw in draws(dataset):
             empty = empty_estimate(draw, spec.target)
             if spec.target in SERIES_TARGETS:

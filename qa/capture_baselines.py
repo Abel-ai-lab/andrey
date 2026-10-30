@@ -69,9 +69,9 @@ def _run_varmalingam_pruned(X: np.ndarray, algorithm: str) -> dict:
 
 
 def _run_granger(X: np.ndarray, algorithm: str) -> dict:
-    from andrey.temporal.granger import granger_lasso
+    from andrey.temporal.granger import granger_f_test
 
-    coeff = np.asarray(granger_lasso(X), dtype=np.float64)
+    coeff = np.asarray(granger_f_test(X, maxlag=2)[0], dtype=np.float64)
     return {"coeff": coeff, "adj": (coeff != 0.0).astype(int)}
 
 
@@ -100,6 +100,7 @@ ALGORITHMS = {
     "XGES": (_facade("xges"), "gauss_5v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
+    "InterIAMB": (_facade("inter_iamb"), "gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),

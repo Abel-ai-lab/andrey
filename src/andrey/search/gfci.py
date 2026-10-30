@@ -52,6 +52,8 @@ def gfci(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    max_parents: int | None = None,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
@@ -71,6 +73,7 @@ def gfci(
     visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
     of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
+    ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
     ``constraints`` reach the GES phase, and the test phase honors them as FCI does: no step tests
@@ -79,7 +82,7 @@ def gfci(
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
     ``workers`` worker processes share the GES passes and the adjacency search's larger
     conditioning-size passes, each above its own work threshold; ``None`` reads
-    ``andrey.config.num_workers``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
+    ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
     the triples the pattern shields by the vote of :func:`~andrey.constraint.fci._vote_sepsets`
     after the possible-d-sep step. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. The private
@@ -96,6 +99,8 @@ def gfci(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        max_parents=max_parents,
         categorical=categorical,
         constraints=constraints,
         workers=workers,

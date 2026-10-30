@@ -67,9 +67,10 @@ from .core.warning_policy import (
     SampleSizeWarning,
     SearchLimitWarning,
 )
+from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 
 __all__ = [
     "__version__",
@@ -80,12 +81,15 @@ __all__ = [
     "StructureOutput",
     # Background knowledge every search takes as knowledge=.
     "Knowledge",
-    # Refit a method on bootstrap resamples: edge frequencies and an averaged graph.
+    # Refit a method on resamples of the rows: edge frequencies and an averaged graph.
     "bootstrap",
     "BootstrapOutput",
+    # Test the independences a DAG or CPDAG implies against data: p-values and a uniformity verdict.
+    "markov_check",
+    "MarkovCheckOutput",
     # Seeds random, NumPy's global generator, and torch for the caller's own draws.
     "seed_all",
-    # Backend grammar: pick the backend + num_workers, layered selection (see ANDREY_BACKEND).
+    # Backend grammar: pick the backend + n_jobs, layered selection (see ANDREY_BACKEND).
     "config",
     "describe",
     # Warning categories: every warning Andrey raises is an AndreyWarning.

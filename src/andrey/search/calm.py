@@ -10,6 +10,11 @@ non-equal-variance negative log-likelihood ``0.5 * sum_j log(residual_var_j) - l
 the gate penalty, and ``0.5 * rho * h**2`` for the acyclicity term ``h(M) = tr((I + M/d)^d) - d``
 (Yu et al. 2019) on the gate mask, until ``h`` is within tolerance. The gates are then
 thresholded, and edges are removed by increasing weight magnitude until no cycle remains.
+
+Background knowledge, as :class:`~andrey.core.knowledge.Constraints`, edits the candidate edges:
+the moral graph's pairs and the pairs of the required edges, less every forbidden direction. A
+required edge's gate is held at one, so the acyclicity term counts it, the penalty and the
+thresholds leave it, and the cycle repair keeps it.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ import numpy as np
 from andrey.constraint.blanket import blanket_graph
 from andrey.core import GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
+from andrey.core.knowledge import Constraints
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.warning_policy import warn_search_limit
 from andrey.search.continuous import (
@@ -108,12 +114,14 @@ def _optimize_gated_dag(
     subproblem_iter: int,
     lr: float,
     seed: int,
+    required: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Fit gate logits and edge weights; return ``(gate_prob, weight)`` numpy arrays.
 
     Runs the quadratic-penalty schedule with a Gumbel-sigmoid gate over the moral-graph support.
     ``gate_prob`` is the noiseless edge probability ``sigmoid(logit / tau)`` and ``weight`` the real
-    coefficient matrix; the caller thresholds them into a binary support. Raises ``ValueError``
+    coefficient matrix; the caller thresholds them into a binary support. A ``required`` edge's
+    gate is held at one and left out of the penalty; its weight is fitted. Raises ``ValueError``
     when the loss or the fitted parameters are not finite.
     """
     torch = _require_torch()
@@ -121,6 +129,7 @@ def _optimize_gated_dag(
     d = cov.shape[0]
     cov_t = torch.from_numpy(cov).double()
     mask_t = torch.from_numpy(moral_mask).double()
+    on = None if required is None else torch.from_numpy(required)
     eye = torch.eye(d, dtype=torch.double)
 
     weight = torch.empty(d, d, dtype=torch.double).uniform_(-1e-3, 1e-3, generator=gen)
@@ -134,7 +143,11 @@ def _optimize_gated_dag(
             g = torch.sigmoid((logit + noise) / tau)
         else:
             g = torch.sigmoid(logit / tau)
-        return g * mask_t
+        g = g * mask_t
+        return g if on is None else torch.where(on, 1.0, g)
+
+    def penalty(g: torch.Tensor) -> torch.Tensor:
+        return g.sum() if on is None else g.masked_fill(on, 0.0).sum()
 
     def acyclicity(gate_mask: torch.Tensor) -> torch.Tensor:
         poly = torch.matrix_power(eye + gate_mask / d, d)
@@ -155,7 +168,7 @@ def _optimize_gated_dag(
             resid = torch.diagonal((eye - B).T @ cov_t @ (eye - B)).clamp_min(1e-12)
             likelihood = 0.5 * torch.sum(torch.log(resid)) - torch.linalg.slogdet(eye - B)[1]
             h = acyclicity(g)
-            loss = likelihood + lambda1 * g.sum() + 0.5 * rho * h * h
+            loss = likelihood + lambda1 * penalty(g) + 0.5 * rho * h * h
             cur = loss.item()
             if not math.isfinite(cur):
                 raise ValueError(_NOT_FINITE)
@@ -203,6 +216,7 @@ def calm(
     use_moral_graph: bool = True,
     seed: int = 0,
     labels: tuple[str, ...] | None = None,
+    constraints: Constraints | None = None,
 ) -> CalmResult:
     """Recover a linear-Gaussian DAG by continuous acyclicity-constrained optimization.
 
@@ -216,7 +230,9 @@ def calm(
     its weight magnitude clears ``w_threshold``. Set ``standardize`` to z-score the columns first;
     ``seed`` makes the run reproducible. The fit runs on the columns in order of their
     :func:`~andrey.search.hc.tie_ranks`, so each column keeps its initial weights and gate noise
-    when the columns are reordered. Returns a :class:`CalmResult`.
+    when the columns are reordered. ``constraints``, in the data's column order, edit the
+    candidate edges and hold the required gates on, as the module describes. Returns a
+    :class:`CalmResult`.
     """
     samples = np.asarray(data, dtype=np.float64)
     n, d = samples.shape
@@ -231,6 +247,14 @@ def calm(
     cov = centered.T @ centered / n
 
     mask = moral_graph(centered, alpha=alpha) if use_moral_graph else (1.0 - np.eye(d))
+    moral_edges = int(mask.sum() // 2)
+    required = None
+    if constraints is not None:
+        fit = constraints.permuted(order)
+        required = fit.required
+        candidates = ((mask > 0) | required | required.T) & ~fit.forbidden
+        np.fill_diagonal(candidates, False)
+        mask = candidates.astype(np.float64)
 
     if mask.sum() == 0:
         gate_prob = np.zeros((d, d))
@@ -249,13 +273,16 @@ def calm(
             subproblem_iter=subproblem_iter,
             lr=lr,
             seed=seed,
+            required=required,
         )
 
-    support = ((gate_prob >= gate_threshold) & (np.abs(weight) >= w_threshold)).astype(np.int8)
-    support = break_cycles(weight, support)
+    kept = (gate_prob >= gate_threshold) & (np.abs(weight) >= w_threshold)
+    if required is not None:
+        kept = (kept & (mask > 0)) | required
+    support = break_cycles(weight, kept.astype(np.int8), required)
     weighted = weight * support
     resid_var = residual_variances(weighted, cov)
-    support, weighted, mask = (m[np.ix_(back, back)] for m in (support, weighted, mask))
+    support, weighted = (m[np.ix_(back, back)] for m in (support, weighted))
 
     marks = endpoint_marks(support)
     dag = to_structure(marks, kind="dag", labels=labels)
@@ -274,7 +301,7 @@ def calm(
             "h_final": h_final,
             "objective": objective,
             "used_moral_graph": bool(use_moral_graph),
-            "moral_edges": int(mask.sum() // 2),
+            "moral_edges": moral_edges,
         },
     )
     return CalmResult(

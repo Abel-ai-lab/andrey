@@ -14,6 +14,7 @@ import pytest
 
 import andrey
 from andrey.core import ci
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 
 @pytest.fixture
@@ -86,6 +87,25 @@ def test_minimal_protocol_is_the_guaranteed_floor(clean_registry):
     assert out.structure.kind == "cpdag"
 
 
+def test_the_statistic_of_a_p_value_grows_as_it_shrinks():
+    p_values = np.array([1.0, 0.5, 0.05, 1e-10, 1e-300])
+    statistics = ci.p_value_statistic(p_values)
+    assert statistics[0] == 0.0
+    assert (np.diff(statistics) > 0).all()
+    assert np.isfinite(ci.p_value_statistic(0.0))  # an underflowed p-value stays finite
+
+
+def test_a_test_with_p_values_only_answers_a_batch_query_by_query():
+    """The adapter the PCMCI family wraps such a test in gives the test's p-values exactly, and
+    statistics that order the queries by p-value, smallest first."""
+    test = PValueOnly(_chain_data(d=5))
+    x, y = np.array([0, 0, 0, 1, 3]), np.array([4, 3, 2, 4, 4])
+    conditions = np.array([[1], [1], [1], [2], [0]])
+    statistics, p_values = ci.PValueTest(test).statistic_pvalues(x, y, conditions)
+    assert p_values.tolist() == [test(a, b, c) for a, b, c in zip(x, y, conditions.tolist())]
+    assert np.array_equal(np.argsort(-statistics), np.argsort(p_values))
+
+
 def test_unknown_indep_test_raises():
     """An unregistered name raises ValueError, naming what is available."""
     with pytest.raises(ValueError, match="indep_test must be one of .*'fisherz'"):
@@ -103,7 +123,7 @@ def test_fisherz_default_matches_explicit():
 def test_registry_surface(clean_registry):
     """``register`` / ``make`` / ``available`` behave as documented; every shipped name builds."""
     assert set(ci.SHIPPED_INDEP_TESTS) <= set(ci.available_indep_tests())
-    assert {"fisherz", "student_t"} < set(ci.SHIPPED_INDEP_TESTS)
+    assert {"fisherz", "student_t", "normal_scores"} < set(ci.SHIPPED_INDEP_TESTS)
     assert set(ci.DISCRETE_INDEP_TESTS) < set(ci.SHIPPED_INDEP_TESTS)
     for name in ci.SHIPPED_INDEP_TESTS:
         assert 0.0 <= ci.make_indep_test(name, np.round(_chain_data()))(0, 1) <= 1.0
@@ -111,19 +131,21 @@ def test_registry_surface(clean_registry):
     assert "delegate" in ci.available_indep_tests()
     assert isinstance(ci.make_indep_test("fisherz", _chain_data()), ci.FisherZ)
     assert isinstance(ci.make_indep_test("student_t", _chain_data()), ci.StudentT)
+    assert isinstance(ci.make_indep_test("normal_scores", _chain_data()), ci.NormalScores)
 
 
+@pytest.mark.parametrize("indep_test", ["student_t", "normal_scores"])
 @pytest.mark.parametrize(
     "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
 )
-def test_student_t_is_selectable_by_every_constraint_facade(facade):
-    """Each constraint facade accepts ``indep_test="student_t"`` and returns a valid graph."""
+def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(facade, indep_test):
+    """Each constraint facade accepts the test by name and returns a valid graph."""
     x = _chain_data()
     if facade == "cdnod":
         c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        out = andrey.cdnod(x, c, indep_test="student_t")
+        out = andrey.cdnod(x, c, indep_test=indep_test)
     else:
-        out = getattr(andrey, facade)(x, indep_test="student_t")
+        out = getattr(andrey, facade)(x, indep_test=indep_test)
     out.structure.validate()
     assert out.structure.n_nodes == x.shape[1]
 

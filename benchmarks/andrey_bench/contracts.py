@@ -37,7 +37,7 @@ RUN_ENV_FIELDS: tuple[str, ...] = (
     "warmup",
     "machine_id",
     "threads",
-    "num_workers",
+    "n_jobs",
 )
 
 #: Environment fields appended as ``name=value`` only when set. Unset fields preserve existing
@@ -150,7 +150,7 @@ class RunRecord:
 
     Each repeat carries its dataset coordinates, resource limits, timings, and memory peaks.
     Parent-declared fields such as ``cores`` and ``device`` survive censored runs. Child-observed
-    fields such as ``threads``, ``num_workers``, and ``device_id`` remain ``None`` when the child
+    fields such as ``threads``, ``n_jobs``, and ``device_id`` remain ``None`` when the child
     does not report them.
     """
 
@@ -166,7 +166,7 @@ class RunRecord:
     output_type: str  # cpdag | dag | pag | order | temporal
     # --- environment, as the parent declared it ---
     machine_id: str
-    cores: int  # per-task core budget; split_cores(cores, mode) recovers threads/num_workers
+    cores: int  # per-task core budget; split_cores(cores, mode) recovers threads/n_jobs
     device: str  # cpu | cuda; the ANDREY_DEVICE request passed to the child
     dtype: str  # how the canonical f64 file was read for this fit
     # --- dataset coordinate, flat: the DatasetKey behind dataset_id ---
@@ -231,7 +231,7 @@ class RunRecord:
     # --- environment, as the child observed it ---
     device_id: str | None = None  # "cpu" | "cuda:<index>:<name>"; resolved backend device
     threads: int | None = None  # BLAS/numeric pin the child ran under
-    num_workers: int | None = None  # Andrey worker-pool size the child ran under
+    n_jobs: int | None = None  # Andrey worker-pool size the child ran under
     # --- metrics vs the DGP truth (filled by ``scoring.score_result``; kept open) ---
     metrics: dict[str, float] = field(default_factory=dict)
 

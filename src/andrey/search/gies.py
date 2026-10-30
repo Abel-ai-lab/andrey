@@ -1,9 +1,11 @@
-"""Greedy interventional equivalence search over the linear-Gaussian BIC, the engine behind
+"""Greedy interventional equivalence search over a decomposable score, the engine behind
 :func:`andrey.gies`.
 
 The search state is the interventional essential graph: a chain graph whose arrows are the edges
 that every DAG of the interventional Markov equivalence class orients alike. Each variable's local
-score uses only the rows where it was not intervened on. The forward, backward, and turning phases
+score uses only the rows where it was not intervened on (:class:`InterventionalScore`), under the
+linear-Gaussian BIC, the categorical BDeu and BIC, or a mixed-data BIC. The forward, backward, and
+turning phases
 repeat until none of them improves the score. A step orients the chain components it touches along
 a lexicographic breadth-first search (LexBFS) ordering, adds, removes, or turns one edge, and
 rebuilds the essential graph by turning every arrow that is not strongly protected into an
@@ -14,6 +16,9 @@ References
 ----------
 Hauser and Buhlmann (2012). Characterization and greedy learning of interventional Markov
 equivalence classes of directed acyclic graphs. https://jmlr.org/papers/v13/hauser12a.html
+
+Cooper and Yoo (1999). Causal discovery from a mixture of experimental and observational data.
+Proceedings of the Fifteenth Conference on Uncertainty in Artificial Intelligence, 116-125.
 """
 
 from __future__ import annotations
@@ -28,8 +33,20 @@ import numpy.typing as npt
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta, stats
 from andrey.core.knowledge import Constraints, mpdag, orient, violates
+from andrey.core.mixed import column_mask
 from andrey.core.orient import pdag2dag, to_structure
-from andrey.core.score import BICScore, check_columns, penalty_weight
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    MIXED_SCORES,
+    SCORES,
+    BDeuScore,
+    BICScore,
+    CategoricalBICScore,
+    CGScore,
+    DGScore,
+    LocalScore,
+    make_score,
+)
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search._parallel_ges import move_key
@@ -80,17 +97,31 @@ def cut_pairs(mask: np.ndarray) -> np.ndarray:
     return cut
 
 
-class InterventionalBICScore:
-    """Linear-Gaussian BIC with each variable scored on the rows where it was not intervened on.
+class InterventionalScore:
+    """A local score with each variable scored on the rows where it was not intervened on.
 
-    A variable's local score is ``n_v * log(R) + penalty_discount * log(n) * len(parents)`` plus the
-    extended-BIC term :func:`~andrey.core.score.ebic_penalty` of ``len(parents)`` among the ``d``
-    variables: ``n_v`` counts the rows without an intervention on the variable, ``R`` is the
-    residual variance of its regression on its parents over those rows, and ``n`` counts every
-    row. Variables left alone in
-    the same rows share one :class:`~andrey.core.score.BICScore` over those rows' covariance, with
-    the penalty of all ``n`` rows. With no interventions it equals
-    :class:`~andrey.core.score.BICScore`.
+    In a row where a variable was intervened on, its value was set from outside, so only the other
+    rows show how its causes set it. ``score_func`` names the score, as for
+    :func:`~andrey.core.score.make_score`. Variables left alone in the same rows share one score
+    over those rows: the linear-Gaussian BIC over the rows' covariance; BDeu and the multinomial BIC
+    over the rows' counts, with each column's categories those of every row
+    (:meth:`~andrey.core.score.BDeuScore.on_rows`), which makes BDeu the score of Cooper and Yoo
+    (1999) for a mix of experimental and observational data, with its uniform prior; and the
+    mixed-data BICs over the rows alone, their categories and cells those of the rows. Every BIC
+    charges its penalty with ``log(n)``, ``n`` counting every row, as the BIC of all the data does
+    (Hauser and Buhlmann 2012, Sec. 5). With no interventions each score equals the one
+    ``make_score`` builds over the data.
+
+    Under ``"bic"``, a variable's local score is ``n_v * log(R) + penalty_discount * log(n) *
+    len(parents)`` plus the extended-BIC term :func:`~andrey.core.score.ebic_penalty` of
+    ``len(parents)`` among the ``d`` variables: ``n_v`` counts the rows without an intervention on
+    the variable and ``R`` is the residual variance of its regression on its parents over those
+    rows.
+
+    Two graphs of one interventional class get the same total. They differ only in how the lines of
+    the interventional essential graph are directed (Hauser and Buhlmann 2012, Prop. 16), and the
+    two ends of a line are intervened on in the same rows (Def. 14), so the variables of a chain
+    component share one score, which gives Markov equivalent graphs the same total.
 
     Parameters
     ----------
@@ -98,13 +129,26 @@ class InterventionalBICScore:
         Data matrix; rows are observations, columns are variables.
     mask : ndarray of bool, shape (n, d), or None
         True where the row's value of the variable was set by an intervention; None for none.
+    score_func : str, default="bic"
+        The local score, one of :data:`~andrey.core.score.SCORES`.
     penalty_discount : float, default=1.0
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float, default=0.0
-        Weight on the extended-BIC term, ``2 * ebic_gamma * log C(d - 1, len(parents))`` per
-        variable; ``0.0`` is the standard BIC.
+        Weight on the extended-BIC term of the linear-Gaussian BIC,
+        ``2 * ebic_gamma * log C(d - 1, len(parents))`` per variable; ``0.0`` is the standard BIC.
+        The other scores ignore it.
+    equivalent_sample_size : float, default=1.0
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
+    categorical : ndarray of bool, shape (d,), or None
+        Marks the categorical columns for a mixed-data score; the other scores ignore it.
     cache_size : int or None, default=1_000_000
         Memoization cache bound of each shared score; ``None`` is unbounded.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is not one of :data:`~andrey.core.score.SCORES`.
     """
 
     def __init__(
@@ -112,55 +156,81 @@ class InterventionalBICScore:
         data: np.ndarray,
         mask: np.ndarray | None,
         *,
+        score_func: str = "bic",
         penalty_discount: float = 1.0,
         ebic_gamma: float = 0.0,
+        equivalent_sample_size: float = 1.0,
+        categorical: np.ndarray | None = None,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        penalty_discount = float(penalty_discount)
-        if not np.isfinite(penalty_discount) or penalty_discount < 0.0:
-            raise ValueError(
-                f"penalty_discount must be finite and non-negative, got {penalty_discount}"
-            )
+        if score_func not in SCORES:
+            raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {SCORES}")
         X = np.asarray(data, dtype=np.float64)
         n, d = X.shape
-        check_columns(np.atleast_2d(stats.cov(X, rowvar=False)), n)
+        # Checks the settings and, for the BIC, the columns (check_columns).
+        whole = make_score(
+            score_func,
+            X,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
+            categorical=categorical,
+        )
         if mask is None:
             mask = np.zeros((n, d), dtype=bool)
         self.n = n
-        self.penalty_discount = penalty_discount
-        self.ebic_gamma = penalty_weight(ebic_gamma, "ebic_gamma")
+        self.d = d
+        self.penalty_discount = float(penalty_discount)
+        self.ebic_gamma = float(ebic_gamma)
         self.log_n = float(np.log(n))
-        self._groups: list[BICScore] = []
+        self._groups: list[LocalScore] = []
         self._group_of: list[int] = []
         index: dict[bytes, int] = {}
         for v in range(d):
             key = mask[:, v].tobytes()
             if key not in index:
                 rows = ~mask[:, v]
-                cov = np.atleast_2d(stats.cov(X[rows], rowvar=False))
-                group = BICScore.from_cov(
-                    cov,
-                    int(rows.sum()),
-                    penalty_discount=penalty_discount,
-                    ebic_gamma=ebic_gamma,
-                    cache_size=cache_size,
-                )
-                group.log_n = self.log_n  # the penalty counts every row
+                group: LocalScore
+                if isinstance(whole, BICScore):
+                    cov = np.atleast_2d(stats.cov(X[rows], rowvar=False))
+                    group = BICScore.from_cov(
+                        cov,
+                        int(rows.sum()),
+                        penalty_discount=penalty_discount,
+                        ebic_gamma=ebic_gamma,
+                        cache_size=cache_size,
+                    )
+                    group.log_n = self.log_n  # the penalty counts every row
+                elif isinstance(whole, BDeuScore | CategoricalBICScore):
+                    group = whole.on_rows(rows, cache_size)
+                else:
+                    kind = DGScore if isinstance(whole, DGScore) else CGScore
+                    group = kind(
+                        X[rows],
+                        categorical,
+                        penalty_discount=penalty_discount,
+                        cache_size=cache_size,
+                    )
+                    group.log_n = self.log_n  # the penalty counts every row
                 index[key] = len(self._groups)
                 self._groups.append(group)
             self._group_of.append(index[key])
 
     def score(self, node: int, parents: Iterable[int]) -> float:
-        """Return the memoized negative local BIC score for ``node`` given ``parents``."""
+        """Return the memoized negative local score for ``node`` given ``parents``."""
         return self._groups[self._group_of[node]].score(node, tuple(parents))
 
     def add_deltas(self, node: int, parents: Iterable[int]) -> np.ndarray:
         """``score(node, parents + u) - score(node, parents)`` for every variable ``u``.
 
-        One rank-one update per ``u`` off a shared inverse
-        (:func:`~andrey.core.score_delta.add_deltas`); ``inf`` for ``node`` and ``parents``.
+        Under the BIC, one rank-one update per ``u`` off a shared inverse
+        (:func:`~andrey.core.score_delta.add_deltas`); under the other scores, two full scores
+        (:func:`~andrey.core.score_delta.full_add_deltas`). ``inf`` for ``node`` and ``parents``.
         """
-        return score_delta.add_deltas(self._groups[self._group_of[node]], node, parents)
+        group = self._groups[self._group_of[node]]
+        if isinstance(group, BICScore):
+            return score_delta.add_deltas(group, node, parents)
+        return score_delta.full_add_deltas(group, node, parents, self.d)
 
 
 # ---- the interventional essential graph ---------------------------------------------------------
@@ -331,7 +401,7 @@ class _Objective:
     it never revisits a graph and stops.
     """
 
-    def __init__(self, score: InterventionalBICScore, n: int) -> None:
+    def __init__(self, score: InterventionalScore, n: int) -> None:
         self.score = score
         self.terms = [score.score(v, ()) for v in range(n)]
         self.total = math.fsum(self.terms)
@@ -362,21 +432,25 @@ class _Objective:
 def _forward_candidates(
     v: int,
     adj: np.ndarray,
-    score: InterventionalBICScore,
+    score: InterventionalScore,
     n: int,
     ranks: Sequence[int],
     forbidden: np.ndarray | None = None,
+    cap: int | None = None,
 ) -> list[tuple[tuple, int, set[int]]]:
     """The improving insertions into ``v`` as ``(key, u, C)``, sorted by ``key``, path unchecked.
 
     ``u -> v`` with ``C`` the parents in ``v``'s component (Hauser and Buhlmann 2012, Prop. 25 (i)
     and (ii)); ``key`` is :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``.
     Insertions that give ``v`` the same other parents are scored together
-    (:meth:`InterventionalBICScore.add_deltas`). With ``forbidden`` (``[i, j]``: no edge
-    ``i -> j``), neither ``u`` nor a member of ``C``'s free part is forbidden into ``v``.
+    (:meth:`InterventionalScore.add_deltas`). With ``forbidden`` (``[i, j]``: no edge
+    ``i -> j``), neither ``u`` nor a member of ``C``'s free part is forbidden into ``v``. With
+    ``cap``, an insertion that gives ``v`` more than ``cap`` parents is left out before scoring.
     """
     row = adj[v]
     pa = np.flatnonzero(row == ARROW)
+    if cap is not None and pa.size >= cap:
+        return []
     ne = np.flatnonzero((row == TAIL) & (adj[:, v] == TAIL))
     sources = np.flatnonzero(row == NULL)
     sources = sources[sources != v]
@@ -402,6 +476,8 @@ def _forward_candidates(
                 C = na | set(T)
                 groups.setdefault(tuple(sorted(pa_set | C)), []).append((u, C))
         for base, moves in groups.items():
+            if cap is not None and len(base) >= cap:
+                continue
             deltas = score.add_deltas(v, base)
             for u, C in moves:
                 delta = float(deltas[u])
@@ -414,7 +490,7 @@ def _forward_candidates(
 def _backward_candidate(
     v: int,
     adj: np.ndarray,
-    score: InterventionalBICScore,
+    score: InterventionalScore,
     n: int,
     ranks: Sequence[int],
     constraints: Constraints | None = None,
@@ -492,11 +568,12 @@ def _separated(
 
 def _turning_best(
     adj: np.ndarray,
-    score: InterventionalBICScore,
+    score: InterventionalScore,
     n: int,
     ranks: Sequence[int],
     constraints: Constraints | None = None,
     excluded: Excluded | None = None,
+    cap: int | None = None,
 ) -> tuple[int, int, set[int], bool] | None:
     """The best-improving turn as ``(u, v, C, essential)``: ``v -> u`` (or ``v -- u``) becomes
     ``u -> v`` with ``C`` the parents of ``v`` in its component.
@@ -505,7 +582,8 @@ def _turning_best(
     compared by :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``. With
     ``constraints``, a turn never makes a forbidden ``u -> v`` (the reverse of a required edge
     included) or a forbidden ``c -> v`` for a ``c`` of ``C`` not adjacent to ``u``, which the
-    v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned.
+    v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned. With ``cap``,
+    a turn that gives ``v`` more than ``cap`` parents is left out before scoring.
     """
     pa, nbr, adj_sets = _neighborhoods(adj)
     succ = ops.tail_successor_lists(adj)
@@ -527,6 +605,8 @@ def _turning_best(
             N = nbr[v] & adj_sets[u]
             for _index, T in ops.clique_extensions(adj, (), sorted(nbr[v] - {u})):
                 C = set(T)
+                if cap is not None and len(pa[v] | C) >= cap:
+                    continue
                 if not C - N or not _separated(nbr, nbr[v], N - C, C - N, C & N):
                     continue
                 if forbidden is not None and forbidden[list(C - N), v].any():
@@ -545,6 +625,8 @@ def _turning_best(
             N = nbr[v] & adj_sets[u]
             for _index, T in ops.clique_extensions(adj, N, sorted(nbr[v] - adj_sets[u])):
                 C = N | set(T)
+                if cap is not None and len(pa[v] | C) >= cap:
+                    continue
                 if _reaches(succ, v, u, C | nbr[u]):
                     continue
                 if forbidden is not None and forbidden[list(T), v].any():
@@ -589,21 +671,23 @@ def _turn(
 class _Search:
     """The GIES search state: the essential graph, the cached candidates, and the objective.
 
-    ``constraints`` filters the candidates, and ``start``, an essential graph, replaces the empty
-    graph the search otherwise starts from.
+    ``constraints`` and ``cap``, the most parents a step may give a vertex, filter the candidates,
+    and ``start``, an essential graph, replaces the empty graph the search otherwise starts from.
     """
 
     def __init__(
         self,
-        score: InterventionalBICScore,
+        score: InterventionalScore,
         n: int,
         ranks: Sequence[int],
         constraints: Constraints | None = None,
         start: np.ndarray | None = None,
+        cap: int | None = None,
     ) -> None:
         self.score = score
         self.n = n
         self.ranks = ranks
+        self.cap = cap
         self.constraints = constraints
         self.forbidden = None if constraints is None else constraints.forbidden
         self.adj = np.zeros((n, n), dtype=np.int8) if start is None else start
@@ -619,7 +703,7 @@ class _Search:
         for v in range(n):
             if v not in self.forward:
                 self.forward[v] = _forward_candidates(
-                    v, adj, self.score, n, self.ranks, self.forbidden
+                    v, adj, self.score, n, self.ranks, self.forbidden, self.cap
                 )
         heap = [(moves[0][0], v, 0) for v, moves in self.forward.items() if moves]
         if not heap:
@@ -667,7 +751,9 @@ class _Search:
         self, excluded: Excluded | None = None
     ) -> tuple[int, int, set[int], bool] | None:
         """The best-improving turn not in ``excluded`` (:func:`_turning_best`)."""
-        return _turning_best(self.adj, self.score, self.n, self.ranks, self.constraints, excluded)
+        return _turning_best(
+            self.adj, self.score, self.n, self.ranks, self.constraints, excluded, self.cap
+        )
 
     def step(self, best: Callable, move: Callable[..., np.ndarray], cut: np.ndarray) -> bool:
         """Apply the move ``best`` selects, built by ``move``; False when it selects none.
@@ -704,8 +790,12 @@ def gies(
     data: np.ndarray,
     mask: np.ndarray | None = None,
     *,
+    score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
+    max_parents: int | None = None,
+    categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover an interventional essential graph by greedy interventional equivalence search.
@@ -723,12 +813,29 @@ def gies(
     mask : ndarray of bool, shape (n_samples, n_features), or None
         True where the row's value of the variable was set by an intervention, as
         :func:`intervention_mask` returns; None for observational data.
+    score_func : str
+        Local score, scored on the rows without an intervention on each variable
+        (:class:`InterventionalScore`): ``"bic"`` (linear-Gaussian BIC), ``"bdeu"`` or
+        ``"discrete_bic"`` (BDeu or the multinomial BIC on category codes), or a mixed-data BIC,
+        ``"degen_gauss"`` or ``"cond_gauss"``.
     penalty_discount : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     ebic_gamma : float
         Weight on the extended-BIC term of the linear-Gaussian BIC,
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
-        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC.
+        (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
+        ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
+    max_parents : int or None
+        A cap on the most parents any DAG of the class gives a node. An insertion or a turn is
+        skipped when the DAG it builds gives its target more than ``max_parents`` parents; every DAG
+        of a class has the same largest number of parents, so the cap holds for the whole class
+        after every step, and a deletion never breaks it. ``None`` sets no cap. With a cap,
+        ``constraints`` may not require edges that already break it.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
         Background knowledge. No step adds a forbidden edge, removes or turns a required one, or
         reaches a class that holds no DAG that satisfies the knowledge (such a step is skipped
@@ -739,25 +846,43 @@ def gies(
     Returns
     -------
     tuple[GraphStructure, float]
-        The essential graph (``kind="cpdag"``) and its total BIC score (lower is better).
+        The essential graph (``kind="cpdag"``) and its total score (lower is better).
 
     Raises
     ------
+    NotImplementedError
+        If ``score_func`` is not one of :data:`~andrey.core.score.SCORES`.
+    ValueError
+        If the required edges give a node more than ``max_parents`` parents.
     RuntimeError
         If a step does not lower the score, which a correct search never does.
     """
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
-    score = InterventionalBICScore(
-        X, mask, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
+    score = InterventionalScore(
+        X,
+        mask,
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        categorical=categorical,
     )
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)
-    ranks = tie_ranks(X).tolist()
+    columns = np.full(n, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:
+        columns = column_mask(categorical, n)
+    ranks = tie_ranks(X, columns).tolist()
     start = None
     if constraints is not None and constraints.required.any():
         start = replace_unprotected(required_dag(constraints), cut)
+    if max_parents is not None and start is not None and ops.exceeds_parent_cap(start, max_parents):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents "
+            "in some graph of their class"
+        )
     with backend.one_blas_thread():
-        search = _Search(score, n, ranks, constraints, start)
+        search = _Search(score, n, ranks, constraints, start, max_parents)
         while True:
             while search.step(search.forward_best, _insert, cut):
                 pass

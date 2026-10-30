@@ -20,14 +20,26 @@ import pytest
 
 import andrey
 from andrey.api import _method as method_wrapper
+from andrey.api._method import PENALTIES
 from andrey.core import ci, warning_policy
+from andrey.core import score as score_module
 from andrey.core.knowledge import KNOWLEDGE_PARTS
+from andrey.core.removed import REMOVED, removal_hint
+from andrey.core.score import BDeuScore
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import CI_SEARCHES, CONCEPTS, PCMCI_FAMILY, SCORE_ALIASES, Concept
+from andrey.spec.concepts import (
+    BOOTSTRAP_PARAMS,
+    CI_SEARCHES,
+    CONCEPTS,
+    PCMCI_FAMILY,
+    Concept,
+)
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.ci_tests import PValueOnly
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
+UPGRADING = API_MD.parent / "guides" / "upgrading.md"
 #: Public callables outside the registry that a concept may name.
 UTILITIES = ("bootstrap",)
 
@@ -121,9 +133,20 @@ def test_utility_cell(concept, deviation):
     assert deviation.name in live and live[deviation.name].default == deviation.default
 
 
+@pytest.mark.parametrize("key", list(BOOTSTRAP_PARAMS))
+def test_bootstrap_takes_each_of_its_concepts_as_its_spec_and_template_say(key):
+    concept, spec = CONCEPTS[key], BOOTSTRAP_PARAMS[key]
+    deviation = concept.deviation("bootstrap")
+    assert spec.concept == key and signature("bootstrap")[key].default == spec.default
+    assert spec.default == (concept.param.default if deviation is None else deviation.default)  # ty: ignore[possibly-missing-attribute]
+    bounds = ("type", "minimum", "maximum", "exclusive_minimum", "exclusive_maximum")
+    assert {f: getattr(spec, f) for f in bounds} == {f: getattr(concept.param, f) for f in bounds}
+    assert spec.choices == (deviation.choices if deviation else concept.param.choices)  # ty: ignore[possibly-missing-attribute]
+
+
 @pytest.mark.parametrize("utility", UTILITIES)
 def test_a_utility_takes_an_execution_setting_only_as_a_recorded_deviation(utility):
-    concept = CONCEPTS["num_workers"]
+    concept = CONCEPTS["n_jobs"]
     assert (concept.deviation(utility) is not None) == (concept.param.name in signature(utility))  # ty: ignore[possibly-missing-attribute]
 
 
@@ -167,18 +190,23 @@ def test_docstring_entry_states_the_concept(concept, method):
 N = 200
 
 
-def frame(seed: int, *, codes: bool) -> pd.DataFrame:
-    """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories."""
+def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
+    """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories,
+    and with ``gaps``, a few values of x and y are missing."""
     rng = np.random.default_rng(seed)
     u = rng.uniform(-1, 1, size=(N, 3)) ** 3
     x = rng.integers(0, 4, N).astype(float) if codes else u[:, 0]
     y = 0.8 * x + u[:, 1]
-    return pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
+    data = pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
+    if gaps:
+        data.iloc[::13, 0] = np.nan
+        data.iloc[5::11, 1] = np.nan
+    return data
 
 
-def inputs(method: str, *, codes: bool) -> list:
+def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
-    frames = [frame(seed, codes=codes) for seed in range(3)]
+    frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
         if not inp.required:
@@ -197,13 +225,13 @@ SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
-def fit(method: str, *, codes: bool, **kwargs):
+def fit(method: str, *, codes: bool, gaps: bool = False, **kwargs):
     if method == "calm":
         pytest.importorskip("torch")
     warning_policy._warned.clear()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        out = getattr(andrey, method)(*inputs(method, codes=codes), **kwargs)
+        out = getattr(andrey, method)(*inputs(method, codes=codes, gaps=gaps), **kwargs)
     return (out[0] if isinstance(out, list) else out), [w.category for w in caught]
 
 
@@ -382,9 +410,9 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
 
     for key in list(ci._CI_REGISTRY):
         spy(ci._CI_REGISTRY, key, "indep_test")
-    for key in list(pcmci.INDEP_TESTS):
-        spy(pcmci.INDEP_TESTS, key, "indep_test")
-    for module in ("ges", "exact", "hc", "boss", "tabu"):
+    for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
+        spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
+    for module in ("ges", "gies", "xges", "exact", "hc", "boss", "tabu"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):
@@ -411,8 +439,8 @@ def used_settings(method: str, table: pd.DataFrame, **kwargs) -> dict[str, tuple
 def agrees(found: dict[str, tuple[str, set[str]]], wanted: set[str]) -> bool:
     """Whether the fit recorded each of ``wanted`` and built exactly the name it recorded.
 
-    The linear-Gaussian BIC runs without a build by name in ``gies``, ``xges``, and the continuous
-    fit of ``exact_search``: the record says ``bic``.
+    The linear-Gaussian BIC runs without a build by name in the continuous fit of
+    ``exact_search``: the record says ``bic``.
     """
     if set(found) != wanted:
         return False
@@ -467,7 +495,8 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
     out = out[0] if isinstance(out, list) else out
     s = out.structure
     if not series:
-        return ("x", "y", "directed") in s.oriented_edges()
+        edge = "undirected" if spec.output.graph_kind == "undirected" else "directed"
+        return ("x", "y", edge) in s.oriented_edges()
     graphs = [s.at(t, 1) for t in s.times] if s.n_times else [s.lag(1)]
     return all(("x", "y", "directed") in g.oriented_edges() for g in graphs)
 
@@ -496,6 +525,7 @@ OBSERVE = {
     "required_edges": (keeps_the_required_edge, True),
     "warnings": (andrey_warnings, True),
     "units": (unit_free, True),
+    "averaged_graph": (lambda m: "averaged_graph" in coded_fit(m)[0].metadata, None),
 }
 
 
@@ -567,8 +597,12 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
 
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
-#: The settings that make a CI search draw random numbers.
-RANDOMIZED = {m: {"indep_test": "rcot"} for m in CI_SEARCHES}
+#: The settings that make a fit draw random numbers: a randomized test, or a later start of a search
+#: that changes the best DAG at random.
+RANDOMIZED = {
+    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY)},
+    **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
+}
 
 
 @pytest.mark.parametrize("method", SEEDED)
@@ -583,9 +617,10 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 
 
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
-    """A method without a seed, and a CI search under a deterministic test, record none."""
+    """A method without a seed, a CI search under a deterministic test, and a search that changes
+    the best DAG at random only before a later start, run with one start, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
-    for method in CI_SEARCHES:
+    for method in (*CI_SEARCHES, *PCMCI_FAMILY, *CONCEPTS["n_perturbations"].suitable):
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
 
@@ -610,13 +645,107 @@ def test_a_registered_test_is_recorded_by_its_registered_name(monkeypatch):
     assert out.metadata["indep_test"] == "fisherz_copy"
 
 
-@pytest.mark.parametrize(("former", "current"), [("local_score_BIC", "bic")])
-def test_a_former_score_name_is_recorded_as_the_current_one(former, current):
-    assert dict(SCORE_ALIASES)[former] == current
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        out = andrey.ges(*inputs("ges", codes=False), score_func=former)
-    assert out.metadata["score_func"] == current
+#: The score searches, each with its penalty arguments by concept.
+PENALIZED = [m for m in REGISTRY if tagged(CONCEPTS["score_func"], m)]
+#: The arguments that weigh a score, by concept.
+PENALTY_CONCEPTS = ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
+
+
+def penalties(method: str) -> dict[str, object]:
+    """The method's penalty arguments, by concept, with their defaults."""
+    return {p.concept: p.default for p in REGISTRY[method].params if p.concept in PENALTY_CONCEPTS}
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_a_score_search_records_the_penalties_its_score_used(method):
+    """Each score records the penalties it reads (PENALTIES) and none that it does not."""
+    assert set(penalties(method)) == set(PENALTY_CONCEPTS)
+    assert set(PENALTY_CONCEPTS) <= set(REGISTRY[method].output.metadata)
+    categorical = args_for(method, [typed_frame("categorical")] * 3)
+    cases = [
+        (args_for(method, [typed_frame("continuous")] * 3), {}, "bic"),
+        (categorical, {"penalty_discount": 2.0}, "bdeu"),
+        (categorical, {"penalty_discount": 2.0, "score_func": "discrete_bic"}, "discrete_bic"),
+        (categorical, {"equivalent_sample_size": 7.0}, "bdeu"),
+    ]
+    for args, given, score in cases:
+        out = getattr(andrey, method)(*args, **given)
+        assert out.metadata["score_func"] == score
+        recorded = {k for k in PENALTY_CONCEPTS if k in out.metadata}
+        assert recorded == {k for k in PENALTY_CONCEPTS if score in PENALTIES[k]}
+        for key in recorded:
+            assert out.metadata[key] == given.get(key, penalties(method)[key])
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_ebic_gamma_with_a_score_that_does_not_use_it_raises(method):
+    """Only bic adds the extended-BIC term: a call that passes ebic_gamma with another score, named
+    or picked from the declared column types, raises before the fit."""
+    categorical = args_for(method, [typed_frame("categorical")] * 3)
+    with pytest.raises(ValueError, match="ebic_gamma weighs the extended-BIC term"):
+        getattr(andrey, method)(*categorical, ebic_gamma=0.5)
+    with pytest.raises(ValueError, match="score_func='discrete_bic'"):
+        getattr(andrey, method)(*categorical, score_func="discrete_bic", ebic_gamma=0.0)
+    continuous = args_for(method, [typed_frame("continuous")] * 3)
+    assert getattr(andrey, method)(*continuous, ebic_gamma=0.5).metadata["ebic_gamma"] == 0.5
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_equivalent_sample_size_with_a_score_that_does_not_use_it_raises(method):
+    """Only bdeu reads the equivalent sample size: a call that passes it with another score, named
+    or picked from the declared column types, raises before the fit."""
+    continuous = args_for(method, [typed_frame("continuous")] * 3)
+    with pytest.raises(ValueError, match="equivalent_sample_size weighs the Dirichlet prior"):
+        getattr(andrey, method)(*continuous, equivalent_sample_size=2.0)
+    categorical = args_for(method, [typed_frame("categorical")] * 3)
+    with pytest.raises(ValueError, match="score_func='discrete_bic'"):
+        getattr(andrey, method)(*categorical, score_func="discrete_bic", equivalent_sample_size=2.0)
+    out = getattr(andrey, method)(*categorical, equivalent_sample_size=2.0)
+    assert out.metadata["equivalent_sample_size"] == 2.0
+
+
+@pytest.mark.parametrize("method", PENALIZED)
+def test_the_equivalent_sample_size_reaches_the_bdeu_score_of_a_fit(method, monkeypatch):
+    """Every BDeu score a fit builds carries the weight the call passed, 1 when it passed none, and
+    the weight changes the fit's score where the result records one."""
+    built = []
+
+    class Recording(BDeuScore):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            built.append(self.equivalent_sample_size)
+
+    monkeypatch.setattr(score_module, "BDeuScore", Recording)
+    args = args_for(method, [typed_frame("categorical")] * 3)
+    default = getattr(andrey, method)(*args)
+    assert built and set(built) == {1.0} and default.metadata["equivalent_sample_size"] == 1.0
+    built.clear()
+    other = getattr(andrey, method)(*args, equivalent_sample_size=50.0)
+    assert built and set(built) == {50.0}
+    if "score" in default.metadata:
+        assert other.metadata["score"] != default.metadata["score"]
+    for bad in (0.0, -1.0, float("inf")):
+        with pytest.raises(ValueError, match="equivalent_sample_size"):
+            getattr(andrey, method)(*args, equivalent_sample_size=bad)
+
+
+#: The methods whose result andrey.config's tie_break can change.
+TIE_BREAKING = [m for m, spec in REGISTRY.items() if spec.tie_break]
+
+
+@pytest.mark.parametrize("method", TIE_BREAKING)
+def test_a_fit_the_tie_break_can_change_records_it(method):
+    assert "tie_break" in REGISTRY[method].output.metadata
+    assert coded_fit(method)[0].metadata["tie_break"] == "rank"
+    with andrey.config(tie_break="position"):
+        out, _ = fit(method, codes=False, **SHORT.get(method, {}))
+    assert out.metadata["tie_break"] == "position"
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if m not in TIE_BREAKING])
+def test_a_fit_the_tie_break_cannot_change_records_none(method):
+    assert "tie_break" not in REGISTRY[method].output.metadata
+    assert "tie_break" not in coded_fit(method)[0].metadata
 
 
 # --- randomness -----------------------------------------------------------------------------------
@@ -674,11 +803,34 @@ CI_CASES = {
     "mmpc": [{}, {"target": 0}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
+    "pcmci": [{}],
+    "pcmciplus": [{}],
+    "lpcmci": [{}],
 }
 
 
 def test_every_search_with_a_ci_test_has_cases():
-    assert set(CI_CASES) == set(CI_SEARCHES)
+    assert set(CI_CASES) == {*CI_SEARCHES, *PCMCI_FAMILY}
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "gaps"),
+    [
+        pytest.param(m, s, g, id=f"{m}-{'+'.join(s) or 'default'}-{'gaps' if g else 'complete'}")
+        for m, cases in CI_CASES.items()
+        for s in cases
+        for g in (False, True)
+        if not g or REGISTRY[m].data.missing
+    ],
+)
+def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings, gaps, monkeypatch):
+    """A test registered with the single-query call alone runs every search that takes
+    ``indep_test``, on complete data and, where the method takes missing values, on data with gaps,
+    and gives the graph of Fisher's z-test it wraps."""
+    expected, _ = fit(method, codes=False, gaps=gaps, **settings)
+    monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    out, _ = fit(method, codes=False, gaps=gaps, indep_test="p_value_only", **settings)
+    assert out.structure == expected.structure
 
 
 @pytest.fixture
@@ -714,23 +866,15 @@ def test_the_seed_reaches_every_randomized_test_a_search_builds(
     assert out.metadata["seed"] == 7
 
 
-@pytest.mark.parametrize("method", CI_SEARCHES)
+@pytest.mark.parametrize("method", (*CI_SEARCHES, *PCMCI_FAMILY))
 def test_the_global_seed_does_not_change_a_fit_that_passes_a_seed(method, monkeypatch):
     results = []
     for global_seed in ("0", "11"):
         monkeypatch.setenv("ANDREY_SEED", global_seed)
         out, _ = fit(method, codes=False, indep_test="rcot", seed=7)
-        results.append((out.structure.to_numpy().tolist(), out.metadata))
-    assert results[0] == results[1]
-
-
-def test_a_former_seed_name_maps_to_seed_for_one_release():
-    data = inputs("ica_lingam", codes=False)
-    expected = andrey.ica_lingam(*data, seed=3)
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="random_state is now seed"):
-        out = andrey.ica_lingam(*data, random_state=3)
-    assert out.metadata["seed"] == 3 and out.ordering == expected.ordering
+        results.append((out.structure, out.metadata))
+    assert results[0][0] == results[1][0]
+    assert repr(results[0][1]) == repr(results[1][1])
 
 
 DROPPED = [(m, arg) for m, spec in REGISTRY.items() for arg in spec.dropped_args]
@@ -753,10 +897,10 @@ def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
 
 
 ALIASED = [
-    pytest.param(m, a.name, old, id=f"{m}-{old}")
+    pytest.param(m, p.name, old, id=f"{m}-{old}")
     for m, spec in REGISTRY.items()
-    for a in (*spec.data.inputs, *spec.params)
-    for old in a.aliases
+    for p in spec.params
+    for old in p.aliases
 ]
 
 
@@ -765,14 +909,13 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
     method, name, old
 ):
     spec = REGISTRY[method]
-    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
-    as_input = argument in spec.data.inputs
+    argument = next(p for p in spec.params if p.name == name)
     data = inputs(method, codes=False)
     settings = dict(SHORT.get(method, {}))
-    value = data[0] if as_input else settings.pop(name, argument.default)
+    value = settings.pop(name, argument.default)
 
     def call(**named):
-        out = getattr(andrey, method)(*(() if as_input else data), **settings, **named)
+        out = getattr(andrey, method)(*data, **settings, **named)
         return [o.structure for o in (out if isinstance(out, list) else [out])]
 
     expected = call(**{name: value})
@@ -790,10 +933,10 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
 #: each argument it drops.
 FORMER = [
     *(
-        pytest.param(m, {old}, {a.name}, id=f"{m}-{old}")
+        pytest.param(m, {old}, {p.name}, id=f"{m}-{old}")
         for m, spec in REGISTRY.items()
-        for a in (*spec.data.inputs, *spec.params)
-        for old in a.aliases
+        for p in spec.params
+        for old in p.aliases
     ),
     *(
         pytest.param(m, {p.name, old}, {p.name, new}, id=f"{m}-{old}")
@@ -831,6 +974,113 @@ def test_each_former_name_is_in_a_changelog_table(method, former, current):
         len(cells) >= 3 and method in cells[0] and former <= cells[1] and current <= cells[2]
         for cells in changelog_rows()
     ), f"{method}: {sorted(former)} -> {sorted(current)} has no CHANGELOG table row"
+
+
+#: The rows of the table of argument names and choices that 0.11.0 renamed and 0.12.0 removed, one
+#: for each method.
+REMOVED_NAMES = [
+    pytest.param(m, row, id=f"{m}-{row.name}")
+    for row in REMOVED
+    if row.value is None
+    for m in row.methods
+]
+REMOVED_CHOICES = [
+    pytest.param(m, row, id=f"{m}-{row.value}")
+    for row in REMOVED
+    if row.value is not None
+    for m in row.methods
+]
+#: The former score names, which the score searches took in 0.11.0 and no longer take.
+REMOVED_SCORES = sorted({row.value for row in REMOVED if row.name == "score_func"})
+SCORE_SEARCHES = [
+    m for m, spec in REGISTRY.items() if any(p.name == "score_func" for p in spec.params)
+]
+
+
+def call_with(method: str, **named):
+    return getattr(andrey, method)(*inputs(method, codes=False), **named)
+
+
+@pytest.mark.parametrize(("method", "row"), REMOVED_NAMES)
+def test_a_removed_name_is_an_unknown_argument_that_says_what_it_is_called_now(method, row):
+    spec = REGISTRY[method]
+    assert row.name not in spec.dropped_args
+    assert all(row.name not in p.aliases for p in spec.params)
+    with pytest.raises(TypeError, match=rf"{method}\(\) got an unexpected keyword argument") as e:
+        call_with(method, **{row.name: 3})
+    message = str(e.value)
+    assert repr(row.name) in message
+    assert row.note in message if row.now is None else f"`{row.now}`" in message
+
+
+@pytest.mark.parametrize(("method", "row"), REMOVED_CHOICES)
+def test_a_removed_score_name_is_refused_with_the_score_it_is_called_now(method, row):
+    param = next(p for p in REGISTRY[method].params if p.name == row.name)
+    assert not param.choice_aliases
+    assert row.value not in param.choices and row.now in param.choices
+    with pytest.raises(ValueError, match=f"{method}: {row.name}.*{row.value}") as error:
+        call_with(method, **{row.name: row.value})
+    assert removal_hint(method, row.name, row.value) in str(error.value)
+
+
+@pytest.mark.parametrize("method", SCORE_SEARCHES)
+def test_a_former_score_name_is_not_one_of_the_choices(method):
+    param = next(p for p in REGISTRY[method].params if p.name == "score_func")
+    for old in REMOVED_SCORES:
+        assert old not in param.choices
+        with pytest.raises(ValueError, match=f"{method}: score_func.*{old}") as error:
+            call_with(method, score_func=old)
+        assert all(choice in str(error.value) for choice in param.choices)
+
+
+def test_a_name_only_some_methods_removed_gets_no_hint_from_the_others():
+    """`pc_alpha` is gone from `pcmciplus`; `pcmci` still takes it for one release."""
+    assert removal_hint("pcmciplus", "pc_alpha") and removal_hint("pcmci", "pc_alpha") is None
+    assert removal_hint("pc", "pc_alpha") is None and removal_hint("ges", "score_func") is None
+    assert removal_hint("ges", "score_func", ["local_score_BIC"]) is None
+
+
+@pytest.mark.parametrize(
+    "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
+)
+def test_the_hint_gives_the_current_name_or_what_to_do(row):
+    hint = removal_hint(row.methods[0], row.name, row.value)
+    assert (row.now or row.note) in hint
+
+
+def guide_rows() -> set[tuple[frozenset[str], str, str | None, str | None]]:
+    """Each row of the upgrade guide's table of former names from 0.10, as the table lists it."""
+    text = UPGRADING.read_text(encoding="utf-8")
+    section = text.split("### Former names from 0.10", 1)[1].split("\n#", 1)[0]
+    rows = set()
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not line.startswith("|") or cells[0] in ("Method", "---"):
+            continue
+        name, value = re.match(r'`(\w+)(?:="(\w+)")?`', cells[1]).groups()
+        now = re.match(r'`(?:\w+=")?(\w+)', cells[2])
+        rows.add((frozenset(re.findall(r"`(\w+)`", cells[0])), name, value, now and now[1]))
+    return rows
+
+
+def test_the_upgrade_guide_lists_the_removed_names_and_values_the_errors_name():
+    table = {(frozenset(r.methods), r.name, r.value, r.now) for r in REMOVED}
+    assert guide_rows() == table
+
+
+@pytest.mark.parametrize(
+    "row", [pytest.param(r, id=f"{r.methods[0]}-{r.value or r.name}") for r in REMOVED]
+)
+def test_each_removed_name_is_in_a_changelog_table(row):
+    """The table that announced the removal lists every name removed here, with its replacement."""
+    for method in row.methods:
+        assert any(
+            len(cells) >= 3
+            and method in cells[0]
+            and {row.value or row.name} <= cells[1]
+            and (row.now is None or {row.now} <= cells[2])
+            for cells in changelog_rows()
+        ), f"{method}: {row.value or row.name} has no CHANGELOG table row"
 
 
 def renamed(monkeypatch, method: str, name: str, **update) -> None:

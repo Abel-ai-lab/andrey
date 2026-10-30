@@ -19,13 +19,13 @@ from andrey_bench.adapters.andrey_fci import _andrey_version
 #: Andrey's defaults, named in full so the record says what ran.
 DEFAULTS: dict[str, Any] = {
     "lambda1": 0.005,
-    "alpha": 0.01,
+    "screen_alpha": 0.01,
     "tau": 0.5,
     "rho_init": 1e-3,
     "rho_mult": 3.0,
     "rho_max": 1e16,
     "h_tol": 1e-8,
-    "max_outer": 25,
+    "max_iter": 25,
     "subproblem_iter": 3000,
     "lr": 0.01,
     "w_threshold": 0.3,
@@ -39,7 +39,7 @@ DEFAULTS: dict[str, Any] = {
 PAPER_SCHEDULE: dict[str, Any] = {
     **DEFAULTS,
     "rho_init": 1e-5,
-    "max_outer": 100,
+    "max_iter": 100,
     "subproblem_iter": 40000,
     "lr": 0.001,
     "w_threshold": 0.0,

@@ -1,21 +1,31 @@
-"""The pairwise-likelihood (pwling) exogeneity measure for LiNGAM ordering.
+"""The pairwise likelihood-ratio exogeneity measures for LiNGAM ordering.
 
-Scores each candidate variable by how plausibly exogenous it is -- the Hyvarinen maximum-entropy
-approximation of the pairwise likelihood ratios (Hyvarinen & Smith 2013) -- and peels the
-most-exogenous variable one at a time. Entropy is evaluated in batch over a stack of residuals.
-Shared by the LiNGAM ordering methods (DirectLiNGAM, MultiGroupDirectLiNGAM, the temporal LiNGAMs).
+Scores each candidate variable by how plausibly exogenous it is and peels the most-exogenous
+variable one at a time. Three approximations of the pairwise likelihood ratios of Hyvarinen & Smith
+(2013) build the score (:data:`MEASURES`): ``"pwling"``, their maximum-entropy approximation (Eqs.
+2-3), evaluated in batch over a stack of residuals; and ``"tanh"`` and ``"skew"``, their
+first-order approximations by a nonlinear correlation of the standardized columns (Eqs. 5, 10, 13,
+and 18), which need one matrix product per step. Shared by the LiNGAM ordering methods
+(DirectLiNGAM, MultiGroupDirectLiNGAM, the temporal LiNGAMs).
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 import numpy as np
 
 from andrey.core import stats
 from andrey.search.hc import tie_ranks
 
+#: The measures a DirectLiNGAM order search takes, in the order the facades list them.
+MEASURES = ("pwling", "skew", "tanh")
+
 # A score is ``-sum_j min(0, diff_j)^2``, so ``sqrt(-score)`` is the norm of the negative entropy
 # differences, and rounding moves it by at most the norm of their rounding errors. Mathematically
-# tied candidates measure < 1e-12 apart in this norm and distinct ones > 5e-10 apart.
+# tied candidates measure < 1e-12 apart in this norm and distinct ones > 5e-10 apart. The
+# nonlinear correlations of ``"skew"`` and ``"tanh"`` are sums of products whose rounding errors
+# are near 1e-16, well inside it.
 _TIE_TOL = 1e-10
 # Two columns are copies when one leaves at most this fraction of the other's variance
 # unexplained (1 - corr^2): their pairwise residuals are then zero or rounding noise, whose
@@ -71,6 +81,76 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     return scores
 
 
+def _standardized(X: np.ndarray, U: list[int]) -> np.ndarray:
+    """Columns ``U`` of ``X`` with mean 0 and standard deviation 1 (``ddof=0``)."""
+    sub = X[:, np.asarray(U)]
+    return (sub - sub.mean(axis=0)) / sub.std(axis=0)
+
+
+def nonlinear_correlations(x: np.ndarray, g: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+    """The matrix ``M`` of Eq. 18 for standardized columns ``x``, shape ``(n, m)``.
+
+    ``M[i, j] = rho_ij * (E[x_i g(x_j)] - E[g(x_i) x_j])`` with ``rho`` the correlation matrix of
+    the columns and ``g`` the nonlinearity. ``M`` is antisymmetric with a zero diagonal. A positive
+    entry says ``i`` precedes ``j``, and the row of an exogenous variable is non-negative.
+    """
+    n = x.shape[0]
+    a = x.T @ g(x) / n  # a[i, j] = E[x_i g(x_j)]
+    return (x.T @ x / n) * (a - a.T)
+
+
+def _violations(x: np.ndarray, g: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+    """Score each column by ``-sum_j min(0, M[i, j])^2`` (Eq. 19, Sec. 3.2.2): its violations."""
+    return -np.sum(np.minimum(0.0, nonlinear_correlations(x, g)) ** 2, axis=1)
+
+
+def _negative_square(u: np.ndarray) -> np.ndarray:
+    """The skew measure's ``g(u) = -u^2`` (Sec. 3.2.1)."""
+    return -(u * u)
+
+
+def score_tanh(X: np.ndarray, U: list[int]) -> np.ndarray:
+    """Score how plausibly exogenous each column in ``U`` of ``X`` is by the tanh measure.
+
+    The entries are ``rho * E[x_i tanh(x_j) - tanh(x_i) x_j]`` of the standardized columns (Eq.
+    5), positive when ``i`` precedes ``j`` for super-Gaussian (positive-kurtosis) variables; for
+    sub-Gaussian ones the sign reverses (Eq. 7 and Theorem 1). Returns an array aligned with ``U``,
+    higher = more exogenous, as :func:`score_candidates` does.
+    """
+    if len(U) < 2:
+        return np.zeros(len(U), dtype=np.float64)  # a lone candidate has no pair to score
+    return _violations(_standardized(X, U), np.tanh)
+
+
+def score_skew(X: np.ndarray, U: list[int]) -> np.ndarray:
+    """Score how plausibly exogenous each column in ``U`` of ``X`` is by the skew measure.
+
+    The entries are ``rho * E[x_i^2 x_j - x_i x_j^2]`` (Eq. 10) of the standardized columns, each
+    first multiplied by the sign of its skewness (Eq. 13, ``+1`` for a skewness of ``0``) so that
+    ``rho`` is the correlation of the multiplied columns; the entry is then positive when ``i``
+    precedes ``j`` (Theorem 2), whatever the sign of the skewness. A column of symmetric noise has
+    skewness near ``0``, and the measure then says little about it. Returns an array aligned with
+    ``U``, higher = more exogenous, as :func:`score_candidates` does.
+    """
+    if len(U) < 2:
+        return np.zeros(len(U), dtype=np.float64)
+    x = _standardized(X, U)
+    x = x * np.where(np.mean(x**3, axis=0) < 0, -1.0, 1.0)
+    return _violations(x, _negative_square)
+
+
+def scorer(measure: str) -> Callable[[np.ndarray, list[int]], np.ndarray]:
+    """The function that scores the candidates of ``measure``, one of :data:`MEASURES`.
+
+    Called as ``scorer(measure)(X, U)``, it returns :func:`score_candidates`-style scores of the
+    columns ``U`` of ``X``. Raises ``ValueError`` for any other value.
+    """
+    if measure not in MEASURES:
+        options = ", ".join(repr(m) for m in MEASURES)
+        raise ValueError(f"measure must be one of {options}, got {measure!r}")
+    return {"pwling": score_candidates, "skew": score_skew, "tanh": score_tanh}[measure]
+
+
 def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
     """The candidate with the highest score; the lowest ``ranks`` entry among tied candidates.
 
@@ -120,8 +200,13 @@ def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> di
     return {u: copies[u] for u in U if u in copies}
 
 
-def find_causal_order(X: np.ndarray, *, precedence: np.ndarray | None = None) -> list[int]:
-    """Peel exogenous variables (:func:`pick` of :func:`score_candidates`) one at a time.
+def find_causal_order(
+    X: np.ndarray, *, precedence: np.ndarray | None = None, measure: str = "pwling"
+) -> list[int]:
+    """Peel exogenous variables (:func:`pick` of the ``measure`` scores) one at a time.
+
+    ``measure`` is one of :data:`MEASURES`; :func:`scorer` gives its scoring function, and
+    ``"pwling"`` scores with :func:`score_candidates`.
 
     Each pick is residualized out of the rest. Only one column of each copy group
     (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
@@ -129,11 +214,12 @@ def find_causal_order(X: np.ndarray, *, precedence: np.ndarray | None = None) ->
     columns, which are identical on every machine and keep their ranks when the columns are
     reordered; residualized columns differ in the last bits across machines. Single-dataset;
     MultiGroupDirectLiNGAM runs its own group loop (per-group residualization), reusing
-    :func:`copy_groups`, :func:`score_candidates`, and :func:`pick` directly. With ``precedence``
+    :func:`copy_groups`, :func:`scorer`, and :func:`pick` directly. With ``precedence``
     (``precedence[a, b]``: ``a`` comes before ``b``, acyclic), no copy group is formed, since
     placing one at once could put a column before one that must precede it: every remaining
     variable is scored, and the pick is the best one that no remaining variable must precede.
     """
+    score = scorer(measure)
     remaining = list(range(X.shape[1]))
     order: list[int] = []
     residualized = np.array(X, dtype=np.float64)  # copy + float64: the write-back must not truncate
@@ -148,10 +234,10 @@ def find_causal_order(X: np.ndarray, *, precedence: np.ndarray | None = None) ->
         if len(candidates) == 1:
             m = candidates[0]
         elif precedence is None:
-            m = pick(score_candidates(residualized, candidates), candidates, ranks)
+            m = pick(score(residualized, candidates), candidates, ranks)
         else:
             eligible = ~precedence[np.ix_(candidates, candidates)].any(axis=0)
-            values = score_candidates(residualized, candidates)[eligible]
+            values = score(residualized, candidates)[eligible]
             m = pick(values, [c for c, ok in zip(candidates, eligible) if ok], ranks)
         placed = [m, *copies[m]]
         remaining = [u for u in remaining if u not in placed]

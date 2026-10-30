@@ -10,6 +10,311 @@ names its pull request.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-30
+
+### Highlights
+
+- `chisq` and `gsq` hold their level in sparse tables: at 0.05 over 3 to 5 categories they rejected
+  11.1% and 21.7% of true independences, and now 4.9% and 3.8%; at 5 categories with 3
+  conditioning variables, 48% and 83%, now 3.2% and 0.8% (Tsamardinos and Borboudakis 2010).
+  ([#574])
+- `indep_test="normal_scores"`, a rank-based Fisher's z test, holds its level on skewed or
+  heavy-tailed columns, where `"fisherz"` over-rejects; every constraint-based search takes it.
+  ([#573])
+- `andrey.markov_check` tests whether the data contradict a graph, such as a method's result
+  (Ramsey, Andrews, and Spirtes 2024); `andrey markov-check` runs it from the command line. ([#571])
+- `pcmci`, `pcmciplus`, and `granger` control the false discovery rate by default
+  (`fdr_method="fdr_bh"`). ([#554], [#565], [#567])
+- `bootstrap` subsamples half of the rows by default, and its averaged graph is a valid graph of
+  the method's kind. ([#544], [#555], [#584])
+- `GraphStructure` answers graph queries: `d_separated`, `m_separated`, `parents`, `ancestors`,
+  `markov_blanket`, and more, by label or position. ([#569])
+- `inter_iamb`, `mmhc`, and `rsmax2` are supported and join the quality gate: against bnlearn 5.2.1
+  on simulated linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree
+  2 and 4, bnlearn makes significantly fewer errors in none of the 72 comparisons, on the CPDAG,
+  the skeleton, and the moral graph that `inter_iamb` returns. The median ratio of bnlearn's fit
+  time to Andrey's is 3.8 for `inter_iamb`'s CPDAG, 6.6 for `mmhc`, and 7.8 for `rsmax2`. ([#581])
+
+### Breaking
+
+- These arguments, values, and settings have new names, so that one name means one thing across
+  the package; the former ones still work in this release, in Python and on the command line, but
+  give an `andrey.DeprecatedArgumentWarning` that names the replacement, and they stop working in
+  the next release. The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows
+  the calls before and after. ([#551])
+
+  | Method | Former name | Name now |
+  | --- | --- | --- |
+  | `grasp` | `depth` | `grasp_depth`, since Tetrad's `depth` is the conditioning-set cap, `max_depth` here |
+  | `pcmci` | `pc_alpha` | `pc1_alpha`, the level of the PC1 step |
+  | `pcmciplus` | `collider_rule="none"` | `collider_rule="sepsets"`, as in the other searches |
+  | `andrey.bootstrap`, `andrey bootstrap` | `n_boot`, `--n-boot` | `n_resamples`, `--n-resamples`, as in SciPy |
+  | `andrey.config` | `num_workers` | `n_jobs`, as in scikit-learn |
+  | environment | `ANDREY_NUM_WORKERS` | `ANDREY_N_JOBS`; the former variable is read when the new one is unset |
+  | `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `pcmci`, `pcmciplus`, `lpcmci` | `max_categories` | none: values no longer declare a column's type, so it is ignored with a warning |
+
+- No method reads a column's type from its values, whatever test or score you name. A mixed-data
+  setting passed by name, such as `pc(df, indep_test="cond_gauss")`, read every column of at most
+  `max_categories` distinct whole numbers as categorical; it now reads the columns you declare, by
+  `categorical` or by a DataFrame's `category`, `bool`, or text type, as `indep_test=None` does, so
+  a call that names the test the default recorded fits the same graph. An undeclared column of a
+  few whole numbers reads as numbers, with the `DataTypeWarning` that it may hold category codes.
+  For the former results, name those columns in `categorical`. ([#551])
+- A declared categorical column behaves the same by either route. A test or score for continuous
+  data, such as `"fisherz"` or `"bic"`, raises `ValueError` on a column of a pandas `category`,
+  `bool`, or text type, as it did on one that `categorical` named, where it read the column as
+  numbers with a warning; pass `categorical=[]` to read every column as numbers. A categorical test
+  or score, such as `"chisq"` or `"bdeu"`, accepts `categorical`, where it raised, as it accepts
+  the same columns by type, and reads every column as categorical. A `categorical` that is not a
+  list raises `TypeError`, where it raised `ValueError` with a test or score for continuous or
+  categorical data. ([#551])
+- `ebic_gamma` takes values from 0 to 1, the range of the extended BIC (Chen and Chen 2008), where
+  it took any value of at least 0, and a call that passes it with a score that does not add the
+  extended-BIC term, any but `"bic"`, raises `ValueError`, where the score ignored it. ([#551])
+- `andrey config --json` and `andrey.describe()` report the worker count as `n_jobs`,
+  and `andrey calibrate` exports `ANDREY_N_JOBS`. ([#551])
+- `andrey bootstrap --json` reports the number of resamples as `bootstrap.n_resamples`, where it
+  reported `bootstrap.n_boot`. `BootstrapOutput.n_resamples` replaces `BootstrapOutput.n_boot`,
+  which still works with an `andrey.DeprecatedArgumentWarning` and stops working in the next
+  release. ([#551])
+- `bootstrap` draws each resample as a subsample by default: `sample_fraction=0.5` of the rows,
+  without replacement, instead of all the rows with replacement, so every default result changes
+  (frequencies and averaged graph). A bootstrap resample repeats rows, so a test or a score sees
+  more evidence than the resample holds; Banerjee, Andrews, and Kummerfeld (2025) find that
+  subsampling half of the rows performs as well as the best correction. On linear data with 20 and
+  50 variables and 1,000 and 5,000 rows, the averaged graph had no more errors (SHD) than the
+  bootstrap's in any of 10 cells and fewer in 5, `ges` with 50 variables and 1,000 rows had 5.0
+  fewer, and a fit takes 0.56 to 0.95 of the time. A time-series method on one series subsamples
+  one stretch of consecutive rows, which had no more errors than the block bootstrap in any of 14
+  cells of simulated series. Pass `resampling="bootstrap"` for the resampling of before; the moving
+  block bootstrap's default block is now `max(ceil(n ** (1/3)), 10 * tau_max)` rows for a method
+  with a `tau_max`, instead of `ceil(n ** (1/3))`. ([#544])
+- `bootstrap`'s averaged graph gives each pair its most frequent state in the fits, no edge counted
+  as one, where it gave each pair adjacent in at least `threshold` of the fits its most frequent
+  edge. `threshold` now asks a pair to be adjacent in more than that share of the fits, or in all
+  of them, and takes values from 0.5 to 1, where it took any share above 0. The vote is then made
+  a valid graph of the method's kind by the published steps: the CPDAG (Chickering 2002) of a
+  consistent DAG extension (Dor and Tarsi 1992) for a CPDAG method, the PAG of Zhang's (2008) MAG
+  for a PAG method, and a DAG without a cycle for a DAG method, where the vote could be a partially
+  directed graph labeled `cpdag`, a graph that is not a PAG, or a graph with a cycle. A DAG
+  method's fits that split evenly between the two directions of an edge point it by the columns'
+  `tie_break` ranks, so reordering the columns relabels the averaged graph, and
+  `metadata["tie_break"]` records the rule. On linear
+  data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
+  the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
+  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others
+  among the resamples that are valid graphs of the kind, Tetrad's `Median` of those, with an
+  `andrey.AndreyWarning`; when no resample is valid either, the warning says so and
+  `metadata["averaged_graph"]` is `"nearest_resample_invalid"`. Under `knowledge`, a PAG method's
+  averaged graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's
+  rules until no endpoint changes. ([#555], [#564], [#584])
+
+- `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
+  cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
+  least squares and returns the links whose coefficient has a p-value of at most `alpha` (default
+  0.05), after the correction `fdr_method` names: the F-test of that regressor (Granger 1969), the
+  coefficient test of a vector autoregression. `lag_weights` hold the regression coefficients of the
+  returned links, and `metadata["p_values"]` holds the p-value of every link, as `pcmci` does. On
+  the quality gate's simulated series of 5 variables with 2 lags, the median errors (missing and
+  extra lagged edges; the empty graph's is 28.5) fall from 13.5 to 6.5 at 1,000 steps and from 12.5
+  to 4 at 2,000. With `fdr_method="none"`, at 80 or more variables with 1,000 steps the uncorrected
+  tests return more errors than the empty graph, as the docstring's Limitations say. The lasso, its
+  `cv` argument, and its worker threads are gone: `cv` is ignored with an
+  `andrey.DeprecatedArgumentWarning` and stops being accepted in the next release. ([#556])
+
+  | Method | Former argument | Now |
+  | --- | --- | --- |
+  | `granger` | `cv` | none: `alpha` sets the level of the test of each link |
+
+- The former argument names and values that 0.11.0 kept for one release no longer work, as its
+  changelog announced. A call that passes one raises `TypeError`, as for any argument a method does
+  not take, and a former score name raises `ValueError`, which lists the scores the method takes;
+  each message adds what the name or value is called now. `andrey run` and `andrey bootstrap`
+  refuse the flags and the `key=value` names the same way, with the same hint, and
+  the data inputs in `andrey --help --json` no longer list `aliases`. The
+  [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) gives the current calls.
+  ([#559])
+
+  | Method | Removed name or value | Name now |
+  | --- | --- | --- |
+  | `ica_lingam` | `random_state` | `seed` |
+  | `direct_lingam`, `multi_group_direct_lingam` | `random_state` | none: it set nothing |
+  | `pcmci` | `alpha_level` | `alpha` |
+  | `pcmciplus`, `lpcmci` | `pc_alpha` | `alpha` |
+  | `rcd` | `ind_alpha` | `alpha` |
+  | `calm` | `alpha` | `screen_alpha` |
+  | `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` | `lambda_value` | `penalty_discount` |
+  | `gfci`, `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC"`, `"local_score_BIC_from_cov"` | `score_func="bic"` |
+  | `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BIC_categorical"` | `score_func="discrete_bic"` |
+  | `gfci`, `ges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp` | `score_func="local_score_BDeu"` | `score_func="bdeu"` |
+  | `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_cond_gauss"` | `score_func="cond_gauss"` |
+  | `gfci`, `ges`, `hc`, `exact_search`, `boss`, `grasp` | `score_func="local_score_degen_gauss"` | `score_func="degen_gauss"` |
+  | `granger` | `maxlag` | `tau_max` |
+  | `longitudinal_lingam` | `n_lags` | `tau_max` |
+  | `rcd` | `max_explanatory_vars` | `max_depth` |
+  | `calm` | `max_outer` | `max_iter` |
+  | `multi_group_direct_lingam` | `data_groups` | `data` |
+  | `longitudinal_lingam` | `data_list` | `data` |
+  | `andrey run`, `andrey bootstrap` | `--data-groups`, `--data-list` | `--data`, once per dataset |
+  | `gin`, `calm` | `labels` | none: the labels come from a DataFrame's columns, or, in `andrey run`, from the data file's header |
+
+- The default `fdr_method` of `pcmci`, `pcmciplus`, and `granger` is `"fdr_bh"`, where it was
+  `"none"` in the pull requests that added it ([#554], [#565]), so a link is kept when its
+  Benjamini-Hochberg adjusted p-value over all the lagged links is at most `alpha`. On simulated
+  linear-Gaussian VAR series of 5 to 80 variables, 500 and 1,000 steps, and `tau_max` 1 and 2 (20
+  cells of 20 series each), the correction had fewer errors (missing plus extra lagged links) than
+  none in 16 cells for `pcmci` and 15 for `granger`, by the paired 95% bootstrap interval of the
+  difference, the same in 3 and 4, and more in 1 and 1: 5 variables, 500 steps, and `tau_max=2`, by
+  0.85 and 0.95. At 80 variables with 1,000 steps and `tau_max=2` the errors fell from 779 to 252
+  (`pcmci`) and from 768 to 256 (`granger`), against the empty graph's 481: the extra links fell
+  from 616 and 603 to 13, and the missed true links rose from 163 and 165 to 239 and 243.
+  `pcmciplus`'s links do not change; its lagged `metadata["p_values"]` are the adjusted ones.
+  `fdr_method="none"` returns `pcmci`'s results of 0.11.0 and `granger`'s uncorrected test. The
+  quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
+  to 6.5 and 4. ([#567])
+- `iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`.
+  `iamb` and `inter_iamb` return a CPDAG by default, kind `cpdag`, where they returned the moral
+  graph of the Markov blankets, as the R package bnlearn's `iamb` and `inter.iamb` return one by
+  default; `structure="moral"` returns the 0.11.0 graph bit for bit. `mmpc` returns the skeleton by
+  default, unchanged, as bnlearn's `mmpc` does, and `structure="cpdag"` returns its CPDAG. The CPDAG
+  is the Grow-Shrink structure learner's (Margaritis 2003): each pair of the moral graph that a
+  subset of the smaller blanket separates leaves, which gives the skeleton; each unshielded triple
+  is a collider when its ends stay dependent given the middle node and every subset of the smaller
+  blanket; and Meek's rules orient the rest. `structure="skeleton"` on `iamb` and `inter_iamb`
+  returns the moral graph without the links between a child's parents. With a `target`, each returns
+  the variable's set, as before. ([#572])
+
+### Added
+
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` take
+  `measure="skew"` and `measure="tanh"`, the first-order approximations of the pairwise likelihood
+  ratios of Hyvarinen and Smith (2013), beside the default `"pwling"`: `"tanh"` suits sparse noise,
+  as for Laplace, and `"skew"` skewed noise, with either sign. Both read the standardized columns
+  and cost one matrix product per step, so the order search took 0.1 to 0.3 of `"pwling"`'s time.
+  On simulated data with 10 and 20 variables and 500 and 2,000 rows, `"pwling"` made no more
+  errors (SHD) than either in any cell, and with uniform noise `"tanh"` orients backwards and
+  `"skew"` at random, so `"pwling"` stays the default. ([#575])
+- `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
+  `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
+  `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,
+  or a DAG, and graph separation on an undirected graph; each raises on the kinds the other one
+  defines. A CPDAG or PAG answers as every member of its class does. `neighbors` and `endpoints`
+  also take a label. ([#569])
+- `pcmci` and `pcmciplus` take `fdr_method`, as tigramite's `run_pcmci` and `run_pcmciplus` do:
+  `"fdr_bh"` replaces the p-values of the lagged links with their Benjamini-Hochberg adjusted
+  values over all those links together. `pcmci` keeps a link when its adjusted p-value is at most
+  `alpha`; `pcmciplus` decides its links in the skeleton phase and only reports the adjusted values
+  in `metadata["p_values"]`. `"none"` keeps the p-values as tested, which returns the results
+  these methods returned before. `lpcmci` takes none, as tigramite's does not. ([#554])
+- `granger` takes `fdr_method`, as `pcmci` and `pcmciplus` do: `"fdr_bh"` replaces the p-values of
+  the lagged links with their Benjamini-Hochberg adjusted values over all those links together,
+  and a link is kept when its adjusted p-value is at most `alpha`; `"none"` keeps the p-values as
+  tested. On the simulated series of 80 and 160 variables with 1,000 steps,
+  where the uncorrected tests return more errors than the empty graph (median 762.5 against 494,
+  and 2,855 against 973), `"fdr_bh"` returns fewer (266.5 and 546), at the cost of more missed
+  true links. ([#565])
+- `boss` and `grasp` take `n_starts`, the number of searches a fit runs, each later one from a
+  random order drawn from `seed`, and return the best-scoring one; the default, 1, returns the
+  graphs these methods returned before. ([#550])
+- `hc` and `tabu` take `n_starts`, `n_perturbations`, and `seed`: each search after the first
+  starts from the best DAG so far after `n_perturbations` random edge additions, removals, or
+  reversals drawn from `seed`, by default as many as there are variables, and the fit returns the
+  best-scoring one; the default, 1, returns the graphs these methods returned before. ([#552])
+- `bootstrap` takes `resampling`, `"subsample"` or `"bootstrap"`, and `sample_fraction`, the share
+  of rows in a subsample; for a time-series method on one series a subsample is one stretch of
+  consecutive rows. `andrey bootstrap` takes `--resampling` and `--sample-fraction`, and the result
+  records both. ([#544])
+- `bootstrap` and `BootstrapOutput.from_fits` take `strict`: `True` raises `ValueError` when no
+  valid graph of the method's kind holds the vote of the fits, instead of returning the resample
+  graph nearest the others with a warning. `metadata["averaged_graph"]` records which graph came
+  back, `"vote"`, `"nearest_resample"`, or `"nearest_resample_invalid"`. `andrey bootstrap` takes
+  `--strict`, and its envelope records both. The example notebook `bootstrap.ipynb` shows how to
+  read the edge frequencies and the averaged graph. ([#555])
+- `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
+  searches do: a required edge is always in the result, a pair forbidden both ways or outside
+  `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
+  tier. ([#521])
+- `pcmci`, `pcmciplus`, and `lpcmci` take every `indep_test` the other conditional-independence
+  searches take: `"chisq"` and `"gsq"` for categorical series, `"degen_gauss"` and `"cond_gauss"`
+  for mixed ones, and the nonlinear `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`, each on the lagged
+  values under test-wise deletion, with `categorical`, `max_categories`, and `seed`. Candidate
+  conditions are ordered by each test's statistic, as in tigramite. `None` still picks from the
+  declared column types. A test registered with `register_indep_test` needs only the single-query
+  call, as in every other search with an `indep_test`, under missing values too: the family orders
+  its candidates by p-value, smallest first. ([#515])
+- `gies`, `xges`, and `gfci` take `max_parents`, a cap on every node's parents, as `ges` does: no
+  DAG the returned graph represents gives a node more than that many parents, and a move that would
+  give a node more is skipped. `gfci` caps its GES phase; the PAG its tests then orient can put more
+  arrowheads at a node. Required edges of `knowledge` above the cap raise `ValueError`. The default,
+  `None`, sets no cap and returns the graphs these methods returned before. ([#516])
+- `gies` and `xges` take every score the other score searches take, `"bdeu"` and `"discrete_bic"`
+  for categorical data and `"cond_gauss"` and `"degen_gauss"` for mixed data besides `"bic"`, with
+  `categorical` and `max_categories`, and `score_func=None` picks from the declared column types as
+  in the other score searches; `gies` scores each variable on the rows without an intervention on
+  it, with BDeu as Cooper and Yoo (1999) define it for a mix of experimental and observational
+  data. ([#520])
+- `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+  `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman,
+  Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform prior over each
+  variable's conditional distributions is worth. The default, `1.0`, is the weight the score used
+  before, so every default result is unchanged. Only `score_func="bdeu"` reads it, so a call that
+  passes it with another score, named or picked from the declared column types, raises
+  `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
+  ([#553])
+- `andrey.markov_check` tests whether the data contradict a DAG or a CPDAG, such as a method's
+  result: it tests the independences the graph implies, each variable and every earlier non-parent
+  given its parents, and rejects the graph when their p-values are not uniform on (0, 1) by the
+  Anderson-Darling test (Ramsey, Andrews, and Spirtes 2024). `indep_test` is picked from the
+  declared column types as in `pc`, and each test reads its own random half of the rows
+  (`sample_fraction`), which keeps a true graph's rejection rate at 6% to 9% for `alpha=0.05`,
+  against 9% to 21% on all rows. The result lists every tested independence with its p-value
+  (`table()`), and `andrey markov-check GRAPH DATA` runs the check from the command line. The
+  docstring gives the rates measured for missing, extra, and reversed edges and for categorical
+  data. ([#571])
+- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a rank-based
+  test for data whose columns are monotone transformations of Gaussian variables (a Gaussian
+  copula): its p-values do not change under a strictly increasing transformation of a column, and
+  it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals. `pc`,
+  `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`,
+  and `lpcmci` take it; on data with missing values, each test ranks within the rows it reads. It
+  finds only monotone dependence. The default test is unchanged. ([#573])
+
+### Changed
+
+- A score search records the penalties its score used: `metadata["penalty_discount"]` for every
+  score but `"bdeu"`, and `metadata["ebic_gamma"]` for `"bic"`. Every fit whose result
+  `andrey.config`'s `tie_break` can change records the rule in `metadata["tie_break"]`, so the
+  metadata names every setting a default or the configuration chose. ([#551])
+- `andrey --help --json` gives each package-wide concept its template parameter, with its default
+  and bounds, such as `alpha` in the open interval (0, 1), and each method that differs from it,
+  with the reason, such as the `alpha` of 0.01 that `pcmciplus` and `rcd` take from their papers.
+  ([#551])
+
+### Fixed
+
+- `rsmax2(restrict="iamb")` and `restrict="inter_iamb"` restrict the score search to the skeleton
+  of `iamb` or `inter_iamb` (`structure="skeleton"`), as Friedman, Nachman and Pe'er (1999) and
+  Tsamardinos, Brown and Aliferis (2006) restrict to the restrict algorithm's skeleton and as
+  bnlearn's `rsmax2` does, where they searched the moral graph, which also joins the parents of a
+  common child. The graphs of those two restricts change; `mmpc`, `pc`, and `mmhc` fit as before.
+  On 15 simulated linear-Gaussian datasets of 20 to 100 variables the candidate pairs fell by 37%
+  to 61%, and the mean SHD to the true CPDAG from 33.7 to 12.8, against 13.1 for bnlearn's
+  `rsmax2(restrict="iamb")`. ([#577])
+- `chisq` and `gsq` no longer reject true independences too often in sparse tables. They referred
+  the statistic to `(r_x - 1) * (r_y - 1)` degrees of freedom per configuration, which rejected
+  11.1% (`chisq`) and 21.7% (`gsq`) of true independences at level 0.05 over 3 to 5 categories,
+  conditioning sets of 0 to 3 variables, and 500 to 5,000 rows, and 48% and 83% at 5 categories
+  with 3 conditioning variables. The degrees of freedom are now the statistic's mean when `y` is
+  shuffled within each configuration, as Tsamardinos and Borboudakis (2010) test with, worked out
+  exactly; the rates are 4.9% and 3.8%, and 3.2% and 0.8%. The graphs of every search that runs
+  these tests on discrete data can change, `gsq` finds fewer edges at small sizes, and `gsq` takes
+  about three times as long. `pc` with `gsq`, the default for categorical data, recovered graphs
+  no farther from the truth than with `chisq` in 16 settings and nearer in 3. ([#574])
+- The `max_depth` of `pcmci` and `pcmciplus` says in `andrey --help --json` that it caps the PC1
+  step, as their docstrings do, where it said every test. ([#551])
+- Every `seed` says first that `None` is the configured seed, `ANDREY_SEED` or 0 when it is unset,
+  not a fresh random one, so a fit repeats. ([#551])
+
 ## [0.11.0] - 2026-10-29
 
 ### Highlights
@@ -991,7 +1296,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
@@ -1137,6 +1443,31 @@ First alpha release.
 [#505]: https://github.com/Abel-ai-lab/andrey/pull/505
 [#509]: https://github.com/Abel-ai-lab/andrey/pull/509
 [#510]: https://github.com/Abel-ai-lab/andrey/pull/510
+[#515]: https://github.com/Abel-ai-lab/andrey/pull/515
+[#516]: https://github.com/Abel-ai-lab/andrey/pull/516
 [#517]: https://github.com/Abel-ai-lab/andrey/pull/517
+[#520]: https://github.com/Abel-ai-lab/andrey/pull/520
+[#521]: https://github.com/Abel-ai-lab/andrey/pull/521
 [#524]: https://github.com/Abel-ai-lab/andrey/pull/524
 [#526]: https://github.com/Abel-ai-lab/andrey/pull/526
+[#544]: https://github.com/Abel-ai-lab/andrey/pull/544
+[#550]: https://github.com/Abel-ai-lab/andrey/pull/550
+[#551]: https://github.com/Abel-ai-lab/andrey/pull/551
+[#552]: https://github.com/Abel-ai-lab/andrey/pull/552
+[#553]: https://github.com/Abel-ai-lab/andrey/pull/553
+[#554]: https://github.com/Abel-ai-lab/andrey/pull/554
+[#555]: https://github.com/Abel-ai-lab/andrey/pull/555
+[#556]: https://github.com/Abel-ai-lab/andrey/pull/556
+[#559]: https://github.com/Abel-ai-lab/andrey/pull/559
+[#564]: https://github.com/Abel-ai-lab/andrey/pull/564
+[#565]: https://github.com/Abel-ai-lab/andrey/pull/565
+[#567]: https://github.com/Abel-ai-lab/andrey/pull/567
+[#569]: https://github.com/Abel-ai-lab/andrey/pull/569
+[#571]: https://github.com/Abel-ai-lab/andrey/pull/571
+[#572]: https://github.com/Abel-ai-lab/andrey/pull/572
+[#573]: https://github.com/Abel-ai-lab/andrey/pull/573
+[#574]: https://github.com/Abel-ai-lab/andrey/pull/574
+[#575]: https://github.com/Abel-ai-lab/andrey/pull/575
+[#577]: https://github.com/Abel-ai-lab/andrey/pull/577
+[#581]: https://github.com/Abel-ai-lab/andrey/pull/581
+[#584]: https://github.com/Abel-ai-lab/andrey/pull/584

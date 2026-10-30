@@ -194,6 +194,10 @@ class Knowledge:
     ``pcmciplus`` applies its rules R1-R3 only, so its lag-0 graph can also leave undirected an
     edge R4 would direct.
 
+    ``iamb``, ``inter_iamb``, and ``mmpc`` return an undirected graph, so the knowledge sets only
+    which pairs their sets hold: tiers and edges forbidden one way constrain orientation, which the
+    graph does not have, and do not change it.
+
     In a PAG, the edges are those of an ancestral graph over the measured variables, where
     ``a -> b`` says that ``a`` is an ancestor of ``b``, not necessarily its direct cause. A
     forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at

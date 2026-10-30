@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from andrey.lingam.var import var_lingam
-from andrey.temporal.granger import granger_lasso
+from andrey.temporal.granger import granger_f_test
 from tests.recovery.helpers import datagen, harness
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -138,25 +138,8 @@ def test_var_lingam_recovery():
 
 
 def test_granger_recovery():
-    coeff = granger_lasso(datagen.generate("var_4v_stable"))
+    coeff, _ = granger_f_test(datagen.generate("var_4v_stable"), maxlag=2)
     harness.assert_baseline("Granger", {"coeff": coeff, "adj": coeff != 0}, case="var_4v_stable")
-
-
-@pytest.mark.parametrize("workers", [1, 3])
-def test_granger_equals_lassocv_on_each_variable(workers):
-    """Each row is scikit-learn's ``LassoCV`` on the lagged design, bit for bit, on any workers."""
-    from sklearn.linear_model import LassoCV
-    from threadpoolctl import threadpool_limits
-
-    import andrey
-
-    data = datagen.generate("var_4v_stable")
-    n, d = data.shape
-    design = np.hstack([data[2 - k : n - k] for k in (1, 2)])
-    with threadpool_limits(limits=1):  # BLAS reductions may round by thread count
-        expected = np.vstack([LassoCV(cv=5).fit(design, data[2:, i]).coef_ for i in range(d)])
-        with andrey.config(num_workers=workers):
-            assert np.array_equal(granger_lasso(data), expected)
 
 
 def test_var_lingam_output_contract():
@@ -167,8 +150,8 @@ def test_var_lingam_output_contract():
 
 
 def test_granger_output_contract():
-    coeff = granger_lasso(datagen.generate("var_4v_stable"))
-    assert coeff.shape == (4, 8)
+    coeff, p_values = granger_f_test(datagen.generate("var_4v_stable"), maxlag=2)
+    assert coeff.shape == p_values.shape == (4, 8)
 
 
 @pytest.fixture(scope="module")
@@ -209,7 +192,7 @@ def test_granger_keeps_absent_edges_absent_when_units_are_far_apart():
             1e200 * np.resize([0, 0, 1, 0, 0, 0, -1, 0.0], 17),
         )
     )
-    weights = granger(x, tau_max=1, cv=2).structure.lag_weights
+    weights = granger(x, tau_max=1).structure.lag_weights
     assert not np.isnan(weights).any()
 
 

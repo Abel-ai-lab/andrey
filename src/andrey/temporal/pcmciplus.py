@@ -16,7 +16,7 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
    when no linked pair has ``p`` neighbors left to condition on.
 3. **Colliders.** Each unshielded triple ``X^i_{t-tau} - X^k_t - X^j_t`` with a lag-0 link
    ``X^k_t - X^j_t`` is a collider, ``X^i_{t-tau} -> X^k_t <- X^j_t``, by ``collider_rule``:
-   ``"none"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
+   ``"sepsets"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
    test ``X^i_{t-tau}`` and ``X^j_t`` again given every subset of the lag-0 neighbors of
    ``X^j_t`` (and, at lag 0, of ``X^i_t``), with the phase-2 conditions added, and count the
    separating subsets that hold ``X^k_t``. ``"majority"`` calls the triple a collider when under
@@ -53,15 +53,16 @@ import numpy as np
 from andrey.constraint._skeleton import collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
+from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
 from andrey.search.hc import tie_ranks
-from andrey.temporal.pcmci import INDEP_TESTS, Link, LinkTest, design_test, pc1
+from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
 
-COLLIDER_RULES: tuple[str, ...] = ("majority", "conservative", "none")
+COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # A triple ``(i, lag, k, j)``: ``X^i_{t-lag} - X^k_t - X^j_t``.
 Triple = tuple[int, int, int, int]
@@ -75,7 +76,7 @@ class PCMCIPlusResult:
     strongest first. ``adjacency``, ``p_values``, and ``statistics`` have shape
     ``(tau_max + 1, n, n)``, indexed ``[lag, i, j]`` for ``X^i_{t-lag}`` and ``X^j_t``; lag 0 is
     symmetric. ``adjacency`` holds the links after phase 2. A link's p-value is the largest of its
-    phase-2 tests, and its statistic the partial correlation of that test; a lagged link phase 1
+    phase-2 tests, and its statistic that test's statistic; a lagged link phase 1
     removed reports its largest phase-1 test instead, and the lag-0 diagonal is ``1`` and ``0``,
     as is a link the knowledge keeps apart; a required link reads ``0`` and ``1``.
     ``marks`` holds the lag-0 endpoint marks: ``marks[i, j]`` is the mark at ``i`` on the link
@@ -321,9 +322,9 @@ def colliders(
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
-    one. With ``collider_rule="none"``, a triple over a pair they keep apart has no separating set
-    to read and is ambiguous. ``max_p_global`` caps the subsets the majority and conservative votes
-    read.
+    one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating
+    set to read and is ambiguous. ``max_p_global`` caps the subsets the majority and conservative
+    votes read.
     """
     tau_max = adjacency.shape[0] - 1
     marks = np.where(adjacency[0], TAIL, NULL).astype(np.int8)
@@ -347,9 +348,9 @@ def colliders(
                 if adjacency[lag, i, k] and not adjacency[lag, i, j]
             ]
             for i, lag in far:
-                if collider_rule == "none" and apart[lag, i, j]:
+                if collider_rule == "sepsets" and apart[lag, i, j]:
                     verdict = "ambiguous"
-                elif collider_rule == "none":
+                elif collider_rule == "sepsets":
                     verdict = "non-collider" if k in sepsets.get((i, lag, j), ()) else "collider"
                 else:
                     key = (min(i, j), 0, max(i, j)) if lag == 0 else (i, lag, j)
@@ -450,29 +451,35 @@ def pcmciplus(
     *,
     tau_max: int = 1,
     pc_alpha: float = 0.01,
+    fdr_method: str = "none",
     collider_rule: str = "majority",
     indep_test: str = "student_t",
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
 ) -> PCMCIPlusResult:
     """Run the four PCMCI+ phases on a ``(T, n)`` series with the ``indep_test`` test.
 
+    ``fdr_method`` corrects the reported p-values of the lagged links
+    (:func:`~andrey.core.fdr.corrected_pvalues`); the links themselves are decided by the
+    phases at ``pc_alpha``, so ``adjacency`` and ``marks`` do not depend on it.
+
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach every phase
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
-    conditions phases 2 and 3 take beyond the lagged parents. Raises :class:`ValueError` when
-    ``indep_test`` is not a key of :data:`~andrey.temporal.pcmci.INDEP_TESTS` or ``collider_rule``
-    is not in :data:`COLLIDER_RULES`.
+    conditions phases 2 and 3 take beyond the lagged parents. ``categorical`` and ``seed`` reach
+    :func:`~andrey.temporal.pcmci.design_test`, which raises on an ``indep_test`` it cannot build.
+    Raises :class:`ValueError` when ``collider_rule`` is not in :data:`COLLIDER_RULES`.
     """
-    if indep_test not in INDEP_TESTS:
-        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     if collider_rule not in COLLIDER_RULES:
         raise ValueError(
             f"collider_rule must be one of {list(COLLIDER_RULES)}, got {collider_rule!r}"
         )
+    check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(indep_test, data, tau_max)
-    ranks = tie_ranks(data).tolist()
+    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         return run_phases(
             test,
@@ -484,6 +491,7 @@ def pcmciplus(
             constraints,
             max_depth,
             max_p_global,
+            fdr_method,
         )
 
 
@@ -497,6 +505,7 @@ def run_phases(
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
     max_p_global: int | None = None,
+    fdr_method: str = "none",
 ) -> PCMCIPlusResult:
     """Run the four phases with ``test`` over the columns of the lagged design.
 
@@ -508,6 +517,8 @@ def run_phases(
     reports p-value 1 and statistic 0, or 0 and 1 when it is required. ``max_depth`` caps phase 1's
     conditioning sets; ``max_p_global`` caps the subsets of lag-0 neighbors that phase 2 conditions
     on beyond the lagged parents of both ends, and the subsets the collider votes of phase 3 read.
+    ``fdr_method`` corrects the lagged ``p_values`` once the phases have recorded them, and only
+    them: lag 0 is left as tested, and the corrected values decide no link.
     """
     recorder = _Recorder(test)
     parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
@@ -523,6 +534,10 @@ def run_phases(
         required = constraints.required.copy()
         required[0] |= required[0].T
         p_values[required], statistics[required] = 0.0, 1.0
+    if fdr_method != "none":
+        p_values[1:] = corrected_pvalues(
+            p_values[1:], fdr_method, None if constraints is None else constraints.forbidden[1:]
+        )
     marks, ambiguous = colliders(
         test,
         n_vars,

@@ -109,10 +109,10 @@ def essential_graph(dag: np.ndarray, interventions: np.ndarray) -> np.ndarray:
 def graph_bic(marks: np.ndarray, X: np.ndarray, interventions: np.ndarray) -> float:
     """BIC of an essential graph in deviance units, through any DAG of its class."""
     from andrey.core.orient import pdag2dag
-    from andrey.search.gies import InterventionalBICScore
+    from andrey.search.gies import InterventionalScore
 
     dag = pdag2dag(marks)
-    score = InterventionalBICScore(X, interventions)
+    score = InterventionalScore(X, interventions)
     return float(sum(score.score(j, np.nonzero(dag[j] == 2)[0]) for j in range(dag.shape[0])))
 
 
@@ -284,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
                     if all((d, seed, adapter.name, r) in done for r in range(args.repeats)):
                         continue
                     params = adapter.params()
-                    threads, num_workers = split_cores(args.cores, adapter.mode)
+                    threads, n_jobs = split_cores(args.cores, adapter.mode)
                     measures = run_task(
                         adapter,
                         stack(X, interventions),
@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
                         repeats=args.repeats,
                         warmup=args.warmup,
                         threads=threads,
-                        num_workers=num_workers,
+                        n_jobs=n_jobs,
                     )
                     for repeat, m in enumerate(measures):
                         if (d, seed, adapter.name, repeat) in done:

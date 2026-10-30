@@ -85,6 +85,7 @@ def ges(
     score_func: str = "bic",
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_parents: float | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
@@ -109,7 +110,7 @@ def ges(
     score_func : str
         Local score: ``"bic"`` (linear-Gaussian BIC),
         ``"bdeu"`` (BDeu on category codes,
-        :class:`~andrey.core.score.BDeuScore` with its default priors),
+        :class:`~andrey.core.score.BDeuScore` with its default structure prior),
         ``"discrete_bic"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
         ``"degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
@@ -121,6 +122,9 @@ def ges(
         ``2 * ebic_gamma * log C(n_features - 1, n_parents)`` per node
         (:func:`~andrey.core.score.ebic_penalty`); ``0.0`` is the standard BIC. The other scores
         ignore it.
+    equivalent_sample_size : float
+        Prior weight of ``"bdeu"``, the equivalent sample size of its uniform Dirichlet prior
+        (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     max_parents : float or None
         A cap on the most parents any DAG of the class gives a node, in the returned CPDAG and in
         the CPDAG after each move (:func:`~andrey.search.operators.max_parents_in_class`): an Insert
@@ -137,7 +141,7 @@ def ges(
         result is that class narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
     workers : int or None
         Worker processes for the BIC passes above the work threshold; ``None`` reads
-        ``andrey.config.num_workers``.
+        ``andrey.config.n_jobs``.
     _parent_rule : {"cap", "gate"}
         Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
@@ -159,6 +163,7 @@ def ges(
         X,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         categorical=categorical,
     )
 

@@ -95,7 +95,7 @@ def collect(futures: list, ordered: bool = False) -> list:
             results.append(fut.result())
     except BrokenProcessPool as exc:
         raise RuntimeError(
-            "a parallel-search worker died mid-pass (e.g. OOM); rerun with ANDREY_NUM_WORKERS=1"
+            "a parallel-search worker died mid-pass (e.g. OOM); rerun with ANDREY_N_JOBS=1"
         ) from exc
     return results
 
@@ -284,7 +284,7 @@ class StableWorkerSet:
             raise RuntimeError(
                 "parallel-search workers failed to start. If a script calls this, guard its entry "
                 'point with `if __name__ == "__main__":` (starting workers re-imports the script). '
-                "Otherwise the likely cause is running out of memory. Set ANDREY_NUM_WORKERS=1 to "
+                "Otherwise the likely cause is running out of memory. Set ANDREY_N_JOBS=1 to "
                 "run without workers."
             ) from exc
         except BaseException:

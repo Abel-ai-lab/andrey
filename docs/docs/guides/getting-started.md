@@ -271,24 +271,26 @@ methods, and draw the learned graph beside the known one.
 ### Resampling
 
 One run gives one graph, and a different sample of cells could give another. `andrey.bootstrap`
-refits PC on resamples of the cells, drawn with replacement, and counts how often each link
-appears. `seed` fixes the resamples, so a rerun gives the same counts:
+refits PC on subsamples, each a random half of the cells, and counts how often each link appears.
+`seed` fixes the subsamples, so a rerun gives the same counts:
 
 ```{code-cell} ipython3
-boot = andrey.bootstrap("pc", sachs.data, n_boot=100, seed=0)
+boot = andrey.bootstrap("pc", sachs.data, n_resamples=100, seed=0)
 pd.DataFrame(boot.table()[:8]).round(2)
 ```
 
 `table()` lists every link that appeared in some resample, with the direction it had there, most
-frequent first. The four undirected links appear in 79 to 96 of the 100 resamples. Directions are
-less stable: each arrow of the collider at pkc appears in 56 resamples, and `plc -> pip3` in 41.
+frequent first. The four undirected links appear in 91 to 100 of the 100 resamples. Directions are
+less stable: each arrow of the collider at pkc appears in 86 resamples, and `plc -> pip3` in 31.
 
-`boot.structure` is the averaged graph. A pair is in it when it is adjacent in at least half of the
-resamples (`threshold=0.5`), with the edge it has most often. It holds the same eight links as
-`out`. A stricter threshold keeps the links the resamples agree on, without refitting:
+`boot.structure` is the averaged graph. Each pair takes the state it has most often, with no edge
+counted as one of the states, and the result is then made a valid CPDAG. It holds seven of `out`'s
+eight links: plc and pip3 are adjacent in 54 of the 100 resamples, but no one edge between them is
+as frequent as no edge (`plc -> pip3` in 31, no edge in 46). A stricter threshold asks a link to be
+adjacent in more of the resamples, without refitting:
 
 ```{code-cell} ipython3
-print(boot.average(0.9))
+print(boot.average(0.95))
 ```
 
 ```{code-cell} ipython3
@@ -299,16 +301,53 @@ table = pd.DataFrame(boot.table())
 assert table.iloc[:4]["type"].eq("undirected").all()
 assert table.iloc[:4]["count"].between(75, 100).all()
 arrows = table[table["target"].eq("pkc") & table["type"].eq("directed")]
-assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(50, 65).all()
-assert 70 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 90
-assert links(boot.structure) == links(out.structure)
-assert links(boot.average(0.9)) < links(out.structure)
-assert len(links(out.structure) - links(boot.average(0.9))) == 1
+assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(80, 90).all()
+assert 50 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 60
+plc_pip3 = table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]
+assert plc_pip3["count"].max() < 100 - plc_pip3["count"].sum()
+assert links(boot.structure) == links(out.structure) - {frozenset({"plc", "pip3"})}
+assert links(out.structure) - links(boot.average(0.95)) == {
+    frozenset({"plc", "pip3"}),
+    frozenset({"erk", "pka"}),
+}
+adjacent = 1 - boot.frequency("absent")
+columns = list(sachs.data.columns)
+assert 0.9 < adjacent[columns.index("erk"), columns.index("pka")] <= 0.95
 ```
 
-That drops the link between plc and pip3, which is in 81 of the 100 resamples. Treat the counts as a
-ranking of the links, not as probabilities. A resample repeats some cells, so PC's tests see more
-evidence than it holds and keep weak links more often than they do on the data.
+That drops the link between erk and pka, which is in 93 of the 100 resamples. Treat the counts as a
+ranking of the links, not as probabilities. `resampling="bootstrap"` draws all the cells with
+replacement instead; a resample then repeats some cells, so PC's tests see more evidence than it
+holds and keep weak links more often than they do on the data.
+
+### Checking a result against the data
+
+A graph implies independences: PC's graph has no link between p38 and jnk, so given the right
+variables the two must look independent in the data. `andrey.markov_check` tests every
+independence the graph implies and asks whether the p-values are uniform, as they are when all of
+them hold. The cells that learned the graph would flatter it, so learn on a random half of the
+cells and check on the other half:
+
+```{code-cell} ipython3
+cells = np.random.default_rng(0).permutation(len(sachs.data))
+learn, held = sachs.data.iloc[cells[: len(cells) // 2]], sachs.data.iloc[cells[len(cells) // 2 :]]
+check = andrey.markov_check(andrey.pc(learn), held, seed=0)
+print(check)
+```
+
+```{code-cell} ipython3
+:tags: [remove-cell]
+
+# The prose below holds only while these do.
+assert check.passed and check.n_tests == 47
+```
+
+The data do not reject the 47 independences of PC's graph. That does not show the graph is right:
+a graph with extra links implies fewer independences and passes too, so read a pass with the number
+of links. A rejection is the informative result, because it means a link is missing or an arrow is
+wrong. `check.table()` lists each independence with its p-value, `check.dag` is the DAG whose
+independences were tested, and `andrey markov-check` runs the same from the shell. The
+[Markov check](../api.md#markov-check) section gives the measured error rates.
 
 ## Your own data
 
@@ -345,15 +384,17 @@ you can screen first and then search inside the pairs that survived:
 of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI names `depth`.
 
 The result honors every part: a required edge is there and directed, a forbidden one is not, and a
-pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed
-and Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the
-DAGs of the equivalence class that satisfy the knowledge. In a PAG, a forbidden `a -> b` puts an
-arrowhead at `a` and can leave a circle at `b`. Knowledge that contradicts itself, such as a
-required edge into an earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD,
-and FCI, knowledge whose directions close a cycle over the edges the search kept raises one after
-the adjacency search. Labels stay attached to their columns, so the same knowledge fits the table
-in any column order. A label is the column name as text: name a column called `1` with `"1"`, as
-the integer `1` is the second column. On the command line, give a JSON object inline or as a file:
+pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
+Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
+of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
+graphs: a required edge is there without a direction, and tiers and edges forbidden one way, which
+constrain orientation, do not change them. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
+and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
+earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
+directions close a cycle over the edges the search kept raises one after the adjacency search.
+Labels stay attached to their columns, so the same knowledge fits the table in any column order. A
+label is the column name as text: name a column called `1` with `"1"`, as the integer `1` is the
+second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
 PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
@@ -380,13 +421,14 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`; for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
-`ges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every
-score. `gfci`, `mmhc`, and `rsmax2` take a score and a test
+`ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and
+`exact_search` take every score; `gies` scores each variable on the rows without an intervention on
+it. `gfci`, `mmhc`, and `rsmax2` take a score and a test
 that read the same kind of data, such as
 `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
@@ -416,13 +458,18 @@ continuous parent.
 **Marking the categorical columns.** Name them with `categorical`, by label (the column name as
 text) or 0-based position:
 `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without `categorical`,
-a mixed-data setting you pass reads a DataFrame's `category`, `bool`, and text columns as
-categorical, since their type declares them, and infers every other column whose values, over all
-its rows, are at most `max_categories` distinct whole numbers (10 by default). pandas does not mark
-such a column as categorical by itself, so this follows the rule Tetrad applies when it loads mixed
-data. A `DataTypeWarning` names the columns inferred from their values, and none of the declared
-ones; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
-for none. The result's `metadata["categorical"]` lists the categorical columns it read.
+a mixed-data setting reads a DataFrame's `category`, `bool`, and text columns as categorical, since
+their type declares them. Values never declare a column: a column of whole numbers that you have
+not declared is continuous, so `andrey.pc(df, indep_test="cond_gauss")` reads the same columns as
+`andrey.pc(df)` does when it picks `cond_gauss`. Pass `categorical=[]` for no categorical column.
+The result's `metadata["categorical"]` lists the categorical columns it read.
+
+**A declared column needs a test or score that reads categories.** A test or score for continuous
+data, such as `fisherz` or `bic`, raises `ValueError` on a column you declare categorical, whether
+`categorical` names it or its type does, since it would read the categories as numbers. Leave the
+setting as `None` to pick a categorical or mixed-data one, or pass `categorical=[]` to read every
+column as numbers. A categorical test or score, such as `chisq` or `bdeu`, reads every column as
+categorical, declared or not.
 
 **No categorical column.** A mixed-data setting that finds no categorical column, or gets
 `categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio
@@ -431,16 +478,16 @@ the BIC.
 
 **Integer-coded columns.** Every method that reads columns as numbers, the default test and the
 linear-Gaussian BIC included, reads a column of codes such as 0, 1, 2 as numbers, which assumes
-the categories are ordered and evenly spaced. When columns of at most `max_categories` distinct
-whole numbers (10 by default) reach such a method, a one-time `DataTypeWarning` names those
-columns; if they are categories, declare them with `categorical=[...]` or a pandas `category`, and
-the default test or score switches to a categorical or mixed-data one.
+the categories are ordered and evenly spaced. When columns of at most 10 distinct whole numbers
+reach such a method, or the continuous part of a mixed-data setting, a one-time `DataTypeWarning`
+names those columns; if they are categories, declare them with `categorical=[...]` or a pandas
+`category`, and the default test or score switches to a categorical or mixed-data one.
 
 From the command line, the same settings are `key=value` arguments, such as
-`andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
-`max_categories=5`. The data file holds numbers only, so code each category as a whole number. The
-JSON result lists the categorical columns under `metadata.categorical` and the warnings under
-`run.warnings`.
+`andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'`. The data file
+holds numbers only, so code each category as a whole number and name those columns in
+`categorical`. The JSON result lists the categorical columns under `metadata.categorical` and the
+warnings under `run.warnings`.
 
 ## Missing values
 
@@ -487,17 +534,15 @@ VARMA-LiNGAM and Granger, fill in the missing steps first.
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
-`ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
+`ANDREY_BACKEND` and `ANDREY_N_JOBS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
 serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
 processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
 with one worker.
-`granger` fits its variables on worker threads, with the same coefficients, and needs none of the
-guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
-more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry
+more than one worker (`ANDREY_N_JOBS` above 1, or `-1` for every core) must put its entry
 point under the `__main__` guard:
 
 ```python

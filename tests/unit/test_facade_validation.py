@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.core import warning_policy
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.data import sample_scm
 from andrey.spec import REGISTRY
@@ -266,7 +267,7 @@ def test_exact_search_gives_no_variable_more_parents_than_rows_minus_2():
 @pytest.mark.parametrize("depth", [1, 2])
 def test_grasp_returns_a_valid_cpdag_at_shallower_depths(depth):
     data = sample_scm(d=8, n=400, seed=1, density=2.0, scale="standardize").data
-    out = andrey.grasp(data, depth=depth)
+    out = andrey.grasp(data, grasp_depth=depth)
     cpdag = from_structure(out.structure)
     assert out.structure.kind == "cpdag" and out.structure.n_nodes == 8
     np.testing.assert_array_equal(dag2cpdag(pdag2dag(cpdag)), cpdag)
@@ -275,8 +276,8 @@ def test_grasp_returns_a_valid_cpdag_at_shallower_depths(depth):
 
 @pytest.mark.parametrize("depth", [0, -1])
 def test_grasp_rejects_a_depth_below_1(depth):
-    with pytest.raises(ValueError, match="depth must be an int at least 1"):
-        andrey.grasp(_data(), depth=depth)
+    with pytest.raises(ValueError, match="grasp_depth must be an int at least 1"):
+        andrey.grasp(_data(), grasp_depth=depth)
 
 
 @pytest.mark.parametrize("fit", [andrey.varma_lingam, andrey.granger], ids=lambda f: f.__name__)
@@ -285,24 +286,10 @@ def test_time_series_methods_need_two_variables(fit):
         fit(_data(d=1))
 
 
-@pytest.mark.parametrize(
-    ("setting", "value", "error"),
-    [
-        ("tau_max", 0, ValueError),
-        ("tau_max", 1.5, TypeError),
-        ("cv", 1, ValueError),
-        ("cv", 2.5, TypeError),
-    ],
-)
-def test_granger_checks_tau_max_and_cv(setting, value, error):
-    with pytest.raises(error, match=setting):
-        andrey.granger(_data(), **{setting: value})
-
-
-def test_granger_needs_a_time_step_in_every_fold():
-    with pytest.raises(ValueError, match="data needs at least 8 rows"):
-        andrey.granger(_data()[:7], tau_max=3, cv=5)
-    assert andrey.granger(_data()[:8], tau_max=3, cv=5).structure.lags == (1, 2, 3)
+@pytest.mark.parametrize(("value", "error"), [(0, ValueError), (1.5, TypeError)])
+def test_granger_checks_tau_max(value, error):
+    with pytest.raises(error, match="tau_max"):
+        andrey.granger(_data(), tau_max=value)
 
 
 LINGAM_PRUNED = {
@@ -371,8 +358,8 @@ def test_varma_lingam_checks_order(order, error):
     [
         ({"tau_max": 0}, ValueError, "tau_max"),
         ({"tau_max": 1.5}, TypeError, "tau_max"),
-        ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
-        ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
+        ({"pc1_alpha": 0.0}, ValueError, "pc1_alpha"),
+        ({"pc1_alpha": 1.0}, ValueError, "pc1_alpha"),
         ({"alpha": 0.0}, ValueError, "alpha"),
         ({"alpha": 1.5}, ValueError, "alpha"),
         ({"indep_test": "spearman"}, ValueError, "indep_test"),
@@ -386,8 +373,8 @@ def test_pcmci_checks_its_parameters(params, error, name):
 def test_pcmci_needs_enough_time_steps_for_every_test():
     # 2 * tau_max * (n_variables + 1) + 3 = 27 rows for tau_max=3 over 3 variables.
     with pytest.raises(ValueError, match="data needs at least 27 rows"):
-        andrey.pcmci(_data(n=26), tau_max=3, pc_alpha=0.99)
-    assert andrey.pcmci(_data(n=27), tau_max=3, pc_alpha=0.99).structure.lags == (1, 2, 3)
+        andrey.pcmci(_data(n=26), tau_max=3, pc1_alpha=0.99)
+    assert andrey.pcmci(_data(n=27), tau_max=3, pc1_alpha=0.99).structure.lags == (1, 2, 3)
 
 
 @pytest.mark.parametrize(
@@ -714,13 +701,36 @@ def _mixed_data(n=200):
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
-def test_a_mixed_setting_infers_whole_number_columns_and_says_so(setting):
-    """Columns 0 and 2 hold three and two whole numbers; column 1 is continuous."""
-    with pytest.warns(andrey.DataTypeWarning, match=r"columns 0 \(3 values\), 2 \(2 values\)"):
-        out = MIXED[setting](_mixed_data())
-    assert out.metadata["categorical"] == [0, 2]
-    named = MIXED[setting](_mixed_data(), categorical=[0, 2])
-    assert np.array_equal(named.structure.to_numpy(), out.structure.to_numpy())
+def test_a_mixed_setting_reads_the_declared_columns_only(setting):
+    """Columns 0 and 2 hold three and two whole numbers; column 1 is continuous. Declaring column
+    0 by its type reads it alone as categorical, as the same declaration in categorical does, and
+    column 2 gets the category-code warning."""
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_mixed_data(), columns=["a", "b", "c"])
+    frame["a"] = pd.Categorical(frame["a"].astype(int))
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DataTypeWarning, match="columns 'c' hold at most 10") as caught:
+        typed = MIXED[setting](frame)
+    assert not any("as categorical" in str(w.message) for w in caught)
+    assert typed.metadata["categorical"] == ["a"]
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DataTypeWarning, match="columns 'c' hold at most 10"):
+        named = MIXED[setting](frame.astype({"a": float}), categorical=["a"])
+    assert named.metadata["categorical"] == ["a"]
+    assert np.array_equal(named.structure.to_numpy(), typed.structure.to_numpy())
+
+
+def test_a_named_mixed_test_reads_the_columns_the_default_records():
+    """``pc(df)`` and ``pc(df, indep_test=...)`` with the test it recorded fit the same graph."""
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_mixed_data(), columns=["a", "b", "c"])
+    frame["a"] = pd.Categorical(frame["a"].astype(int))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
+        default = andrey.pc(frame)
+        named = andrey.pc(frame, indep_test=default.metadata["indep_test"])
+    assert default.metadata["categorical"] == named.metadata["categorical"] == ["a"]
+    assert default.structure == named.structure
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
@@ -733,29 +743,25 @@ def test_a_mixed_setting_without_categorical_columns_warns_and_runs(setting):
         MIXED[setting](continuous)
 
 
-@pytest.mark.parametrize(
-    ("max_categories", "inferred"), [(2, [2]), (3, [0, 2]), (10, [0, 2])], ids=str
-)
-def test_max_categories_bounds_the_inferred_columns(max_categories, inferred):
-    with pytest.warns(andrey.DataTypeWarning):
-        out = andrey.pc(_mixed_data(), indep_test="cond_gauss", max_categories=max_categories)
-    assert out.metadata["categorical"] == inferred
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_never_reads_a_column_as_categorical_from_its_values(setting):
+    """Whole-number columns that nothing declares are continuous: the setting runs as its
+    linear-Gaussian form, and max_categories is ignored with a warning."""
+    with pytest.warns(andrey.DataTypeWarning, match="found no categorical column"):
+        out = MIXED[setting](_mixed_data())
+    assert out.metadata["categorical"] == []
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="max_categories is ignored"):
+        ignored = MIXED[setting](_mixed_data(), max_categories=3)
+    assert ignored.structure == out.structure
 
 
-@pytest.mark.parametrize(("value", "error"), [(1, ValueError), (2.5, TypeError), (True, TypeError)])
-def test_max_categories_is_an_int_of_at_least_two(value, error):
-    with pytest.raises(error, match="max_categories"):
-        andrey.pc(_mixed_data(), max_categories=value)
-
-
-def test_inference_reads_every_row():
-    """A column that is a code over the first rows and continuous after them is not categorical."""
+def test_the_category_code_warning_reads_every_row():
+    """A column that is a code over the first rows and continuous after them is not named."""
     x = _mixed_data()
     x[150:, 0] += 0.5
-    with pytest.warns(andrey.DataTypeWarning) as caught:
-        out = andrey.pc(x, indep_test="degen_gauss")
-    assert out.metadata["categorical"] == [2]
-    assert "column 0" not in str(caught[0].message) and "0 (" not in str(caught[0].message)
+    with pytest.warns(andrey.DataTypeWarning, match="columns 2 hold at most 10"):
+        andrey.pc(x, indep_test="fisherz")
 
 
 def _typed_frame():
@@ -783,15 +789,17 @@ def test_a_dataframe_type_declares_a_column_so_a_mixed_setting_does_not_warn(set
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
-def test_a_mixed_setting_warns_of_the_undeclared_columns_it_infers_only(setting):
-    """Next to the declared columns, a column of whole numbers without a type is a guess."""
+def test_a_mixed_setting_reads_the_typed_columns_and_warns_of_the_untyped_codes(setting):
+    """Next to the declared columns, a column of whole numbers without a type is continuous, and
+    the category-code warning names it alone."""
     frame = _typed_frame().assign(count=_mixed_data()[:, 0])
+    warning_policy._warned.clear()
     with pytest.warns(andrey.DataTypeWarning) as caught:
         out = MIXED[setting](frame)
     [message] = [str(w.message) for w in caught]
-    assert "'count' (3 values)" in message
+    assert "columns 'count' hold at most 10" in message
     assert not any(f"'{declared}'" in message for declared in ("group", "flag", "label"))
-    assert out.metadata["categorical"] == ["group", "flag", "label", "count"]
+    assert out.metadata["categorical"] == ["group", "flag", "label"]
 
 
 @pytest.mark.parametrize(
@@ -819,6 +827,8 @@ SCORE_SEARCHES = {
     "exact_search": (andrey.exact_search, "andrey.search.exact", "exact_search", "bic"),
     "boss": (andrey.boss, "andrey.search.boss", "boss", "bic"),
     "grasp": (andrey.grasp, "andrey.search.grasp", "grasp", "bic"),
+    "gies": (andrey.gies, "andrey.search.gies", "gies", "bic"),
+    "xges": (andrey.xges, "andrey.search.xges", "xges", "bic"),
 }
 
 
@@ -872,17 +882,6 @@ def _mixed_frame():
     return pd.DataFrame(
         {"group": pd.Categorical(x[:, 0].astype(int)), "u": x[:, 1], "flag": x[:, 2] > 0}
     )
-
-
-@pytest.mark.parametrize("name", [*SCORE_SEARCHES, "xges", "gfci"])
-def test_a_former_score_name_maps_to_the_current_one_with_one_warning(name):
-    fit = getattr(andrey, name)
-    x = _normal_data()
-    current = fit(x, score_func="bic")
-    for former in ("local_score_BIC", "local_score_BIC_from_cov"):
-        with pytest.warns(andrey.DeprecatedArgumentWarning, match=former):
-            assert _same_fit(fit(x, score_func=former), current)
-    assert current.structure.to_numpy().any()
 
 
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))
@@ -1014,7 +1013,7 @@ def test_an_explicit_score_func_wins_over_categorical(name, monkeypatch):
         fit(_mixed_data(), score_func="degen_gauss", categorical=[0])
         fit(_categorical_data(), score_func="cond_gauss", categorical=[0, 1, 2])
     assert used == ["degen_gauss", "cond_gauss"]
-    with pytest.raises(ValueError, match="leave categorical as None"):
+    with pytest.raises(ValueError, match="are declared categorical"):
         fit(_mixed_data(), score_func=linear, categorical=[0])
 
 
@@ -1067,10 +1066,7 @@ def test_the_default_score_and_graph_follow_the_columns_in_any_order(name, monke
 
 
 def test_whole_number_counts_read_as_numbers_with_one_warning(monkeypatch):
-    """Counts of at most ``max_categories`` values keep the linear BIC; the warning names them.
-
-    With ``max_categories=9``, the third column's 10 values are not named.
-    """
+    """Counts of at most 10 values keep the linear BIC; the warning names them."""
     rng = np.random.default_rng(0)
     x = rng.binomial(4, 0.5, 500)
     y = x + rng.binomial(3, 0.5, 500)
@@ -1079,10 +1075,8 @@ def test_whole_number_counts_read_as_numbers_with_one_warning(monkeypatch):
     used = _scores_used(monkeypatch, "hc")
     with pytest.warns(andrey.DataTypeWarning, match=r"columns 0, 1, 2 hold at most 10") as caught:
         andrey.hc(counts)
-    with pytest.warns(andrey.DataTypeWarning, match=r"columns 0, 1 hold at most 9"):
-        andrey.hc(counts, max_categories=9)
     assert "score_func='bic'" in str(caught[0].message)
-    assert used == ["bic", "bic"]
+    assert used == ["bic"]
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
@@ -1125,19 +1119,47 @@ def test_categorical_reads_a_string_as_a_label_and_an_integer_as_a_position(fit,
     assert out.metadata["categorical"] == ["1", "2"]
 
 
+#: Settings for continuous data, each as a fit of data and keywords.
+CONTINUOUS_SETTINGS = [
+    partial(andrey.pc, indep_test="fisherz"),
+    partial(andrey.ges, score_func="bic"),
+    partial(andrey.boss, score_func="bic"),
+    partial(andrey.exact_search, score_func="bic"),
+    partial(andrey.pcmci, indep_test="fisherz"),
+]
+
+
+@pytest.mark.parametrize("fit", CONTINUOUS_SETTINGS, ids=lambda f: f.func.__name__)
+def test_a_continuous_setting_rejects_a_declared_column_by_either_route(fit):
+    """A column declared categorical by ``categorical`` or by a pandas category type raises the
+    same error; ``categorical=[]`` reads the typed column as numbers."""
+    pd = pytest.importorskip("pandas")
+    x = np.round(_mixed_data())
+    frame = pd.DataFrame(x, columns=["a", "b", "c"])
+    with pytest.raises(ValueError, match="columns 'a' are declared categorical"):
+        fit(frame, categorical=["a"])
+    frame["a"] = pd.Categorical(frame["a"].astype(int))
+    with pytest.raises(ValueError, match="columns 'a' are declared categorical"):
+        fit(frame)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
+        assert fit(frame, categorical=[]).structure == fit(frame.astype({"a": float})).structure
+
+
 @pytest.mark.parametrize(
     "fit",
-    [
-        lambda x: andrey.pc(x, indep_test="fisherz", categorical=[0]),
-        lambda x: andrey.pc(x, indep_test="chisq", categorical=[0]),
-        lambda x: andrey.ges(x, score_func="bic", categorical=[0]),
-        lambda x: andrey.boss(x, score_func="bic", categorical=[0]),
-        lambda x: andrey.exact_search(x, score_func="bic", categorical=[0]),
-    ],
+    [partial(andrey.pc, indep_test="chisq"), partial(andrey.hc, score_func="bdeu")],
+    ids=lambda f: f.func.__name__,
 )
-def test_a_setting_that_reads_no_column_types_rejects_categorical(fit):
-    with pytest.raises(ValueError, match="leave categorical as None"):
-        fit(np.round(_mixed_data()))
+def test_a_categorical_setting_reads_a_declared_column_by_either_route(fit):
+    """A categorical setting reads every column as categorical, so a declaration by
+    ``categorical`` or by a pandas category type changes nothing."""
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_categorical_data(), columns=["a", "b", "c"])
+    plain = fit(frame)
+    assert fit(frame, categorical=["a"]).structure == plain.structure
+    frame["a"] = pd.Categorical(frame["a"].astype(int))
+    assert fit(frame).structure == plain.structure
 
 
 def _normal_data(n=300):
@@ -1188,7 +1210,7 @@ def test_an_empty_categorical_reads_as_none_where_no_column_types_are_read(fit, 
     "categorical", ["", "a", 0, [[]]], ids=["empty text", "text", "int", "nested"]
 )
 def test_a_categorical_that_is_not_an_empty_list_is_still_rejected(categorical):
-    with pytest.raises(ValueError, match="leave categorical as None or"):
+    with pytest.raises(TypeError, match="categorical must"):
         andrey.pc(_normal_data(), indep_test="fisherz", categorical=categorical)
 
 

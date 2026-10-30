@@ -91,7 +91,7 @@ def assemble_record(
         "warmup": measures["warmup"],
         "machine_id": machine_id,
         "threads": measures["env_threads"],
-        "num_workers": measures["env_num_workers"],
+        "n_jobs": measures["env_n_jobs"],
         "ges_min_work": measures["env_ges_min_work"],
     }
     return RunRecord(
@@ -149,7 +149,7 @@ def assemble_record(
         # Child-observed, so they stay None when the child never reported (timeout / oom / error).
         device_id=measures.get("device_id"),
         threads=measures.get("threads"),
-        num_workers=measures.get("num_workers"),
+        n_jobs=measures.get("n_jobs"),
         warmup=measures.get("warmup"),
         metrics=dict(metrics or {}),
     )
@@ -164,13 +164,11 @@ def _unit_environment(
     warmup: int,
     machine_id: str,
     threads: int,
-    num_workers: int,
+    n_jobs: int,
     extra_env: Mapping[str, str] | None,
 ) -> dict[str, Any]:
     """Return the planned execution environment used to identify a unit."""
-    fields = planned_env_fields(
-        adapter, threads=threads, num_workers=num_workers, extra_env=extra_env
-    )
+    fields = planned_env_fields(adapter, threads=threads, n_jobs=n_jobs, extra_env=extra_env)
     return {
         "backend": adapter.backend,
         "mode": adapter.mode,
@@ -181,7 +179,7 @@ def _unit_environment(
         "warmup": warmup,
         "machine_id": machine_id,
         "threads": fields["env_threads"],
-        "num_workers": fields["env_num_workers"],
+        "n_jobs": fields["env_n_jobs"],
         "ges_min_work": fields["env_ges_min_work"],
     }
 
@@ -258,7 +256,7 @@ def run_batch(
                 # Truth is runtime input for the oracle, not solution configuration.
                 params.update(OracleGES.truth_params(truth))
             # Equal total cores across solutions, split per the adapter's mode.
-            threads, num_workers = split_cores(cores, adapter.mode)
+            threads, n_jobs = split_cores(cores, adapter.mode)
 
             part = None
             if records_dir is not None:
@@ -271,7 +269,7 @@ def run_batch(
                         warmup=warmup,
                         machine_id=machine_id,
                         threads=threads,
-                        num_workers=num_workers,
+                        n_jobs=n_jobs,
                         extra_env=extra_env,
                     )
                 )
@@ -294,7 +292,7 @@ def run_batch(
                     repeats=repeats,
                     warmup=warmup,
                     threads=threads,
-                    num_workers=num_workers,
+                    n_jobs=n_jobs,
                     dtype=dtype,
                     extra_env=extra_env,
                 )
