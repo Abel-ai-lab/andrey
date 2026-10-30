@@ -34,8 +34,26 @@ Edit the spec, not the surfaces.
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
 | `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
-| `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, and `bootstrap`, the last two of which validate `<method>` and its `key=value` overrides (and `--config`) against the registry. |
-| `src/andrey/resample.py` | `andrey.bootstrap` and `BootstrapOutput`: the refits on resamples, the counts of each edge by endpoint marks, and the averaged graph. |
+| `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, `bootstrap`, and `markov-check`; `run` and `bootstrap` `<method>` and its `key=value` overrides (and `--config`) against the registry. |
+| `src/andrey/resample.py` | `andrey.bootstrap` and `BootstrapOutput`: the refits on resamples, the counts of each edge by endpoint marks, and the averaged graph, a valid graph of the method's kind. |
+| `src/andrey/markov.py` | `andrey.markov_check` and `MarkovCheckOutput`: the independences a DAG or CPDAG implies, tested against the data. |
+
+### Counts and lists on the pages
+
+A page that states a fact about the methods, such as how many there are, how many are supported,
+or which ones a family holds, computes it from the registry when it is built; no page types it in.
+A typed count goes stale without failing anything when a method is added or promoted.
+
+- `docs/conf.py` gives the documentation pages substitutions (`{{ method_count }}`,
+  `{{ n_supported }}`) from `_methods_text`.
+- `site/build.py` computes the homepage's counts, including the comparison table's distinct
+  methods (`COUNTED_WITH` names the methods that count with the one they extend).
+- `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
+  markers; `--check-readme` and `tests/unit/test_launch_material.py` fail when a block drifts.
+
+A number that cannot come from the registry, such as another package's method count or a planned
+method, sits in one named constant beside the code that prints it, with a comment saying where it
+was read.
 
 ### The agent skill
 
