@@ -341,8 +341,9 @@ def rsmax2(
         The restrict phase. ``"mmpc"`` keeps a pair when each variable is in the other's MMPC
         parents and children [2]_, as :func:`~andrey.mmhc` does. ``"iamb"`` and ``"inter_iamb"``
         keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB
-        [3]_, the moral graph, which also joins the parents of a common child. ``"pc"`` keeps the
-        skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
+        [3]_ and no subset of the smaller blanket separates the two, the skeleton of
+        ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child.
+        ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -448,13 +449,14 @@ def rsmax2(
     -----
     **How it works.** The restrict phase follows the sparse candidate idea of [1]_: tests narrow
     the pairs a score search must consider. Each choice finds every true adjacency when its tests
-    are exact. The MMPC skeleton and PC's skeleton then hold only the true adjacencies; the moral
-    graph also joins two parents of a common child, which the maximize phase can leave
-    non-adjacent. The maximize phase starts from the empty graph, or from the required edges, with
-    every pair outside the candidates forbidden in both directions, and returns the CPDAG of the
-    DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and :func:`~andrey.inter_iamb`
-    describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s adjacency search without
-    orienting.
+    are exact. The skeletons of MMPC, IAMB, Inter-IAMB, and PC then hold only the true
+    adjacencies. A Markov blanket also holds the other parents of a common child, so IAMB and
+    Inter-IAMB test each pair of their moral graph against subsets of the smaller blanket and drop
+    the pairs that separate. The maximize phase starts from the empty graph, or from the required
+    edges, with every pair outside the candidates forbidden in both directions, and returns the
+    CPDAG of the DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and
+    :func:`~andrey.inter_iamb` describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s
+    adjacency search without orienting.
 
     Ties go to the column whose rank, computed from its own data, comes first, as for
     :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are

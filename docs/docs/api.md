@@ -339,9 +339,9 @@ IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and 
 `structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
 IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
 conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
-RSMAX2 generalizes it: its restrict phase keeps the pairs of MMPC's skeleton, of IAMB's or
-Inter-IAMB's moral graph, or of PC's skeleton, and its maximize phase runs hill climbing or tabu
-search among them.
+RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
+Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
+them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit

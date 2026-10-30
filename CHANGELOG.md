@@ -265,6 +265,14 @@ names its pull request.
 
 ### Fixed
 
+- `rsmax2(restrict="iamb")` and `restrict="inter_iamb"` restrict the score search to the skeleton
+  of `iamb` or `inter_iamb` (`structure="skeleton"`), as Friedman, Nachman and Pe'er (1999) and
+  Tsamardinos, Brown and Aliferis (2006) restrict to the restrict algorithm's skeleton and as
+  bnlearn's `rsmax2` does, where they searched the moral graph, which also joins the parents of a
+  common child. The graphs of those two restricts change; `mmpc`, `pc`, and `mmhc` fit as before.
+  On 15 simulated linear-Gaussian datasets of 20 to 100 variables the candidate pairs fell by 37%
+  to 61%, and the mean SHD to the true CPDAG from 33.7 to 12.8, against 13.1 for bnlearn's
+  `rsmax2(restrict="iamb")`. ([#577])
 - `chisq` and `gsq` no longer reject true independences too often in sparse tables. They referred
   the statistic to `(r_x - 1) * (r_y - 1)` degrees of freedom per configuration, which rejected
   11.1% (`chisq`) and 21.7% (`gsq`) of true independences at level 0.05 over 3 to 5 categories,
@@ -1432,3 +1440,4 @@ First alpha release.
 [#573]: https://github.com/Abel-ai-lab/andrey/pull/573
 [#574]: https://github.com/Abel-ai-lab/andrey/pull/574
 [#575]: https://github.com/Abel-ai-lab/andrey/pull/575
+[#577]: https://github.com/Abel-ai-lab/andrey/pull/577
