@@ -3,9 +3,9 @@
 The nonlinear additive-noise family models each variable as ``x_j = f_j(parents) + e_j`` with
 nonlinear ``f_j`` and noise independent of the parents, which identifies the DAG from the
 observational distribution (Hoyer et al. 2009; Peters et al. 2014). :mod:`andrey.fcm.cam` holds
-CAM. The family's shared pieces: :mod:`andrey.fcm.gam` fits additive models of penalized thin
-plate regression splines, and :mod:`andrey.fcm.pruning` removes the edges of a candidate DAG whose
-smooth terms test as insignificant.
+CAM and :mod:`andrey.fcm.resit` RESIT. The family's shared pieces: :mod:`andrey.fcm.gam` fits
+additive models of penalized thin plate regression splines, and :mod:`andrey.fcm.pruning` removes
+the edges of a candidate DAG whose smooth terms test as insignificant.
 
 References
 ----------

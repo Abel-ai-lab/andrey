@@ -346,10 +346,10 @@ def resit(
     1. *Causal order.* Each remaining variable is regressed on the other remaining ones and its
        residual tested against them jointly; the variable whose residual has the largest p-value
        is the next sink, and the variables still remaining are its possible parents.
-    2. *Edge removal.* Each variable's possible parents are tried one at a time, in column order:
-       a parent goes when the residual of the fit on the other current parents has a p-value
-       above ``alpha`` against all the variable's predecessors in the order. With one parent
-       left, the residual without it is the variable itself.
+    2. *Edge removal.* Each variable's possible parents are tried one at a time, in the rank
+       order of **Ties**: a parent goes when the residual of the fit on the other current parents
+       has a p-value above ``alpha`` against all the variable's predecessors in the order. With one
+       parent left, the residual without it is the variable itself.
 
     Each regression is an additive model of penalized thin plate regression splines with ten
     basis functions per term and smoothing chosen by GCV [4]_, with
@@ -379,7 +379,33 @@ def resit(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet.
+    **Limitations.** Not benchmarked against other packages yet. Binary columns, and any column
+    with fewer than 3 distinct values, are not supported: every regression fits a smooth term of
+    each parent, and such a column raises ``ValueError`` before the fit. Measured on simulated
+    additive-noise data with 1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized
+    columns, on one core. It oriented 92% of the true edges correctly at 5 variables and 80% at
+    10, with median errors (SHD) of 1 and 5 against the empty graph's 5 and 10. From 20 variables
+    its median errors on these data exceed the empty graph's, 23 against 20 at 20 variables and 89
+    against 50 at 50: each test of the causal order reads all the remaining variables at once and
+    loses power, and an early wrong sink carries through the rest of the order. At 20 variables,
+    over ten graphs per generator, it oriented 65% to 76.5% of the true edges correctly on four
+    additive-noise generators, the most with Gumbel noise, with median errors of 17 to 23 against
+    the empty graph's 20; it oriented 43.5% on linear Gaussian data and 25.5% on location-scale
+    data, whose noise scale changes with the parents. A fit took a median of 2 s at 5 variables,
+    48 s at 20, 3.8 minutes at 30, and 24 minutes at 50. The causal order fits about ``d^2 / 2``
+    additive models of up to ``d - 1`` terms; their cost grows with the terms up to about 35, past
+    which each term's basis shrinks to keep three rows per basis function, so a fit's cost grows
+    about as ``d^3.3`` up to 50 variables and as ``d^2`` beyond. A fit passes about a minute near
+    20 variables, 10 minutes near 40, and an hour near 75; at 100 variables, a fit stopped after
+    an hour had run 3,565 of the 5,049 tests of its causal order, and the measured cost per test
+    puts the whole fit near two hours. The edge removal tests each parent against all the
+    variable's predecessors at once, and many of those p-values lie near ``alpha``, so the order
+    the parents are tried in changes the result: trying them in the data's column order instead of
+    by rank gave the same causal orders at 20 variables but graphs a median of 10 to 17 edges
+    apart, at about the same accuracy. The smoothing of each fit is a local minimum of its GCV
+    score, which can have several, so two variables of nearly equal p-value can be taken as the
+    sink in either order. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
