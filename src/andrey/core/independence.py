@@ -185,6 +185,8 @@ def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
 
 
 _TRIU_K1_CACHE: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+#: Most rows whose upper-triangle indices :func:`_triu_k1` keeps: the default median's block.
+_TRIU_CACHED_ROWS = 100
 
 
 def _triu_k1(n: int) -> tuple[np.ndarray, np.ndarray]:
@@ -200,6 +202,31 @@ def _triu_k1(n: int) -> tuple[np.ndarray, np.ndarray]:
     return idx
 
 
+def _upper(sq_dists: np.ndarray) -> np.ndarray:
+    """The strict upper triangle of a square matrix, row by row.
+
+    Up to :data:`_TRIU_CACHED_ROWS` rows through the memoized indices of :func:`_triu_k1`; a larger
+    matrix, which only a median over every row meets, through a boolean mask of one byte per entry
+    that is not kept, in the same order.
+    """
+    n = sq_dists.shape[0]
+    if n <= _TRIU_CACHED_ROWS:
+        return sq_dists[_triu_k1(n)]
+    return sq_dists[np.triu(np.ones((n, n), dtype=bool), k=1)]
+
+
+def _sq_dists(data: np.ndarray) -> np.ndarray:
+    """Squared Euclidean distances between the rows of ``data``, ``x^2 + y^2 - 2xy``."""
+    sq_norms = np.sum(data * data, axis=1)
+    return sq_norms[None, :] + sq_norms[:, None] - 2.0 * (data @ data.T)
+
+
+def _median_width(sq_dists: np.ndarray) -> float:
+    """``sqrt(0.5 * median(positive squared pairwise distances))`` from squared distances."""
+    upper = _upper(sq_dists)
+    return float(np.sqrt(0.5 * np.median(upper[upper > 0])))
+
+
 def _median_width_gamma(column: np.ndarray, rows: int | None = 100) -> float:
     """Median-distance Gaussian bandwidth ``sigma`` from up to the first ``rows`` rows of a matrix.
 
@@ -208,22 +235,16 @@ def _median_width_gamma(column: np.ndarray, rows: int | None = 100) -> float:
     cheap, and ``rows=None`` reads every row.
     """
     data = column[:rows] if rows is not None and column.shape[0] > rows else column
-    n = data.shape[0]
-    sq_norms = np.sum(data * data, axis=1)
-    sq_dists = sq_norms[None, :] + sq_norms[:, None] - 2.0 * (data @ data.T)
-    upper = sq_dists[_triu_k1(n)]
-    return float(np.sqrt(0.5 * np.median(upper[upper > 0])))
+    return _median_width(_sq_dists(data))
 
 
-def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
-    """Raw and doubly-centered RBF gram matrices of an ``(n, q)`` matrix at bandwidth ``sigma``.
+def _gram_from_sq_dists(sq_dists: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
+    """Raw and doubly-centered RBF gram matrices from squared distances, which are overwritten.
 
     The centered matrix is ``H K H`` with ``H = I - 1/n`` in row/column-sum form (the biased
     estimate).
     """
-    n = column.shape[0]
-    sq_norms = np.sum(column * column, axis=1)
-    sq_dists = sq_norms[None, :] + sq_norms[:, None] - 2.0 * (column @ column.T)
+    n = sq_dists.shape[0]
     np.negative(sq_dists, out=sq_dists)  # scale the exponent in place: -sq_dists / 2 / width**2
     sq_dists /= 2.0
     sq_dists /= width**2
@@ -234,6 +255,11 @@ def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarra
     return raw, centered
 
 
+def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
+    """Raw and doubly-centered RBF gram matrices of an ``(n, q)`` matrix at bandwidth ``sigma``."""
+    return _gram_from_sq_dists(_sq_dists(column), width)
+
+
 def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np.ndarray, float]:
     """Return one side's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
 
@@ -241,11 +267,16 @@ def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np
     against many others (RCD, ParceLiNGAM) computes this once per column and reuses it. ``column``
     is one variable or an ``(n, q)`` matrix of several, read jointly through their Euclidean
     distances. The bandwidth's median reads the first ``median_rows`` rows, or every row with
-    ``None`` (RESIT).
+    ``None`` (RESIT); when it reads every row, the squared distances are computed once for both
+    the bandwidth and the kernel.
     """
     col = _as_columns(column)
     n = col.shape[0]
-    raw, centered = _gram_gamma(col, _median_width_gamma(col, median_rows))
+    if median_rows is None or n <= median_rows:
+        sq_dists = _sq_dists(col)
+        raw, centered = _gram_from_sq_dists(sq_dists, _median_width(sq_dists))
+    else:
+        raw, centered = _gram_gamma(col, _median_width_gamma(col, median_rows))
     raw[np.diag_indices(n)] = 0.0
     mu = 1.0 / n / (n - 1) * raw.sum()
     return centered, mu
