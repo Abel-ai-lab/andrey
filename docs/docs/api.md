@@ -151,6 +151,16 @@ all of its removal phases with it. `pcmciplus` splits its caps by phase: `max_de
 lagged phase, whose sets hold no default conditions, and `max_p_global` caps the same-step
 skeleton and collider phases, whose sets add the lagged parents of both ends.
 
+% concept: structure
+`iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`.
+`"cpdag"` is the CPDAG of the Grow-Shrink structure learner (Margaritis 2003): the skeleton, with
+each unshielded triple tested for a collider and Meek's rules applied. `"skeleton"` is the same
+adjacencies, undirected. `iamb` and `inter_iamb` default to `"cpdag"` and also take `"moral"`, the
+moral graph, each variable joined to its Markov blanket, a child's other parents included. `mmpc`
+defaults to `"skeleton"`, the graph its sets give; its parents-and-children sets hold no child's
+other parents, so it has no moral graph. These are the defaults of the corresponding learners of
+the R package bnlearn. With a `target`, each returns that variable's set, whatever `structure` is.
+
 % concept: collider_rule
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
 an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
@@ -325,11 +335,13 @@ its first call in a process.
 ```
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they return every variable's set as an `undirected` graph, joining a pair
-when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests,
-then runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict
-phase keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's
-skeleton, and its maximize phase runs hill climbing or tabu search among them.
+`target`; without one, they join a pair when each is in the other's set and return the graph
+`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
+IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
+conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
+RSMAX2 generalizes it: its restrict phase keeps the pairs of MMPC's skeleton, of IAMB's or
+Inter-IAMB's moral graph, or of PC's skeleton, and its maximize phase runs hill climbing or tabu
+search among them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
