@@ -1272,12 +1272,12 @@ def test_gies_rejects_unusable_interventions(interventions, message):
 
 @pytest.mark.parametrize("fit", [andrey.pc, andrey.fci, andrey.mmhc, andrey.gfci])
 def test_a_null_test_picks_from_the_declared_column_types(fit):
-    """Declared types pick chisq or cond_gauss; undeclared codes keep fisherz, with one warning."""
+    """Declared types pick gsq or cond_gauss; undeclared codes keep fisherz, with one warning."""
     frame, mixed = _categorical_frame(), _mixed_frame()
     columns = ["group", "flag"]
     score = {"score_func": "bdeu"} if fit in (andrey.mmhc, andrey.gfci) else {}
     mixed_score = {"score_func": "cond_gauss"} if score else {}
-    assert _same_fit(fit(frame), fit(frame, indep_test="chisq", **score))
+    assert _same_fit(fit(frame), fit(frame, indep_test="gsq", **score))
     assert _same_fit(
         fit(mixed), fit(mixed, indep_test="cond_gauss", categorical=columns, **mixed_score)
     )
