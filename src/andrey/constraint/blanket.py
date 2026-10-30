@@ -25,12 +25,12 @@ agree to ``_KEY_DP`` decimals go to the candidate with the lower rank, from
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from itertools import combinations
+from collections.abc import Callable, Iterator, Sequence
+from itertools import combinations, islice
 
 import numpy as np
 
-from andrey.constraint._skeleton import adjacent_pairs, scan_conditioning_sets
+from andrey.constraint._skeleton import _CHUNK, adjacent_pairs, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.ci import CITest
 from andrey.core.knowledge import Constraints, orient
@@ -380,6 +380,16 @@ def prune_spouses(
     return skeleton
 
 
+def _collider_sets(sides: list[list[int]], size: int, middle: int) -> Iterator[tuple[int, ...]]:
+    """The conditioning sets of a collider test, each once: ``middle`` with every size-``size``
+    subset of ``sides[0]``, then of the other side, less the subsets the first side holds."""
+    first = set(sides[0])
+    for n, side in enumerate(sides):
+        for rest in combinations(side, size):
+            if n == 0 or not first.issuperset(rest):
+                yield tuple(sorted((*rest, middle)))
+
+
 def blanket_colliders(
     test: CITest,
     skeleton: np.ndarray,
@@ -400,7 +410,8 @@ def blanket_colliders(
     such set separates them. Every conditioning set holds ``b``, so with ``max_depth`` the subsets
     hold at most ``max_depth - 1`` members, and with ``max_depth=0`` no set can be tested and the
     triple is ambiguous. The sets are tested by increasing size, and a non-collider stops at the
-    first size that separates.
+    first size that separates. The sets of one size are generated and tested in chunks, so the
+    memory a triple takes does not grow with the number of its subsets.
 
     Returns the separating sets :func:`~andrey.constraint.pc._orient_colliders` reads, keyed
     ``(a, c)`` and holding the pair's non-collider middle nodes; each decided triple's rank, the
@@ -425,11 +436,10 @@ def blanket_colliders(
                 continue
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
-                conds = dict.fromkeys(
-                    tuple(sorted((*rest, b))) for side in sides for rest in combinations(side, size)
-                )
-                [(p_size, strength_size)] = _weakest(test, a, [c], list(conds))
-                p, strength = max(p, p_size), min(strength, strength_size)
+                conds = _collider_sets(sides, size, b)
+                while chunk := list(islice(conds, _CHUNK)):
+                    [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
+                    p, strength = max(p, p_chunk), min(strength, strength_chunk)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break
