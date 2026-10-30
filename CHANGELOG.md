@@ -28,7 +28,7 @@ names its pull request.
   changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
   the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
   restores the former rank; `tie_break="position"` orders ties by column position, a different
-  rule. ([#TBD])
+  rule. ([#612])
 
 ## [0.12.0] - 2026-10-30
 
@@ -1492,3 +1492,4 @@ First alpha release.
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
 [#596]: https://github.com/Abel-ai-lab/andrey/pull/596
+[#612]: https://github.com/Abel-ai-lab/andrey/pull/612
