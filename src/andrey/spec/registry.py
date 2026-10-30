@@ -1983,8 +1983,10 @@ _add(
                 default=2,
                 doc="The maximum conditioning-set size of a sink test, the most variables tested "
                 "together as a variable's new candidate parents, at least 1: the search runs over "
-                "sets of up to max_depth + 1 variables. Larger values find more parents and take "
-                "longer. The default 2 is the paper's setting, sets of at most 3 variables.",
+                "sets of up to max_depth + 1 variables. Each sink test also regresses on the "
+                "variable's candidates found so far, however many. Larger values find more parents "
+                "and take longer. The default 2 is the paper's setting, sets of at most 3 "
+                "variables.",
                 minimum=1,
                 concept="max_depth",
             ),
@@ -1993,7 +1995,8 @@ _add(
             structure_type="graph",
             graph_kind="pag",
             doc="PAG over the observed variables; o-o joins a pair through a hidden variable, a "
-            "common cause or a causal path, and metadata latent_pairs lists those pairs.",
+            "common cause or a causal path, metadata latent_pairs lists those pairs, and "
+            "cycle_edges the edges dropped from directed cycles.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -2127,8 +2130,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "camuv": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set never "
     "make a variable a candidate parent, so a variable is not tried as the sink of a set that "
     "holds a forbidden parent of it. A required edge's cause is a candidate parent from the start "
-    "and no step removes it; its pair is never marked. A pair forbidden both ways is never marked "
-    "o-o.",
+    "and no step removes it; its pair is never marked. A pair forbidden both ways is never marked; "
+    "on a marked pair, a forbidden i -> j whose reverse is not forbidden, such as an edge into an "
+    "earlier tier, puts an arrowhead at i.",
     "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
@@ -2203,7 +2207,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
-    "camuv": ("latent_pairs",),
+    "camuv": ("latent_pairs", "cycle_edges"),
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the

@@ -5,7 +5,8 @@ The fixed cases have one certain answer: independent columns give no edge and no
 with a nonlinear effect points to it in either column order, a hidden common cause of two
 variables marks the pair and leaves the observed edges directed, the same model with that cause
 observed marks no pair, and a hidden variable between a cause and its effect marks the pair. The
-ground truth is additive-noise data from ``andrey.data`` on random graphs with no hidden variable.
+ground truth is additive-noise data from ``andrey.data`` on random graphs with no hidden variable,
+and the recorded output is the marks of a nonlinear hidden fork.
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ import pytest
 import andrey
 from andrey.data import sample_scm
 from andrey.metrics import shd
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 N = 1000
 
@@ -106,3 +109,8 @@ def test_a_fit_repeats(additive_fits):
     again = _fit(case.data)
     assert again.structure == out.structure
     assert again.metadata == out.metadata
+
+
+def test_camuv_matches_the_recorded_output():
+    out = _fit(datagen.generate("nonlinear_fork_4v"))
+    assert_recorded_output(out, "CAMUV", case="nonlinear_fork_4v")

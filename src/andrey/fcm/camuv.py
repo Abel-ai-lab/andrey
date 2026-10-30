@@ -81,6 +81,8 @@ from dataclasses import dataclass
 from itertools import combinations
 
 import numpy as np
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 from andrey.core.independence import gamma_gram, hsic_gamma_log_p
 from andrey.core.units import unit_factors
@@ -95,7 +97,8 @@ ALPHA = 0.01
 MAX_DEPTH = 2
 #: Basis functions per term of each regression.
 K = 10
-#: Memory for the kept kernel matrices; each holds ``n_samples**2`` float64 entries.
+#: Memory for the kept kernel matrices; each holds ``n_samples**2`` float64 entries, so with more
+#: than about 11,600 rows none is kept.
 _GRAM_BYTES = 2**30
 
 #: A residual: a variable regressed on the sorted variables of the tuple.
@@ -121,9 +124,10 @@ class _Tests:
     """The regressions and HSIC tests of one fit; the only place a test runs.
 
     A residual depends only on its variable and regressors, and a test only on its two sides, so the
-    search's repeated sweeps look up the log p-values of the tests they repeat. Each variable's
-    residual on its current candidates is kept, and the kernel matrices of the most recently used
-    sides of such residuals, as many as ``_GRAM_BYTES`` holds.
+    search's repeated sweeps look up the log p-values of the tests they repeat; a test's value is
+    computed with its two sides in one order, so it does not depend on which step asks first. Each
+    variable's residual on its current candidates is kept, and the kernel matrices of the most
+    recently used sides of such residuals, as many as ``_GRAM_BYTES`` holds.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -131,7 +135,7 @@ class _Tests:
         n = data.shape[0]
         self._residuals: dict[Term, np.ndarray] = {}
         self._grams: OrderedDict[Side, Gram] = OrderedDict()
-        self._capacity = max(4, _GRAM_BYTES // (8 * n * n))
+        self._capacity = _GRAM_BYTES // (8 * n * n)
         self._log_p: dict[tuple[Side, Side], float] = {}
 
     def _fit(self, term: Term) -> np.ndarray:
@@ -177,19 +181,18 @@ class _Tests:
         found = self._grams.pop(side, None)
         if found is None:
             found = self._gram([self._residual(term) for term in side])
-            if len(self._grams) >= self._capacity:
+            if self._capacity and len(self._grams) >= self._capacity:
                 self._grams.popitem(last=False)
-        self._grams[side] = found
+        if self._capacity:
+            self._grams[side] = found
         return found
 
     def log_p(self, x: Side, y: Side) -> float:
         """The log HSIC p-value between two sides of residuals on current candidates."""
-        x, y = min(x, y), max(x, y)
-        key = (x, y)
+        key = (min(x, y), max(x, y))
         found = self._log_p.get(key)
         if found is None:
-            found = self._hsic(self._side_gram(x), self._side_gram(y))
-            self._log_p[key] = found
+            found = self._log_p[key] = self._hsic(*(self._side_gram(side) for side in key))
         return found
 
     def log_p_fresh(self, child: int, regressors: set[int], y: Side) -> float:
@@ -197,14 +200,14 @@ class _Tests:
 
         The residual is fitted for this test alone, so neither it nor its kernel is kept.
         """
-        term = (child, tuple(sorted(regressors)))
-        key = ((term,), y)
+        x: Side = ((child, tuple(sorted(regressors))),)
+        key = (min(x, y), max(x, y))
         found = self._log_p.get(key)
         if found is None:
-            residual = self._residuals.get(term)
-            gram = self._gram([self._fit(term) if residual is None else residual])
-            found = self._hsic(gram, self._side_gram(y))
-            self._log_p[key] = found
+            residual = self._residuals.get(x[0])
+            fresh = self._gram([self._fit(x[0]) if residual is None else residual])
+            grams = {x: fresh, y: self._side_gram(y)}
+            found = self._log_p[key] = self._hsic(*(grams[side] for side in key))
         return found
 
 
@@ -253,19 +256,19 @@ def find_candidates(
         for members in combinations(range(d), size):
             if any(j in candidates[i] for i in members for j in members):
                 continue
-            best: tuple[tuple[float, int], int, float] | None = None
+            scored = []
             for child in members:
                 rest = tuple(j for j in members if j != child)
                 if forbidden[list(rest), child].any() or not dependent[list(rest), child].all():
                     continue
                 regressors = candidates[child] | set(rest)
                 log_p = tests.log_p_fresh(child, regressors, _running(rest, candidates))
-                if best is None or (-_key(log_p), child) < best[0]:
-                    best = ((-_key(log_p), child), child, log_p)
-            if best is None or not best[2] > log_alpha:
+                scored.append((-_key(log_p), child, log_p, rest))
+            if not scored:
                 continue
-            sink = best[1]
-            rest = tuple(j for j in members if j != sink)
+            _, sink, log_p, rest = min(scored)
+            if not log_p > log_alpha:
+                continue
             own = _running((sink,), candidates)
             if all(tests.log_p(own, _running((j,), candidates)) < log_alpha for j in rest):
                 _log.debug("sink %d of %s", sink, members)
@@ -294,17 +297,26 @@ def find_parents(
     return candidates
 
 
-def drop_cycles(parents: list[set[int]], required: np.ndarray) -> list[set[int]]:
-    """Drop every parent edge on a directed cycle but the required ones; ``parents`` changes."""
+def drop_cycles(parents: list[set[int]], required: np.ndarray) -> np.ndarray:
+    """Drop every parent edge on a directed cycle but the required ones; ``parents`` changes.
+
+    An edge lies on a directed cycle exactly when its two variables share a strongly connected
+    component.
+
+    Returns
+    -------
+    np.ndarray
+        ``(d, d)`` bool; ``out[i, j]``: the dropped edge ``i -> j``.
+    """
     d = len(parents)
-    reach = np.zeros((d, d), dtype=bool)  # reach[i, j]: a directed path runs from i to j
+    edges = np.zeros((d, d), dtype=bool)
     for child, found in enumerate(parents):
-        reach[sorted(found), child] = True
-    for k in range(d):
-        reach |= np.outer(reach[:, k], reach[k, :])
-    for child in range(d):
-        parents[child] = {p for p in parents[child] if required[p, child] or not reach[child, p]}
-    return parents
+        edges[sorted(found), child] = True
+    _, component = connected_components(csr_matrix(edges), directed=True, connection="strong")
+    dropped = edges & (component[:, None] == component[None, :]) & ~required
+    for parent, child in zip(*np.nonzero(dropped), strict=True):
+        parents[child].discard(int(parent))
+    return dropped
 
 
 def find_pairs(
@@ -339,14 +351,16 @@ def find_pairs(
 
 @dataclass(frozen=True)
 class CAMUVResult:
-    """A CAM-UV fit: the parent edges and the pairs joined by an unobserved path.
+    """A CAM-UV fit: the parent edges, the pairs joined by an unobserved path, and the edges dropped
+    from directed cycles.
 
     ``edges[i, j]`` is the edge ``i -> j``; ``pairs`` is symmetric and shares no pair with
-    ``edges``.
+    ``edges``; ``cycle_edges[i, j]`` is a dropped edge ``i -> j``.
     """
 
     edges: np.ndarray
     pairs: np.ndarray
+    cycle_edges: np.ndarray
 
 
 def camuv(
@@ -377,9 +391,10 @@ def camuv(
         forbidden=forbidden,
         required=required,
     )
-    parents = drop_cycles(find_parents(tests, candidates, alpha=alpha, required=required), required)
+    parents = find_parents(tests, candidates, alpha=alpha, required=required)
+    cycle_edges = drop_cycles(parents, required)
     pairs = find_pairs(tests, parents, alpha=alpha, dependent=dependent, forbidden=forbidden)
     edges = np.zeros((d, d), dtype=bool)
     for child, found in enumerate(parents):
         edges[sorted(found), child] = True
-    return CAMUVResult(edges=edges, pairs=pairs)
+    return CAMUVResult(edges=edges, pairs=pairs, cycle_edges=cycle_edges)

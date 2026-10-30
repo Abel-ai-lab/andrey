@@ -117,6 +117,7 @@ ALGORITHMS = {
     "PNL": (_facade("pnl"), "anm_pair_cubic"),
     "GIN": (_facade("gin"), "measurement_6v"),
     "RESIT": (_facade("resit"), "nonmonotone_4v"),
+    "CAMUV": (_facade("camuv"), "nonlinear_fork_4v"),
     "PCMCI": (_facade("pcmci", tau_max=2, indep_test="student_t"), "var_3v_lag2"),
     "PCMCIplus": (_facade("pcmciplus", tau_max=2, indep_test="student_t"), "var_4v_stable"),
     "LPCMCI": (_facade("lpcmci", tau_max=2, indep_test="student_t"), "var_6v_hidden"),

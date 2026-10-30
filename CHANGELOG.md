@@ -162,8 +162,8 @@ names its pull request.
   the latent-variable family with the paper's settings: HSIC tests on the residuals of additive
   spline fits find each variable's direct causes over sets of up to 3 variables, and a pair that a
   hidden common cause or a causal path through a hidden variable joins, whose relation no
-  regression can identify, comes back as `o-o` and in `metadata["latent_pairs"]`; it is
-  experimental. ([#TBD])
+  regression can identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it
+  drops from directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#TBD])
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
   `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
   `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,

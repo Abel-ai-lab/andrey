@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,16 +16,18 @@ from andrey.api._adapt import (
 )
 from andrey.api._marks import marks_from_signed
 from andrey.api._method import method_spec
-from andrey.core import GraphStructure
+from andrey.core import ARROW, CIRCLE, GraphStructure
 from andrey.core.backend import one_blas_thread
 from andrey.core.knowledge import Knowledge, resolve
-from andrey.core.score import copies_error, copy_groups
+from andrey.core.score import check_columns, copies_error, copy_groups
 from andrey.fcm.gam import BasisCache
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+
+_log = logging.getLogger(__name__)
 
 #: Fewest distinct values of a column: a smooth term's basis has at least three functions.
 MIN_DISTINCT = 3
@@ -547,8 +550,9 @@ def camuv(
     max_depth : int, default=2
         The maximum conditioning-set size of a sink test, at least ``1``: the most variables
         tested together as a variable's new candidate parents, so the search runs over sets of up
-        to ``max_depth + 1`` variables. Larger values find parents that only show together and
-        take longer. The default ``2`` is the paper's setting, sets of at most 3 variables.
+        to ``max_depth + 1`` variables. Each sink test also regresses on the variable's candidates
+        found so far, however many. Larger values find parents that only show together and take
+        longer. The default ``2`` is the paper's setting, sets of at most 3 variables.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. A forbidden edge, an edge into an
@@ -556,16 +560,18 @@ def camuv(
         variable is not tried as the sink of a set that holds a forbidden parent of it, and none
         is in the result. A required edge's cause is a candidate parent from the start, and no
         step removes it; its pair is never marked. A pair forbidden in both directions is never
-        marked ``o-o``.
+        marked; on a marked pair, a forbidden ``i -> j`` whose reverse is not forbidden, such as an
+        edge into an earlier tier, puts an arrowhead at ``i``, as in :func:`~andrey.fci`.
 
     Returns
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` for a pair joined through a hidden variable, whose relation the method cannot
-        determine. ``metadata["algorithm"]`` is ``"camuv"``, ``metadata["latent_pairs"]`` lists
-        the ``o-o`` pairs as sorted ``[i, j]`` lists, and ``metadata["tie_break"]`` is the rule
-        ties followed.
+        determine, with an arrowhead where ``knowledge`` sets one. ``metadata["algorithm"]`` is
+        ``"camuv"``, ``metadata["latent_pairs"]`` lists the marked pairs as sorted ``[i, j]``
+        lists, ``metadata["cycle_edges"]`` lists as ``[i, j]`` each edge ``i -> j`` dropped from a
+        directed cycle, and ``metadata["tie_break"]`` is the rule ties followed.
 
     Raises
     ------
@@ -576,8 +582,9 @@ def camuv(
         message names the method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or
         fewer than twice as many rows as columns, or with a constant column, a column of fewer than
-        3 distinct values, or a column that repeats another up to scale and shift, each named in
-        the message. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        3 distinct values, a column that repeats another up to scale and shift, or a column that is
+        a linear function of others, such as a total, each named in the message. Also if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
     FloatingPointError
         If an HSIC test gives a non-finite value, rather than let it steer a choice.
@@ -632,9 +639,14 @@ def camuv(
     with them, and its directed errors were lower on 31 of 40 datasets and higher on 3. A parent
     whose dependence the test misses, such as a weak parent beside a strong one, is not found.
 
-    The paper does not say what to do when the parents form a directed cycle, which its model
-    rules out and failed tests can leave: every edge on a directed cycle is dropped, except a
-    required one, and step 3 tests the pair. Each regression is an additive model of penalized thin
+    The paper does not say what to do when the parents form a directed cycle, which its model rules
+    out and failed tests can leave: every edge on a directed cycle is dropped, except a required
+    one, and step 3 tests the pair; :func:`~andrey.rcd` raises instead when required edges close a
+    cycle with the parents it found. ``metadata["cycle_edges"]`` lists the dropped edges, and an
+    INFO log names them. The child's residual on its reduced parents also enters its other pairs,
+    which can mark them too.
+
+    Each regression is an additive model of penalized thin
     plate regression splines with ten basis functions per term and smoothing chosen by GCV [3]_,
     with ``ceil(n_samples / (3 n_terms))`` functions per term, at least 3, when there are fewer
     than 30 rows per term, and at most one per distinct value. Each test is the HSIC test [2]_ with
@@ -674,16 +686,28 @@ def camuv(
     30 pairs with nonlinear effects and 61 with linear Gaussian ones, each a false mark. Dropping
     the edges on directed cycles adds to these, from 19 and 38 without the drop, and doubles the
     hidden pairs found with 4 hidden variables, 20 against 10. Its median errors in the directed
-    edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with hidden variables. Each
-    sink test reads the candidates found before it, so the order the sets are visited in changes the
-    result: visiting them in the data's column order instead of by rank gave graphs a median of 7 to
-    17.5 pairs apart, at about the same accuracy. With one hidden variable per ten observed ones,
-    one to three graphs per size, its median directed errors were at or below the empty graph's
-    through 300 variables, 232 against 239 there, and above them at 400, 330 against 315; at smaller
-    sizes some single graphs had more errors than the empty graph. A fit took 15 s at 20 variables,
-    and its cost grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes
-    near 130, and an hour near 340. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with hidden variables. On the
+    linear Gaussian data, which identify only the Markov equivalence class, it oriented 44% of the
+    true edges. Each sink test reads the candidates found before it, so the order the sets are
+    visited in changes the result: visiting them in the data's column order instead of by rank gave
+    graphs a median of 7 to 17.5 pairs apart, at about the same accuracy. With one hidden variable
+    per ten observed ones, ten graphs per size, its mean directed errors were 87% of the empty
+    graph's at 10 variables, 74% at 20, and 60% at 50, though 3 of the ten graphs at 10 and at 20
+    variables had more errors than the empty graph; at 300 variables, over 8 graphs, they were 95%
+    of it, with 2 graphs above it, and at 400 they passed it, 330 against 315 on one graph. A fit
+    took 15 s at 20 variables, and its cost grows about as ``d^2``: a fit passes about a minute near
+    40 variables, 10 minutes near 130, and an hour near 340. Each HSIC test builds matrices with one
+    row and one column per sample, so time and memory grow with the square of ``n_samples``: at 5
+    variables a fit took 1.6 s and 0.21 GB with 1,000 rows and 79 s and 3.6 GB with 8,000, and at 20
+    variables 5.6 minutes and 1.7 GB with 4,000; the kernels kept between tests stay within 1 GiB,
+    so above about 11,600 rows none is kept. A cause with a long tail loses its edge: with a
+    lognormal cause of log-sd 2 or 3 and an effect of its logarithm plus noise, on 500 rows, it
+    marked the pair ``o-o`` in all 10 fits, where it found the edge in 5 of 5 at log-sd 1; replacing
+    the cause by its ranks found the edge in 9 of the 10, while its logarithm, which makes the pair
+    linear and Gaussian, reversed it in 11 of 15 fits. One value of 1e6 in the middle variable of a
+    nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks in 5 of 5 fits. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -715,6 +739,8 @@ def camuv(
     labels = column_labels(data)
     _smooth_columns(X, labels, "camuv")
     _regression_rows(X, "camuv")
+    if X.shape[1] > 1:  # a column that is a linear function of others has no noise of its own
+        check_columns(np.cov(X, rowvar=False), X.shape[0], column_namer(labels))
     constraints = resolve(knowledge, X.shape[1], labels, method="camuv")
     # The fit runs on the columns in rank order, so no step reads their positions.
     order = np.argsort(tie_ranks(X), kind="stable")
@@ -727,9 +753,26 @@ def camuv(
             X[:, order], alpha=alpha, max_depth=max_depth, forbidden=forbidden, required=required
         )
     back = np.argsort(order)
-    edges, pairs = result.edges[np.ix_(back, back)], result.pairs[np.ix_(back, back)]
+    edges, pairs, dropped = (
+        m[np.ix_(back, back)] for m in (result.edges, result.pairs, result.cycle_edges)
+    )
+    cycle_edges = [[int(i), int(j)] for i, j in zip(*np.nonzero(dropped), strict=True)]
+    if cycle_edges:
+        name = column_namer(labels)
+        _log.info(
+            "camuv: dropped %d edge(s) on directed cycles, then tested each pair for a hidden "
+            "path: %s",
+            len(cycle_edges),
+            ", ".join(f"{name(i)} -> {name(j)}" for i, j in cycle_edges),
+        )
     # B[i, j] != 0 is the edge j -> i, and a NaN pair is o-o.
     B = np.where(pairs, np.nan, edges.T.astype(np.float64))
-    structure = GraphStructure.from_numpy(marks_from_signed(B, nan_mark="circle"), kind="pag")
+    marks = marks_from_signed(B, nan_mark="circle")
+    if constraints is not None:
+        # On a marked pair, a forbidden i -> j whose reverse is not forbidden: an arrowhead at i.
+        one_way = constraints.forbidden & ~constraints.forbidden.T
+        marks[(marks == CIRCLE) & one_way] = ARROW
+    structure = GraphStructure.from_numpy(marks, kind="pag")
     latent = [[int(i), int(j)] for i, j in zip(*np.nonzero(np.triu(pairs)), strict=True)]
-    return structure_output(structure, labels=labels, metadata={"latent_pairs": latent})
+    metadata = {"latent_pairs": latent, "cycle_edges": cycle_edges}
+    return structure_output(structure, labels=labels, metadata=metadata)

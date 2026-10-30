@@ -73,9 +73,10 @@ same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with tho
 also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
 such as `'a' at lag 1 repeats 'd'`. `cam`, `resit`, and `camuv` reject copies the same way, and a
 column of fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit;
-`resit` and `camuv` also need at least twice as many rows as columns. Other data raises a
-`ValueError` that names the argument and, for a bad cell, its row and column. A single column gives
-a one-node graph.
+`resit` and `camuv` also need at least twice as many rows as columns, and `camuv` rejects a column
+that is a linear function of other columns, such as a total, as the BIC methods do. Other data
+raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
+column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
