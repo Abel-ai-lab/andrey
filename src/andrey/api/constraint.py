@@ -286,10 +286,13 @@ def pc(
     configuration for large counts, with ``r_x`` and ``r_y`` the values present in it [6]_, and
     more for few rows, where the usual degrees of freedom over-reject a true independence; with
     none, the p-value is 1. A table with fewer rows than cells has most cells empty: the p-values
-    are then a little too large, ``"gsq"``'s more than ``"chisq"``'s, so prefer ``"chisq"``. Over
-    35,808 true independences of random discrete networks, with 3 to 5 categories, conditioning
-    sets of 0 to 3 variables, and 500 to 5,000 rows, a test at level 0.05 rejected 4.9%
-    (``"chisq"``) and 3.8% (``"gsq"``); the usual degrees of freedom rejected 11.1% and 21.7%.
+    are then a little too large, ``"gsq"``'s more than ``"chisq"``'s, which loses ``"gsq"`` some
+    power there. Over 35,808 true independences of random discrete networks, with 3 to 5
+    categories, conditioning sets of 0 to 3 variables, and 500 to 5,000 rows, a test at level 0.05
+    rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``); the usual degrees of freedom rejected 11.1%
+    and 21.7%. ``"gsq"``, the default, takes 2 to 5 times as long as ``"chisq"`` for its exact
+    mean; on discrete networks and generated tables of 500 to 5,000 rows the graph it finds was
+    no farther from the truth than ``"chisq"``'s in all 16 settings and nearer in 3.
 
     **Mixed data.** ``"degen_gauss"`` and ``"cond_gauss"`` test data with continuous and categorical
     columns. Each distinct value of a categorical column is one category, and a DataFrame column of

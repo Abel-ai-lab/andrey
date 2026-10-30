@@ -262,7 +262,8 @@ names its pull request.
   shuffled within each configuration, as Tsamardinos and Borboudakis (2010) test with, worked out
   exactly; the rates are 4.9% and 3.8%, and 3.2% and 0.8%. The graphs of every search that runs
   these tests on discrete data can change, `gsq` finds fewer edges at small sizes, and `gsq` takes
-  about three times as long. ([#574])
+  about three times as long. `pc` with `gsq`, the default for categorical data, recovered graphs
+  no farther from the truth than with `chisq` in 16 settings and nearer in 3. ([#574])
 - The `max_depth` of `pcmci` and `pcmciplus` says in `andrey --help --json` that it caps the PC1
   step, as their docstrings do, where it said every test. ([#551])
 - Every `seed` says first that `None` is the configured seed, `ANDREY_SEED` or 0 when it is unset,

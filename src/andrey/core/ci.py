@@ -732,10 +732,14 @@ class ChiSquare:
     and 21.7% (G-square) on those degrees of freedom, and 4.9% and 3.8% on the mean; with 5
     categories and 3 conditioning variables, a table of 3,125 cells, 48% and 83% against 3.2% and
     0.8%. One mean is not the whole distribution: in the sparsest tables the p-values come out too
-    large, G-square's more than Pearson's, so G-square loses power there, and ``"chisq"`` is the
-    better choice when a table has fewer rows than cells. Shuffling the rows and counting the
-    statistics above the observed one (a permutation test [4]_) rejected 4.6% to 5.0% in the same
-    tables, at about a hundred times the cost; Andrey does not offer it.
+    large, G-square's more than Pearson's, so G-square loses power there, while Pearson's rejection
+    stays near 5%. The mean of G-square costs more to compute, a sum of hypergeometric terms for
+    every cell of every table (about 1.3 million for ``pc`` on 37 variables and 5,000 rows), and
+    ``pc`` took 2 to 5 times as long with G-square as with Pearson's on discrete networks and
+    generated tables of 500 to 5,000 rows. On the same fits, the graph found with G-square was no
+    farther from the truth than with Pearson's in all 16 settings and nearer in 3. Shuffling the
+    rows and counting the statistics above the observed one (a permutation test [4]_) rejected 4.6%
+    to 5.0% in the same tables, at about a hundred times the cost; Andrey does not offer it.
 
     Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
 
