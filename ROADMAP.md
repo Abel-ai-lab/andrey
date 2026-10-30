@@ -1,7 +1,7 @@
 # Roadmap
 
 Andrey's mission is to make causal discovery more accessible, scalable, and accurate, with native
-support for agents. This roadmap lays out the planned work, in order.
+support for agents. This roadmap lays out the planned work in a rough order; the stages overlap.
 
 Missing a method or a feature you need? Open a
 [feature request](https://github.com/Abel-ai-lab/andrey/issues/new/choose).
@@ -27,18 +27,18 @@ and missing values; the [API reference](https://andrey.abel.ai/docs/api.html) sa
 
 <!-- ROADMAP:END -->
 
-## 2. Local causal discovery
-
-Local causal discovery learns the structure around one variable, such as its direct causes and
-effects or its Markov blanket, without learning the whole graph.
-
-## 3. Interventional data
+## 2. Interventional data
 
 Experiments reveal causal directions that observational data cannot. Methods that learn from
 interventional data, alone or mixed with observational data: GIES today, then FCI-JCI, UT-IGSP,
 and a domain index for the score-based and permutation searches, with Sachs's nine conditions as a
 real test set, and interventions in `andrey.data`'s simulations, so every such method is
 benchmarked on data with a known answer.
+
+## 3. Local causal discovery
+
+Local causal discovery learns the structure around one variable, such as its direct causes and
+effects or its Markov blanket, without learning the whole graph.
 
 ## 4. Agentic causal discovery
 

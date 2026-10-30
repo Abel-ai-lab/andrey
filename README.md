@@ -168,7 +168,7 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 - [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)
 - [FAQ](https://andrey.abel.ai/docs/faq.html) and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
-- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.
+- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, stage by stage.
 
 Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is fully
 tested; macOS and Windows install and run on the CPU, but the full test suite and the GPU speedups
