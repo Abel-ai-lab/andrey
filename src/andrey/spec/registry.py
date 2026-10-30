@@ -1069,8 +1069,9 @@ _add(
                 type="str",
                 default="mmpc",
                 doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
-                "children; iamb and inter_iamb = each in the other's Markov blanket (the moral "
-                "graph); pc = PC's skeleton.",
+                "children; iamb and inter_iamb = each in the other's Markov blanket and not "
+                "separated by a subset of the smaller blanket (their skeleton); pc = PC's "
+                "skeleton.",
                 choices=RESTRICTS,
             ),
             ParamSpec(
