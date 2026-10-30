@@ -31,9 +31,6 @@ names its pull request.
   "Functional causal models", with `cam` (Glymour, Zhang, and Spirtes 2019): their `family` value
   in `andrey list` and in the method contracts of `andrey --help --json` is `"functional"` in place
   of `"lingam"`, and nothing else in the API changes. ([#597])
-
-### Changed
-
 - The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
   on a column's units or sign: it is a hash of each column's relations to the other columns, and a
   new column order still relabels it; only columns that no row order, unit, or sign tells apart
