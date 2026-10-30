@@ -10,6 +10,39 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014) and the first method of
+  a new family, nonlinear additive noise, learns a DAG and a causal order from nonlinear additive
+  effects with the paper's settings: boosting preselects each variable's possible parents, a
+  greedy search adds edges by the drop in log residual variance of additive spline fits, and
+  smooth-term tests prune them; it is experimental. ([#TBD])
+
+## [0.12.0] - 2026-10-30
+
+### Highlights
+
+- `chisq` and `gsq` hold their level in sparse tables: at 0.05 over 3 to 5 categories they rejected
+  11.1% and 21.7% of true independences, and now 4.9% and 3.8%; at 5 categories with 3
+  conditioning variables, 48% and 83%, now 3.2% and 0.8% (Tsamardinos and Borboudakis 2010).
+  ([#574])
+- `indep_test="normal_scores"`, a rank-based Fisher's z test, holds its level on skewed or
+  heavy-tailed columns, where `"fisherz"` over-rejects; every constraint-based search takes it.
+  ([#573])
+- `andrey.markov_check` tests whether the data contradict a graph, such as a method's result
+  (Ramsey, Andrews, and Spirtes 2024); `andrey markov-check` runs it from the command line. ([#571])
+- `pcmci`, `pcmciplus`, and `granger` control the false discovery rate by default
+  (`fdr_method="fdr_bh"`). ([#554], [#565], [#567])
+- `bootstrap` subsamples half of the rows by default, and its averaged graph is a valid graph of
+  the method's kind. ([#544], [#555], [#584])
+- `GraphStructure` answers graph queries: `d_separated`, `m_separated`, `parents`, `ancestors`,
+  `markov_blanket`, and more, by label or position. ([#569])
+- `inter_iamb`, `mmhc`, and `rsmax2` are supported and join the quality gate: against bnlearn 5.2.1
+  on simulated linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree
+  2 and 4, bnlearn makes significantly fewer errors in none of the 72 comparisons, on the CPDAG,
+  the skeleton, and the moral graph that `inter_iamb` returns. The median ratio of bnlearn's fit
+  time to Andrey's is 3.8 for `inter_iamb`'s CPDAG, 6.6 for `mmhc`, and 7.8 for `rsmax2`. ([#581])
+
 ### Breaking
 
 - These arguments, values, and settings have new names, so that one name means one thing across
@@ -77,10 +110,12 @@ names its pull request.
   `metadata["tie_break"]` records the rule. On linear
   data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
   the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
-  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,
-  Tetrad's `Median`, with an `andrey.AndreyWarning`. Under `knowledge`, a PAG method's averaged
-  graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's rules until
-  no endpoint changes. ([#555], [#564])
+  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others
+  among the resamples that are valid graphs of the kind, Tetrad's `Median` of those, with an
+  `andrey.AndreyWarning`; when no resample is valid either, the warning says so and
+  `metadata["averaged_graph"]` is `"nearest_resample_invalid"`. Under `knowledge`, a PAG method's
+  averaged graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's
+  rules until no endpoint changes. ([#555], [#564], [#584])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -145,14 +180,28 @@ names its pull request.
   `fdr_method="none"` returns `pcmci`'s results of 0.11.0 and `granger`'s uncorrected test. The
   quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
   to 6.5 and 4. ([#567])
+- `iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`.
+  `iamb` and `inter_iamb` return a CPDAG by default, kind `cpdag`, where they returned the moral
+  graph of the Markov blankets, as the R package bnlearn's `iamb` and `inter.iamb` return one by
+  default; `structure="moral"` returns the 0.11.0 graph bit for bit. `mmpc` returns the skeleton by
+  default, unchanged, as bnlearn's `mmpc` does, and `structure="cpdag"` returns its CPDAG. The CPDAG
+  is the Grow-Shrink structure learner's (Margaritis 2003): each pair of the moral graph that a
+  subset of the smaller blanket separates leaves, which gives the skeleton; each unshielded triple
+  is a collider when its ends stay dependent given the middle node and every subset of the smaller
+  blanket; and Meek's rules orient the rest. `structure="skeleton"` on `iamb` and `inter_iamb`
+  returns the moral graph without the links between a child's parents. With a `target`, each returns
+  the variable's set, as before. ([#572])
 
 ### Added
 
-- `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014) and the first method of
-  a new family, nonlinear additive noise, learns a DAG and a causal order from nonlinear additive
-  effects with the paper's settings: boosting preselects each variable's possible parents, a
-  greedy search adds edges by the drop in log residual variance of additive spline fits, and
-  smooth-term tests prune them; it is experimental. ([#TBD])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` take
+  `measure="skew"` and `measure="tanh"`, the first-order approximations of the pairwise likelihood
+  ratios of Hyvarinen and Smith (2013), beside the default `"pwling"`: `"tanh"` suits sparse noise,
+  as for Laplace, and `"skew"` skewed noise, with either sign. Both read the standardized columns
+  and cost one matrix product per step, so the order search took 0.1 to 0.3 of `"pwling"`'s time.
+  On simulated data with 10 and 20 variables and 500 and 2,000 rows, `"pwling"` made no more
+  errors (SHD) than either in any cell, and with uniform noise `"tanh"` orients backwards and
+  `"skew"` at random, so `"pwling"` stays the default. ([#575])
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
   `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
   `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,
@@ -186,9 +235,9 @@ names its pull request.
 - `bootstrap` and `BootstrapOutput.from_fits` take `strict`: `True` raises `ValueError` when no
   valid graph of the method's kind holds the vote of the fits, instead of returning the resample
   graph nearest the others with a warning. `metadata["averaged_graph"]` records which graph came
-  back, `"vote"` or `"nearest_resample"`. `andrey bootstrap` takes `--strict`, and its envelope
-  records both. The example notebook `bootstrap.ipynb` shows how to read the edge frequencies and
-  the averaged graph. ([#555])
+  back, `"vote"`, `"nearest_resample"`, or `"nearest_resample_invalid"`. `andrey bootstrap` takes
+  `--strict`, and its envelope records both. The example notebook `bootstrap.ipynb` shows how to
+  read the edge frequencies and the averaged graph. ([#555])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
   searches do: a required edge is always in the result, a pair forbidden both ways or outside
   `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
@@ -220,6 +269,23 @@ names its pull request.
   passes it with another score, named or picked from the declared column types, raises
   `ValueError`; the result records the value a BDeu fit used as `metadata["equivalent_sample_size"]`.
   ([#553])
+- `andrey.markov_check` tests whether the data contradict a DAG or a CPDAG, such as a method's
+  result: it tests the independences the graph implies, each variable and every earlier non-parent
+  given its parents, and rejects the graph when their p-values are not uniform on (0, 1) by the
+  Anderson-Darling test (Ramsey, Andrews, and Spirtes 2024). `indep_test` is picked from the
+  declared column types as in `pc`, and each test reads its own random half of the rows
+  (`sample_fraction`), which keeps a true graph's rejection rate at 6% to 9% for `alpha=0.05`,
+  against 9% to 21% on all rows. The result lists every tested independence with its p-value
+  (`table()`), and `andrey markov-check GRAPH DATA` runs the check from the command line. The
+  docstring gives the rates measured for missing, extra, and reversed edges and for categorical
+  data. ([#571])
+- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a rank-based
+  test for data whose columns are monotone transformations of Gaussian variables (a Gaussian
+  copula): its p-values do not change under a strictly increasing transformation of a column, and
+  it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals. `pc`,
+  `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`,
+  and `lpcmci` take it; on data with missing values, each test ranks within the rows it reads. It
+  finds only monotone dependence. The default test is unchanged. ([#573])
 
 ### Changed
 
@@ -234,6 +300,24 @@ names its pull request.
 
 ### Fixed
 
+- `rsmax2(restrict="iamb")` and `restrict="inter_iamb"` restrict the score search to the skeleton
+  of `iamb` or `inter_iamb` (`structure="skeleton"`), as Friedman, Nachman and Pe'er (1999) and
+  Tsamardinos, Brown and Aliferis (2006) restrict to the restrict algorithm's skeleton and as
+  bnlearn's `rsmax2` does, where they searched the moral graph, which also joins the parents of a
+  common child. The graphs of those two restricts change; `mmpc`, `pc`, and `mmhc` fit as before.
+  On 15 simulated linear-Gaussian datasets of 20 to 100 variables the candidate pairs fell by 37%
+  to 61%, and the mean SHD to the true CPDAG from 33.7 to 12.8, against 13.1 for bnlearn's
+  `rsmax2(restrict="iamb")`. ([#577])
+- `chisq` and `gsq` no longer reject true independences too often in sparse tables. They referred
+  the statistic to `(r_x - 1) * (r_y - 1)` degrees of freedom per configuration, which rejected
+  11.1% (`chisq`) and 21.7% (`gsq`) of true independences at level 0.05 over 3 to 5 categories,
+  conditioning sets of 0 to 3 variables, and 500 to 5,000 rows, and 48% and 83% at 5 categories
+  with 3 conditioning variables. The degrees of freedom are now the statistic's mean when `y` is
+  shuffled within each configuration, as Tsamardinos and Borboudakis (2010) test with, worked out
+  exactly; the rates are 4.9% and 3.8%, and 3.2% and 0.8%. The graphs of every search that runs
+  these tests on discrete data can change, `gsq` finds fewer edges at small sizes, and `gsq` takes
+  about three times as long. `pc` with `gsq`, the default for categorical data, recovered graphs
+  no farther from the truth than with `chisq` in 16 settings and nearer in 3. ([#574])
 - The `max_depth` of `pcmci` and `pcmciplus` says in `andrey --help --json` that it caps the PC1
   step, as their docstrings do, where it said every test. ([#551])
 - Every `seed` says first that `None` is the configured seed, `ANDREY_SEED` or 0 when it is unset,
@@ -1220,7 +1304,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
@@ -1386,3 +1471,11 @@ First alpha release.
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
 [#569]: https://github.com/Abel-ai-lab/andrey/pull/569
+[#571]: https://github.com/Abel-ai-lab/andrey/pull/571
+[#572]: https://github.com/Abel-ai-lab/andrey/pull/572
+[#573]: https://github.com/Abel-ai-lab/andrey/pull/573
+[#574]: https://github.com/Abel-ai-lab/andrey/pull/574
+[#575]: https://github.com/Abel-ai-lab/andrey/pull/575
+[#577]: https://github.com/Abel-ai-lab/andrey/pull/577
+[#581]: https://github.com/Abel-ai-lab/andrey/pull/581
+[#584]: https://github.com/Abel-ai-lab/andrey/pull/584

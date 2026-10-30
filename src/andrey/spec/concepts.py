@@ -27,6 +27,7 @@ from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.score import SCORES
+from andrey.core.structure import Kind
 
 from .models import ParamSpec, ParamType, Spec
 
@@ -34,6 +35,13 @@ Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
 SCORE_NAMES = SCORES
+#: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
+#: each.
+BLANKET_STRUCTURES: dict[str, Kind] = {
+    "cpdag": "cpdag",
+    "skeleton": "undirected",
+    "moral": "undirected",
+}
 #: The largest seed NumPy and torch accept.
 SEED_MAX = 2**32 - 1
 
@@ -651,8 +659,9 @@ _CONCEPTS = (
     ),
     Concept(
         key="sample_fraction",
-        summary="The share of the rows in a subsample of andrey.bootstrap, drawn without "
-        "replacement; not used by the bootstrap resampling.",
+        summary="The share of the rows in a subsample, drawn without replacement: each resample "
+        "of andrey.bootstrap (not used by the bootstrap resampling) and each test of "
+        "andrey.markov_check. An argument of those functions, not of a method.",
         param=_template(
             "sample_fraction",
             "float",
@@ -663,7 +672,8 @@ _CONCEPTS = (
             exclusive_minimum=True,
         ),
         suitable=(),
-        others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
+        others_exempt="Row subsampling belongs to andrey.bootstrap, which refits any method, and "
+        "andrey.markov_check.",
     ),
     Concept(
         key="threshold",
@@ -701,8 +711,9 @@ _CONCEPTS = (
         key="averaged_graph",
         summary="BootstrapOutput.metadata['averaged_graph'] records which graph is the averaged "
         "graph: 'vote', the vote of the fits made a valid graph of the method's kind, or "
-        "'nearest_resample', the resample graph nearest the others when the vote has no valid "
-        "graph of that kind.",
+        "'nearest_resample', the valid resample graph nearest the others when the vote has no "
+        "valid graph of that kind, or 'nearest_resample_invalid', the resample graph nearest the "
+        "others when no resample is a valid graph of that kind either.",
         suitable=(),
         others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
     ),
@@ -840,13 +851,15 @@ _CONCEPTS = (
     ),
     Concept(
         key="measure",
-        summary="The independence measure of a DirectLiNGAM order search.",
+        summary="The pairwise likelihood-ratio measure of a DirectLiNGAM order search.",
         param=_template(
             "measure",
             "str",
             "pwling",
-            "How the order search picks the most exogenous variable.",
-            choices=("pwling",),
+            "How the order search picks the most exogenous variable: pwling = the maximum-entropy "
+            "approximation of the pairwise likelihood ratios; tanh and skew = their first-order "
+            "approximations by a nonlinear correlation (Hyvarinen and Smith 2013).",
+            choices=("pwling", "skew", "tanh"),
         ),
         fragment="most exogenous",
         suitable=(
@@ -856,6 +869,40 @@ _CONCEPTS = (
             "longitudinal_lingam",
         ),
         others_exempt="No DirectLiNGAM order search.",
+    ),
+    Concept(
+        key="structure",
+        summary="The graph a Markov-blanket search returns without a target. The default follows "
+        "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
+        "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
+        "bnlearn's mmpc does (undirected=TRUE). cpdag is the CPDAG of the Grow-Shrink structure "
+        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
+        "Markov blankets.",
+        param=_template(
+            "structure",
+            "str",
+            "cpdag",
+            "The graph returned without a target: cpdag = the skeleton with its colliders "
+            "oriented and Meek's rules applied (Margaritis 2003); skeleton = the adjacencies, each "
+            "variable joined to its parents and children; moral = the moral graph, each variable "
+            "joined to its Markov blanket. With a target, the target's set, whatever the value.",
+            choices=tuple(BLANKET_STRUCTURES),
+        ),
+        fragment="cpdag",
+        suitable=("iamb", "inter_iamb", "mmpc"),
+        others_exempt="Learns the whole graph of one kind.",
+        deviations=(
+            Deviation(
+                method="mmpc",
+                name="structure",
+                default="skeleton",
+                choices=("skeleton", "cpdag"),
+                fixed_in=None,
+                reason="bnlearn's mmpc returns the skeleton (undirected=TRUE), which is the graph "
+                "MMPC's sets give; cpdag stays available. MMPC learns parents and children, which "
+                "hold no child's other parents, so it has no moral graph to return.",
+            ),
+        ),
     ),
     Concept(
         key="collider_rule",
@@ -881,11 +928,30 @@ _CONCEPTS = (
                 "lpcmci",
             ),
             *_exempt(
+                "The Grow-Shrink structure learner (Margaritis 2003) decides each triple by its "
+                "own test, of the endpoints given the middle node and every subset of the smaller "
+                "Markov blanket, not by a separating set.",
+                "iamb",
+                "inter_iamb",
+                "mmpc",
+            ),
+            *_exempt(
                 "No separating-set orientation.",
                 *(
                     m
                     for m in ALL_METHODS
-                    if m not in ("pc", "fci", "gfci", "cdnod", "pcmciplus", "lpcmci")
+                    if m
+                    not in (
+                        "pc",
+                        "fci",
+                        "gfci",
+                        "cdnod",
+                        "pcmciplus",
+                        "lpcmci",
+                        "iamb",
+                        "inter_iamb",
+                        "mmpc",
+                    )
                 ),
             ),
         ),
@@ -908,7 +974,9 @@ _CONCEPTS = (
         key="graph_kind",
         summary="The graph kind names what an edge means: a search identified up to its "
         "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
-        "direction is undirected. A fit returns the kind its spec declares.",
+        "direction is undirected. A fit returns the kind its spec declares; a method with "
+        "structure returns the kind of its default, and cpdag for structure=cpdag and undirected "
+        "for skeleton and moral.",
         suitable=ALL_METHODS,
     ),
     Concept(
@@ -974,4 +1042,15 @@ BOOTSTRAP_PARAMS: dict[str, ParamSpec] = {
     "sample_fraction": concept_param("sample_fraction"),
     "threshold": concept_param("threshold"),
     "strict": concept_param("strict"),
+}
+
+
+#: The arguments of ``andrey.markov_check`` that are package-wide concepts, which it checks.
+MARKOV_CHECK_PARAMS: dict[str, ParamSpec] = {
+    "alpha": concept_param(
+        "alpha", doc="The level of the Anderson-Darling test of the p-values' uniformity."
+    ),
+    "indep_test": concept_param("indep_test"),
+    "seed": concept_param("seed"),
+    "sample_fraction": concept_param("sample_fraction"),
 }

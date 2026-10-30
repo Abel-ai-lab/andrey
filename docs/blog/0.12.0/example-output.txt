@@ -1,0 +1,8 @@
+fisherz: 11 errors against the true graph
+normal_scores: 5 errors against the true graph
+true graph, checked with fisherz: p = 0.000, rejected
+true graph, checked with normal_scores: p = 0.288, passed
+one edge missing: p = 0.000, rejected
+edges in at least 9 fits in 10: 7, 7 of them in the true graph
+averaged graph: vote, a cpdag
+Markov blanket of x0: ['x2', 'x6']

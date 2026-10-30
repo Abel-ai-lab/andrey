@@ -222,16 +222,83 @@ def test_a_vote_with_no_valid_graph_returns_the_fit_nearest_the_others_with_a_wa
         BootstrapOutput.from_fits([*fits, *fits], strict=True).average(0.6)
 
 
+def shd(a, b):
+    """The structural Hamming distance between two mark matrices: pairs whose marks differ."""
+    upper = np.triu(np.ones(a.shape, dtype=bool), 1)
+    return int((((a != b) | (a.T != b.T)) & upper).sum())
+
+
+def is_valid(structure):
+    """Whether a cpdag has a consistent DAG extension, or a pag the MAG of Zhang's construction."""
+    marks = structure.to_numpy()
+    try:
+        (pdag2dag if structure.kind == "cpdag" else mag_of_pag)(marks)
+    except ValueError:
+        return False
+    return True
+
+
+def chain(nodes, mark, kind):
+    """A fit whose edges join ``nodes`` in order, each with ``mark`` at both ends."""
+    pairs = zip(nodes, nodes[1:])
+    return graph(4, [(i, j, mark, mark) for i, j in pairs], kind)
+
+
+# A chordless cycle of four nodes has no consistent DAG extension and no MAG, though a fit can
+# carry one under the kind's name: a PDAG labeled cpdag, or a graph labeled pag.
+KIND_MARKS = [("cpdag", TAIL), ("pag", CIRCLE)]
+
+
+@pytest.mark.parametrize(("kind", "mark"), KIND_MARKS)
+def test_the_fallback_returns_the_nearest_fit_that_is_a_valid_graph(kind, mark):
+    ring = chain([0, 1, 2, 3, 0], mark, kind)
+    path = chain([0, 1, 2, 3], mark, kind)
+    fits = [ring, ring, ring, path, path]
+    marks = [f.structure.to_numpy() for f in fits]
+    distance = [sum(shd(a, b) for b in marks) for a in marks]
+    assert distance.index(min(distance)) == 0  # the ring is the fit nearest the others...
+    assert not is_valid(ring.structure) and is_valid(path.structure)  # ...and has no valid graph
+    with pytest.warns(andrey.AndreyWarning, match="valid fit nearest the others") as caught:
+        out = BootstrapOutput.from_fits(fits)
+    assert len(caught) == 1
+    assert out.metadata["averaged_graph"] == "nearest_resample"
+    assert out.structure == path.structure and is_valid(out.structure)
+    if kind == "cpdag":
+        out.structure.markov_blanket(0)  # a graph query raises on a PDAG that no DAG extends
+    with pytest.raises(ValueError, match=f"no valid {kind}"):
+        BootstrapOutput.from_fits(fits, strict=True)
+
+
+@pytest.mark.parametrize(("kind", "mark"), KIND_MARKS)
+def test_a_vote_and_fits_with_no_valid_graph_warn_and_record_it(kind, mark):
+    ring = chain([0, 1, 2, 3, 0], mark, kind)
+    other = chain([0, 2, 1, 3, 0], mark, kind)  # also a ring; the vote is the first one
+    fits = [ring, ring, ring, other, other]
+    with pytest.warns(andrey.AndreyWarning, match=f"No fit is a valid {kind}") as caught:
+        out = BootstrapOutput.from_fits(fits)
+    assert len(caught) == 1
+    assert out.metadata["averaged_graph"] == "nearest_resample_invalid"
+    assert out.structure == ring.structure and not is_valid(out.structure)
+    with pytest.raises(ValueError, match=f"no valid {kind}"):
+        BootstrapOutput.from_fits(fits, strict=True)
+
+
+def test_pc_resamples_that_no_dag_extends_do_not_become_the_averaged_graph():
+    truth = andrey.data.sample_scm(d=10, n=4000, seed=5, density=3.0)
+    columns = [f"x{i}" for i in range(10)]
+    data = np.exp(pd.DataFrame(truth.data, columns=columns)).iloc[:2000]
+    with andrey.config(n_jobs=1), pytest.warns(andrey.AndreyWarning, match="no valid cpdag"):
+        out = bootstrap("pc", data, n_resamples=100, seed=0, indep_test="normal_scores")
+    assert out.metadata["averaged_graph"] == "nearest_resample"  # the vote has no valid cpdag
+    assert is_valid(out.structure)
+    assert out.structure.markov_blanket("x0")
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_the_nearest_fit_has_the_least_mean_shd_to_the_fits(seed):
     fits = random_fits("pag", seed, count=12)
     out = BootstrapOutput.from_fits(fits)
     marks = [f.structure.to_numpy() for f in fits]
-
-    def shd(a, b):
-        upper = np.triu(np.ones(a.shape, dtype=bool), 1)
-        return int((((a != b) | (a.T != b.T)) & upper).sum())
-
     distance = [sum(shd(a, b) for b in marks) for a in marks]
     assert out._nearest is not None and out._nearest[0] == int(np.argmin(distance))
 

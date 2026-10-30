@@ -18,7 +18,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
@@ -89,6 +89,14 @@ class _Slice:
     counts: np.ndarray
 
 
+class _Nearest(NamedTuple):
+    """The fit nearest the others: its position, its graph, and whether it is a valid graph."""
+
+    index: int
+    graph: Structure
+    valid: bool
+
+
 @dataclass(frozen=True, eq=False, slots=True, repr=False)
 class BootstrapOutput:
     """The edge frequencies over bootstrap refits of one method, and the averaged graph.
@@ -115,7 +123,7 @@ class BootstrapOutput:
     _metadata: Mapping[str, JSONValue]
     _fits: tuple[StructureOutput, ...] | None = None
     _strict: bool = False
-    _nearest: tuple[int, Structure] | None = None  # the fit nearest the others, by resample
+    _nearest: _Nearest | None = None  # the fit nearest the others among the valid ones
     _constraints: Constraints | None = None
     _ranks: np.ndarray | None = None  # the nodes' tie ranks: the data's, from bootstrap
 
@@ -145,7 +153,7 @@ class BootstrapOutput:
             in all of them, in ``[0.5, 1]``.
         strict : bool, default=False
             Raise when the vote of the fits has no valid graph of their kind, instead of returning
-            the fit nearest the others with a warning.
+            the valid fit nearest the others with a warning.
         keep_fits : bool, default=False
             Keep ``fits`` in the ``fits`` property.
         metadata : Mapping[str, JSONValue] or None, default=None
@@ -163,7 +171,11 @@ class BootstrapOutput:
             the fits' kind, the widest among them (``dag``, ``cpdag``, ``pag``, with a ``mag`` read
             as a ``pag``), as ``bootstrap``'s Notes describe. ``metadata["averaged_graph"]`` is
             ``"vote"``, or ``"nearest_resample"`` when the vote has no valid graph of that kind and
-            the averaged graph is the fit nearest the others. ``from_fits`` has no data to rank
+            the averaged graph is the fit nearest the others among the fits that are valid graphs
+            of that kind, or ``"nearest_resample_invalid"`` when no fit is, so the averaged graph
+            is the fit nearest the others and not a valid graph of that kind. A ``cpdag`` fit is
+            valid when it has a consistent DAG extension, and a ``pag`` or ``mag`` fit when it
+            passes the steps that make a vote a PAG. ``from_fits`` has no data to rank
             the nodes by, so a ``dag`` vote with a tie edge becomes a ``cpdag`` that leaves the
             tie edge undirected; ``bootstrap`` points it by the ranks of its data.
 
@@ -236,8 +248,7 @@ class BootstrapOutput:
             slices.append(_Slice(_widest(kinds[k]), codes, counts.astype(np.int64)))
         nearest = None
         if lags is None and slices[0].kind in _MADE_VALID:
-            index = _nearest(slices[0], coded[0], len(fits))
-            nearest = (index, fits[index].structure)
+            nearest = _nearest(slices[0], coded[0], fits)
         structure, source = _average(
             slices, len(fits), threshold, lags, n, labels, nearest, strict, constraints, ranks
         )
@@ -314,7 +325,7 @@ class BootstrapOutput:
         Structure
             The graph ``from_fits`` describes, at this threshold, with the ``strict`` this result
             was built with. When the vote has no valid graph of the fits' kind, it is the fit
-            nearest the others, as ``structure`` would be.
+            nearest the others, as ``structure`` would be: the valid one when some fit is.
 
         Raises
         ------
@@ -499,14 +510,15 @@ def _average(
     lags: tuple[int, ...] | None,
     n: int,
     labels: tuple[str, ...] | None,
-    nearest: tuple[int, Structure] | None,
+    nearest: _Nearest | None,
     strict: bool,
     constraints: Constraints | None,
     ranks: np.ndarray | None,
 ) -> tuple[Structure, str]:
     """Build the averaged graph from the slices' counts: see ``BootstrapOutput.from_fits``.
 
-    Returns the graph and its ``metadata["averaged_graph"]``: ``"vote"`` or ``"nearest_resample"``.
+    Returns the graph and its ``metadata["averaged_graph"]``: ``"vote"``, ``"nearest_resample"``,
+    or ``"nearest_resample_invalid"`` when no fit is a valid graph of the kind.
     """
     if lags is not None:
         graphs = [_vote_graph(s, n_resamples, threshold, n, labels) for s in slices]
@@ -523,13 +535,16 @@ def _average(
     if strict:
         raise ValueError(f"{reason}. strict=False returns the fit nearest the others instead")
     assert nearest is not None  # computed for every kind made valid
-    index, graph = nearest
-    warn_once(
-        f"{reason}. The averaged graph is resample {index}, the fit nearest the others; "
-        "strict=True raises instead",
-        AndreyWarning,
-    )
-    return graph, "nearest_resample"
+    index, graph, valid = nearest
+    if valid:
+        reason += f". The averaged graph is resample {index}, the valid fit nearest the others"
+    else:
+        reason += (
+            f". No fit is a valid {s.kind} either, so the averaged graph is resample {index}, "
+            f"the fit nearest the others, and not a valid {s.kind}"
+        )
+    warn_once(f"{reason}; strict=True raises instead", AndreyWarning)
+    return graph, "nearest_resample" if valid else "nearest_resample_invalid"
 
 
 def _vote(s: _Slice, n_resamples: int, threshold: float, n: int) -> np.ndarray:
@@ -625,13 +640,16 @@ def _valid_graph(
     return GraphStructure.from_numpy(cpdag, kind="cpdag", labels=labels)
 
 
-def _nearest(s: _Slice, coded: list[np.ndarray], n_resamples: int) -> int:
-    """Return the fit nearest the others: the first with the highest agreement (Tetrad's Median).
+def _nearest(s: _Slice, coded: list[np.ndarray], fits: Sequence[StructureOutput]) -> _Nearest:
+    """Return the valid fit nearest the others: the first with the highest agreement.
 
-    A fit's agreement sums, over the pairs, the number of fits that give the pair the fit's own
-    state, no edge included; the highest agreement is the least mean SHD to the fits. ``coded``
-    holds each fit's codes, as ``_codes`` makes them.
+    This is Tetrad's Median among the fits that are valid graphs of the slice's kind
+    (``_is_valid``). A fit's agreement sums, over the pairs, the number of fits that give the pair
+    the fit's own state, no edge included; the highest agreement is the least mean SHD to the
+    fits. ``coded`` holds each fit's codes, as ``_codes`` makes them. When no fit is valid, it
+    returns the fit with the highest agreement, marked invalid.
     """
+    n_resamples = len(fits)
     pair = s.codes // _STATES
     pairs, where = np.unique(pair, return_inverse=True)
     adjacent = np.bincount(where, weights=s.counts).astype(np.int64)
@@ -646,7 +664,25 @@ def _nearest(s: _Slice, coded: list[np.ndarray], n_resamples: int) -> int:
         )
         for codes in coded
     ]
-    return int(np.argmax(agreement))
+    ranking = np.argsort(-np.array(agreement), kind="stable").tolist()  # the first fit wins a tie
+    for index in ranking:
+        if _is_valid(fits[index].structure, s.kind):
+            return _Nearest(index, fits[index].structure, True)
+    return _Nearest(ranking[0], fits[ranking[0]].structure, False)
+
+
+def _is_valid(graph: Structure, kind: Kind) -> bool:
+    """Whether ``graph`` is a valid graph of ``kind``: ``_valid_graph`` can make it one.
+
+    A ``cpdag`` has a consistent DAG extension (Dor and Tarsi), and a ``pag`` or ``mag`` has the MAG
+    that Zhang's construction builds.
+    """
+    assert isinstance(graph, GraphStructure)
+    try:
+        _valid_graph(graph.to_numpy(), kind, graph.labels, None, None)
+    except ValueError:
+        return False
+    return True
 
 
 def _graphs(s: Structure, lags: tuple[int, ...] | None) -> list[GraphStructure] | None:
@@ -903,7 +939,7 @@ def bootstrap(
         is, which needs more than half of them, so a value below 0.5 would change nothing.
     strict : bool, default=False
         What happens when the vote of the fits has no valid graph of the method's kind: ``False``
-        returns the resample graph nearest the others with a warning, and ``True`` raises
+        returns the valid resample graph nearest the others with a warning, and ``True`` raises
         ``ValueError``.
     resampling : {"subsample", "bootstrap"}, default="subsample"
         How a resample is drawn. ``"subsample"`` draws ``round(sample_fraction * n_samples)``
@@ -935,8 +971,9 @@ def bootstrap(
         The frequencies and the averaged graph; for ``multi_group_direct_lingam``, one per group.
         ``metadata`` records the ``resampling``, the ``sample_fraction`` of a subsample, the
         ``block_length`` of a block bootstrap, the ``tie_break`` rule in effect
-        (:data:`andrey.config`), and ``averaged_graph``: ``"vote"``, or ``"nearest_resample"``
-        when the averaged graph is the resample graph nearest the others.
+        (:data:`andrey.config`), and ``averaged_graph``: ``"vote"``, ``"nearest_resample"`` when
+        the averaged graph is the valid resample graph nearest the others, or
+        ``"nearest_resample_invalid"`` when no resample is a valid graph of the method's kind.
 
     Raises
     ------
@@ -954,8 +991,8 @@ def bootstrap(
     -----
     AndreyWarning
         Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
-        no valid graph of the method's kind, so the averaged graph is the resample graph nearest the
-        others.
+        no valid graph of the method's kind, so the averaged graph is the valid resample graph
+        nearest the others, or, when no resample is valid, the resample graph nearest the others.
 
     Notes
     -----
@@ -1019,10 +1056,15 @@ def bootstrap(
     cycle or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``,
     the averaged graph is then the resample graph nearest the others, a graph the method returned:
     the fit whose state of each pair the most fits share, summed over the pairs, which is the fit
-    with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). A
-    warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is
-    ``"vote"`` otherwise. ``strict=True`` raises instead, as bnlearn's ``cextend`` does by default
-    [12]_. Either way, ``frequency`` and ``table`` keep the whole vote.
+    with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). Only
+    a resample that is a valid graph of the method's kind can be that fit: a ``cpdag`` with a
+    consistent DAG extension, or a PAG that passes the steps above, because a method can return a
+    graph labeled ``cpdag`` that no DAG extends (``pc`` leaves conflicting orientations
+    undirected). A warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``;
+    it is ``"vote"`` otherwise. When no resample is valid, a warning says so, the averaged graph is
+    the resample nearest the others, and ``metadata["averaged_graph"]`` is
+    ``"nearest_resample_invalid"``. ``strict=True`` raises in both cases instead, as bnlearn's
+    ``cextend`` does by default [12]_. Either way, ``frequency`` and ``table`` keep the whole vote.
 
     On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
     ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with

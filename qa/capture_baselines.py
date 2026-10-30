@@ -100,6 +100,7 @@ ALGORITHMS = {
     "XGES": (_facade("xges"), "gauss_5v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
+    "InterIAMB": (_facade("inter_iamb"), "gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),

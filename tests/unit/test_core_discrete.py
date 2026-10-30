@@ -9,14 +9,14 @@ one table, a per-configuration loop for a conditional test, the BDeu formula wri
 from __future__ import annotations
 
 import math
-from itertools import combinations
+from itertools import combinations, permutations
 
 import numpy as np
 import pytest
 from scipy.special import chdtrc
-from scipy.stats import chi2, chi2_contingency
+from scipy.stats import chi2, chi2_contingency, hypergeom
 
-from andrey.core import categorical
+from andrey.core import categorical, ci
 from andrey.core.ci import ChiSquare
 from andrey.core.score import BDeuScore, CategoricalBICScore, make_score
 
@@ -38,30 +38,77 @@ def _table(x: np.ndarray, a: int, b: int) -> np.ndarray:
     return table
 
 
+def _null_mean(table: np.ndarray, g_square: bool) -> float:
+    """The mean of the statistic over the arrangements of ``y`` that keep a table's margins.
+
+    Every cell's count is hypergeometric, so the mean of G-square is a sum over each cell's
+    support, and Pearson's is Haldane's ``n * (r - 1) * (c - 1) / (n - 1)``.
+    """
+    n, r, c = table.sum(), table.sum(axis=1), table.sum(axis=0)
+    if min(table.shape) < 2:
+        return 0.0
+    if not g_square:
+        return float(n * (len(r) - 1) * (len(c) - 1) / (n - 1))
+    total = 0.0
+    for ri in r:
+        for cj in c:
+            t = np.arange(max(1, ri + cj - n), min(ri, cj) + 1)
+            total += float(np.sum(hypergeom.pmf(t, n, ri, cj) * 2 * t * np.log(t * n / (ri * cj))))
+    return total
+
+
 @pytest.mark.parametrize(("g_square", "lambda_"), [(False, None), (True, "log-likelihood")])
-def test_a_marginal_test_matches_scipy(g_square, lambda_):
+def test_a_marginal_test_refers_the_statistic_to_its_null_mean(g_square, lambda_):
+    """The statistic is SciPy's; the p-value is the chi-square survival function at the mean the
+    statistic has when ``y`` is shuffled (Pearson's exactly, G-square's to the expansion error)."""
     x = _codes()
     test = ChiSquare(x, g_square=g_square)
     for a, b in combinations(range(x.shape[1]), 2):
-        stat, p, dof, _ = chi2_contingency(_table(x, a, b), correction=False, lambda_=lambda_)
-        assert test(a, b) == pytest.approx(p, rel=1e-9, abs=1e-300)
+        table = _table(x, a, b)
+        stat = chi2_contingency(table, correction=False, lambda_=lambda_)[0]
+        expected = chi2.sf(stat, _null_mean(table, g_square))
+        assert test(a, b) == pytest.approx(expected, rel=0.05 if g_square else 1e-9, abs=1e-300)
 
 
 @pytest.mark.parametrize(("g_square", "lambda_"), [(False, None), (True, "log-likelihood")])
 def test_a_conditional_test_sums_one_table_per_configuration(g_square, lambda_):
-    """The statistic and degrees of freedom add up over the conditioning configurations, each
-    table counting only the values present in it."""
+    """The statistic and the null mean add up over the conditioning configurations, each table
+    counting only the values present in it."""
     x = _codes(seed=1, n=600)
-    statistic = dof = 0.0
+    statistic = mean = 0.0
     for config in np.unique(x[:, [2, 3]], axis=0):
         rows = x[(x[:, [2, 3]] == config).all(axis=1)]
         table = _table(rows, 0, 1)
         if min(table.shape) > 1:
-            s, _, k, _ = chi2_contingency(table, correction=False, lambda_=lambda_)
-            statistic, dof = statistic + s, dof + k
+            statistic += chi2_contingency(table, correction=False, lambda_=lambda_)[0]
+            mean += _null_mean(table, g_square)
     assert ChiSquare(x, g_square=g_square)(0, 1, (2, 3)) == pytest.approx(
-        chi2.sf(statistic, dof), rel=1e-9
+        chi2.sf(statistic, mean), rel=0.05 if g_square else 1e-9
     )
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+@pytest.mark.parametrize("shape", [(2, 2), (2, 3), (3, 3)])
+def test_the_null_mean_is_the_mean_over_every_arrangement(g_square, shape):
+    """Brute force: average the statistic over every arrangement of ``y`` in a small table."""
+    kx, ky = shape
+    x = np.arange(7) % kx
+    y = np.array([0, 1, 2, 0, 1, 2, 1])[:7] % ky
+    n_sx = np.bincount(x, minlength=kx)[None, :]
+    n_sy = np.bincount(y, minlength=ky)[None, :]
+    stats = []
+    for arrangement in permutations(y):
+        table = np.zeros(shape)
+        np.add.at(table, (x, np.array(arrangement)), 1)
+        expected = np.outer(table.sum(1), table.sum(0)) / 7
+        seen = table > 0
+        stats.append(
+            2 * np.sum(table[seen] * np.log(table[seen] / expected[seen]))
+            if g_square
+            else np.sum((table - expected) ** 2 / expected)
+        )
+    got = ci._null_means(n_sx, n_sy, np.array([7]), g_square)
+    assert got[0] == pytest.approx(np.mean(stats), rel=1e-9)
 
 
 def test_a_pair_with_no_degrees_of_freedom_has_p_value_one():
@@ -189,8 +236,9 @@ def _dense_tables(data: np.ndarray, x: int, y: int, conds: list[tuple[int, ...]]
     cuts = np.searchsorted(occupied, bounds * cells).tolist()
     sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
     statistic = 2.0 * sums if g_square else sums - float(n)
-    per_table = ((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)
-    dof = np.add.reduceat(per_table, bounds[:-1])
+    per_table = ci._null_means(n_sx, n_sy, n_s, g_square)
+    cuts = bounds.tolist()
+    dof = np.array([np.sum(per_table[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
     pvalue = np.ones(len(dof))
     live = dof != 0
     pvalue[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
@@ -517,3 +565,41 @@ def test_a_score_is_the_same_alone_or_in_a_batch(cls):
     sets = [[], [1], [2, 1], [3, 1, 2]]
     alone = [cls(x).score(0, s) for s in sets]
     assert cls(x).score_many(0, sets) == alone
+
+
+def test_a_cell_mean_matches_the_hypergeometric_sum_on_both_sides_of_the_expansion():
+    """Sparse cells are summed over the support and dense ones expanded; both are within 2e-3."""
+    rng = np.random.default_rng(0)
+    n = rng.integers(20, 5000, 400)
+    r = np.minimum(rng.integers(2, 1 + n // 2), n - 2)
+    c = np.maximum(r, np.minimum(rng.integers(2, n - 1), n - 2))
+    mu = r * c / n
+    assert (mu < ci._SERIES_MEAN).any() and (mu >= ci._SERIES_MEAN).any()
+    for ni, ri, ci_, got in zip(n, r, c, ci._cell_g_means(n, r, c), strict=True):
+        t = np.arange(max(1, ri + ci_ - ni), ri + 1)
+        exact = np.sum(hypergeom.pmf(t, ni, ri, ci_) * 2 * t * np.log(t * ni / (ri * ci_)))
+        assert got == pytest.approx(exact, abs=2e-3)
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+@pytest.mark.parametrize("categories", [3, 4, 5])
+def test_a_true_independence_is_rejected_at_the_level_it_is_tested_at(g_square, categories):
+    """Given two conditioning variables, ``x`` and ``y`` are drawn independently from their own
+    random tables, in tables sparse enough that the chi-square law of the statistic is poor
+    (``n`` over ``categories ** 4`` cells is 8 to 1.6). The rate at which ``alpha = 0.05``
+    rejects stays inside the binomial band of 0.05; a test that over-rejects fails the upper
+    bound, and one that never rejects fails the lower."""
+    k, n, draws, alpha = categories, 1000, 300, 0.05
+    rng = np.random.default_rng(100 * categories + g_square)
+    rejected = 0
+    for _ in range(draws):
+        z = rng.integers(0, k * k, n)
+        px = rng.dirichlet(np.ones(k), size=k * k)
+        py = rng.dirichlet(np.ones(k), size=k * k)
+        u, v = rng.random(n), rng.random(n)
+        xs = (u[:, None] > np.cumsum(px[z], axis=1)).sum(axis=1)
+        ys = (v[:, None] > np.cumsum(py[z], axis=1)).sum(axis=1)
+        data = np.column_stack([xs, ys, z // k, z % k]).astype(np.float64)
+        rejected += ChiSquare(data, g_square=g_square)(0, 1, (2, 3)) < alpha
+    sd = math.sqrt(alpha * (1 - alpha) / draws)
+    assert alpha - 3.5 * sd < rejected / draws < alpha + 3.5 * sd
