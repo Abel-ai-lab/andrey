@@ -89,8 +89,8 @@ why.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"` and `"student_t"` for
-continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
+`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
+`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
 for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
 from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
@@ -362,6 +362,7 @@ test as `indep_test`:
 |---|---|---|
 | `"fisherz"` | Partial correlation with Fisher's z-transform: linear effects, Gaussian noise | Supported |
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
+| `"normal_scores"` | Fisher's z-transform of the partial correlation of each column's normal scores: monotone effects, any marginals | Experimental |
 | `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
 | `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
 | `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Supported |
@@ -400,7 +401,8 @@ On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from
 those rows, many queries at once, so the p-value is the one the test gives on that block up to
 rounding in its last digits. Every other test is built on that block, its columns in data order,
-and gives that test's p-value exactly; a registered test works the same way, built anew for each
+and gives that test's p-value exactly; `normal_scores` therefore ranks each column within the rows
+its query reads; a registered test works the same way, built anew for each
 query.
 
 ```{eval-rst}
@@ -412,6 +414,7 @@ query.
 
    ci.FisherZ
    ci.StudentT
+   ci.NormalScores
    ci_kernel.KCI
    ci_kernel.RCoT
    ci_cmiknn.CMIknn

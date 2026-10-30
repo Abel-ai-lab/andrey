@@ -132,11 +132,11 @@ def mmhc(
         Significance level of the conditional-independence test. Smaller values give sparser
         skeletons, so the score search considers fewer pairs.
     indep_test : str or None, default=None
-        Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``
-        or ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test. It must read the
-        same kind of data as ``score_func``. ``None`` picks from the declared column types, as for
-        :func:`~andrey.pc`.
+        Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+        It must read the same kind of data as ``score_func``. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     score_func : str or None, default=None
