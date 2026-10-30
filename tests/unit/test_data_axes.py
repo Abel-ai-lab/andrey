@@ -157,12 +157,12 @@ def _squared_residual_r2(ds) -> list[float]:
 def test_location_scale_noise_variance_changes_with_the_parents(scale):
     """Every child's squared residuals depend on its parents under location-scale noise, and on
     additive noise, the same graph and weights, they do not."""
-    kwargs = {"d": 10, "n": 4000, "seed": 0, "density": 2.0, "scale": scale}
+    kwargs = {"d": 10, "n": 10_000, "seed": 0, "density": 2.0, "scale": scale}
     location_scale = _squared_residual_r2(data.sample_scm(functional="location_scale", **kwargs))
     additive = _squared_residual_r2(data.sample_scm(functional="additive_noise", **kwargs))
     assert len(location_scale) == len(additive) > 0
-    assert min(location_scale) > 0.02
-    assert max(additive) < 0.01
+    assert min(location_scale) > 0.01
+    assert max(additive) < 0.003
 
 
 def test_location_scale_with_a_constant_scale_is_additive_noise():
@@ -180,6 +180,8 @@ def test_location_scale_with_a_constant_scale_is_additive_noise():
     assert constant.data.tobytes() == additive.data.tobytes()
     assert constant.graph == additive.graph
     assert np.array_equal(constant.params.weights, additive.params.weights)
+    assert constant.params.scale_weights.shape == constant.params.weights.shape
+    assert additive.params.scale_weights.size == 0
 
 
 def test_location_scale_is_determined_by_its_seed():

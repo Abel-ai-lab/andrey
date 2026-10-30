@@ -22,6 +22,11 @@ from .graphs import DAGDraw
 #: matrix of the nodes, 8 MB in float64 at this size, and its time grows with ``d`` times the edges.
 UNITLESS_MAX_NODES = 1000
 
+#: The noise scales of the location-scale benchmark in Immer et al. (2023), Supplementary Material
+#: E: ``0.1 (4 pi - |x|) + 0.2`` over ``x ~ U[-4 pi, 4 pi]``, from 0.2 at the borders to
+#: ``0.2 + 0.4 pi`` at the center.
+LOCATION_SCALE_RANGE = (0.2, 0.2 + 0.4 * np.pi)
+
 
 @dataclass(frozen=True, kw_only=True)
 class Functional:
@@ -37,6 +42,10 @@ class Functional:
         lo, hi = self.weight_range
         return rng.uniform(lo, hi, size=m) * rng.choice(np.array([-1.0, 1.0]), size=m)
 
+    def draw_scale_weights(self, draw: DAGDraw, rng: np.random.Generator) -> np.ndarray:
+        """Per-edge weights of the noise scale; empty, with no draws, unless a subclass has one."""
+        return np.empty(0)
+
     def _node(
         self, parent_values: np.ndarray, weights: np.ndarray, noise_c: np.ndarray
     ) -> np.ndarray:
@@ -44,7 +53,13 @@ class Functional:
         raise NotImplementedError
 
     def evaluate(
-        self, draw: DAGDraw, weights: np.ndarray, noise: np.ndarray, *, rescale: bool = False
+        self,
+        draw: DAGDraw,
+        weights: np.ndarray,
+        noise: np.ndarray,
+        *,
+        rescale: bool = False,
+        scale_weights: np.ndarray | None = None,
     ) -> np.ndarray:
         """Evaluate ``X`` (shape ``(n, d)``, node-label columns) in topological order.
 
@@ -58,8 +73,14 @@ class Functional:
             computed (before its children use it) -- ancestral rescaling. This stops variance from
             accumulating down the causal order, so varsortability sits at ~0.5 by construction; the
             recovered *structure* is unchanged (a per-column scaling of a DAG).
+        scale_weights : np.ndarray of shape (m,) or None, default=None
+            The per-edge weights of the noise scale, from :meth:`draw_scale_weights`. When not
+            empty, :meth:`_node` receives each child's ``(k, 2)`` block of location and scale
+            weights.
         """
         x = noise.astype(np.float64, copy=True)
+        if scale_weights is not None and scale_weights.size:
+            weights = np.column_stack([weights, scale_weights])
         child_block = _parents_by_child(draw.children, draw.parents, weights)
         for c in draw.topo_order:
             c = int(c)
@@ -206,11 +227,15 @@ class LocationScale(Functional):
     """Location-scale noise model ``X_c = sum_p w_{p,c} g(X_p) + s(pa_c) noise_c``.
 
     The location is the additive-noise mean, with ``g(z) = z + sin(z)``. The scale is a function of
-    the parents, ``s(pa_c) = lo + (hi - lo) sigmoid(sum_p w_{p,c} X_p)`` with
+    the parents, ``s(pa_c) = lo + (hi - lo) sigmoid(sum_p v_{p,c} X_p)`` with
     ``(lo, hi) = scale_range``, so it is strictly positive and bounded, and the conditional variance
     of a child given its parents changes with them (Immer et al. 2023, Definition 1). The scale
-    reuses the edge weights of the location. ``scale_range=(1.0, 1.0)`` gives a constant scale and
-    the data of :class:`AdditiveNoise`.
+    weights ``v`` are drawn independently of the location weights ``w``, from the same range, after
+    them in the weight stream, so the location weights are those of :class:`AdditiveNoise` on the
+    same seed; ``params.scale_weights`` records them. The default ``scale_range`` is the range of
+    the noise scale ``0.1 (4 pi - |x|) + 0.2`` over ``x ~ U[-4 pi, 4 pi]`` in the location-scale
+    benchmark of Immer et al. (2023, Supplementary Material E), a ratio of about 7.3.
+    ``scale_range=(1.0, 1.0)`` gives a constant scale and the data of :class:`AdditiveNoise`.
 
     The scale argument grows with its parents' variance. Under ``scale="standardize"`` and
     ``scale="raw"``, which evaluate the model on raw values, a node deep in the causal order has a
@@ -224,8 +249,9 @@ class LocationScale(Functional):
     ----------
     weight_range : tuple of float, default=(0.5, 2.0)
         Magnitude range of the edge weights, each drawn with a random sign.
-    scale_range : tuple of float, default=(0.2, 2.0)
-        The bounds ``(lo, hi)`` of the scale, with ``0 < lo <= hi``.
+    scale_range : tuple of float, default=(0.2, 0.2 + 0.4 * pi)
+        The bounds ``(lo, hi)`` of the scale, with ``0 < lo <= hi``
+        (:data:`LOCATION_SCALE_RANGE`).
 
     Raises
     ------
@@ -240,7 +266,7 @@ class LocationScale(Functional):
     """
 
     name: str = "location_scale"
-    scale_range: tuple[float, float] = (0.2, 2.0)
+    scale_range: tuple[float, float] = LOCATION_SCALE_RANGE
 
     def __post_init__(self) -> None:
         """Check that the scale is strictly positive and its bounds ordered."""
@@ -250,11 +276,17 @@ class LocationScale(Functional):
                 f"scale_range must be finite with 0 < lo <= hi, got {self.scale_range!r}"
             )
 
+    def draw_scale_weights(self, draw: DAGDraw, rng: np.random.Generator) -> np.ndarray:
+        """Per-edge weights of the scale, drawn as the location weights are (``(m,)``)."""
+        return self.draw_weights(draw, rng)
+
     def _node(self, parent_values, weights, noise_c):
         lo, hi = self.scale_range
+        location = np.ascontiguousarray(weights[:, 0])
+        scale_weights = np.ascontiguousarray(weights[:, 1])
         # sigmoid(z) = (1 + tanh(z / 2)) / 2, which does not overflow for a large |z|.
-        scale = lo + (hi - lo) * 0.5 * (1.0 + np.tanh(0.5 * (parent_values @ weights)))
-        return _nl(parent_values) @ weights + scale * noise_c
+        scale = lo + (hi - lo) * 0.5 * (1.0 + np.tanh(0.5 * (parent_values @ scale_weights)))
+        return _nl(parent_values) @ location + scale * noise_c
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -337,7 +369,8 @@ def nonmonotone(weight_range: tuple[float, float] = (0.5, 2.0)) -> NonMonotone:
 
 
 def location_scale(
-    weight_range: tuple[float, float] = (0.5, 2.0), scale_range: tuple[float, float] = (0.2, 2.0)
+    weight_range: tuple[float, float] = (0.5, 2.0),
+    scale_range: tuple[float, float] = LOCATION_SCALE_RANGE,
 ) -> LocationScale:
     """Build a location-scale noise (LSNM) spec: a noise scale that depends on the parents.
 

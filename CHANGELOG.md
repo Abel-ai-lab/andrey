@@ -217,7 +217,9 @@ names its pull request.
   ([#553])
 - `andrey.data.sample_scm(functional="location_scale")` and
   `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
-  noise scale is a function of its parents, between the bounds of `scale_range`. ([#TBD])
+  noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
+  between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
+  ([#TBD])
 
 ### Changed
 

@@ -256,19 +256,26 @@ class SCM:
     ) -> CausalDataset:
         _, draw = self.graph.materialize(_component_rng(root, _GRAPH))
         noise_rng = _component_rng(root, _NOISE)
+        scale_weights = np.empty(0)
         if scale == "unitless":
             weights, scales = self.functional.draw_unitless(  # ty: ignore[unresolved-attribute]  # checked in sample: Linear only
                 draw, _component_rng(root, _WEIGHTS)
             )
         else:
-            weights = self.functional.draw_weights(draw, _component_rng(root, _WEIGHTS))
+            weight_rng = _component_rng(root, _WEIGHTS)
+            weights = self.functional.draw_weights(draw, weight_rng)
+            # The scale weights follow the location weights in their stream, so they leave the
+            # location weights and every other stream as they are.
+            scale_weights = self.functional.draw_scale_weights(draw, weight_rng)
             scales = self.noise.draw_scales(draw.d, noise_rng)
         if self.functional.is_temporal:
             return self._sample_temporal(
                 n, draw, weights, scales, noise_rng, root, scale, dtype, shuffle
             )
         innovations = self.noise.draw(n, scales, noise_rng)
-        values = self.functional.evaluate(draw, weights, innovations, rescale=(scale == "rescale"))
+        values = self.functional.evaluate(
+            draw, weights, innovations, rescale=(scale == "rescale"), scale_weights=scale_weights
+        )
         if scale == "standardize":
             values = standardize(values)
         data = values.astype(dtype)
@@ -296,6 +303,7 @@ class SCM:
         params = SCMParams(
             edges=edges,
             weights=weights,
+            scale_weights=scale_weights,
             noise_scales=scales[order],
             functional=self.functional.name,
             noise=self.noise.name,
