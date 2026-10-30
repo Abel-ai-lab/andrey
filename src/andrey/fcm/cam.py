@@ -48,7 +48,7 @@ import numpy as np
 from scipy import linalg, optimize, sparse
 from scipy.interpolate import BSpline
 
-from andrey.fcm.gam import BasisCache, SmoothBasis, effective_k, fit_gam
+from andrey.fcm.gam import BasisCache, SmoothBasis, fit_gam
 from andrey.fcm.pruning import prune
 from andrey.search._parallel import _KEY_DP
 
@@ -239,11 +239,6 @@ class DistinctBases(BasisCache):
     def __call__(self, column: int, k: int) -> SmoothBasis:
         """Return column ``column``'s basis of rank ``min(k, distinct values)``."""
         return super().__call__(column, min(int(k), int(self.distinct[column])))
-
-    def n_coef(self, parents: list[int], k: int) -> int:
-        """Coefficients of the additive model of ``fit_gam`` on ``parents``, the intercept's too."""
-        rank = effective_k(self.data.shape[0], len(parents), k)
-        return 1 + sum(min(rank, int(self.distinct[p])) - 1 for p in parents)
 
 
 def order_search(
