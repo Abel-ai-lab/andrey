@@ -231,7 +231,7 @@ names its pull request.
   it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals. `pc`,
   `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`,
   and `lpcmci` take it; on data with missing values, each test ranks within the rows it reads. It
-  finds only monotone dependence. The default test is unchanged. ([#NNN])
+  finds only monotone dependence. The default test is unchanged. ([#573])
 
 ### Changed
 
@@ -1399,4 +1399,4 @@ First alpha release.
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
 [#569]: https://github.com/Abel-ai-lab/andrey/pull/569
 [#571]: https://github.com/Abel-ai-lab/andrey/pull/571
-[#NNN]: https://github.com/Abel-ai-lab/andrey/pull/NNN
+[#573]: https://github.com/Abel-ai-lab/andrey/pull/573
