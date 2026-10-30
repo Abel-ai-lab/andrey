@@ -7,7 +7,7 @@ plus Gaussian noise, ``x_j = sum_k f_jk(x_k) + e_j``, and runs three steps:
    componentwise L2 boosting (Buhlmann and Yu 2003; Buhlmann and Hothorn 2007) with one P-spline
    base learner per other variable (Eilers and Marx 1996). The possible parents of a variable are
    the ten others picked most often in 100 boosting iterations, among those picked at least three
-   times (Section 5.1).
+   times (Section 5.1), ties going to the earlier column.
 2. **Greedy order search.** Starting from the empty graph, the search adds the edge ``i -> j``
    whose additive-model fit lowers ``log`` of ``j``'s residual variance the most, among the
    possible parents that close no cycle, and refits only ``j``'s candidates after each addition,
@@ -210,15 +210,14 @@ def neighbors(
 ) -> np.ndarray:
     """The possible parents from the boosting counts: ``out[i, j]`` when ``i`` may cause ``j``.
 
-    A variable is a possible parent when it was picked at least ``min_picks`` times. When more
-    than ``max_neighbors`` qualify, those picked more often than the ``max_neighbors + 1``-th most
-    picked stay, so a tie at that place keeps fewer, never a choice by column order.
+    The possible parents of ``j`` are the ``max_neighbors`` variables picked most often among those
+    picked at least ``min_picks`` times, ties going to the earlier column.
     """
-    out = counts >= min_picks
+    out = np.zeros(counts.shape, dtype=bool)
     for j in range(counts.shape[1]):
-        if out[:, j].sum() > max_neighbors:
-            cut = np.sort(counts[:, j])[::-1][max_neighbors]
-            out[:, j] = counts[:, j] > cut
+        picked = np.flatnonzero(counts[:, j] >= min_picks)
+        most = picked[np.argsort(-counts[picked, j], kind="stable")]
+        out[most[:max_neighbors], j] = True
     return out
 
 

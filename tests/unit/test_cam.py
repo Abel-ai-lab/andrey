@@ -164,17 +164,18 @@ def test_boosting_picks_the_variable_the_response_depends_on():
     assert counts[0, 2] > 90
 
 
-def test_possible_parents_are_picked_three_times_and_a_tie_at_the_tenth_keeps_fewer():
+def test_possible_parents_are_the_ten_most_picked_of_three_picks_ties_to_the_earlier_column():
     counts = np.zeros((14, 3), dtype=np.int64)
-    counts[:, 0] = [2, 3, 30, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    counts[:, 0] = [0, 3, 30, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]
     # Eleven picked at least three times: the ten most picked stay.
-    counts[:, 1] = [2, 3, 30, 9, 9, 8, 8, 7, 7, 6, 5, 5, 1, 0]
-    # Twelve tied at the tenth place: none is picked more often than the eleventh.
-    counts[:12, 2] = 8
+    counts[:, 1] = [2, 0, 30, 9, 9, 8, 8, 7, 7, 6, 5, 5, 3, 1]
+    # Twelve tied at the tenth place: the ten earliest of them stay.
+    counts[:13, 2] = 8
+    counts[2, 2] = 0
     out = neighbors(counts)
     assert np.flatnonzero(out[:, 0]).tolist() == [1, 2]
     assert np.flatnonzero(out[:, 1]).tolist() == list(range(2, 12))
-    assert not out[:, 2].any()
+    assert np.flatnonzero(out[:, 2]).tolist() == [0, 1, *range(3, 11)]
 
 
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
