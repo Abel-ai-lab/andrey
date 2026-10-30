@@ -14,14 +14,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, model_validator
 
 Family = Literal[
-    "constraint",
-    "score",
-    "permutation",
-    "lingam",
-    "additive_noise",
-    "temporal",
-    "latent",
-    "pairwise",
+    "constraint", "score", "permutation", "functional", "temporal", "latent", "pairwise"
 ]
 Determinism = Literal["deterministic", "stochastic"]
 Accel = Literal["numpy", "torch"]
