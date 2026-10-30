@@ -255,6 +255,7 @@ def _orient_colliders(
     *,
     order: str = "p_value",
     ambiguous: Collection[tuple[int, int, int]] = frozenset(),
+    ranks: Mapping[tuple[int, int, int], float] | None = None,
     _trace: list[dict] | None = None,
 ) -> np.ndarray:
     """Orient the unshielded colliders in ``order``, by default most clearly separated pair first.
@@ -275,10 +276,12 @@ def _orient_colliders(
     are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``_KEY_DP``
     decimals are each checked against the marks set before their rank, then all set: an edge two of
     them dispute ends bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's
-    rules. The result depends on the ranks, not on the column order. With ``order="column"``,
-    ``pvalues`` is not read (it may be empty): the triples are visited by middle node ``y``, then by
-    endpoint pair ``(x, z)``, in ascending column order, each decided against the marks set before
-    it, so no edge ends bidirected and the result depends on the column order.
+    rules. The result depends on the ranks, not on the column order. With ``ranks``, keyed like
+    ``ambiguous``, each triple's rank is its own entry in place of its pair's p-value, and
+    ``pvalues`` is not read. With ``order="column"``, ``pvalues`` and ``ranks`` are not read
+    (``pvalues`` may be empty): the triples are visited by middle node ``y``, then by endpoint pair
+    ``(x, z)``, in ascending column order, each decided against the marks set before it, so no edge
+    ends bidirected and the result depends on the column order.
 
     The private ``_trace`` sink records every unshielded triple in the order decided:
     ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``
@@ -296,7 +299,11 @@ def _orient_colliders(
                 and ((x, z) in sepsets or (z, x) in sepsets)
                 and (x, y, z) not in ambiguous
             ):
-                triples.append((pvalues[(x, z)] if ranked else None, x, y, z))
+                if not ranked:
+                    triples.append((None, x, y, z))
+                else:
+                    own = ranks is not None
+                    triples.append((ranks[x, y, z] if own else pvalues[(x, z)], x, y, z))
     if ranked:
 
         def rank(triple: tuple) -> float:

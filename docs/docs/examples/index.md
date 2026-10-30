@@ -168,6 +168,18 @@ trust.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Markov check: do the data contradict a graph?
+:link: markov_check
+:link-type: doc
+:img-top: /_generated/thumbs/markov_check.svg
+:img-alt: The sparsest GES graph on ALARM data that the Markov check does not reject
+
+Test the independences a graph implies against held-out rows: a true graph passes, a damaged one is
+rejected, and the sparsest passing graph is not always the most accurate.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -197,5 +209,6 @@ pairwise
 time_series
 knowledge
 bootstrap
+markov_check
 viz
 ```

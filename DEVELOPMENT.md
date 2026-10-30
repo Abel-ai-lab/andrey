@@ -330,6 +330,10 @@ from the Typer app. A change keeps this contract:
 - `andrey bootstrap` returns that envelope with `structure` the averaged graph, plus `bootstrap`
   (the resample settings) and `frequencies` (one row per edge that appeared in a fit); the fields
   are additive, so `schema_version` stays the same.
+- `andrey markov-check` returns `{schema_version, status, markov_check, run}`, where `status` is
+  the run's and `markov_check` holds the verdict (`passed`), the uniformity test, and `tests`
+  (one row per tested independence, capped at the 1,000 smallest p-values with
+  `tests_truncated`); the fields are additive, so `schema_version` stays the same.
 - Error envelope: `{error: {code, message, valid_options?, next?}}`, where `next` lists runnable
   follow-up commands when the fix is obvious.
 - Exit codes (`EXIT_CODES`): `0` success, `2` usage or validation, `3` data, `4` algorithm failure,

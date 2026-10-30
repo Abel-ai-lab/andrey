@@ -91,8 +91,8 @@ why.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"` and `"student_t"` for
-continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
+`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
+`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
 for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
 from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
@@ -121,7 +121,11 @@ panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting an
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
 DirectLiNGAM's order search and take `measure`, how it picks the most exogenous variable at each
-step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the only one.
+step, by an approximation of the pairwise likelihood ratios of Hyvarinen and Smith (2013).
+`"pwling"`, the default, uses the entropies of each variable and of each regression residual.
+`"tanh"` uses a correlation of the standardized pair through `tanh`, which suits sparse noise such
+as Laplace, and `"skew"` one through the square after a sign correction, which suits skewed noise;
+they cost less, and `direct_lingam`'s Notes and Limitations give where each fails.
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, and `granger` take `fdr_method`, tigramite's name for the correction of the
@@ -148,6 +152,16 @@ beyond the default conditions, the parents of both ends, which every test includ
 all of its removal phases with it. `pcmciplus` splits its caps by phase: `max_depth` caps the
 lagged phase, whose sets hold no default conditions, and `max_p_global` caps the same-step
 skeleton and collider phases, whose sets add the lagged parents of both ends.
+
+% concept: structure
+`iamb`, `inter_iamb`, and `mmpc` take `structure`, the graph they return without a `target`.
+`"cpdag"` is the CPDAG of the Grow-Shrink structure learner (Margaritis 2003): the skeleton, with
+each unshielded triple tested for a collider and Meek's rules applied. `"skeleton"` is the same
+adjacencies, undirected. `iamb` and `inter_iamb` default to `"cpdag"` and also take `"moral"`, the
+moral graph, each variable joined to its Markov blanket, a child's other parents included. `mmpc`
+defaults to `"skeleton"`, the graph its sets give; its parents-and-children sets hold no child's
+other parents, so it has no moral graph. These are the defaults of the corresponding learners of
+the R package bnlearn. With a `target`, each returns that variable's set, whatever `structure` is.
 
 % concept: collider_rule
 `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
@@ -261,6 +275,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    fci
    gfci
    cdnod
+   inter_iamb
    ges
    gies
    xges
@@ -268,6 +283,8 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    tabu
    exact_search
    calm
+   mmhc
+   rsmax2
    boss
    grasp
    direct_lingam
@@ -290,16 +307,25 @@ CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andr
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
 
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
+`target`; without one, they join a pair when each is in the other's set and return the graph
+`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
+IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
+conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
+RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
+Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
+them.
+
 FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
 apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
 bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
 The rules run in rounds, each setting together the marks every rule implies on the graph as it
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
-Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order and is the
-default under `andrey.config(tie_break="position")`.
+Their possible-d-separation step visits the pairs and nodes by a rank computed from the data, so
+with `possible_dsep="order_free"`, the default, their result does not depend on the column order
+unless two columns are identical; `"fast"` visits them in column order and is the default under
+`andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
@@ -315,22 +341,12 @@ its first call in a process.
    :nosignatures:
 
    iamb
-   inter_iamb
    mmpc
-   mmhc
-   rsmax2
    notears
    dagma
    cam
    resit
 ```
-
-IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they return every variable's set as an `undirected` graph, joining a pair
-when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests,
-then runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict
-phase keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's
-skeleton, and its maximize phase runs hill climbing or tabu search among them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
@@ -367,6 +383,7 @@ test as `indep_test`:
 |---|---|---|
 | `"fisherz"` | Partial correlation with Fisher's z-transform: linear effects, Gaussian noise | Supported |
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
+| `"normal_scores"` | Fisher's z-transform of the partial correlation of each column's normal scores: monotone effects, any marginals | Experimental |
 | `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
 | `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
 | `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Supported |
@@ -405,7 +422,8 @@ On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from
 those rows, many queries at once, so the p-value is the one the test gives on that block up to
 rounding in its last digits. Every other test is built on that block, its columns in data order,
-and gives that test's p-value exactly; a registered test works the same way, built anew for each
+and gives that test's p-value exactly; `normal_scores` therefore ranks each column within the rows
+its query reads; a registered test works the same way, built anew for each
 query.
 
 ```{eval-rst}
@@ -417,6 +435,7 @@ query.
 
    ci.FisherZ
    ci.StudentT
+   ci.NormalScores
    ci_kernel.KCI
    ci_kernel.RCoT
    ci_cmiknn.CMIknn
@@ -484,9 +503,11 @@ edge than have no edge; `threshold` (0.5 to 1) asks the pair to be adjacent in m
 of the fits, or in all of them, and two edges that tie give `--` (`o-o` for a PAG). The vote is
 then made a valid graph of the method's kind: a DAG with its edges and no cycle, the CPDAG of such
 a DAG, or the PAG of a MAG built from it. A tie between the two directions of a DAG method's edge
-points by the columns' `tie_break` ranks, so the graph relabels with the columns. When no such graph exists, the averaged graph is the
-resample graph nearest the others, with a warning, and `metadata["averaged_graph"]` says
-`"nearest_resample"` instead of `"vote"`; `strict=True` raises instead. A bootstrap resample
+points by the columns' `tie_break` ranks, so the graph relabels with the columns. When no such
+graph exists, the averaged graph is the resample graph nearest the others among the resamples that
+are valid graphs of the kind, with a warning, and `metadata["averaged_graph"]` says
+`"nearest_resample"` instead of `"vote"`; when no resample is valid either, it says
+`"nearest_resample_invalid"`. `strict=True` raises instead of both. A bootstrap resample
 repeats rows, so a conditional-independence test sees
 more evidence than the resample holds; a subsample does not, which is why we make it the default
 (the `bootstrap` docstring gives the measurements). Either way, read a frequency as a ranking of
@@ -499,6 +520,47 @@ the edges, not as a probability. `andrey bootstrap` runs the same from the shell
 
    bootstrap
    BootstrapOutput
+```
+
+## Markov check
+
+`andrey.markov_check` asks whether data are consistent with a graph. A DAG implies independences:
+in a topological order, each variable is independent of every earlier variable that is not its
+parent, given its parents (the ordered local Markov property of Ramsey, Andrews, and Spirtes 2024).
+A CPDAG is checked through a DAG of its class, which implies the same independences. The check runs
+one conditional-independence test for each implied independence, `indep_test` as `pc` takes it, and
+asks whether the p-values are uniform on (0, 1), as they are when every tested independence holds.
+The graph is rejected when the Anderson-Darling test of uniformity gives a p-value of at most
+`alpha`.
+
+{py:class}`~andrey.MarkovCheckOutput` holds the verdict (`passed`, `verdict`), the test
+(`uniformity_statistic`, `uniformity_p_value`), the `share_dependent` of p-values below `alpha`
+(about `alpha` when the graph is right), and every tested independence with its p-value in
+`table()`. A graph that implies no independence, a complete DAG, cannot be rejected. A PAG, a MAG,
+an undirected graph, and a time-series result raise `ValueError`.
+
+Check on rows the graph was not learned from: a graph fitted to the same rows can pass because the
+fit made its independences true there. Split the rows, learn on one half, and check on the other.
+Each test reads `sample_fraction` (0.5) of the rows, drawn at random for that test alone, so that
+the tests do not all read the same rows; `seed` fixes the draws. In 1,000 simulated linear datasets
+per cell, the check rejected the true graph at `alpha=0.05` in 6% to 9% of the datasets with the
+default, and in 9% to 21% with `sample_fraction=1.0`, where the tests share every row. A graph with
+one edge missing was rejected in 96% to 99% of the datasets at 1,000 rows and 72% to 82% at 200 rows
+(98% to 100% and 89% to 93% on all rows). The `markov_check` docstring gives the measurements.
+
+A pass does not show that the edges are right: a graph with extra edges also passes, because an
+added edge removes an implied independence without making another false. Read the check with the
+number of edges. To choose among graphs of the same data, take the one with the fewest edges among
+those that pass, for example across a method's `alpha` values (the
+[example notebook](examples/markov_check)). `andrey markov-check` runs the same from the shell
+([Command-line interface](#command-line-interface)).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: api
+
+   markov_check
+   MarkovCheckOutput
 ```
 
 ## Utilities
@@ -595,6 +657,8 @@ name.
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells (Sachs et al., 2005) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
+| `child` | 20 | 25 | Simulated on the published network (bnlearn) |
+| `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
 | `alarm` | 37 | 46 | Simulated on the published network (bnlearn) |
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
@@ -625,14 +689,16 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
-and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
-time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
-categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
-continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
-true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
-so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
-graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form, and
+noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `functional="location_scale"` gives each variable noise whose scale depends on
+its parents, the location-scale noise model of Immer et al. (2023); with `scale="rescale"` that
+scale stays a smooth function of the parents at every depth of the graph.
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
@@ -772,6 +838,7 @@ and `rc_params` return plain data and need no import.
 | `andrey run hc --help` | Readable inputs, parameters, defaults, and examples |
 | `andrey run hc --help --json` | One versioned method contract, without execution |
 | `andrey bootstrap hc --data data.csv` | Edge frequencies over refits on resamples, and the averaged graph |
+| `andrey markov-check pc.json data.csv` | The p-values of the independences a DAG or CPDAG implies, and whether they pass |
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
@@ -794,6 +861,13 @@ HC. Configuration reports list detected backends, not the backend an operation w
 Its result is a run's, with the averaged graph as `structure`, plus `bootstrap` (the settings) and
 `frequencies` (each edge that appeared in a fit, most frequent first); see
 [Bootstrap](#bootstrap).
+
+`andrey markov-check <graph> <data>` takes a DAG or CPDAG from `andrey run <method> -o <file>` or
+from a saved result, the data to check it against, and `--indep-test`, `--alpha`, `--categorical`,
+`--sample-fraction`, and `--seed`. Its result has `markov_check` (`passed`, `verdict`, the
+uniformity test, and `tests`, each independence with its p-value, capped at the 1,000 smallest) and
+`run`; `status` is the run's, and the verdict is `markov_check.passed`. See
+[Markov check](#markov-check).
 
 Structured help, configuration and calibration reports, and run results carry
 `schema_version: "2"`, which versions the command line's JSON separately from the `format_version`

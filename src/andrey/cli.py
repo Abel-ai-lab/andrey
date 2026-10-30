@@ -39,7 +39,7 @@ from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, node_labels
 from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
-from andrey.spec.concepts import BOOTSTRAP_PARAMS
+from andrey.spec.concepts import BOOTSTRAP_PARAMS, MARKOV_CHECK_PARAMS
 from andrey.spec.generate import (
     concepts_dict,
     env_dict,
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 
     import numpy as np
 
-    from andrey import BootstrapOutput
+    from andrey import BootstrapOutput, MarkovCheckOutput
     from andrey.core import StructureOutput
     from andrey.spec.models import InputSpec, MethodSpec, ParamSpec
 
@@ -356,6 +356,38 @@ def bootstrap_envelope(
     return env
 
 
+def markov_check_envelope(out: MarkovCheckOutput, run: dict) -> dict:
+    """The result envelope of ``andrey markov-check``.
+
+    ``status`` belongs to the run, as in the other envelopes; the verdict is
+    ``markov_check.passed``.
+    ``tests`` lists every tested independence by 0-based column index, in the order tested.
+    """
+    meta = out.metadata
+    labels = out.structure.labels
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "status": "supported",
+        "markov_check": {
+            "passed": out.passed,
+            "verdict": out.verdict,
+            "alpha": out.alpha,
+            "n_tests": out.n_tests,
+            "uniformity_statistic": out.uniformity_statistic,
+            "uniformity_p_value": out.uniformity_p_value,
+            "share_dependent": out.share_dependent,
+            "indep_test": meta["indep_test"],
+            "seed": meta["seed"],
+            "sample_fraction": meta["sample_fraction"],
+            "rows_per_test": meta["rows_per_test"],
+            "graph_kind": out.structure.kind,
+            "labels": None if labels is None else list(labels),
+            "tests": out.table(index=True),
+        },
+        "run": run,
+    }
+
+
 def _nested_shape(x: object) -> list[int]:
     shape = []
     while isinstance(x, list):
@@ -411,11 +443,20 @@ def _apply_output_cap(env: dict, limit: int) -> None:
     """Cap inline edges and dense weight stacks across a single- or multi-output envelope.
 
     Counts and shape summaries always survive -- only bulk arrays are cut, so a large result never
-    floods stdout. A bootstrap's frequency table keeps its most frequent edges. A note tells the
+    floods stdout. A bootstrap's frequency table keeps its most frequent edges, and a Markov
+    check's test table its smallest p-values. A note tells the
     caller how to get the whole thing back.
     """
     results = env["results"] if env.get("multi") else [env]
-    cut = [_truncate_output(r["structure"], limit) for r in results]
+    cut = [_truncate_output(r["structure"], limit) for r in results if "structure" in r]
+    check = env.get("markov_check")
+    if check is not None and len(check["tests"]) > limit:  # a Markov check keeps its smallest p
+        keep = sorted(
+            sorted(range(len(check["tests"])), key=lambda k: check["tests"][k]["p_value"])[:limit]
+        )
+        check["tests"] = [check["tests"][k] for k in keep]
+        check["tests_truncated"] = True
+        cut.append(True)
     for r in results:
         if len(r.get("frequencies", ())) > limit:  # a bootstrap's edge table: its most frequent
             r["frequencies"] = r["frequencies"][:limit]
@@ -479,6 +520,22 @@ def render_bootstrap_human(
     lines = [f"{spec.name}  |  {len(out)} groups"]
     for k, o in enumerate(out):
         lines += ["", *o._summary(name=f"group {k}", limit=limit, more=_MORE_HINT)]
+    return "\n".join(lines) + _run_footer(run)
+
+
+def render_markov_check_human(out: MarkovCheckOutput, run: dict, *, full: bool = False) -> str:
+    """Render a terminal summary of a Markov check: the verdict and its smallest p-values.
+
+    ``full`` lists every tested independence; otherwise at most ``SUMMARY_EDGES`` of them, the ones
+    with the smallest p-values.
+    """
+    lines = [str(out)]
+    rows = sorted(out.table(), key=lambda row: row["p_value"])
+    for row in rows if full else rows[:SUMMARY_EDGES]:
+        given = f" | {', '.join(map(str, row['given']))}" if row["given"] else ""
+        lines.append(f"    {row['x']} _||_ {row['y']}{given}   p = {row['p_value']:.3g}")
+    if len(rows) > len(lines) - 1:
+        lines.append(f"    ... and {len(rows) - len(lines) + 1} more{_MORE_HINT}")
     return "\n".join(lines) + _run_footer(run)
 
 
@@ -1115,6 +1172,136 @@ def execute_bootstrap(
     _emit(
         env,
         lambda: render_bootstrap_human(spec, out, run, full=full),
+        output=output,
+        as_json=as_json,
+        full=full,
+    )
+
+
+def load_graph(path: str) -> GraphStructure:
+    """Load a DAG or CPDAG from a result file.
+
+    The file is what ``StructureOutput.save`` writes (JSON or ``.npz``), or the JSON that
+    ``andrey run <method> -o <file>`` writes, whose ``structure`` lists the edges.
+    """
+    import numpy as np
+
+    from andrey.core import StructureOutput
+    from andrey.core.structure import ARROW, EDGE_DTYPE, TAIL
+
+    try:
+        if path.endswith(".npz"):
+            return _saved_graph(StructureOutput.load(path), path)
+        with open(path, encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except FileNotFoundError as exc:
+        raise CliError("input_not_found", f"no such file: {path!r}", EXIT_USAGE) from exc
+    except OSError as exc:
+        raise CliError("input_unreadable", f"could not read {path!r}: {exc}", EXIT_USAGE) from exc
+    except ValueError as exc:  # not JSON, or a saved result this build cannot read
+        raise CliError("bad_data", f"could not load {path!r}: {exc}", EXIT_DATA) from exc
+    if isinstance(doc, dict) and "structure_type" in doc:
+        return _saved_graph(StructureOutput.load(path), path)
+    view = doc.get("structure") if isinstance(doc, dict) else None
+    if not isinstance(view, dict) or view.get("type") != "graph" or "edges" not in view:
+        raise CliError(
+            "bad_data",
+            f"{path!r} is neither a saved result nor the JSON of `andrey run <method> -o <file>`",
+            EXIT_DATA,
+        )
+    if view.get("edges_truncated") or len(view["edges"]) != view.get("n_edges", len(view["edges"])):
+        raise CliError(
+            "bad_data", f"{path!r} lists only some of the graph's edges; rerun with -o", EXIT_DATA
+        )
+    marks = {"directed": (TAIL, ARROW), "undirected": (TAIL, TAIL)}
+    unsupported = sorted({e["type"] for e in view["edges"]} - set(marks))
+    if unsupported or view.get("kind") not in ("dag", "cpdag"):
+        raise CliError(
+            "unsupported_value",
+            f"markov-check checks a dag or a cpdag, got a {view.get('kind')!r} graph"
+            + (f" with {', '.join(unsupported)} edges" if unsupported else ""),
+            EXIT_USAGE,
+        )
+    edges = np.array(
+        [(e["source"], e["target"], *marks[e["type"]]) for e in view["edges"]], dtype=EDGE_DTYPE
+    )
+    labels = view.get("labels")
+    return GraphStructure.from_edges(
+        edges,
+        n_nodes=int(view["n_nodes"]),
+        kind=view["kind"],
+        labels=None if labels is None else tuple(labels),
+    )
+
+
+def _saved_graph(out: StructureOutput, path: str) -> GraphStructure:
+    """Return the graph of a loaded result, or fail for a time-series result."""
+    if not isinstance(out.structure, GraphStructure):
+        raise CliError(
+            "unsupported_value", f"{path!r} holds a time-series result, not a graph", EXIT_USAGE
+        )
+    return out.structure
+
+
+def execute_markov_check(
+    graph_path: str,
+    data_path: str,
+    *,
+    indep_test: str | None,
+    alpha: float,
+    categorical: list[str] | None,
+    sample_fraction: float,
+    seed: int | None,
+    output: str | None,
+    as_json: bool,
+    full: bool,
+) -> None:
+    """Test the graph's implied independences against the data, then emit the check."""
+    import time
+
+    graph = load_graph(graph_path)
+    data, labels = load(data_path)
+    bad = []
+    for flag_, name, value in (
+        ("--alpha", "alpha", alpha),
+        ("--sample-fraction", "sample_fraction", sample_fraction),
+        ("--seed", "seed", seed),
+        ("--indep-test", "indep_test", indep_test),
+    ):
+        try:
+            MARKOV_CHECK_PARAMS[name].check(value, "markov_check")
+        except (TypeError, ValueError) as exc:
+            bad.append(str(exc).replace(f"markov_check: {name}", flag_, 1))
+    if bad:
+        raise CliError("bad_value", "; ".join(bad), EXIT_USAGE)
+    positions = None if categorical is None else column_positions(categorical, labels)
+    table = _table(data, labels)
+    start = time.perf_counter()
+    with _fit_errors():
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            out = andrey.markov_check(
+                graph,
+                table,  # ty: ignore[invalid-argument-type]  # one table; _table also takes a list
+                indep_test=indep_test,
+                alpha=alpha,
+                categorical=positions,
+                sample_fraction=sample_fraction,
+                seed=seed,
+            )
+    resolved = {
+        "indep_test": out.metadata["indep_test"],
+        "alpha": alpha,
+        "sample_fraction": sample_fraction,
+        "seed": out.metadata["seed"],
+        "categorical": categorical,
+    }
+    run = _run_info([table], resolved, time.perf_counter() - start, caught)
+    run["seed"] = out.metadata["seed"]
+    env = markov_check_envelope(out, run)
+    _emit(
+        env,
+        lambda: render_markov_check_human(out, run, full=full),
         output=output,
         as_json=as_json,
         full=full,
@@ -1857,6 +2044,67 @@ def cmd_bootstrap(
         resampling=resampling,
         sample_fraction=sample_fraction,
         block_length=block_length,
+        output=output,
+        as_json=as_json,
+        full=full,
+    )
+
+
+@app.command("markov-check")
+def cmd_markov_check(
+    graph: str = typer.Argument(
+        ...,
+        metavar="GRAPH",
+        help="A DAG or CPDAG: the JSON of `andrey run <method> -o`, or a saved result.",
+    ),
+    data: str = typer.Argument(
+        ..., metavar="DATA", help="The data to check against: CSV, TSV, whitespace text, or .npy."
+    ),
+    indep_test: Optional[str] = typer.Option(
+        None,
+        "--indep-test",
+        help="The conditional-independence test, as the methods take it. Default: from the "
+        "declared column types.",
+    ),
+    alpha: float = typer.Option(
+        0.05, "--alpha", help="The level of the uniformity test, in (0, 1). Default 0.05."
+    ),
+    categorical: Optional[list[str]] = typer.Option(
+        None,
+        "--categorical",
+        metavar="COLUMN",
+        help="A categorical column, by name or 0-based position; repeatable.",
+    ),
+    sample_fraction: float = typer.Option(
+        0.5,
+        "--sample-fraction",
+        metavar="SHARE",
+        help="Share of the rows each test reads, in (0, 1]; 1 reads every row in every test.",
+    ),
+    seed: Optional[int] = typer.Option(
+        None,
+        "--seed",
+        help="Seed of the row draws and randomized tests. Without it, ANDREY_SEED, else 0.",
+    ),
+    output: _OutputOption = None,
+    as_json: _JsonOption = False,
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help=f"Print every tested independence. Without it, a terminal shows the {SUMMARY_EDGES} "
+        f"with the smallest p-values, and JSON output at most {EDGE_LIMIT}.",
+    ),
+) -> None:
+    """Check a DAG or CPDAG against data: the p-values of the independences it implies."""
+    check_environment()
+    execute_markov_check(
+        graph,
+        data,
+        indep_test=indep_test,
+        alpha=alpha,
+        categorical=categorical,
+        sample_fraction=sample_fraction,
+        seed=seed,
         output=output,
         as_json=as_json,
         full=full,

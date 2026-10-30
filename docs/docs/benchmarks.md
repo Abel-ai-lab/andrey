@@ -17,40 +17,70 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.11.0
+:link: benchmarks/0.12.0
 :link-type: doc
-:link-alt: The 0.11.0 release card: ready for real data
-:class-card: release-cover release-art release-art-0-11-0
+:link-alt: The 0.12.0 release card: calibration
+:class-card: release-cover release-art release-art-0-12-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Ready for real data
+Calibration
 
-0.11.0
+0.12.0
 :::
 
 ::::{div} release-tldr
 
-0.11.0 is here: ready for real data. The card measures the extended BIC, now the default penalty of
-ten score searches, test-wise deletion under missing values, and how often the bootstrap's
-frequent edges are true.
+0.12.0 is here: calibration. The card measures the three methods it makes supported, Inter-IAMB,
+MMHC, and RSMAX2, against bnlearn on the CPDAG, the skeleton, and the moral graph each returns.
 
 :::{div} release-stats
 
-- **87 to 25** GES's median errors with the extended BIC, over 299 simulated datasets
-- **98% to 100%** of the edges in more than nine bootstrap fits in ten are true
-- **11 methods** accept missing values
+- **3 methods** newly supported: Inter-IAMB, MMHC, and RSMAX2
+- **0 of 72** comparisons where bnlearn makes significantly fewer errors
+- **7.8x** RSMAX2's median speed over bnlearn's, and 6.6x for MMHC
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.11.0.md)
+[Read the release card](benchmarks/0.12.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.11.0
+:link-type: doc
+:link-alt: The 0.11.0 release card: ready for real data
+:class-card: release-tile release-art-0-11-0
+:shadow: none
+:margin: 0
+
+0.11.0
+:::
+
+:::{div} release-body
+<h3>Ready for real data</h3>
+
+The extended BIC as the default penalty of ten score searches, test-wise deletion under missing
+values, and how often the bootstrap's frequent edges are true.
+
+- GES's median errors from **87 to 25** with the extended BIC, over 299 simulated datasets
+- **11 methods** accept missing values
+:::
+
+:::{div} release-meta
+Released October 29, 2026
+
+- [Release card<span class="visually-hidden"> 0.11.0</span>](benchmarks/0.11.0.md)
+- [Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -365,6 +395,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.12.0: calibration <benchmarks/0.12.0>
 0.11.0: ready for real data <benchmarks/0.11.0>
 0.10.0: the boundary <benchmarks/0.10.0>
 0.9.0: acceleration <benchmarks/0.9.0>

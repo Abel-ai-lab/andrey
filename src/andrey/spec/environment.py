@@ -191,7 +191,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         default="rank",
         effect=(
             "How the searches order tied candidates. `rank` orders them by a rank computed from "
-            "each column's own data, so reordering the columns relabels the result. `position` "
+            "the data, which a row shuffle, a change of units, or a sign flip leaves in place, so "
+            "reordering the columns relabels the result. `position` "
             "orders them by column position, which skips computing the ranks, fires the "
             "orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, "
             "and visits the possible-d-separation step of `fci` and `gfci` in column order; "
