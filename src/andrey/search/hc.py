@@ -81,8 +81,11 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     A column's key is the sorted list of its relations to the other columns. Where two columns'
     keys are equal, as they always are with two columns or fewer, each of them adds its marginal:
     a continuous column's absolute skewness and kurtosis rounded to 9 decimal places, or a
-    categorical column's category counts. Columns are ordered by a hash of their keys, so the rank
-    is arbitrary with respect to causal structure, and columns whose keys stay equal are ordered by
+    categorical column's category counts. Where keys are still equal, each of them adds its pattern
+    in row order: a continuous column's rise, fall, or tie from each row to the next, or a
+    categorical column's categories numbered in order of first appearance; and where they are equal
+    after that, its values. Columns are ordered by a hash of their keys, so the rank is arbitrary
+    with respect to causal structure, and identical columns, whose keys stay equal, are ordered by
     position. A missing value (NaN) takes the middle rank of its continuous column and forms a
     category of its own in a categorical column.
 
@@ -93,13 +96,17 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     - A change of units can round two distinct values to one, which changes the column's ranks.
     - The marginal is rounded, so in rare cases a change of units or a sign flip moves it across a
       rounding boundary.
-    - Columns that no row order, unit, or sign tells apart rank by position, so a new column order
-      changes which of them ranks first: copies of one column in other units or the other sign,
-      two columns whose rows also appear with the two swapped, and columns that share their ranks
-      and whose marginals agree to 9 decimal places, such as a copy nudged in its last digits.
+    - Columns that no row order, unit, or sign tells apart rank by their pattern in row order, so a
+      row shuffle can change which of them ranks first, while a new column order still relabels
+      them. These are copies of one column in other units or the other sign, two columns whose rows
+      also appear with the two swapped, and columns that share their ranks and whose marginals
+      agree to 9 decimal places, such as a copy nudged in its last digits. Where their patterns
+      agree too, as for a copy in other units, their values decide, so a change of units can change
+      which of them ranks first.
+    - Identical columns rank by position, so a new column order changes which of them ranks first.
     - The relations are exact integers and agree on every machine. The marginal comes from
-      floating-point sums, whose last bits, and so in rare cases whose rounding, can differ between
-      machines.
+      floating-point sums, and the values in row order from the data's bits, so in rare cases they
+      differ between machines.
 
     Under ``tie_break="position"`` (:data:`andrey.config`, ``ANDREY_TIE_BREAK``), each column's
     rank is its position, so the methods that order ties by these ranks order them by column
@@ -126,11 +133,12 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
         np.zeros(x.shape[1], dtype=bool) if categorical is None else np.asarray(categorical, bool)
     )
     keys = _relation_keys(x, mask)
-    shared = {key for key, count in Counter(keys).items() if count > 1}
-    keys = [
-        key + _marginal_key(col, is_categorical) if key in shared else key
-        for key, col, is_categorical in zip(keys, x.T, mask.tolist(), strict=True)
-    ]
+    for extend in (_marginal_key, _row_pattern, _values):  # only where the keys so far are equal
+        shared = {key for key, count in Counter(keys).items() if count > 1}
+        keys = [
+            key + extend(col, is_categorical) if key in shared else key
+            for key, col, is_categorical in zip(keys, x.T, mask.tolist(), strict=True)
+        ]
     digests = [hashlib.blake2b(key, digest_size=8).digest() for key in keys]
     order = sorted(range(len(digests)), key=digests.__getitem__)
     ranks = np.empty(len(order), dtype=np.intp)
@@ -204,6 +212,23 @@ def _marginal_key(col: np.ndarray, is_categorical: bool) -> bytes:
     z = values - values.mean()
     z /= np.sqrt(np.mean(z**2))
     return f"V{values.size} {abs(np.mean(z**3)):.9f} {np.mean(z**4):.9f}".encode()
+
+
+def _row_pattern(col: np.ndarray, is_categorical: bool) -> bytes:
+    """A column's pattern in row order, which tells apart columns with equal relations and marginals
+    (:func:`tie_ranks`)."""
+    if is_categorical:
+        _, first, codes = np.unique(col, return_index=True, return_inverse=True)
+        seen = np.empty(first.size, dtype=np.int64)
+        seen[np.argsort(first)] = np.arange(first.size)
+        return b"R" + seen[codes.reshape(-1)].astype("<i8").tobytes()
+    steps = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
+    return b"R" + steps.tobytes()
+
+
+def _values(col: np.ndarray, is_categorical: bool) -> bytes:
+    """A column's values, which tell apart columns with equal relations, marginals, and patterns."""
+    return b"X" + col.astype("<f8").tobytes()
 
 
 def _digest(tag: bytes, ints: np.ndarray) -> bytes:

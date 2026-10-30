@@ -188,14 +188,16 @@ def test_exact_ties_break_independently_of_column_order(search, score_func) -> N
 
 
 def test_tie_ranks_move_with_the_columns() -> None:
-    """Reordering distinct columns reorders their ranks; copies of a column rank by position."""
+    """Reordering columns reorders their ranks, also for columns that only their values in row
+    order tell apart; identical columns rank by position."""
     x = _data(0, 50, 6)
     order = np.array([3, 0, 5, 1, 4, 2])
     np.testing.assert_array_equal(tie_ranks(x[:, order]), tie_ranks(x)[order])
     np.testing.assert_array_equal(tie_ranks(x[:, [2, 2, 2]]), [0, 1, 2])
     copies = x[:, [2, 2]] * np.array([1.0, -3.7]) + np.array([0.0, 10.0])
-    np.testing.assert_array_equal(tie_ranks(copies), [0, 1])
-    np.testing.assert_array_equal(tie_ranks(copies[:, ::-1]), [0, 1])
+    swapped = np.vstack([x[:, :3], x[:, [1, 0, 2]]])  # columns 0 and 1 trade places row by row
+    for data, order in ((copies, [1, 0]), (swapped, [1, 0, 2])):
+        np.testing.assert_array_equal(tie_ranks(data[:, order]), tie_ranks(data)[order])
 
 
 _ROWS = np.random.default_rng(1).permutation(300)
