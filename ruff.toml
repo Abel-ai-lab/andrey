@@ -42,7 +42,7 @@ known-first-party = ["andrey", "tests", "qa", "andrey_bench"]
 # List the top-level modules explicitly: `src/andrey/*.py` would also match `src/andrey/api/**`
 # (the `*` crosses `/` in ruff's matcher) and silently disable D on the facades it should guard.
 "src/andrey/{cli,__init__}.py" = ["D"]
-"src/andrey/{constraint,core,irregular,latent,lingam,metrics,search,spec,temporal}/**" = ["D"]
+"src/andrey/{constraint,core,fcm,irregular,latent,lingam,metrics,search,spec,temporal}/**" = ["D"]
 
 [lint.pydocstyle]
 # Pin the convention now; enable the D (missing-docstring) rules near release.
