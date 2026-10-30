@@ -16,7 +16,7 @@ names its pull request.
   `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
   noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
   between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
-  ([#TBD])
+  ([#596])
 
 ## [0.12.0] - 2026-10-30
 
@@ -1479,3 +1479,4 @@ First alpha release.
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#596]: https://github.com/Abel-ai-lab/andrey/pull/596
