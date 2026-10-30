@@ -24,13 +24,17 @@ if __name__ == "__main__":  # worker processes re-import this script
     # The check: does the held-out half contradict a graph?
     for test in ["fisherz", "normal_scores"]:
         check = andrey.markov_check(graph, held_out, indep_test=test)
-        print(f"true graph, checked with {test}: p = {check.uniformity_p_value:.3f}, "
-              f"{'passed' if check.passed else 'rejected'}")
+        print(
+            f"true graph, checked with {test}: p = {check.uniformity_p_value:.3f}, "
+            f"{'passed' if check.passed else 'rejected'}"
+        )
     edges = graph.to_edges()
     missing_one = GraphStructure.from_edges(edges[1:], n_nodes=10, kind="dag", labels=names)
     check = andrey.markov_check(missing_one, held_out, indep_test="normal_scores")
-    print(f"one edge missing: p = {check.uniformity_p_value:.3f}, "
-          f"{'passed' if check.passed else 'rejected'}")
+    print(
+        f"one edge missing: p = {check.uniformity_p_value:.3f}, "
+        f"{'passed' if check.passed else 'rejected'}"
+    )
 
     # How stable: 100 fits on half-size subsamples, four at a time, and their averaged graph.
     with andrey.config(n_jobs=4):
