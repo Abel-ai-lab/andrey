@@ -85,10 +85,12 @@ names its pull request.
   `metadata["tie_break"]` records the rule. On linear
   data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
   the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
-  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,
-  Tetrad's `Median`, with an `andrey.AndreyWarning`. Under `knowledge`, a PAG method's averaged
-  graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's rules until
-  no endpoint changes. ([#555], [#564])
+  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others
+  among the resamples that are valid graphs of the kind, Tetrad's `Median` of those, with an
+  `andrey.AndreyWarning`; when no resample is valid either, the warning says so and
+  `metadata["averaged_graph"]` is `"nearest_resample_invalid"`. Under `knowledge`, a PAG method's
+  averaged graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's
+  rules until no endpoint changes. ([#555], [#564], [#584])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -208,9 +210,9 @@ names its pull request.
 - `bootstrap` and `BootstrapOutput.from_fits` take `strict`: `True` raises `ValueError` when no
   valid graph of the method's kind holds the vote of the fits, instead of returning the resample
   graph nearest the others with a warning. `metadata["averaged_graph"]` records which graph came
-  back, `"vote"` or `"nearest_resample"`. `andrey bootstrap` takes `--strict`, and its envelope
-  records both. The example notebook `bootstrap.ipynb` shows how to read the edge frequencies and
-  the averaged graph. ([#555])
+  back, `"vote"`, `"nearest_resample"`, or `"nearest_resample_invalid"`. `andrey bootstrap` takes
+  `--strict`, and its envelope records both. The example notebook `bootstrap.ipynb` shows how to
+  read the edge frequencies and the averaged graph. ([#555])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
   searches do: a required edge is always in the result, a pair forbidden both ways or outside
   `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
@@ -1450,3 +1452,4 @@ First alpha release.
 [#575]: https://github.com/Abel-ai-lab/andrey/pull/575
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
+[#584]: https://github.com/Abel-ai-lab/andrey/pull/584
