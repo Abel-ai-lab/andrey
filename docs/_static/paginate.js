@@ -6,7 +6,7 @@
   const blog = document.getElementById("blog-earlier");
   const releases = document.querySelector("section#earlier-releases");
   const rows = blog
-    ? () => [...blog.children]
+    ? () => [...blog.querySelectorAll(":scope > .blog-row")]
     : releases && (() => [...releases.querySelectorAll(":scope > .release-row")]);
   if (!rows || rows().length <= PAGE) return;
   const pages = Math.ceil(rows().length / PAGE);

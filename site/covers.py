@@ -20,6 +20,7 @@ COVERS = {
     "rocket": "a rocket climbing out of a bank of clouds, its engine flare amber",
     "ceiling": "a rocket reaching the curved edge of the sky, the edge amber and cracking",
     "shelf": "a pantry shelf of mixed jars, cartons, and sacks, one jar amber",
+    "plumb": "a plumb bob hanging beside an engraved measuring column, the bob amber",
     "ground": "the stipple ground",
 }
 

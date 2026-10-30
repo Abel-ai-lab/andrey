@@ -272,6 +272,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    fci
    gfci
    cdnod
+   inter_iamb
    ges
    gies
    xges
@@ -279,6 +280,8 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    tabu
    exact_search
    calm
+   mmhc
+   rsmax2
    boss
    grasp
    direct_lingam
@@ -300,6 +303,15 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
+`target`; without one, they join a pair when each is in the other's set and return the graph
+`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
+IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
+conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
+RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
+Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
+them.
 
 FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
 apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
@@ -326,22 +338,10 @@ its first call in a process.
    :nosignatures:
 
    iamb
-   inter_iamb
    mmpc
-   mmhc
-   rsmax2
    notears
    dagma
 ```
-
-IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they join a pair when each is in the other's set and return the graph
-`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
-IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
-conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
-RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
-Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
-them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
@@ -487,9 +487,11 @@ edge than have no edge; `threshold` (0.5 to 1) asks the pair to be adjacent in m
 of the fits, or in all of them, and two edges that tie give `--` (`o-o` for a PAG). The vote is
 then made a valid graph of the method's kind: a DAG with its edges and no cycle, the CPDAG of such
 a DAG, or the PAG of a MAG built from it. A tie between the two directions of a DAG method's edge
-points by the columns' `tie_break` ranks, so the graph relabels with the columns. When no such graph exists, the averaged graph is the
-resample graph nearest the others, with a warning, and `metadata["averaged_graph"]` says
-`"nearest_resample"` instead of `"vote"`; `strict=True` raises instead. A bootstrap resample
+points by the columns' `tie_break` ranks, so the graph relabels with the columns. When no such
+graph exists, the averaged graph is the resample graph nearest the others among the resamples that
+are valid graphs of the kind, with a warning, and `metadata["averaged_graph"]` says
+`"nearest_resample"` instead of `"vote"`; when no resample is valid either, it says
+`"nearest_resample_invalid"`. `strict=True` raises instead of both. A bootstrap resample
 repeats rows, so a conditional-independence test sees
 more evidence than the resample holds; a subsample does not, which is why we make it the default
 (the `bootstrap` docstring gives the measurements). Either way, read a frequency as a ranking of
@@ -669,14 +671,16 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
-and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
-time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
-categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
-continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
-true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
-so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
-graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form, and
+noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `functional="location_scale"` gives each variable noise whose scale depends on
+its parents, the location-scale noise model of Immer et al. (2023); with `scale="rescale"` that
+scale stays a smooth function of the parents at every depth of the graph.
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data

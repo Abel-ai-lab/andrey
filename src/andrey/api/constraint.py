@@ -261,9 +261,14 @@ def pc(
     (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
     row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
     at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
-    2,000 rows). The numbers below were measured with ``collider_order="column"``. On the
-    223-variable ANDES network with 1,000 simulated rows, its median errors passed the empty graph's
-    (372 against 338). Its run time grows combinatorially with the largest neighborhood. On
+    2,000 rows). Test errors can make the colliders it finds fit no DAG on the skeleton, and the
+    ``cpdag`` it returns then has no consistent DAG extension, so a graph query such as
+    ``markov_blanket`` raises ``ValueError``. With the default settings, of 200 simulated datasets
+    with 10 variables, mean degree 3, and 2,000 rows, 33 fits with ``"fisherz"`` and 31 with
+    ``"normal_scores"`` returned one. The numbers below were measured with
+    ``collider_order="column"``. On the 223-variable ANDES network with 1,000 simulated rows, its
+    median errors passed the empty graph's (372 against 338). Its run time grows combinatorially
+    with the largest neighborhood. On
     simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
     half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
     rows, its median errors stayed below the empty graph's at every size: at 40 variables, 18.5 with

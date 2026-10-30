@@ -699,8 +699,9 @@ _CONCEPTS = (
         key="averaged_graph",
         summary="BootstrapOutput.metadata['averaged_graph'] records which graph is the averaged "
         "graph: 'vote', the vote of the fits made a valid graph of the method's kind, or "
-        "'nearest_resample', the resample graph nearest the others when the vote has no valid "
-        "graph of that kind.",
+        "'nearest_resample', the valid resample graph nearest the others when the vote has no "
+        "valid graph of that kind, or 'nearest_resample_invalid', the resample graph nearest the "
+        "others when no resample is a valid graph of that kind either.",
         suitable=(),
         others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
     ),

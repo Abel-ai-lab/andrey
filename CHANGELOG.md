@@ -10,6 +10,39 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `andrey.data.sample_scm(functional="location_scale")` and
+  `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
+  noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
+  between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
+  ([#596])
+
+## [0.12.0] - 2026-10-30
+
+### Highlights
+
+- `chisq` and `gsq` hold their level in sparse tables: at 0.05 over 3 to 5 categories they rejected
+  11.1% and 21.7% of true independences, and now 4.9% and 3.8%; at 5 categories with 3
+  conditioning variables, 48% and 83%, now 3.2% and 0.8% (Tsamardinos and Borboudakis 2010).
+  ([#574])
+- `indep_test="normal_scores"`, a rank-based Fisher's z test, holds its level on skewed or
+  heavy-tailed columns, where `"fisherz"` over-rejects; every constraint-based search takes it.
+  ([#573])
+- `andrey.markov_check` tests whether the data contradict a graph, such as a method's result
+  (Ramsey, Andrews, and Spirtes 2024); `andrey markov-check` runs it from the command line. ([#571])
+- `pcmci`, `pcmciplus`, and `granger` control the false discovery rate by default
+  (`fdr_method="fdr_bh"`). ([#554], [#565], [#567])
+- `bootstrap` subsamples half of the rows by default, and its averaged graph is a valid graph of
+  the method's kind. ([#544], [#555], [#584])
+- `GraphStructure` answers graph queries: `d_separated`, `m_separated`, `parents`, `ancestors`,
+  `markov_blanket`, and more, by label or position. ([#569])
+- `inter_iamb`, `mmhc`, and `rsmax2` are supported and join the quality gate: against bnlearn 5.2.1
+  on simulated linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree
+  2 and 4, bnlearn makes significantly fewer errors in none of the 72 comparisons, on the CPDAG,
+  the skeleton, and the moral graph that `inter_iamb` returns. The median ratio of bnlearn's fit
+  time to Andrey's is 3.8 for `inter_iamb`'s CPDAG, 6.6 for `mmhc`, and 7.8 for `rsmax2`. ([#581])
+
 ### Breaking
 
 - These arguments, values, and settings have new names, so that one name means one thing across
@@ -77,10 +110,12 @@ names its pull request.
   `metadata["tie_break"]` records the rule. On linear
   data with 20 and 50 variables (`pc`, `ges`, `fci`, and `direct_lingam`; 24 cells of 20 datasets),
   the averaged graph had fewer errors (SHD) than before in 11 cells and more in none. When no valid
-  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others,
-  Tetrad's `Median`, with an `andrey.AndreyWarning`. Under `knowledge`, a PAG method's averaged
-  graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's rules until
-  no endpoint changes. ([#555], [#564])
+  graph of the kind holds the vote, the averaged graph is the resample graph nearest the others
+  among the resamples that are valid graphs of the kind, Tetrad's `Median` of those, with an
+  `andrey.AndreyWarning`; when no resample is valid either, the warning says so and
+  `metadata["averaged_graph"]` is `"nearest_resample_invalid"`. Under `knowledge`, a PAG method's
+  averaged graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's
+  rules until no endpoint changes. ([#555], [#564], [#584])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -200,9 +235,9 @@ names its pull request.
 - `bootstrap` and `BootstrapOutput.from_fits` take `strict`: `True` raises `ValueError` when no
   valid graph of the method's kind holds the vote of the fits, instead of returning the resample
   graph nearest the others with a warning. `metadata["averaged_graph"]` records which graph came
-  back, `"vote"` or `"nearest_resample"`. `andrey bootstrap` takes `--strict`, and its envelope
-  records both. The example notebook `bootstrap.ipynb` shows how to read the edge frequencies and
-  the averaged graph. ([#555])
+  back, `"vote"`, `"nearest_resample"`, or `"nearest_resample_invalid"`. `andrey bootstrap` takes
+  `--strict`, and its envelope records both. The example notebook `bootstrap.ipynb` shows how to
+  read the edge frequencies and the averaged graph. ([#555])
 - `calm`, `iamb`, `inter_iamb`, and `mmpc` take `knowledge` with all four parts, as the other
   searches do: a required edge is always in the result, a pair forbidden both ways or outside
   `allowed` never is, and `calm` also leaves out every forbidden edge and every edge into an earlier
@@ -1269,7 +1304,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
@@ -1441,3 +1477,6 @@ First alpha release.
 [#574]: https://github.com/Abel-ai-lab/andrey/pull/574
 [#575]: https://github.com/Abel-ai-lab/andrey/pull/575
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
+[#581]: https://github.com/Abel-ai-lab/andrey/pull/581
+[#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#596]: https://github.com/Abel-ai-lab/andrey/pull/596
