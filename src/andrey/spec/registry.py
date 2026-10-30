@@ -1217,7 +1217,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
-                "is the pairwise likelihood-ratio measure.",
+                "is the maximum-entropy approximation of the pairwise likelihood ratio, tanh and "
+                "skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Shimizu et al. 2011", "Hyvarinen & Smith 2013"),
@@ -1294,7 +1295,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
-                "is the pairwise likelihood-ratio measure.",
+                "is the maximum-entropy approximation of the pairwise likelihood ratio, tanh and "
+                "skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Shimizu 2012",),
@@ -1375,7 +1377,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the order search on the innovations picks the most exogenous variable; "
-                "pwling is the pairwise likelihood-ratio measure.",
+                "pwling is the maximum-entropy approximation of the pairwise likelihood ratio, "
+                "tanh and skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
@@ -1416,7 +1419,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the instantaneous order search picks the most exogenous variable; "
-                "pwling is the pairwise likelihood-ratio measure.",
+                "pwling is the maximum-entropy approximation of the pairwise likelihood ratio, "
+                "tanh and skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Kadowaki, Shimizu & Washio 2013",),

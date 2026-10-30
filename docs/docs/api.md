@@ -119,7 +119,11 @@ panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting an
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
 DirectLiNGAM's order search and take `measure`, how it picks the most exogenous variable at each
-step. `"pwling"`, the pairwise likelihood-ratio measure and the default, is the only one.
+step, by an approximation of the pairwise likelihood ratios of Hyvarinen and Smith (2013).
+`"pwling"`, the default, uses the entropies of each variable and of each regression residual.
+`"tanh"` uses a correlation of the standardized pair through `tanh`, which suits sparse noise such
+as Laplace, and `"skew"` one through the square after a sign correction, which suits skewed noise;
+they cost less, and `direct_lingam`'s Notes and Limitations give where each fails.
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, and `granger` take `fdr_method`, tigramite's name for the correction of the
