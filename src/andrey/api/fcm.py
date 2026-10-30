@@ -317,6 +317,8 @@ def resit(
         3 distinct values, or a column that repeats another up to scale and shift, each named in
         the message. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
+    FloatingPointError
+        If an HSIC test gives a non-finite value, rather than let it steer a choice.
 
     Warns
     -----
@@ -361,8 +363,10 @@ def resit(
     bandwidth the median of the positive squared distances over every pair of rows, and the null
     approximated by a gamma law matched to its mean and variance.
 
-    The kernels read the columns divided by their standard deviations, and each smooth term reads
-    a variable through an affine map to a fixed interval, so rescaling a column changes no step.
+    The kernels read the columns centered and divided by their standard deviations, and each smooth
+    term reads a variable through an affine map to a fixed interval, so rescaling or shifting a
+    column changes no step; the centering also keeps a large offset from cancelling the distances'
+    digits.
     The paper's kernel reads several raw columns at once and so weighs each by its units; on
     columns of one scale, such as standardized data, the two kernels are the same. The fit draws
     no random numbers and runs on one BLAS thread.

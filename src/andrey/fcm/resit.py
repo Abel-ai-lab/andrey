@@ -21,9 +21,10 @@ moments of Gretton et al. (2007) in the product form the paper uses; and ``alpha
 
 Where the steps here differ from the paper's:
 
-- The kernels read the columns divided by their standard deviations. The paper's kernel on several
-  raw columns weighs each by its units; on columns of one scale, such as standardized data, the
-  two are the same, since a common factor leaves a median-bandwidth kernel unchanged.
+- The kernels read the columns centered and divided by their standard deviations. The paper's
+  kernel on several raw columns weighs each by its units; on columns of one scale, such as
+  standardized data, the two are the same, since a common factor leaves a median-bandwidth kernel
+  unchanged.
 - The bandwidth is the median over every pair of rows with a positive distance. The paper's takes
   every pair of up to 1,000 rows, ties included, and a random 1,000 rows of a larger sample.
 - p-values are compared as their logarithms, computed directly so that a p-value below the
@@ -83,9 +84,21 @@ def _gram(side: np.ndarray) -> tuple[np.ndarray, float]:
 
 def _log_p(gram: tuple[np.ndarray, float], residual: np.ndarray) -> float:
     """The log HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``, the
-    null variance in its product form."""
+    null variance in its product form.
+
+    Raises
+    ------
+    FloatingPointError
+        If the test's value is not finite, so that no choice rests on it.
+    """
     n = residual.shape[0]
-    return hsic_gamma_log_p(gram, _gram(residual), n, variance="product")
+    log_p = hsic_gamma_log_p(gram, _gram(residual), n, variance="product")
+    if not math.isfinite(log_p):
+        raise FloatingPointError(
+            "resit: an HSIC test gave a non-finite p-value; the kernels could not be computed "
+            "from these data"
+        )
+    return log_p
 
 
 def _key(log_p: float) -> float:
@@ -208,7 +221,7 @@ def resit(
         allowed &= ~forbidden
     required = np.zeros((d, d), dtype=bool) if required is None else required
     bases = BasisCache(X)
-    unit = X * unit_factors(X, standardize=True)
+    unit = (X - X.mean(axis=0)) * unit_factors(X, standardize=True)
     order = causal_order(bases, unit, allowed, precedence)
     dag = remove_edges(bases, unit, order, alpha=alpha, allowed=allowed, required=required)
     return RESITResult(dag=dag, order=order)

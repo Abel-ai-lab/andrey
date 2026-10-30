@@ -146,6 +146,21 @@ def test_the_sink_follows_p_values_below_the_smallest_double():
     assert _fit(X).ordering[-1] == sink
 
 
+def test_a_large_offset_changes_neither_the_graph_nor_the_order():
+    X = np.random.default_rng(0).standard_normal((100, 3))
+    out, shifted = _fit(X), _fit(X + 1e9)
+    assert shifted.structure == out.structure
+    assert shifted.ordering == out.ordering
+
+
+def test_a_non_finite_test_raises_rather_than_steer_a_choice(monkeypatch):
+    import andrey.fcm.resit as fit
+
+    monkeypatch.setattr(fit, "hsic_gamma_log_p", lambda *args, **kwargs: float("nan"))
+    with pytest.raises(FloatingPointError):
+        _fit(_chain())
+
+
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
 def test_a_binary_column_is_named():
     X = _chain()
