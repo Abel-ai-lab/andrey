@@ -214,7 +214,7 @@ def cam(
     generator, the density, the method's settings, and the machine.
 
     **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
-    independent columns it kept a median of 25.5 at 40 rows and 60 variables and 8.5 at 200 rows and
+    independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and
     60 variables, against 0 at 500 rows and 20. The search keeps each variable's best-fitting
     candidates and the pruning tests them on the same rows, and the smooth-term tests run slightly
     liberal at small samples: an unrelated parent among five reached a p-value of at most 0.01 in
