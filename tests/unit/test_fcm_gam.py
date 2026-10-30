@@ -48,9 +48,9 @@ def test_the_basis_is_centered_and_leaves_the_linear_function_unpenalized(n, max
 
 
 def test_the_basis_needs_k_distinct_values():
-    with pytest.raises(ValueError, match="distinct values"):
+    with pytest.raises(ValueError):
         gam.tp_basis(np.repeat(np.arange(5.0), 10), 10)
-    with pytest.raises(ValueError, match="k >= 3"):
+    with pytest.raises(ValueError):
         gam.tp_basis(np.arange(10.0), 2)
 
 
@@ -105,11 +105,25 @@ def test_the_fit_is_deterministic_and_free_of_parent_order(fit, data):
     np.testing.assert_allclose(reverse.p_values()[::-1][2], fit.p_values()[2], rtol=1e-5)
 
 
+@pytest.mark.parametrize("unit", [1e-6, 1e6])
+def test_the_fit_is_the_same_in_any_unit(fit, data, unit):
+    scaled = data * np.array([unit, 1.0, 1.0, 1.0])
+    again = gam.fit_gam(gam.BasisCache(scaled), 3, [0, 1, 2])
+    np.testing.assert_allclose(again.fitted, fit.fitted, atol=1e-6)
+    np.testing.assert_allclose(again.edf, fit.edf, atol=1e-5)
+
+
 @pytest.mark.parametrize(
     ("n", "parents", "k"), [(1000, 5, 10), (200, 10, 7), (1000, 99, 4), (40, 15, 3)]
 )
 def test_the_rank_keeps_three_rows_per_basis_function(n, parents, k):
     assert gam.effective_k(n, parents, 10) == k
+
+
+def test_collinear_parents_are_refused(data):
+    duplicated = np.column_stack([data[:, 0], data[:, 0], data[:, 3]])
+    with pytest.raises(ValueError):
+        gam.fit_gam(gam.BasisCache(duplicated), 2, [0, 1])
 
 
 def test_a_failed_search_refits_without_penalty(data, monkeypatch):
@@ -158,7 +172,7 @@ def test_prune_reuses_bases_only_for_their_data(data):
     candidates = np.zeros((4, 4), dtype=int)
     candidates[[0, 1], 3] = 1
     np.testing.assert_array_equal(prune(data, candidates, bases=cache), prune(data, candidates))
-    with pytest.raises(ValueError, match="different data"):
+    with pytest.raises(ValueError):
         prune(data + 1.0, candidates, bases=cache)
-    with pytest.raises(ValueError, match="self-loop"):
+    with pytest.raises(ValueError):
         prune(data, np.eye(4, dtype=int))

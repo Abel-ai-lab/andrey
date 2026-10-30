@@ -56,6 +56,8 @@ _MAX_NEWTON = 200
 _MAX_HALVINGS = 30
 #: Largest change of a log smoothing parameter in one step.
 _MAX_STEP = 5.0
+#: Relative size below which a pivot of the column-normalized ``[R; roots]`` counts as zero.
+_RANK_TOL = np.finfo(float).eps ** 0.5
 #: Midpoint-rule nodes above which a tail probability falls back to adaptive quadrature.
 _MAX_NODES = 200_000
 
@@ -86,8 +88,10 @@ class SmoothBasis:
 def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> SmoothBasis:
     """Build the rank-``k`` thin plate regression spline basis of one covariate.
 
-    The covariate is centered. The full thin plate spline (second-derivative penalty, kernel
-    ``eta(r) = r^3 / 12``) is built on the distinct values, or, when there are more than
+    The covariate is centered and divided by its largest absolute value, an affine change that
+    keeps the function space and, up to a constant factor, the penalty, so the fit is the same in
+    any unit. The full thin plate spline (second-derivative penalty, kernel ``eta(r) = r^3 / 12``)
+    is built on the distinct values, or, when there are more than
     ``max_knots`` of them, on a fixed subset of ``max_knots`` drawn by R's Mersenne-Twister
     ``sample()`` seeded with ``1``. The basis keeps the ``k`` eigenvectors of the kernel matrix
     with the largest absolute eigenvalues, constrained orthogonal to the linear functions, plus the
@@ -121,18 +125,20 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
     knots = np.unique(xc)
     if knots.size < k:
         raise ValueError(f"k = {k} needs at least {k} distinct values, got {knots.size}")
+    width = float(np.abs(xc).max())
+    u = xc / width
+    knots /= width
     if x.size > max_knots and knots.size > max_knots:
         knots = np.sort(knots[_r_sample(knots.size, max_knots, seed=1)])
-    width = float(np.abs(knots).max())
-    values, vectors = _top_eigen(knots / width, k)
-    values *= width**3 / 12.0
+    values, vectors = _top_eigen(knots, k)
+    values /= 12.0
     polynomial = np.column_stack([np.ones(knots.size), knots])
     Q, _ = np.linalg.qr(vectors.T @ polynomial, mode="complete")
     Z = Q[:, 2:]
     X = np.empty((x.size, k))
-    X[:, : k - 2] = _cubic_cross(xc / width, knots / width, vectors @ Z) * (width**3 / 12.0)
+    X[:, : k - 2] = _cubic_cross(u, knots, vectors @ Z) / 12.0
     X[:, k - 2] = 1.0
-    X[:, k - 1] = xc
+    X[:, k - 1] = u
     S = np.zeros((k, k))
     S[: k - 2, : k - 2] = Z.T @ (values[:, None] * Z)
     S = (S + S.T) / 2
@@ -338,8 +344,8 @@ def fit_gam(
     Raises
     ------
     ValueError
-        If ``parents`` is empty or contains ``child``, or a parent has fewer than the rank's
-        distinct values.
+        If ``parents`` is empty or contains ``child``, a parent has fewer than the rank's distinct
+        values, or the parents' terms are linearly dependent (collinear parents).
     """
     parents = [int(p) for p in parents]
     if not parents:
@@ -380,6 +386,8 @@ def fit_additive(
 
     Raises
     ------
+    ValueError
+        If the terms are linearly dependent, so the coefficients are not identifiable.
     numpy.linalg.LinAlgError
         If the penalized least-squares system is singular.
     FloatingPointError
@@ -437,16 +445,25 @@ class _Problem:
             r += b.root.shape[0]
         self.n_root = r
         Q, self.R = np.linalg.qr(self.X)
+        stacked = np.vstack([self.R, self._penalty_root(np.ones(len(self.bases)))])
+        stacked /= np.linalg.norm(stacked, axis=0)
+        diag = np.abs(np.diag(linalg.qr(stacked, mode="r", pivoting=True)[0]))
+        if diag[-1] <= _RANK_TOL * diag[0]:
+            raise ValueError("the terms are linearly dependent: some parents are collinear")
         self.f = Q.T @ y
         resid = y - Q @ self.f
         self.rss0 = float(resid @ resid)
 
-    def solve(self, sp: np.ndarray) -> _State:
-        """Penalized least squares at ``sp`` through the QR factor of ``[R; sqrt(sp) roots]``."""
+    def _penalty_root(self, sp: np.ndarray) -> np.ndarray:
+        """The block matrix ``B`` with ``B'B = sum_j sp_j S_j``."""
         B = np.zeros((self.n_root, self.p))
         for j, b in enumerate(self.bases):
             B[self.rows[j], self.cols[j]] = math.sqrt(sp[j]) * b.root
-        Qs, Rs = np.linalg.qr(np.vstack([self.R, B]))
+        return B
+
+    def solve(self, sp: np.ndarray) -> _State:
+        """Penalized least squares at ``sp`` through the QR factor of ``[R; sqrt(sp) roots]``."""
+        Qs, Rs = np.linalg.qr(np.vstack([self.R, self._penalty_root(sp)]))
         P = linalg.solve_triangular(Rs, np.eye(self.p), check_finite=False)
         Q1 = Qs[: self.p]
         Q1f = Q1.T @ self.f
