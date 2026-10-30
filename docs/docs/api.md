@@ -641,6 +641,8 @@ name.
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells (Sachs et al., 2005) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
+| `child` | 20 | 25 | Simulated on the published network (bnlearn) |
+| `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
 | `alarm` | 37 | 46 | Simulated on the published network (bnlearn) |
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |

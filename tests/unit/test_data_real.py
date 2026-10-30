@@ -1,20 +1,24 @@
 """``andrey.data.load_dataset`` downloads once, checks the SHA-256, caches, and falls back in order.
 
 The ``offline_datasets`` fixture replaces the network: it serves Sachs's 853 observational rows
-and the published ASIA network.
+and the published ASIA, CHILD, and INSURANCE networks.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import gzip
 import hashlib
 import urllib.error
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from andrey.data import list_datasets, load_dataset, real
 from andrey.data.sortability import index_correlation
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_sachs_is_the_observational_rows_and_the_consensus_network(offline_datasets):
@@ -25,7 +29,16 @@ def test_sachs_is_the_observational_rows_and_the_consensus_network(offline_datas
     arcs = {(s, t) for s, t, kind in sachs.graph.oriented_edges() if kind == "directed"}
     assert arcs == set(real.SACHS_ARCS) and len(sachs.graph.oriented_edges()) == 17
     assert "Science 308" in sachs.description
-    assert list_datasets() == ("sachs", "asia", "alarm", "hepar2", "andes", "diabetes")
+    assert list_datasets() == (
+        "sachs",
+        "asia",
+        "child",
+        "insurance",
+        "alarm",
+        "hepar2",
+        "andes",
+        "diabetes",
+    )
 
 
 def test_the_array_holds_the_frames_values(offline_datasets):
@@ -161,6 +174,47 @@ def test_a_published_network_is_its_graph_with_data_simulated_on_it(offline_data
     np.testing.assert_allclose(asia.data.std(ddof=0), 1.0)
     assert "simulated" in asia.description and "n=1000, seed=0" in asia.description
     assert "Lauritzen" in asia.description
+
+
+#: Each network's variables, arcs, and conditional probabilities as the bnlearn repository gives
+#: them, with the license and the paper to cite.
+PUBLISHED = [
+    ("child", 20, 25, 230, "Spiegelhalter"),
+    ("insurance", 27, 52, 1008, "Binder"),
+]
+
+
+@pytest.mark.parametrize(("name", "nodes", "arcs", "parameters", "cite"), PUBLISHED)
+def test_child_and_insurance_are_the_published_networks(
+    offline_datasets, name, nodes, arcs, parameters, cite
+):
+    network = load_dataset(name)
+    assert network.data.shape == (1000, nodes)
+    assert list(network.data.columns) == list(network.feature_names) == list(network.graph.labels)
+    edges = network.graph.oriented_edges()
+    assert len(edges) == arcs and {kind for *_, kind in edges} == {"directed"}
+    assert network.graph.kind == "dag"
+    assert cite in network.description and "CC BY-SA" in network.description
+    # The file's tables hold the published number of free parameters, not only its structure.
+    text = gzip.decompress((FIXTURES / f"{name}.bif.gz").read_bytes()).decode("utf-8")
+    tables = real.read_bif_tables(text)
+    assert sum(t.shape[0] * (t.shape[1] - 1) for t in tables.tables) == parameters
+    categorical = load_dataset(name, n=300, discrete=True)
+    assert categorical.data.shape == (300, nodes)
+    states = dict(zip(tables.nodes, tables.states, strict=True))
+    assert all(
+        categorical.data[c].cat.categories.tolist() == list(states[c]) for c in categorical.data
+    )
+
+
+@pytest.mark.parametrize(("name", "other"), [("child", "insurance"), ("insurance", "child")])
+def test_a_network_file_must_match_its_pinned_checksum(offline_datasets, monkeypatch, name, other):
+    """Another network's file is a valid BIF but not this one's: it is refused and not cached."""
+    served = (FIXTURES / f"{other}.bif.gz").read_bytes()
+    monkeypatch.setattr(real, "fetch", lambda url: served)
+    with pytest.raises(OSError, match="SHA-256"):
+        load_dataset(name)
+    assert not (real.cache_dir() / name).exists()
 
 
 def test_each_simulated_column_is_the_variable_it_is_named_for(offline_datasets):

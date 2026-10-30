@@ -17,6 +17,8 @@ names its pull request.
   noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
   between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
   ([#596])
+- `andrey.data.load_dataset("child")` and `load_dataset("insurance")`, the bnlearn child network
+  (20 variables, 25 arcs) and insurance network (27 variables, 52 arcs). ([#611])
 
 ### Changed
 
@@ -1492,4 +1494,5 @@ First alpha release.
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
 [#596]: https://github.com/Abel-ai-lab/andrey/pull/596
+[#611]: https://github.com/Abel-ai-lab/andrey/pull/611
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
