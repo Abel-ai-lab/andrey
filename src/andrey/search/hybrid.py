@@ -14,13 +14,17 @@ from contextlib import nullcontext
 import numpy as np
 
 from andrey.constraint.blanket import (
+    blanket_cpdag,
     blanket_graph,
     markov_blanket,
+    mmpc_sets,
     mmpc_skeleton,
     parents_children,
+    prune_spouses,
+    reach,
 )
 from andrey.constraint.pc import _discover_skeleton
-from andrey.core import NULL, GraphStructure, backend
+from andrey.core import NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import (
     DISCRETE_INDEP_TESTS,
     MIXED_INDEP_TESTS,
@@ -130,6 +134,54 @@ def local_graph(
             max_depth=max_depth,
             constraints=constraints,
         )
+
+
+def local_structure(
+    X: np.ndarray,
+    method: str,
+    output: str,
+    *,
+    alpha: float,
+    indep_test: str,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+) -> np.ndarray:
+    """Every variable's MMPC, IAMB, or Inter-IAMB set joined into the graph ``output`` names, as an
+    endpoint-mark matrix.
+
+    ``"moral"`` (IAMB, Inter-IAMB) is :func:`local_graph`'s moral graph, undirected. ``"skeleton"``
+    is MMPC's skeleton, or the moral graph less the pairs :func:`prune_spouses` separates.
+    ``"cpdag"`` orients that skeleton (:func:`~andrey.constraint.blanket.blanket_cpdag`) against
+    the blankets: the moral graph, or for MMPC each variable's set together with its members' sets
+    before the symmetry check (:func:`~andrey.constraint.blanket.reach`). The other settings are
+    :func:`local_graph`'s.
+    """
+    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    d = X.shape[1]
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        if method == "mmpc":
+            sets = mmpc_sets(test, d, alpha, ranks, max_depth, constraints)
+            skeleton, blankets = sets & sets.T, reach(sets)
+        else:
+            blankets = blanket_graph(
+                test,
+                d,
+                alpha,
+                ranks,
+                interleaved=method == "inter_iamb",
+                max_depth=max_depth,
+                constraints=constraints,
+            )
+            skeleton = (
+                blankets
+                if output == "moral"
+                else prune_spouses(test, blankets, alpha, max_depth, constraints)
+            )
+        if output != "cpdag":
+            return np.where(skeleton, TAIL, NULL).astype(np.int8)
+        return blanket_cpdag(test, skeleton, blankets, alpha, max_depth, constraints)
 
 
 def local_set(

@@ -27,6 +27,7 @@ from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.score import SCORES
+from andrey.core.structure import Kind
 
 from .models import ParamSpec, ParamType, Spec
 
@@ -34,6 +35,12 @@ Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
 SCORE_NAMES = SCORES
+#: The graphs a Markov-blanket search returns without a target (``output``), and the kind of each.
+BLANKET_OUTPUTS: dict[str, Kind] = {
+    "cpdag": "cpdag",
+    "skeleton": "undirected",
+    "moral": "undirected",
+}
 #: The largest seed NumPy and torch accept.
 SEED_MAX = 2**32 - 1
 
@@ -845,6 +852,37 @@ _CONCEPTS = (
         others_exempt="No DirectLiNGAM order search.",
     ),
     Concept(
+        key="output",
+        summary="The graph a Markov-blanket search returns without a target, as bnlearn's "
+        "structure learners and learn.mb offer it: cpdag, the default, the CPDAG of the "
+        "Grow-Shrink structure learner (Margaritis 2003); skeleton, its adjacencies "
+        "(undirected=TRUE); moral, the moral graph of the Markov blankets.",
+        param=_template(
+            "output",
+            "str",
+            "cpdag",
+            "The graph returned without a target: cpdag = the skeleton with its colliders "
+            "oriented and Meek's rules applied (Margaritis 2003); skeleton = the adjacencies, each "
+            "variable joined to its parents and children; moral = the moral graph, each variable "
+            "joined to its Markov blanket. With a target, the target's set, whatever the value.",
+            choices=tuple(BLANKET_OUTPUTS),
+        ),
+        fragment="cpdag",
+        suitable=("iamb", "inter_iamb", "mmpc"),
+        others_exempt="Learns the whole graph of one kind.",
+        deviations=(
+            Deviation(
+                method="mmpc",
+                name="output",
+                default="cpdag",
+                choices=("cpdag", "skeleton"),
+                fixed_in=None,
+                reason="MMPC learns parents and children, which hold no child's other parents, "
+                "so it has no moral graph to return.",
+            ),
+        ),
+    ),
+    Concept(
         key="collider_rule",
         summary="How a separating-set search decides the colliders.",
         param=_template(
@@ -868,11 +906,30 @@ _CONCEPTS = (
                 "lpcmci",
             ),
             *_exempt(
+                "The Grow-Shrink structure learner (Margaritis 2003) decides each triple by its "
+                "own test, of the endpoints given the middle node and every subset of the smaller "
+                "Markov blanket, not by a separating set.",
+                "iamb",
+                "inter_iamb",
+                "mmpc",
+            ),
+            *_exempt(
                 "No separating-set orientation.",
                 *(
                     m
                     for m in ALL_METHODS
-                    if m not in ("pc", "fci", "gfci", "cdnod", "pcmciplus", "lpcmci")
+                    if m
+                    not in (
+                        "pc",
+                        "fci",
+                        "gfci",
+                        "cdnod",
+                        "pcmciplus",
+                        "lpcmci",
+                        "iamb",
+                        "inter_iamb",
+                        "mmpc",
+                    )
                 ),
             ),
         ),
@@ -895,7 +952,8 @@ _CONCEPTS = (
         key="graph_kind",
         summary="The graph kind names what an edge means: a search identified up to its "
         "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
-        "direction is undirected. A fit returns the kind its spec declares.",
+        "direction is undirected. A fit returns the kind its spec declares; a method with output "
+        "returns cpdag for output=cpdag and undirected for skeleton and moral.",
         suitable=ALL_METHODS,
     ),
     Concept(

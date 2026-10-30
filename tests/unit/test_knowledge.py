@@ -20,6 +20,7 @@ from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
+from andrey.spec.concepts import BLANKET_OUTPUTS
 
 # The searches that take knowledge and return a graph over the columns of a table.
 METHODS = [
@@ -54,6 +55,15 @@ SERIES_CASES = [
 PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
 # Undirected results: the knowledge sets which pairs are adjacent, and orients nothing.
 UNDIRECTED = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "undirected"}
+#: Each method and output choice whose graph is undirected.
+UNDIRECTED_OUTPUTS = [
+    (name, choice)
+    for name, spec in REGISTRY.items()
+    for param in spec.params
+    if param.concept == "output"
+    for choice in param.choices or ()
+    if BLANKET_OUTPUTS[choice] == "undirected"
+]
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
 # A short schedule: the knowledge holds whether or not the fit has converged.
 SHORT_CALM = {"max_iter": 2, "subproblem_iter": 200}
@@ -672,7 +682,7 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
 @pytest.mark.parametrize(
     ("name", "knowledge"),
     [
-        *((name, CYCLE) for name in ("pc", "cdnod")),
+        *((name, CYCLE) for name in ("pc", "cdnod", "iamb", "inter_iamb", "mmpc")),
         *((name, ANCESTOR) for name in ("pc", "cdnod", "fci")),
     ],
 )
@@ -681,12 +691,13 @@ def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
         _fit(name, _triangle(), knowledge=knowledge)
 
 
-@pytest.mark.parametrize("name", sorted(UNDIRECTED))
+@pytest.mark.parametrize(("name", "output"), UNDIRECTED_OUTPUTS)
 @pytest.mark.parametrize("knowledge", [CYCLE, Knowledge(tiers=[["c"], ["a", "b"]])])
-def test_tiers_and_one_way_forbidden_edges_leave_an_undirected_result(name, knowledge):
+def test_tiers_and_one_way_forbidden_edges_leave_an_undirected_result(name, output, knowledge):
     # They constrain orientation only, which an undirected result does not have.
-    plain = _fit(name, _triangle()).structure.oriented_edges()
-    assert _fit(name, _triangle(), knowledge=knowledge).structure.oriented_edges() == plain
+    plain = _fit(name, _triangle(), output=output).structure.oriented_edges()
+    with_knowledge = _fit(name, _triangle(), output=output, knowledge=knowledge)
+    assert with_knowledge.structure.oriented_edges() == plain
 
 
 @pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc", "calm"])

@@ -10,6 +10,13 @@ background knowledge as :class:`~andrey.core.knowledge.Constraints`: each end of
 is a member of the other's set from the start and never leaves it, and a pair the knowledge makes
 non-adjacent is never in a returned set.
 
+The structure learner of Margaritis (2003) turns the sets into a CPDAG: :func:`prune_spouses`
+removes from the moral graph each pair that a subset of the smaller of the two blankets separates,
+which gives the skeleton, and :func:`blanket_cpdag` decides each unshielded triple by testing its
+endpoints given the middle node and each subset of the smaller blanket
+(:func:`blanket_colliders`), orients the colliders with :func:`andrey.constraint.pc`'s code, and
+completes the result by Meek's rules.
+
 Candidates are compared by the strength of their dependence on the target: the absolute partial
 correlation for a test that reports one (``statistic_pvalue``), else the p-value. Strengths that
 agree to ``_KEY_DP`` decimals go to the candidate with the lower rank, from
@@ -23,9 +30,11 @@ from itertools import combinations
 
 import numpy as np
 
-from andrey.constraint._skeleton import scan_conditioning_sets
+from andrey.constraint._skeleton import adjacent_pairs, scan_conditioning_sets
+from andrey.core import ARROW, NULL, TAIL
 from andrey.core.ci import CITest
-from andrey.core.knowledge import Constraints
+from andrey.core.knowledge import Constraints, orient
+from andrey.core.orient import meek
 from andrey.search._parallel import _KEY_DP
 
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
@@ -281,6 +290,23 @@ def parents_children(
     return members
 
 
+def mmpc_sets(
+    test: CITest,
+    d: int,
+    alpha: float,
+    ranks: Sequence[int],
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+) -> np.ndarray:
+    """Every variable's parents and children before the symmetry check: ``[i, j]`` when ``j`` is
+    in ``i``'s set (:func:`parents_children`, with ``constraints``), a boolean ``(d, d)``
+    matrix."""
+    raw = np.zeros((d, d), dtype=bool)
+    for i in range(d):
+        raw[i, parents_children(test, i, d, alpha, ranks, max_depth, constraints)] = True
+    return raw
+
+
 def mmpc_skeleton(
     test: CITest,
     d: int,
@@ -290,9 +316,171 @@ def mmpc_skeleton(
     constraints: Constraints | None = None,
 ) -> np.ndarray:
     """MMPC's skeleton: ``[i, j]`` when each of ``i`` and ``j`` is in the other's parents and
-    children (:func:`parents_children`, with ``constraints``), a symmetric boolean ``(d, d)``
-    matrix."""
-    raw = np.zeros((d, d), dtype=bool)
-    for i in range(d):
-        raw[i, parents_children(test, i, d, alpha, ranks, max_depth, constraints)] = True
+    children (:func:`mmpc_sets`), a symmetric boolean ``(d, d)`` matrix."""
+    raw = mmpc_sets(test, d, alpha, ranks, max_depth, constraints)
     return raw & raw.T
+
+
+def reach(sets: np.ndarray) -> np.ndarray:
+    """Each variable's set together with the sets of its members, less the variable itself: the
+    blanket MMPC's sets stand in for, which holds each child's other parents."""
+    out = sets | (sets.astype(np.float32) @ sets.astype(np.float32) > 0)
+    np.fill_diagonal(out, False)
+    return out
+
+
+def _smaller(blankets: np.ndarray, a: int, b: int, drop: Sequence[int] = ()) -> list[list[int]]:
+    """The candidate sets of the pair ``a``, ``b``: the smaller of the two rows of ``blankets``
+    less ``a``, ``b``, and ``drop``, ascending, or both when they hold as many members."""
+    sides = [
+        [v for v in np.flatnonzero(blankets[e]).tolist() if v not in (a, b, *drop)] for e in (a, b)
+    ]
+    if len(sides[0]) != len(sides[1]):
+        return [min(sides, key=len)]
+    return sides if sides[0] != sides[1] else sides[:1]
+
+
+def prune_spouses(
+    test: CITest,
+    moral: np.ndarray,
+    alpha: float,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+) -> np.ndarray:
+    """The skeleton: the ``moral`` graph less every pair that some subset of the smaller of the
+    two blankets separates (Margaritis 2003).
+
+    For each pair ``x``, ``y`` of ``moral``, the candidates are the smaller of ``moral[x]`` less
+    ``y`` and ``moral[y]`` less ``x``, or both when they hold as many members; the pair leaves when
+    ``x`` and ``y`` test independent (a p-value above ``alpha``) given some subset of them, the
+    empty set included, by increasing size up to ``max_depth``. The blankets are the moral graph
+    the search starts from, so each pair's verdict does not depend on another's. A pair a required
+    edge of ``constraints`` joins is not tested. Returns a new symmetric boolean matrix.
+    """
+    skeleton = moral.copy()
+    required = None if constraints is None else constraints.required | constraints.required.T
+    for x, y in adjacent_pairs(moral):
+        if required is not None and required[x, y]:
+            continue
+        sides = _smaller(moral, x, y)
+        top = max(len(side) for side in sides)
+        for size in range(top + 1 if max_depth is None else min(top, max_depth) + 1):
+            seen: set[int] | None = None
+            separated = False
+            for side in sides:
+                if size <= len(side) and scan_conditioning_sets(
+                    test, x, y, side, size, alpha, set(), seen
+                ):
+                    separated = True
+                    break
+                seen = set(side)
+            if separated:
+                skeleton[x, y] = skeleton[y, x] = False
+                break
+    return skeleton
+
+
+def blanket_colliders(
+    test: CITest,
+    skeleton: np.ndarray,
+    blankets: np.ndarray,
+    alpha: float,
+    max_depth: int | None = None,
+) -> tuple[
+    dict[tuple[int, int], tuple[int, ...]],
+    dict[tuple[int, int, int], float],
+    frozenset[tuple[int, int, int]],
+]:
+    """Decide every unshielded triple of ``skeleton`` by the collider test of Margaritis (2003).
+
+    For a triple ``a - b - c``, ``a < c``, with ``a`` and ``c`` not adjacent, the candidates are the
+    smaller of ``blankets[a]`` and ``blankets[c]`` less ``a``, ``b``, and ``c``, or both when they
+    hold as many members. ``b`` is a collider when ``a`` and ``c`` test dependent (a p-value at or
+    below ``alpha``) given ``b`` together with every subset of them, and a non-collider when some
+    such set separates them. Every conditioning set holds ``b``, so with ``max_depth`` the subsets
+    hold at most ``max_depth - 1`` members, and with ``max_depth=0`` no set can be tested and the
+    triple is ambiguous. The sets are tested by increasing size, and a non-collider stops at the
+    first size that separates.
+
+    Returns the separating sets :func:`~andrey.constraint.pc._orient_colliders` reads, keyed
+    ``(a, c)`` and holding the pair's non-collider middle nodes; each decided triple's rank, the
+    weakest association over its tests (:func:`_weakest`: the smallest absolute partial correlation
+    for a test that reports one, else the negated largest p-value), so the most clearly dependent
+    collider comes first; and the ambiguous triples, keyed ``(a, b, c)``.
+    """
+    sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
+    strengths: dict[tuple[int, int, int], float] = {}
+    ambiguous: set[tuple[int, int, int]] = set()
+    for b in range(skeleton.shape[0]):
+        for a, c in combinations(np.flatnonzero(skeleton[b]).tolist(), 2):
+            if skeleton[a, c]:
+                continue
+            sepsets.setdefault((a, c), ())
+            sides = _smaller(blankets, a, c, (b,))
+            top = max(len(side) for side in sides)
+            if max_depth is not None:
+                top = min(top, max_depth - 1)
+            if top < 0:
+                ambiguous.add((a, b, c))
+                continue
+            p, strength = -np.inf, np.inf
+            for size in range(top + 1):
+                conds = dict.fromkeys(
+                    tuple(sorted((*rest, b))) for side in sides for rest in combinations(side, size)
+                )
+                [(p_size, strength_size)] = _weakest(test, a, [c], list(conds))
+                p, strength = max(p, p_size), min(strength, strength_size)
+                if p > alpha:
+                    sepsets[a, c] = (*sepsets[a, c], b)
+                    break
+            strengths[a, b, c] = strength
+    return sepsets, strengths, frozenset(ambiguous)
+
+
+def blanket_cpdag(
+    test: CITest,
+    skeleton: np.ndarray,
+    blankets: np.ndarray,
+    alpha: float,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+) -> np.ndarray:
+    """The CPDAG of the structure learner of Margaritis (2003), as an endpoint-mark matrix.
+
+    The unshielded triples of the boolean ``skeleton`` are decided by :func:`blanket_colliders`
+    against ``blankets``. As in :func:`andrey.constraint.pc.pc`, every edge ``constraints`` decide
+    is directed first (:func:`~andrey.constraint.pc.check_knowledge_cycle` raises on a directed
+    cycle), the colliders are oriented by
+    :func:`~andrey.constraint.pc._orient_colliders` in the order ``andrey.config.tie_break``
+    selects, Meek's rules complete the result, with R4 under ``constraints``, and an edge two
+    colliders of equal rank dispute is left undirected.
+    """
+    # pc imports this module through andrey.search, so its import waits for the call.
+    from andrey.constraint.pc import (
+        _orient_colliders,
+        _undirect_conflicts,
+        check_knowledge_cycle,
+        resolve_collider_order,
+        resolve_in_column_order,
+    )
+
+    sepsets, strengths, ambiguous = blanket_colliders(test, skeleton, blankets, alpha, max_depth)
+    marks = np.where(skeleton, TAIL, NULL).astype(np.int8)
+    if constraints is not None:
+        marks = orient(marks, constraints)
+        check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW))
+    pdag = _orient_colliders(
+        marks,
+        sepsets,
+        {},
+        order=resolve_collider_order(None),
+        ambiguous=ambiguous,
+        ranks=strengths,
+    )
+    cpdag = meek(
+        pdag,
+        rule4=constraints is not None,
+        ambiguous=ambiguous,
+        in_column_order=resolve_in_column_order(),
+    )
+    return _undirect_conflicts(cpdag)
