@@ -152,26 +152,80 @@ def _relation_keys(x: np.ndarray, mask: np.ndarray) -> list[bytes]:
     ranks = _centered_ranks(x[:, continuous])
     c = len(continuous)
     products = _abs_products(ranks)[~np.eye(c, dtype=bool)].reshape(c, max(c - 1, 0))
-    relations: list[list[bytes]] = [[] for _ in range(x.shape[1])]
-    codes = [np.unique(x[:, j], return_inverse=True)[1].reshape(-1) for j in categorical]
-    sizes = [int(code.max()) + 1 if code.size else 0 for code in codes]
-    for a, j in enumerate(categorical):
-        counts = np.bincount(codes[a], minlength=sizes[a])
-        for b, k in enumerate(continuous):
-            sums = np.abs(np.bincount(codes[a], weights=ranks[:, b], minlength=counts.size))
-            pairs = np.column_stack([counts, sums])[np.lexsort((sums, counts))]
-            relations[j].append(_digest(b"m", pairs))
-            relations[k].append(relations[j][-1])
-        for b in range(a + 1, len(categorical)):
-            joint = np.bincount(codes[a] * sizes[b] + codes[b], minlength=sizes[a] * sizes[b])
-            relations[j].append(_digest(b"t", np.sort(joint)))
-            relations[categorical[b]].append(relations[j][-1])
     sorted_products = dict(zip(continuous.tolist(), np.sort(products, axis=1), strict=True))
-    return [
-        (b"K" if is_categorical else b"C" + sorted_products[j].astype("<u8").tobytes())
-        + b"".join(sorted(relations[j]))
-        for j, is_categorical in enumerate(mask.tolist())
-    ]
+    relations = _categorical_relations(
+        x[:, categorical], ranks, continuous, categorical, x.shape[1]
+    )
+    keys = []
+    for j, is_categorical in enumerate(mask.tolist()):
+        if is_categorical:  # its relations with every other column
+            head, others = b"K", np.delete(relations[np.searchsorted(categorical, j)], j)
+        else:  # its products with the other continuous columns, its relations with the categorical
+            head, others = b"C" + sorted_products[j].astype("<u8").tobytes(), relations[:, j]
+        keys.append(head + np.sort(others).tobytes())
+    return keys
+
+
+def _categorical_relations(
+    x: np.ndarray, ranks: np.ndarray, continuous: np.ndarray, categorical: np.ndarray, d: int
+) -> np.ndarray:
+    """``out[a, k]``: the 16-byte hash of the relation of categorical column ``a`` and column ``k``:
+    each category's count and absolute centered rank sum with a continuous column, or the sorted
+    joint counts with another categorical column (:func:`tie_ranks`)."""
+    n, q = x.shape
+    out = np.zeros((q, d), dtype="S16")
+    if not n:  # no rows: every relation is the empty list
+        out[:, continuous] = _digests(b"m", np.zeros((1, 0)))
+        out[:, categorical] = _digests(b"t", np.zeros((1, 0)))
+        return out
+    if not q:
+        return out
+    codes = np.column_stack([np.unique(col, return_inverse=True)[1].reshape(-1) for col in x.T])
+    sizes = codes.max(axis=0) + 1
+    start = np.concatenate([[0], np.cumsum(sizes)])
+    # One 0/1 column per category of each categorical column. Their products and their sums of
+    # centered ranks are whole numbers below 2**53, which float64 holds exactly.
+    indicators = np.zeros((n, start[-1]))
+    indicators[np.arange(n)[:, None], start[:-1] + codes] = 1.0
+    counts = indicators.sum(axis=0).astype(np.int64)
+    sums = np.abs(indicators.T @ ranks)  # each category's sum of each continuous column's ranks
+    # With a continuous column: the (count, |sum|) pairs of the categories, sorted.
+    for a in range(q):
+        rows = slice(start[a], start[a + 1])
+        held = np.broadcast_to(counts[rows, None], (sizes[a], len(continuous)))
+        order = np.lexsort((sums[rows], held), axis=0)
+        pairs = np.stack(
+            [np.take_along_axis(held, order, 0), np.take_along_axis(sums[rows], order, 0)]
+        )
+        out[a, continuous] = _digests(
+            b"m", pairs.transpose(2, 1, 0).reshape(len(continuous), 2 * sizes[a])
+        )
+    # The joint table of two categorical columns, from the products of the indicators of all but
+    # each column's last category, which give all but the table's last row and column, and the
+    # counts, which complete them.
+    last = start[1:] - 1
+    kept = np.setdiff1d(np.arange(start[-1]), last)
+    inner = np.cumsum(np.concatenate([[0], sizes - 1]))
+    products = indicators[:, kept].T @ indicators[:, kept]
+    first, second = np.triu_indices(q, 1)
+    for ka, kb in set(zip(sizes[first].tolist(), sizes[second].tolist(), strict=True)):
+        pick = (sizes[first] == ka) & (sizes[second] == kb)
+        a, b = first[pick], second[pick]
+        block = products[
+            (inner[a][:, None] + np.arange(ka - 1))[:, :, None],
+            (inner[b][:, None] + np.arange(kb - 1))[:, None, :],
+        ]
+        ca = counts[start[a][:, None] + np.arange(ka)]
+        cb = counts[start[b][:, None] + np.arange(kb)]
+        table = np.empty((len(a), ka, kb))
+        table[:, :-1, :-1] = block
+        table[:, :-1, -1] = ca[:, :-1] - block.sum(axis=2)
+        table[:, -1, :-1] = cb[:, :-1] - block.sum(axis=1)
+        table[:, -1, -1] = cb[:, -1] - ca[:, :-1].sum(axis=1) + block.sum(axis=(1, 2))
+        digests = _digests(b"t", np.sort(table.reshape(len(a), -1), axis=1))
+        out[a, categorical[b]] = digests
+        out[b, categorical[a]] = digests
+    return out
 
 
 def _centered_ranks(x: np.ndarray) -> np.ndarray:
@@ -234,6 +288,19 @@ def _values(col: np.ndarray, is_categorical: bool) -> bytes:
 def _digest(tag: bytes, ints: np.ndarray) -> bytes:
     """A 16-byte hash of ``tag`` and ``ints`` as little-endian 64-bit integers."""
     return hashlib.blake2b(tag + ints.astype("<i8").tobytes(), digest_size=16).digest()
+
+
+def _digests(tag: bytes, rows: np.ndarray) -> np.ndarray:
+    """:func:`_digest` of each row of ``rows``, a 2-D array of whole numbers, as 16-byte strings."""
+    data = np.ascontiguousarray(rows, dtype="<i8")
+    tagged = np.empty((len(data), 1 + 8 * data.shape[1]), dtype=np.uint8)
+    tagged[:, 0] = tag[0]
+    tagged[:, 1:] = data.view(np.uint8)
+    raw, width, blake = memoryview(tagged.tobytes()), tagged.shape[1], hashlib.blake2b
+    return np.array(
+        [blake(raw[i : i + width], digest_size=16).digest() for i in range(0, len(raw), width)],
+        dtype="S16",
+    )
 
 
 def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
