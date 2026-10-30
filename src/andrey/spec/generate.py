@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import andrey
 from andrey.core.structure import EDGE_GLYPHS
 
-from .concepts import BOOTSTRAP_PARAMS, CONCEPTS
+from .concepts import BOOTSTRAP_PARAMS, CONCEPTS, MARKOV_CHECK_PARAMS
 from .environment import ENV_VARS, PRECEDENCE
 from .registry import REGISTRY, get_spec, list_specs
 
@@ -306,6 +306,28 @@ def cli_meta() -> dict:
                 "for a time-series method); capped at 1000 (frequencies_truncated)"
             ),
         },
+        "markov_check": {
+            "invocation": (
+                "andrey markov-check <graph.json> <data.csv> [--indep-test T] [--alpha A] "
+                "[--categorical COLUMN ...] [--sample-fraction F] [--seed S]"
+            ),
+            "what": (
+                "tests the conditional independences a DAG or CPDAG implies against the data, one "
+                "p-value each, and tests whether those p-values are uniform (Anderson-Darling). "
+                "The graph is the JSON of `andrey run <method> -o` or a saved result; use rows "
+                "the graph was not learned from. Takes -o, --json, and --full of `run`."
+            ),
+            "parameters": {
+                name: _param_schema(param) for name, param in MARKOV_CHECK_PARAMS.items()
+            },
+            "envelope": (
+                "markov_check (passed, verdict, alpha, n_tests, uniformity_statistic, "
+                "uniformity_p_value, share_dependent, indep_test, seed, sample_fraction, "
+                "rows_per_test, graph_kind, labels, tests[] of x, y, given, and p_value by "
+                "0-based column index; capped at the 1000 smallest p-values, tests_truncated) "
+                "and run. `status` is the run's, the verdict is markov_check.passed"
+            ),
+        },
         "error_envelope": {
             "error": {
                 "code": "machine-readable error code",
@@ -476,8 +498,9 @@ def render_skill() -> str:
         "when more fits have it than have no edge and the pair is adjacent in more than "
         "`--threshold` of the fits (default 0.5, at least 0.5) or in all of them, and the result "
         "is then made a valid graph of the method's kind. When no such graph exists, it is the "
-        "resample graph nearest the others, with a warning (`--strict` fails instead), and "
-        "`bootstrap.averaged_graph` is `nearest_resample` instead of `vote`. `bootstrap` gives "
+        "valid resample graph nearest the others, with a warning (`--strict` fails instead), and "
+        "`bootstrap.averaged_graph` is `nearest_resample` instead of `vote`, or "
+        "`nearest_resample_invalid` when no resample is valid. `bootstrap` gives "
         "`n_resamples`, `threshold`, `strict`, `averaged_graph`, `seed`, `resampling`, "
         "`sample_fraction`, and `block_length`, and `frequencies` lists each edge that appeared "
         "in some fit, most "
@@ -490,6 +513,21 @@ def render_skill() -> str:
         "`--block-length` rows for such a method). Set `--seed` when the "
         "result must repeat; `ANDREY_N_JOBS` spreads the fits over processes without "
         "changing it."
+    )
+    a("")
+    a("## Whether the data support a graph")
+    a("")
+    a(
+        "`andrey markov-check <graph.json> <data.csv> [--indep-test T] [--alpha A] "
+        "[--categorical COLUMN ...] [--sample-fraction F] [--seed S]` tests a DAG or CPDAG (the "
+        "JSON of `andrey run <method> -o`) against data: each independence the graph implies "
+        "gets a p-value, and the check asks whether those p-values are uniform. Its envelope "
+        "holds `markov_check`, with `passed` (false when the uniformity p-value is at most "
+        "`--alpha`), `verdict`, `uniformity_p_value`, and `tests`, each with its `x`, `y`, "
+        "`given` (0-based column indices), and `p_value`, plus `run`. Check on rows the graph "
+        "was not learned from. A pass does not show the edges are right: a graph with extra "
+        "edges also passes. A rejection says an implied independence fails in the data, so an "
+        "edge is missing or a collider is wrong."
     )
     a("")
     a("## Data types")

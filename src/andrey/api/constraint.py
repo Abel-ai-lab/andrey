@@ -68,8 +68,11 @@ def pc(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
+        for data whose columns are monotone transformations of Gaussian variables: its p-values do
+        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns, by a likelihood ratio. Four more tests detect nonlinear dependence in
         continuous data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
@@ -258,9 +261,14 @@ def pc(
     (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
     row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
     at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
-    2,000 rows). The numbers below were measured with ``collider_order="column"``. On the
-    223-variable ANDES network with 1,000 simulated rows, its median errors passed the empty graph's
-    (372 against 338). Its run time grows combinatorially with the largest neighborhood. On
+    2,000 rows). Test errors can make the colliders it finds fit no DAG on the skeleton, and the
+    ``cpdag`` it returns then has no consistent DAG extension, so a graph query such as
+    ``markov_blanket`` raises ``ValueError``. With the default settings, of 200 simulated datasets
+    with 10 variables, mean degree 3, and 2,000 rows, 33 fits with ``"fisherz"`` and 31 with
+    ``"normal_scores"`` returned one. The numbers below were measured with
+    ``collider_order="column"``. On the 223-variable ANDES network with 1,000 simulated rows, its
+    median errors passed the empty graph's (372 against 338). Its run time grows combinatorially
+    with the largest neighborhood. On
     simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
     half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
     rows, its median errors stayed below the empty graph's at every size: at 40 variables, 18.5 with
@@ -278,10 +286,18 @@ def pc(
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
     ``category`` columns are read the same way. A test compares the counts of ``x`` and ``y`` with
     independence within each configuration of the conditioning set that occurs in the data [2]_.
-    Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom, counting only the values
-    of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1. A test needs several rows
-    per cell of its table: with many categories or a large conditioning set, most cells are empty,
-    and the p-value is unreliable.
+    The p-value refers the statistic to a chi-square law whose degrees of freedom are its
+    mean when ``y`` is shuffled within each configuration: ``(r_x - 1) * (r_y - 1)`` per
+    configuration for large counts, with ``r_x`` and ``r_y`` the values present in it [6]_, and
+    more for few rows, where the usual degrees of freedom over-reject a true independence; with
+    none, the p-value is 1. A table with fewer rows than cells has most cells empty: the p-values
+    are then a little too large, ``"gsq"``'s more than ``"chisq"``'s, which loses ``"gsq"`` some
+    power there. Over 35,808 true independences of random discrete networks, with 3 to 5
+    categories, conditioning sets of 0 to 3 variables, and 500 to 5,000 rows, a test at level 0.05
+    rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``); the usual degrees of freedom rejected 11.1%
+    and 21.7%. ``"gsq"``, the default, takes 2 to 5 times as long as ``"chisq"`` for its exact
+    mean; on discrete networks and generated tables of 500 to 5,000 rows the graph it finds was
+    no farther from the truth than ``"chisq"``'s in all 16 settings and nearer in 3.
 
     **Mixed data.** ``"degen_gauss"`` and ``"cond_gauss"`` test data with continuous and categorical
     columns. Each distinct value of a categorical column is one category, and a DataFrame column of
@@ -443,8 +459,11 @@ def fci(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
+        for data whose columns are monotone transformations of Gaussian variables: its p-values do
+        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns. Four more tests detect nonlinear dependence in continuous data, at a
         far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
@@ -787,7 +806,8 @@ def gfci(
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     indep_test : str or None, default=None
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
-        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
+        ``"student_t"`` (Student-t) test partial correlation, for continuous data, and
+        ``"normal_scores"`` does so on each column's normal scores. ``"chisq"``
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``,
         ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
@@ -1081,7 +1101,8 @@ def cdnod(
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
-        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
+        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
+        column's normal scores. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
         and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per

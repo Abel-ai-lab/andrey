@@ -140,20 +140,44 @@ def test_tabu_never_scores_worse_than_hill_climbing_on_the_same_candidates(restr
 
 
 @pytest.mark.parametrize("seed", range(3))
-def test_each_restrict_phase_finds_its_graph_under_an_oracle(seed, oracle_test):
-    """The skeleton phases return the true skeleton; the blanket phases the true moral graph."""
+def test_each_restrict_phase_finds_the_true_skeleton_under_an_oracle(seed, oracle_test):
     from andrey.search.hybrid import candidate_graph
 
     sample = _er_sample(15, seed)
     oracle = oracle_test["oracle"] = DSeparation(sample.graph)
-    for restrict, want in [
-        ("mmpc", oracle.skeleton()),
-        ("pc", oracle.skeleton()),
-        ("iamb", oracle.moral_graph()),
-        ("inter_iamb", oracle.moral_graph()),
-    ]:
+    for restrict in ("mmpc", "iamb", "inter_iamb", "pc"):
         got = candidate_graph(sample.data, restrict, alpha=0.5, indep_test="dsep")
-        np.testing.assert_array_equal(got, want, err_msg=restrict)
+        np.testing.assert_array_equal(got, oracle.skeleton(), err_msg=restrict)
+
+
+def _collider_data() -> np.ndarray:
+    """a -> c <- b, c -> d, as columns 0 to 3."""
+    rng = np.random.default_rng(0)
+    a, b, e, f = rng.standard_normal((4, 1000))
+    c = a + b + 0.5 * e
+    return np.column_stack([a, b, c, c + f])
+
+
+@pytest.mark.parametrize("restrict", ["iamb", "inter_iamb"])
+def test_the_blanket_restricts_keep_the_skeleton_and_drop_the_parents_of_a_common_child(restrict):
+    """The candidates are the skeleton the blanket method returns, which leaves out the pair 0, 1
+    that the moral graph joins."""
+    from andrey.search.hybrid import rsmax2
+
+    x = _collider_data()
+    *_, candidates = rsmax2(x, restrict=restrict)
+    pairs = {frozenset(map(int, pair)) for pair in np.argwhere(np.triu(candidates))}
+    skeleton = getattr(andrey, restrict)(x, structure="skeleton")
+    assert pairs == _adjacent(skeleton) == {frozenset(p) for p in ((0, 2), (1, 2), (2, 3))}
+    moral = getattr(andrey, restrict)(x, structure="moral")
+    assert frozenset((0, 1)) in _adjacent(moral)
+
+
+@pytest.mark.parametrize("restrict", ["iamb", "inter_iamb"])
+def test_a_required_edge_joins_a_pair_the_skeleton_leaves_out(restrict):
+    knowledge = andrey.Knowledge(required=[(0, 1)])
+    out = andrey.rsmax2(_collider_data(), restrict=restrict, knowledge=knowledge)
+    assert frozenset((0, 1)) in _adjacent(out)
 
 
 @pytest.mark.parametrize("seed", range(5))

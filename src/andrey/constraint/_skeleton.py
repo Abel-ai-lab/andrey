@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.core import NULL, backend
-from andrey.core.ci import CITest, DGTest, FisherZ, StudentT, pins_blas
+from andrey.core.ci import CITest, DGTest, FisherZ, NormalScores, StudentT, pins_blas
 from andrey.core.ci_missing import GaussianDeletion
 
 if TYPE_CHECKING:
@@ -136,15 +136,15 @@ def _subsets(
 
 
 def canonical_capable(test: CITest) -> bool:
-    """Whether ``test`` takes canonical query arrays and runs on the worker pool: a FisherZ or
-    StudentT test, exactly.
+    """Whether ``test`` takes canonical query arrays and runs on the worker pool: a FisherZ,
+    StudentT, or NormalScores test, exactly.
 
     A subclass or a wrapper of either keeps the ``batched_call`` and ``first_order_pvalues`` it
     may override, and a worker cannot rebuild it from the correlation matrix, so it scans in the
     caller's process; the test-wise deletion of either takes the canonical query arrays there
     (:func:`_canonical_route`), and any other one call at a time.
     """
-    return type(test) in (FisherZ, StudentT)
+    return type(test) in (FisherZ, StudentT, NormalScores)
 
 
 def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
