@@ -185,7 +185,7 @@ def methods_block():
 # registry's experimental methods join them in the roadmap. Methods for interventional data are
 # planned in the roadmap's own stage for them.
 PLANNED = {
-    "score": ["CAM", "FGES", "NOTEARS-MLP", "GraN-DAG"],
+    "score": ["CAM", "FGES"],
     "temporal": ["DYNOTEARS", "J-PCMCI+"],
     "latent": ["CAM-UV", "FOFC"],
     "pairwise": ["RESIT"],
