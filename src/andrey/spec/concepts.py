@@ -25,7 +25,9 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.fdr import FDR_METHODS
 from andrey.core.score import SCORES
+from andrey.core.structure import Kind
 
 from .models import ParamSpec, ParamType, Spec
 
@@ -33,15 +35,13 @@ Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
 SCORE_NAMES = SCORES
-#: The score names that shipped before 0.11.0, each with its current name, kept for one release.
-SCORE_ALIASES = (
-    ("local_score_BIC", "bic"),
-    ("local_score_BIC_from_cov", "bic"),
-    ("local_score_BDeu", "bdeu"),
-    ("local_score_BIC_categorical", "discrete_bic"),
-    ("local_score_cond_gauss", "cond_gauss"),
-    ("local_score_degen_gauss", "degen_gauss"),
-)
+#: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
+#: each.
+BLANKET_STRUCTURES: dict[str, Kind] = {
+    "cpdag": "cpdag",
+    "skeleton": "undirected",
+    "moral": "undirected",
+}
 #: The largest seed NumPy and torch accept.
 SEED_MAX = 2**32 - 1
 
@@ -140,6 +140,8 @@ _LINGAM = (
     "longitudinal_lingam",
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
+#: The searches that take n_starts.
+_STARTS = ("boss", "grasp", "hc", "tabu")
 #: The methods with no edge to name in knowledge.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl")
 ALL_METHODS = (
@@ -159,7 +161,7 @@ _CONCEPTS = (
     Concept(
         key="alpha",
         summary="The significance level of the test that decides the returned edges, or of the "
-        "only test. A second test step's level is <step>_alpha.",
+        "only test, in the open interval (0, 1). A second test step's level is <step>_alpha.",
         param=_template(
             "alpha",
             "float",
@@ -171,7 +173,7 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, *_RESIDUAL),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt("Continuous optimization: no test decides an edge.", *_CONTINUOUS),
@@ -185,7 +187,6 @@ _CONCEPTS = (
                 "Lasso by BIC: no test at a level.",
                 *_LINGAM,
             ),
-            *_exempt("A Lasso chosen by cross-validation: no test.", "granger"),
         ),
         deviations=(
             Deviation(
@@ -271,16 +272,18 @@ _CONCEPTS = (
     ),
     Concept(
         key="ebic_gamma",
-        summary="The weight of the extended-BIC term.",
+        summary="The weight of the extended-BIC term of the linear-Gaussian BIC, from 0 to 1 "
+        "(Chen and Chen 2008). A call that passes it with another score raises ValueError.",
         param=_template(
             "ebic_gamma",
             "float",
             1.0,
             "Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) "
             "that the linear-Gaussian BIC adds per variable; it grows with the number of "
-            "variables. Larger values give sparser graphs; 0.0 is the standard BIC. Other scores "
-            "ignore it.",
+            "variables, from 0 to 1. Larger values give sparser graphs; 0.0 is the standard BIC. "
+            "Only bic uses it: passing it with another score raises ValueError.",
             minimum=0,
+            maximum=1,
         ),
         fragment="extended-BIC term",
         suitable=SCORE_SEARCHES,
@@ -295,6 +298,26 @@ _CONCEPTS = (
                 "raised them on some dense graphs; its docstring gives the measurements.",
             ),
         ),
+    ),
+    Concept(
+        key="equivalent_sample_size",
+        summary="The equivalent sample size of the BDeu score: the weight, in rows, of its uniform "
+        "Dirichlet prior (Heckerman, Geiger and Chickering 1995; Buntine 1991), in (0, inf). A "
+        "call that passes it with another score raises ValueError.",
+        param=_template(
+            "equivalent_sample_size",
+            "float",
+            1.0,
+            "The equivalent sample size of the BDeu score: how many rows the uniform prior over "
+            "each variable's conditional distributions is worth. A larger value weighs the prior "
+            "more against the data, and the graph can change with it. Only bdeu uses it: passing "
+            "it with another score raises ValueError.",
+            minimum=0,
+            exclusive_minimum=True,
+        ),
+        fragment="equivalent sample size",
+        suitable=SCORE_SEARCHES,
+        others_exempt="Does not score with BDeu.",
     ),
     Concept(
         key="lambda1",
@@ -324,6 +347,33 @@ _CONCEPTS = (
         fragment="weight magnitude",
         suitable=(*_CONTINUOUS, "calm"),
         others_exempt="No weighted continuous fit to threshold.",
+    ),
+    Concept(
+        key="fdr_method",
+        summary="The correction of the lagged links' p-values for the number of links tested "
+        "(tigramite's name): fdr_bh, the default, replaces them with their Benjamini-Hochberg "
+        "adjusted values over all the lagged links together, and none leaves them as tested. A "
+        "method whose graph is thresholded on those p-values (pcmci, granger) thresholds the "
+        "adjusted ones; a method that decides its links before it reports them (pcmciplus) "
+        "reports the adjusted values and keeps its links.",
+        param=_template(
+            "fdr_method",
+            "str",
+            "fdr_bh",
+            "How the p-values of the lagged links are corrected for the number of links tested: "
+            "fdr_bh replaces them with their Benjamini-Hochberg adjusted values over all the "
+            "lagged links together; none keeps them as tested.",
+            choices=FDR_METHODS,
+        ),
+        fragment="benjamini-hochberg",
+        suitable=("pcmci", "pcmciplus", "granger"),
+        exempt=_exempt(
+            "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
+            "The marks come from the removal phases and the orientation rules at alpha, not from "
+            "a threshold on the p-values the method reports.",
+            "lpcmci",
+        ),
+        others_exempt="Reports no p-values of a family of lagged links.",
     ),
     Concept(
         key="max_depth",
@@ -368,6 +418,19 @@ _CONCEPTS = (
                 reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
                 "one when there are fewer rows than variables; the minimum is 1, since the "
                 "smallest ancestor test regresses one variable on another.",
+            ),
+            *(
+                Deviation(
+                    method=m,
+                    name="max_depth",
+                    default=None,
+                    fixed_in=None,
+                    fragment="pc1",
+                    reason="It caps the PC1 step that selects the lagged parents, as tigramite's "
+                    "max_conds_dim does; the later tests condition on those parents, however "
+                    "many, which max_p_global caps in pcmciplus.",
+                )
+                for m in ("pcmci", "pcmciplus")
             ),
         ),
     ),
@@ -484,24 +547,26 @@ _CONCEPTS = (
     ),
     Concept(
         key="seed",
-        summary="The seed of every random draw; None uses ANDREY_SEED, or 0 when it is unset. A "
-        "method that tests independence takes it for the randomized tests: "
+        summary="The seed of every random draw. None is the configured seed, ANDREY_SEED or 0 "
+        "when it is unset, not a fresh random one, so a fit repeats. A method that tests "
+        "independence takes it for the randomized tests: "
         f"{', '.join(STOCHASTIC_INDEP_TESTS)}.",
         param=_template(
             "seed",
             "int",
             None,
-            "Seed for the method's random draws. null uses ANDREY_SEED, or 0 when it is unset.",
+            "null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random "
+            "one, so a fit repeats. Seed for the method's random draws.",
             nullable=True,
             minimum=0,
             maximum=SEED_MAX,
         ),
-        fragment="ANDREY_SEED",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "boss", "grasp", "calm", "ica_lingam"),
+        fragment="not a fresh random one",
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, *_STARTS, "calm", "ica_lingam"),
         exempt=(
             *_exempt(
                 "Deterministic.",
-                *(m for m in _PURE_SCORE if m not in ("boss", "grasp")),
+                *(m for m in _PURE_SCORE if m not in _STARTS),
                 *_CONTINUOUS,
                 "direct_lingam",
                 "multi_group_direct_lingam",
@@ -513,18 +578,131 @@ _CONCEPTS = (
         ),
     ),
     Concept(
-        key="num_workers",
+        key="n_starts",
+        summary="The number of searches a fit runs, each later one from a start drawn from seed: "
+        "a random order (boss, grasp), or the best DAG so far after n_perturbations random edge "
+        "changes (hc, tabu); the best-scoring one is returned, and 1, the default, runs one "
+        "search.",
+        param=_template(
+            "n_starts",
+            "int",
+            1,
+            "Number of searches, the first from the method's usual start and each later one from a "
+            "start drawn from seed and its index: a random order, or the best DAG so far after "
+            "random edge changes; returns the best-scoring one.",
+            minimum=1,
+        ),
+        fragment="best-scoring search",
+        suitable=_STARTS,
+        others_exempt="Runs one search per fit.",
+    ),
+    Concept(
+        key="n_perturbations",
+        summary="The number of random edge additions, removals, or reversals made to the best DAG "
+        "so far before each later start of n_starts; None, the default, is the number of "
+        "variables.",
+        param=_template(
+            "n_perturbations",
+            "int",
+            None,
+            "Number of random edge additions, removals, or reversals made to the best DAG so far "
+            "before each search after the first, at least 1; null uses the number of variables. "
+            "Changes nothing when n_starts is 1.",
+            nullable=True,
+            minimum=1,
+        ),
+        fragment="random edge",
+        suitable=("hc", "tabu"),
+        others_exempt="No later start from a changed DAG.",
+    ),
+    Concept(
+        key="n_jobs",
         summary="Parallelism and the device come from andrey.config or ANDREY_*, never from a "
         "method argument.",
         param=_template(
-            "num_workers",
+            "n_jobs",
             "int",
             None,
-            "Not a method argument: set it with andrey.config(num_workers=...).",
+            "Not a method argument: set it with andrey.config(n_jobs=...).",
             nullable=True,
         ),
         suitable=(),
         others_exempt="Execution settings come from andrey.config or ANDREY_* only.",
+    ),
+    Concept(
+        key="resampling",
+        summary="How andrey.bootstrap draws a resample of the rows: a subsample, sample_fraction "
+        "of the rows without replacement, or a bootstrap resample, as many rows with "
+        "replacement. An argument of the bootstrap function, not of a method.",
+        param=_template(
+            "resampling",
+            "str",
+            "subsample",
+            "How a resample is drawn: subsample (sample_fraction of the rows, without "
+            "replacement) or bootstrap (as many rows, with replacement).",
+            choices=("subsample", "bootstrap"),
+        ),
+        suitable=(),
+        others_exempt="Resampling belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
+        key="sample_fraction",
+        summary="The share of the rows in a subsample, drawn without replacement: each resample "
+        "of andrey.bootstrap (not used by the bootstrap resampling) and each test of "
+        "andrey.markov_check. An argument of those functions, not of a method.",
+        param=_template(
+            "sample_fraction",
+            "float",
+            0.5,
+            "The share of the rows in a subsample, in (0, 1].",
+            minimum=0,
+            maximum=1,
+            exclusive_minimum=True,
+        ),
+        suitable=(),
+        others_exempt="Row subsampling belongs to andrey.bootstrap, which refits any method, and "
+        "andrey.markov_check.",
+    ),
+    Concept(
+        key="threshold",
+        summary="The share of fits in which a pair of andrey.bootstrap's averaged graph must be "
+        "adjacent, on top of its most frequent edge outnumbering no edge. An argument of the "
+        "bootstrap function, not of a method.",
+        param=_template(
+            "threshold",
+            "float",
+            0.5,
+            "A pair of the averaged graph must be adjacent in more than this share of the fits, "
+            "or in all of them, in [0.5, 1].",
+            minimum=0.5,
+            maximum=1,
+        ),
+        suitable=(),
+        others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
+        key="strict",
+        summary="What andrey.bootstrap does when the vote of the fits has no valid graph of the "
+        "method's kind: return the resample graph nearest the others with a warning (False), or "
+        "raise (True). An argument of the bootstrap function, not of a method.",
+        param=_template(
+            "strict",
+            "bool",
+            False,
+            "Raise when the vote of the fits has no valid graph of the method's kind, instead of "
+            "returning the resample graph nearest the others with a warning.",
+        ),
+        suitable=(),
+        others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
+    ),
+    Concept(
+        key="averaged_graph",
+        summary="BootstrapOutput.metadata['averaged_graph'] records which graph is the averaged "
+        "graph: 'vote', the vote of the fits made a valid graph of the method's kind, or "
+        "'nearest_resample', the resample graph nearest the others when the vote has no valid "
+        "graph of that kind.",
+        suitable=(),
+        others_exempt="Averaging belongs to andrey.bootstrap, which refits any method.",
     ),
     Concept(
         key="knowledge",
@@ -563,41 +741,14 @@ _CONCEPTS = (
             None,
             "The categorical columns, for a mixed-data test or score: column names from the data "
             "file's header or 0-based positions, for example, categorical=[smoker,region]; [] "
-            "marks none. With a null test or score they declare the column types the default "
-            "picks from. null takes a DataFrame's category, bool, and text columns; a mixed-data "
-            "setting passed explicitly also infers every column of at most max_categories distinct "
-            "whole numbers, named in a DataTypeWarning; with none, the setting runs as its "
-            "linear-Gaussian form and warns. Other tests and scores take only null or [].",
+            "marks none. null takes a DataFrame's category, bool, and text columns. Values never "
+            "declare a column. With a null test or score they declare the column types the "
+            "default picks from; a mixed-data setting reads the declared columns as categorical, "
+            "and with none it runs as its linear-Gaussian form and warns. A setting for continuous "
+            "data raises ValueError on a declared column, by either route.",
             nullable=True,
         ),
         fragment="categorical columns",
-        suitable=(
-            *CI_SEARCHES,
-            "ges",
-            "hc",
-            "exact_search",
-            "boss",
-            "grasp",
-            "tabu",
-            "gies",
-            "xges",
-            *PCMCI_FAMILY,
-        ),
-        others_exempt="A continuous model.",
-    ),
-    Concept(
-        key="max_categories",
-        summary="The most distinct whole numbers a column may hold to be inferred as categorical.",
-        param=_template(
-            "max_categories",
-            "int",
-            10,
-            "The most distinct whole numbers a column may hold to be inferred as categorical, at "
-            "least 2. With a continuous test or score, such columns get a one-time "
-            "DataTypeWarning that they may be category codes.",
-            minimum=2,
-        ),
-        fragment="inferred as categorical",
         suitable=(
             *CI_SEARCHES,
             "ges",
@@ -686,13 +837,15 @@ _CONCEPTS = (
     ),
     Concept(
         key="measure",
-        summary="The independence measure of a DirectLiNGAM order search.",
+        summary="The pairwise likelihood-ratio measure of a DirectLiNGAM order search.",
         param=_template(
             "measure",
             "str",
             "pwling",
-            "How the order search picks the most exogenous variable.",
-            choices=("pwling",),
+            "How the order search picks the most exogenous variable: pwling = the maximum-entropy "
+            "approximation of the pairwise likelihood ratios; tanh and skew = their first-order "
+            "approximations by a nonlinear correlation (Hyvarinen and Smith 2013).",
+            choices=("pwling", "skew", "tanh"),
         ),
         fragment="most exogenous",
         suitable=(
@@ -702,6 +855,40 @@ _CONCEPTS = (
             "longitudinal_lingam",
         ),
         others_exempt="No DirectLiNGAM order search.",
+    ),
+    Concept(
+        key="structure",
+        summary="The graph a Markov-blanket search returns without a target. The default follows "
+        "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
+        "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
+        "bnlearn's mmpc does (undirected=TRUE). cpdag is the CPDAG of the Grow-Shrink structure "
+        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
+        "Markov blankets.",
+        param=_template(
+            "structure",
+            "str",
+            "cpdag",
+            "The graph returned without a target: cpdag = the skeleton with its colliders "
+            "oriented and Meek's rules applied (Margaritis 2003); skeleton = the adjacencies, each "
+            "variable joined to its parents and children; moral = the moral graph, each variable "
+            "joined to its Markov blanket. With a target, the target's set, whatever the value.",
+            choices=tuple(BLANKET_STRUCTURES),
+        ),
+        fragment="cpdag",
+        suitable=("iamb", "inter_iamb", "mmpc"),
+        others_exempt="Learns the whole graph of one kind.",
+        deviations=(
+            Deviation(
+                method="mmpc",
+                name="structure",
+                default="skeleton",
+                choices=("skeleton", "cpdag"),
+                fixed_in=None,
+                reason="bnlearn's mmpc returns the skeleton (undirected=TRUE), which is the graph "
+                "MMPC's sets give; cpdag stays available. MMPC learns parents and children, which "
+                "hold no child's other parents, so it has no moral graph to return.",
+            ),
+        ),
     ),
     Concept(
         key="collider_rule",
@@ -727,11 +914,30 @@ _CONCEPTS = (
                 "lpcmci",
             ),
             *_exempt(
+                "The Grow-Shrink structure learner (Margaritis 2003) decides each triple by its "
+                "own test, of the endpoints given the middle node and every subset of the smaller "
+                "Markov blanket, not by a separating set.",
+                "iamb",
+                "inter_iamb",
+                "mmpc",
+            ),
+            *_exempt(
                 "No separating-set orientation.",
                 *(
                     m
                     for m in ALL_METHODS
-                    if m not in ("pc", "fci", "gfci", "cdnod", "pcmciplus", "lpcmci")
+                    if m
+                    not in (
+                        "pc",
+                        "fci",
+                        "gfci",
+                        "cdnod",
+                        "pcmciplus",
+                        "lpcmci",
+                        "iamb",
+                        "inter_iamb",
+                        "mmpc",
+                    )
                 ),
             ),
         ),
@@ -740,10 +946,13 @@ _CONCEPTS = (
                 method="pcmciplus",
                 name="collider_rule",
                 default="majority",
-                choices=("majority", "conservative", "none"),
-                fixed_in="0.11.0",
+                choices=COLLIDER_RULES,
+                fixed_in=None,
                 aliases=("none",),
-                reason="none is sepsets under another name; the default majority is tigramite's.",
+                reason="majority is tigramite's default (contemp_collider_rule) and orients the "
+                "same-step links without regard to the order of the variables, where sepsets reads "
+                "the one separating set the skeleton phase stored, which can change with it "
+                "(Runge 2020).",
             ),
         ),
     ),
@@ -751,7 +960,9 @@ _CONCEPTS = (
         key="graph_kind",
         summary="The graph kind names what an edge means: a search identified up to its "
         "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
-        "direction is undirected. A fit returns the kind its spec declares.",
+        "direction is undirected. A fit returns the kind its spec declares; a method with "
+        "structure returns the kind of its default, and cpdag for structure=cpdag and undirected "
+        "for skeleton and moral.",
         suitable=ALL_METHODS,
     ),
     Concept(
@@ -766,7 +977,10 @@ _CONCEPTS = (
         "conflicts for the links colliders ask to orient both ways, score for a score search's "
         "score. An order that is not a total order of the variables has its own name "
         "(partial_order, cluster_order), and no key repeats an argument, but for the ones a "
-        "default leaves open: seed, indep_test, and score_func hold the value the fit used.",
+        "default or the configuration leaves open: seed, indep_test, score_func, the score's "
+        "penalty_discount, ebic_gamma, and equivalent_sample_size, and n_perturbations hold the "
+        "value the fit used, and tie_break the rule of andrey.config that a fit it can change ran "
+        "under.",
         suitable=ALL_METHODS,
     ),
     Concept(
@@ -774,7 +988,9 @@ _CONCEPTS = (
         summary="A method with an indep_test or a score_func records the one it used in "
         "metadata['indep_test'] or metadata['score_func'], as its current short name: the name "
         "the call passed, or, for None, the one picked from the declared column types. A "
-        "registered test records its registered name.",
+        "registered test records its registered name. A score search records the penalties its "
+        "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
+        "equivalent_sample_size for bdeu.",
         suitable=tuple(
             m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
         ),
@@ -804,3 +1020,23 @@ def concept_param(key: str, **update: Any) -> ParamSpec:
     if param is None:
         raise KeyError(f"{key} is a behavior, not a parameter")
     return param.model_copy(update=update)
+
+
+#: The resampling and averaging arguments of ``andrey.bootstrap``, the "bootstrap spec" it checks.
+BOOTSTRAP_PARAMS: dict[str, ParamSpec] = {
+    "resampling": concept_param("resampling"),
+    "sample_fraction": concept_param("sample_fraction"),
+    "threshold": concept_param("threshold"),
+    "strict": concept_param("strict"),
+}
+
+
+#: The arguments of ``andrey.markov_check`` that are package-wide concepts, which it checks.
+MARKOV_CHECK_PARAMS: dict[str, ParamSpec] = {
+    "alpha": concept_param(
+        "alpha", doc="The level of the Anderson-Darling test of the p-values' uniformity."
+    ),
+    "indep_test": concept_param("indep_test"),
+    "seed": concept_param("seed"),
+    "sample_fraction": concept_param("sample_fraction"),
+}

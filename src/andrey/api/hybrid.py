@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
-    MAX_CATEGORIES,
     categorical_metadata,
     checked_data,
     column_labels,
@@ -43,11 +42,11 @@ def _fit(
     score_func: str | None,
     penalty_discount: float,
     ebic_gamma: float,
+    equivalent_sample_size: float,
     max_iter: int | None,
     tabu_length: int,
     max_tabu: int | None,
     categorical: Sequence[str | int] | None,
-    max_categories: int,
     seed: int | None,
     max_depth: int | None,
     max_parents: int | None,
@@ -67,9 +66,7 @@ def _fit(
             "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
             f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
-    X, mask = checked_data(
-        data, categorical, "indep_test", indep_test, max_categories=max_categories, method=name
-    )
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method=name)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
@@ -85,6 +82,7 @@ def _fit(
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             max_iter=max_iter,
             tabu_length=tabu_length,
             max_tabu=max_tabu,
@@ -110,9 +108,9 @@ def mmhc(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     max_parents: int | None = None,
@@ -134,11 +132,11 @@ def mmhc(
         Significance level of the conditional-independence test. Smaller values give sparser
         skeletons, so the score search considers fewer pairs.
     indep_test : str or None, default=None
-        Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``
-        or ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test. It must read the
-        same kind of data as ``score_func``. ``None`` picks from the declared column types, as for
-        :func:`~andrey.pc`.
+        Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+        It must read the same kind of data as ``score_func``. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     score_func : str or None, default=None
@@ -155,19 +153,21 @@ def mmhc(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
         Maximum hill-climbing moves, at least ``1``; ``None`` sets no limit.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test and score, as for
-        :func:`~andrey.pc`. The other settings take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        :func:`~andrey.pc`. A continuous setting raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test in the MMPC phase,
         at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller
@@ -215,8 +215,8 @@ def mmhc(
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data setting infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data setting finds no declared categorical column or
+        a setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -293,11 +293,11 @@ def mmhc(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         max_iter=max_iter,
         tabu_length=10,
         max_tabu=None,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         max_parents=max_parents,
@@ -316,11 +316,11 @@ def rsmax2(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     seed: int | None = None,
     max_depth: int | None = None,
     max_parents: int | None = None,
@@ -341,8 +341,9 @@ def rsmax2(
         The restrict phase. ``"mmpc"`` keeps a pair when each variable is in the other's MMPC
         parents and children [2]_, as :func:`~andrey.mmhc` does. ``"iamb"`` and ``"inter_iamb"``
         keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB
-        [3]_, the moral graph, which also joins the parents of a common child. ``"pc"`` keeps the
-        skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
+        [3]_ and no subset of the smaller blanket separates the two, the skeleton of
+        ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child.
+        ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -365,6 +366,11 @@ def rsmax2(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     max_iter : int or None, default=None
         Maximum moves of the maximize phase, at least ``1``; ``None`` sets no limit.
     tabu_length : int, default=10
@@ -375,15 +381,12 @@ def rsmax2(
         to ``tabu_length``; ``None`` uses ``tabu_length``. Hill climbing ignores it.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test and score, as for
-        :func:`~andrey.pc`. The other settings take no column types and reject it.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``, as for :func:`~andrey.pc`.
+        :func:`~andrey.pc`. A continuous setting raises ``ValueError`` on a declared column.
     seed : int or None, default=None
-        Seed for the random draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and
-        ``"gpdc"`` make; the other tests ignore it. ``None`` uses the ``ANDREY_SEED`` environment
-        variable, or ``0`` when it is unset. With those tests, ``metadata["seed"]`` records the
-        seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
+        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
+        tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test in the restrict
         phase, at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A
@@ -435,8 +438,8 @@ def rsmax2(
         With ``restrict="pc"``, when a conditioning pass needs at least ten million tests, as for
         :func:`~andrey.pc`.
     DataTypeWarning
-        As for :func:`~andrey.pc`, when a mixed-data setting infers the categorical columns or a
-        continuous setting meets columns that look like category codes; once per process.
+        As for :func:`~andrey.pc`, when a mixed-data setting finds no declared categorical column or
+        a setting reads columns that look like category codes as numbers; once per process.
 
     See Also
     --------
@@ -446,13 +449,14 @@ def rsmax2(
     -----
     **How it works.** The restrict phase follows the sparse candidate idea of [1]_: tests narrow
     the pairs a score search must consider. Each choice finds every true adjacency when its tests
-    are exact. The MMPC skeleton and PC's skeleton then hold only the true adjacencies; the moral
-    graph also joins two parents of a common child, which the maximize phase can leave
-    non-adjacent. The maximize phase starts from the empty graph, or from the required edges, with
-    every pair outside the candidates forbidden in both directions, and returns the CPDAG of the
-    DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and :func:`~andrey.inter_iamb`
-    describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s adjacency search without
-    orienting.
+    are exact. The skeletons of MMPC, IAMB, Inter-IAMB, and PC then hold only the true
+    adjacencies. A Markov blanket also holds the other parents of a common child, so IAMB and
+    Inter-IAMB test each pair of their moral graph against subsets of the smaller blanket and drop
+    the pairs that separate. The maximize phase starts from the empty graph, or from the required
+    edges, with every pair outside the candidates forbidden in both directions, and returns the
+    CPDAG of the DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and
+    :func:`~andrey.inter_iamb` describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s
+    adjacency search without orienting.
 
     Ties go to the column whose rank, computed from its own data, comes first, as for
     :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are
@@ -522,11 +526,11 @@ def rsmax2(
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
         max_iter=max_iter,
         tabu_length=tabu_length,
         max_tabu=max_tabu,
         categorical=categorical,
-        max_categories=max_categories,
         seed=seed,
         max_depth=max_depth,
         max_parents=max_parents,

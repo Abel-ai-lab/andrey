@@ -587,9 +587,10 @@ names map to Andrey's:
 
 | Andrey | causal-learn |
 |---|---|
-| `lambda1`, `alpha`, `tau`, `rho_init`, `rho_mult`, `subproblem_iter`, `standardize` | the same names |
+| `lambda1`, `tau`, `rho_init`, `rho_mult`, `subproblem_iter`, `standardize` | the same names |
+| `screen_alpha` | `alpha` |
 | `h_tol` | `htol` |
-| `lr=0.001`, `max_outer=100`, `rho_max=1e16`, `gate_threshold=0.5`, `w_threshold=0` | fixed inside `calm` |
+| `lr=0.001`, `max_iter=100`, `rho_max=1e16`, `gate_threshold=0.5`, `w_threshold=0` | fixed inside `calm` |
 | `seed=0` | `torch.manual_seed(0)` before the fit |
 
 causal-learn's `calm` stops after 100 rounds whether or not its graph is acyclic; a cyclic graph
@@ -805,7 +806,7 @@ Where a package's default differs, the adapter overrides it:
 |---|---|---|---|
 | PC test | `chisq`, `gsq` | `x2-adf`, `mi-adf` | |
 | PC level, conditioning-set size | `alpha=0.05`, no limit | `alpha=0.05`, no limit (`max.sx`) | |
-| BDeu equivalent sample size | 1 (`sample_prior`) | `iss=1` | `equivalent_sample_size=1` (default 10) |
+| BDeu equivalent sample size | `equivalent_sample_size=1` | `iss=1` | `equivalent_sample_size=1` (default 10) |
 | BDeu structure prior | each other variable a parent with probability `1 / (d - 1)` | `prior="vsp"`, `beta = 1 / (d - 1)` | the same, added through `structure_prior_ratio` (pgmpy has none) |
 | BIC penalty | `penalty_discount=1`: `log(n)` per parameter, in deviance units | `k = log(n) / 2`, in log-likelihood units | `log(n) / 2`, fixed |
 | parent cap | none | `maxp=Inf` | `max_indegree=None` |
@@ -886,8 +887,8 @@ keys stay as they were. The Dirichlet concentration of the categorical tables is
 `datasets.MIXED_SETTINGS`. Codes and values are never rescaled.
 
 Every solution reads a column as categorical when it holds at most ten distinct whole numbers.
-Andrey infers its categorical columns with `max_categories=10`; Tetrad's reader marks a column of at
-most ten distinct values categorical, and the bnlearn adapters turn such columns into factors. On
+The Andrey adapters name those columns in `categorical`; Tetrad's reader marks a column of at most
+ten distinct values categorical, and the bnlearn adapters turn such columns into factors. On
 `mixed_er` the rule reads exactly the generated categorical columns, which
 `tests/test_adapters_mixed.py` checks, and every Tetrad fit stops unless Tetrad read exactly the
 rule's columns. Each
@@ -895,7 +896,7 @@ package's names for the settings map to Andrey's:
 
 | Andrey | Tetrad (causal-cmd) | bnlearn |
 |---|---|---|
-| `max_categories=10` | `--data-type mixed --numCategories 10` | integer columns of at most 10 values made `factor` |
+| `categorical=[...]`, the columns of at most 10 whole numbers | `--data-type mixed --numCategories 10` | integer columns of at most 10 values made `factor` |
 | `indep_test="degen_gauss"` | `--test dg-lr-test` | - |
 | `indep_test="cond_gauss"` | `--test cg-lr-test` | `pc.stable(test = "mi-cg")` |
 | `score_func="degen_gauss"` | `--score dg-bic-score` | - |
@@ -1052,13 +1053,14 @@ Every solution tests lags 1 to `tau_max`, at `pc_alpha=0.2` and `alpha_level=0.0
 | `tigramite.pcmci.parcorr.tau<k>` | `ParCorr(significance="analytic")`, Student-t p-value |
 | `baseline.empty.temporal.tau<k>` | none: no link at any lag |
 
-tigramite runs `run_pcmci` with `tau_min=1` and `fdr_method="none"` and its other defaults; its own
-`tau_min=0` would also test lag 0, which is PCMCI+'s scope. `tau_max` is in every name because
-`params` are not part of a `run_id`, and the record carries it as `tau_max`. Andrey's PCMCI runs
-its tests with one BLAS thread whatever the core budget, while tigramite's fits get the budget's
-BLAS threads; set the core budget to 1 to compare one core with one core. Andrey's Student-t test
-and tigramite's analytic `ParCorr` share their test, so their graphs should match; the driver ends
-by listing, per dataset, the solutions that returned identical graphs (`structure_hash`).
+tigramite runs `run_pcmci` with `tau_min=1` and `fdr_method="fdr_bh"`, Andrey's default, and its
+other defaults; its own `tau_min=0` would also test lag 0, which is PCMCI+'s scope. `tau_max` is in
+every name because `params` are not part of a `run_id`, and the record carries it as `tau_max`.
+Andrey's PCMCI runs its tests with one BLAS thread whatever the core budget, while tigramite's fits
+get the budget's BLAS threads; set the core budget to 1 to compare one core with one core. Andrey's
+Student-t test and tigramite's analytic `ParCorr` share their test, so their p-values match. Both
+run the same `fdr_method="fdr_bh"`, so the comparison is like for like. The driver ends by listing,
+per dataset, the solutions that returned identical graphs (`structure_hash`).
 
 A temporal estimate is scored lag by lag with `andrey.metrics.temporal_scores`; its CPDAG and PAG
 columns (`shd`, `skeleton_*`, `arrowhead_*`) stay empty. Each lag is a directed graph, so a link in
@@ -1478,7 +1480,7 @@ Resume cannot detect solution edits because part filenames exclude `params` and 
 the body of `fit`. Freeze the code during a run.
 
 The run declares `cores` and `device`, so timeout records include them. The child reports `threads`,
-`num_workers`, and `device_id`; these fields are empty when the fit does not return.
+`n_jobs`, and `device_id`; these fields are empty when the fit does not return.
 
 Each failure produces a record. A stopped fit includes `status=timeout` or `oom` and its cap.
 `error_text` describes other failures.

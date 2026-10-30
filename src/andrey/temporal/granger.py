@@ -1,192 +1,113 @@
-"""Linear Granger causality by a cross-validated multivariate lasso VAR fit.
+"""Linear Granger causality by a t-test (the F-test of one coefficient) on a vector autoregression.
 
 Stacks a time series into a lag-regression design (each column at time ``t`` regressed on all
-columns at times ``t-1 .. t-maxlag``) and fits one cross-validated lasso per target variable. The
-resulting coefficient matrix is the Granger lag graph: ``coeff[i, j + d*k]`` is the influence of
-variable ``j`` at lag ``k+1`` on variable ``i`` at time ``t``, and its nonzero support is the
-directed lag adjacency (a zero coefficient means no Granger cause at that lag).
-
-Each target's fit is scikit-learn's ``LassoCV(cv=cv)`` with its defaults, computed step for step.
-Every target shares the design, so the folds' centered designs and Gram matrices are computed once
-for all of them. The targets run on the configured worker threads (the coordinate descent releases
-the GIL), each with one BLAS thread.
+columns at times ``t-1 .. t-maxlag``) and fits one ordinary least-squares regression per target
+variable. The test of each lagged coefficient is the F-test of the target's regression with and
+without that regressor, which is the square of the coefficient's t-ratio: ``p[i, j + d*k]`` is the
+p-value of variable ``j`` at lag ``k+1`` given every other lagged variable, the coefficient p-values
+of a vector autoregression. A link is significant when ``p <= alpha``; with ``fdr_method="fdr_bh"``
+the p-values of all the links are first replaced by their Benjamini-Hochberg adjusted values
+(:mod:`andrey.core.fdr`).
 
 References
 ----------
 Granger (1969). Investigating Causal Relations by Econometric Models and Cross-spectral
 Methods. Econometrica 37(3):424-438. https://doi.org/10.2307/1912791
+
+Lutkepohl (2005). New Introduction to Multiple Time Series Analysis. Springer.
 """
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-from functools import cache
-
 import numpy as np
-from sklearn.linear_model import Lasso, lasso_path
-from sklearn.model_selection import KFold
-from threadpoolctl import ThreadpoolController
+from scipy import stats
+from scipy.linalg import solve_triangular
 
-from andrey.core import backend
-from andrey.core.units import least_squares
-
-#: ``LassoCV`` defaults: penalties per grid, and the smallest penalty as a fraction of the largest.
-_N_ALPHAS = 100
-_EPS = 1e-3
+from andrey.core.fdr import check_fdr_method, corrected_pvalues
 
 
-@cache
-def _blas() -> ThreadpoolController:
-    """The loaded BLAS libraries, found once: the search reads every loaded library's path."""
-    return ThreadpoolController()
+def _ols(design: np.ndarray, targets: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Least-squares coefficients and two-sided p-values of ``targets`` on ``design``.
 
-
-@dataclass(frozen=True)
-class _Fold:
-    """One cross-validation split of the design, shared by every target."""
-
-    train: np.ndarray
-    test: np.ndarray
-    centered: np.ndarray  # the training rows minus their column means
-    offset: np.ndarray  # those column means
-    gram: np.ndarray  # centered.T @ centered
-    held_out: np.ndarray  # the test rows, uncentered
-
-
-def _fold(design: np.ndarray, train: np.ndarray, test: np.ndarray) -> _Fold:
-    """Center the training rows and form their Gram matrix as ``LassoCV`` does for each fold."""
-    centered = design[train]
-    offset = np.average(centered, axis=0)
-    centered -= offset
-    gram = np.empty((design.shape[1], design.shape[1]), order="C")
-    np.dot(centered.T, centered, out=gram)
-    for array in (centered, offset, gram):
-        array.setflags(write=False)  # shared across worker threads
-    return _Fold(train, test, centered, offset, gram, design[test])
-
-
-def _alpha_grid(design: np.ndarray, column_mean: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """One target's ``LassoCV`` penalty grid, geometric down from the least all-zero penalty."""
-    centered_y = y - np.average(y, axis=0)
-    xy = design.T @ centered_y - column_mean * np.sum(centered_y, axis=0)
-    alpha_max = np.sqrt(np.max(xy**2)) / design.shape[0]
-    resolution = np.finfo(np.float64).resolution
-    if alpha_max <= resolution:  # y is constant: no penalty leaves a coefficient nonzero
-        return np.full(_N_ALPHAS, resolution)
-    return np.geomspace(alpha_max, alpha_max * _EPS, num=_N_ALPHAS)
-
-
-def _fold_mse(fold: _Fold, y: np.ndarray, alphas: np.ndarray) -> np.ndarray:
-    """Held-out mean squared error of the fold's lasso path at each penalty."""
-    y_train = y[fold.train]
-    y_offset = np.average(y_train, axis=0)
-    y_train -= y_offset
-    xy = np.empty(fold.gram.shape[0])
-    np.dot(fold.centered.T, y_train, out=xy)
-    _, coefs, _ = lasso_path(
-        fold.centered,
-        y_train,
-        alphas=alphas,
-        precompute=fold.gram,
-        Xy=xy,
-        copy_X=False,
-        check_input=False,
-    )
-    coefs = coefs[np.newaxis, :, :]
-    intercepts = np.atleast_1d(y_offset)[:, np.newaxis] - np.dot(fold.offset, coefs)
-    residues = np.dot(fold.held_out, coefs) - y[fold.test][:, np.newaxis, np.newaxis]
-    residues += intercepts
-    return (residues**2).mean(axis=0).mean(axis=0)
-
-
-def _fit_target(
-    design: np.ndarray, column_mean: np.ndarray, folds: list[_Fold], y: np.ndarray
-) -> np.ndarray:
-    """``LassoCV`` for one target: the penalty of least mean held-out error, refit on all rows."""
-    alphas = _alpha_grid(design, column_mean, y)
-    paths = np.reshape([_fold_mse(fold, y, alphas) for fold in folds], (1, len(folds), -1))
-    best = np.argmin(np.mean(paths, axis=1)[0])  # LassoCV's (1, folds, alphas) reduction
-    return Lasso(alpha=alphas[best], precompute=False).fit(design, y).coef_
-
-
-def _fit_known(
-    design: np.ndarray, y: np.ndarray, cv: int, drop: np.ndarray, force: np.ndarray
-) -> np.ndarray:
-    """One target's coefficients when knowledge removes the ``drop`` columns and requires ``force``.
-
-    The ``force`` columns are partialed out of ``y`` and of every free column by least squares
-    (:func:`~andrey.core.units.least_squares`, with an intercept), so the lasso never penalizes
-    them; the cross-validated lasso runs on the free columns' residuals with their own Gram
-    matrices, and one least-squares fit of what the free columns leave of ``y`` on the ``force``
-    columns gives their coefficients. A ``drop`` column has coefficient 0.
+    ``design`` carries the intercept in column 0 and has shape ``(m, p)``; ``targets`` has shape
+    ``(m, k)``. Returns two ``(p - 1, k)`` arrays without the intercept row: the coefficients and
+    their p-values from the Student ``t`` distribution with ``m - p`` degrees of freedom. Raises
+    ``ValueError`` when the design is singular.
     """
-    free = ~drop & ~force
-    coefs = np.zeros(design.shape[1], dtype=np.float64)
-    if not free.any() and not force.any():
-        return coefs
-    x = design[:, free]
-    if force.any():
-        forced = design[:, force]
-        coef, intercept = least_squares(forced, np.column_stack([y, x]))
-        residuals = np.column_stack([y, x]) - (forced @ coef.T + intercept)
-        y_free, x = residuals[:, 0], residuals[:, 1:]
-    else:
-        y_free = y
-    if free.any():
-        folds = [_fold(x, train, test) for train, test in KFold(cv).split(x)]
-        coefs[free] = _fit_target(x, np.average(x, axis=0), folds, np.ascontiguousarray(y_free))
-    if force.any():
-        left = y - design[:, free] @ coefs[free]
-        coefs[force] = least_squares(design[:, force], left)[0]
-    return coefs
+    m, p = design.shape
+    q, r = np.linalg.qr(design)
+    singular_values = np.linalg.svd(r, compute_uv=False)
+    if singular_values[-1] <= singular_values[0] * p * np.finfo(np.float64).eps:
+        raise ValueError(
+            "granger: the lagged regression is singular (some lagged variables are linear "
+            "combinations of others); drop or merge the redundant columns"
+        )
+    coef = solve_triangular(r, q.T @ targets)
+    r_inverse = solve_triangular(r, np.eye(p))
+    df = m - p
+    variance = np.sum((targets - design @ coef) ** 2, axis=0) / df
+    scale = np.sqrt(np.sum(r_inverse**2, axis=1)[:, np.newaxis] * variance[np.newaxis, :])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t_ratio = coef / scale
+    p_values = 2 * stats.t.sf(np.abs(t_ratio), df)
+    # A perfect fit leaves no noise: a nonzero coefficient is then certain (p = 0, from t = inf),
+    # and a zero one says nothing (0 / 0).
+    p_values = np.where(np.isnan(p_values), 1.0, p_values)
+    return coef[1:], p_values[1:]
 
 
-def granger_lasso(
+def granger_f_test(
     data: np.ndarray,
     *,
-    maxlag: int = 2,
-    cv: int = 5,
+    maxlag: int,
+    alpha: float = 0.05,
+    fdr_method: str = "none",
     forbidden: np.ndarray | None = None,
     required: np.ndarray | None = None,
-) -> np.ndarray:
-    """Fit the lasso VAR and return the Granger lag-coefficient matrix.
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fit the vector autoregression and return the Granger lag coefficients and p-values.
 
-    ``data`` is a ``(n_samples, d)`` time series (row = time step). Returns ``coeff`` of shape
-    ``(d, d * maxlag)`` where ``coeff[i, j + d*k]`` is the influence of variable ``j`` at lag
-    ``k + 1`` on variable ``i``; ``coeff != 0`` is the directed lag adjacency. Each target row is an
-    independent ``cv``-fold cross-validated lasso regression on the stacked lagged design, equal to
-    ``LassoCV(cv=cv)``. The rows are fitted on up to ``backend.worker_count()`` threads.
+    ``data`` is a ``(n_samples, d)`` time series (row = time step). Returns ``(coeff, p_values)``,
+    both of shape ``(d, d * maxlag)``, where entry ``[i, j + d*k]`` belongs to variable ``j`` at lag
+    ``k + 1`` and target ``i``. ``p_values`` holds the p-value of the test that the coefficient is
+    zero in the target's regression on every other lagged variable; ``coeff`` holds the
+    least-squares coefficient where ``p_values <= alpha`` and ``0`` elsewhere, so ``coeff != 0`` is
+    the directed lag adjacency. Each target row is an independent regression, so the rows are fitted
+    together for the targets that share a design.
+
+    ``fdr_method`` corrects the p-values of all the links together before ``alpha`` decides which
+    are significant (:func:`~andrey.core.fdr.corrected_pvalues`): ``"none"`` leaves them as tested,
+    and ``"fdr_bh"`` returns their Benjamini-Hochberg adjusted values, and keeps the links whose
+    adjusted value is at most ``alpha``.
 
     With background knowledge, ``forbidden[k, j, i]`` leaves the lag-``k + 1`` regressor ``j`` out
-    of target ``i``'s regression, and ``required[k, j, i]`` keeps it unpenalized
-    (:func:`_fit_known`); both are boolean arrays of shape ``(maxlag, d, d)``. A target that
-    knowledge leaves alone is fitted as without knowledge.
+    of target ``i``'s regression (coefficient ``0``, p-value ``1``), and ``required[k, j, i]`` keeps
+    it in the graph whatever its test says (p-value ``0``); both are boolean arrays of shape
+    ``(maxlag, d, d)``. The other regressors are tested given the ones that stay in the regression.
+    A forbidden link is no test: the correction does not count it, and it keeps p-value ``1``; a
+    required link is counted with p-value ``0``.
     """
+    check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     n_samples, d = data.shape
     targets = data[maxlag:]
-    design = np.hstack([data[maxlag - k : n_samples - k] for k in range(1, maxlag + 1)])
-    design.setflags(write=False)
-    column_mean = np.average(design, axis=0)
-    folds = [_fold(design, train, test) for train, test in KFold(cv).split(design)]
-    # Column (k - 1) * d + j of the design is variable j at lag k, so [:, :, i] flattens to it.
+    # Column (k - 1) * d + j + 1 of the design is variable j at lag k; column 0 is the intercept.
+    design = np.hstack(
+        [np.ones((n_samples - maxlag, 1))]
+        + [data[maxlag - k : n_samples - k] for k in range(1, maxlag + 1)]
+    )
     drop = np.zeros((d, d * maxlag), dtype=bool) if forbidden is None else _by_target(forbidden)
     force = np.zeros((d, d * maxlag), dtype=bool) if required is None else _by_target(required)
-
-    def fit(i: int) -> np.ndarray:
-        y = np.ascontiguousarray(targets[:, i])
-        if drop[i].any() or force[i].any():
-            return _fit_known(design, y, cv, drop[i], force[i])
-        return _fit_target(design, column_mean, folds, y)
-
-    workers = min(backend.worker_count(), d)
-    if workers <= 1:
-        rows = [fit(i) for i in range(d)]
-    else:  # one BLAS thread per worker thread, so they do not oversubscribe the cores
-        with _blas().limit(limits=1), ThreadPoolExecutor(max_workers=workers) as pool:
-            rows = list(pool.map(fit, range(d)))
-    return np.asarray(rows, dtype=np.float64).reshape(d, d * maxlag)
+    coeff = np.zeros((d, d * maxlag), dtype=np.float64)
+    p_values = np.ones((d, d * maxlag), dtype=np.float64)
+    for pattern in np.unique(drop, axis=0):  # targets with the same dropped regressors share a fit
+        rows = np.flatnonzero((drop == pattern).all(axis=1))
+        kept = np.flatnonzero(~pattern)
+        fit, p = _ols(design[:, [0, *(1 + kept)]], targets[:, rows])
+        coeff[np.ix_(rows, kept)] = fit.T
+        p_values[np.ix_(rows, kept)] = p.T
+    p_values = corrected_pvalues(np.where(force, 0.0, p_values), fdr_method, drop)
+    return np.where((p_values <= alpha) | force, coeff, 0.0), p_values
 
 
 def _by_target(links: np.ndarray) -> np.ndarray:

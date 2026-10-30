@@ -156,6 +156,30 @@ Pass what you already know to a search: tiers in time, and required or forbidden
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Bootstrap: how stable is each edge?
+:link: bootstrap
+:link-type: doc
+:img-top: /_generated/thumbs/bootstrap.svg
+:img-alt: The averaged graph of PC over 50 subsamples of data on the ALARM network
+
+Refit a method on resamples of the rows: edge frequencies, the averaged graph, and which edges to
+trust.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
+:::{grid-item-card} Markov check: do the data contradict a graph?
+:link: markov_check
+:link-type: doc
+:img-top: /_generated/thumbs/markov_check.svg
+:img-alt: The sparsest GES graph on ALARM data that the Markov check does not reject
+
+Test the independences a graph implies against held-out rows: a true graph passes, a damaged one is
+rejected, and the sparsest passing graph is not always the most accurate.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -184,5 +208,7 @@ bottom_up_parce_lingam
 pairwise
 time_series
 knowledge
+bootstrap
+markov_check
 viz
 ```

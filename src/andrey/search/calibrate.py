@@ -267,7 +267,7 @@ def fit_timers(
 
     def run(d: int, n_workers: int, cutoff: str | None) -> float:
         x = sample(d)
-        with _cutoff(var, cutoff), andrey.config(num_workers=n_workers):
+        with _cutoff(var, cutoff), andrey.config(n_jobs=n_workers):
             seconds = _time(lambda: fit(x), _REPEATS)
         if n_workers > 1:
             works[d] = _parallel_ges.largest_pass_work

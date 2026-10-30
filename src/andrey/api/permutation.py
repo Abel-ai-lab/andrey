@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
-    MAX_CATEGORIES,
     categorical_metadata,
     checked_data,
     column_labels,
@@ -40,10 +39,11 @@ def boss(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
     seed: int | None = None,
+    n_starts: int = 1,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with BOSS (Best Order Score Search).
@@ -77,10 +77,21 @@ def boss(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     seed : int or None, default=None
-        Seed for the random order in which the search visits variables. ``None`` uses the
-        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
-        the same graph. Different seeds can reach different graphs.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random order in which the search
+        visits variables. Different seeds can reach different graphs.
+    n_starts : int, default=1
+        Number of searches, at least ``1``. The first starts from the order described in Notes;
+        each later one starts from a random order drawn from ``seed`` and its own index. The result
+        is the best-scoring search; a later one replaces an earlier one only when it scores better
+        by more than ``1e-6``. Each search builds its own caches and drops the previous one's, so
+        more starts take more time but little more memory. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the grow step of each variable's parent
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
@@ -89,15 +100,11 @@ def boss(
         graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
-        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical score reads every column as
+        categorical, and a continuous score raises ``ValueError`` on a declared column, named here
+        or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -137,9 +144,9 @@ def boss(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes. Each message warns once per process.
+        When a mixed-data score finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers. Each message warns once per process.
 
     See Also
     --------
@@ -163,6 +170,13 @@ def boss(
     **Choosing seed.** The search visits variables in a random order and stops when no move improves
     the order. Different seeds can therefore reach different graphs; comparing a few shows whether
     a result depends on the seed.
+
+    **Choosing n_starts.** The search can stop at an order that scores worse than the true graph,
+    most often on dense graphs. Its authors run one search [1]_; Tetrad's ``numStarts`` [6]_ runs
+    later searches from random orders and keeps the best score, as ``n_starts`` does. On simulated
+    linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the defaults, 8
+    starts lowered the mean errors (SHD) over 20 datasets from 7.9 to 2.1 and took a median of 7.7
+    times as long as one start.
 
     **How it works.** BOSS searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree to cache its best parent set for any set of
@@ -250,6 +264,9 @@ def boss(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [5] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [6] Ramsey, J. D., Zhang, K., Glymour, M., Sanchez Romero, R., Huang, B., Ebert-Uphoff, I.,
+       Samarasinghe, S., Barnes, E. A., and Glymour, C. (2018). TETRAD - A toolbox for causal
+       discovery. 8th International Workshop on Climate Informatics.
 
     Examples
     --------
@@ -270,9 +287,7 @@ def boss(
         score_func,
         categorical=categorical,
     )
-    X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories, method="boss"
-    )
+    X, mask = checked_data(data, categorical, "score_func", score_func, method="boss")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="boss")
     with copies_named(labels):
@@ -280,7 +295,9 @@ def boss(
             X,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
             random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            n_starts=n_starts,
             score_func=score_func,
             categorical=mask,
             constraints=constraints,
@@ -297,19 +314,20 @@ def grasp(
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
-    depth: int = 3,
+    equivalent_sample_size: float = 1.0,
+    grasp_depth: int = 3,
     seed: int | None = None,
+    n_starts: int = 1,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with GRaSP (Greedy Relaxation of the Sparsest Permutation).
 
     GRaSP searches variable orders (permutations) using linear-Gaussian BIC (Bayesian information
     criterion). It converts the best-scoring order to a CPDAG, which represents an equivalence class
-    of graphs. It searches the same space as :func:`~andrey.boss` using chains of up to ``depth``
-    tucks [1]_, the moves described in Notes.
+    of graphs. It searches the same space as :func:`~andrey.boss` using chains of up to
+    ``grasp_depth`` tucks [1]_, the moves described in Notes.
 
     Parameters
     ----------
@@ -336,15 +354,26 @@ def grasp(
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
-    depth : int, default=3
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
+    grasp_depth : int, default=3
         Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
         follows a chain of tucks that leave the score unchanged until one improves it or the chain
-        reaches ``depth`` tucks. ``1`` tries single tucks only; larger depths search more chains,
-        which can reach a better score, and run longer.
+        reaches ``grasp_depth`` tucks. ``1`` tries single tucks only; larger depths search more
+        chains, which can reach a better score, and run longer.
     seed : int or None, default=None
-        Seed for the random starting order and the order in which the search visits variables.
-        ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
-        repeated calls return the same graph. Different seeds can reach different graphs.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random starting order and the order
+        in which the search visits variables. Different seeds can reach different graphs.
+    n_starts : int, default=1
+        Number of searches, at least ``1``, each from its own random starting order: the first
+        from ``seed``'s, each later one from an order drawn from ``seed`` and its own index. The
+        result is the best-scoring search; a later one replaces an earlier one only when it scores
+        better by more than ``1e-6``. Each search builds its own caches and drops the previous
+        one's, so more starts take more time but little more memory. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the grow step of each variable's parent
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
@@ -353,15 +382,11 @@ def grasp(
         graph. ``None`` sets no cap.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns; a
-        mixed-data setting passed explicitly also infers every column of at most ``max_categories``
-        distinct whole numbers, named in a ``DataTypeWarning``. ``[]`` marks none. The other scores
-        take no column types and accept only ``None`` or ``[]``. See *Data types* in the
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical score reads every column as
+        categorical, and a continuous score raises ``ValueError`` on a declared column, named here
+        or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    max_categories : int, default=10
-        The most distinct whole numbers a column may hold to be inferred as categorical, at least
-        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -401,9 +426,9 @@ def grasp(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes. Each message warns once per process.
+        When a mixed-data score finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers. Each message warns once per process.
 
     See Also
     --------
@@ -432,6 +457,13 @@ def grasp(
     different seeds can reach different graphs; comparing a few shows whether a result depends on
     the seed.
 
+    **Choosing n_starts.** The search can stop at a DAG that scores worse than the true one, most
+    often on dense graphs. Its authors run one search [1]_; Tetrad's ``numStarts`` [6]_ runs later
+    searches from random orders and keeps the best score, as ``n_starts`` does. On simulated
+    linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the defaults, 8
+    starts lowered the mean errors (SHD) over 20 datasets from 18.2 to 4.6 and took a median of 8.3
+    times as long as one start.
+
     **How it works.** GRaSP searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree [2]_ to cache its best parent set for any set of
     variables allowed to precede it. The search starts from a shuffled order and changes it with
@@ -439,10 +471,10 @@ def grasp(
     sit between ``x`` and ``y``. A depth-first search tries a tuck on every edge of the current DAG,
     in random order. A tuck that leaves the score unchanged starts a chain, which goes on with tucks
     on covered edges, those where ``y``'s parents are ``x`` and ``x``'s parents, to DAGs the chain
-    has not visited, up to ``depth`` tucks. The search keeps the first tuck or chain that improves
-    the total score and repeats until none does. This is the paper's GRaSP2 at the depths of its
-    simulations [1]_; the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP does
-    not. The final parent sets form a DAG, which is reduced to its CPDAG.
+    has not visited, up to ``grasp_depth`` tucks. The search keeps the first tuck or chain that
+    improves the total score and repeats until none does. This is the paper's GRaSP2 at the depths
+    of its simulations [1]_; the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP
+    does not. The final parent sets form a DAG, which is reduced to its CPDAG.
 
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged. Under
@@ -498,7 +530,7 @@ def grasp(
     fits ran past 1 h. Every ladder ended when three fits of the next size ran past 1 h. The median
     fit took 3,108 s at 800 variables (mean degree 8, 2,000 rows). At ``penalty_discount=1.0`` on
     denser graphs (mean degree 4) of 50 to 200 variables, it stopped at a DAG that scores worse than
-    the true DAG in 26 of 60 fits, one that no chain of up to ``depth`` tucks improves. On the
+    the true DAG in 26 of 60 fits, one that no chain of up to ``grasp_depth`` tucks improves. On the
     223-variable ANDES network with 1,000 simulated rows, at ``penalty_discount=1.0``, its median
     errors passed the empty graph's (471 against 338). With fewer rows than columns the standard BIC
     is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so
@@ -524,6 +556,9 @@ def grasp(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [5] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
+    .. [6] Ramsey, J. D., Zhang, K., Glymour, M., Sanchez Romero, R., Huang, B., Ebert-Uphoff, I.,
+       Samarasinghe, S., Barnes, E. A., and Glymour, C. (2018). TETRAD - A toolbox for causal
+       discovery. 8th International Workshop on Climate Informatics.
 
     Examples
     --------
@@ -544,9 +579,7 @@ def grasp(
         score_func,
         categorical=categorical,
     )
-    X, mask = checked_data(
-        data, categorical, "score_func", score_func, max_categories=max_categories, method="grasp"
-    )
+    X, mask = checked_data(data, categorical, "score_func", score_func, method="grasp")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="grasp")
     with copies_named(labels):
@@ -554,8 +587,10 @@ def grasp(
             X,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
-            depth=depth,
+            equivalent_sample_size=equivalent_sample_size,
+            depth=grasp_depth,
             random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            n_starts=n_starts,
             score_func=score_func,
             categorical=mask,
             constraints=constraints,

@@ -936,7 +936,7 @@ class GraphStructure(Structure):
         names = range(self._n_nodes) if index or self._labels is None else self._labels
         return [(names[s], names[t], edge_type) for s, t, edge_type in self._oriented()]
 
-    def neighbors(self, i: int) -> np.ndarray:
+    def neighbors(self, i: str | int) -> np.ndarray:
         """Return the nodes that share an edge with node ``i``, whatever the marks.
 
         For a ``dag`` or ``cpdag`` each call scans every edge; to visit every node, use
@@ -944,8 +944,8 @@ class GraphStructure(Structure):
 
         Parameters
         ----------
-        i : int
-            Node index.
+        i : str or int
+            The node, by label or by 0-based position.
 
         Returns
         -------
@@ -953,6 +953,9 @@ class GraphStructure(Structure):
             The adjacent node indices, ascending and read-only; includes ``i`` if it has a
             self-loop.
         """
+        from ._convert import _positions
+
+        i = _positions(self, [i], "i")[0]
         if self._layout == "sym":
             return self._indices[self._indptr[i] : self._indptr[i + 1]]
         # compact: out-edges (row i) plus in-edges (i appearing as a column in another row).
@@ -963,15 +966,15 @@ class GraphStructure(Structure):
         result.setflags(write=False)
         return result
 
-    def endpoints(self, i: int, j: int) -> tuple[int, int]:
+    def endpoints(self, i: str | int, j: str | int) -> tuple[int, int]:
         """Return the endpoint marks on edge ``i-j``. ``O(log deg)``.
 
         Parameters
         ----------
-        i : int
-            First node index.
-        j : int
-            Second node index.
+        i : str or int
+            The first node, by label or by 0-based position.
+        j : str or int
+            The second node, by label or by 0-based position.
 
         Returns
         -------
@@ -979,7 +982,345 @@ class GraphStructure(Structure):
             ``(mark at i, mark at j)``: ``1`` tail, ``2`` arrowhead, ``3`` circle; ``(0, 0)`` when
             there is no edge.
         """
+        from ._convert import _positions
+
+        i, j = _positions(self, [i], "i")[0], _positions(self, [j], "j")[0]
         return int(self._mark_at(i, j)), int(self._mark_at(j, i))
+
+    # ---- graph queries --------------------------------------------------------------------
+
+    def parents(self, x: str | int, *, index: bool = False) -> list[str | int]:
+        """Return the parents of ``x``: the nodes with an edge ``a -> x``.
+
+        Only directed edges count. In a ``cpdag`` an undirected edge ``--`` points either way in
+        the DAGs of the class, and in a ``pag`` a circle is unresolved, so neither makes a parent;
+        ``neighbors`` lists every adjacent node. In a ``digraph`` a 2-cycle makes each end a parent
+        of the other, and a self-loop makes ``x`` its own parent.
+
+        Parameters
+        ----------
+        x : str or int
+            The node, by label or by 0-based position.
+        index : bool, default=False
+            Name the returned nodes by position even when the graph has labels.
+
+        Returns
+        -------
+        list[str | int]
+            The parents in node order, named by label when the graph has labels.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` is not a node of the graph.
+        TypeError
+            If ``x`` is neither a label nor an integer position.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [2, 0, 2], [0, 1, 0]])  # a -> b <- c
+        >>> GraphStructure.from_numpy(M, labels=("a", "b", "c")).parents("b")
+        ['a', 'c']
+        """
+        from . import _queries
+
+        k = _queries.node(self, x, "x")
+        return _queries.named(self, _queries.parents(self, k), index)
+
+    def children(self, x: str | int, *, index: bool = False) -> list[str | int]:
+        """Return the children of ``x``: the nodes with an edge ``x -> b``.
+
+        Only directed edges count, as for ``parents``.
+
+        Parameters
+        ----------
+        x : str or int
+            The node, by label or by 0-based position.
+        index : bool, default=False
+            Name the returned nodes by position even when the graph has labels.
+
+        Returns
+        -------
+        list[str | int]
+            The children in node order, named by label when the graph has labels.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` is not a node of the graph.
+        TypeError
+            If ``x`` is neither a label nor an integer position.
+        """
+        from . import _queries
+
+        k = _queries.node(self, x, "x")
+        return _queries.named(self, _queries.children(self, k), index)
+
+    def ancestors(self, x: str | int, *, index: bool = False) -> list[str | int]:
+        """Return the ancestors of ``x``: the nodes with a directed path ``a -> ... -> x``.
+
+        ``x`` itself is left out, as in Lauritzen's ``an(x)`` (1996) and networkx's
+        ``ancestors``. Only directed edges count, as for ``parents``. In a ``cpdag`` or ``pag`` a
+        node with a directed path to ``x`` is an ancestor of ``x`` in every member of the class,
+        but a node can be an ancestor in every member without such a path, through undirected or
+        circle edges that the members orient in different ways.
+
+        Parameters
+        ----------
+        x : str or int
+            The node, by label or by 0-based position.
+        index : bool, default=False
+            Name the returned nodes by position even when the graph has labels.
+
+        Returns
+        -------
+        list[str | int]
+            The ancestors in node order, named by label when the graph has labels.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` is not a node of the graph.
+        TypeError
+            If ``x`` is neither a label nor an integer position.
+
+        References
+        ----------
+        Lauritzen, S. L. (1996). Graphical Models. Oxford University Press.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [2, 0, 1], [0, 2, 0]])  # a -> b -> c
+        >>> GraphStructure.from_numpy(M, labels=("a", "b", "c")).ancestors("c")
+        ['a', 'b']
+        """
+        from . import _queries
+
+        k = _queries.node(self, x, "x")
+        return _queries.named(self, _queries.ancestors(self, k), index)
+
+    def descendants(self, x: str | int, *, index: bool = False) -> list[str | int]:
+        """Return the descendants of ``x``: the nodes with a directed path ``x -> ... -> b``.
+
+        ``x`` itself is left out, and only directed edges count, as for ``ancestors``.
+
+        Parameters
+        ----------
+        x : str or int
+            The node, by label or by 0-based position.
+        index : bool, default=False
+            Name the returned nodes by position even when the graph has labels.
+
+        Returns
+        -------
+        list[str | int]
+            The descendants in node order, named by label when the graph has labels.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` is not a node of the graph.
+        TypeError
+            If ``x`` is neither a label nor an integer position.
+        """
+        from . import _queries
+
+        k = _queries.node(self, x, "x")
+        return _queries.named(self, _queries.descendants(self, k), index)
+
+    def markov_blanket(self, x: str | int, *, index: bool = False) -> list[str | int]:
+        """Return the Markov blanket of ``x``: the fewest nodes that separate it from the rest.
+
+        Given its Markov blanket, the Markov boundary, ``x`` is separated (``d_separated`` or
+        ``m_separated``, by kind) from every other node, and given any smaller set it is not. In a
+        ``dag`` the blanket is the parents, the children, and the children's other parents (Pearl
+        1988). In a ``mag`` it is every node joined to ``x`` by a path whose inner nodes are all
+        colliders: the parents, the children, the spouses, and the nodes joined to ``x`` or its
+        children by bidirected paths, with their parents (Pellet and Elisseeff 2008). A ``cpdag``
+        or ``pag`` has the blanket every member of its class has, since the members share their
+        separations; it is computed on one member. In an ``undirected`` graph it is the neighbors,
+        as in a Markov network, so for ``iamb``'s graph it is the blanket the method found.
+
+        Parameters
+        ----------
+        x : str or int
+            The node, by label or by 0-based position.
+        index : bool, default=False
+            Name the returned nodes by position even when the graph has labels.
+
+        Returns
+        -------
+        list[str | int]
+            The blanket in node order, named by label when the graph has labels.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` is not a node of the graph; for a ``digraph``; for a ``dag`` with a directed
+            cycle; for a ``cpdag`` that no DAG fits (see ``to_dag``); for a ``mag`` that is not
+            ancestral; or for a ``pag`` from which Zhang's construction builds no ancestral graph.
+        TypeError
+            If ``x`` is neither a label nor an integer position.
+
+        References
+        ----------
+        Pearl, J. (1988). Probabilistic Reasoning in Intelligent Systems. Morgan Kaufmann.
+
+        Pellet, J.-P., and Elisseeff, A. (2008). Finding latent causes in causal networks: an
+        efficient approach based on Markov blankets. Advances in Neural Information Processing
+        Systems 21.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [2, 0, 2], [0, 1, 0]])  # a -> b <- c
+        >>> GraphStructure.from_numpy(M, labels=("a", "b", "c")).markov_blanket("a")
+        ['b', 'c']
+        """
+        from . import _queries
+
+        k = _queries.node(self, x, "x")
+        graph = _queries.member(self, "markov_blanket")
+        return _queries.named(self, _queries.collider_connected(graph, k), index)
+
+    def d_separated(
+        self,
+        x: str | int | Collection[str | int],
+        y: str | int | Collection[str | int],
+        given: Collection[str | int] = (),
+    ) -> bool:
+        """Return whether ``given`` d-separates ``x`` from ``y`` in a ``dag`` or ``cpdag``.
+
+        A path between ``x`` and ``y`` is open given ``given`` when each of its colliders, a node
+        that both of its edges on the path point into, is in ``given`` or an ancestor of a node in
+        it, and each of its other inner nodes is not in ``given``; ``x`` and ``y`` are
+        d-separated when no path is open (Pearl 1988). A ``cpdag`` answers as every DAG of its
+        class does, since they share their d-separations (Verma and Pearl 1990); the answer is
+        computed on one of them (``to_dag``).
+
+        A ``mag``, a ``pag``, and an ``undirected`` graph have ``m_separated`` instead, which
+        equals this on a ``dag``.
+
+        Parameters
+        ----------
+        x : str, int, or a collection of them
+            A node, or a set of nodes, by label or by 0-based position.
+        y : str, int, or a collection of them
+            Another node or set of nodes, disjoint from ``x``.
+        given : collection of str or int, default=()
+            The conditioning set, disjoint from ``x`` and ``y``.
+
+        Returns
+        -------
+        bool
+            ``True`` when every path between a node of ``x`` and a node of ``y`` is blocked.
+
+        Raises
+        ------
+        ValueError
+            For a kind other than ``dag`` and ``cpdag``, naming ``m_separated`` for ``mag``,
+            ``pag``, and ``undirected``; for a ``digraph``, whose directed cycles need a separation
+            criterion that depends on the model; if a node is not in the graph or is named twice;
+            if ``x``, ``y``, and ``given`` overlap; for a ``dag`` with a directed cycle; or for a
+            ``cpdag`` that no DAG fits (see ``to_dag``).
+        TypeError
+            If a node is neither a label nor an integer position.
+
+        References
+        ----------
+        Pearl, J. (1988). Probabilistic Reasoning in Intelligent Systems. Morgan Kaufmann.
+
+        Verma, T., and Pearl, J. (1990). Equivalence and synthesis of causal models. Proceedings of
+        the Sixth Conference on Uncertainty in Artificial Intelligence, 255-270.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [2, 0, 2], [0, 1, 0]])  # a -> b <- c
+        >>> g = GraphStructure.from_numpy(M, labels=("a", "b", "c"))
+        >>> g.d_separated("a", "c"), g.d_separated("a", "c", given=["b"])
+        (True, False)
+        """
+        from . import _queries
+
+        return _queries.separation(self, "d_separated", x, y, given)
+
+    def m_separated(
+        self,
+        x: str | int | Collection[str | int],
+        y: str | int | Collection[str | int],
+        given: Collection[str | int] = (),
+    ) -> bool:
+        """Return whether ``given`` m-separates ``x`` from ``y`` in a ``mag``, ``pag``, ``dag``, or
+        ``undirected`` graph.
+
+        A path between ``x`` and ``y`` is open given ``given`` when each of its colliders, a node
+        that both of its edges on the path have an arrowhead at, is in ``given`` or an ancestor of
+        a node in it, and each of its other inner nodes is not in ``given``; ``x`` and ``y`` are
+        m-separated when no path is open (Richardson and Spirtes 2002). A ``pag`` answers as every
+        MAG of its class does, since Markov-equivalent MAGs share their m-separations; the answer
+        is computed on one of them, Zhang's MAG of the class (2008). On a ``dag`` this equals
+        ``d_separated``, and on an ``undirected`` graph, which has no colliders, it is plain
+        separation (Lauritzen 1996): every path between ``x`` and ``y`` passes through ``given``.
+        An undirected skeleton that makes no claim about direction, such as ``mmpc``'s, implies no
+        independence this way.
+
+        A ``cpdag`` has ``d_separated`` instead.
+
+        Parameters
+        ----------
+        x : str, int, or a collection of them
+            A node, or a set of nodes, by label or by 0-based position.
+        y : str, int, or a collection of them
+            Another node or set of nodes, disjoint from ``x``.
+        given : collection of str or int, default=()
+            The conditioning set, disjoint from ``x`` and ``y``.
+
+        Returns
+        -------
+        bool
+            ``True`` when every path between a node of ``x`` and a node of ``y`` is blocked.
+
+        Raises
+        ------
+        ValueError
+            For a ``cpdag``, naming ``d_separated``; for a ``digraph``, whose directed cycles need
+            a separation criterion that depends on the model; if a node is not in the graph or is
+            named twice; if ``x``, ``y``, and ``given`` overlap; for a ``dag`` with a directed
+            cycle; for a ``mag`` that is not ancestral; or for a ``pag`` from which Zhang's
+            construction builds no ancestral graph.
+        TypeError
+            If a node is neither a label nor an integer position.
+
+        References
+        ----------
+        Richardson, T., and Spirtes, P. (2002). Ancestral graph Markov models. The Annals of
+        Statistics 30(4), 962-1030.
+
+        Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+        presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+        1873-1896.
+
+        Lauritzen, S. L. (1996). Graphical Models. Oxford University Press.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1, 0], [2, 0, 2], [0, 1, 0]])  # a -> b <- c
+        >>> g = GraphStructure.from_numpy(M, labels=("a", "b", "c"))
+        >>> g.m_separated("a", "c"), g.m_separated("a", "c", given=["b"])
+        (True, False)
+        """
+        from . import _queries
+
+        return _queries.separation(self, "m_separated", x, y, given)
 
     # ---- validation -----------------------------------------------------------------------
 

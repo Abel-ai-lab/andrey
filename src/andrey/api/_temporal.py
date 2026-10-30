@@ -127,16 +127,22 @@ def _adapt_longitudinal_lingam(model: Any, required: np.ndarray | None = None) -
 
 
 def _adapt_granger(
-    coeff: np.ndarray, n_vars: int, maxlag: int, required: np.ndarray | None = None
+    coeff: np.ndarray,
+    n_vars: int,
+    maxlag: int,
+    required: np.ndarray | None = None,
+    p_values: np.ndarray | None = None,
 ) -> StructureOutput:
-    """Granger-lasso coefficients -> ``StructureOutput`` over a :class:`TemporalStructure`.
+    """Granger coefficients -> ``StructureOutput`` over a :class:`TemporalStructure`.
 
     ``coeff`` has shape ``(d, d * maxlag)``; the lag-``k`` block (``k`` in ``1..maxlag``) is
     ``coeff[:, d * (k - 1) : d * k]`` with ``block[i, j]`` the influence ``j -> i`` at lag ``k``.
     Granger has no lag-0 (contemporaneous) block and no causal order, so every lag view is tagged
     ``kind="digraph"`` and the envelope carries no ``ordering``. The re-stacked coefficients are
     stored as ``lag_weights`` (shape ``(maxlag, d, d)``), so ``n_lags == maxlag``. ``required``
-    holds the required links of lags ``1`` to ``maxlag`` (:func:`_lag_graphs`).
+    holds the required links of lags ``1`` to ``maxlag`` (:func:`_lag_graphs`). ``p_values``, when
+    given, has the shape of ``coeff`` and rides in ``metadata`` in the ``[lag - 1, cause, effect]``
+    layout PCMCI's p-values take.
     """
     coeff = np.asarray(coeff, dtype=np.float64)
     d = int(n_vars)
@@ -150,7 +156,10 @@ def _adapt_granger(
     temporal = TemporalStructure.from_lag_graphs(
         graphs, lags=list(range(1, maxlag + 1)), lag_weights=ar.transpose(0, 2, 1)
     )
-    return structure_output(temporal)
+    if p_values is None:
+        return structure_output(temporal)
+    by_lag = np.asarray(p_values, dtype=np.float64).reshape(d, maxlag, d).transpose(1, 2, 0)
+    return structure_output(temporal, metadata={"p_values": by_lag})
 
 
 def _adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None) -> StructureOutput:

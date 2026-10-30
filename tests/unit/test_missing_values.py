@@ -17,7 +17,7 @@ import pytest
 
 import andrey
 from andrey.cli import main
-from andrey.core import ci
+from andrey.core import ci, warning_policy
 from andrey.core.ci import (
     FisherZ,
     StudentT,
@@ -85,6 +85,7 @@ def _mixed(n: int = 400, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
 TESTS = {
     "fisherz": (_continuous, None),
     "student_t": (_continuous, None),
+    "normal_scores": (_continuous, None),
     "kci": (lambda: _continuous(120), None),
     "rcot": (_continuous, None),
     "cmiknn": (lambda: _continuous(120), None),
@@ -351,10 +352,16 @@ def test_pandas_na_is_a_missing_value():
         andrey.ges(frame)
 
 
-def test_categories_are_inferred_from_the_observed_values():
+def test_the_category_code_warning_reads_the_observed_values():
+    """Column a holds three codes and gaps: the warning names it, and declaring it reads it as
+    categorical with its gaps."""
     x, _ = _mixed()
-    x = _gaps(x, 0.1)
-    out = andrey.pc(pd.DataFrame(x, columns=list("abcde")), indep_test="cond_gauss")
+    frame = pd.DataFrame(_gaps(x, 0.1), columns=list("abcde"))
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DataTypeWarning, match="columns 'a' hold at most 10"):
+        out = andrey.pc(frame, indep_test="cond_gauss")
+    assert out.metadata["categorical"] == []
+    out = andrey.pc(frame, indep_test="cond_gauss", categorical=["a"])
     assert out.metadata["categorical"] == ["a"]
 
 
@@ -412,7 +419,7 @@ def test_more_workers_give_the_same_result_on_missing_values(name, monkeypatch):
     monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "1")
     x = _gaps(_continuous(400), 0.1)
     serial = _fit(name, x)
-    with andrey.config(num_workers=2):
+    with andrey.config(n_jobs=2):
         assert _fit(name, x) == serial
 
 
@@ -518,8 +525,8 @@ def test_a_pair_test_with_too_few_rows_raises(name):
 @pytest.mark.parametrize("name", ["pc", "fci"])
 def test_bootstrap_resamples_rows_with_missing_values(name):
     x = _gaps(_continuous(300), 0.1)
-    boot = andrey.bootstrap(name, x, n_boot=4, seed=0)
-    assert boot.n_boot == 4
+    boot = andrey.bootstrap(name, x, n_resamples=4, seed=0)
+    assert boot.n_resamples == 4
 
 
 # --- the command line -----------------------------------------------------------------------------

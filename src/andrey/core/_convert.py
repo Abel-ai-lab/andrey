@@ -17,6 +17,8 @@ from .structure import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, is_ancestral
 if TYPE_CHECKING:
     import networkx
 
+    from .knowledge import Constraints
+
 _LISTED = 10  # undirected edges an error message lists before "and N more"
 
 
@@ -51,12 +53,21 @@ def dag_extension(
         rank = np.arange(n)
     else:
         rank = np.argsort(np.array(structure.labels, dtype=object), kind="stable")
-    extension = pdag2dag(marks[np.ix_(rank, rank)])
-    back = np.empty(n, dtype=np.intp)
-    back[rank] = np.arange(n)
     return GraphStructure.from_numpy(
-        extension[np.ix_(back, back)], kind="dag", labels=structure.labels
+        extend_in_order(marks, rank), kind="dag", labels=structure.labels
     )
+
+
+def extend_in_order(marks: np.ndarray, order: np.ndarray) -> np.ndarray:
+    """Return the consistent extension (Dor and Tarsi) of a PDAG's marks that ``order`` picks.
+
+    ``order`` lists the nodes in the order the extension removes them when more than one is
+    removable, so it decides the tied edges. Raises ``ValueError`` when no extension exists.
+    """
+    extension = pdag2dag(marks[np.ix_(order, order)])
+    back = np.empty(len(order), dtype=np.intp)
+    back[order] = np.arange(len(order))
+    return extension[np.ix_(back, back)]
 
 
 def mag_of(
@@ -76,19 +87,50 @@ def pag_of(
     structure: GraphStructure,
     latent: Collection[str | int] | None,
     selection: Collection[str | int],
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
-    """Return the PAG of a ``dag`` or a MAG over the nodes ``latent`` and ``selection`` leave."""
+    """Return the PAG of a ``dag`` or a MAG over the nodes ``latent`` and ``selection`` leave.
+
+    ``constraints``, over those nodes, set their endpoints before the orientation rules run, as
+    ``fci`` sets them; ``None`` sets none.
+    """
     if structure.kind == "dag":
         digraph = _causal_dag(structure)
         observed, selected = _split(structure, latent, selection)
-        return _named(_project(digraph, observed, selected, "pag"), structure, observed)
+        return _named(
+            _project(digraph, observed, selected, "pag", constraints), structure, observed
+        )
     if not is_ancestral_kind(structure.kind):
         raise ValueError(f"to_pag takes a dag or a mag, not kind {structure.kind!r}")
     digraph, added_selection = _canonical_dag(structure)
     observed, selected = _split(structure, latent, selection)
     return _named(
-        _project(digraph, observed, [*selected, *added_selection], "pag"), structure, observed
+        _project(digraph, observed, [*selected, *added_selection], "pag", constraints),
+        structure,
+        observed,
     )
+
+
+def mag_of_pag(pag: np.ndarray) -> np.ndarray:
+    """Return the MAG that Zhang's construction (2008, Theorem 2) builds from a PAG's mark matrix.
+
+    A circle opposite an arrowhead becomes a tail (``o->`` to ``->``), and the ``o-o`` edges are
+    oriented into a DAG with no unshielded collider, a consistent extension (Dor and Tarsi) of
+    them as an undirected graph. For a PAG, the result is a MAG of its equivalence class. A circle
+    opposite a tail, which a PAG without selection variables does not have, becomes an arrowhead,
+    as pcalg's ``pag2magAM`` does. Raises ``ValueError`` when the ``o-o`` edges have no such
+    orientation, which happens when they hold a chordless cycle of four or more nodes, so the input
+    is not a PAG.
+    """
+    mag = pag.copy()
+    circle = pag == CIRCLE
+    both = circle & circle.T
+    mag[circle & (pag.T == ARROW)] = TAIL
+    mag[circle & (pag.T == TAIL)] = ARROW
+    if both.any():
+        dag = pdag2dag(np.where(both, TAIL, 0).astype(np.int8))
+        mag[both] = dag[both]
+    return mag
 
 
 def _causal_dag(structure: GraphStructure) -> networkx.DiGraph:
@@ -169,18 +211,24 @@ def _observed_ancestors_of(
 
 
 def _project(
-    digraph: networkx.DiGraph, observed: list[int], selection: list[int], target: str
+    digraph: networkx.DiGraph,
+    observed: list[int],
+    selection: list[int],
+    target: str,
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Return the MAG or the PAG over ``observed``, node ``k`` being ``observed[k]``.
 
-    Every d-separation query also conditions on ``selection``.
+    Every d-separation query also conditions on ``selection``. A PAG gets the endpoints
+    ``constraints`` set before its orientation rules.
     """
     from andrey.data.latent import _mag_projection, _observed_ancestors, _pag_projection
 
     anc = _observed_ancestors(digraph, observed)
     up = _observed_ancestors_of(digraph, observed, selection)
-    build = _mag_projection if target == "mag" else _pag_projection
-    return build(digraph, observed, anc, selection, up)
+    if target == "mag":
+        return _mag_projection(digraph, observed, anc, selection, up)
+    return _pag_projection(digraph, observed, anc, selection, up, constraints)
 
 
 def _named(

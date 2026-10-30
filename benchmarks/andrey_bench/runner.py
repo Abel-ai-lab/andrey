@@ -54,7 +54,7 @@ def available_cores() -> int:
 
 
 def split_cores(cores: int, mode: str) -> tuple[int, int]:
-    """Return ``(threads, num_workers)`` with ``threads * num_workers == cores``.
+    """Return ``(threads, n_jobs)`` with ``threads * n_jobs == cores``.
 
     Parallel mode uses ``(1, cores)`` to avoid nested BLAS oversubscription; all other modes use
     ``(cores, 1)``.
@@ -110,22 +110,22 @@ def _child_env(
     threads: int,
     adapter: SolutionAdapter,
     *,
-    num_workers: int = 1,
+    n_jobs: int = 1,
     extra_env: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Build the child environment with thread limits and import paths for the worker and adapter.
 
-    Remove inherited ``ANDREY_NUM_WORKERS`` and ``ANDREY_GES_PARALLEL_MIN_WORK``, then set
-    ``ANDREY_NUM_WORKERS`` to ``num_workers``. Apply ``extra_env`` last.
+    Remove inherited ``ANDREY_N_JOBS`` and ``ANDREY_GES_PARALLEL_MIN_WORK``, then set
+    ``ANDREY_N_JOBS`` to ``n_jobs``. Apply ``extra_env`` last.
     """
     env = dict(os.environ)
     env.update(thread_env(threads))  # BLAS/numeric pools pinned before the child imports numpy.
 
     # Remove inherited Andrey worker settings, including the GES threshold.
     # Set the worker count allocated to this task.
-    env.pop("ANDREY_NUM_WORKERS", None)
+    env.pop("ANDREY_N_JOBS", None)
     env.pop("ANDREY_GES_PARALLEL_MIN_WORK", None)
-    env["ANDREY_NUM_WORKERS"] = str(num_workers)
+    env["ANDREY_N_JOBS"] = str(n_jobs)
 
     paths = [str(BENCH_ROOT)]
     # The adapter's defining module must be importable in the child so pickle can rebuild it — for a
@@ -167,7 +167,7 @@ def resolved_env_fields(env: Mapping[str, str]) -> dict[str, Any]:
     """Read ``run_id`` environment fields from the child's environment."""
     return {
         "env_threads": _int_or_none(env.get("OMP_NUM_THREADS")),
-        "env_num_workers": _int_or_none(env.get("ANDREY_NUM_WORKERS")),
+        "env_n_jobs": _int_or_none(env.get("ANDREY_N_JOBS")),
         "env_device": (env.get("ANDREY_DEVICE") or "cpu").strip().lower(),
         "env_ges_min_work": _int_or_none(env.get("ANDREY_GES_PARALLEL_MIN_WORK")),
     }
@@ -177,16 +177,14 @@ def planned_env_fields(
     adapter: SolutionAdapter,
     *,
     threads: int,
-    num_workers: int,
+    n_jobs: int,
     extra_env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Resolve the child's environment fields before launch, including ``extra_env`` overrides.
 
     Use these fields to name resume parts consistently with :func:`run_task`.
     """
-    return resolved_env_fields(
-        _child_env(threads, adapter, num_workers=num_workers, extra_env=extra_env)
-    )
+    return resolved_env_fields(_child_env(threads, adapter, n_jobs=n_jobs, extra_env=extra_env))
 
 
 def check_interpreters(adapters: Sequence[SolutionAdapter]) -> dict[str, Path]:
@@ -427,7 +425,7 @@ def run_task(
     repeats: int = 5,
     warmup: int = 1,
     threads: int = 1,
-    num_workers: int = 1,
+    n_jobs: int = 1,
     dtype: str = "float64",
     extra_env: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
@@ -456,9 +454,9 @@ def run_task(
         ``peak_rss_mb`` because the step may run on another node.
     repeats, warmup, threads
         Timed repeats, untimed warmups per repeat, and BLAS/numeric threads per child.
-    num_workers
-        Pool size, exported as ``ANDREY_NUM_WORKERS`` after removing its inherited value.
-        :func:`split_cores` sets ``threads * num_workers`` to the core budget.
+    n_jobs
+        Pool size, exported as ``ANDREY_N_JOBS`` after removing its inherited value.
+        :func:`split_cores` sets ``threads * n_jobs`` to the core budget.
     extra_env
         Optional child-environment overrides, applied last.
 
@@ -468,10 +466,10 @@ def run_task(
         One dict per repeat, including ``status``, caps, ``mem_route``, ``tree_peak_mem_mb``,
         ``warmup``, ``dtype``, and :func:`resolved_env_fields`, even if the child dies. Successful
         repeats include ``wall_s``, ``cpu_s``, ``warmup_s``, ``peak_rss_mb``, ``adj``,
-        ``output_hash``, and child-reported ``threads``, ``num_workers``, and ``device_id``.
+        ``output_hash``, and child-reported ``threads``, ``n_jobs``, and ``device_id``.
     """
     python = _bench_python(adapter)
-    env = _child_env(threads, adapter, num_workers=num_workers, extra_env=extra_env)
+    env = _child_env(threads, adapter, n_jobs=n_jobs, extra_env=extra_env)
 
     results: list[dict[str, Any]] = []
     with contextlib.ExitStack() as stack:

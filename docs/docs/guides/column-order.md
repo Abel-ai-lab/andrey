@@ -49,6 +49,12 @@ neither the argument order nor the column order, and `tie_break="position"` rank
 position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
 `indep_test` names one.
 
+`bootstrap` is not a method either. Its resamples draw the same rows whatever the column order, so
+its edge frequencies relabel like the method's. The averaged graph of a DAG method relabels too:
+when the fits split evenly between the two directions of an edge, the columns' ranks point it, or
+their positions under `tie_break="position"`. A CPDAG or a PAG needs no rank, as every order of the
+tie gives the same graph.
+
 Identical columns are the exception for every method: they rank the same, so position decides which
 comes first, and the graph is the same up to swapping them. The score-based searches with the BIC
 score, and `pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy

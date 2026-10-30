@@ -107,9 +107,9 @@ def test_lingam_bottom_up_marks_a_nan_pair_as_circles(monkeypatch) -> None:
             AndreyRCD(),
             "rcd",
             {
-                "max_explanatory_vars": 2,
+                "max_depth": 2,
                 "cor_alpha": 0.01,
-                "ind_alpha": 0.01,
+                "alpha": 0.01,
                 "shapiro_alpha": 0.01,
             },
         ),

@@ -77,5 +77,5 @@ def _deterministic_and_isolated():
     if torch is not None:
         torch.use_deterministic_algorithms(prev)
     backend.config._backend = None
-    backend.config._num_workers = None
+    backend.config._n_jobs = None
     warning_policy._warned.clear()

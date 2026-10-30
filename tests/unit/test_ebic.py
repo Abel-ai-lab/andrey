@@ -162,7 +162,7 @@ def _module(name: str):
 
 
 def _reference_score(monkeypatch, module: str, gamma: float) -> None:
-    def build(score_func, data, *, penalty_discount=1.0, ebic_gamma=0.0, categorical=None):
+    def build(score_func, data, *, penalty_discount=1.0, ebic_gamma=0.0, **_):
         assert ebic_gamma == gamma
         return _Reference(
             np.asarray(data), penalty_discount=penalty_discount, ebic_gamma=ebic_gamma

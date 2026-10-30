@@ -147,7 +147,7 @@ def test_parallel_matches_serial_at_every_penalty(monkeypatch, lam):
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
     created = _spy_pool(monkeypatch)
     serial_structure, serial_score = ges(_GES_PARALLEL_SEM, penalty_discount=lam)
-    with backend.config(num_workers=_GES_WORKERS):
+    with backend.config(n_jobs=_GES_WORKERS):
         parallel_structure, parallel_score = ges(_GES_PARALLEL_SEM, penalty_discount=lam)
     assert sum(created) == 1, "the pool never opened -- the comparison would be serial vs serial"
     assert np.array_equal(serial_structure.to_numpy(), parallel_structure.to_numpy())
@@ -159,7 +159,7 @@ def test_parallel_matches_serial_under_ebic(monkeypatch):
     created = _spy_pool(monkeypatch)
     x = _gaussian_sem(0, 200, 12, 0.3)  # few enough rows that the term changes the graph
     serial_structure, serial_score = ges(x, ebic_gamma=1.0)
-    with backend.config(num_workers=_GES_WORKERS):
+    with backend.config(n_jobs=_GES_WORKERS):
         parallel_structure, parallel_score = ges(x, ebic_gamma=1.0)
     assert sum(created) == 1, "the pool never opened -- the comparison would be serial vs serial"
     assert np.array_equal(serial_structure.to_numpy(), parallel_structure.to_numpy())
@@ -171,7 +171,7 @@ def test_parallel_matches_serial_under_ebic(monkeypatch):
 def test_parallel_arm_tracks_the_penalty(monkeypatch):
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
     created = _spy_pool(monkeypatch)
-    with backend.config(num_workers=_GES_WORKERS):
+    with backend.config(n_jobs=_GES_WORKERS):
         marks = {
             lam: _marks(ges(_GES_PARALLEL_SEM, penalty_discount=lam, ebic_gamma=0.0)[0])
             for lam in _PARALLEL_GRID

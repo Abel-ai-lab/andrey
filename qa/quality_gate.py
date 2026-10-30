@@ -465,7 +465,7 @@ def _adapted(adapter: Any) -> Callable[[Any], Any]:
 def _granger(x: np.ndarray) -> np.ndarray:
     """The lagged edges of ``andrey.granger`` with the published settings, as ``(lag, cause,
     effect)``."""
-    out = andrey.granger(x, tau_max=GRANGER_LAGS, cv=5)
+    out = andrey.granger(x, tau_max=GRANGER_LAGS)
     return np.stack([np.asarray(w) != 0 for w in out.structure.lag_weights])
 
 
@@ -727,7 +727,7 @@ def evaluate(method: str, dataset: str, fit: Callable[[Draw], object] | None = N
     run = fit or (lambda draw: spec.fit(draw.data))
     shds, empties = [], []
     start = time.perf_counter()
-    with andrey.config(backend="numpy", num_workers=1), threadpool_limits(limits=1):
+    with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         for draw in draws(dataset):
             empty = empty_estimate(draw, spec.target)
             if spec.target in SERIES_TARGETS:

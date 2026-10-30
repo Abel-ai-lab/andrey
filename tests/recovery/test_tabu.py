@@ -106,7 +106,7 @@ def test_tabu_is_deterministic_across_runs_and_worker_counts():
     x = _er_sample(10, 9).data
     first = andrey.tabu(x)
     for workers in (1, 2, 3):
-        with backend.config(num_workers=workers):
+        with backend.config(n_jobs=workers):
             again = andrey.tabu(x)
         assert np.array_equal(again.structure.to_numpy(), first.structure.to_numpy())
         assert again.metadata["score"] == first.metadata["score"]

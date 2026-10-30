@@ -1,13 +1,13 @@
 #!/usr/bin/env python
-"""Benchmark lasso Granger causality on CPU: Andrey against causal-learn.
+"""Benchmark Granger causality on CPU: Andrey's coefficient tests against causal-learn's lasso.
 
-Runs Andrey's ``granger``, serially and on worker threads, and causal-learn's
-``Granger.granger_lasso`` on vector-autoregressive
-time series with known lagged edges: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t`` with Gaussian
+Runs Andrey's ``granger``, which tests each lagged coefficient of a least-squares vector
+autoregression at ``alpha``, and causal-learn's ``Granger.granger_lasso``, a cross-validated lasso,
+on vector-autoregressive time series with known lagged edges: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t`` with Gaussian
 noise and no instantaneous effects, drawn by ``andrey.data`` (:func:`sample`). Every variable keeps
 its own lags, and each other variable enters a lag with probability ``LAG_DEGREE / (d - 1)``. The
 lag matrices are scaled so the process is stationary. Each variable is z-scored before the fits,
-so both packages fit the same standardized series, and both fit with the same ``maxlag`` and ``cv``.
+and both fit with the same ``maxlag``; ``cv`` is the lasso's.
 
 Each fit runs isolated, with the variables' count ``d`` as the ladder, under a per-fit wall cap; a
 fit past the cap is recorded as ``timeout`` and has no scores. A fit's lagged edges, the nonzero
@@ -258,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
                 for adapter in LANE:
                     if all((d, seed, adapter.name, r) in done for r in range(args.repeats)):
                         continue
-                    threads, num_workers = split_cores(args.cores, adapter.mode)
+                    threads, n_jobs = split_cores(args.cores, adapter.mode)
                     measures = run_task(
                         adapter,
                         data,
@@ -268,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
                         repeats=args.repeats,
                         warmup=args.warmup,
                         threads=threads,
-                        num_workers=num_workers,
+                        n_jobs=n_jobs,
                     )
                     for repeat, m in enumerate(measures):
                         if (d, seed, adapter.name, repeat) in done:  # kept from an earlier run

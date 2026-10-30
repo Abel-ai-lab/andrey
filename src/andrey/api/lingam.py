@@ -86,9 +86,13 @@ def direct_lingam(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    measure : {"pwling"}, default="pwling"
-        How the order search picks the most exogenous remaining variable at each step. Only
-        ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
+    measure : {"pwling", "skew", "tanh"}, default="pwling"
+        How the order search picks the most exogenous remaining variable at each step, by an
+        approximation of the pairwise likelihood ratios [2]_. ``"pwling"`` approximates them by the
+        entropy of each variable and of each regression residual. ``"tanh"`` and ``"skew"`` replace
+        them by a correlation of nonlinear functions of the standardized variables, ``tanh`` for
+        sparse (heavy-tailed) noise and the square after a sign correction for skewed noise, which
+        costs far less; the Notes say when each applies.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
@@ -139,6 +143,18 @@ def direct_lingam(
     number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
     GPU once they are large enough.
 
+    **Choosing the measure.** Each measure scores a candidate by how far its pairwise statistics
+    with the other variables fall below zero, and picks the candidate with the fewest violations
+    [2]_; they differ in the statistic. ``"pwling"``, the default, compares the entropies of each
+    variable and of each regression residual, and asks only that the noise is not Gaussian.
+    ``"tanh"`` takes the correlation ``rho * E[x tanh(y) - tanh(x) y]`` of the standardized pair,
+    which needs one matrix product per step; it orients correctly when the noise is sparse, with
+    positive excess kurtosis as for Laplace noise, and backwards when the kurtosis is negative, as
+    for uniform noise. ``"skew"`` takes ``rho * E[x^2 y - x y^2]`` after multiplying each variable
+    by the sign of its skewness; it orients correctly when the noise is skewed, whatever the sign
+    of the skewness, and says little when the noise is symmetric, where the skewness is near zero.
+    All three standardize the columns at each step, so none depends on their units.
+
     **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
     with the same number of ones, have equal scores up to rounding, which differs between CPUs.
     Each step treats candidates as tied when the square roots of their negated scores lie within
@@ -171,8 +187,20 @@ def direct_lingam(
     empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20 variables and 545 s
     at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300 variables did not
     finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a fit took 528 s at
-    300 variables and 1,410 s at 400. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    300 variables and 1,410 s at 400. Measured on simulated linear data with unit-variance noise
+    from Erdos-Renyi graphs of mean degree 2, with 10 and 20 variables and 500 and 2,000 rows, 10
+    datasets in each of 4 cells per noise, on standardized columns, the mean errors (SHD) of
+    ``"pwling"`` were 0.7 to 0.9 for every noise, and no cell had fewer errors with ``"skew"`` or
+    ``"tanh"`` by a paired 95% interval. With exponential noise, skewed with either sign, ``"skew"``
+    matched it (0.6) and ``"tanh"`` did worse (4.7). With Laplace noise ``"tanh"`` matched it (0.8)
+    and ``"skew"`` did worse (16.2). With Student t noise of 5 degrees of freedom, symmetric and
+    heavy-tailed, ``"tanh"`` had 1.4 and ``"skew"`` 9.8. With uniform noise, symmetric and
+    sub-Gaussian, both were worse than ``"pwling"``'s 0.8: ``"tanh"``, which assumes sparse
+    (super-Gaussian) noise [2]_, had 35.1 and put 17% of the true edges in the right order, and
+    ``"skew"``, which needs skewed noise, had 22.4 and 48%, against 99% for ``"pwling"``. The order
+    search alone took 0.1 to 0.3 of ``"pwling"``'s time, and the whole fit about half to two thirds
+    of it, as the pruning step does not change. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -231,9 +259,9 @@ def ica_lingam(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     seed : int or None, default=None
-        Seed for FastICA's starting point, from ``0`` to ``2**32 - 1``. ``None`` uses the
-        ``ANDREY_SEED`` environment variable, or ``0`` when it is unset. ``metadata["seed"]``
-        records the seed used.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for FastICA's starting point, from ``0`` to
+        ``2**32 - 1``. ``metadata["seed"]`` records the seed used.
     max_iter : int, default=1000
         Most FastICA iterations, at least ``1``. Reaching it before FastICA converges warns with
         :class:`~andrey.SearchLimitWarning`.
@@ -383,10 +411,10 @@ def multi_group_direct_lingam(
         Two or more datasets over the same ``d`` variables; sample counts may differ per group.
         Each is coerced to ``float64``. DataFrames must name their columns alike; the names become
         the structures' ``labels``.
-    measure : {"pwling"}, default="pwling"
-        How the order search picks the most exogenous variable at each step; ``"pwling"`` is
-        DirectLiNGAM's pairwise likelihood-ratio measure, with the groups' scores weighted by their
-        share of the samples.
+    measure : {"pwling", "skew", "tanh"}, default="pwling"
+        How the order search picks the most exogenous variable at each step, as in
+        :func:`~andrey.direct_lingam` [2]_: the groups' scores, each from the group's own
+        standardized columns, are weighted by their share of the samples.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. It holds for every group. The
@@ -403,7 +431,7 @@ def multi_group_direct_lingam(
         :class:`~andrey.core.GraphStructure`; all share the same ``ordering`` (the joint causal
         order) while carrying that group's own ``weighted_adjacency`` (``W[i, j]`` weights ``i ->
         j``). ``metadata["algorithm"]`` is ``"multi_group_direct_lingam"``, and
-        ``metadata["group_index"]`` is the group's position in ``data_groups``.
+        ``metadata["group_index"]`` is the group's position in ``data``.
 
     Raises
     ------
@@ -419,6 +447,10 @@ def multi_group_direct_lingam(
 
     Notes
     -----
+    **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
+    :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; each group is
+    standardized, and for ``"skew"`` sign-corrected, on its own.
+
     **Ties.** Each step sums the groups' scores and breaks ties as :func:`~andrey.direct_lingam`
     does, ranking each column by its data stacked over the groups. Columns that are copies in any
     group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
@@ -443,6 +475,8 @@ def multi_group_direct_lingam(
     ----------
     .. [1] Shimizu, S. (2012). Joint estimation of linear non-Gaussian acyclic models.
        Neurocomputing 81, 104-107.
+    .. [2] Hyvarinen, A., and Smith, S. M. (2013). Pairwise likelihood ratios for estimation of
+       non-Gaussian structural equation models. JMLR 14, 111-152.
 
     Examples
     --------
