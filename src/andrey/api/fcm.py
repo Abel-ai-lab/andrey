@@ -616,13 +616,12 @@ def camuv(
     reads the candidates found before it, so the order the sets are visited in changes the result:
     visiting them in the data's column order instead of by rank gave graphs a median of 7 to 17.5
     pairs apart, at about the same accuracy. With one hidden variable per ten observed ones and one
-    to three graphs per size, a fit took a median of 16 s at 20 variables, 5.5 minutes at 100, and
-    51 minutes at 300, where its directed errors nearly reached the empty graph's, 232 against 239;
-    its cost grows about as ``d^2``, so a fit passes about a minute near 40 variables, 10 minutes
-    near 130, and an hour near 330. The dependence screens skip most of the sink tests: without them
-    a fit took 49 minutes at 50 variables, against 1.8 with them. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    to three graphs per size, a fit took a median of 22 s at 20 variables, 6.7 minutes at 100, and
+    57 minutes at 300, where its directed errors nearly reached the empty graph's, 232 against 239;
+    its cost grows about as ``d^2``, so a fit passes about a minute near 36 variables, 10 minutes
+    near 120, and an hour near 310. The dependence screens skip most of the sink tests: without them
+    a fit took 29 times as long at 50 variables. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
