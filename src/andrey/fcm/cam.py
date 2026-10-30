@@ -48,7 +48,7 @@ import numpy as np
 from scipy import linalg, optimize, sparse
 from scipy.interpolate import BSpline
 
-from andrey.fcm.gam import BasisCache, SmoothBasis, effective_k, fit_gam
+from andrey.fcm.gam import BasisCache, fit_gam
 from andrey.fcm.pruning import prune
 from andrey.search._parallel import _KEY_DP
 
@@ -225,29 +225,8 @@ def neighbors(
     return out
 
 
-class DistinctBases(BasisCache):
-    """Bases whose rank never exceeds the number of distinct values of their column.
-
-    A function of a variable with ``m`` distinct values is fixed by its ``m`` values, so a basis of
-    rank ``m`` represents every such function.
-    """
-
-    def __init__(self, data: np.ndarray) -> None:
-        super().__init__(data)
-        self.distinct = np.array([np.unique(c).size for c in self.data.T], dtype=np.int64)
-
-    def __call__(self, column: int, k: int) -> SmoothBasis:
-        """Return column ``column``'s basis of rank ``min(k, distinct values)``."""
-        return super().__call__(column, min(int(k), int(self.distinct[column])))
-
-    def n_coef(self, parents: list[int], k: int) -> int:
-        """Coefficients of the additive model of ``fit_gam`` on ``parents``, the intercept's too."""
-        rank = effective_k(self.data.shape[0], len(parents), k)
-        return 1 + sum(min(rank, int(self.distinct[p])) - 1 for p in parents)
-
-
 def order_search(
-    bases: DistinctBases,
+    bases: BasisCache,
     candidates: np.ndarray,
     *,
     required: np.ndarray | None = None,
@@ -269,8 +248,8 @@ def order_search(
 
     Parameters
     ----------
-    bases : DistinctBases
-        Bases of the data's columns.
+    bases : BasisCache
+        Bases of the data's columns, each of rank at most its column's distinct values.
     candidates : np.ndarray
         ``(d, d)`` bool; ``candidates[i, j]`` allows ``i -> j``.
     required : np.ndarray or None
@@ -387,7 +366,7 @@ def cam(
     candidates = neighbors(boosting_counts(X))
     if forbidden is not None:
         candidates &= ~forbidden
-    bases = DistinctBases(X)
+    bases = BasisCache(X)
     searched = order_search(bases, candidates, required=required, precedence=precedence)
     dag = prune(X, searched, cutoff=alpha, k=K, bases=bases).astype(bool) | required
     return CAMResult(
