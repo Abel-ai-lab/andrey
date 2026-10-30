@@ -8,10 +8,11 @@ independent.
   the bandwidth by the empirical rule. :func:`hsic_statistic_test`, used by ANM, runs the same test
   and returns the statistic, divided by its mean under independence, with the p-value. PNL computes
   the same numbers from kernels it shares across pairs.
-- :func:`hsic_gamma_from_grams`, used by RCD and ParceLiNGAM with the grams of :func:`gamma_gram`,
-  sets the bandwidth by the median distance over the first rows without z-scoring, corrects the
-  variance for bias, and returns the statistic with the p-value. RESIT runs the same test on each
-  side's joint distances with two settings of its own: the bandwidth's median over every row
+- :func:`hsic_gamma_from_grams`, used by RCD, ParceLiNGAM, and GIN with the grams of
+  :func:`gamma_gram`, sets the bandwidth by the median distance over the first rows without
+  z-scoring, corrects the variance for bias, and returns the statistic with the p-value. RESIT runs
+  the same test, through :func:`hsic_gamma_log_p` for the p-value's logarithm, on each side's joint
+  distances with two settings of its own: the bandwidth's median over every row
   (``median_rows=None``) and the variance's product form (``variance="product"``).
 
 References

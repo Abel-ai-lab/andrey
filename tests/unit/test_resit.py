@@ -100,10 +100,15 @@ def test_a_required_edge_stays_on_independent_columns():
 
 
 def test_tiers_order_the_variables_and_forbid_edges_into_an_earlier_tier():
-    # x2 first: no edge may enter it, and no order may place x0 or x1 before it.
-    out = _fit(_chain(), knowledge=andrey.Knowledge(tiers=[[2], [0, 1]]))
-    assert all(j != 2 for _, j in _edges(out))
-    assert out.ordering[0] == 2
+    # The highest-ranked column goes first and the lowest-ranked last, against the rank's own pull.
+    X = np.random.default_rng(5).standard_normal((300, 10))
+    ranks = tie_ranks(X)
+    first, last = int(np.argmax(ranks)), int(np.argmin(ranks))
+    middle = [j for j in range(10) if j not in (first, last)]
+    out = _fit(X, knowledge=andrey.Knowledge(tiers=[[first], middle, [last]]))
+    assert out.ordering[0] == first
+    assert out.ordering[-1] == last
+    assert all(j != first and i != last for i, j in _edges(out))
 
 
 def test_p_values_far_below_double_precision_stay_positive_and_ordered():
@@ -162,15 +167,18 @@ def test_a_non_finite_test_raises_rather_than_steer_a_choice(monkeypatch):
 
 
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
-def test_a_binary_column_is_named():
-    X = _chain()
-    X[:, 1] = np.arange(N) % 2
-    with pytest.raises(ValueError, match="column 1 has fewer than 3 distinct values; resit"):
-        _fit(X)
+def test_a_binary_column_is_refused_by_name():
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_chain(), columns=["a", "flag", "c"])
+    frame["flag"] = np.arange(N) % 2
+    with pytest.raises(ValueError) as error:
+        _fit(frame)
+    assert "flag" in str(error.value)
+    assert "resit" in str(error.value)
 
 
-def test_fewer_rows_than_twice_the_columns_are_refused():
-    X = np.random.default_rng(4).standard_normal((15, 8))
-    with pytest.raises(ValueError, match=r"needs at least 16 rows \(samples\) over 8 variables"):
-        _fit(X)
-    assert _fit(X[:, :7]).structure.n_nodes == 7
+def test_twice_as_many_rows_as_columns_fit_and_one_fewer_is_refused():
+    X = np.random.default_rng(4).standard_normal((16, 8))
+    assert _fit(X).structure.n_nodes == 8
+    with pytest.raises(ValueError):
+        _fit(X[:15])

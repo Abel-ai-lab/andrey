@@ -15,26 +15,21 @@ with each noise independent of the variable's non-descendants, and runs two phas
 The settings are those of the paper's experiments: the regression is an additive model of thin
 plate regression splines with ten basis functions per term and GCV smoothing,
 :func:`andrey.fcm.gam.fit_gam`, which lowers the rank with fewer than 30 rows per term; the test is
-the gamma HSIC test of :func:`andrey.core.independence.hsic_gamma_from_grams`, with Gaussian kernels
-on each side's joint squared distances, the bandwidth set by the median heuristic, and the null
-moments of Gretton et al. (2007) in the product form the paper uses; and ``alpha`` is ``0.05``.
+the gamma HSIC test of :func:`andrey.core.independence.hsic_gamma_log_p`, with Gaussian kernels on
+each side's joint squared distances, the bandwidth set by the median heuristic, and the null
+moments of Gretton et al. (2007) in their product form; and ``alpha`` is ``0.05``.
 
-Where the steps here differ from the paper's:
+The choices Algorithm 1 leaves open:
 
-- The kernels read the columns centered and divided by their standard deviations. The paper's
-  kernel on several raw columns weighs each by its units; on columns of one scale, such as
-  standardized data, the two are the same, since a common factor leaves a median-bandwidth kernel
-  unchanged.
-- The bandwidth is the median over every pair of rows with a positive distance. The paper's takes
-  every pair of up to 1,000 rows, ties included, and a random 1,000 rows of a larger sample.
+- The kernels read the columns centered and divided by their standard deviations, so neither a
+  column's units nor its offset changes a test.
+- The bandwidth is the median over every pair of rows with a positive distance.
 - p-values are compared as their logarithms, computed directly so that a p-value below the
   smallest double keeps its place, rounded to ``_KEY_DP`` decimal places, as :func:`andrey.hc`
-  compares its score changes, and a tie goes to the earlier column. The paper's takes the first
-  column of an exact tie.
-- The edge removal tries the parents in column order, and :func:`andrey.resit` passes the columns
-  in their rank order, so the parents are tried by rank. The paper's code tries them in the data's
-  column order. Each removal changes the fits after it, so the two orders can keep different
-  parents.
+  compares its score changes; a tie goes to the earlier column.
+- The parents are tried in column order, and :func:`andrey.resit` passes the columns in their rank
+  order, so they are tried by rank. Each removal changes the fits after it, so another order can
+  keep other parents.
 
 The fit draws no random numbers.
 
@@ -141,17 +136,16 @@ def causal_order(
         candidates = [
             k for k in remaining if precedence is None or not precedence[k, remaining].any()
         ]
-        best: tuple[float, int] | None = None
+        keys = {}
         for k in candidates:
             others = [i for i in remaining if i != k]
             parents = [i for i in others if allowed[i, k]]
             log_p = _log_p(_gram(unit[:, others]), _residual(bases, k, parents))
             _log.debug("%d remaining: sink %d, log p-value %.9g", len(remaining), k, log_p)
-            if best is None or (-_key(log_p), k) < best:
-                best = (-_key(log_p), k)
-        assert best is not None
-        remaining.remove(best[1])
-        sinks.append(best[1])
+            keys[k] = _key(log_p)
+        sink = min(candidates, key=lambda k: (-keys[k], k))
+        remaining.remove(sink)
+        sinks.append(sink)
     return np.array([*remaining, *reversed(sinks)], dtype=np.int64)
 
 

@@ -366,10 +366,7 @@ def resit(
     The kernels read the columns centered and divided by their standard deviations, and each smooth
     term reads a variable through an affine map to a fixed interval, so rescaling or shifting a
     column changes no step; the centering also keeps a large offset from cancelling the distances'
-    digits.
-    The paper's kernel reads several raw columns at once and so weighs each by its units; on
-    columns of one scale, such as standardized data, the two kernels are the same. The fit draws
-    no random numbers and runs on one BLAS thread.
+    digits. The fit draws no random numbers and runs on one BLAS thread.
 
     **Ties.** p-values are compared as their logarithms rounded to 9 decimal places, as
     :func:`~andrey.hc` compares its score changes per row, so two p-values that differ only in
