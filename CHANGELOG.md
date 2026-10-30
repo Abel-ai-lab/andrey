@@ -32,6 +32,10 @@ names its pull request.
 
 ### Changed
 
+- `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` now belong to the family
+  "Functional causal models", with `cam` (Glymour, Zhang, and Spirtes 2019): their `family` value
+  in `andrey list` and in the method contracts of `andrey --help --json` is `"functional"` in place
+  of `"lingam"`, and nothing else in the API changes. ([#597])
 - The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
   on a column's units or sign: it is a hash of each column's relations to the other columns, and a
   new column order still relabels it; only columns that no row order, unit, or sign tells apart
@@ -41,10 +45,6 @@ names its pull request.
   the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
   restores the former rank; `tie_break="position"` orders ties by column position, a different
   rule. ([#612])
-- `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` now belong to the family
-  "Functional causal models", with `cam` (Glymour, Zhang, and Spirtes 2019): their `family` value
-  in `andrey list` and in the method contracts of `andrey --help --json` is `"functional"` in place
-  of `"lingam"`, and nothing else in the API changes. ([#597])
 
 ## [0.12.0] - 2026-10-30
 
