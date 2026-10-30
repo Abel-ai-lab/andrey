@@ -83,8 +83,11 @@ class PSpline:
     index, value : np.ndarray
         ``(n, DEGREE + 1)`` columns and values of each row's nonzero B-splines.
     inverse : np.ndarray
-        ``(m, m)`` inverse of ``X'X + lam D'D`` for the ``(n, m)`` design ``X``, or the
+        ``(m, m)`` inverse ``P`` of ``X'X + lam D'D`` for the ``(n, m)`` design ``X``, or the
         pseudo-inverse of ``X'X`` when ``lam`` is ``0``.
+    explained : np.ndarray
+        ``(m, m)`` matrix ``2P - P X'X P``: the fit to a response ``u`` lowers the residual sum of
+        squares by ``b' explained b`` for ``b = X'u``.
     lam : float
         Penalty weight.
     """
@@ -92,6 +95,7 @@ class PSpline:
     index: np.ndarray
     value: np.ndarray
     inverse: np.ndarray
+    explained: np.ndarray
     lam: float
 
 
@@ -126,7 +130,8 @@ def pspline(x: np.ndarray) -> PSpline:
         inverse = np.linalg.pinv(xtx, hermitian=True)
     else:
         inverse = linalg.inv(xtx + lam * penalty)
-    return PSpline(index=index, value=value, inverse=inverse, lam=lam)
+    explained = 2.0 * inverse - inverse @ xtx @ inverse
+    return PSpline(index=index, value=value, inverse=inverse, explained=explained, lam=lam)
 
 
 def _df_lambda(xtx: np.ndarray, penalty: np.ndarray, *, rank: int) -> float:
@@ -164,7 +169,9 @@ def boosting_counts(X: np.ndarray, *, n_iter: int = N_ITER, step: float = STEP) 
     For response ``j`` the fit starts at the mean of ``x_j``. Each iteration fits every other
     variable's base learner to the current residuals by penalized least squares, takes the one with
     the smallest residual sum of squares (the first in column order on an exact tie), and adds
-    ``step`` times its fit.
+    ``step`` times its fit. The residual sums of squares are compared through the amount each fit
+    lowers them, a quadratic form in the ``X'u`` of each learner, so only the picked learner's fit
+    is evaluated on the rows.
 
     Returns
     -------
@@ -180,23 +187,22 @@ def boosting_counts(X: np.ndarray, *, n_iter: int = N_ITER, step: float = STEP) 
     m = learners[0].inverse.shape[0]
     index = np.stack([b.index for b in learners])
     value = np.stack([b.value for b in learners])
-    inverse = np.stack([b.inverse for b in learners])
+    explained = np.stack([b.explained for b in learners])
     rows = (np.arange(d)[:, None, None] * m + index).ravel()
     cols = np.broadcast_to(np.arange(n)[None, :, None], index.shape).ravel()
     transpose = sparse.csr_array((value.ravel(), (rows, cols)), shape=(d * m, n))
-    learner = np.arange(d)[:, None, None]
     for j in range(d):
         y = X[:, j]
         fit = np.full(n, y.mean())
         u = y - fit
         for _ in range(n_iter):
-            coef = np.einsum("ikl,il->ik", inverse, (transpose @ u).reshape(d, m))
-            fitted = np.sum(value * coef[learner, index], axis=2)
-            rss = np.mean((fitted - u) ** 2, axis=1)
-            rss[j] = np.inf
-            pick = int(np.argmin(rss))
+            b = (transpose @ u).reshape(d, m)
+            drop = np.einsum("ik,ikl,il->i", b, explained, b)
+            drop[j] = -np.inf
+            pick = int(np.argmax(drop))
             counts[pick, j] += 1
-            fit = fit + step * fitted[pick]
+            coef = learners[pick].inverse @ b[pick]
+            fit = fit + step * np.sum(value[pick] * coef[index[pick]], axis=1)
             u = y - fit
     return counts
 
