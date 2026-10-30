@@ -85,6 +85,7 @@ def _mixed(n: int = 400, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
 TESTS = {
     "fisherz": (_continuous, None),
     "student_t": (_continuous, None),
+    "normal_scores": (_continuous, None),
     "kci": (lambda: _continuous(120), None),
     "rcot": (_continuous, None),
     "cmiknn": (lambda: _continuous(120), None),

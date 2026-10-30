@@ -22,7 +22,7 @@ from scipy.special import ndtr
 
 import andrey
 from andrey.core import ci
-from andrey.core.ci import FisherZ, StudentT
+from andrey.core.ci import FisherZ, NormalScores, StudentT
 
 
 @pytest.fixture(autouse=True)
@@ -629,3 +629,82 @@ def test_student_t_shares_the_fisher_z_error_paths():
         StudentT(np.array([[1.0, np.nan], [2.0, 3.0], [4.0, 5.0]]))
     with pytest.raises(AssertionError, match="condition_set"):
         StudentT(X)(0, 1, (0, 2))
+
+
+def _latent_fork(rng, n, size):
+    """Columns ``[x, y, *z]`` with ``x`` and ``y`` independent given the ``size`` columns ``z``."""
+    z = rng.standard_normal((n, size))
+    weights = rng.uniform(0.5, 1.0, (size, 2))
+    x = z @ weights[:, 0] + rng.standard_normal(n)
+    y = z @ weights[:, 1] + rng.standard_normal(n)
+    return np.column_stack([x, y, z])
+
+
+def test_normal_scores_p_values_do_not_change_under_increasing_transforms_of_columns():
+    rng = np.random.default_rng(3)
+    x = _latent_fork(rng, 150, 2)
+    x[:, 1] += 0.4 * x[:, 0]
+    transformed = np.column_stack([np.exp(x[:, 0]), x[:, 1] ** 3, 5.0 * x[:, 2] - 2.0, x[:, 3]])
+    before, after = ci.NormalScores(x), ci.NormalScores(transformed)
+    for a, b, cond in [(0, 1, ()), (0, 2, ()), (0, 1, (2,)), (0, 1, (2, 3)), (1, 3, (0, 2))]:
+        assert after(a, b, cond) == before(a, b, cond)
+
+
+def test_normal_scores_is_fisher_z_on_the_normal_scores_of_each_column():
+    rng = np.random.default_rng(4)
+    x = np.exp(_latent_fork(rng, 120, 2))
+    x[:, 3] = np.round(x[:, 3])  # tied values share their average rank
+    ranks = stats.rankdata(x, axis=0)
+    scores = stats.norm.ppf(ranks / (len(x) + 1.0))
+    for a, b, cond in [(0, 1, ()), (0, 1, (2,)), (0, 1, (2, 3))]:
+        assert NormalScores(x)(a, b, cond) == pytest.approx(
+            FisherZ(scores)(a, b, cond), rel=1e-12, abs=0
+        )
+
+
+def test_normal_scores_query_paths_return_the_scalar_p_values():
+    rng = np.random.default_rng(5)
+    x = np.exp(_latent_fork(rng, 200, 3))
+    test = NormalScores(x)
+    sets = [(2,), (3,), (4,), (2, 3), (2, 4), (3, 4), (2, 3, 4), ()]
+    assert test.batched_call(0, 1, sets) == [test(0, 1, s) for s in sets]
+
+
+@pytest.mark.parametrize("size", [0, 2])
+@pytest.mark.parametrize("transform", [np.exp, lambda v: v**3], ids=["exp", "cubic"])
+def test_normal_scores_rejects_a_true_independence_at_about_the_level_on_monotone_marginals(
+    size, transform
+):
+    rng = np.random.default_rng(6)
+    n_data, n_rows, level = 400, 200, 0.05
+    rejected = sum(
+        ci.NormalScores(transform(_latent_fork(rng, n_rows, size)))(0, 1, tuple(range(2, 2 + size)))
+        < level
+        for _ in range(n_data)
+    )
+    # Four binomial standard deviations around the level.
+    tolerance = 4 * np.sqrt(level * (1 - level) / n_data)
+    assert abs(rejected / n_data - level) < tolerance
+
+
+def test_normal_scores_finds_a_monotone_dependence_that_pearson_correlation_dilutes():
+    rng = np.random.default_rng(7)
+    latent = rng.standard_normal((300, 1))
+    x = np.column_stack(
+        [np.exp(3 * latent[:, 0]), np.exp(3 * (0.4 * latent[:, 0] + rng.standard_normal(300)))]
+    )
+    assert NormalScores(x)(0, 1) < 1e-4 < FisherZ(x)(0, 1)
+
+
+def test_normal_scores_shares_the_fisher_z_error_paths():
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((100, 5))
+    X[:, 4] = X[:, 0]
+    with pytest.raises(ValueError, match="singular"):
+        NormalScores(X)(1, 2, (0, 4))
+    with pytest.raises(ValueError, match="NaN or Inf"):
+        NormalScores(np.array([[1.0, np.nan], [2.0, 3.0], [4.0, 5.0]]))
+    with pytest.raises(ValueError, match="2-D"):
+        NormalScores(np.arange(5.0))
+    with pytest.raises(ValueError, match="degrees of freedom"):
+        NormalScores(X[:3])(0, 1, (2,))
