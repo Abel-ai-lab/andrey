@@ -139,7 +139,7 @@ def local_graph(
 def local_structure(
     X: np.ndarray,
     method: str,
-    output: str,
+    structure: str,
     *,
     alpha: float,
     indep_test: str,
@@ -148,8 +148,8 @@ def local_structure(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
 ) -> np.ndarray:
-    """Every variable's MMPC, IAMB, or Inter-IAMB set joined into the graph ``output`` names, as an
-    endpoint-mark matrix.
+    """Every variable's MMPC, IAMB, or Inter-IAMB set joined into the graph ``structure`` names, as
+    an endpoint-mark matrix.
 
     ``"moral"`` (IAMB, Inter-IAMB) is :func:`local_graph`'s moral graph, undirected. ``"skeleton"``
     is MMPC's skeleton, or the moral graph less the pairs :func:`prune_spouses` separates.
@@ -176,10 +176,10 @@ def local_structure(
             )
             skeleton = (
                 blankets
-                if output == "moral"
+                if structure == "moral"
                 else prune_spouses(test, blankets, alpha, max_depth, constraints)
             )
-        if output != "cpdag":
+        if structure != "cpdag":
             return np.where(skeleton, TAIL, NULL).astype(np.int8)
         return blanket_cpdag(test, skeleton, blankets, alpha, max_depth, constraints)
 

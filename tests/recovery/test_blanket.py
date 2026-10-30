@@ -1,9 +1,9 @@
 """Recovery checks for the local-structure calls: IAMB, Inter-IAMB, and MMPC.
 
 Under a d-separation oracle each call returns the true set of each variable, and without a target
-each output its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
+each structure its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
 that fits the truth as well. On seeded linear-Gaussian data from sparse graphs the sets are close
-to the true ones, and on one recorded case each output is the graph bnlearn returns.
+to the true ones, and on one recorded case each structure is the graph bnlearn returns.
 """
 
 from __future__ import annotations
@@ -27,8 +27,10 @@ from tests.recovery.helpers.oracle import DSeparation
 METHODS = ["iamb", "inter_iamb", "mmpc"]
 KEY = {"iamb": "markov_blanket", "inter_iamb": "markov_blanket", "mmpc": "parents_and_children"}
 #: Each method's outputs, from its spec.
-OUTPUTS = {m: next(p.choices for p in REGISTRY[m].params if p.name == "output") for m in METHODS}
-CELLS = [(m, o) for m in METHODS for o in OUTPUTS[m]]
+STRUCTURES = {
+    m: next(p.choices for p in REGISTRY[m].params if p.name == "structure") for m in METHODS
+}
+CELLS = [(m, o) for m in METHODS for o in STRUCTURES[m]]
 
 
 @pytest.fixture(autouse=True)
@@ -52,15 +54,15 @@ def _adjacency(out: andrey.StructureOutput) -> np.ndarray:
     return out.structure.to_numpy() != 0
 
 
-def _true_output(oracle: DSeparation, sample, output: str) -> np.ndarray:
-    """The truth an output is judged against: endpoint marks for the CPDAG, else adjacency."""
-    if output == "cpdag":
+def _true_structure(oracle: DSeparation, sample, structure: str) -> np.ndarray:
+    """The truth a structure is judged against: endpoint marks for the CPDAG, else adjacency."""
+    if structure == "cpdag":
         return dag2cpdag(sample.graph.to_numpy())
-    return oracle.moral_graph() if output == "moral" else oracle.skeleton()
+    return oracle.moral_graph() if structure == "moral" else oracle.skeleton()
 
 
-def _got_output(out: andrey.StructureOutput, output: str) -> np.ndarray:
-    return out.structure.to_numpy() if output == "cpdag" else _adjacency(out)
+def _got_structure(out: andrey.StructureOutput, structure: str) -> np.ndarray:
+    return out.structure.to_numpy() if structure == "cpdag" else _adjacency(out)
 
 
 def _named_edges(out: andrey.StructureOutput) -> set:
@@ -144,29 +146,31 @@ def test_each_set_is_the_true_set_under_an_oracle(method, seed, oracle_test):
 
 
 @pytest.mark.parametrize("seed", range(3))
-@pytest.mark.parametrize(("method", "output"), CELLS)
-def test_each_output_is_its_own_truth_under_an_oracle(method, output, seed, oracle_test):
+@pytest.mark.parametrize(("method", "structure"), CELLS)
+def test_each_structure_is_its_own_truth_under_an_oracle(method, structure, seed, oracle_test):
     """The CPDAG is the true CPDAG, the skeleton the true skeleton, the moral graph the true moral
     graph, and the kind says which: ``cpdag``, else ``undirected``."""
     sample = _er_sample(15, seed)
     oracle = oracle_test["oracle"] = DSeparation(sample.graph)
-    out = getattr(andrey, method)(sample.data, output=output, indep_test="dsep", alpha=0.5)
-    np.testing.assert_array_equal(_got_output(out, output), _true_output(oracle, sample, output))
-    assert out.structure.kind == ("cpdag" if output == "cpdag" else "undirected")
+    out = getattr(andrey, method)(sample.data, structure=structure, indep_test="dsep", alpha=0.5)
+    np.testing.assert_array_equal(
+        _got_structure(out, structure), _true_structure(oracle, sample, structure)
+    )
+    assert out.structure.kind == ("cpdag" if structure == "cpdag" else "undirected")
 
 
 @pytest.mark.parametrize("seed", range(3))
-@pytest.mark.parametrize(("method", "output"), CELLS)
-def test_each_output_is_close_to_its_truth_on_sparse_graphs(method, output, seed):
-    """On 20 variables with 2,000 rows, an undirected output has at most a third as many wrong
+@pytest.mark.parametrize(("method", "structure"), CELLS)
+def test_each_structure_is_close_to_its_truth_on_sparse_graphs(method, structure, seed):
+    """On 20 variables with 2,000 rows, an undirected structure has at most a third as many wrong
     pairs as its truth has pairs. A CPDAG pair is wrong when its edge or its marks differ, and one
     wrong collider misdirects the edges Meek's rules orient from it, so the CPDAG has at most half
     as many."""
     sample = _er_sample(20, seed)
-    want = _true_output(DSeparation(sample.graph), sample, output)
-    got = _got_output(getattr(andrey, method)(sample.data, output=output), output)
+    want = _true_structure(DSeparation(sample.graph), sample, structure)
+    got = _got_structure(getattr(andrey, method)(sample.data, structure=structure), structure)
     wrong = (got != want) | (got.T != want.T)
-    share = 1 / 2 if output == "cpdag" else 1 / 3
+    share = 1 / 2 if structure == "cpdag" else 1 / 3
     assert np.triu(wrong, 1).sum() <= np.triu(want != 0, 1).sum() * share
 
 
@@ -175,28 +179,30 @@ def test_each_output_is_close_to_its_truth_on_sparse_graphs(method, output, seed
 def test_the_skeleton_is_a_subgraph_of_the_moral_graph(method, seed):
     sample = _er_sample(20, seed)
     fit = functools.partial(getattr(andrey, method), sample.data)
-    skeleton, moral = _adjacency(fit(output="skeleton")), _adjacency(fit(output="moral"))
+    skeleton, moral = _adjacency(fit(structure="skeleton")), _adjacency(fit(structure="moral"))
     assert not (skeleton & ~moral).any()
     np.testing.assert_array_equal(_adjacency(fit()), skeleton)
 
 
 @pytest.mark.parametrize("seed", range(5))
-@pytest.mark.parametrize(("method", "output"), CELLS)
-def test_a_column_shuffle_leaves_every_set(method, output, seed):
+@pytest.mark.parametrize(("method", "structure"), CELLS)
+def test_a_column_shuffle_leaves_every_set(method, structure, seed):
     frame = pd.DataFrame(_er_sample(20, 1).data, columns=[f"x{j}" for j in range(20)])
     order = list(np.random.default_rng(seed).permutation(20))
     shuffled = frame.iloc[:, order]
     for target in ("x3", "x10"):
-        base = getattr(andrey, method)(frame, target=target, output=output).metadata
-        assert getattr(andrey, method)(shuffled, target=target, output=output).metadata == base
-    edges = _named_edges(getattr(andrey, method)(frame, output=output))
-    assert _named_edges(getattr(andrey, method)(shuffled, output=output)) == edges
+        base = getattr(andrey, method)(frame, target=target, structure=structure).metadata
+        assert (
+            getattr(andrey, method)(shuffled, target=target, structure=structure).metadata == base
+        )
+    edges = _named_edges(getattr(andrey, method)(frame, structure=structure))
+    assert _named_edges(getattr(andrey, method)(shuffled, structure=structure)) == edges
 
 
 @pytest.mark.parametrize("method", METHODS)
 def test_the_cpdag_orients_a_collider_and_its_consequence(method):
     """a -> c <- b, c -> d: the collider at c, then c -> d by Meek's first rule."""
-    out = getattr(andrey, method)(_collider(), output="cpdag")
+    out = getattr(andrey, method)(_collider(), structure="cpdag")
     edges = set(out.structure.oriented_edges())
     assert edges == {("a", "c", "directed"), ("b", "c", "directed"), ("c", "d", "directed")}
 
@@ -205,13 +211,13 @@ def test_the_moral_graph_joins_a_childs_parents_and_the_skeleton_does_not():
     """The blankets' graph joins a and b, the parents of c; the skeleton and MMPC's do not."""
     frame = _collider()
     true_edges = {frozenset("ac"), frozenset("bc"), frozenset("cd")}
-    for out in (andrey.iamb(frame, output="moral"), andrey.inter_iamb(frame, output="moral")):
+    for out in (andrey.iamb(frame, structure="moral"), andrey.inter_iamb(frame, structure="moral")):
         assert frozenset("ab") in {frozenset(e[:2]) for e in out.structure.oriented_edges()}
     for method in METHODS:
-        for output in OUTPUTS[method]:
-            out = getattr(andrey, method)(frame, output=output)
+        for structure in STRUCTURES[method]:
+            out = getattr(andrey, method)(frame, structure=structure)
             edges = {frozenset(e[:2]) for e in out.structure.oriented_edges()}
-            assert edges == (true_edges | {frozenset("ab")} if output == "moral" else true_edges)
+            assert edges == (true_edges | {frozenset("ab")} if structure == "moral" else true_edges)
 
 
 def _two_colliders() -> pd.DataFrame:
@@ -232,14 +238,14 @@ BNLEARN_RECORDED = {
 }
 
 
-@pytest.mark.parametrize(("method", "output"), CELLS)
-def test_each_output_matches_bnlearn_on_a_recorded_case(method, output):
-    out = getattr(andrey, method)(_two_colliders(), output=output)
+@pytest.mark.parametrize(("method", "structure"), CELLS)
+def test_each_structure_matches_bnlearn_on_a_recorded_case(method, structure):
+    out = getattr(andrey, method)(_two_colliders(), structure=structure)
     edges = {
         f"{a} -> {b}" if kind == "directed" else f"{min(a, b)} - {max(a, b)}"
         for a, b, kind in out.structure.oriented_edges()
     }
-    assert edges == BNLEARN_RECORDED[output]
+    assert edges == BNLEARN_RECORDED[structure]
 
 
 #: The graph each of bnlearn 5.2.1's learners returns by default: ``undirected = FALSE`` for
@@ -248,7 +254,7 @@ BNLEARN_DEFAULT = {"iamb": "cpdag", "inter_iamb": "cpdag", "mmpc": "skeleton"}
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_a_call_without_output_returns_the_graph_bnlearn_returns_by_default(method):
+def test_a_call_without_structure_returns_the_graph_bnlearn_returns_by_default(method):
     out = getattr(andrey, method)(_two_colliders())
     edges = {
         f"{a} -> {b}" if kind == "directed" else f"{min(a, b)} - {max(a, b)}"
@@ -259,16 +265,16 @@ def test_a_call_without_output_returns_the_graph_bnlearn_returns_by_default(meth
 
 
 def test_mmpc_has_no_moral_graph():
-    with pytest.raises(ValueError, match="output"):
-        andrey.mmpc(_collider(), output="moral")
+    with pytest.raises(ValueError, match="structure"):
+        andrey.mmpc(_collider(), structure="moral")
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_a_target_gives_its_set_whatever_the_output(method):
+def test_a_target_gives_its_set_whatever_the_structure(method):
     frame = _collider()
     base = getattr(andrey, method)(frame, target="c")
-    for output in OUTPUTS[method]:
-        out = getattr(andrey, method)(frame, target="c", output=output)
+    for structure in STRUCTURES[method]:
+        out = getattr(andrey, method)(frame, target="c", structure=structure)
         assert out.metadata == base.metadata
         assert out.structure.kind == "undirected"
 
@@ -289,8 +295,10 @@ def _edges(out: andrey.StructureOutput) -> dict[frozenset, tuple[str, str, str]]
 def test_a_required_pair_joins_and_a_pair_kept_apart_leaves_with_and_without_a_target(method):
     plain = _edges(getattr(andrey, method)(_collider()))
     assert frozenset("cd") in plain and frozenset("ad") not in plain
-    for output in OUTPUTS[method]:
-        edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, output=output))
+    for structure in STRUCTURES[method]:
+        edges = _edges(
+            getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, structure=structure)
+        )
         assert frozenset("ad") in edges and frozenset("cd") not in edges
     out = getattr(andrey, method)(_collider(), target="d", knowledge=KNOWLEDGE)
     assert out.metadata[KEY[method]] == ["a"]
@@ -298,13 +306,13 @@ def test_a_required_pair_joins_and_a_pair_kept_apart_leaves_with_and_without_a_t
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_tiers_direct_the_cpdag_and_leave_the_undirected_outputs(method):
+def test_tiers_direct_the_cpdag_and_leave_the_undirected_structures(method):
     """The tiers put a and b before c and d: the CPDAG directs every edge between the tiers, and the
     skeleton stays undirected."""
-    edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, output="cpdag"))
+    edges = _edges(getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, structure="cpdag"))
     assert edges[frozenset("ad")] == ("a", "d", "directed")
     assert edges[frozenset("ac")] == ("a", "c", "directed")
-    out = getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, output="skeleton")
+    out = getattr(andrey, method)(_collider(), knowledge=KNOWLEDGE, structure="skeleton")
     assert {kind for *_, kind in _edges(out).values()} == {"undirected"}
 
 
@@ -332,8 +340,8 @@ def test_true_knowledge_leaves_the_true_sets_under_an_oracle(method, seed, oracl
         )
         want = {u for u in _truth(oracle, method, v) if kept[v, u]}
         assert set(out.metadata[KEY[method]]) == want, v
-    for output in OUTPUTS[method]:
+    for structure in STRUCTURES[method]:
         out = getattr(andrey, method)(
-            sample.data, indep_test="dsep", alpha=0.5, knowledge=knowledge, output=output
+            sample.data, indep_test="dsep", alpha=0.5, knowledge=knowledge, structure=structure
         )
         np.testing.assert_array_equal(_adjacency(out), kept)

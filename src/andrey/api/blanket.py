@@ -2,7 +2,7 @@
 
 ``iamb``, ``inter_iamb``, and ``mmpc`` share :mod:`andrey.constraint.blanket`. With ``target`` they
 return that variable's set; without, every variable's, joined by the AND rule into the graph
-``output`` names: the CPDAG, the skeleton, or, for the blankets, the moral graph.
+``structure`` names: the CPDAG, the skeleton, or, for the blankets, the moral graph.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _fit(
     data: npt.ArrayLike,
     *,
     target: str | int | None,
-    output: str,
+    structure: str,
     alpha: float,
     indep_test: str | None,
     categorical: Sequence[str | int] | None,
@@ -49,9 +49,9 @@ def _fit(
     max_depth: int | None,
     knowledge: Knowledge | None,
 ) -> StructureOutput:
-    """Check the settings, run the search, and wrap the graph ``output`` names or the set."""
+    """Check the settings, run the search, and wrap the graph ``structure`` names or the set."""
     from andrey.search.hybrid import local_set, local_structure
-    from andrey.spec.concepts import BLANKET_OUTPUTS
+    from andrey.spec.concepts import BLANKET_STRUCTURES
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -75,10 +75,10 @@ def _fit(
         "constraints": constraints,
     }
     metadata: dict[str, object] = {}
-    kind = BLANKET_OUTPUTS[output] if t is None else "undirected"
+    kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
     with copies_named(labels), rows_tested() as rows:
         if t is None:
-            marks = local_structure(X, method, output, **settings)
+            marks = local_structure(X, method, structure, **settings)
         else:
             members = local_set(X, method, t, **settings)
             adjacent = np.zeros((d, d), dtype=bool)
@@ -95,7 +95,7 @@ def iamb(
     data: npt.ArrayLike,
     *,
     target: str | int | None = None,
-    output: str = "cpdag",
+    structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -108,7 +108,7 @@ def iamb(
     A variable's Markov blanket is the smallest set of other variables given which it is
     independent of all the rest: in a causal graph, its parents, its children, and its children's
     other parents. IAMB [1]_ grows the blanket by conditional-independence tests, then shrinks it.
-    Without a target, every variable's blanket is learned and joined into the graph ``output``
+    Without a target, every variable's blanket is learned and joined into the graph ``structure``
     names, by default the CPDAG of the Grow-Shrink structure learner [2]_ [3]_.
 
     Parameters
@@ -120,14 +120,14 @@ def iamb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). ``None`` learns every variable's set and keeps a pair when each variable is in
         the other's set.
-    output : {"cpdag", "skeleton", "moral"}, default="cpdag"
+    structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
         adjacencies with no directions, each variable joined to its parents and children.
         ``"moral"``: the moral graph, each variable joined to every member of its Markov blanket,
         a child's other parents included, for feature selection or as a superset of the skeleton;
         an edge there does not say that the two variables are adjacent. With ``target``, the result
-        is the target's Markov blanket, whatever ``output`` is.
+        is the target's Markov blanket, whatever ``structure`` is.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
     indep_test : str or None, default=None
@@ -159,7 +159,7 @@ def iamb(
         the other's blanket from the start, and no test removes it. A pair the knowledge makes
         non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
         other parent belongs to the blanket without being adjacent, and is left out of the result.
-        Under ``output="cpdag"``, the result directs every edge the knowledge
+        Under ``structure="cpdag"``, the result directs every edge the knowledge
         decides, by a tier or an edge forbidden one way, before the colliders, which never reverse
         it, and Meek's rules direct the edges that follow, giving the maximally oriented PDAG
         (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search
@@ -169,7 +169,7 @@ def iamb(
     Returns
     -------
     StructureOutput
-        Without ``target``, wraps the graph ``output`` names: a ``cpdag``
+        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -192,7 +192,7 @@ def iamb(
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``output="cpdag"``
+        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"``
         orients the edges the search kept into a directed cycle.
 
     Warns
@@ -223,10 +223,10 @@ def iamb(
     the p-value for the other tests.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
-    other's blanket, which gives the moral graph (``output="moral"``). The skeleton drops each pair
-    ``x - y`` that tests independent given some subset, the empty set included, of the smaller of
-    ``x``'s blanket without ``y`` and ``y``'s blanket without ``x``, or of either when both hold as
-    many members [2]_ [3]_: a child's other parent is in the blanket without being adjacent, and
+    other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
+    pair ``x - y`` that tests independent given some subset, the empty set included, of the smaller
+    of ``x``'s blanket without ``y`` and ``y``'s blanket without ``x``, or of either when both hold
+    as many members [2]_ [3]_: a child's other parent is in the blanket without being adjacent, and
     such a subset separates the two. Every pair is tested against the moral graph, so no verdict
     depends on another. The CPDAG decides each triple ``x - z - y`` of the skeleton with ``x`` and
     ``y`` not adjacent: ``z`` is a collider, ``x -> z <- y``, when ``x`` and ``y`` test dependent
@@ -300,7 +300,7 @@ def iamb(
         "iamb",
         data,
         target=target,
-        output=output,
+        structure=structure,
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,
@@ -315,7 +315,7 @@ def inter_iamb(
     data: npt.ArrayLike,
     *,
     target: str | int | None = None,
-    output: str = "cpdag",
+    structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -327,8 +327,8 @@ def inter_iamb(
 
     Inter-IAMB [1]_ is IAMB with its shrink step after every addition, so a member that becomes
     independent leaves before it enlarges the later conditioning sets. Without a target, every
-    variable's blanket is learned and joined into the graph ``output`` names, by default the CPDAG
-    of the Grow-Shrink structure learner [2]_ [3]_.
+    variable's blanket is learned and joined into the graph ``structure`` names, by default the
+    CPDAG of the Grow-Shrink structure learner [2]_ [3]_.
 
     Parameters
     ----------
@@ -339,14 +339,14 @@ def inter_iamb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). ``None`` learns every variable's set and keeps a pair when each variable is in
         the other's set.
-    output : {"cpdag", "skeleton", "moral"}, default="cpdag"
+    structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
         adjacencies with no directions, each variable joined to its parents and children.
         ``"moral"``: the moral graph, each variable joined to every member of its Markov blanket,
         a child's other parents included, for feature selection or as a superset of the skeleton;
         an edge there does not say that the two variables are adjacent. With ``target``, the result
-        is the target's Markov blanket, whatever ``output`` is.
+        is the target's Markov blanket, whatever ``structure`` is.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
     indep_test : str or None, default=None
@@ -378,7 +378,7 @@ def inter_iamb(
         the other's blanket from the start, and no test removes it. A pair the knowledge makes
         non-adjacent, forbidden both ways or outside ``allowed``, stays a candidate, since a child's
         other parent belongs to the blanket without being adjacent, and is left out of the result.
-        Under ``output="cpdag"``, the result directs every edge the knowledge
+        Under ``structure="cpdag"``, the result directs every edge the knowledge
         decides, by a tier or an edge forbidden one way, before the colliders, which never reverse
         it, and Meek's rules direct the edges that follow, giving the maximally oriented PDAG
         (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search
@@ -388,7 +388,7 @@ def inter_iamb(
     Returns
     -------
     StructureOutput
-        Without ``target``, wraps the graph ``output`` names: a ``cpdag``
+        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -411,7 +411,7 @@ def inter_iamb(
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``output="cpdag"``
+        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"``
         orients the edges the search kept into a directed cycle.
 
     Warns
@@ -443,10 +443,10 @@ def inter_iamb(
     the p-value for the other tests.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
-    other's blanket, which gives the moral graph (``output="moral"``). The skeleton drops each pair
-    ``x - y`` that tests independent given some subset, the empty set included, of the smaller of
-    ``x``'s blanket without ``y`` and ``y``'s blanket without ``x``, or of either when both hold as
-    many members [2]_ [3]_: a child's other parent is in the blanket without being adjacent, and
+    other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
+    pair ``x - y`` that tests independent given some subset, the empty set included, of the smaller
+    of ``x``'s blanket without ``y`` and ``y``'s blanket without ``x``, or of either when both hold
+    as many members [2]_ [3]_: a child's other parent is in the blanket without being adjacent, and
     such a subset separates the two. Every pair is tested against the moral graph, so no verdict
     depends on another. The CPDAG decides each triple ``x - z - y`` of the skeleton with ``x`` and
     ``y`` not adjacent: ``z`` is a collider, ``x -> z <- y``, when ``x`` and ``y`` test dependent
@@ -516,7 +516,7 @@ def inter_iamb(
         "inter_iamb",
         data,
         target=target,
-        output=output,
+        structure=structure,
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,
@@ -531,7 +531,7 @@ def mmpc(
     data: npt.ArrayLike,
     *,
     target: str | int | None = None,
-    output: str = "skeleton",
+    structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -543,8 +543,8 @@ def mmpc(
 
     MMPC [1]_ finds the variables adjacent to a target in the causal graph, its parents and
     children, without telling them apart, by conditional-independence tests. Every variable's
-    set together gives the skeleton :func:`~andrey.mmhc` searches, which ``output="cpdag"`` orients
-    into a CPDAG by the collider tests of the Grow-Shrink structure learner [2]_ [3]_.
+    set together gives the skeleton :func:`~andrey.mmhc` searches, which ``structure="cpdag"``
+    orients into a CPDAG by the collider tests of the Grow-Shrink structure learner [2]_ [3]_.
 
     Parameters
     ----------
@@ -555,13 +555,13 @@ def mmpc(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). ``None`` learns every variable's set and keeps a pair when each variable is in
         the other's set.
-    output : {"skeleton", "cpdag"}, default="skeleton"
+    structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
         ``"cpdag"``: the CPDAG, the causal graphs the tests cannot tell apart, whose directed edges
         they all share, which tests every unshielded triple for a collider and costs more. A
         variable's parents and children hold no child's other parents, so there is no moral graph.
-        With ``target``, the result is the target's parents and children, whatever ``output`` is.
+        With ``target``, the result is the target's parents and children, whatever ``structure`` is.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
     indep_test : str or None, default=None
@@ -591,7 +591,7 @@ def mmpc(
         allowed to be adjacent, and temporal tiers, all honored. Each end of a required edge is in
         the other's set from the start, and no test removes it; a pair the knowledge makes
         non-adjacent, forbidden both ways or outside ``allowed``, is never a candidate.
-        Under ``output="cpdag"``, the result directs every edge the knowledge
+        Under ``structure="cpdag"``, the result directs every edge the knowledge
         decides, by a tier or an edge forbidden one way, before the colliders, which never reverse
         it, and Meek's rules direct the edges that follow, giving the maximally oriented PDAG
         (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search
@@ -601,7 +601,7 @@ def mmpc(
     Returns
     -------
     StructureOutput
-        Without ``target``, wraps the graph ``output`` names: an ``undirected``
+        Without ``target``, wraps the graph ``structure`` names: an ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
         edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges
@@ -623,7 +623,7 @@ def mmpc(
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``output="cpdag"``
+        contradicts itself, as :class:`~andrey.Knowledge` lists, or under ``structure="cpdag"``
         orients the edges the search kept into a directed cycle.
 
     Warns
@@ -660,7 +660,7 @@ def mmpc(
     the p-value for the other tests.
 
     **From sets to a graph.** Without a target, a pair is kept when each variable is in the other's
-    set, which gives the skeleton (``output="skeleton"``). The CPDAG decides each triple
+    set, which gives the skeleton (``structure="skeleton"``). The CPDAG decides each triple
     ``x - z - y`` of the skeleton with ``x`` and ``y`` not adjacent: ``z`` is a collider,
     ``x -> z <- y``, when ``x`` and ``y`` test dependent given ``z`` together with every subset of
     the smaller of their blankets without ``x``, ``y``, and ``z`` [2]_ [3]_, and a non-collider when
@@ -732,7 +732,7 @@ def mmpc(
         "mmpc",
         data,
         target=target,
-        output=output,
+        structure=structure,
         alpha=alpha,
         indep_test=indep_test,
         categorical=categorical,

@@ -328,21 +328,21 @@ _TARGET = ParamSpec(
     nullable=True,
 )
 _LOCAL_OUTPUT_DOC = (
-    "without a target, the graph output names: the CPDAG, the skeleton, or, for the blankets, the "
-    "moral graph; with a target, undirected edges from target to each member, "
+    "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
+    "the moral graph; with a target, undirected edges from target to each member, "
     "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
     "they joined"
 )
-_BLANKET_OUTPUT = concept_param("output")
-for _name, _summary, _key, _output, _kind, _refs in (
+_BLANKET_STRUCTURE = concept_param("structure")
+for _name, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
         "incremental association: grow by conditional-independence tests, then shrink. With "
         "target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink structure "
-        "learner, or into the skeleton or the moral graph (output).",
+        "learner, or into the skeleton or the moral graph (structure).",
         "markov_blanket",
-        _BLANKET_OUTPUT,
+        _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
     ),
@@ -350,9 +350,9 @@ for _name, _summary, _key, _output, _kind, _refs in (
         "inter_iamb",
         "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
         "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
-        "structure learner, or into the skeleton or the moral graph (output).",
+        "structure learner, or into the skeleton or the moral graph (structure).",
         "markov_blanket",
-        _BLANKET_OUTPUT,
+        _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
     ),
@@ -360,11 +360,11 @@ for _name, _summary, _key, _output, _kind, _refs in (
         "mmpc",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
-        "check. With target=null, the skeleton that mmhc searches, or, with output=cpdag, that "
+        "check. With target=null, the skeleton that mmhc searches, or, with structure=cpdag, that "
         "skeleton oriented into a CPDAG by the Grow-Shrink structure learner.",
         "parents_and_children",
         concept_param(
-            "output",
+            "structure",
             default="skeleton",
             choices=("skeleton", "cpdag"),
             doc="The graph returned without a target: skeleton = the adjacencies, each variable "
@@ -393,7 +393,7 @@ for _name, _summary, _key, _output, _kind, _refs in (
             column_order="relabels",
             tie_break=True,
             seeded=True,
-            params=(_TARGET, _output, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
+            params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
             references=_refs,
         )
     )
@@ -1957,9 +1957,9 @@ _MEMBER_RULE = (
     "Each end of a required edge is in the other's set from the start, and no test removes it. "
 )
 _BLANKET_ORIENT_RULE = (
-    "Under output=cpdag, every edge the knowledge decides is directed before the colliders, which "
-    "never reverse it, and Meek's rules R1-R4 follow; the undirected outputs do not read tiers or "
-    "edges forbidden one way."
+    "Under structure=cpdag, every edge the knowledge decides is directed before the colliders, "
+    "which never reverse it, and Meek's rules R1-R4 follow; the undirected structures do not read "
+    "tiers or edges forbidden one way."
 )
 _BLANKET_RULE = (
     _MEMBER_RULE

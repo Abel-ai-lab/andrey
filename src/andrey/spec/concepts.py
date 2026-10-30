@@ -35,8 +35,9 @@ Release = Literal["0.11.0", "0.12.0"]
 
 #: The score names every score search takes.
 SCORE_NAMES = SCORES
-#: The graphs a Markov-blanket search returns without a target (``output``), and the kind of each.
-BLANKET_OUTPUTS: dict[str, Kind] = {
+#: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
+#: each.
+BLANKET_STRUCTURES: dict[str, Kind] = {
     "cpdag": "cpdag",
     "skeleton": "undirected",
     "moral": "undirected",
@@ -856,7 +857,7 @@ _CONCEPTS = (
         others_exempt="No DirectLiNGAM order search.",
     ),
     Concept(
-        key="output",
+        key="structure",
         summary="The graph a Markov-blanket search returns without a target. The default follows "
         "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
         "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
@@ -864,14 +865,14 @@ _CONCEPTS = (
         "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
         "Markov blankets.",
         param=_template(
-            "output",
+            "structure",
             "str",
             "cpdag",
             "The graph returned without a target: cpdag = the skeleton with its colliders "
             "oriented and Meek's rules applied (Margaritis 2003); skeleton = the adjacencies, each "
             "variable joined to its parents and children; moral = the moral graph, each variable "
             "joined to its Markov blanket. With a target, the target's set, whatever the value.",
-            choices=tuple(BLANKET_OUTPUTS),
+            choices=tuple(BLANKET_STRUCTURES),
         ),
         fragment="cpdag",
         suitable=("iamb", "inter_iamb", "mmpc"),
@@ -879,7 +880,7 @@ _CONCEPTS = (
         deviations=(
             Deviation(
                 method="mmpc",
-                name="output",
+                name="structure",
                 default="skeleton",
                 choices=("skeleton", "cpdag"),
                 fixed_in=None,
@@ -959,9 +960,9 @@ _CONCEPTS = (
         key="graph_kind",
         summary="The graph kind names what an edge means: a search identified up to its "
         "equivalence class returns the class (cpdag, pag), and a graph whose edges claim no "
-        "direction is undirected. A fit returns the kind its spec declares; a method with output "
-        "returns the kind of its default, and cpdag for output=cpdag and undirected for skeleton "
-        "and moral.",
+        "direction is undirected. A fit returns the kind its spec declares; a method with "
+        "structure returns the kind of its default, and cpdag for structure=cpdag and undirected "
+        "for skeleton and moral.",
         suitable=ALL_METHODS,
     ),
     Concept(

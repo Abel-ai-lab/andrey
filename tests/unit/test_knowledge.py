@@ -20,7 +20,7 @@ from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
-from andrey.spec.concepts import BLANKET_OUTPUTS
+from andrey.spec.concepts import BLANKET_STRUCTURES
 
 # The searches that take knowledge and return a graph over the columns of a table.
 METHODS = [
@@ -55,14 +55,14 @@ SERIES_CASES = [
 PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
 # Undirected results: the knowledge sets which pairs are adjacent, and orients nothing.
 UNDIRECTED = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "undirected"}
-#: Each method and output choice whose graph is undirected.
-UNDIRECTED_OUTPUTS = [
+#: Each method and structure choice whose graph is undirected.
+UNDIRECTED_STRUCTURES = [
     (name, choice)
     for name, spec in REGISTRY.items()
     for param in spec.params
-    if param.concept == "output"
+    if param.concept == "structure"
     for choice in param.choices or ()
-    if BLANKET_OUTPUTS[choice] == "undirected"
+    if BLANKET_STRUCTURES[choice] == "undirected"
 ]
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
 # A short schedule: the knowledge holds whether or not the fit has converged.
@@ -688,17 +688,17 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
     # A blanket method directs edges only in its CPDAG.
-    settings = {"output": "cpdag"} if name in {"iamb", "inter_iamb", "mmpc"} else {}
+    settings = {"structure": "cpdag"} if name in {"iamb", "inter_iamb", "mmpc"} else {}
     with pytest.raises(KnowledgeError):
         _fit(name, _triangle(), knowledge=knowledge, **settings)
 
 
-@pytest.mark.parametrize(("name", "output"), UNDIRECTED_OUTPUTS)
+@pytest.mark.parametrize(("name", "structure"), UNDIRECTED_STRUCTURES)
 @pytest.mark.parametrize("knowledge", [CYCLE, Knowledge(tiers=[["c"], ["a", "b"]])])
-def test_tiers_and_one_way_forbidden_edges_leave_an_undirected_result(name, output, knowledge):
+def test_tiers_and_one_way_forbidden_edges_leave_an_undirected_result(name, structure, knowledge):
     # They constrain orientation only, which an undirected result does not have.
-    plain = _fit(name, _triangle(), output=output).structure.oriented_edges()
-    with_knowledge = _fit(name, _triangle(), output=output, knowledge=knowledge)
+    plain = _fit(name, _triangle(), structure=structure).structure.oriented_edges()
+    with_knowledge = _fit(name, _triangle(), structure=structure, knowledge=knowledge)
     assert with_knowledge.structure.oriented_edges() == plain
 
 

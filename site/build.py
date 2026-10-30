@@ -41,7 +41,7 @@ from andrey import GraphStructure
 from andrey.cli import main as andrey_cli
 from andrey.core.structure import Kind
 from andrey.spec import list_specs
-from andrey.spec.concepts import BLANKET_OUTPUTS
+from andrey.spec.concepts import BLANKET_STRUCTURES
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
@@ -1178,14 +1178,14 @@ NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "ei
 
 def experimental_kinds() -> set[str]:
     """The graph kinds that only experimental methods return: the kinds their specs declare and
-    the kinds of the graphs their ``output`` can name."""
+    the kinds of the graphs their ``structure`` can name."""
     specs = list_specs()
     supported = {spec.output.graph_kind for spec in specs if spec.status == "supported"}
     experimental = {spec.output.graph_kind for spec in specs if spec.status == "experimental"}
     for spec in specs:
-        outputs = [p.choices for p in spec.params if p.concept == "output" and p.choices]
-        if spec.status == "experimental" and outputs:
-            experimental |= {BLANKET_OUTPUTS[choice] for choice in outputs[0]}
+        structures = [p.choices for p in spec.params if p.concept == "structure" and p.choices]
+        if spec.status == "experimental" and structures:
+            experimental |= {BLANKET_STRUCTURES[choice] for choice in structures[0]}
     return experimental - supported
 
 

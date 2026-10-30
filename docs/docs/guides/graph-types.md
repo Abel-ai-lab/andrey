@@ -121,8 +121,8 @@ when saving or converting a graph.
 `kind="undirected"` holds `(TAIL, TAIL)` pairs only. Its edges claim no direction, and a moral
 graph's edges also join spouses, two parents of one child that need not be adjacent. `mmpc`
 returns the skeleton of its parents-and-children sets by default, an undirected graph, and a CPDAG
-with `output="cpdag"`. `iamb` and `inter_iamb` return a CPDAG by default; with `output="skeleton"`
-they return its adjacencies as an undirected graph, and with `output="moral"` the moral graph of
+with `structure="cpdag"`. `iamb` and `inter_iamb` return a CPDAG by default; with `structure="skeleton"`
+they return its adjacencies as an undirected graph, and with `structure="moral"` the moral graph of
 their Markov blankets. With a `target`, the three return that variable's set as undirected edges.
 An undirected graph has no CPDAG or DAG, so `andrey.metrics.score` scores it on its skeleton
 alone: `shd` counts the pairs adjacent in one graph and not in the other, and no arrowhead metric
