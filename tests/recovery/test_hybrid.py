@@ -217,7 +217,7 @@ def test_rsmax2_rejects_settings_it_does_not_take(setting, error):
 def test_categorical_data_with_the_chi_square_test_and_bdeu():
     """On a categorical collider, MMHC keeps the independent causes apart, which hill climbing
     alone joins; tabu search within the same skeleton orients the collider."""
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(3)
     a, b = rng.integers(0, 2, (2, 3000))
     c = np.where(rng.random(3000) < 0.85, a + b, rng.integers(0, 3, 3000))
     x = np.column_stack([a, b, c]).astype(float)

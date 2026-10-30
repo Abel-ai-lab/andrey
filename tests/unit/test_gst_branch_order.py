@@ -228,7 +228,7 @@ def test_ranks_move_with_the_columns_and_the_score_is_the_same(case) -> None:
 @pytest.mark.parametrize("search", [boss, grasp])
 def test_the_seed_still_matters(search) -> None:
     """Different seeds shuffle the sorted columns differently and can reach different graphs."""
-    x = _linear(1)
+    x = _linear(5)
     graphs = {
         search(x, random_state=seed, ebic_gamma=0.0)[0].to_numpy().tobytes() for seed in range(4)
     }
