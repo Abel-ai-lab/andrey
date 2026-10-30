@@ -977,38 +977,6 @@ _add(
         ),
     )
 )
-_add(
-    MethodSpec(
-        name="cam",
-        family="score",
-        summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
-        "boosting preselects each variable's possible parents, a greedy search adds edges by the "
-        "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
-        "Returns a DAG and a causal order. Deterministic; no torch.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="dag",
-            has_ordering=True,
-            doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
-        ),
-        determinism="deterministic",
-        accel="numpy",
-        status="experimental",
-        column_order="relabels",
-        tie_break=True,
-        params=(
-            concept_param(
-                "alpha",
-                default=0.001,
-                doc="Significance level of the pruning test: a parent stays when its smooth "
-                "term's p-value is at most alpha. 0.001 is the paper's value.",
-            ),
-        ),
-        references=("Buhlmann, Peters & Ernest 2014",),
-    )
-)
-
 # --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
 
 _HYBRID_MAX_ITER = concept_param(
@@ -1308,6 +1276,44 @@ _add(
             ),
         ),
         references=("Shimizu 2012",),
+    )
+)
+
+# --- nonlinear additive-noise family (Hoyer et al. 2009; Peters et al. 2014) ----------------------
+
+_add(
+    MethodSpec(
+        name="cam",
+        family="additive_noise",
+        summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
+        "boosting preselects each variable's possible parents, a greedy search adds edges by the "
+        "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
+        "Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the paper's value.",
+            ),
+        ),
+        references=(
+            "Buhlmann, Peters & Ernest 2014",
+            "Hoyer et al. 2009",
+            "Peters, Mooij, Janzing & Scholkopf 2014",
+        ),
     )
 )
 

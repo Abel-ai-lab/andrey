@@ -64,10 +64,10 @@ def cam(
     """Learn a DAG with CAM, the causal additive model (nonlinear additive effects).
 
     CAM [1]_ models each variable as a sum of smooth functions of its parents plus Gaussian noise,
-    ``x_j = sum_k f_jk(x_k) + e_j``, which identifies the DAG when the functions are nonlinear. It
-    preselects each variable's possible parents by boosting, adds edges greedily by the drop in the
-    log residual variance until the DAG is complete within them, and prunes the edges whose smooth
-    terms are not significant. It returns a DAG and a causal order.
+    ``x_j = sum_k f_jk(x_k) + e_j``, which identifies the DAG when the functions are nonlinear
+    [6]_ [7]_. It preselects each variable's possible parents by boosting, adds edges greedily by
+    the drop in the log residual variance until the DAG is complete within them, and prunes the
+    edges whose smooth terms are not significant. It returns a DAG and a causal order.
 
     Parameters
     ----------
@@ -196,6 +196,10 @@ def cam(
        Society B 65(1), 95-114.
     .. [5] Wood, S. N. (2013). On p-values for smooth components of an extended generalized
        additive model. Biometrika 100(1), 221-228.
+    .. [6] Hoyer, P. O., Janzing, D., Mooij, J. M., Peters, J., and Scholkopf, B. (2009). Nonlinear
+       causal discovery with additive noise models. NeurIPS 21, 689-696.
+    .. [7] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. Journal of Machine Learning Research 15, 2009-2053.
 
     Examples
     --------

@@ -345,6 +345,7 @@ _FAMILY_TITLES = {
     "score": "Score-based",
     "permutation": "Permutation-based",
     "lingam": "LiNGAM (linear non-Gaussian)",
+    "additive_noise": "Nonlinear additive noise",
     "temporal": "Temporal",
     "latent": "Latent-variable",
     "pairwise": "Pairwise",

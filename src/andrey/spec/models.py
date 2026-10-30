@@ -13,7 +13,16 @@ from typing import Any, Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, model_validator
 
-Family = Literal["constraint", "score", "permutation", "lingam", "temporal", "latent", "pairwise"]
+Family = Literal[
+    "constraint",
+    "score",
+    "permutation",
+    "lingam",
+    "additive_noise",
+    "temporal",
+    "latent",
+    "pairwise",
+]
 Determinism = Literal["deterministic", "stochastic"]
 Accel = Literal["numpy", "torch"]
 # supported: benchmarked and gated before each release. experimental: warns once; API may change.

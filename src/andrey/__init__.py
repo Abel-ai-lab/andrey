@@ -116,13 +116,14 @@ __all__ = [
     "calm",
     "notears",
     "dagma",
-    "cam",
     "mmhc",
     "rsmax2",
     "boss",
     "grasp",
     "direct_lingam",
     "ica_lingam",
+    # Nonlinear additive noise.
+    "cam",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

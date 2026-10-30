@@ -44,7 +44,6 @@ __all__ = [
     "calm",
     "notears",
     "dagma",
-    "cam",
     # hybrid: a restrict phase of CI tests, then a score search
     "mmhc",
     "rsmax2",
@@ -55,6 +54,8 @@ __all__ = [
     "direct_lingam",
     "ica_lingam",
     "multi_group_direct_lingam",
+    # nonlinear additive-noise family
+    "cam",
     # temporal family
     "varma_lingam",
     "longitudinal_lingam",
