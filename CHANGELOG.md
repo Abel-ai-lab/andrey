@@ -153,6 +153,11 @@ names its pull request.
   effects with the paper's settings: boosting preselects each variable's possible parents, a
   greedy search adds edges by the drop in log residual variance of additive spline fits, and
   smooth-term tests prune them; it is experimental. ([#TBD])
+- `resit`, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf
+  2014), learns a DAG and a causal order from nonlinear effects with additive noise of any
+  distribution, with the paper's settings: it takes as each next sink the variable whose
+  additive-model residual an HSIC test finds most independent of the others, then removes each
+  parent whose removal leaves the residual independent; it is experimental. ([#TBD])
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
   `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
   `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,

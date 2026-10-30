@@ -1,4 +1,4 @@
-"""Functional-causal-model facades: CAM fits each variable as additive functions of its parents."""
+"""Functional-causal-model facades: CAM and RESIT fit each variable as a function of its parents."""
 
 from __future__ import annotations
 
@@ -27,12 +27,12 @@ if TYPE_CHECKING:
 MIN_DISTINCT = 3
 
 
-def _smooth_columns(X: np.ndarray, labels: tuple[str, ...] | None) -> None:
+def _smooth_columns(X: np.ndarray, labels: tuple[str, ...] | None, method: str) -> None:
     """Raise ``ValueError`` when a column cannot carry a smooth term or repeats another.
 
-    A column with fewer than :data:`MIN_DISTINCT` distinct values has no smooth basis, and a column
-    that repeats another up to scale and shift explains it with no residual. The messages name every
-    such column.
+    A column with fewer than :data:`MIN_DISTINCT` distinct values, such as a binary one, has no
+    smooth basis, and a column that repeats another up to scale and shift explains it with no
+    residual. The messages name ``method`` and every such column.
     """
     name = column_namer(labels)
     few = [j for j in range(X.shape[1]) if np.unique(X[:, j]).size < MIN_DISTINCT]
@@ -44,9 +44,9 @@ def _smooth_columns(X: np.ndarray, labels: tuple[str, ...] | None) -> None:
             columns = f"columns {', '.join(names[:-1])} and {names[-1]}"
             verb, pronoun = "have", "them"
         raise ValueError(
-            f"data {columns} {verb} fewer than {MIN_DISTINCT} distinct values; cam fits a smooth "
-            f"function of each variable, which needs at least {MIN_DISTINCT}, so drop {pronoun} "
-            "before the fit"
+            f"data {columns} {verb} fewer than {MIN_DISTINCT} distinct values; {method} fits a "
+            f"smooth function of each variable, which needs at least {MIN_DISTINCT}, so drop "
+            f"{pronoun} before the fit"
         )
     if X.shape[1] > 1:
         groups = copy_groups(np.corrcoef(X, rowvar=False), X.shape[0])
@@ -222,7 +222,7 @@ def cam(
 
     X = data_matrix(data, method="cam")
     labels = column_labels(data)
-    _smooth_columns(X, labels)
+    _smooth_columns(X, labels, "cam")
     constraints = resolve(knowledge, X.shape[1], labels, method="cam")
     # The fit runs on the columns in rank order, so no step reads their positions.
     order = np.argsort(tie_ranks(X), kind="stable")
@@ -232,6 +232,196 @@ def cam(
         forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
     with one_blas_thread():
         result = _cam(
+            X[:, order],
+            alpha=alpha,
+            forbidden=forbidden,
+            required=required,
+            precedence=precedence,
+        )
+    back = np.argsort(order)
+    dag = result.dag[np.ix_(back, back)]
+    return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
+#: Fewest rows of the HSIC test, whose null variance has the factor ``(n - 4)(n - 5)``.
+MIN_ROWS = 6
+
+
+def _regression_rows(X: np.ndarray) -> None:
+    """Raise ``ValueError`` when the first regression has as many coefficients as rows.
+
+    The first step fits each variable on the ``d - 1`` others, each smooth term of at least 3
+    basis functions, 2 coefficients after its centering constraint, plus the intercept: ``2d - 1``
+    coefficients, which need ``2d`` rows. A later fit has fewer terms or fewer coefficients.
+    """
+    n, d = X.shape
+    if n < 2 * d:
+        raise ValueError(
+            f"data needs at least {2 * d} rows (samples) over {d} variables, got {n}: resit "
+            f"regresses each variable on the other {d - 1} with a smooth term of at least 2 "
+            "coefficients each, plus an intercept, which needs more rows than coefficients"
+        )
+
+
+@method_spec("resit")
+def resit(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.05,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with RESIT, regression with subsequent independence tests (additive noise).
+
+    RESIT [1]_ models each variable as a function of its parents plus noise independent of its
+    non-descendants, ``x_j = f_j(parents) + e_j``, which identifies the DAG when the functions are
+    nonlinear or the noise is not Gaussian [1]_ [3]_. It finds a causal order from the sink up,
+    taking as the next sink the variable whose additive-model residual is most independent of the
+    others by an HSIC test [2]_, then removes each parent whose removal leaves the residual
+    independent of the variable's predecessors. It returns a DAG and a causal order.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.05
+        The significance level of the edge-removal tests: a parent goes when the residual without
+        it is independent of the variable's predecessors at a p-value above ``alpha``, in
+        ``(0, 1)``. The causal order does not read it. ``0.05`` is the paper's value.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is the next sink only
+        when no remaining variable is in a later tier or is the effect of a required edge out of
+        it. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are in
+        no regression and never in the result; each test still reads every remaining variable or
+        predecessor. The edge removal never removes a required edge.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"resit"`` and ``metadata["tie_break"]`` the rule ties followed. ``ordering`` is the
+        causal order of the sink search, as a tuple of column indices, causes first.
+
+    Raises
+    ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or
+        fewer than twice as many rows as columns, or with a constant column, a column of fewer than
+        3 distinct values, or a column that repeats another up to scale and shift, each named in
+        the message. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+
+    See Also
+    --------
+    andrey.cam : Additive effects with Gaussian noise, scored by the likelihood.
+    andrey.anm : Decides the direction between two variables under an additive noise model.
+    andrey.pc, andrey.ges : Return the equivalence class, which is what linear Gaussian data
+        identify.
+
+    Notes
+    -----
+    **When to use it.** RESIT suits continuous data whose effects are nonlinear and additive in the
+    parents, with additive noise of any distribution and no unmeasured common causes [1]_. It reads
+    the noise through independence tests, not a likelihood, so the noise need not be Gaussian.
+
+    **When not to.** With linear effects and Gaussian noise only the Markov equivalence class is
+    identified: use :func:`~andrey.pc` or :func:`~andrey.ges`. Noise whose scale depends on the
+    parents breaks the independence of the residuals. Each test of the causal order reads all the
+    remaining variables jointly, so its power falls as the variables grow, and an early wrong sink
+    carries through the rest of the order [1]_.
+
+    **The steps.** The paper's settings, in its two phases [1]_:
+
+    1. *Causal order.* Each remaining variable is regressed on the other remaining ones and its
+       residual tested against them jointly; the variable whose residual has the largest p-value
+       is the next sink, and the variables still remaining are its possible parents.
+    2. *Edge removal.* Each variable's possible parents are tried one at a time, in column order:
+       a parent goes when the residual of the fit on the other current parents has a p-value
+       above ``alpha`` against all the variable's predecessors in the order. With one parent
+       left, the residual without it is the variable itself.
+
+    Each regression is an additive model of penalized thin plate regression splines with ten
+    basis functions per term and smoothing chosen by GCV [4]_, with
+    ``ceil(n_samples / (3 n_parents))`` functions per term, at least 3, when there are fewer than
+    30 rows per term, and at most one per distinct value. Each test is the HSIC test [2]_ with
+    Gaussian kernels on the residual and on the other side's joint squared distances, each
+    bandwidth the median of the positive squared distances over every pair of rows, and the null
+    approximated by a gamma law matched to its mean and variance.
+
+    The kernels read the columns divided by their standard deviations, and each smooth term reads
+    a variable through an affine map to a fixed interval, so rescaling a column changes no step.
+    The paper's kernel reads several raw columns at once and so weighs each by its units; on
+    columns of one scale, such as standardized data, the two kernels are the same. The fit draws
+    no random numbers and runs on one BLAS thread.
+
+    **Ties.** p-values are compared as their logarithms rounded to 9 decimal places, as
+    :func:`~andrey.hc` compares its score changes per row, so two p-values that differ only in
+    their rounding tie; so do p-values too small to represent. A tie goes to the variable with the
+    lower rank computed from each column's own data, as for :func:`~andrey.hc`, and the edge
+    removal tries the parents in that rank order; the fit runs on the columns in that rank order,
+    so the result does not depend on the column order unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet.
+
+    References
+    ----------
+    .. [1] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. Journal of Machine Learning Research 15, 2009-2053.
+    .. [2] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J. (2007).
+       A kernel statistical test of independence. NeurIPS 20, 585-592.
+    .. [3] Hoyer, P. O., Janzing, D., Mooij, J. M., Peters, J., and Scholkopf, B. (2009). Nonlinear
+       causal discovery with additive noise models. NeurIPS 21, 689-696.
+    .. [4] Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical
+       Society B 65(1), 95-114.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import resit
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.uniform(-2, 2, 300)
+    >>> y = np.sin(2 * x) + 0.3 * rng.standard_normal(300)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = resit(np.column_stack([x, y]))
+    >>> out.structure.kind, out.ordering
+    ('dag', (0, 1))
+    """
+    from andrey.fcm.resit import resit as _resit
+    from andrey.search.hc import tie_ranks
+
+    X = data_matrix(data, method="resit", min_rows=MIN_ROWS)
+    labels = column_labels(data)
+    _smooth_columns(X, labels, "resit")
+    _regression_rows(X)
+    constraints = resolve(knowledge, X.shape[1], labels, method="resit")
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    forbidden = required = precedence = None
+    if constraints is not None:
+        ranked = constraints.permuted(order)
+        forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
+    with one_blas_thread():
+        result = _resit(
             X[:, order],
             alpha=alpha,
             forbidden=forbidden,

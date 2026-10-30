@@ -288,6 +288,7 @@ UNIT_CASES = {
     "anm": "anm_pair_cubic",
     "pnl": "anm_pair_cubic",
     "cam": "nonmonotone_4v",
+    "resit": "nonmonotone_4v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
@@ -504,9 +505,9 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
 
 def keeps_the_required_edge(method: str) -> bool:
     """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
-    a constant column and CAM, which needs three distinct values per column, on data where its
-    weight is exactly 0."""
-    flat = () if method in (*PCMCI_FAMILY, "cam") else ("flat",)
+    a constant column and CAM and RESIT, which need three distinct values per column, on data where
+    its weight is exactly 0."""
+    flat = () if method in (*PCMCI_FAMILY, "cam", "resit") else ("flat",)
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 
 

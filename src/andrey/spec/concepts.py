@@ -142,6 +142,7 @@ ALL_METHODS = (
     "calm",
     *_CONTINUOUS,
     "cam",
+    "resit",
     "mmhc",
     "rsmax2",
     *_LINGAM,
@@ -166,7 +167,7 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam", "resit"),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt("Continuous optimization: no test decides an edge.", *_CONTINUOUS),
@@ -234,7 +235,9 @@ _CONCEPTS = (
         suitable=(*CI_SEARCHES, *PCMCI_FAMILY),
         exempt=(
             *_exempt(
-                "It tests the independence of residuals as part of its own model.", *_RESIDUAL
+                "It tests the independence of residuals as part of its own model.",
+                *_RESIDUAL,
+                "resit",
             ),
             *_exempt("No conditional-independence test.", *_PURE_SCORE, *_CONTINUOUS, *_LINGAM),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
@@ -403,6 +406,7 @@ _CONCEPTS = (
                 *_PURE_SCORE,
                 "calm",
                 "cam",
+                "resit",
                 *_CONTINUOUS,
                 *_LINGAM,
                 "granger",
@@ -486,7 +490,7 @@ _CONCEPTS = (
                 "A cardinality cap is not part of the continuous objective.", "calm", *_CONTINUOUS
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *_LINGAM),
-            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
+            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL, "resit"),
             *_exempt(
                 "The paper's search sets no cap; the neighbor preselection keeps at most ten "
                 "possible parents per variable.",
@@ -577,6 +581,7 @@ _CONCEPTS = (
                 *(m for m in _PURE_SCORE if m not in _STARTS),
                 *_CONTINUOUS,
                 "cam",
+                "resit",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -797,6 +802,7 @@ _CONCEPTS = (
                 "calm",
                 *_CONTINUOUS,
                 "cam",
+                "resit",
                 *_LINGAM,
                 "gin",
                 "rcd",

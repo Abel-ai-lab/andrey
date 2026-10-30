@@ -11,6 +11,9 @@ independent.
 - :func:`hsic_gamma_from_grams`, used by RCD and ParceLiNGAM with the grams of :func:`gamma_gram`,
   sets the bandwidth by the median distance over the first rows without z-scoring, corrects the
   variance for bias, and returns the statistic with the p-value.
+- :func:`hsic_moments_from_grams`, used by RESIT with the grams of :func:`median_gram`, takes each
+  side's kernel on its joint squared distances with the median over every pair of rows as the
+  bandwidth, and matches the gamma law to the null mean and variance of Gretton et al. (2007).
 
 References
 ----------
@@ -25,7 +28,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from scipy.special import gammainc
+from scipy.special import gammainc, gammaincc
 from scipy.stats import zscore
 
 
@@ -267,3 +270,58 @@ def hsic_gamma_from_grams(
     shape = mean**2 / var
     scale = var * n / mean
     return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
+
+
+# ---- RESIT HSIC (joint median bandwidth, the null moments of Gretton et al. 2007) ---------------
+
+
+def median_gram(sq_dists: np.ndarray) -> tuple[np.ndarray, float, float]:
+    """Return one side's ``(centered_gram, off_diagonal_mean, sum_of_squares)`` for the moment HSIC.
+
+    ``sq_dists`` holds the squared Euclidean distances between the rows of the side, one variable or
+    several jointly. The Gaussian kernel is ``exp(-D / m)``, ``m`` the median of the positive
+    squared distances over every pair of rows: the median heuristic ``sigma = sqrt(m / 2)``, under
+    which a common rescaling of the side's coordinates leaves the kernel unchanged. A side whose
+    rows are all equal has the all-ones kernel, whose centered gram is zero. The off-diagonal mean
+    is of the raw kernel; the sum of squares is of the centered gram.
+    """
+    n = sq_dists.shape[0]
+    upper = sq_dists[_triu_k1(n)]
+    positive = upper[upper > 0]
+    kernel = np.exp(-sq_dists / np.median(positive)) if positive.size else np.ones((n, n))
+    mean = float((kernel.sum() - np.trace(kernel)) / (n * (n - 1)))
+    centered = _center_kernel(kernel)
+    return centered, mean, float(np.sum(centered * centered))
+
+
+def hsic_moments_from_grams(
+    gram_x: tuple[np.ndarray, float, float], gram_y: tuple[np.ndarray, float, float]
+) -> tuple[float, float]:
+    """Return ``(statistic, p_value)`` of the HSIC test from two :func:`median_gram` outputs.
+
+    The statistic is ``n HSIC_b = sum(Kc * Lc) / n`` for the centered grams ``Kc`` and ``Lc`` of
+    ``n`` rows. Under independence it is matched to a gamma law with the mean and variance of
+    ``HSIC_b`` from Gretton et al. (2007), each kernel's squared Hilbert-Schmidt norm estimated by
+    ``sum(Kc^2) / (n - 1)^2``:
+
+        mean = (1 + mu_x mu_y - mu_x - mu_y) / n,
+        var = 2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3)) sum(Kc^2) sum(Lc^2) / (n - 1)^4,
+        shape = mean^2 / var,   scale = n var / mean,
+
+    with ``mu`` each raw kernel's off-diagonal mean. The p-value is the gamma upper tail, the
+    regularized upper incomplete gamma function, which keeps its relative precision far below
+    ``1e-16``. A larger p-value means more independent. A side with a zero centered gram, a constant
+    variable, is independent of any other: statistic ``0`` and p-value ``1``. Needs ``n >= 6``.
+    """
+    cen_x, mu_x, sq_x = gram_x
+    cen_y, mu_y, sq_y = gram_y
+    n = cen_x.shape[0]
+    if sq_x == 0 or sq_y == 0:
+        return 0.0, 1.0
+    statistic = float(np.sum(cen_x * cen_y)) / n
+    mean = (1.0 + mu_x * mu_y - mu_x - mu_y) / n
+    var = 2.0 * (n - 4) * (n - 5) / (n * (n - 1) * (n - 2) * (n - 3))
+    var *= sq_x / (n - 1) ** 2 * sq_y / (n - 1) ** 2
+    shape = mean**2 / var
+    scale = n * var / mean
+    return statistic, float(gammaincc(shape, statistic / scale))
