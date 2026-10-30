@@ -196,22 +196,22 @@ def cam(
 
     **Limitations.** Not benchmarked against other packages yet. Measured on simulated data with
     1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized columns, ten graphs at 20
-    variables and two or three at 100, on one core. On additive-noise data with Gaussian noise it
-    oriented 88.5% to 95% of the true edges correctly at 20 variables, depending on the generator,
-    and 95% at 100, with median errors (SHD) of 2 to 2.5 and 9 against the empty graph's 20 and 100;
-    with Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose noise
-    scale changes with the parents, break the model's fixed noise variance: it reversed 42% of the
-    true edges at 20 variables and 32% at 100, with median errors of 11.5 and 54. Linear Gaussian
-    data identify only the Markov equivalence class, and there the two directions of an edge fit
-    equally, their gains differing by less than ``1e-6``, so the direction of an edge the class
-    leaves undirected is arbitrary: it reversed 36% of the true edges at 20 variables, with median
-    errors of 11 at 20 variables and 84 at 100. A fit took a median of 3 s at 20 variables and 22 s
-    at 100, about 40% of it in the neighbor preselection and 55% in the order search. The smoothing
-    of each fit is a local minimum of its GCV score, which can have several, so two edges of nearly
-    equal gain can be added in either order. Binary columns, and any column with fewer than 3
-    distinct values, are not supported: a smooth term needs at least 3, so such a column raises
-    ``ValueError``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    and at 100 variables, on one core. On additive-noise data with Gaussian noise it oriented 88.5%
+    to 95% of the true edges correctly at 20 variables, depending on the generator, and 97.5% at
+    100, with median errors (SHD) of 2 to 2.5 and 8 against the empty graph's 20 and 100; with
+    Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose noise scale
+    changes with the parents, break the model's fixed noise variance: it reversed 42% of the true
+    edges at 20 variables and 32% at 100, with median errors of 11.5 and 55.5. Linear Gaussian data
+    identify only the Markov equivalence class, and there the two directions of an edge fit equally,
+    their gains differing by less than ``1e-6``, so the direction of an edge the class leaves
+    undirected is arbitrary: it reversed 36% of the true edges at 20 variables and 32% at 100, with
+    median errors of 11 and 68. On the additive-noise data a fit took a median of 3 s at 20
+    variables and 21 s at 100, about 40% of it in the neighbor preselection and 55% in the order
+    search. The smoothing of each fit is a local minimum of its GCV score, which can have several,
+    so two edges of nearly equal gain can be added in either order. Binary columns, and any column
+    with fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so such a
+    column raises ``ValueError``. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
     independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and
