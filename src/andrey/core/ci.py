@@ -516,7 +516,35 @@ class NormalScores(FisherZ):
     The scores estimate the latent correlation without the sine transformation of Spearman's rho
     that Harris and Drton (2013) use for the same model. On the grid measured for this test, the
     sine-transformed Spearman estimate rejected a true null more often than the nominal level
-    (0.06 to 0.09 at 0.05 for n = 200 and 500), which the scores did not.
+    (0.06 to 0.09 at 0.05 for n = 200 and 500, 2,000 runs per cell), which the scores did not.
+
+    The scores keep the level where Fisher-Z loses it. Each cell below is the fraction of 1,000
+    simulated data sets in which a true conditional independence is rejected at level 0.05. The
+    columns are jointly Gaussian variables, passed through the identity (``gauss``), ``exp``,
+    ``x**3``, or a heavy-tailed monotone map (``heavy``); the pair is independent given ``|S|``
+    common causes::
+
+    n     |S|   fisherz (gauss, exp, cubic, heavy)   normal_scores (gauss, exp, cubic, heavy)
+    200   0     0.051 0.042 0.045 0.064              0.048 0.045 0.054 0.058
+    200   2     0.042 0.238 0.285 0.312              0.046 0.054 0.058 0.044
+    500   0     0.042 0.041 0.055 0.056              0.045 0.052 0.048 0.053
+    500   2     0.050 0.325 0.437 0.460              0.048 0.050 0.042 0.056
+    2000  0     0.048 0.057 0.048 0.053              0.046 0.040 0.037 0.056
+    2000  2     0.041 0.517 0.558 0.535              0.041 0.036 0.051 0.057
+
+    On ``pc`` at its default level, over 10 random DAGs per row with expected degree 3, the paired
+    difference in skeleton errors (normal_scores minus fisherz; negative favors normal_scores), with
+    a 95% interval, is::
+
+    d    n      Gaussian        exp             mixed monotone
+    10   500    -0.1 +- 0.2     -4.2 +- 1.9     -1.9 +- 1.3
+    10   2000   +0.0 +- 0.0     -3.2 +- 2.3     -2.9 +- 1.9
+    20   500    +0.1 +- 0.2     -13.2 +- 3.0    -8.9 +- 2.8
+    20   2000   +0.2 +- 0.5     -16.7 +- 4.6    -11.0 +- 2.5
+
+    The test is as fast as Fisher-Z: a fit on 10 to 20 columns and 500 to 2,000 rows takes between
+    4 and 20 milliseconds for both. Its p-values are the same whatever the marginals, as the ranks
+    do not see them.
 
     **Limitations.** Ranks measure monotone dependence: a relation that is not monotone, such as
     ``y = x**2`` for a symmetric ``x``, has zero rank correlation, and the test finds nothing where

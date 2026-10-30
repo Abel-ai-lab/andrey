@@ -225,6 +225,13 @@ names its pull request.
   (`table()`), and `andrey markov-check GRAPH DATA` runs the check from the command line. The
   docstring gives the rates measured for missing, extra, and reversed edges and for categorical
   data. ([#571])
+- `indep_test="normal_scores"` runs Fisher's z test on the normal scores of each column, a rank-based
+  test for data whose columns are monotone transformations of Gaussian variables (a Gaussian
+  copula): its p-values do not change under a strictly increasing transformation of a column, and
+  it holds its level where `"fisherz"` over-rejects on skewed or heavy-tailed marginals. `pc`,
+  `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`,
+  and `lpcmci` take it; on data with missing values, each test ranks within the rows it reads. It
+  finds only monotone dependence. The default test is unchanged. ([#NNN])
 
 ### Changed
 
@@ -1392,3 +1399,4 @@ First alpha release.
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
 [#569]: https://github.com/Abel-ai-lab/andrey/pull/569
 [#571]: https://github.com/Abel-ai-lab/andrey/pull/571
+[#NNN]: https://github.com/Abel-ai-lab/andrey/pull/NNN
