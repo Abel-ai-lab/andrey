@@ -169,6 +169,28 @@
           {"seed": 4, "andrey": 8, "comparator": 7, "andrey_reversed": 7, "andrey_reversed_is_comparator": true}
         ]
       }
+    },
+    {
+      "summary": "0.13.0",
+      "method": "IAMB",
+      "comparator": "bnlearn",
+      "row": {"mean_degree": 2.0, "d": 50, "n": 5000},
+      "andrey_errors": 9.15,
+      "comparator_errors": 8.65,
+      "cause": "correct-by-paper",
+      "reason": "On every dataset where the two outputs differ, the difference starts at one node's first grow step. There the p-values of several candidates underflow to exactly 0 in bnlearn, which takes the first column among them. Andrey takes the candidate with the strongest test statistic, the association measure that IAMB maximizes. Applied in Andrey's search, bnlearn's choice reproduces bnlearn's skeleton on all 4 differing datasets. Two of them have skeletons that differ and carry +7 of the row's +10 pairs; the other two have equal skeletons and carry +3, from Meek's rules on a cyclic partially directed graph and from a collider that bnlearn skips for closing a directed cycle.",
+      "citation": "Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Algorithms for large scale Markov blanket discovery. FLAIRS, 376-380: the forward phase admits the variable that maximizes a heuristic function f(X ; T | CMB), a measure of association, not a p-value. bnlearn 5.2.1, traced through ia.markov.blanket: candidates whose p-value is 0 are taken in column order."
+    },
+    {
+      "summary": "0.13.0",
+      "method": "MMPC, CPDAG",
+      "comparator": "bnlearn",
+      "row": {"mean_degree": 2.0, "d": 100, "n": 1000},
+      "andrey_errors": 37.05,
+      "comparator_errors": 36.35,
+      "cause": "correct-by-paper",
+      "reason": "On every traced dataset where the two outputs differ, the difference starts at one node's first forward step. There the p-values of several candidates underflow to exactly 0 in bnlearn, which takes the first column among them. Andrey takes the candidate with the strongest test statistic, which the MMPC paper uses to break ties between equal p-values. Applied in Andrey's search, bnlearn's choice reproduces bnlearn's skeleton on all 8 traced datasets. The 7 with differing skeletons carry +12 of the row's +14 pairs; the other +2 come from one dataset with an equal skeleton, where the two blankets of a triple have equal size and bnlearn tests a collider on one of them, Andrey on both.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78: to break ties among equal p-values the G2 statistic is used. bnlearn 5.2.1, traced through maxmin.pc.forward.phase: candidates whose p-value is 0 are taken in column order."
     }
   ]
 }
