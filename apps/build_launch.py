@@ -186,7 +186,7 @@ def methods_block():
 # planned in the roadmap's own stage for them.
 PLANNED = {
     "score": ["CAM", "FGES"],
-    "temporal": ["DYNOTEARS", "J-PCMCI+"],
+    "temporal": ["DYNOTEARS"],
     "latent": ["CAM-UV", "FOFC"],
     "pairwise": ["RESIT"],
 }

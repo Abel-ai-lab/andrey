@@ -22,7 +22,7 @@ reference](https://andrey.abel.ai/docs/api.html) says which.
 | Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html) (experimental), [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html) (experimental), CAM, FGES |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html) |  |
 | Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html) |  |
-| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html) | DYNOTEARS, J-PCMCI+ |
+| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html) | DYNOTEARS |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html) | CAM-UV, FOFC |
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html) | RESIT |
 
@@ -32,9 +32,9 @@ reference](https://andrey.abel.ai/docs/api.html) says which.
 
 Experiments reveal causal directions that observational data cannot. Methods that learn from
 interventional data, alone or mixed with observational data: GIES today, then FCI-JCI, BOSS-FCI,
-GRaSP-FCI, UT-IGSP, and a domain index for the score-based and permutation searches, with Sachs's
-nine conditions as a real test set, and interventions in `andrey.data`'s simulations, so every such
-method is benchmarked on data with a known answer.
+GRaSP-FCI, J-PCMCI+ for time series, UT-IGSP, and a domain index for the score-based and permutation
+searches, with Sachs's nine conditions as a real test set, and interventions in `andrey.data`'s
+simulations, so every such method is benchmarked on data with a known answer.
 
 ## 3. Local causal discovery
 
