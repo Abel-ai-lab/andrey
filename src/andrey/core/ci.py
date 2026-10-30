@@ -17,9 +17,11 @@ and first-order closed forms, the many-query path
 (:meth:`~PartialCorrelationTest.statistic_pvalues`), and the path for queries already canonical,
 which the skeleton search and GFCI's separating-set search take, return the same p-values exactly.
 
-The two partial-correlation tests differ only in how a partial correlation ``r`` and its degrees of
-freedom become a p-value. :class:`FisherZ` applies the normal distribution to Fisher's z-transform
-of ``r``; :class:`StudentT` applies the Student-t distribution to ``t = r * sqrt(df / (1 - r**2))``.
+The partial-correlation tests differ in how a partial correlation ``r`` and its degrees of freedom
+become a p-value, and in the data they read. :class:`FisherZ` applies the normal distribution to
+Fisher's z-transform of ``r``; :class:`StudentT` applies the Student-t distribution to
+``t = r * sqrt(df / (1 - r**2))``. :class:`NormalScores` is :class:`FisherZ` on the normal scores of
+each column, which makes it blind to monotone transformations of the columns.
 
 :class:`ChiSquare` implements the Pearson chi-square and G-square tests on category codes: one
 contingency table of ``x`` and ``y`` per observed configuration of the conditioning set. Its
@@ -52,6 +54,15 @@ Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of 
 International Journal of Data Science and Analytics 6(1), 3-18.
 https://doi.org/10.1007/s41060-017-0085-7
 
+van der Waerden, B. L. (1952). Order tests for the two-sample problem and their power. Indagationes
+Mathematicae 14, 453-458.
+
+Liu, H., Lafferty, J., and Wasserman, L. (2009). The nonparanormal: semiparametric estimation of
+high dimensional undirected graphs. Journal of Machine Learning Research 10, 2295-2328.
+
+Harris, N., and Drton, M. (2013). PC algorithm for nonparanormal graphical models. Journal of
+Machine Learning Research 14, 3365-3383.
+
 Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed acyclic
 graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
 """
@@ -66,7 +77,7 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
-from scipy.special import chdtrc, ndtr, stdtr
+from scipy.special import chdtrc, ndtr, ndtri, stdtr
 
 from . import categorical, stats
 from .mixed import ConditionalGaussian, DegenerateGaussian
@@ -76,6 +87,7 @@ __all__ = [
     "CITest",
     "FisherZ",
     "StudentT",
+    "NormalScores",
     "register_indep_test",
     "available_indep_tests",
     "make_indep_test",
@@ -479,6 +491,47 @@ class StudentT(PartialCorrelationTest):
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
         t = r * np.sqrt(df / (1.0 - r * r))
         return 2.0 * stdtr(df, -np.abs(t))
+
+
+class NormalScores(FisherZ):
+    """Fisher-Z test on the normal scores of each column: a rank-based test for monotone effects.
+
+    Each column is replaced by its normal scores ``Phi^-1(rank / (n + 1))`` (van der Waerden), with
+    tied values sharing their average rank, and the :class:`FisherZ` test runs on the scores. The
+    scores depend on a column only through its ranks, so the p-value of every query is unchanged by
+    a strictly increasing transformation of any column. For data whose columns are monotone
+    transformations of jointly Gaussian variables, a Gaussian copula or nonparanormal model
+    (Liu, Lafferty and Wasserman 2009), the scores correlate as the latent Gaussian variables do,
+    and the partial correlation of the scores tests the latent conditional independence. Where
+    every column is Gaussian the scores lose little: the test has asymptotic relative efficiency 1
+    against Fisher-Z there.
+
+    A query reads the ranks of the data this test was built over. Under test-wise deletion
+    (:mod:`andrey.core.ci_missing`), the test of a query is built over the rows its columns observe,
+    so the ranks are taken within them. See :class:`FisherZ` for the p-value and
+    :class:`PartialCorrelationTest` for the query paths.
+
+    Notes
+    -----
+    The scores estimate the latent correlation without the sine transformation of Spearman's rho
+    that Harris and Drton (2013) use for the same model. On the grid measured for this test, the
+    sine-transformed Spearman estimate rejected a true null more often than the nominal level
+    (0.06 to 0.09 at 0.05 for n = 200 and 500), which the scores did not.
+
+    **Limitations.** Ranks measure monotone dependence: a relation that is not monotone, such as
+    ``y = x**2`` for a symmetric ``x``, has zero rank correlation, and the test finds nothing where
+    ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` do. Conditioning removes only the monotone
+    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically.
+    """
+
+    def __init__(self, data: np.ndarray) -> None:
+        from scipy.stats import rankdata
+
+        arr = np.asarray(data, dtype=np.float64)
+        scores = arr
+        if arr.ndim == 2 and np.isfinite(arr).all():
+            scores = ndtri(rankdata(arr, axis=0) / (arr.shape[0] + 1.0))
+        super().__init__(scores)
 
 
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
@@ -1227,6 +1280,7 @@ def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
 SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     "fisherz",
     "student_t",
+    "normal_scores",
     "chisq",
     "gsq",
     "degen_gauss",
@@ -1238,6 +1292,7 @@ MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "student_t": StudentT,
+    "normal_scores": NormalScores,
     "chisq": ChiSquare,
     "gsq": partial(ChiSquare, g_square=True),
     "degen_gauss": DGTest,

@@ -68,8 +68,11 @@ def pc(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
+        for data whose columns are monotone transformations of Gaussian variables: its p-values do
+        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns, by a likelihood ratio. Four more tests detect nonlinear dependence in
         continuous data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
@@ -443,8 +446,11 @@ def fci(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
+        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
+        for data whose columns are monotone transformations of Gaussian variables: its p-values do
+        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns. Four more tests detect nonlinear dependence in continuous data, at a
         far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
@@ -787,7 +793,8 @@ def gfci(
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     indep_test : str or None, default=None
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
-        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
+        ``"student_t"`` (Student-t) test partial correlation, for continuous data, and
+        ``"normal_scores"`` does so on each column's normal scores. ``"chisq"``
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``,
         ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
@@ -1081,7 +1088,8 @@ def cdnod(
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
-        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
+        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
+        column's normal scores. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
         and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per

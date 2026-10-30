@@ -123,7 +123,7 @@ def test_fisherz_default_matches_explicit():
 def test_registry_surface(clean_registry):
     """``register`` / ``make`` / ``available`` behave as documented; every shipped name builds."""
     assert set(ci.SHIPPED_INDEP_TESTS) <= set(ci.available_indep_tests())
-    assert {"fisherz", "student_t"} < set(ci.SHIPPED_INDEP_TESTS)
+    assert {"fisherz", "student_t", "normal_scores"} < set(ci.SHIPPED_INDEP_TESTS)
     assert set(ci.DISCRETE_INDEP_TESTS) < set(ci.SHIPPED_INDEP_TESTS)
     for name in ci.SHIPPED_INDEP_TESTS:
         assert 0.0 <= ci.make_indep_test(name, np.round(_chain_data()))(0, 1) <= 1.0
@@ -131,19 +131,21 @@ def test_registry_surface(clean_registry):
     assert "delegate" in ci.available_indep_tests()
     assert isinstance(ci.make_indep_test("fisherz", _chain_data()), ci.FisherZ)
     assert isinstance(ci.make_indep_test("student_t", _chain_data()), ci.StudentT)
+    assert isinstance(ci.make_indep_test("normal_scores", _chain_data()), ci.NormalScores)
 
 
+@pytest.mark.parametrize("indep_test", ["student_t", "normal_scores"])
 @pytest.mark.parametrize(
     "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
 )
-def test_student_t_is_selectable_by_every_constraint_facade(facade):
-    """Each constraint facade accepts ``indep_test="student_t"`` and returns a valid graph."""
+def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(facade, indep_test):
+    """Each constraint facade accepts the test by name and returns a valid graph."""
     x = _chain_data()
     if facade == "cdnod":
         c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        out = andrey.cdnod(x, c, indep_test="student_t")
+        out = andrey.cdnod(x, c, indep_test=indep_test)
     else:
-        out = getattr(andrey, facade)(x, indep_test="student_t")
+        out = getattr(andrey, facade)(x, indep_test=indep_test)
     out.structure.validate()
     assert out.structure.n_nodes == x.shape[1]
 
