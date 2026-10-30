@@ -90,7 +90,7 @@ names its pull request.
   `andrey.AndreyWarning`; when no resample is valid either, the warning says so and
   `metadata["averaged_graph"]` is `"nearest_resample_invalid"`. Under `knowledge`, a PAG method's
   averaged graph is oriented as `fci` orients one: the knowledge's endpoints first, then Zhang's
-  rules until no endpoint changes. ([#555], [#564])
+  rules until no endpoint changes. ([#555], [#564], [#584])
 
 - `granger` decides lagged links by a test at `alpha`, where it kept the nonzero coefficients of a
   cross-validated lasso. It fits each variable on the past `tau_max` steps of every variable by
@@ -1452,3 +1452,4 @@ First alpha release.
 [#575]: https://github.com/Abel-ai-lab/andrey/pull/575
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
+[#584]: https://github.com/Abel-ai-lab/andrey/pull/584
