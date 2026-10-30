@@ -16,8 +16,10 @@ taken, and of lowest p-values equal to ``_KEY_DP`` decimals, the one holding the
 column. When none passes, the ordering stops and the remaining clusters stay unordered: the paper
 adds a latent to the order only when the condition holds.
 
-The covariance is taken on standardized columns, so ``omega`` comes from the correlation block and
-does not depend on the columns' units (:func:`_surrogate`).
+The columns are centered first, as the paper does for its zero-mean variables (Xie et al. 2020,
+Sec. 2), so that no step reads where a column's zero lies. The covariance is taken on standardized
+columns, so ``omega`` comes from the correlation block and does not depend on the columns' units
+(:func:`_surrogate`).
 
 The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed from
 the data, so every column order of the same data gives the same clusters and order.
@@ -233,12 +235,13 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, so it orders its
     groups and members, and breaks its ties, by each column's data rather than its position. The
     sorted data are the same bytes for every column order, so reordering the columns of ``data``
-    relabels the result and changes nothing else, unless two columns are identical. The surrogates
-    are built from standardized columns (:func:`_surrogate`).
+    relabels the result and changes nothing else, unless two columns are identical. The columns are
+    centered, and the surrogates are built from standardized columns (:func:`_surrogate`).
     """
     data = np.asarray(data, dtype=np.float64)
     by_rank = np.argsort(tie_ranks(data))
     ranked = np.ascontiguousarray(data[:, by_rank])
+    ranked -= ranked.mean(axis=0)
     unit = ranked * unit_factors(ranked, standardize=True)
     cov = np.cov(unit, rowvar=False)
     grams = [gamma_gram(ranked[:, j]) for j in range(ranked.shape[1])]
