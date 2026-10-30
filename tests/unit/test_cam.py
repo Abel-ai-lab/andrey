@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import itertools
 import warnings
 
 import numpy as np
 import pytest
 
 import andrey
-from andrey.fcm.cam import boosting_counts, neighbors
+from andrey.fcm.cam import DistinctBases, boosting_counts, neighbors, order_search
+from andrey.search.hc import tie_ranks
 
 N = 400
 
@@ -46,6 +48,42 @@ def test_rescaling_a_column_changes_neither_the_graph_nor_the_order(chain_fit):
     out = _fit(_chain() * np.array([1e-4, 3.7, 2e3]))
     assert out.structure == chain_fit.structure
     assert out.ordering == chain_fit.ordering
+
+
+def _mirrored(seed: int = 0) -> np.ndarray:
+    """Linear Gaussian ``x``, ``y`` with each row's swap also a row, and independent ``z``.
+
+    Swapping ``x`` and ``y`` only reorders the rows, so ``x -> y`` and ``y -> x`` have the same
+    gain up to rounding; at this seed the two differ in the last bit.
+    """
+    rng = np.random.default_rng(seed)
+    a = rng.standard_normal(N // 2)
+    b = 0.8 * a + 0.6 * rng.standard_normal(N // 2)
+    x, y = np.concatenate([a, b]), np.concatenate([b, a])
+    return np.column_stack([x, y, rng.standard_normal(N)])
+
+
+def _named(out: andrey.StructureOutput) -> set[tuple[str, str]]:
+    return {(str(i), str(j)) for i, j, _ in out.structure.oriented_edges()}
+
+
+def test_tied_gains_go_to_the_earlier_column():
+    X = _mirrored()[:, :2]
+    candidates = ~np.eye(2, dtype=bool)
+    for columns in (X, X[:, ::-1]):
+        assert np.argwhere(order_search(DistinctBases(columns), candidates)).tolist() == [[0, 1]]
+
+
+def test_a_tie_follows_the_rank_and_reordered_columns_relabel_the_result():
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_mirrored(), columns=list("xyz"))
+    found = {frozenset(_named(_fit(frame[list(order)]))) for order in itertools.permutations("xyz")}
+    assert len(found) == 1
+    ranks = dict(zip("xyz", tie_ranks(frame.to_numpy()).tolist(), strict=True))
+    cause, effect = sorted("xy", key=ranks.get)
+    assert found == {frozenset({(cause, effect)})}
+    with andrey.config(tie_break="position"):
+        assert _named(_fit(frame[["y", "x", "z"]])) == {("y", "x")}
 
 
 def test_a_forbidden_edge_is_never_in_the_graph():

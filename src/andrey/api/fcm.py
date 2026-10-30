@@ -155,11 +155,13 @@ def cam(
     variable through an affine map to a fixed interval, and each gain is a ratio of residual
     variances. The fit draws no random numbers and runs on one BLAS thread.
 
-    **Ties.** The fit runs on the columns ordered by a rank computed from each column's own data,
-    as for :func:`~andrey.hc`: two edges with exactly equal gains go to the one whose child, then
-    parent, ranks first, and so do the variables the causal order could place next, so the result
-    does not depend on the column order unless two columns are identical. The :doc:`column-order
-    guide </docs/guides/column-order>` says what the rank keeps under a new column order.
+    **Ties.** Gains are compared rounded to 9 decimal places, as :func:`~andrey.hc` compares its
+    score changes per row, so two gains that differ only in their rounding tie. A tie goes to the
+    edge whose cause, then effect, has the lower rank computed from each column's own data, as for
+    :func:`~andrey.hc`, and so do the variables the causal order could place next; the fit runs on
+    the columns in that rank order, so the result does not depend on the column order unless two
+    columns are identical. The :doc:`column-order guide </docs/guides/column-order>` says what the
+    rank keeps under a new column order.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows

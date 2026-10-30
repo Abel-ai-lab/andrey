@@ -50,6 +50,7 @@ from scipy.interpolate import BSpline
 
 from andrey.fcm.gam import BasisCache, SmoothBasis, effective_k, fit_gam
 from andrey.fcm.pruning import prune
+from andrey.search._parallel import _KEY_DP
 
 _log = logging.getLogger(__name__)
 
@@ -259,7 +260,9 @@ def order_search(
     fit on its required parents (its sample variance with none). The gain of ``i -> j`` is
     ``log(v_j / v_j')``, ``v_j`` the residual variance (denominator ``n - 1``) of ``j``'s current
     fit and ``v_j'`` that of its fit with ``i`` added. The search adds the edge of largest gain,
-    whatever its sign, with equal gains going to the smallest ``(j, i)``; then it
+    whatever its sign. Gains are compared rounded to ``_KEY_DP`` decimal places, as
+    :func:`andrey.hc` compares its score changes per row, so two gains that differ only in their
+    rounding tie, and a tie goes to the smallest ``(i, j)``, the cause first; then it
     drops every candidate that would close a cycle or break ``precedence`` and refits ``j``'s
     remaining candidates. It stops when no candidate is left. A candidate whose model would have as
     many coefficients as rows is never added.
@@ -315,8 +318,10 @@ def order_search(
     for j in range(d):
         refresh(j)
     while open_.any():
+        # Monotone rounding puts every tie of the largest rounded gain within one grid step of it.
         best = gain[open_].max()
-        i, j = min(np.argwhere(open_ & (gain == best)).tolist(), key=lambda e: (e[1], e[0]))
+        near = np.argwhere(open_ & (gain >= best - 2 * 10.0**-_KEY_DP)).tolist()
+        i, j = min(near, key=lambda e: (-round(float(gain[e[0], e[1]]), _KEY_DP), e[0], e[1]))
         adj[i, j] = True
         variance[j] = refit[i, j]
         before, after = path[:, i], path[j, :]
@@ -374,7 +379,8 @@ def cam(
     The possible parents come from :func:`boosting_counts` and :func:`neighbors`, less the
     ``forbidden`` edges; the ``required`` edges are in the order search from the start and in the
     result whatever their p-values; ``precedence`` goes to :func:`order_search`. A parent stays
-    when its p-value is at most ``alpha``. Exact ties go to the earlier column throughout.
+    when its p-value is at most ``alpha``. Ties go to the earlier column throughout, so a caller
+    that orders the columns by rank breaks them by rank.
     """
     d = X.shape[1]
     required = np.zeros((d, d), dtype=bool) if required is None else required
