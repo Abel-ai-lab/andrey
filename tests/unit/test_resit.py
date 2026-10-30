@@ -113,11 +113,7 @@ def test_p_values_far_below_double_precision_stay_positive_and_ordered():
     gram = gamma_gram(x, median_rows=None)
     p = [
         hsic_gamma_from_grams(
-            gram,
-            gamma_gram(np.sin(2 * x) + s * noise, median_rows=None),
-            200,
-            variance="product",
-            tail="upper",
+            gram, gamma_gram(np.sin(2 * x) + s * noise, median_rows=None), 200, variance="product"
         )[1]
         for s in (0.1, 0.3)
     ]

@@ -11,9 +11,8 @@ independent.
 - :func:`hsic_gamma_from_grams`, used by RCD and ParceLiNGAM with the grams of :func:`gamma_gram`,
   sets the bandwidth by the median distance over the first rows without z-scoring, corrects the
   variance for bias, and returns the statistic with the p-value. RESIT runs the same test on each
-  side's joint distances with three settings of its own: the bandwidth's median over every row
-  (``median_rows=None``), the variance's product form (``variance="product"``), and the tail as
-  the upper incomplete gamma function (``tail="upper"``).
+  side's joint distances with two settings of its own: the bandwidth's median over every row
+  (``median_rows=None``) and the variance's product form (``variance="product"``).
 
 References
 ----------
@@ -28,7 +27,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from scipy.special import gammainc, gammaincc
+from scipy.special import gammaincc
 from scipy.stats import zscore
 
 
@@ -133,7 +132,7 @@ def _gamma_test(
     var_appr = 2 * sumsq_x * sumsq_y / n / n
     shape = mean_appr**2 / var_appr
     scale = var_appr / mean_appr
-    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
+    return float(statistic / mean_appr), float(gammaincc(shape, statistic / scale))
 
 
 def _centered_kernel(raw: np.ndarray) -> np.ndarray:
@@ -164,9 +163,10 @@ def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
         mean = tr(Kxc) tr(Kyc) / n,   var = 2 sum(Kxc^2) sum(Kyc^2) / n^2,
         shape = mean^2 / var,         scale = var / mean,
 
-    and the p-value is the gamma upper tail ``1 - P(shape, T / scale)`` with ``P`` the regularized
-    lower incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``).
-    A larger p-value means more independent. ``T / mean`` is the statistic relative to its mean
+    and the p-value is the gamma upper tail ``Q(shape, T / scale)`` with ``Q`` the regularized
+    upper incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``),
+    which keeps its relative precision far below ``1e-16``. A larger p-value means more
+    independent. ``T / mean`` is the statistic relative to its mean
     under independence, the gamma null's ``shape * scale``: near 1 for independent variables and
     larger the more dependent they are. It still orders two tests whose p-values are both zero.
     Accepts 1-D vectors or ``(n, d)`` matrices.
@@ -255,22 +255,20 @@ def hsic_gamma_from_grams(
     n: int,
     *,
     variance: str = "bias_corrected",
-    tail: str = "complement",
 ) -> tuple[float, float]:
     """Return ``(statistic, p_value)`` of the gamma HSIC from two cached :func:`gamma_gram` outputs.
 
     ``n`` is the sample size. The biased HSIC V-statistic ``T = sum(Kxc.T * Kyc) / n`` is matched to
     a gamma law through the finite-sample null mean ``(1 + mu_x mu_y - mu_x - mu_y) / n`` and a null
-    variance; the p-value is the gamma upper tail. A larger p-value means more independent.
+    variance; the p-value is the gamma upper tail, the regularized upper incomplete gamma function,
+    which keeps its relative precision far below ``1e-16``. A larger p-value means more
+    independent.
 
     ``variance="bias_corrected"`` estimates the variance from the joint products
     ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
     ``"product"`` uses the variance's product form in that paper,
     ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's ``sum(Kc^2) / (n - 1)^2``,
-    the RESIT paper's. ``tail="complement"`` computes the tail as ``1 - P``, ``P`` the regularized
-    lower incomplete gamma function, whose resolution ends near ``1e-16``; ``"upper"`` computes it
-    as the regularized upper incomplete gamma function, which keeps its relative precision far
-    below that.
+    the RESIT paper's.
     """
     cen_x, mu_x = gram_x
     cen_y, mu_y = gram_y
@@ -293,8 +291,4 @@ def hsic_gamma_from_grams(
 
     shape = mean**2 / var
     scale = var * n / mean
-    if tail == "complement":
-        return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
-    if tail == "upper":
-        return float(statistic), float(gammaincc(shape, statistic / scale))
-    raise ValueError(f"tail must be 'complement' or 'upper', got {tail!r}")
+    return float(statistic), float(gammaincc(shape, statistic / scale))

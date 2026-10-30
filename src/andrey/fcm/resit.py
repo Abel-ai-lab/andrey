@@ -82,10 +82,10 @@ def _gram(side: np.ndarray) -> tuple[np.ndarray, float]:
 
 
 def _p_value(gram: tuple[np.ndarray, float], residual: np.ndarray) -> float:
-    """The HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``: the null
-    variance in its product form and the tail as the upper incomplete gamma function."""
+    """The HSIC p-value of ``residual`` against the side whose :func:`_gram` is ``gram``, the null
+    variance in its product form."""
     n = residual.shape[0]
-    return hsic_gamma_from_grams(gram, _gram(residual), n, variance="product", tail="upper")[1]
+    return hsic_gamma_from_grams(gram, _gram(residual), n, variance="product")[1]
 
 
 def _key(p: float) -> float:

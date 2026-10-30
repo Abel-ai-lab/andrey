@@ -11,7 +11,7 @@ from unittest import mock
 
 import numpy as np
 import pytest
-from scipy.special import gammainc
+from scipy.special import gammaincc
 
 import andrey
 from andrey.core import backend, warning_policy
@@ -47,7 +47,7 @@ def _reference_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     statistic = np.sum(kxc * kyc)
     mean = np.trace(kxc) * np.trace(kyc) / n
     var = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
-    return float(statistic / mean), float(1.0 - gammainc(mean**2 / var, statistic / (var / mean)))
+    return float(statistic / mean), float(gammaincc(mean**2 / var, statistic / (var / mean)))
 
 
 @pytest.mark.parametrize("n", [150, 600, 1300])  # each kernel width of the HSIC test
