@@ -75,6 +75,21 @@ def test_zero_smoothing_is_least_squares_on_the_basis(data):
     assert f.residual_df == pytest.approx(len(data) - 28.0)
 
 
+def test_zero_smoothing_on_dependent_terms_is_the_minimum_norm_least_squares_fit():
+    # Two five-level columns, one a function of the other: unpenalized, their terms overlap.
+    rng = np.random.default_rng(6)
+    x = rng.integers(0, 5, 300).astype(float)
+    data = np.column_stack([x, x**2, np.sin(2 * x) + 0.3 * rng.standard_normal(300)])
+    cache = gam.BasisCache(data)
+    bases = [cache(0, 10), cache(1, 10)]
+    f = gam.fit_additive(data[:, 2], bases, sp=np.zeros(2))
+    design = np.column_stack([np.ones(len(data)), *(b.X for b in bases)])
+    solution = np.linalg.lstsq(design, data[:, 2], rcond=None)[0]
+    np.testing.assert_allclose(f.fitted, design @ solution, atol=1e-10)
+    np.testing.assert_allclose(f.coef, solution, atol=1e-8)
+    assert f.edf.sum() == pytest.approx(4.0)
+
+
 def test_infinite_smoothing_is_the_linear_regression(data):
     cache = gam.BasisCache(data)
     f = gam.fit_additive(data[:, 3], [cache(j, 10) for j in range(3)], sp=np.full(3, 1e12))
@@ -157,6 +172,14 @@ def test_a_failed_search_refits_without_penalty(data, monkeypatch):
 def test_the_reference_tail_is_the_f_tail_for_one_unit_weight(d, df, tol):
     p = gam._quadratic_form_sf([1.0, -d / df], [1.0, float(df)])
     assert p == pytest.approx(stats.f.sf(d, 1, df), abs=tol)
+
+
+def test_a_fractional_rank_p_value_reads_the_real_residual_degrees_of_freedom():
+    # Rank 2.5 takes the mixture reference; residual df 8.3, 8.4, and 8.5 all round to 8.
+    rng = np.random.default_rng(0)
+    X, coef = rng.standard_normal((50, 4)), 0.3 * rng.standard_normal(4)
+    p = [gam._p_value(coef, X, 0.02 * np.eye(4), 2.5, df) for df in (8.3, 8.4, 8.5)]
+    assert p[0] > p[1] > p[2]
 
 
 def test_the_knot_subsample_is_fixed():
