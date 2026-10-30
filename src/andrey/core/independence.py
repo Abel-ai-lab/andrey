@@ -320,10 +320,10 @@ def hsic_gamma_log_p(
     *,
     variance: str = "bias_corrected",
 ) -> float:
-    """Return the natural logarithm of the gamma HSIC p-value of :func:`hsic_gamma_from_grams`.
+    """Return the natural logarithm of the p-value of :func:`hsic_gamma_from_grams`'s test.
 
-    Here the tail is the regularized upper incomplete gamma function, whose relative precision holds
-    far below the ``1e-16`` where ``1 - P`` ends. Below about ``1e-308`` the tail underflows to
+    The tail here is the regularized upper incomplete gamma function rather than ``1 - P``, so it
+    keeps its relative precision far below ``1e-16``. Below about ``1e-308`` the tail underflows to
     ``0``, as a strongly dependent pair's does once there are a few thousand rows; its logarithm
     stays finite there and keeps the order of two such tails (:func:`_log_upper_gamma`).
     """
