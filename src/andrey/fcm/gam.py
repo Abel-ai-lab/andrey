@@ -46,6 +46,8 @@ _log = logging.getLogger(__name__)
 
 #: Distinct covariate values above which a basis is built on a fixed subset of this many knots.
 MAX_KNOTS = 2000
+#: Seed of the fixed knot subsample, independent of the run's ``seed``.
+_KNOT_SEED = 0
 
 #: Bounds of the log smoothing parameters. At either bound a term is, to working precision, its
 #: penalty null space (a linear function) or an unpenalized regression spline.
@@ -91,9 +93,9 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
     The covariate is centered and divided by its largest absolute value, an affine change that
     keeps the function space and, up to a constant factor, the penalty, so the fit is the same in
     any unit. The full thin plate spline (second-derivative penalty, kernel ``eta(r) = r^3 / 12``)
-    is built on the distinct values, or, when there are more than
-    ``max_knots`` of them, on a fixed subset of ``max_knots`` drawn by R's Mersenne-Twister
-    ``sample()`` seeded with ``1``. The basis keeps the ``k`` eigenvectors of the kernel matrix
+    is built on the distinct values. Above ``max_knots`` distinct values the knots are a fixed
+    subsample of ``max_knots`` of them, so the fit stays deterministic and does not depend on
+    ``seed``. The basis keeps the ``k`` eigenvectors of the kernel matrix
     with the largest absolute eigenvalues, constrained orthogonal to the linear functions, plus the
     constant and linear functions (Wood 2003). The penalty is divided by
     ``norm_1(S) / norm_inf(X)^2``, then the constraint ``sum_i f(x_i) = 0`` is absorbed by a
@@ -129,7 +131,8 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
     u = xc / width
     knots /= width
     if x.size > max_knots and knots.size > max_knots:
-        knots = np.sort(knots[_r_sample(knots.size, max_knots, seed=1)])
+        pick = np.random.default_rng(_KNOT_SEED).choice(knots.size, max_knots, replace=False)
+        knots = np.sort(knots[pick])
     values, vectors = _top_eigen(knots, k)
     values /= 12.0
     polynomial = np.column_stack([np.ones(knots.size), knots])
@@ -157,7 +160,7 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
 def _top_eigen(t: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     """The ``k`` largest-magnitude eigenpairs of ``|t_i - t_j|^3`` for sorted ``t``.
 
-    Lanczos iteration (ARPACK) from a fixed start vector, on products that cost ``O(m)`` through
+    Lanczos iteration from a fixed start vector, on products that cost ``O(m)`` through
     prefix sums of ``v t^p``; dense ``eigh`` for small ``m`` or when Lanczos does not converge.
     """
     m = t.size
@@ -344,8 +347,8 @@ def fit_gam(
     Raises
     ------
     ValueError
-        If ``parents`` is empty or contains ``child``, a parent has fewer than the rank's distinct
-        values, or the parents' terms are linearly dependent (collinear parents).
+        If ``parents`` is empty or contains ``child``, or a parent has fewer than the rank's
+        distinct values.
     """
     parents = [int(p) for p in parents]
     if not parents:
@@ -386,9 +389,7 @@ def fit_additive(
 
     Raises
     ------
-    ValueError
-        If the terms are linearly dependent, so the coefficients are not identifiable.
-    numpy.linalg.LinAlgError
+    LinAlgError
         If the penalized least-squares system is singular.
     FloatingPointError
         If the GCV score is not finite.
@@ -410,7 +411,7 @@ class _State:
     """The penalized fit at one set of smoothing parameters."""
 
     sp: np.ndarray
-    P: np.ndarray  # inverse of the triangular factor of [R; sqrt(sp) roots]
+    P: np.ndarray  # coefficient map times the inverse triangular factor of [R; sqrt(sp) roots]
     Q1: np.ndarray  # R @ P
     coef: np.ndarray
     rss: float
@@ -445,14 +446,32 @@ class _Problem:
             r += b.root.shape[0]
         self.n_root = r
         Q, self.R = np.linalg.qr(self.X)
-        stacked = np.vstack([self.R, self._penalty_root(np.ones(len(self.bases)))])
-        stacked /= np.linalg.norm(stacked, axis=0)
-        diag = np.abs(np.diag(linalg.qr(stacked, mode="r", pivoting=True)[0]))
-        if diag[-1] <= _RANK_TOL * diag[0]:
-            raise ValueError("the terms are linearly dependent: some parents are collinear")
+        self.basis = self._identifiable_basis()
         self.f = Q.T @ y
         resid = y - Q @ self.f
         self.rss0 = float(resid @ resid)
+
+    def _identifiable_basis(self) -> np.ndarray | None:
+        """An orthonormal basis of the coefficients the data and penalties identify, or ``None``.
+
+        A direction ``b`` with ``X b = 0`` and ``S_j b = 0`` for every term (collinear linear parts
+        of several terms) is unidentified for every positive smoothing parameter. It is found once,
+        from the column-normalized ``[R; roots]`` at unit penalties; the fit is then solved in the
+        orthogonal complement, the minimum-norm solution, so duplicated terms share their linear
+        part equally. ``None`` when every direction is identified.
+        """
+        stacked = np.vstack([self.R, self._penalty_root(np.ones(len(self.bases)))])
+        norms = np.linalg.norm(stacked, axis=0)
+        stacked /= norms
+        diag = np.abs(np.diag(linalg.qr(stacked, mode="r", pivoting=True)[0]))
+        if diag[-1] > _RANK_TOL * diag[0]:
+            return None
+        _, sv, Vt = np.linalg.svd(stacked, full_matrices=False)
+        rank = int(np.sum(sv > _RANK_TOL * sv[0]))
+        null = Vt[rank:].T / norms[:, None]
+        Q, _ = np.linalg.qr(null, mode="complete")
+        _log.info("%d unidentified coefficient direction(s): minimum-norm fit", null.shape[1])
+        return Q[:, null.shape[1] :]
 
     def _penalty_root(self, sp: np.ndarray) -> np.ndarray:
         """The block matrix ``B`` with ``B'B = sum_j sp_j S_j``."""
@@ -463,8 +482,13 @@ class _Problem:
 
     def solve(self, sp: np.ndarray) -> _State:
         """Penalized least squares at ``sp`` through the QR factor of ``[R; sqrt(sp) roots]``."""
-        Qs, Rs = np.linalg.qr(np.vstack([self.R, self._penalty_root(sp)]))
-        P = linalg.solve_triangular(Rs, np.eye(self.p), check_finite=False)
+        stacked = np.vstack([self.R, self._penalty_root(sp)])
+        if self.basis is not None:
+            stacked = stacked @ self.basis
+        Qs, Rs = np.linalg.qr(stacked)
+        P = linalg.solve_triangular(Rs, np.eye(Rs.shape[0]), check_finite=False)
+        if self.basis is not None:
+            P = self.basis @ P
         Q1 = Qs[: self.p]
         Q1f = Q1.T @ self.f
         coef = P @ Q1f
@@ -482,7 +506,7 @@ class _Problem:
         J = sp.size
         K = Q1.T @ Q1
         G = np.vstack([b.root @ P[self.cols[j]] for j, b in enumerate(self.bases)])
-        A = np.empty((self.p, J))
+        A = np.empty((P.shape[1], J))
         for j, b in enumerate(self.bases):
             g = b.root @ st.coef[self.cols[j]]
             A[:, j] = sp[j] * (G[self.rows[j]].T @ g)
@@ -713,47 +737,3 @@ def _quadratic_form_sf_quad(w: np.ndarray, h: np.ndarray, top: float) -> float:
         integrand, math.log(u0), math.log(top), epsabs=1e-13, epsrel=1e-11, limit=4000
     )
     return 0.5 + (value + 0.5 * float(np.sum(h * w)) * u0) / math.pi
-
-
-def _r_sample(n: int, size: int, *, seed: int) -> np.ndarray:
-    """0-based indices of R's ``set.seed(seed); sample.int(n, size)`` for ``n <= 1e7``.
-
-    R seeds its Mersenne-Twister state by a scrambled linear congruential generator, draws uniforms
-    as 32-bit outputs times ``2^-32``, and samples an index below ``n`` by rejection on the low
-    ``ceil(log2 n)`` bits of 16-bit chunks; ``sample.int`` without replacement draws each index
-    from the shrinking pool and moves the pool's last element into its slot.
-    """
-    state = seed & 0xFFFFFFFF
-    for _ in range(50):
-        state = (69069 * state + 1) & 0xFFFFFFFF
-    key = np.empty(625, dtype=np.uint32)
-    for i in range(625):
-        state = (69069 * state + 1) & 0xFFFFFFFF
-        key[i] = state
-    generator = np.random.MT19937()
-    generator.state = {"bit_generator": "MT19937", "state": {"key": key[1:], "pos": 624}}
-    tiny = 2.328306437080797e-10
-
-    def uniform() -> float:
-        v = int(generator.random_raw()) * 2.3283064365386963e-10
-        return 0.5 * tiny if v <= 0.0 else (1.0 - 0.5 * tiny if 1.0 - v <= 0.0 else v)
-
-    def index_below(m: int) -> int:
-        bits = math.ceil(math.log2(m))
-        while True:
-            v = 0
-            for _ in range(0, bits + 1, 16):
-                v = 65536 * v + math.floor(uniform() * 65536)
-            v &= (1 << bits) - 1
-            if v < m:
-                return v
-
-    pool = list(range(n))
-    out = np.empty(size, dtype=np.intp)
-    m = n
-    for i in range(size):
-        j = index_below(m)
-        out[i] = pool[j]
-        m -= 1
-        pool[j] = pool[m]
-    return out

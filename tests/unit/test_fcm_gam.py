@@ -120,10 +120,13 @@ def test_the_rank_keeps_three_rows_per_basis_function(n, parents, k):
     assert gam.effective_k(n, parents, 10) == k
 
 
-def test_collinear_parents_are_refused(data):
-    duplicated = np.column_stack([data[:, 0], data[:, 0], data[:, 3]])
-    with pytest.raises(ValueError):
-        gam.fit_gam(gam.BasisCache(duplicated), 2, [0, 1])
+def test_a_duplicated_parent_splits_one_term_equally(data):
+    duplicated = np.column_stack([data[:, 0], data[:, 0], data[:, 1], data[:, 3]])
+    f = gam.fit_gam(gam.BasisCache(duplicated), 3, [0, 1, 2])
+    assert f.edf[0] == pytest.approx(f.edf[1], rel=1e-6)
+    assert f.p_values()[0] == pytest.approx(f.p_values()[1], rel=1e-6)
+    single = gam.fit_gam(gam.BasisCache(duplicated), 3, [0, 2])
+    np.testing.assert_allclose(f.fitted, single.fitted, atol=1e-4)
 
 
 def test_a_failed_search_refits_without_penalty(data, monkeypatch):
@@ -146,15 +149,11 @@ def test_the_reference_tail_is_the_f_tail_for_one_unit_weight(d, df, tol):
     assert p == pytest.approx(stats.f.sf(d, 1, df), abs=tol)
 
 
-def test_the_knot_subset_is_r_set_seed_1_sample():
-    # R 4.6.1: set.seed(1); sample(1:3000, 10) and set.seed(1); sample(1:5000, 2000)[1:10]
-    np.testing.assert_array_equal(
-        gam._r_sample(3000, 10, seed=1) + 1, [1017, 679, 2177, 930, 1533, 471, 2347, 270, 1211, 597]
-    )
-    np.testing.assert_array_equal(
-        gam._r_sample(5000, 2000, seed=1)[:10] + 1,
-        [1017, 4775, 2177, 1533, 4567, 2347, 270, 4050, 3379, 4065],
-    )
+def test_the_knot_subsample_is_fixed():
+    x = np.random.default_rng(2).uniform(-2.0, 2.0, 80)
+    first, second = gam.tp_basis(x, 10, max_knots=50), gam.tp_basis(x, 10, max_knots=50)
+    np.testing.assert_array_equal(first.X, second.X)
+    assert np.abs(first.X - gam.tp_basis(x, 10).X).max() > 1e-6  # a subset, not every value
 
 
 def test_prune_keeps_the_parents_and_drops_the_spurious_edges(data):
