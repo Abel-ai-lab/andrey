@@ -347,12 +347,7 @@ def effective_k(n: int, n_parents: int, k: int = 10) -> int:
 
 
 def fit_gam(
-    bases: BasisCache,
-    child: int,
-    parents: Sequence[int] | np.ndarray,
-    *,
-    k: int = 10,
-    starts: Sequence[float] = (0.0,),
+    bases: BasisCache, child: int, parents: Sequence[int] | np.ndarray, *, k: int = 10
 ) -> GAMFit:
     """Fit column ``child`` of ``bases.data`` as an additive model of columns ``parents``.
 
@@ -371,8 +366,6 @@ def fit_gam(
         Covariate columns, at least one, excluding ``child``.
     k : int, default 10
         Basis rank before :func:`effective_k` adjusts it.
-    starts : sequence of float, default (0.0,)
-        Passed to :func:`fit_additive`.
 
     Returns
     -------
@@ -397,18 +390,14 @@ def fit_gam(
     terms = [bases(p, rank) for p in parents]
     y = bases.data[:, child]
     try:
-        return fit_additive(y, terms, starts=starts)
+        return fit_additive(y, terms)
     except (np.linalg.LinAlgError, FloatingPointError) as err:
         _log.info("GCV search failed (%s); refitting with zero smoothing parameters", err)
         return fit_additive(y, terms, sp=np.zeros(len(terms)))
 
 
 def fit_additive(
-    y: np.ndarray,
-    bases: Sequence[SmoothBasis],
-    *,
-    sp: np.ndarray | None = None,
-    starts: Sequence[float] = (0.0,),
+    y: np.ndarray, bases: Sequence[SmoothBasis], *, sp: np.ndarray | None = None
 ) -> GAMFit:
     """Fit ``y = c + sum_j f_j`` with one smooth term per basis.
 
@@ -420,11 +409,6 @@ def fit_additive(
         One basis per term, each with ``n`` rows.
     sp : np.ndarray or None, default None
         Fixed smoothing parameters, one per term, each ``>= 0``; ``None`` selects them by GCV.
-    starts : sequence of float, default (0.0,)
-        Shifts of every log smoothing parameter from the start rule's values. The GCV search
-        descends from each shifted start and keeps the lowest score, the earliest start on a tie.
-        The score can have several local minima, and one descent stays in the basin of its start,
-        so more starts can reach a lower minimum at the cost of one descent each.
 
     Returns
     -------
@@ -441,7 +425,7 @@ def fit_additive(
     y = np.asarray(y, dtype=np.float64)
     problem = _Problem(y, bases)
     if sp is None:
-        state = problem.optimize(starts)
+        state = problem.optimize()
     else:
         sp = np.asarray(sp, dtype=np.float64)
         if sp.shape != (len(bases),) or np.any(sp < 0):
@@ -601,30 +585,14 @@ class _Problem:
             ss = ss / 10.0
         return np.clip(np.log(sp), -_LOG_SP_BOUND, _LOG_SP_BOUND)
 
-    def optimize(self, starts: Sequence[float] = (0.0,)) -> _State:
+    def optimize(self) -> _State:
         """Minimize the GCV score over ``log sp`` in ``[-25, 25]``.
-
-        The search descends from :meth:`initial_log_sp` shifted by each of ``starts`` in every log
-        smoothing parameter and keeps the lowest score, the earliest start on a tie.
-        """
-        if len(starts) == 0 or not all(math.isfinite(s) for s in starts):
-            raise ValueError(f"starts must hold at least one finite shift, got {starts}")
-        start = self.initial_log_sp()
-        best: _State | None = None
-        for shift in starts:
-            st = self._descend(np.clip(start + shift, -_LOG_SP_BOUND, _LOG_SP_BOUND))
-            if best is None or st.gcv < best.gcv:
-                best = st
-        assert best is not None
-        return best
-
-    def _descend(self, rho: np.ndarray) -> _State:
-        """Descend the GCV score from ``rho`` to a local minimum.
 
         A step is Newton's when the Hessian of the free parameters is positive definite and steepest
         descent otherwise, capped at 5 per parameter and halved until the score falls. A parameter
         at a bound whose gradient points outward is held there.
         """
+        rho = self.initial_log_sp()
         st = self.solve(np.exp(rho))
         for _ in range(_MAX_NEWTON):
             grad, hess = self.derivatives(st)
