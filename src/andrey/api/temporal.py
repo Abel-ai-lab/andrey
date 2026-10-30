@@ -409,7 +409,9 @@ def pcmci(
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
-        distribution, as the authors' reference implementation does. ``"chisq"`` (Pearson's
+        distribution, as the authors' reference implementation does. ``"normal_scores"`` applies
+        ``"fisherz"`` to the normal scores of each column of the lagged values, for monotone
+        effects. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical series, coded
         by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
         Gaussian) test mixed series, continuous and categorical columns, by a likelihood ratio.
@@ -702,7 +704,9 @@ def pcmciplus(
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
-        distribution, as the authors' reference implementation does. ``"chisq"`` (Pearson's
+        distribution, as the authors' reference implementation does. ``"normal_scores"`` applies
+        ``"fisherz"`` to the normal scores of each column of the lagged values, for monotone
+        effects. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical series, coded
         by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
         Gaussian) test mixed series, continuous and categorical columns, by a likelihood ratio.
@@ -989,7 +993,9 @@ def lpcmci(
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
-        distribution, as the authors' reference implementation does. ``"chisq"`` (Pearson's
+        distribution, as the authors' reference implementation does. ``"normal_scores"`` applies
+        ``"fisherz"`` to the normal scores of each column of the lagged values, for monotone
+        effects. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical series, coded
         by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
         Gaussian) test mixed series, continuous and categorical columns, by a likelihood ratio.

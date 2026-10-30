@@ -118,10 +118,10 @@ def iamb(
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
     indep_test : str or None, default=None
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
-        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
-        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
-        column types, as for :func:`~andrey.pc`.
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
@@ -285,10 +285,10 @@ def inter_iamb(
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
     indep_test : str or None, default=None
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
-        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
-        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
-        column types, as for :func:`~andrey.pc`.
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
@@ -453,10 +453,10 @@ def mmpc(
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give smaller sets.
     indep_test : str or None, default=None
-        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"`` or ``"student_t"``
-        for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data, ``"degen_gauss"`` or
-        ``"cond_gauss"`` for mixed data, or a nonlinear test. ``None`` picks from the declared
-        column types, as for :func:`~andrey.pc`.
+        Conditional-independence test, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear
+        test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional

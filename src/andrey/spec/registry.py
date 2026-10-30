@@ -32,7 +32,9 @@ _INDEP_TEST = concept_param(
     "indep_test",
     doc="Conditional-independence test. For continuous data, on the partial correlation: "
     "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
-    "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
+    "distribution, exact for Gaussian data at any sample size; normal_scores = fisherz on each "
+    "column's normal scores, for data whose columns are monotone transformations of Gaussian "
+    "variables. For categorical data coded by whole "
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
     "columns named by categorical: degen_gauss = degenerate Gaussian and "
     "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
