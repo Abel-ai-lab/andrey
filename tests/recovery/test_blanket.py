@@ -3,7 +3,7 @@
 Under a d-separation oracle each call returns the true set of each variable, and without a target
 each output its own truth: the true CPDAG, skeleton, and moral graph, with background knowledge
 that fits the truth as well. On seeded linear-Gaussian data from sparse graphs the sets are close
-to the true ones.
+to the true ones, and on one recorded case each output is the graph bnlearn returns.
 """
 
 from __future__ import annotations
@@ -209,6 +209,34 @@ def test_the_moral_graph_joins_a_childs_parents_and_the_skeleton_does_not():
             out = getattr(andrey, method)(frame, output=output)
             edges = {frozenset(e[:2]) for e in out.structure.oriented_edges()}
             assert edges == (true_edges | {frozenset("ab")} if output == "moral" else true_edges)
+
+
+def _two_colliders() -> pd.DataFrame:
+    """a -> c <- b, c -> d, d -> f <- e."""
+    rng = np.random.default_rng(1)
+    a, b, e, u, v, w = rng.standard_normal((6, 2000))
+    c = a + b + 0.5 * u
+    d = 0.8 * c + v
+    return pd.DataFrame({"a": a, "b": b, "c": c, "d": d, "e": e, "f": d - e + 0.5 * w})
+
+
+#: bnlearn 5.2.1's graphs on :func:`_two_colliders` with ``test="zf"`` and ``alpha=0.05``: each
+#: variable's ``learn.mb`` joined by the AND rule, ``undirected=TRUE``, and the default.
+BNLEARN_RECORDED = {
+    "moral": {"a - b", "a - c", "b - c", "c - d", "d - e", "d - f", "e - f"},
+    "skeleton": {"a - c", "b - c", "c - d", "d - f", "e - f"},
+    "cpdag": {"a -> c", "b -> c", "c -> d", "d -> f", "e -> f"},
+}
+
+
+@pytest.mark.parametrize(("method", "output"), CELLS)
+def test_each_output_matches_bnlearn_on_a_recorded_case(method, output):
+    out = getattr(andrey, method)(_two_colliders(), output=output)
+    edges = {
+        f"{a} -> {b}" if kind == "directed" else f"{min(a, b)} - {max(a, b)}"
+        for a, b, kind in out.structure.oriented_edges()
+    }
+    assert edges == BNLEARN_RECORDED[output]
 
 
 def test_mmpc_has_no_moral_graph():
