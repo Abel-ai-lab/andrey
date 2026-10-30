@@ -239,6 +239,15 @@ names its pull request.
 
 ### Fixed
 
+- `chisq` and `gsq` no longer reject true independences too often in sparse tables. They referred
+  the statistic to `(r_x - 1) * (r_y - 1)` degrees of freedom per configuration, which rejected
+  11.1% (`chisq`) and 21.7% (`gsq`) of true independences at level 0.05 over 3 to 5 categories,
+  conditioning sets of 0 to 3 variables, and 500 to 5,000 rows, and 48% and 83% at 5 categories
+  with 3 conditioning variables. The degrees of freedom are now the statistic's mean when `y` is
+  shuffled within each configuration, as Tsamardinos and Borboudakis (2010) test with, worked out
+  exactly; the rates are 4.9% and 3.8%, and 3.2% and 0.8%. The graphs of every search that runs
+  these tests on discrete data can change, `gsq` finds fewer edges at small sizes, and `gsq` takes
+  about three times as long. ([#574])
 - The `max_depth` of `pcmci` and `pcmciplus` says in `andrey --help --json` that it caps the PC1
   step, as their docstrings do, where it said every test. ([#551])
 - Every `seed` says first that `None` is the configured seed, `ANDREY_SEED` or 0 when it is unset,
@@ -1392,3 +1401,4 @@ First alpha release.
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
 [#569]: https://github.com/Abel-ai-lab/andrey/pull/569
 [#571]: https://github.com/Abel-ai-lab/andrey/pull/571
+[#574]: https://github.com/Abel-ai-lab/andrey/pull/574
