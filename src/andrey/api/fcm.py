@@ -445,12 +445,11 @@ def resit(
     :func:`~andrey.hc` compares its score changes per row, so two p-values that differ only in
     their rounding tie. The logarithms are computed directly, so p-values below the smallest
     double, about ``1e-308``, which strongly dependent residuals reach with a few thousand rows,
-    keep their order. A tie goes to the variable with the lower rank computed from each column's
-    own data, as for :func:`~andrey.hc`, and the edge removal tries the parents in that rank order;
-    the fit runs on the columns in that rank order, so the result does not depend on the column
-    order unless two columns are identical.
-    The :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
-    column order.
+    keep their order. A tie goes to the variable with the lower rank computed from the data, as for
+    :func:`~andrey.hc`, and the edge removal tries the parents in that rank order; the fit runs on
+    the columns in that rank order, so the result does not depend on the column order unless two
+    columns are identical. The :doc:`column-order guide </docs/guides/column-order>` says what the
+    rank keeps under a new column order.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
