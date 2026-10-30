@@ -977,6 +977,37 @@ _add(
         ),
     )
 )
+_add(
+    MethodSpec(
+        name="cam",
+        family="score",
+        summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
+        "boosting preselects each variable's possible parents, a greedy search adds edges by the "
+        "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
+        "Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the paper's value.",
+            ),
+        ),
+        references=("Buhlmann, Peters & Ernest 2014",),
+    )
+)
 
 # --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
 
@@ -1973,6 +2004,10 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
+    "cam": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are "
+    "never possible parents; the boosting that preselects the possible parents reads the data "
+    "alone. The search starts from the required edges, and the pruning never removes one. "
+    + _ORDER_RULE.rstrip(),
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE

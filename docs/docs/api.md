@@ -71,8 +71,9 @@ group and read its edges as the group's; no option drops or merges the copies fo
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
 same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
 also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
-such as `'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
-cell, its row and column. A single column gives a one-node graph.
+such as `'a' at lag 1 repeats 'd'`. `cam` rejects copies the same way, and a column of fewer than 3
+distinct values, on which no smooth term can be fit. Other data raises a `ValueError` that names the
+argument and, for a bad cell, its row and column. A single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
@@ -102,9 +103,9 @@ first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `direct_lingam`,
-`ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`,
-`pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
+`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`,
+`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
 {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
 temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
 in the result, whatever its weight, test, or score says. For the time-series methods, an edge
@@ -318,6 +319,7 @@ its first call in a process.
    rsmax2
    notears
    dagma
+   cam
 ```
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
@@ -331,6 +333,11 @@ NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG b
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
+smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
+variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
+variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges.
 
 A method becomes supported once it has:
 
