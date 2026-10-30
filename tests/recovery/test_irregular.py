@@ -106,6 +106,18 @@ def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method):
     assert out.structure.oriented_edges() == [(*edge, "directed")]
 
 
+def test_pnl_orients_a_circle_whose_p_values_both_round_to_zero_by_its_statistic():
+    # Both directions' p-values, near 1e-48 and 1e-50, round to zero as ``1 - P``, so the smaller
+    # statistic orients this circle 1 -> 0; p-values that kept those digits would orient it 0 -> 1.
+    from andrey.api.irregular import pnl as pnl_facade
+
+    angle = np.pi * np.random.default_rng(7).uniform(-1, 1, 200)
+    out = pnl_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
+    p = out.metadata["p_values"]
+    assert p["forward"] == p["backward"] == 0.0
+    assert out.structure.oriented_edges() == [(1, 0, "directed")]
+
+
 def test_pnl_draws_no_edge_when_the_statistics_tie_too():
     # Two equal columns fit the same model to the same data in both directions.
     from andrey.api.irregular import pnl as pnl_facade
