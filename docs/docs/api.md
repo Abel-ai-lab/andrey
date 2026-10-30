@@ -272,6 +272,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    fci
    gfci
    cdnod
+   inter_iamb
    ges
    gies
    xges
@@ -279,6 +280,8 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    tabu
    exact_search
    calm
+   mmhc
+   rsmax2
    boss
    grasp
    direct_lingam
@@ -300,6 +303,15 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
+`target`; without one, they join a pair when each is in the other's set and return the graph
+`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
+IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
+conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
+RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
+Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
+them.
 
 FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
 apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
@@ -326,22 +338,10 @@ its first call in a process.
    :nosignatures:
 
    iamb
-   inter_iamb
    mmpc
-   mmhc
-   rsmax2
    notears
    dagma
 ```
-
-IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
-`target`; without one, they join a pair when each is in the other's set and return the graph
-`structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
-IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
-conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
-RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
-Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
-them.
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit

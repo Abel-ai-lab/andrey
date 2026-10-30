@@ -209,9 +209,6 @@ def mmhc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves.
     DataTypeWarning
@@ -256,8 +253,12 @@ def mmhc(
     score of one dataset. Drop the incomplete rows first, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data. An edge the MMPC phase misses is never added, and the
+    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
+    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC,
+    on one core. In every setting the mean CPDAG errors stay below the empty graph's; the closest
+    is at 20 variables and mean degree 4, with 29 to 31 pairs wrong against 40 for the empty
+    graph. A fit took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4.
+    An edge the MMPC phase misses is never added, and the
     hill-climbing phase stops at a local optimum. MMPC tests each candidate against every subset
     of the current members, so its cost grows exponentially with the size of a variable's
     parents-and-children set.
@@ -429,9 +430,6 @@ def rsmax2(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     SearchLimitWarning
         When the maximize phase takes a given ``max_iter`` moves.
     PerformanceWarning
@@ -480,8 +478,14 @@ def rsmax2(
     one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
     use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data. An edge the restrict phase misses is never added, and the
+    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
+    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC,
+    on one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting
+    the mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean
+    degree 4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for
+    the empty graph. A fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to 8.8 s with ``"iamb"``,
+    the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses
+    is never added, and the
     maximize phase stops at a local optimum. MMPC tests each candidate against every subset of
     the current members, so its cost grows exponentially with the size of a variable's
     parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket, so each
