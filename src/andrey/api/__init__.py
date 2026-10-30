@@ -50,11 +50,10 @@ __all__ = [
     # permutation-based
     "boss",
     "grasp",
-    # LiNGAM family
+    # functional causal models: LiNGAM, then nonlinear additive noise
     "direct_lingam",
     "ica_lingam",
     "multi_group_direct_lingam",
-    # nonlinear additive-noise family
     "cam",
     "resit",
     # temporal family

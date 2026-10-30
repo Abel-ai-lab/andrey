@@ -127,7 +127,6 @@ __all__ = [
     "grasp",
     "direct_lingam",
     "ica_lingam",
-    # Nonlinear additive noise.
     "cam",
     "resit",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.

@@ -135,6 +135,9 @@ def cam(
     ExperimentalWarning
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes,
+        which the fit reads as numbers. Each message warns once per process.
 
     See Also
     --------
@@ -196,22 +199,49 @@ def cam(
 
     **Limitations.** Not benchmarked against other packages yet. Measured on simulated data with
     1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized columns, ten graphs at 20
-    variables and two or three at 100, on one core. On additive-noise data with Gaussian noise it
-    oriented 88.5% to 95% of the true edges correctly at 20 variables, depending on the generator,
-    and 95% at 100, with median errors (SHD) of 2 to 2.5 and 9 against the empty graph's 20 and 100;
-    with Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose noise
-    scale changes with the parents, break the model's fixed noise variance: it reversed 42% of the
-    true edges at 20 variables and 32% at 100, with median errors of 11.5 and 54. Linear Gaussian
-    data identify only the Markov equivalence class, and there the two directions of an edge fit
-    equally, their gains differing by less than ``1e-6``, so the direction of an edge the class
-    leaves undirected is arbitrary: it reversed 36% of the true edges at 20 variables, with median
-    errors of 11 at 20 variables and 84 at 100. A fit took a median of 3 s at 20 variables and 22 s
-    at 100, about 40% of it in the neighbor preselection and 55% in the order search. The smoothing
-    of each fit is a local minimum of its GCV score, which can have several, so two edges of nearly
-    equal gain can be added in either order. Binary columns, and any column with fewer than 3
-    distinct values, are not supported: a smooth term needs at least 3, so such a column raises
-    ``ValueError``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    and at 100 variables, on one core. On additive-noise data with Gaussian noise it oriented 88.5%
+    to 95% of the true edges correctly at 20 variables, depending on the generator, and 97.5% at
+    100, with median errors (SHD) of 2 to 2.5 and 8 against the empty graph's 20 and 100; with
+    Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose noise scale
+    changes with the parents, break the model's fixed noise variance: it reversed 42% of the true
+    edges at 20 variables and 32% at 100, with median errors of 11.5 and 55.5. Linear Gaussian data
+    identify only the Markov equivalence class, and there the two directions of an edge fit equally,
+    their gains differing by less than ``1e-6``, so the direction of an edge the class leaves
+    undirected is arbitrary: it reversed 36% of the true edges at 20 variables and 32% at 100, with
+    median errors of 11 and 68. The model has no hidden common causes: with 2 hidden variables among
+    22, over ten graphs of the Gaussian additive-noise generator, its median errors were 12 against
+    the empty graph's 16, mostly extra edges, and it joined 42 of the 49 pairs of observed variables
+    that share only a hidden cause. Effects that interact are outside the model too: with ``x3`` the
+    product of ``x1`` and ``x2`` plus noise, on 1,000 rows and standard normal causes, whose product
+    has no additive part, it found at most one of the two edges into ``x3`` and returned an edge out
+    of ``x3`` in 6 of 10 fits; with causes uniform on ``(0, 2)`` it made ``x3`` the cause of both,
+    and added an edge between them, in 8 of 10. On the additive-noise data a fit took a median of 3
+    s at 20 variables and 21 s at 100, about 40% of it in the neighbor preselection and 55% in the
+    order search. The smoothing of each fit is a local minimum of its GCV score, which can have
+    several, so two edges of nearly equal gain can be added in either order. Binary columns, and any
+    column with fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so
+    such a column raises ``ValueError``. Categorical columns are not modeled: text labels raise
+    ``ValueError``, and integer codes are read as numbers, a smooth function of the code, with a
+    :class:`~andrey.DataTypeWarning`. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
+
+    **Large graphs and many rows.** On the rescaled additive-noise data with 1,000 rows, over five
+    graphs at 200 variables, three at 500, and two at 1,000 and at 2,000, its median errors stayed
+    below the empty graph's at every size but grew faster than the variables, from 8% of the empty
+    graph's at 100 variables to 37% at 2,000. Nearly all of them were extra edges, and on one graph
+    each at 100 and 500 variables all but one lay between variables unrelated or more than three
+    edges apart in the true graph: the preselection picks, among more variables, those that fit a
+    variable's residuals best by chance, and the pruning tests them on the same rows, so of the
+    searched edges between such pairs it kept 1.1% and 5.4%. The preselection fits ``d - 1`` base
+    learners for each of the ``d`` variables, so its cost grows as ``d^2`` and takes over the fit,
+    85% of it at 1,000 variables and 88% at 2,000; a fit's cost grows about as ``d^1.6`` up to 1,000
+    variables and ``d^1.9`` from 1,000 to 2,000. A fit passes about a minute near 200 variables, 10
+    minutes near 800, and an hour near 2,000, where it took a median of 57 minutes and peaked at
+    0.64 GB of memory. With 20 variables, over three graphs each, a fit took a median of 5 s at
+    5,000 rows and 17.5 s at 20,000 and peaked at 140 MB and 214 MB, about 100 MB of it the imports;
+    the median errors stayed at 2. Above 2,000 distinct values a column's thin plate basis is built
+    on a fixed subsample of 2,000 of them: at 5,000 and 20,000 rows that returned the same graph as
+    knots on every value in 6 of 6 fits, in up to a fifth less time.
 
     **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
     independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and

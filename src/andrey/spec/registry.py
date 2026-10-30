@@ -1200,12 +1200,13 @@ _add(
     )
 )
 
-# --- LiNGAM family --------------------------------------------------------------------------------
+# --- functional causal models (Glymour, Zhang & Spirtes 2019) -------------------------------------
+# Linear effects with non-Gaussian noise (LiNGAM).
 
 _add(
     MethodSpec(
         name="direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM for linear non-Gaussian data: recovers a fully-oriented DAG plus a "
         "causal order and edge weights. Use when noise is non-Gaussian and effects are linear.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -1231,7 +1232,7 @@ _add(
 _add(
     MethodSpec(
         name="ica_lingam",
-        family="lingam",
+        family="functional",
         summary="ICA-based LiNGAM for linear non-Gaussian data: FastICA gives a causal order, "
         "adaptive Lasso the edge weights; returns a DAG, the order, and the weights. Seeded "
         "(ANDREY_SEED, else 0), so repeated runs match. DirectLiNGAM is more accurate on the "
@@ -1269,7 +1270,7 @@ _add(
 _add(
     MethodSpec(
         name="multi_group_direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
         "shared causal order and a per-group weighted DAG. Returns one result per group.",
         data=DataSpec(
@@ -1307,12 +1308,12 @@ _add(
     )
 )
 
-# --- nonlinear additive-noise family (Hoyer et al. 2009; Peters et al. 2014) ----------------------
+# Nonlinear effects with additive noise (Hoyer et al. 2009; Peters et al. 2014).
 
 _add(
     MethodSpec(
         name="cam",
-        family="additive_noise",
+        family="functional",
         summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
         "boosting preselects each variable's possible parents, a greedy search adds edges by the "
         "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
@@ -1347,7 +1348,7 @@ _add(
 _add(
     MethodSpec(
         name="resit",
-        family="additive_noise",
+        family="functional",
         summary="Regression with subsequent independence test (RESIT) for nonlinear effects with "
         "additive noise of any distribution: a causal order from the sink up, each sink the "
         "variable whose additive-model residual an HSIC test finds most independent of the "
