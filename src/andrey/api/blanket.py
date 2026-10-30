@@ -231,13 +231,14 @@ def iamb(
     depends on another. The CPDAG decides each triple ``x - z - y`` of the skeleton with ``x`` and
     ``y`` not adjacent: ``z`` is a collider, ``x -> z <- y``, when ``x`` and ``y`` test dependent
     given ``z`` together with every subset of the smaller of their blankets without ``x``, ``y``,
-    and ``z`` [2]_, and a non-collider when one such set separates them. The colliders are oriented as :func:`~andrey.pc` orients them, the most clearly dependent
-    first: by the smallest absolute partial correlation over the collider's tests for ``"fisherz"``
-    and ``"student_t"``, and by the largest p-value, smallest first, for the other tests. When two
-    colliders that rank equal to nine decimals dispute an edge, it stays undirected. Meek's rules
-    [4]_ then orient the edges that follow, in rounds, as for :func:`~andrey.pc`, so the result does
-    not depend on the column order; under ``andrey.config(tie_break="position")`` the colliders and
-    the rules follow the column order instead. With exact tests, the result is the true CPDAG [2]_.
+    and ``z`` [2]_, and a non-collider when one such set separates them. The colliders are oriented
+    as :func:`~andrey.pc` orients them, the most clearly dependent first: by the smallest absolute
+    partial correlation over the collider's tests for ``"fisherz"`` and ``"student_t"``, and by the
+    largest p-value, smallest first, for the other tests. When two colliders that rank equal to nine
+    decimals dispute an edge, it stays undirected. Meek's rules [4]_ then orient the edges that
+    follow, in rounds, as for :func:`~andrey.pc`, so the result does not depend on the column order;
+    under ``andrey.config(tie_break="position")`` the colliders and the rules follow the column
+    order instead. With exact tests, the result is the true CPDAG [2]_.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
@@ -447,13 +448,14 @@ def inter_iamb(
     depends on another. The CPDAG decides each triple ``x - z - y`` of the skeleton with ``x`` and
     ``y`` not adjacent: ``z`` is a collider, ``x -> z <- y``, when ``x`` and ``y`` test dependent
     given ``z`` together with every subset of the smaller of their blankets without ``x``, ``y``,
-    and ``z`` [2]_, and a non-collider when one such set separates them. The colliders are oriented as :func:`~andrey.pc` orients them, the most clearly dependent
-    first: by the smallest absolute partial correlation over the collider's tests for ``"fisherz"``
-    and ``"student_t"``, and by the largest p-value, smallest first, for the other tests. When two
-    colliders that rank equal to nine decimals dispute an edge, it stays undirected. Meek's rules
-    [4]_ then orient the edges that follow, in rounds, as for :func:`~andrey.pc`, so the result does
-    not depend on the column order; under ``andrey.config(tie_break="position")`` the colliders and
-    the rules follow the column order instead. With exact tests, the result is the true CPDAG [2]_.
+    and ``z`` [2]_, and a non-collider when one such set separates them. The colliders are oriented
+    as :func:`~andrey.pc` orients them, the most clearly dependent first: by the smallest absolute
+    partial correlation over the collider's tests for ``"fisherz"`` and ``"student_t"``, and by the
+    largest p-value, smallest first, for the other tests. When two colliders that rank equal to nine
+    decimals dispute an edge, it stays undirected. Meek's rules [4]_ then orient the edges that
+    follow, in rounds, as for :func:`~andrey.pc`, so the result does not depend on the column order;
+    under ``andrey.config(tie_break="position")`` the colliders and the rules follow the column
+    order instead. With exact tests, the result is the true CPDAG [2]_.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
@@ -650,19 +652,20 @@ def mmpc(
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests.
 
-    **From sets to a graph.** Without a target, a pair is kept when each variable is in the
-    other's set, which gives the skeleton (``output="skeleton"``). The CPDAG decides each triple
+    **From sets to a graph.** Without a target, a pair is kept when each variable is in the other's
+    set, which gives the skeleton (``output="skeleton"``). The CPDAG decides each triple
     ``x - z - y`` of the skeleton with ``x`` and ``y`` not adjacent: ``z`` is a collider,
     ``x -> z <- y``, when ``x`` and ``y`` test dependent given ``z`` together with every subset of
-    the smaller of their blankets without ``x``, ``y``, and ``z`` [2]_ [3]_, and a non-collider
-    when one such set separates them. A variable's blanket here is its set together with its
-    members' sets, before the symmetry check, which holds its children's other parents. The colliders are oriented as :func:`~andrey.pc` orients them, the most clearly dependent
-    first: by the smallest absolute partial correlation over the collider's tests for ``"fisherz"``
-    and ``"student_t"``, and by the largest p-value, smallest first, for the other tests. When two
-    colliders that rank equal to nine decimals dispute an edge, it stays undirected. Meek's rules
-    [4]_ then orient the edges that follow, in rounds, as for :func:`~andrey.pc`, so the result does
-    not depend on the column order; under ``andrey.config(tie_break="position")`` the colliders and
-    the rules follow the column order instead. With exact tests, the result is the true CPDAG [2]_.
+    the smaller of their blankets without ``x``, ``y``, and ``z`` [2]_ [3]_, and a non-collider when
+    one such set separates them. A variable's blanket here is its set together with its members'
+    sets, before the symmetry check, which holds its children's other parents. The colliders are
+    oriented as :func:`~andrey.pc` orients them, the most clearly dependent first: by the smallest
+    absolute partial correlation over the collider's tests for ``"fisherz"`` and ``"student_t"``,
+    and by the largest p-value, smallest first, for the other tests. When two colliders that rank
+    equal to nine decimals dispute an edge, it stays undirected. Meek's rules [4]_ then orient the
+    edges that follow, in rounds, as for :func:`~andrey.pc`, so the result does not depend on the
+    column order; under ``andrey.config(tie_break="position")`` the colliders and the rules follow
+    the column order instead. With exact tests, the result is the true CPDAG [2]_.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
