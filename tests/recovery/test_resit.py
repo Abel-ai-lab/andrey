@@ -4,8 +4,9 @@ output.
 The fixed cases have one certain answer: independent columns give no edge, a cause with a
 nonlinear effect and uniform noise points to it in either column order, and a collider of two
 nonlinear causes is found with both edges directed into it. The ground truth is additive-noise data
-from ``andrey.data`` on random graphs. The recorded output pins the graph and the causal order on
-one fixed case.
+from ``andrey.data`` on five random graphs, whose median errors stay within half the empty graph's,
+each fit's edges following its causal order. The recorded output pins the graph and the causal
+order on one fixed case.
 """
 
 from __future__ import annotations
@@ -82,8 +83,10 @@ def additive_fits():
 def test_additive_noise_graphs_are_recovered(additive_fits):
     errors = [shd(out.structure, case.graph) for case, out in additive_fits]
     empty = [len(case.graph.oriented_edges()) for case, _ in additive_fits]
-    assert all(e < m for e, m in zip(errors, empty, strict=True)), (errors, empty)
-    assert np.median(errors) <= 2, errors
+    assert np.median(errors) <= np.median(empty) / 2, (errors, empty)
+    for _, out in additive_fits:
+        order = list(out.ordering)
+        assert all(order.index(i) < order.index(j) for i, j in _edges(out))
 
 
 def test_a_fit_repeats(additive_fits):

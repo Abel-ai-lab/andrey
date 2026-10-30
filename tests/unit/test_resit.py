@@ -28,11 +28,15 @@ def _edges(out: andrey.StructureOutput) -> set[tuple[int, int]]:
 
 
 def _chain(seed: int = 0) -> np.ndarray:
-    """``x0 -> x1 -> x2`` with nonlinear effects and uniform noise."""
+    """``x0 -> x1 -> x2`` with nonlinear effects and uniform noise.
+
+    ``x1``'s noise is wide enough that ``x0`` alone leaves ``x2``'s residual dependent, so the
+    edge removal keeps ``x1 -> x2`` and drops ``x0 -> x2`` whichever parent it tries first.
+    """
     rng = np.random.default_rng(seed)
     x0 = rng.uniform(-2, 2, N)
-    x1 = np.sin(2 * x0) + x0 + rng.uniform(-0.5, 0.5, N)
-    x2 = np.tanh(2 * x1) + rng.uniform(-0.5, 0.5, N)
+    x1 = np.sin(2 * x0) + x0 + rng.uniform(-1, 1, N)
+    x2 = np.cos(2 * x1) + rng.uniform(-0.5, 0.5, N)
     return np.column_stack([x0, x1, x2])
 
 
@@ -44,6 +48,8 @@ def chain_fit():
 def test_the_chain_is_found(chain_fit):
     assert _edges(chain_fit) == {(0, 1), (1, 2)}
     assert chain_fit.ordering == (0, 1, 2)
+    with andrey.config(tie_break="position"):
+        assert _edges(_fit(_chain())) == {(0, 1), (1, 2)}
 
 
 def test_rescaling_a_column_changes_neither_the_graph_nor_the_order(chain_fit):
