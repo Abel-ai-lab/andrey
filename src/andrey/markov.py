@@ -176,7 +176,7 @@ def markov_check(
         completely at random.
     indep_test : str or None, default=None
         The conditional-independence test, as ``pc`` takes it. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
+        column types: ``"chisq"`` when every column is categorical, ``"cond_gauss"`` when some are,
         else ``"fisherz"``. ``metadata["indep_test"]`` names the one used. See Notes.
     alpha : float, default=0.05
         The level of the uniformity test, in ``(0, 1)``, and the level at which

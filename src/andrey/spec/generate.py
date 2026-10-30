@@ -404,9 +404,9 @@ def _data_types_section() -> str:
     ]
     return (
         "`indep_test=null` and `score_func=null` pick from the declared column types, a column "
-        "`categorical=[...]` names or a DataFrame's `category`, `bool`, or text column: `gsq` and "
-        "`bdeu` when every column is categorical, `cond_gauss` when some are, else `fisherz` and "
-        "the linear-Gaussian BIC `bic`; values never decide. For categorical columns "
+        "`categorical=[...]` names or a DataFrame's `category`, `bool`, or text column: `chisq` "
+        "and `bdeu` when every column is categorical, `cond_gauss` when some are, else `fisherz` "
+        "and the linear-Gaussian BIC `bic`; values never decide. For categorical columns "
         f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
         f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
