@@ -161,8 +161,9 @@ def cam(
        variable [3]_: a cubic B-spline basis on 20 equidistant interior knots over the variable's
        range, a second-order difference penalty, and the penalty weight that gives the learner 4
        degrees of freedom. The possible parents are the ten variables picked most often, among
-       those picked at least three times, a tie at the tenth place going to the column of lower
-       rank (see Ties).
+       those picked at least three times. When more than ten qualify, the ones picked more often
+       than the eleventh stay, so a tie at the tenth place keeps fewer than ten rather than
+       choosing by column order.
     2. *Order search.* From the empty graph, the search adds the edge ``i -> j`` whose fit most
        lowers the log residual variance of ``j``, among the possible parents that close no cycle,
        whatever the sign of the change, and refits only ``j``'s remaining candidates, until none
@@ -182,10 +183,10 @@ def cam(
     **Ties.** Gains are compared rounded to 9 decimal places, as :func:`~andrey.hc` compares its
     score changes per row, so two gains that differ only in their rounding tie. A tie goes to the
     edge whose cause, then effect, has the lower rank computed from each column's own data, as for
-    :func:`~andrey.hc`, and so do a tie for the tenth possible parent and the variables the causal
-    order could place next; the fit runs on the columns in that rank order, so the result does not
-    depend on the column order unless two columns are identical. The :doc:`column-order guide
-    </docs/guides/column-order>` says what the rank keeps under a new column order.
+    :func:`~andrey.hc`, and so do the variables the causal order could place next; the fit runs on
+    the columns in that rank order, so the result does not depend on the column order unless two
+    columns are identical. The :doc:`column-order guide </docs/guides/column-order>` says what the
+    rank keeps under a new column order.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
