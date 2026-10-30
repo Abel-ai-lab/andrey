@@ -137,7 +137,7 @@ def cam(
         change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
-        which the fit reads as numbers; once per process.
+        which the fit reads as numbers. Each message warns once per process.
 
     See Also
     --------
@@ -228,20 +228,20 @@ def cam(
     **Large graphs and many rows.** On the rescaled additive-noise data with 1,000 rows, over five
     graphs at 200 variables, three at 500, and two at 1,000 and at 2,000, its median errors stayed
     below the empty graph's at every size but grew faster than the variables, from 8% of the empty
-    graph's at 100 variables to 37% at 2,000. Nearly all of them were extra edges between variables
-    unrelated or more than three edges apart in the true graph: the preselection picks, among more
-    variables, those that fit a variable's residuals best by chance, and the pruning tests them on
-    the same rows, so of the searched edges between such pairs it kept 1.1% on one graph of 100
-    variables and 5.4% on one of 500. The preselection fits ``d - 1`` base learners for each of the
-    ``d`` variables, so its cost grows as ``d^2`` and takes over the fit, 85% of it at 1,000
-    variables and 88% at 2,000; a fit's cost grows about as ``d^1.6`` up to 1,000 variables and
-    ``d^1.9`` from 1,000 to 2,000. A fit passes about a minute near 200 variables, 10 minutes near
-    800, and an hour near 2,000, where it took a median of 57 minutes and peaked at 0.64 GB of
-    memory. With 20 variables, over three graphs each, a fit took a median of 5 s at 5,000 rows and
-    17.5 s at 20,000 and peaked at 140 MB and 214 MB, about 100 MB of it the imports; the median
-    errors stayed at 2. Above 2,000 distinct values a column's thin plate basis is built on a fixed
-    subsample of 2,000 of them: at 5,000 and 20,000 rows that returned the same graph as knots on
-    every value in 6 of 6 fits, in up to a fifth less time.
+    graph's at 100 variables to 37% at 2,000. Nearly all of them were extra edges, and on one graph
+    each at 100 and 500 variables all but one lay between variables unrelated or more than three
+    edges apart in the true graph: the preselection picks, among more variables, those that fit a
+    variable's residuals best by chance, and the pruning tests them on the same rows, so of the
+    searched edges between such pairs it kept 1.1% and 5.4%. The preselection fits ``d - 1`` base
+    learners for each of the ``d`` variables, so its cost grows as ``d^2`` and takes over the fit,
+    85% of it at 1,000 variables and 88% at 2,000; a fit's cost grows about as ``d^1.6`` up to 1,000
+    variables and ``d^1.9`` from 1,000 to 2,000. A fit passes about a minute near 200 variables, 10
+    minutes near 800, and an hour near 2,000, where it took a median of 57 minutes and peaked at
+    0.64 GB of memory. With 20 variables, over three graphs each, a fit took a median of 5 s at
+    5,000 rows and 17.5 s at 20,000 and peaked at 140 MB and 214 MB, about 100 MB of it the imports;
+    the median errors stayed at 2. Above 2,000 distinct values a column's thin plate basis is built
+    on a fixed subsample of 2,000 of them: at 5,000 and 20,000 rows that returned the same graph as
+    knots on every value in 6 of 6 fits, in up to a fifth less time.
 
     **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
     independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and
