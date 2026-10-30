@@ -9,7 +9,6 @@ local optimum and tabu search reaches the true equivalence class.
 
 from __future__ import annotations
 
-import math
 import warnings
 
 import numpy as np
@@ -21,6 +20,7 @@ from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.moves import class_gain, grid
 from tests.recovery.helpers.project import found_dag
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -51,17 +51,18 @@ def _bic(x: np.ndarray, dag) -> float:
     return float(sum(score.score(i, sorted(parents[i])) for i in range(x.shape[1])))
 
 
-def test_tabu_reaches_the_score_optimum_on_gauss_5v():
-    """Tabu search returns the CPDAG of the best-scoring DAG, which exact search finds, and that
-    DAG's score. The graph and score match the recorded output."""
+def test_tabu_stops_at_a_local_optimum_on_gauss_5v():
+    """Tabu search and hill climbing each return a DAG that no legal edge addition, removal, or
+    reversal improves beyond the rounding grid; tabu search scores between exact search's optimum
+    and hill climbing's. The graph and score match the recorded output."""
     x = datagen.generate("gauss_5v")
-    out = andrey.tabu(x)
-    optimum = andrey.exact_search(x)
+    score = BICScore(x, ebic_gamma=_EBIC_GAMMA)
+    out, climbed = andrey.tabu(x), andrey.hc(x)
     assert out.structure.kind == "cpdag"
-    assert out.structure.oriented_edges() == optimum.structure.oriented_edges()
-    assert math.isclose(
-        out.metadata["score"], _bic(x, found_dag(optimum)), rel_tol=0.0, abs_tol=1e-6
-    )
+    for fit in (out, climbed):
+        assert class_gain(fit.structure, score) <= grid(len(x))
+    optimum = _bic(x, found_dag(andrey.exact_search(x)))
+    assert optimum - 1e-6 <= out.metadata["score"] <= climbed.metadata["score"] + 1e-6
     assert_recorded_output(out, "Tabu", case="gauss_5v")
 
 

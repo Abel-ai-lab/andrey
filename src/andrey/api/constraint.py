@@ -498,7 +498,7 @@ def fci(
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
-        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        ``"order_free"`` visits the pairs and nodes by a rank computed from the data,
         so the result does not depend on the column order unless two columns are identical.
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
@@ -617,7 +617,7 @@ def fci(
     already tested. It visits the pairs one at a time, removes a pair as soon as a subset separates
     it, and records that subset, so each removal changes the sets of the pairs after it. With
     ``possible_dsep="order_free"``, the pairs, the nodes of each search, and the subsets follow a
-    tie rank computed from each column's own data, as for :func:`~andrey.hc`, which moves with its
+    tie rank computed from the data, as for :func:`~andrey.hc`, which moves with its
     column when the columns are reordered; with ``"fast"``, they follow the column order.
 
     **Collider rules.** ``collider_rule="conservative"``, conservative FCI [4]_ after the idea of
@@ -840,7 +840,7 @@ def gfci(
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
-        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        ``"order_free"`` visits the pairs and nodes by a rank computed from the data,
         so the result does not depend on the column order unless two columns are identical.
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
         ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and

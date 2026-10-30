@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.search.hc import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -67,15 +68,19 @@ def test_boss_equal_scores_are_stable_under_input_rounding():
     # standard BIC: with the extended-BIC term a second parent lowers the score on three variables.
     x = np.array([[6, 6, 6], [0, -3, -3], [-3, 0, -3], [-3, -3, 0]], dtype=float)
     # Scaling each column by its own factor near 1 moves the scores in their last bits and keeps
-    # each column's row-to-row pattern, so its tie rank.
+    # each column's row-to-row pattern, which alone tells these columns apart, so its tie rank.
     rng = np.random.default_rng(10_000)
     perturbed = x * (1 + 1e-12 * rng.standard_normal(x.shape[1]))
+    np.testing.assert_array_equal(tie_ranks(perturbed), tie_ranks(x))
     base = andrey.boss(x, seed=0, score_func="bic", ebic_gamma=0.0).structure
     moved = andrey.boss(perturbed, seed=0, score_func="bic", ebic_gamma=0.0).structure
 
     assert base.kind == moved.kind == "cpdag"
-    # Both inputs give the undirected edges 0 -- 2 and 1 -- 2: column 2 has the lowest tie rank.
-    expected = np.array([[0, 0, 1], [0, 0, 1], [1, 1, 0]])
+    # Both inputs give the undirected edges from the lowest-ranked column to the other two.
+    hub = int(np.argmin(tie_ranks(x)))
+    expected = np.zeros((3, 3), dtype=int)
+    expected[hub] = expected[:, hub] = 1
+    expected[hub, hub] = 0
     np.testing.assert_array_equal(base.to_numpy(), expected)
     np.testing.assert_array_equal(moved.to_numpy(), expected)
 

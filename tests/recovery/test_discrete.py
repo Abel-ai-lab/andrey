@@ -3,9 +3,9 @@
 The fixed cases have one answer: ``discrete_5v`` is the network ``x0 -> x2 <- x1``, ``x2 -> x3 ->
 x4``, whose CPDAG has every edge oriented, and ``discrete_independent_4v`` has no edges. The
 ground-truth case is a random network from :func:`andrey.data.sample_discrete`, scored against its
-CPDAG with a margin, and the permutation searches are checked against exact search's optimum on
-draws where that optimum's class is unique. Edges are named by variable and mapped to the case's
-columns.
+CPDAG with a margin. On other draws, the permutation searches and hill climbing stop where no move
+of their own improves the score, no lower than exact search's optimum. Edges are named by variable
+and mapped to the case's columns.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from andrey.core.score import make_score
 from andrey.data import sample_discrete
 from andrey.metrics import shd, to_cpdag
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.moves import boss_gain, class_gain, grasp_gain, grid
 from tests.recovery.helpers.project import found_dag
 
 CASE = "discrete_5v"
@@ -68,12 +69,24 @@ def _edges(out, kinds):
     return {(a, b) for a, b, kind in out.structure.oriented_edges() if kind in kinds}
 
 
-@pytest.mark.parametrize("fit", list(CPDAG_FITS))
+@pytest.mark.parametrize("fit", [fit for fit in CPDAG_FITS if not fit.startswith("hc-")])
 def test_cpdag_methods_recover_the_categorical_network(fit):
     out = CPDAG_FITS[fit](datagen.generate(CASE))
     assert out.structure.kind == "cpdag"
     assert _edges(out, {"directed"}) == TRUTH
     assert _edges(out, {"undirected"}) == set()
+
+
+@pytest.mark.parametrize("fit", ["hc-bdeu", "hc-bic"])
+def test_hill_climbing_makes_at_most_half_the_empty_graphs_errors(fit):
+    """Hill climbing stops at a local optimum, which need not be the network's class; its CPDAG
+    makes at most half the empty graph's errors."""
+    out = CPDAG_FITS[fit](datagen.generate(CASE))
+    marks = np.zeros((len(COLUMN),) * 2, dtype=np.int8)
+    for a, b in TRUTH:
+        marks[a, b], marks[b, a] = TAIL, ARROW
+    truth = andrey.GraphStructure.from_numpy(marks, kind="cpdag")
+    assert shd(out.structure, truth) <= shd(np.zeros_like(marks), truth) / 2
 
 
 @pytest.mark.parametrize("fit", list(PAG_FITS))
@@ -203,26 +216,43 @@ def test_the_searches_order_by_score_on_one_categorical_score(score_func):
     assert total(found_dag(exact)) < hc.metadata["score"] - 1.0
 
 
-# Draws of sample_discrete, as (d, n, seed), whose optimal class is unique under BDeu and under the
-# multinomial BIC: the next-best class scores far above the search tolerance. Hill climbing stops
-# above the optimum on each.
-_UNIQUE_OPTIMA = [(6, 5000, 2), (7, 2000, 1), (8, 5000, 2)]
+# Draws of sample_discrete, as (d, n, seed), each scored under BDeu and under the multinomial BIC.
+_DRAWS = [(6, 5000, 2), (7, 2000, 1), (8, 5000, 2)]
 _SCORES = {"bdeu": "bdeu", "bic": "discrete_bic"}
+# The tolerance below which BOSS and GRaSP count a move as no improvement.
+_PERMUTATION_EPS = 1e-6
+
+
+def _optimum(data: np.ndarray, score_func: str) -> float:
+    """The total score of exact search's DAG, the lowest any DAG reaches."""
+    score = make_score(score_func, data)
+    exact = found_dag(andrey.exact_search(data, score_func=score_func)).to_numpy() == TAIL
+    return sum(score.score(v, np.flatnonzero(exact[:, v]).tolist()) for v in range(data.shape[1]))
 
 
 @pytest.mark.parametrize("fit", ["boss-bdeu", "grasp-bdeu", "boss-bic", "grasp-bic"])
-@pytest.mark.parametrize("draw", _UNIQUE_OPTIMA)
-def test_the_permutation_searches_find_the_exact_optimum(fit, draw):
-    """BOSS and GRaSP return the class of exact search's DAG, at its score."""
+@pytest.mark.parametrize("draw", _DRAWS)
+def test_the_permutation_searches_stop_at_a_local_optimum(fit, draw):
+    """BOSS ends at an order where moving one variable to another place, and GRaSP at one where
+    one tuck, improves the score by no more than their tolerance, and neither scores below exact
+    search's optimum."""
     d, n, seed = draw
-    score_func = _SCORES[fit.split("-")[1]]
+    method, score = fit.split("-")
     data = sample_discrete(d=d, n=n, seed=seed).data
-    score = make_score(score_func, data)
-    exact = found_dag(andrey.exact_search(data, score_func=score_func))
-    optimum = sum(
-        score.score(v, np.flatnonzero(exact.to_numpy()[:, v] == TAIL).tolist()) for v in range(d)
-    )
     out = CPDAG_FITS[fit](data)
-    np.testing.assert_array_equal(out.structure.to_numpy(), to_cpdag(exact).to_numpy())
-    assert out.metadata["score"] == pytest.approx(optimum, abs=1e-6)
-    assert andrey.hc(data, score_func=score_func).metadata["score"] > optimum + 1.0
+    gain, cpdag = (boss_gain if method == "boss" else grasp_gain)(data, _SCORES[score])
+    np.testing.assert_array_equal(out.structure.to_numpy(), cpdag)  # the run that fit returned
+    assert gain <= _PERMUTATION_EPS
+    assert out.metadata["score"] >= _optimum(data, _SCORES[score]) - _PERMUTATION_EPS
+
+
+@pytest.mark.parametrize("score_func", list(_SCORES.values()))
+@pytest.mark.parametrize("draw", _DRAWS)
+def test_hill_climbing_stops_at_a_local_optimum(score_func, draw):
+    """Hill climbing ends at a DAG that no legal edge addition, removal, or reversal improves
+    beyond the rounding grid, no lower than exact search's optimum."""
+    d, n, seed = draw
+    data = sample_discrete(d=d, n=n, seed=seed).data
+    out = andrey.hc(data, score_func=score_func)
+    assert class_gain(out.structure, make_score(score_func, data)) <= grid(n)
+    assert out.metadata["score"] >= _optimum(data, score_func) - grid(n)

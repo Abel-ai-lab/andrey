@@ -20,7 +20,7 @@ The covariance is taken on standardized columns, so ``omega`` comes from the cor
 does not depend on the columns' units (:func:`_surrogate`).
 
 The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed from
-each column's own data, so every column order of the same data gives the same clusters and order.
+the data, so every column order of the same data gives the same clusters and order.
 
 Each column's HSIC kernel matrix is built once per fit and reused by every test, so a fit holds one
 ``n x n`` matrix per column for ``n`` rows.
