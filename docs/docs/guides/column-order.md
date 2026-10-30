@@ -79,8 +79,8 @@ The thread count is fixed where it could matter. The skeleton searches of `pc`, 
 and the tests of `iamb`, `inter_iamb`, `mmpc`, and the restrict phases of `mmhc` and `rsmax2`, with
 the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000 rows,
 the scores of `ges` (and so of `gfci`'s first phase), `gies`, `xges`, `hc`, `tabu`, `mmhc`, and
-`rsmax2`, the fits of `notears` and `dagma`, and the tests of `pcmci`, `pcmciplus`, and `lpcmci` run
-on one BLAS thread, and so do their worker processes, so the host's thread count cannot change their
+`rsmax2`, the fits of `notears`, `dagma`, and `cam`, and the tests of `pcmci`, `pcmciplus`, and
+`lpcmci` run on one BLAS thread, and so do their worker processes, so the host's thread count cannot change their
 results. From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run faster; its
 p-values then repeat for a fixed thread count.
 

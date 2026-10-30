@@ -19,9 +19,18 @@ names its pull request.
   ([#596])
 - `andrey.data.load_dataset("child")` and `load_dataset("insurance")`, the bnlearn child network
   (20 variables, 25 arcs) and insurance network (27 variables, 52 arcs). ([#611])
+- `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014), a functional causal
+  model, learns a DAG and a causal order from nonlinear additive effects with the paper's
+  settings: boosting preselects each variable's possible parents, a greedy search adds edges by the
+  drop in log residual variance of additive spline fits, and smooth-term tests prune them; it is
+  experimental. ([#597])
 
 ### Changed
 
+- `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` now belong to the family
+  "Functional causal models", with `cam` (Glymour, Zhang, and Spirtes 2019): their `family` value
+  in `andrey list` and in the method contracts of `andrey --help --json` is `"functional"` in place
+  of `"lingam"`, and nothing else in the API changes. ([#597])
 - The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
   on a column's units or sign: it is a hash of each column's relations to the other columns, and a
   new column order still relabels it; only columns that no row order, unit, or sign tells apart
@@ -1494,5 +1503,6 @@ First alpha release.
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
 [#596]: https://github.com/Abel-ai-lab/andrey/pull/596
+[#597]: https://github.com/Abel-ai-lab/andrey/pull/597
 [#611]: https://github.com/Abel-ai-lab/andrey/pull/611
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612

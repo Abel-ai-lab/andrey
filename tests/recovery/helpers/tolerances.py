@@ -59,6 +59,11 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    # CAM records no weights: its DAG and its causal order.
+    "CAM": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
     # CALM's weights come from a torch optimizer, so only the graph is recorded.
     "CALM": {
         "structural": ["graph"],

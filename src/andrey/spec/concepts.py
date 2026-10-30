@@ -149,6 +149,7 @@ ALL_METHODS = (
     *_PURE_SCORE,
     "calm",
     *_CONTINUOUS,
+    "cam",
     "mmhc",
     "rsmax2",
     *_LINGAM,
@@ -173,7 +174,7 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam"),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt("Continuous optimization: no test decides an edge.", *_CONTINUOUS),
@@ -216,6 +217,14 @@ _CONCEPTS = (
                 )
                 for m in ("anm", "pnl")
             ),
+            Deviation(
+                method="cam",
+                name="alpha",
+                default=0.001,
+                fixed_in=None,
+                reason="0.001 is the paper's cutoff of the pruning tests, at every sample size "
+                "(Buhlmann, Peters and Ernest 2014, Section 5.3).",
+            ),
         ),
     ),
     Concept(
@@ -238,6 +247,7 @@ _CONCEPTS = (
             *_exempt("No conditional-independence test.", *_PURE_SCORE, *_CONTINUOUS, *_LINGAM),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger"),
+            *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
         ),
     ),
     Concept(
@@ -400,6 +410,7 @@ _CONCEPTS = (
                 "No conditional-independence tests over growing conditioning sets.",
                 *_PURE_SCORE,
                 "calm",
+                "cam",
                 *_CONTINUOUS,
                 *_LINGAM,
                 "granger",
@@ -468,7 +479,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "cam"),
         exempt=(
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -568,6 +579,7 @@ _CONCEPTS = (
                 "Deterministic.",
                 *(m for m in _PURE_SCORE if m not in _STARTS),
                 *_CONTINUOUS,
+                "cam",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -790,6 +802,7 @@ _CONCEPTS = (
                 *_PURE_SCORE,
                 "calm",
                 *_CONTINUOUS,
+                "cam",
                 *_LINGAM,
                 "gin",
                 "rcd",
