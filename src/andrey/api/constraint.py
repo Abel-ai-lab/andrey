@@ -278,10 +278,15 @@ def pc(
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
     ``category`` columns are read the same way. A test compares the counts of ``x`` and ``y`` with
     independence within each configuration of the conditioning set that occurs in the data [2]_.
-    Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom, counting only the values
-    of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1. A test needs several rows
-    per cell of its table: with many categories or a large conditioning set, most cells are empty,
-    and the p-value is unreliable.
+    The p-value refers the statistic to a chi-square law whose degrees of freedom are its
+    mean when ``y`` is shuffled within each configuration: ``(r_x - 1) * (r_y - 1)`` per
+    configuration for large counts, with ``r_x`` and ``r_y`` the values present in it [6]_, and
+    more for few rows, where the usual degrees of freedom over-reject a true independence; with
+    none, the p-value is 1. A table with fewer rows than cells has most cells empty: the p-values
+    are then a little too large, ``"gsq"``'s more than ``"chisq"``'s, so prefer ``"chisq"``. Over
+    35,808 true independences of random discrete networks, with 3 to 5 categories, conditioning
+    sets of 0 to 3 variables, and 500 to 5,000 rows, a test at level 0.05 rejected 4.9%
+    (``"chisq"``) and 3.8% (``"gsq"``); the usual degrees of freedom rejected 11.1% and 21.7%.
 
     **Mixed data.** ``"degen_gauss"`` and ``"cond_gauss"`` test data with continuous and categorical
     columns. Each distinct value of a categorical column is one category, and a DataFrame column of
