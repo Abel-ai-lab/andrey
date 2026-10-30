@@ -10,10 +10,10 @@ independent.
   the same numbers from kernels it shares across pairs.
 - :func:`hsic_gamma_from_grams`, used by RCD and ParceLiNGAM with the grams of :func:`gamma_gram`,
   sets the bandwidth by the median distance over the first rows without z-scoring, corrects the
-  variance for bias, and returns the statistic with the p-value.
-- :func:`hsic_moments_from_grams`, used by RESIT with the grams of :func:`median_gram`, takes each
-  side's kernel on its joint squared distances with the median over every pair of rows as the
-  bandwidth, and matches the gamma law to the null mean and variance of Gretton et al. (2007).
+  variance for bias, and returns the statistic with the p-value. RESIT runs the same test on each
+  side's joint distances with three settings of its own: the bandwidth's median over every row
+  (``median_rows=None``), the variance's product form (``variance="product"``), and the tail as
+  the upper incomplete gamma function (``tail="upper"``).
 
 References
 ----------
@@ -198,13 +198,14 @@ def _triu_k1(n: int) -> tuple[np.ndarray, np.ndarray]:
     return idx
 
 
-def _median_width_gamma(column: np.ndarray) -> float:
-    """Median-distance Gaussian bandwidth ``sigma`` from up to the first 100 rows of an ``(n, 1)``.
+def _median_width_gamma(column: np.ndarray, rows: int | None = 100) -> float:
+    """Median-distance Gaussian bandwidth ``sigma`` from up to the first ``rows`` rows of a matrix.
 
-    ``sigma = sqrt(0.5 * median(positive squared pairwise distances))``; the 100-row cap keeps the
-    median heuristic cheap.
+    ``sigma = sqrt(0.5 * median(positive squared pairwise distances))`` over the rows of an
+    ``(n, q)`` matrix, its ``q`` columns read jointly; the 100-row cap keeps the median heuristic
+    cheap, and ``rows=None`` reads every row.
     """
-    data = column[:100] if column.shape[0] > 100 else column
+    data = column[:rows] if rows is not None and column.shape[0] > rows else column
     n = data.shape[0]
     sq_norms = np.sum(data * data, axis=1)
     sq_dists = sq_norms[None, :] + sq_norms[:, None] - 2.0 * (data @ data.T)
@@ -213,7 +214,7 @@ def _median_width_gamma(column: np.ndarray) -> float:
 
 
 def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
-    """Raw and doubly-centered RBF gram matrices of an ``(n, 1)`` column at bandwidth ``sigma``.
+    """Raw and doubly-centered RBF gram matrices of an ``(n, q)`` matrix at bandwidth ``sigma``.
 
     The centered matrix is ``H K H`` with ``H = I - 1/n`` in row/column-sum form (the biased
     estimate).
@@ -231,97 +232,69 @@ def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarra
     return raw, centered
 
 
-def gamma_gram(column: np.ndarray) -> tuple[np.ndarray, float]:
-    """Return one variable's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
+def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np.ndarray, float]:
+    """Return one side's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
 
     These are the only per-variable quantities the test needs, so a caller that scores one column
-    against many others (RCD, ParceLiNGAM) computes this once per column and reuses it.
+    against many others (RCD, ParceLiNGAM) computes this once per column and reuses it. ``column``
+    is one variable or an ``(n, q)`` matrix of several, read jointly through their Euclidean
+    distances. The bandwidth's median reads the first ``median_rows`` rows, or every row with
+    ``None`` (RESIT).
     """
     col = _as_columns(column)
     n = col.shape[0]
-    raw, centered = _gram_gamma(col, _median_width_gamma(col))
+    raw, centered = _gram_gamma(col, _median_width_gamma(col, median_rows))
     raw[np.diag_indices(n)] = 0.0
     mu = 1.0 / n / (n - 1) * raw.sum()
     return centered, mu
 
 
 def hsic_gamma_from_grams(
-    gram_x: tuple[np.ndarray, float], gram_y: tuple[np.ndarray, float], n: int
+    gram_x: tuple[np.ndarray, float],
+    gram_y: tuple[np.ndarray, float],
+    n: int,
+    *,
+    variance: str = "bias_corrected",
+    tail: str = "complement",
 ) -> tuple[float, float]:
     """Return ``(statistic, p_value)`` of the gamma HSIC from two cached :func:`gamma_gram` outputs.
 
     ``n`` is the sample size. The biased HSIC V-statistic ``T = sum(Kxc.T * Kyc) / n`` is matched to
-    a gamma law through the finite-sample null mean and bias-corrected variance; the p-value is the
-    gamma upper tail. A larger p-value means more independent.
+    a gamma law through the finite-sample null mean ``(1 + mu_x mu_y - mu_x - mu_y) / n`` and a null
+    variance; the p-value is the gamma upper tail. A larger p-value means more independent.
+
+    ``variance="bias_corrected"`` estimates the variance from the joint products
+    ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
+    ``"product"`` uses the variance's product form in that paper,
+    ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's ``sum(Kc^2) / (n - 1)^2``,
+    the RESIT paper's. ``tail="complement"`` computes the tail as ``1 - P``, ``P`` the regularized
+    lower incomplete gamma function, whose resolution ends near ``1e-16``; ``"upper"`` computes it
+    as the regularized upper incomplete gamma function, which keeps its relative precision far
+    below that.
     """
     cen_x, mu_x = gram_x
     cen_y, mu_y = gram_y
 
     statistic = 1.0 / n * np.sum(cen_x.T * cen_y)
 
-    prod = cen_x * (1.0 / 6.0)  # 1/6 * cen_x * cen_y then squared, fused into one reused buffer
-    prod *= cen_y
-    prod **= 2
-    var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
-    var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
+    if variance == "bias_corrected":
+        prod = cen_x * (1.0 / 6.0)  # 1/6 * cen_x * cen_y then squared, fused into one reused buffer
+        prod *= cen_y
+        prod **= 2
+        var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
+        var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
+    elif variance == "product":
+        var = 2.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3)
+        var *= np.sum(cen_x * cen_x) / (n - 1) ** 2 * np.sum(cen_y * cen_y) / (n - 1) ** 2
+    else:
+        raise ValueError(f"variance must be 'bias_corrected' or 'product', got {variance!r}")
 
     mean = 1.0 / n * (1 + mu_x * mu_y - mu_x - mu_y)
 
     shape = mean**2 / var
     scale = var * n / mean
-    return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
-
-
-# ---- RESIT HSIC (joint median bandwidth, the null moments of Gretton et al. 2007) ---------------
-
-
-def median_gram(sq_dists: np.ndarray) -> tuple[np.ndarray, float, float]:
-    """Return one side's ``(centered_gram, off_diagonal_mean, sum_of_squares)`` for the moment HSIC.
-
-    ``sq_dists`` holds the squared Euclidean distances between the rows of the side, one variable or
-    several jointly. The Gaussian kernel is ``exp(-D / m)``, ``m`` the median of the positive
-    squared distances over every pair of rows: the median heuristic ``sigma = sqrt(m / 2)``, under
-    which a common rescaling of the side's coordinates leaves the kernel unchanged. A side whose
-    rows are all equal has the all-ones kernel, whose centered gram is zero. The off-diagonal mean
-    is of the raw kernel; the sum of squares is of the centered gram.
-    """
-    n = sq_dists.shape[0]
-    upper = sq_dists[_triu_k1(n)]
-    positive = upper[upper > 0]
-    kernel = np.exp(-sq_dists / np.median(positive)) if positive.size else np.ones((n, n))
-    mean = float((kernel.sum() - np.trace(kernel)) / (n * (n - 1)))
-    centered = _center_kernel(kernel)
-    return centered, mean, float(np.sum(centered * centered))
-
-
-def hsic_moments_from_grams(
-    gram_x: tuple[np.ndarray, float, float], gram_y: tuple[np.ndarray, float, float]
-) -> tuple[float, float]:
-    """Return ``(statistic, p_value)`` of the HSIC test from two :func:`median_gram` outputs.
-
-    The statistic is ``n HSIC_b = sum(Kc * Lc) / n`` for the centered grams ``Kc`` and ``Lc`` of
-    ``n`` rows. Under independence it is matched to a gamma law with the mean and variance of
-    ``HSIC_b`` from Gretton et al. (2007), each kernel's squared Hilbert-Schmidt norm estimated by
-    ``sum(Kc^2) / (n - 1)^2``:
-
-        mean = (1 + mu_x mu_y - mu_x - mu_y) / n,
-        var = 2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3)) sum(Kc^2) sum(Lc^2) / (n - 1)^4,
-        shape = mean^2 / var,   scale = n var / mean,
-
-    with ``mu`` each raw kernel's off-diagonal mean. The p-value is the gamma upper tail, the
-    regularized upper incomplete gamma function, which keeps its relative precision far below
-    ``1e-16``. A larger p-value means more independent. A side with a zero centered gram, a constant
-    variable, is independent of any other: statistic ``0`` and p-value ``1``. Needs ``n >= 6``.
-    """
-    cen_x, mu_x, sq_x = gram_x
-    cen_y, mu_y, sq_y = gram_y
-    n = cen_x.shape[0]
-    if sq_x == 0 or sq_y == 0:
-        return 0.0, 1.0
-    statistic = float(np.sum(cen_x * cen_y)) / n
-    mean = (1.0 + mu_x * mu_y - mu_x - mu_y) / n
-    var = 2.0 * (n - 4) * (n - 5) / (n * (n - 1) * (n - 2) * (n - 3))
-    var *= sq_x / (n - 1) ** 2 * sq_y / (n - 1) ** 2
-    shape = mean**2 / var
-    scale = n * var / mean
-    return statistic, float(gammaincc(shape, statistic / scale))
+    if tail == "complement":
+        return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
+    if tail == "upper":
+        return float(statistic), float(gammaincc(shape, statistic / scale))
+    raise ValueError(f"tail must be 'complement' or 'upper', got {tail!r}")
