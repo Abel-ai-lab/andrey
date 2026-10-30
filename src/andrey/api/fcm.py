@@ -17,6 +17,7 @@ from andrey.api._method import method_spec
 from andrey.core.backend import one_blas_thread
 from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.score import copies_error, copy_groups
+from andrey.fcm.gam import BasisCache
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -54,11 +55,28 @@ def _smooth_columns(X: np.ndarray, labels: tuple[str, ...] | None, method: str) 
             raise copies_error(groups, name)
 
 
+def _required_rows(X: np.ndarray, required: np.ndarray, labels: tuple[str, ...] | None) -> None:
+    """Raise ``ValueError`` when a column's required parents have more coefficients than rows."""
+    name = column_namer(labels)
+    bases = BasisCache(X)
+    n = X.shape[0]
+    for j in np.flatnonzero(required.any(axis=0)).tolist():
+        parents = np.flatnonzero(required[:, j]).tolist()
+        need = bases.n_coef(parents)
+        if need >= n:
+            raise ValueError(
+                f"cam: knowledge requires {len(parents)} parents of column {name(j)}, whose "
+                f"additive model has {need} coefficients, but the fit needs more rows than "
+                f"coefficients and data has {n} rows"
+            )
+
+
 @method_spec("cam")
 def cam(
     data: npt.ArrayLike,
     *,
     alpha: float = 0.001,
+    max_parents: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a DAG with CAM, the causal additive model (nonlinear additive effects).
@@ -76,8 +94,13 @@ def cam(
         become the structure's ``labels``.
     alpha : float, default=0.001
         The significance level of the pruning test: a parent stays when its smooth term's p-value
-        is at most ``alpha``, in ``(0, 1)``. ``0.001`` is the paper's value, which it keeps at every
-        sample size and advises raising for small samples.
+        is at most ``alpha``, in ``(0, 1)``. ``0.001`` is the paper's value at every sample size. A
+        larger value keeps more of the true edges a small sample tests weakly, and more false edges
+        with them (see Notes).
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: the order search adds no edge that gives a
+        node more, so no node of the returned DAG has more than ``max_parents`` parents. A cap can
+        stop the search short of the best-scoring DAG. ``None`` sets no cap, as in the paper.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -103,7 +126,9 @@ def cam(
         not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
         a column of fewer than 3 distinct values, or a column that repeats another up to scale and
         shift, each named in the message. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        contradicts itself, as :class:`~andrey.Knowledge` lists; if its required edges give a node
+        more than ``max_parents`` parents; or if a column's required parents need more
+        coefficients than ``data`` has rows, naming the column.
 
     Warns
     -----
@@ -138,7 +163,8 @@ def cam(
        degrees of freedom. The possible parents are the ten variables picked most often, among
        those picked at least three times. When more than ten qualify, the ones picked more often
        than the eleventh stay, so a tie at the tenth place keeps fewer than ten rather than
-       choosing by column order.
+       choosing by column order. When more than ten tie at the top count, none is picked more
+       often than the eleventh, and the variable has no possible parents.
     2. *Order search.* From the empty graph, the search adds the edge ``i -> j`` whose fit most
        lowers the log residual variance of ``j``, among the possible parents that close no cycle,
        whatever the sign of the change, and refits only ``j``'s remaining candidates, until none
@@ -146,8 +172,8 @@ def cam(
        basis functions per parent and smoothing chosen by GCV [4]_; with fewer than 30 rows per
        parent each term gets ``ceil(n_samples / (3 n_parents))`` functions, at least 3, and a
        variable with fewer distinct values than that gets one per distinct value. The paper states
-       no cap on a variable's parents, and the search sets none; a candidate whose model would have
-       as many coefficients as rows is never added.
+       no cap on a variable's parents, so ``max_parents`` sets none by default; a candidate whose
+       model would have as many coefficients as rows is never added.
     3. *Pruning.* Each variable is fit on its parents in that DAG, and a parent stays when its
        smooth term's p-value [5]_ is at most ``alpha``, the paper's rule.
 
@@ -186,6 +212,21 @@ def cam(
     distinct values, are not supported: a smooth term needs at least 3, so such a column raises
     ``ValueError``. The numbers are a reference, not a hard limit: they change with the data
     generator, the density, the method's settings, and the machine.
+
+    **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
+    independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and
+    60 variables, against 0 at 500 rows and 20. The search keeps each variable's best-fitting
+    candidates and the pruning tests them on the same rows, and the smooth-term tests run slightly
+    liberal at small samples: an unrelated parent among five reached a p-value of at most 0.01 in
+    3.3% of fits at 100 rows. A larger ``alpha`` trades false edges for true ones: at 100 rows,
+    ``alpha=0.01`` found 2 more of 100 true adjacencies on additive-noise graphs of 10 variables and
+    5 more false ones. A strongly skewed cause can be reversed: with a lognormal cause of log-scale
+    2 and an effect of ``log(x)`` plus noise, it reversed the edge in 6 of 10 fits. A
+    variance-stabilizing transform such as the log of a positive column suits data whose effect
+    stays nonlinear on the new scale: with an effect of ``sin(2 log(x) / 3)`` at log-scale 3, it
+    found the edge in 6 of 10 fits on ``x`` and 10 of 10 on ``log(x)``. An effect that becomes
+    linear, as ``log(x)`` itself does, leaves a linear Gaussian pair, whose direction no fit
+    identifies.
 
     References
     ----------
@@ -230,6 +271,7 @@ def cam(
     order = np.argsort(tie_ranks(X), kind="stable")
     forbidden = required = precedence = None
     if constraints is not None:
+        _required_rows(X, constraints.required, labels)
         ranked = constraints.permuted(order)
         forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
     with one_blas_thread():
@@ -239,6 +281,7 @@ def cam(
             forbidden=forbidden,
             required=required,
             precedence=precedence,
+            max_parents=max_parents,
         )
     back = np.argsort(order)
     dag = result.dag[np.ix_(back, back)]
