@@ -689,26 +689,26 @@ def camuv(
     hidden pairs found with 4 hidden variables, 20 against 10. Its median errors in the directed
     edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with hidden variables. On the
     linear Gaussian data, which identify only the Markov equivalence class, it oriented 44% of the
-    true edges. Each sink test reads the candidates found before it, so the order the sets are
-    visited in changes the result: visiting them in the data's column order instead of by rank gave
-    graphs a median of 7 to 17.5 pairs apart, at about the same accuracy. With one hidden variable
-    per ten observed ones, ten graphs per size, its mean directed errors were 87% of the empty
-    graph's at 10 variables, 74% at 20, and 60% at 50, though 3 of the ten graphs at 10 and at 20
-    variables had more errors than the empty graph; at 300 variables, over 8 graphs, they were 95%
-    of it, with 2 graphs above it, and at 400 they passed it, 330 against 315 on one graph. A fit
-    took 15 s at 20 variables, and its cost grows about as ``d^2``: a fit passes about a minute near
-    40 variables, 10 minutes near 130, and an hour near 340. Each HSIC test builds matrices with one
-    row and one column per sample, so time and memory grow with the square of ``n_samples``: at 5
-    variables a fit took 1.6 s and 0.21 GB with 1,000 rows and 79 s and 3.6 GB with 8,000, and at 20
-    variables 5.6 minutes and 1.7 GB with 4,000; the kernels kept between tests stay within 1 GiB,
-    so above about 11,600 rows none is kept. A cause with a long tail loses its edge: with a
-    lognormal cause of log-sd 2 or 3 and an effect of its logarithm plus noise, on 500 rows, it
-    marked the pair ``o-o`` in all 10 fits, where it found the edge in 5 of 5 at log-sd 1; replacing
-    the cause by its ranks found the edge in 9 of the 10, while its logarithm, which makes the pair
-    linear and Gaussian, reversed it in 11 of 15 fits. One value of 1e6 in the middle variable of a
-    nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks in 5 of 5 fits. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    true edges, with median errors of 16 against the empty graph's 20. Each sink test reads the
+    candidates found before it, so the order the sets are visited in changes the result: visiting
+    them in the data's column order instead of by rank gave graphs a median of 7 to 17.5 pairs
+    apart, at about the same accuracy. With one hidden variable per ten observed ones, ten graphs
+    per size, its mean directed errors were 87% of the empty graph's at 10 variables, 74% at 20, and
+    60% at 50, though 3 of the ten graphs at 10 and at 20 variables had more errors than the empty
+    graph; at 300 variables, over 8 graphs, they were 95% of it, with 2 graphs above it, and at 400
+    they passed it, 330 against 315 on one graph. A fit took 15 s at 20 variables, and its cost
+    grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes near 130, and
+    an hour near 340. Each HSIC test builds matrices with one row and one column per sample, so time
+    and memory grow with the square of ``n_samples``: at 5 variables a fit took 1.6 s and 0.21 GB
+    with 1,000 rows and 79 s and 3.6 GB with 8,000, and at 20 variables 5.6 minutes and 1.7 GB with
+    4,000; the kernels kept between tests stay within 1 GiB, so above about 11,600 rows none is
+    kept. A cause with a long tail loses its edge: with a lognormal cause of log-sd 2 or 3 and an
+    effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in all 10 fits,
+    where it found the edge in 5 of 5 at log-sd 1; replacing the cause by its ranks found the edge
+    in 9 of the 10, while its logarithm, which makes the pair linear and Gaussian, reversed it in 11
+    of 15 fits. One value of 1e6 in the middle variable of a nonlinear chain of 800 rows turned both
+    of its edges into ``o-o`` marks in 5 of 5 fits. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
