@@ -96,7 +96,7 @@ def cam(
         The significance level of the pruning test: a parent stays when its smooth term's p-value
         is at most ``alpha``, in ``(0, 1)``. ``0.001`` is the paper's value at every sample size. A
         larger value keeps more of the true edges a small sample tests weakly, and more false edges
-        with them (see Limitations).
+        with them (see Notes).
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the order search adds no edge that gives a
         node more, so no node of the returned DAG has more than ``max_parents`` parents. A cap can
@@ -196,20 +196,35 @@ def cam(
     1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized columns, ten graphs at 20
     variables and two or three at 100, on one core. On additive-noise data with Gaussian noise it
     oriented 88.5% to 95% of the true edges correctly at 20 variables, depending on the generator,
-    and 95% at 100, with median errors (SHD) of 2 to 2.5 and 9 against the empty graph's 20 and 100;
-    with Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose noise
-    scale changes with the parents, break the model's fixed noise variance: it reversed 42% of the
-    true edges at 20 variables and 32% at 100, with median errors of 11.5 and 54. Linear Gaussian
-    data identify only the Markov equivalence class, and there the two directions of an edge fit
-    equally, their gains differing by less than ``1e-6``, so the direction of an edge the class
-    leaves undirected is arbitrary: it reversed 36% of the true edges at 20 variables, with median
-    errors of 11 at 20 variables and 84 at 100. A fit took a median of 3 s at 20 variables and 22 s
-    at 100, about 40% of it in the neighbor preselection and 55% in the order search. The smoothing
-    of each fit is a local minimum of its GCV score, which can have several, so two edges of nearly
-    equal gain can be added in either order. Binary columns, and any column with fewer than 3
-    distinct values, are not supported: a smooth term needs at least 3, so such a column raises
-    ``ValueError``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    and 95% at 100, with median errors (SHD) of 2 to 2.5 and 12 against the empty graph's 20 and
+    100; with Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose
+    noise scale changes with the parents, break the model's fixed noise variance: it reversed 42% of
+    the true edges at 20 variables and 33% at 100, with median errors of 11.5 and 54. Linear
+    Gaussian data identify only the Markov equivalence class, and there the two directions of an
+    edge fit equally, their gains differing by less than ``1e-6``, so the direction of an edge the
+    class leaves undirected is arbitrary: it reversed 36% of the true edges at 20 variables, with
+    median errors of 11 at 20 variables and 86.5 at 100. A fit took a median of 3 s at 20 variables
+    and 26.5 s at 100, about a third of it in the neighbor preselection and 60% in the order search.
+    The smoothing of each fit is a local minimum of its GCV score, which can have several, so two
+    edges of nearly equal gain can be added in either order. Binary columns, and any column with
+    fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so such a
+    column raises ``ValueError``. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
+
+    **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
+    independent columns it kept a median of 25.5 at 40 rows and 60 variables and 8.5 at 200 rows and
+    60 variables, against 0 at 500 rows and 20. The search keeps each variable's best-fitting
+    candidates and the pruning tests them on the same rows, and the smooth-term tests run slightly
+    liberal at small samples: an unrelated parent among five reached a p-value of at most 0.01 in
+    3.3% of fits at 100 rows. A larger ``alpha`` trades false edges for true ones: at 100 rows,
+    ``alpha=0.01`` found 2 more of 100 true adjacencies on additive-noise graphs of 10 variables and
+    5 more false ones. A strongly skewed cause can be reversed: with a lognormal cause of log-scale
+    2 and an effect of ``log(x)`` plus noise, it reversed the edge in 6 of 10 fits. A
+    variance-stabilizing transform such as the log of a positive column suits data whose effect
+    stays nonlinear on the new scale: with an effect of ``sin(2 log(x) / 3)`` at log-scale 3, it
+    found the edge in 6 of 10 fits on ``x`` and 10 of 10 on ``log(x)``. An effect that becomes
+    linear, as ``log(x)`` itself does, leaves a linear Gaussian pair, whose direction no fit
+    identifies.
 
     References
     ----------
