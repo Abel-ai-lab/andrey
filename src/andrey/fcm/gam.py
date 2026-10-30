@@ -212,12 +212,21 @@ def _cubic_cross(x: np.ndarray, t: np.ndarray, A: np.ndarray) -> np.ndarray:
 class BasisCache:
     """The thin plate bases of one data matrix's columns, built once per column and rank.
 
+    A basis's rank never exceeds its column's number of distinct values: a function of a variable
+    with ``m`` distinct values is fixed by its ``m`` values, so a basis of rank ``m`` represents
+    every such function. A column with fewer than 3 distinct values has no smooth basis.
+
     Parameters
     ----------
     data : np.ndarray
         ``(n, d)`` data matrix; column ``j`` is variable ``j``.
     max_knots : int, default 2000
         Passed to :func:`tp_basis`.
+
+    Attributes
+    ----------
+    distinct : np.ndarray
+        ``(d,)`` number of distinct values of each column.
     """
 
     def __init__(self, data: np.ndarray, *, max_knots: int = MAX_KNOTS) -> None:
@@ -225,14 +234,31 @@ class BasisCache:
         if self.data.ndim != 2:
             raise ValueError(f"data must be 2-D, got shape {self.data.shape}")
         self.max_knots = max_knots
+        self.distinct = np.array([np.unique(c).size for c in self.data.T], dtype=np.int64)
         self._bases: dict[tuple[int, int], SmoothBasis] = {}
 
     def __call__(self, column: int, k: int) -> SmoothBasis:
-        """Return column ``column``'s rank-``k`` basis, building it on first use."""
-        key = (int(column), int(k))
+        """Return column ``column``'s basis of rank ``min(k, distinct values)``, built once.
+
+        Raises
+        ------
+        ValueError
+            If the column has fewer than 3 distinct values.
+        """
+        rank = min(int(k), int(self.distinct[column]))
+        if rank < 3:
+            raise ValueError(
+                f"column {column} has {self.distinct[column]} distinct values; a smooth needs 3"
+            )
+        key = (int(column), rank)
         if key not in self._bases:
-            self._bases[key] = tp_basis(self.data[:, column], k, max_knots=self.max_knots)
+            self._bases[key] = tp_basis(self.data[:, column], rank, max_knots=self.max_knots)
         return self._bases[key]
+
+    def n_coef(self, parents: Sequence[int], k: int = 10) -> int:
+        """Return the coefficients of :func:`fit_gam`'s model on ``parents``, intercept included."""
+        rank = effective_k(self.data.shape[0], len(parents), k)
+        return 1 + sum(min(rank, int(self.distinct[p])) - 1 for p in parents)
 
 
 @dataclass
@@ -257,7 +283,8 @@ class GAMFit:
     residual_df : float
         ``n - tr(A)``: the number of rows less the model's effective degrees of freedom.
     k : int
-        Basis rank of every term.
+        Largest basis rank of the terms; a term of a column with fewer distinct values has that
+        many.
     bases : tuple of SmoothBasis
         The terms' bases, in the order of ``sp``.
     """
@@ -320,11 +347,17 @@ def effective_k(n: int, n_parents: int, k: int = 10) -> int:
 
 
 def fit_gam(
-    bases: BasisCache, child: int, parents: Sequence[int] | np.ndarray, *, k: int = 10
+    bases: BasisCache,
+    child: int,
+    parents: Sequence[int] | np.ndarray,
+    *,
+    k: int = 10,
+    starts: Sequence[float] = (0.0,),
 ) -> GAMFit:
     """Fit column ``child`` of ``bases.data`` as an additive model of columns ``parents``.
 
-    Every parent gets a smooth term of rank :func:`effective_k`. When the GCV search fails
+    Every parent gets a smooth term of rank :func:`effective_k`, capped by its distinct values
+    (:class:`BasisCache`). When the GCV search fails
     numerically, the model is refit with every smoothing parameter ``0``, an unpenalized regression
     spline.
 
@@ -338,6 +371,8 @@ def fit_gam(
         Covariate columns, at least one, excluding ``child``.
     k : int, default 10
         Basis rank before :func:`effective_k` adjusts it.
+    starts : sequence of float, default (0.0,)
+        Passed to :func:`fit_additive`.
 
     Returns
     -------
@@ -362,14 +397,18 @@ def fit_gam(
     terms = [bases(p, rank) for p in parents]
     y = bases.data[:, child]
     try:
-        return fit_additive(y, terms)
+        return fit_additive(y, terms, starts=starts)
     except (np.linalg.LinAlgError, FloatingPointError) as err:
         _log.info("GCV search failed (%s); refitting with zero smoothing parameters", err)
         return fit_additive(y, terms, sp=np.zeros(len(terms)))
 
 
 def fit_additive(
-    y: np.ndarray, bases: Sequence[SmoothBasis], *, sp: np.ndarray | None = None
+    y: np.ndarray,
+    bases: Sequence[SmoothBasis],
+    *,
+    sp: np.ndarray | None = None,
+    starts: Sequence[float] = (0.0,),
 ) -> GAMFit:
     """Fit ``y = c + sum_j f_j`` with one smooth term per basis.
 
@@ -381,6 +420,11 @@ def fit_additive(
         One basis per term, each with ``n`` rows.
     sp : np.ndarray or None, default None
         Fixed smoothing parameters, one per term, each ``>= 0``; ``None`` selects them by GCV.
+    starts : sequence of float, default (0.0,)
+        Shifts of every log smoothing parameter from the start rule's values. The GCV search
+        descends from each shifted start and keeps the lowest score, the earliest start on a tie.
+        The score can have several local minima, and one descent stays in the basin of its start,
+        so more starts can reach a lower minimum at the cost of one descent each.
 
     Returns
     -------
@@ -397,13 +441,13 @@ def fit_additive(
     y = np.asarray(y, dtype=np.float64)
     problem = _Problem(y, bases)
     if sp is None:
-        state = problem.optimize()
+        state = problem.optimize(starts)
     else:
         sp = np.asarray(sp, dtype=np.float64)
         if sp.shape != (len(bases),) or np.any(sp < 0):
             raise ValueError(f"sp must hold {len(bases)} values >= 0")
         state = problem.solve(sp)
-    return problem.finish(state, k=bases[0].X.shape[1] + 1 if bases else 0)
+    return problem.finish(state, k=max(b.X.shape[1] + 1 for b in bases))
 
 
 @dataclass
@@ -557,14 +601,30 @@ class _Problem:
             ss = ss / 10.0
         return np.clip(np.log(sp), -_LOG_SP_BOUND, _LOG_SP_BOUND)
 
-    def optimize(self) -> _State:
+    def optimize(self, starts: Sequence[float] = (0.0,)) -> _State:
         """Minimize the GCV score over ``log sp`` in ``[-25, 25]``.
+
+        The search descends from :meth:`initial_log_sp` shifted by each of ``starts`` in every log
+        smoothing parameter and keeps the lowest score, the earliest start on a tie.
+        """
+        if len(starts) == 0 or not all(math.isfinite(s) for s in starts):
+            raise ValueError(f"starts must hold at least one finite shift, got {starts}")
+        start = self.initial_log_sp()
+        best: _State | None = None
+        for shift in starts:
+            st = self._descend(np.clip(start + shift, -_LOG_SP_BOUND, _LOG_SP_BOUND))
+            if best is None or st.gcv < best.gcv:
+                best = st
+        assert best is not None
+        return best
+
+    def _descend(self, rho: np.ndarray) -> _State:
+        """Descend the GCV score from ``rho`` to a local minimum.
 
         A step is Newton's when the Hessian of the free parameters is positive definite and steepest
         descent otherwise, capped at 5 per parameter and halved until the score falls. A parameter
         at a bound whose gradient points outward is held there.
         """
-        rho = self.initial_log_sp()
         st = self.solve(np.exp(rho))
         for _ in range(_MAX_NEWTON):
             grad, hess = self.derivatives(st)
