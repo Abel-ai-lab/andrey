@@ -67,20 +67,39 @@ StructureKey = tuple[int, ...]
 def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
     """Each column's rank for choosing between moves with equal rounded score changes.
 
-    A continuous column's pattern records whether each value rises, falls, or stays equal to the
-    preceding row's value, using comparisons rather than subtraction. A categorical column's
-    pattern assigns codes in order of first appearance, so changing category labels preserves the
-    pattern. Columns are ordered by a hash of their pattern, then by a hash of their values if
-    pattern hashes match. For example, a column and a strictly increasing function of it share a
-    pattern. If both hashes match, as for identical columns, column position decides. Otherwise,
-    each rank moves with its column when the columns are reordered. The rank is arbitrary with
-    respect to causal structure.
+    A column's rank comes from what the data say about it in any row order, unit, or sign. A
+    continuous column enters by its ranks within the column, doubled and centered so that they are
+    integers summing to zero, and a categorical column by which rows share a category. Each pair of
+    columns has one relation, an integer or a list of integers:
 
-    Distinct pattern hashes give the same ranks across machines when the patterns are unchanged.
-    Last-bit differences in data, such as those from different CPUs' BLAS calculations, preserve
-    continuous patterns unless they change a comparison between consecutive rows. If pattern
-    hashes match, the fallback to raw values can make ranks sensitive to these differences or to
-    category recoding.
+    - two continuous columns: the absolute sum of their centered ranks' products, the numerator of
+      Spearman's correlation without its sign;
+    - a categorical and a continuous column: each category's count and the absolute sum of the
+      continuous column's centered ranks over its rows;
+    - two categorical columns: the counts of their joint table.
+
+    A column's key is the sorted list of its relations to the other columns. Where two columns'
+    keys are equal, as they always are with two columns or fewer, each of them adds its marginal:
+    a continuous column's absolute skewness and kurtosis rounded to 9 decimal places, or a
+    categorical column's category counts. Columns are ordered by a hash of their keys, so the rank
+    is arbitrary with respect to causal structure, and columns whose keys stay equal are ordered by
+    position. A missing value (NaN) takes the middle rank of its continuous column and forms a
+    category of its own in a categorical column.
+
+    The ranks stay the same when the rows are shuffled, when a column's units change to
+    ``a * x + b`` with ``a > 0``, when a column's sign flips, and when a categorical column's
+    categories are relabeled; a new column order reorders the ranks with the columns. The limits:
+
+    - A change of units can round two distinct values to one, which changes the column's ranks.
+    - The marginal is rounded, so in rare cases a change of units or a sign flip moves it across a
+      rounding boundary.
+    - Columns that no row order, unit, or sign tells apart rank by position, so a new column order
+      changes which of them ranks first: copies of one column in other units or the other sign,
+      two columns whose rows also appear with the two swapped, and columns that share their ranks
+      and whose marginals agree to 9 decimal places, such as a copy nudged in its last digits.
+    - The relations are exact integers and agree on every machine. The marginal comes from
+      floating-point sums, whose last bits, and so in rare cases whose rounding, can differ between
+      machines.
 
     Under ``tie_break="position"`` (:data:`andrey.config`, ``ANDREY_TIE_BREAK``), each column's
     rank is its position, so the methods that order ties by these ranks order them by column
@@ -91,8 +110,8 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     x : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     categorical : ndarray of bool, shape (n_features,), optional
-        Marks columns that use first-appearance category codes. ``None`` treats all columns as
-        continuous.
+        Marks the categorical columns, whose distinct values are their categories. ``None`` treats
+        all columns as continuous.
 
     Returns
     -------
@@ -102,27 +121,94 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     """
     if backend.config.tie_break == "position":
         return np.arange(x.shape[1])
-    mask = np.zeros(x.shape[1], dtype=bool) if categorical is None else categorical
-    patterns = []
-    for col, is_categorical in zip(x.T, mask.tolist(), strict=True):
-        if is_categorical:
-            _, first, codes = np.unique(col, return_index=True, return_inverse=True)
-            seen = np.empty(first.size, dtype=np.int64)
-            seen[np.argsort(first)] = np.arange(first.size)
-            pattern = seen[codes]
-        else:
-            col = np.ascontiguousarray(col)
-            pattern = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
-        patterns.append(hashlib.blake2b(pattern.tobytes(), digest_size=8).digest())
-    shared = {key for key, count in Counter(patterns).items() if count > 1}
-    digests = [
-        (key, hashlib.blake2b(col.tobytes(), digest_size=8).digest() if key in shared else b"")
-        for key, col in zip(patterns, x.T, strict=True)
+    x = np.asarray(x, dtype=np.float64)
+    mask = (
+        np.zeros(x.shape[1], dtype=bool) if categorical is None else np.asarray(categorical, bool)
+    )
+    keys = _relation_keys(x, mask)
+    shared = {key for key, count in Counter(keys).items() if count > 1}
+    keys = [
+        key + _marginal_key(col, is_categorical) if key in shared else key
+        for key, col, is_categorical in zip(keys, x.T, mask.tolist(), strict=True)
     ]
+    digests = [hashlib.blake2b(key, digest_size=8).digest() for key in keys]
     order = sorted(range(len(digests)), key=digests.__getitem__)
     ranks = np.empty(len(order), dtype=np.intp)
     ranks[order] = np.arange(len(order))
     return ranks
+
+
+def _relation_keys(x: np.ndarray, mask: np.ndarray) -> list[bytes]:
+    """Each column's type and sorted relations to the other columns (:func:`tie_ranks`)."""
+    continuous, categorical = np.flatnonzero(~mask), np.flatnonzero(mask)
+    ranks = _centered_ranks(x[:, continuous])
+    c = len(continuous)
+    products = _abs_products(ranks)[~np.eye(c, dtype=bool)].reshape(c, max(c - 1, 0))
+    relations: list[list[bytes]] = [[] for _ in range(x.shape[1])]
+    codes = [np.unique(x[:, j], return_inverse=True)[1].reshape(-1) for j in categorical]
+    sizes = [int(code.max()) + 1 if code.size else 0 for code in codes]
+    for a, j in enumerate(categorical):
+        counts = np.bincount(codes[a], minlength=sizes[a])
+        for b, k in enumerate(continuous):
+            sums = np.abs(np.bincount(codes[a], weights=ranks[:, b], minlength=counts.size))
+            pairs = np.column_stack([counts, sums])[np.lexsort((sums, counts))]
+            relations[j].append(_digest(b"m", pairs))
+            relations[k].append(relations[j][-1])
+        for b in range(a + 1, len(categorical)):
+            joint = np.bincount(codes[a] * sizes[b] + codes[b], minlength=sizes[a] * sizes[b])
+            relations[j].append(_digest(b"t", np.sort(joint)))
+            relations[categorical[b]].append(relations[j][-1])
+    sorted_products = dict(zip(continuous.tolist(), np.sort(products, axis=1), strict=True))
+    return [
+        (b"K" if is_categorical else b"C" + sorted_products[j].astype("<u8").tobytes())
+        + b"".join(sorted(relations[j]))
+        for j, is_categorical in enumerate(mask.tolist())
+    ]
+
+
+def _centered_ranks(x: np.ndarray) -> np.ndarray:
+    """Each column's doubled average ranks minus ``m + 1``, ``m`` its count of values that are not
+    NaN: integers summing to zero, which a sign flip negates. A NaN takes 0, the middle."""
+    out = np.zeros(x.shape)
+    for j, col in enumerate(x.T):
+        present = ~np.isnan(col)
+        _, inverse, counts = np.unique(col[present], return_inverse=True, return_counts=True)
+        doubled = 2 * np.cumsum(counts) - counts + 1  # a value's first plus last place, from 1
+        out[present, j] = doubled[inverse.reshape(-1)] - (counts.sum() + 1)
+    return out
+
+
+def _abs_products(ranks: np.ndarray) -> np.ndarray:
+    """``|ranks.T @ ranks|`` as exact unsigned 64-bit integers.
+
+    Every partial sum of two columns' products of centered ranks is an integer of magnitude at most
+    ``(n**3 - n) / 3``, so float64 sums them exactly while that bound is below ``2**53``. Past it,
+    unsigned integers sum them exactly modulo ``2**64``, and the smaller of a sum and its negative
+    removes the sign; the two agree on every sum below ``2**63``.
+    """
+    n = len(ranks)
+    if (n**3 - n) // 3 < 2**53:
+        return np.abs(ranks.T @ ranks).astype(np.uint64)
+    wide = ranks.astype(np.int64).view(np.uint64)
+    sums = wide.T @ wide
+    return np.minimum(sums, -sums)
+
+
+def _marginal_key(col: np.ndarray, is_categorical: bool) -> bytes:
+    """A column's marginal, which tells apart columns with equal relations (:func:`tie_ranks`)."""
+    if is_categorical:
+        return _digest(b"k", np.sort(np.unique(col, return_counts=True)[1]))
+    values = np.sort(col[~np.isnan(col)])
+    if values.size == 0 or values[0] == values[-1]:
+        return f"V{values.size} constant".encode()
+    z = values - values.mean()
+    z /= np.sqrt(np.mean(z**2))
+    return f"V{values.size} {abs(np.mean(z**3)):.9f} {np.mean(z**4):.9f}".encode()
+
+
+def _digest(tag: bytes, ints: np.ndarray) -> bytes:
+    """A 16-byte hash of ``tag`` and ``ints`` as little-endian 64-bit integers."""
+    return hashlib.blake2b(tag + ints.astype("<i8").tobytes(), digest_size=16).digest()
 
 
 def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:

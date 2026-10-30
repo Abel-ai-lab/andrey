@@ -21,6 +21,7 @@ from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, r
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.hc import MoveScanner, _apply_move, _key_after, hc, tie_ranks
 from andrey.search.tabu import tabu
+from qa import identity
 
 
 def _reference_scan(score, adj_int, parents_of, d, floor, tabu, ranks):
@@ -187,20 +188,88 @@ def test_exact_ties_break_independently_of_column_order(search, score_func) -> N
 
 
 def test_tie_ranks_move_with_the_columns() -> None:
-    """Reordering distinct columns reorders their ranks; identical columns rank by position."""
+    """Reordering distinct columns reorders their ranks; copies of a column rank by position."""
     x = _data(0, 50, 6)
     order = np.array([3, 0, 5, 1, 4, 2])
     np.testing.assert_array_equal(tie_ranks(x[:, order]), tie_ranks(x)[order])
     np.testing.assert_array_equal(tie_ranks(x[:, [2, 2, 2]]), [0, 1, 2])
+    copies = x[:, [2, 2]] * np.array([1.0, -3.7]) + np.array([0.0, 10.0])
+    np.testing.assert_array_equal(tie_ranks(copies), [0, 1])
+    np.testing.assert_array_equal(tie_ranks(copies[:, ::-1]), [0, 1])
+
+
+_ROWS = np.random.default_rng(1).permutation(300)
+
+
+def _with_missing(x: np.ndarray) -> np.ndarray:
+    x = x.copy()
+    x[np.random.default_rng(2).random(x.shape) < 0.05] = np.nan
+    return x
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda x: x[_ROWS],
+        lambda x: 3.7 * x + 10,
+        lambda x: x * np.array([1.0, 1.0, -1.0, 1.0, 1.0, 1.0]),
+    ],
+    ids=["row shuffle", "units", "sign flip"],
+)
+@pytest.mark.parametrize("missing", [False, True])
+def test_tie_ranks_ignore_row_order_units_and_sign(change, missing) -> None:
+    """Column 5 rises with column 0, so the two share their relations and their marginals decide."""
+    x = _data(0, 300, 6)
+    x[:, 5] = np.exp(x[:, 0])
+    if missing:
+        x = _with_missing(x)
+    np.testing.assert_array_equal(tie_ranks(change(x)), tie_ranks(x))
+
+
+def test_one_or_two_columns_rank_by_their_marginals() -> None:
+    """Two columns have one relation, which cannot tell them apart; their marginals do."""
+    x = _data(0, 300, 6)[:, [1, 4]]
+    want = tie_ranks(x)
+    np.testing.assert_array_equal(tie_ranks(x[:, ::-1]), want[::-1])
+    np.testing.assert_array_equal(tie_ranks(-3.7 * x[_ROWS] + 10), want)
+    np.testing.assert_array_equal(tie_ranks(x[:, :1]), [0])
 
 
 def test_recoding_categories_keeps_the_tie_ranks() -> None:
-    """A categorical column ranks by which rows share a category, not by the codes."""
-    x = _categorical(0, 200, 6)
-    recoded = x * np.array([3.0, -1.0, 2.0, -5.0, 1.0, 7.0]) + np.arange(6.0)
+    """A categorical column ranks by which rows share a category, not by the codes or the rows."""
+    x = _categorical(0, 300, 6)
+    recoded = np.array([2.0, 0.0, 1.0])[x[_ROWS].astype(int)]
     every = np.ones(6, dtype=bool)
     assert not np.array_equal(tie_ranks(recoded), tie_ranks(x))
     np.testing.assert_array_equal(tie_ranks(recoded, every), tie_ranks(x, every))
+
+
+def test_mixed_tie_ranks_ignore_rows_units_sign_and_labels() -> None:
+    """Categorical columns beside continuous ones: the changes of the continuous tests and a
+    relabeling of the categories keep the ranks, and a column order relabels them."""
+    x = _data(3, 300, 6)
+    x[:, 1] = np.digitize(x[:, 0], [-0.5, 0.5])
+    x[:, 4] = np.random.default_rng(3).integers(0, 2, 300)
+    mask = np.isin(np.arange(6), [1, 4])
+    want = tie_ranks(x, mask)
+    changed = x[_ROWS] * np.array([3.7, 1.0, -1.0, 1.0, 1.0, 0.2]) + 10
+    changed[:, 1] = np.array([5.0, -2.0, 9.0])[x[_ROWS, 1].astype(int)]
+    changed[:, 4] = 1 - x[_ROWS, 4]
+    np.testing.assert_array_equal(tie_ranks(changed, mask), want)
+    missing = _with_missing(x)
+    np.testing.assert_array_equal(tie_ranks(missing[_ROWS], mask), tie_ranks(missing, mask))
+    order = np.array([4, 2, 0, 5, 1, 3])
+    np.testing.assert_array_equal(tie_ranks(x[:, order], mask[order]), want[order])
+
+
+def test_rescaling_the_identity_corpus_moves_no_rank() -> None:
+    """On each draw the identity check fits, units that are not a power of two, which move the
+    last bits of the marginals, leave every rank in place."""
+    draws = {(dataset, seed): data for _, dataset, seed, data in identity.corpus(identity.FITS, 2)}
+    assert len(draws) > 50
+    for data in draws.values():
+        x = data.reshape(-1, data.shape[-1])
+        np.testing.assert_array_equal(tie_ranks(3.7 * x), tie_ranks(x))
 
 
 @pytest.mark.parametrize("search", [hc, tabu])
