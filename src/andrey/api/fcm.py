@@ -603,7 +603,22 @@ def camuv(
 
     **Limitations.** Not benchmarked against other packages yet. Binary columns, and any column
     with fewer than 3 distinct values, are not supported: every regression fits a smooth term of
-    each regressor, and such a column raises ``ValueError`` before the fit.
+    each regressor, and such a column raises ``ValueError`` before the fit. Measured on simulated
+    additive-noise data with 1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized
+    columns, ten graphs per setting, on one core. With 20 observed variables and 2 or 4 hidden
+    ones, 33% and 43% of the pairs it marked ``o-o`` were joined through a hidden variable, and it
+    marked 17% and 20% of the pairs that were; on data with no hidden variable it marked a mean of
+    3 pairs a fit on nonlinear data and 6 on linear Gaussian data, each a false mark. Its median
+    errors in the directed edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with
+    hidden variables, and 6.5 against 20 without, orienting 78% to 79% of the true edges. Each
+    sink test reads the candidates found before it, so the order the sets are visited in changes
+    the result: visiting them in the data's column order instead of by rank gave graphs a median of
+    7 to 17.5 pairs apart, at about the same accuracy. A fit took a median of 16 s at 20 variables,
+    1.8 minutes at 50, and 5.5 minutes at 100; its cost grows about as ``d^2``, and a fit passes
+    about a minute near 40 variables, 10 minutes near TBD, and an hour near TBD. The dependence
+    screens skip most of the sink tests: without them a fit took 49 minutes at 50 variables. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
