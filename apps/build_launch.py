@@ -132,8 +132,7 @@ def pitch_block(summary):
             f"- **Fast**: {builder.CLAIM}",
             f"- **Accurate**: {accuracy.lower()} {fewer}% fewer errors than other popular"
             " packages.",
-            f"- **One API**: {len(list_specs())} methods, {supported_count()} of them supported,"
-            " each one function call.",
+            f"- **One API**: {supported_count()} supported methods, each one function call.",
             "- **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden"
             " confounders.",
             "- **Agent-ready**: a command line that answers in JSON, and a skill for coding"
