@@ -10,13 +10,30 @@ names its pull request.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-30
+
 ### Highlights
 
+- `chisq` and `gsq` hold their level in sparse tables: at 0.05 over 3 to 5 categories they rejected
+  11.1% and 21.7% of true independences, and now 4.9% and 3.8%; at 5 categories with 3
+  conditioning variables, 48% and 83%, now 3.2% and 0.8% (Tsamardinos and Borboudakis 2010).
+  ([#574])
+- `indep_test="normal_scores"`, a rank-based Fisher's z test, holds its level on skewed or
+  heavy-tailed columns, where `"fisherz"` over-rejects; every constraint-based search takes it.
+  ([#573])
+- `andrey.markov_check` tests whether the data contradict a graph, such as a method's result
+  (Ramsey, Andrews, and Spirtes 2024); `andrey markov-check` runs it from the command line. ([#571])
+- `pcmci`, `pcmciplus`, and `granger` control the false discovery rate by default
+  (`fdr_method="fdr_bh"`). ([#554], [#565], [#567])
+- `bootstrap` subsamples half of the rows by default, and its averaged graph is a valid graph of
+  the method's kind. ([#544], [#555], [#584])
+- `GraphStructure` answers graph queries: `d_separated`, `m_separated`, `parents`, `ancestors`,
+  `markov_blanket`, and more, by label or position. ([#569])
 - `inter_iamb`, `mmhc`, and `rsmax2` are supported and join the quality gate: against bnlearn 5.2.1
   on simulated linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree
-  2 and 4, none of 72 settings has bnlearn making fewer errors, on the CPDAG, the skeleton, and the
-  moral graph that `inter_iamb` returns, and their median fits are 1.9 to 7.8 times faster.
-  ([#581])
+  2 and 4, bnlearn makes significantly fewer errors in none of the 72 comparisons, on the CPDAG,
+  the skeleton, and the moral graph that `inter_iamb` returns. The median ratio of bnlearn's fit
+  time to Andrey's is 3.8 for `inter_iamb`'s CPDAG, 6.6 for `mmhc`, and 7.8 for `rsmax2`. ([#581])
 
 ### Breaking
 
@@ -1279,7 +1296,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0

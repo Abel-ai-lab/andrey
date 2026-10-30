@@ -18,14 +18,15 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.11.0
+## ⭐ What's new in 0.12.0
 
-Ready for real data: missing values, mixed types, what you already know, and how sure each edge
-is. On a national health survey of 5,569 adults, a third of them missing a value, PC keeps every
-sample, and the bootstrap ranks each edge by how often it comes back.
+Calibration: tests that keep their stated level. A rank-based test holds it on skewed columns, the
+G-square test on sparse tables, and PCMCI and Granger control the false discovery rate over many
+lags. `andrey.markov_check` tests a graph against data it was not learned from, and Inter-IAMB,
+MMHC, and RSMAX2 are supported.
 
-**[Read the post](https://andrey.abel.ai/blog/20261029-andrey-0-11-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.11.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261030-andrey-0-12-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.12.0.html)**
 
 ---
 
@@ -198,7 +199,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.11.0},
+  version = {0.12.0},
   url = {https://andrey.abel.ai},
 }
 ```
