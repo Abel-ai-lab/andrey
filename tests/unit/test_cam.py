@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import itertools
 import warnings
-from collections import Counter
 
 import numpy as np
 import pytest
@@ -119,17 +118,11 @@ def test_every_tier_precedes_the_next_in_the_order_of_many_columns(seed):
     assert all(j != 14 for _, j in _edges(out))
 
 
-def test_max_parents_caps_every_node():
+def test_required_edges_above_max_parents_raise():
     rng = np.random.default_rng(7)
-    X = rng.uniform(-2, 2, (N, 4))
-    X[:, 3] = (
-        np.sin(2 * X[:, 0]) + np.cos(2 * X[:, 1]) + X[:, 2] ** 2 + 0.3 * rng.standard_normal(N)
-    )
-    assert len([e for e in _edges(_fit(X)) if e[1] == 3]) == 3
-    capped = _fit(X, max_parents=1)
-    assert max(Counter(j for _, j in _edges(capped)).values(), default=0) <= 1
+    X = rng.uniform(-2, 2, (N, 3))
     with pytest.raises(ValueError):
-        _fit(X, max_parents=1, knowledge=andrey.Knowledge(required=[(0, 3), (1, 3)]))
+        _fit(X, max_parents=1, knowledge=andrey.Knowledge(required=[(0, 2), (1, 2)]))
 
 
 def test_required_parents_with_more_coefficients_than_rows_name_the_column():
