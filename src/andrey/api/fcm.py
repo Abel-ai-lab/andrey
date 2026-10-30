@@ -135,6 +135,9 @@ def cam(
     ExperimentalWarning
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes,
+        which the fit reads as numbers; once per process.
 
     See Also
     --------
@@ -210,8 +213,10 @@ def cam(
     search. The smoothing of each fit is a local minimum of its GCV score, which can have several,
     so two edges of nearly equal gain can be added in either order. Binary columns, and any column
     with fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so such a
-    column raises ``ValueError``. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    column raises ``ValueError``. Categorical columns are not modeled: text labels raise
+    ``ValueError``, and integer codes are read as numbers, a smooth function of the code, with a
+    :class:`~andrey.DataTypeWarning`. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
     independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and
