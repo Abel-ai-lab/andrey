@@ -2,8 +2,8 @@
 
 Each node with candidate parents is fit as an additive model of them
 (:func:`andrey.fcm.gam.fit_gam`), and a parent stays when its smooth term's p-value is at most
-``cutoff`` (Buhlmann, Peters, Ernest 2014, Section 5.3). The paper declares significance at p-values
-of at most 0.001 for any sample size and notes that smaller samples call for a larger cutoff. The
+``cutoff`` (Buhlmann, Peters, Ernest 2014, Section 5.3): significance at p-values "lower or equal"
+to 0.001, for any sample size, with a larger cutoff for small samples. The
 order-based methods that end with this step (CAM, SCORE, NoGAM, DAS, CaPS) prune the complete DAG
 of their estimated order.
 
@@ -41,7 +41,7 @@ def prune(
     adjacency : np.ndarray
         ``(d, d)`` candidate DAG; a nonzero ``adjacency[i, j]`` is the edge ``i -> j``.
     cutoff : float, default 0.001
-        An edge stays when its p-value is at most ``cutoff``.
+        An edge stays when its p-value is at most ``cutoff``, the paper's "lower or equal".
     k : int, default 10
         Basis rank of each smooth term before :func:`andrey.fcm.gam.effective_k` adjusts it.
     bases : BasisCache or None, default None
