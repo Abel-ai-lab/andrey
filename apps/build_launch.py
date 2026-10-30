@@ -182,11 +182,12 @@ def methods_block():
 
 
 # Methods planned for each family that are not in the registry yet, by their usual names; the
-# registry's experimental methods join them in the roadmap. Stage 1 ends with these; later methods
-# and those for interventional data are planned in the roadmap's later sections.
+# registry's experimental methods join them in the roadmap. Methods for interventional data are
+# planned in the roadmap's own stage for them.
 PLANNED = {
-    "score": ["CAM"],
-    "latent": ["CAM-UV"],
+    "score": ["CAM", "FGES", "NOTEARS-MLP", "GraN-DAG"],
+    "temporal": ["DYNOTEARS", "J-PCMCI+"],
+    "latent": ["CAM-UV", "FOFC"],
     "pairwise": ["RESIT"],
 }
 
