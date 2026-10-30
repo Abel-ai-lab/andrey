@@ -204,6 +204,8 @@ def test_the_moral_graph_joins_a_childs_parents_and_the_skeleton_does_not():
     """The blankets' graph joins a and b, the parents of c; the skeleton and MMPC's do not."""
     frame = _collider()
     true_edges = {frozenset("ac"), frozenset("bc"), frozenset("cd")}
+    for out in (andrey.iamb(frame, output="moral"), andrey.inter_iamb(frame, output="moral")):
+        assert frozenset("ab") in {frozenset(e[:2]) for e in out.structure.oriented_edges()}
     for method in METHODS:
         for output in OUTPUTS[method]:
             out = getattr(andrey, method)(frame, output=output)
