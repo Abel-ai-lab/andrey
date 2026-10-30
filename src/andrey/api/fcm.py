@@ -624,11 +624,13 @@ def camuv(
     3. *Hidden paths.* A dependent pair with no edge whose residuals, each on its parents, are
        dependent at a p-value below ``alpha`` is marked ``o-o``.
 
-    The two dependence screens come from the authors' code; the paper's algorithms test every
-    member of a set and every pair. Under the model they add no conclusion: two independent
-    variables share no noise, so their residuals are independent too, and neither a sink test nor
-    step 3 would accept them. With tests at ``alpha`` they skip most sink tests, and a parent whose
-    dependence the test misses, such as a weak parent beside a strong one, is not found.
+    The two dependence screens come from the authors' implementation, not from the paper's
+    algorithm, which tests every member of a set and every pair. Under the model they add no
+    conclusion: two independent variables share no noise, so their residuals are independent too,
+    and neither a sink test nor step 3 would accept them. With tests at ``alpha`` they skip most
+    sink tests: on the simulated data of **Limitations**, a fit at 50 variables ran 29 times faster
+    with them, and its directed errors were lower on 31 of 40 datasets and higher on 3. A parent
+    whose dependence the test misses, such as a weak parent beside a strong one, is not found.
 
     The paper does not say what to do when the parents form a directed cycle, which its model
     rules out and failed tests can leave: every edge on a directed cycle is dropped, except a
@@ -666,21 +668,22 @@ def camuv(
     fewer than 3 distinct values, are not supported: every regression fits a smooth term of each
     regressor, and such a column raises ``ValueError`` before the fit. Measured on simulated
     additive-noise data with 1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized
-    columns, ten graphs per setting, on one core. With 20 observed variables and 2 or 4 hidden ones,
-    33% and 43% of the pairs it marked ``o-o`` were joined through a hidden variable, and it marked
-    17% and 20% of the pairs that were; on data with no hidden variable it marked a mean of 3 pairs
-    a fit on nonlinear data and 6 on linear Gaussian data, each a false mark. Its median errors in
-    the directed edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with hidden
-    variables, and 6.5 against 20 without, orienting 78% to 79% of the true edges. Each sink test
-    reads the candidates found before it, so the order the sets are visited in changes the result:
-    visiting them in the data's column order instead of by rank gave graphs a median of 7 to 17.5
-    pairs apart, at about the same accuracy. With one hidden variable per ten observed ones and one
-    to three graphs per size, a fit took a median of 15 s at 20 variables, 4.9 minutes at 100, and
-    90 minutes at 400, where its directed errors passed the empty graph's, 330 against 315; its cost
-    grows about as ``d^2``, so a fit passes about a minute near 40 variables, 10 minutes near 130,
-    and an hour near 340. The dependence screens skip most of the sink tests: without them a fit
-    took 29 times as long at 50 variables. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    columns, on one core. With 20 observed variables and 2 or 4 hidden ones, ten graphs each, 33%
+    and 43% of the pairs it marked ``o-o`` were joined through a hidden variable, and it marked 17%
+    and 20% of the pairs that were. On ten graphs of 20 variables with no hidden variable it marked
+    30 pairs with nonlinear effects and 61 with linear Gaussian ones, each a false mark. Dropping
+    the edges on directed cycles adds to these, from 19 and 38 without the drop, and doubles the
+    hidden pairs found with 4 hidden variables, 20 against 10. Its median errors in the directed
+    edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with hidden variables. Each
+    sink test reads the candidates found before it, so the order the sets are visited in changes the
+    result: visiting them in the data's column order instead of by rank gave graphs a median of 7 to
+    17.5 pairs apart, at about the same accuracy. With one hidden variable per ten observed ones,
+    one to three graphs per size, its median directed errors were at or below the empty graph's
+    through 300 variables, 232 against 239 there, and above them at 400, 330 against 315; at smaller
+    sizes some single graphs had more errors than the empty graph. A fit took 15 s at 20 variables,
+    and its cost grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes
+    near 130, and an hour near 340. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
