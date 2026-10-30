@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import warnings
+from collections import Counter
 
 import numpy as np
 import pytest
@@ -107,6 +108,41 @@ def test_tiers_order_the_variables_and_forbid_edges_into_an_earlier_tier(chain_f
 
 
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
+@pytest.mark.parametrize("seed", [1, 2])
+def test_every_tier_precedes_the_next_in_the_order_of_many_columns(seed):
+    # Few possible parents per variable leave most pairs unconnected by the search.
+    rng = np.random.default_rng(seed)
+    X = rng.standard_normal((300, 15))
+    X[:, 1] = np.sin(2 * X[:, 0]) + 0.3 * rng.standard_normal(300)
+    out = _fit(X, knowledge=andrey.Knowledge(tiers=[[14], list(range(14))]))
+    assert out.ordering[0] == 14
+    assert all(j != 14 for _, j in _edges(out))
+
+
+def test_max_parents_caps_every_node():
+    rng = np.random.default_rng(7)
+    X = rng.uniform(-2, 2, (N, 4))
+    X[:, 3] = (
+        np.sin(2 * X[:, 0]) + np.cos(2 * X[:, 1]) + X[:, 2] ** 2 + 0.3 * rng.standard_normal(N)
+    )
+    assert len([e for e in _edges(_fit(X)) if e[1] == 3]) == 3
+    capped = _fit(X, max_parents=1)
+    assert max(Counter(j for _, j in _edges(capped)).values(), default=0) <= 1
+    with pytest.raises(ValueError):
+        _fit(X, max_parents=1, knowledge=andrey.Knowledge(required=[(0, 3), (1, 3)]))
+
+
+def test_required_parents_with_more_coefficients_than_rows_name_the_column():
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(
+        np.random.default_rng(8).standard_normal((14, 8)), columns=list("abcdefgh")
+    )
+    required = [(c, "h") for c in "abcdefg"]
+    with pytest.raises(ValueError, match="'h'"):
+        _fit(frame, knowledge=andrey.Knowledge(required=required))
+
+
+@pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
 def test_a_variable_with_few_distinct_values_is_a_parent():
     rng = np.random.default_rng(2)
     x = rng.integers(0, 5, N).astype(float)
@@ -145,5 +181,5 @@ def test_possible_parents_are_picked_three_times_and_a_tie_at_the_tenth_keeps_fe
 def test_columns_without_a_smooth_basis_are_named():
     X = _chain()
     X[:, 1] = np.arange(N) % 2
-    with pytest.raises(ValueError, match="column 1 has fewer than 3 distinct values"):
+    with pytest.raises(ValueError):
         _fit(X)

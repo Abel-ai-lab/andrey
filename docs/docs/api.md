@@ -160,12 +160,13 @@ takes the same three rules for its same-step colliders, with `"majority"` as its
 tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
-`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, and
-`gfci` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
+`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, `gfci`,
+and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
 gives a node more than that many parents. `None`, the default, sets no cap. `ges`, `gies`, `xges`,
 `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss` and
-`grasp` grow no parent set past it, and `exact_search` scores only the parent sets within it.
-`gfci` caps its GES phase; the PAG its tests then orient can put more arrowheads at a node.
+`grasp` grow no parent set past it, `exact_search` scores only the parent sets within it, and
+`cam`'s order search adds no edge past it. `gfci` caps its GES phase; the PAG its tests then orient
+can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,

@@ -471,7 +471,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "cam"),
         exempt=(
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -487,11 +487,6 @@ _CONCEPTS = (
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *_LINGAM),
             *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
-            *_exempt(
-                "The paper's search sets no cap; the neighbor preselection keeps at most ten "
-                "possible parents per variable.",
-                "cam",
-            ),
         ),
     ),
     Concept(
