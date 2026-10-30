@@ -17,6 +17,7 @@ from sklearn.exceptions import ConvergenceWarning
 
 import andrey
 from andrey.core import ci, warning_policy
+from andrey.fcm import camuv as camuv_engine
 from andrey.irregular import rcd as rcd_engine
 from andrey.search import gfci as gfci_engine
 from andrey.search.operators import max_parents_in_class
@@ -127,7 +128,28 @@ def rcd_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
     return sizes
 
 
-RECORDERS = {"pcmci": pc1_sizes, "pcmciplus": pc1_sizes, "rcd": rcd_sizes}
+def camuv_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
+    """Every sink test of CAM-UV: the other members of the set, tested together.
+
+    The tests are stubbed to find every pair dependent and no sink, so the search tries every set
+    of every size the cap allows.
+    """
+    sizes: list[int] = []
+
+    def sink_test(self, child, regressors, y):
+        sizes.append(len(y))
+        return 0.0
+
+    monkeypatch.setattr(camuv_engine._Tests, "p_fresh", sink_test)
+    monkeypatch.setattr(camuv_engine._Tests, "p_value", lambda self, x, y: 0.0)
+    data = np.random.default_rng(0).standard_normal((200, 5))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        andrey.camuv(data, max_depth=data.shape[1] if cap is None else max(cap, 1))
+    return sizes
+
+
+RECORDERS = {"pcmci": pc1_sizes, "pcmciplus": pc1_sizes, "rcd": rcd_sizes, "camuv": camuv_sizes}
 
 
 @pytest.mark.parametrize("method", methods_with("max_depth"))

@@ -158,6 +158,12 @@ names its pull request.
   distribution, with the paper's settings: it takes as each next sink the variable whose
   additive-model residual an HSIC test finds most independent of the others, then removes each
   parent whose removal leaves the residual independent; it is experimental. ([#TBD])
+- `camuv`, causal additive models with unobserved variables (Maeda and Shimizu 2021), returns to
+  the latent-variable family with the paper's settings: HSIC tests on the residuals of additive
+  spline fits find each variable's direct causes over sets of up to 3 variables, and a pair that a
+  hidden common cause or a causal path through a hidden variable joins, whose relation no
+  regression can identify, comes back as `o-o` and in `metadata["latent_pairs"]`; it is
+  experimental. ([#TBD])
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
   `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
   `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,

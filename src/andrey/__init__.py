@@ -22,6 +22,7 @@ from .api import (
     bottom_up_parce_lingam,
     calm,
     cam,
+    camuv,
     cdnod,
     dagma,
     direct_lingam,
@@ -143,4 +144,5 @@ __all__ = [
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
     "bottom_up_parce_lingam",
+    "camuv",
 ]
