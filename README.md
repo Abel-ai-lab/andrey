@@ -165,8 +165,7 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
   browser.
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): benchmark details for each
   release.
-- [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html): the four
-  ideas behind the speed.
+- [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)
 - [FAQ](https://andrey.abel.ai/docs/faq.html) and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
 - [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.
