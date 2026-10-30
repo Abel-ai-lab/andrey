@@ -255,9 +255,12 @@ def iamb(
     conditions on the whole current blanket, so each test needs more rows as the blanket grows,
     and a candidate the grow step adds in error enlarges every later conditioning set. The skeleton
     and the CPDAG test every subset of the smaller blanket for each pair of the moral graph and
-    each unshielded triple, so their cost grows exponentially with the blanket size. Missing
-    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
-    the values missing completely at random.
+    each unshielded triple, and a collider takes all of them, so a triple whose smaller blanket
+    holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50
+    variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
+    collider tests took 0.07 to 0.7 s on five datasets, and learning the blankets 0.8 to 1.0 s.
+    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
+    fifth of the values missing completely at random.
 
     References
     ----------
@@ -471,9 +474,12 @@ def inter_iamb(
     simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It
     conditions on the whole current blanket, so each test needs more rows as the blanket grows.
     The skeleton and the CPDAG test every subset of the smaller blanket for each pair of the moral
-    graph and each unshielded triple, so their cost grows exponentially with the blanket size.
-    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random.
+    graph and each unshielded triple, and a collider takes all of them, so a triple whose smaller
+    blanket holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data
+    with 50 variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16
+    variables, the collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets
+    0.9 to 1.3 s. Missing values are not benchmarked yet; the tests run them on up to 20 variables
+    with up to a fifth of the values missing completely at random.
 
     References
     ----------
@@ -682,10 +688,14 @@ def mmpc(
     simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It tests
     each candidate against every subset of the current members, so its cost grows exponentially
     with the size of the set; the symmetry check runs the search once more for each member. The
-    CPDAG tests every subset of the smaller blanket for each unshielded triple, and these blankets
-    reach two steps from a variable, so its cost grows exponentially with their size. Missing
-    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
-    the values missing completely at random.
+    CPDAG tests every subset of the smaller blanket for each unshielded triple, and a collider
+    takes all of them. These blankets reach two steps from a variable, so they are larger than a
+    Markov blanket, and a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
+    collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose smaller blanket
+    held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s. Missing values are
+    not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of the values
+    missing completely at random.
 
     References
     ----------
