@@ -9,7 +9,8 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.fcm.cam import DistinctBases, boosting_counts, neighbors, order_search
+from andrey.fcm.cam import boosting_counts, neighbors, order_search
+from andrey.fcm.gam import BasisCache
 from andrey.search.hc import tie_ranks
 
 N = 400
@@ -71,7 +72,7 @@ def test_tied_gains_go_to_the_earlier_column():
     X = _mirrored()[:, :2]
     candidates = ~np.eye(2, dtype=bool)
     for columns in (X, X[:, ::-1]):
-        assert np.argwhere(order_search(DistinctBases(columns), candidates)).tolist() == [[0, 1]]
+        assert np.argwhere(order_search(BasisCache(columns), candidates)).tolist() == [[0, 1]]
 
 
 def test_a_tie_follows_the_rank_and_reordered_columns_relabel_the_result():

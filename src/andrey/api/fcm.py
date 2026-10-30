@@ -182,8 +182,10 @@ def cam(
     errors of 11 at 20 variables and 84 at 100. A fit took a median of 3 s at 20 variables and 22 s
     at 100, about 40% of it in the neighbor preselection and 55% in the order search. The smoothing
     of each fit is a local minimum of its GCV score, which can have several, so two edges of nearly
-    equal gain can be added in either order. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    equal gain can be added in either order. Binary columns, and any column with fewer than 3
+    distinct values, are not supported: a smooth term needs at least 3, so such a column raises
+    ``ValueError``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
