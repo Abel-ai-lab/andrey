@@ -145,6 +145,16 @@ names its pull request.
   `fdr_method="none"` returns `pcmci`'s results of 0.11.0 and `granger`'s uncorrected test. The
   quality gate's medians move: PCMCI's from 8 and 9.5 to 2 and 0.5, and Granger's from 5.5 and 3.5
   to 6.5 and 4. ([#567])
+- `iamb`, `inter_iamb`, and `mmpc` take `output`, and without a `target` they return a CPDAG by
+  default, kind `cpdag`, where they returned an undirected graph: the moral graph of the Markov
+  blankets (`iamb`, `inter_iamb`) and the skeleton (`mmpc`). The CPDAG is the Grow-Shrink structure
+  learner's (Margaritis 2003): each pair of the moral graph that a subset of the smaller blanket
+  separates leaves, which gives the skeleton; each unshielded triple is a collider when its ends
+  stay dependent given the middle node and every subset of the smaller blanket; and Meek's rules
+  orient the rest. `output="moral"` (`iamb`, `inter_iamb`) and `output="skeleton"` (`mmpc`) return
+  the 0.11.0 graphs, bit for bit; `output="skeleton"` on `iamb` and `inter_iamb` returns the moral
+  graph without the links between a child's parents. With a `target`, each returns the variable's
+  set, as before. ([#572])
 
 ### Added
 
@@ -1381,3 +1391,4 @@ First alpha release.
 [#565]: https://github.com/Abel-ai-lab/andrey/pull/565
 [#567]: https://github.com/Abel-ai-lab/andrey/pull/567
 [#569]: https://github.com/Abel-ai-lab/andrey/pull/569
+[#572]: https://github.com/Abel-ai-lab/andrey/pull/572

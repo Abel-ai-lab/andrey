@@ -150,6 +150,23 @@ to pick one that reads categories, or pass `categorical=[]` to read every column
 `ebic_gamma` takes values from 0 to 1 and only with `score_func="bic"`; drop it from a call with
 another score.
 
+### Markov-blanket methods
+
+Without a `target`, `iamb`, `inter_iamb`, and `mmpc` return a CPDAG, kind `cpdag`, where they
+returned an undirected graph. Pass `output` for the 0.11 graph; a call with a `target` does not
+change:
+
+```python
+# 0.11
+moral = andrey.iamb(data)  # also inter_iamb
+skeleton = andrey.mmpc(data)
+
+# 0.12
+moral = andrey.iamb(data, output="moral")
+skeleton = andrey.mmpc(data, output="skeleton")
+cpdag = andrey.iamb(data)  # the default: spouse links pruned, colliders and Meek's rules
+```
+
 ## From 0.10 to 0.11
 
 Andrey 0.11.0 gives each setting one name in every method, such as `seed`, `alpha`,
