@@ -92,18 +92,11 @@ def test_pnl_output_contract():
 
 
 @pytest.mark.parametrize("method", ["anm", "pnl"])
-def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method, monkeypatch):
-    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits;
-    # with enough rows both p-values underflow to zero, which the tests' p-values are set to here,
-    # and the smaller HSIC statistic over its null mean decides.
-    import importlib
-
+def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method):
+    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits
+    # and both p-values round to zero; the smaller HSIC statistic over its null mean decides.
     from andrey.api import irregular
 
-    module = importlib.import_module(f"andrey.irregular.{method}")
-    name = "hsic_statistic_test" if method == "anm" else "_gamma_test"
-    test = getattr(module, name)
-    monkeypatch.setattr(module, name, lambda *args: (test(*args)[0], 0.0))
     angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
     out = getattr(irregular, method)(np.column_stack([np.cos(angle), np.sin(angle)]))
     p, stat = out.metadata["p_values"], out.metadata["statistics"]
@@ -111,6 +104,18 @@ def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method, monkeypatch):
     assert stat["forward"] != stat["backward"]
     edge = (0, 1) if stat["forward"] < stat["backward"] else (1, 0)
     assert out.structure.oriented_edges() == [(*edge, "directed")]
+
+
+def test_pnl_orients_a_circle_whose_p_values_both_round_to_zero_by_its_statistic():
+    # Both directions' p-values, near 1e-48 and 1e-50, round to zero as ``1 - P``, so the smaller
+    # statistic orients this circle 1 -> 0; p-values that kept those digits would orient it 0 -> 1.
+    from andrey.api.irregular import pnl as pnl_facade
+
+    angle = np.pi * np.random.default_rng(7).uniform(-1, 1, 200)
+    out = pnl_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
+    p = out.metadata["p_values"]
+    assert p["forward"] == p["backward"] == 0.0
+    assert out.structure.oriented_edges() == [(1, 0, "directed")]
 
 
 def test_pnl_draws_no_edge_when_the_statistics_tie_too():

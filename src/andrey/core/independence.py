@@ -11,9 +11,10 @@ independent.
 - :func:`hsic_gamma_from_grams`, used by RCD, ParceLiNGAM, and GIN with the grams of
   :func:`gamma_gram`, sets the bandwidth by the median distance over the first rows without
   z-scoring, corrects the variance for bias, and returns the statistic with the p-value. RESIT runs
-  the same test, through :func:`hsic_gamma_log_p` for the p-value's logarithm, on each side's joint
-  distances with two settings of its own: the bandwidth's median over every row
-  (``median_rows=None``) and the variance's product form (``variance="product"``).
+  the same test through :func:`hsic_gamma_log_p`, which returns the logarithm of a p-value that
+  keeps its precision below ``1e-16``, on each side's joint distances with two settings of its own:
+  the bandwidth's median over every row (``median_rows=None``) and the variance's product form
+  (``variance="product"``).
 
 References
 ----------
@@ -30,7 +31,7 @@ import math
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from scipy.special import gammaincc, gammaln
+from scipy.special import gammainc, gammaincc, gammaln
 from scipy.stats import zscore
 
 
@@ -135,7 +136,7 @@ def _gamma_test(
     var_appr = 2 * sumsq_x * sumsq_y / n / n
     shape = mean_appr**2 / var_appr
     scale = var_appr / mean_appr
-    return float(statistic / mean_appr), float(gammaincc(shape, statistic / scale))
+    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
 
 
 def _centered_kernel(raw: np.ndarray) -> np.ndarray:
@@ -166,10 +167,9 @@ def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
         mean = tr(Kxc) tr(Kyc) / n,   var = 2 sum(Kxc^2) sum(Kyc^2) / n^2,
         shape = mean^2 / var,         scale = var / mean,
 
-    and the p-value is the gamma upper tail ``Q(shape, T / scale)`` with ``Q`` the regularized
-    upper incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``),
-    which keeps its relative precision far below ``1e-16``. A larger p-value means more
-    independent. ``T / mean`` is the statistic relative to its mean
+    and the p-value is the gamma upper tail ``1 - P(shape, T / scale)`` with ``P`` the regularized
+    lower incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``).
+    A larger p-value means more independent. ``T / mean`` is the statistic relative to its mean
     under independence, the gamma null's ``shape * scale``: near 1 for independent variables and
     larger the more dependent they are. It still orders two tests whose p-values are both zero.
     Accepts 1-D vectors or ``(n, d)`` matrices.
@@ -299,9 +299,8 @@ def hsic_gamma_from_grams(
 
     ``n`` is the sample size. The biased HSIC V-statistic ``T = sum(Kxc.T * Kyc) / n`` is matched to
     a gamma law through the finite-sample null mean ``(1 + mu_x mu_y - mu_x - mu_y) / n`` and a null
-    variance; the p-value is the gamma upper tail, the regularized upper incomplete gamma function,
-    which keeps its relative precision far below ``1e-16``. A larger p-value means more
-    independent.
+    variance; the p-value is the gamma upper tail ``1 - P``, ``P`` the regularized lower incomplete
+    gamma function, whose resolution ends near ``1e-16``. A larger p-value means more independent.
 
     ``variance="bias_corrected"`` estimates the variance from the joint products
     ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
@@ -311,7 +310,7 @@ def hsic_gamma_from_grams(
     than summed again.
     """
     statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
-    return float(statistic), float(gammaincc(shape, x))
+    return float(statistic), float(1.0 - gammainc(shape, x))
 
 
 def hsic_gamma_log_p(
@@ -321,14 +320,44 @@ def hsic_gamma_log_p(
     *,
     variance: str = "bias_corrected",
 ) -> float:
-    """Return the natural logarithm of :func:`hsic_gamma_from_grams`'s p-value.
+    """Return the natural logarithm of the p-value of :func:`hsic_gamma_from_grams`'s test.
 
-    The p-value underflows to ``0`` below about ``1e-308``, where a strongly dependent pair's tail
-    lies once there are a few thousand rows; its logarithm stays finite and keeps the order of two
-    such tails (:func:`_log_upper_gamma`).
+    The tail here is the regularized upper incomplete gamma function rather than ``1 - P``, so it
+    keeps its relative precision far below ``1e-16``. Below about ``1e-308`` the tail underflows to
+    ``0``, as a strongly dependent pair's does once there are a few thousand rows; its logarithm
+    stays finite there and keeps the order of two such tails (:func:`_log_upper_gamma`).
+
+    The statistic, ``tr(Kxc Kyc) / n`` of two positive semidefinite centered grams, is never
+    negative in exact arithmetic. A negative value within :func:`_rounding_bound` of ``0`` is
+    rounding of an exact ``0``, as on a balanced grid of independent values, and gives ``0``, the
+    logarithm of ``p = 1``; one further below ``0``, or a non-finite argument, gives ``nan``.
     """
-    _, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
+    statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
+    if 0.0 > statistic >= -_rounding_bound(gram_x, gram_y, n):
+        x = 0.0
     return _log_upper_gamma(float(shape), float(x))
+
+
+def _sum_of_squares(gram: Gram) -> float:
+    """A gram's ``sum(Kc^2)``: its third element when it carries one, else summed here."""
+    return gram[2] if len(gram) == 3 else np.sum(gram[0] * gram[0])
+
+
+def _rounding_bound(gram_x: Gram, gram_y: Gram, n: int) -> float:
+    """How far rounding can move the statistic ``sum(Kxc.T * Kyc) / n``: ``n^2 eps`` times the
+    largest value it can take.
+
+    The statistic sums ``n^2`` products. A floating-point sum of ``N`` terms errs by at most about
+    ``N eps`` times the sum of the terms' magnitudes (Higham 2002, Section 3.1), and by
+    Cauchy-Schwarz that sum is at most ``sqrt(sum(Kxc^2) sum(Kyc^2))``, which over ``n`` bounds the
+    statistic itself. The rounding of the centered entries, a few ``eps`` each against entries of
+    order one, adds less. The bound is therefore ``n eps sqrt(sum(Kxc^2) sum(Kyc^2))``.
+
+    References
+    ----------
+    Higham (2002). Accuracy and Stability of Numerical Algorithms, 2nd ed. SIAM.
+    """
+    return n * _EPS * math.sqrt(_sum_of_squares(gram_x) * _sum_of_squares(gram_y))
 
 
 def _gamma_arguments(
@@ -347,8 +376,7 @@ def _gamma_arguments(
         var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
         var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
     elif variance == "product":
-        sq_x = gram_x[2] if len(gram_x) == 3 else np.sum(cen_x * cen_x)
-        sq_y = gram_y[2] if len(gram_y) == 3 else np.sum(cen_y * cen_y)
+        sq_x, sq_y = _sum_of_squares(gram_x), _sum_of_squares(gram_y)
         var = 2.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3)
         var *= sq_x / (n - 1) ** 2 * sq_y / (n - 1) ** 2
     else:
@@ -368,6 +396,8 @@ _LOG_TAIL_FLOOR = float(np.finfo(np.float64).tiny)
 _CF_TINY = 1e-300
 _CF_EPS = 1e-16
 _CF_MAX_ITER = 10_000
+#: Machine epsilon of a double, the unit of :func:`_rounding_bound`.
+_EPS = float(np.finfo(np.float64).eps)
 
 
 def _log_upper_gamma(a: float, x: float) -> float:
