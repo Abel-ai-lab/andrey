@@ -282,9 +282,6 @@ class GAMFit:
         GCV score ``n * RSS / (n - tr(A))^2``.
     residual_df : float
         ``n - tr(A)``: the number of rows less the model's effective degrees of freedom.
-    k : int
-        Largest basis rank of the terms; a term of a column with fewer distinct values has that
-        many.
     bases : tuple of SmoothBasis
         The terms' bases, in the order of ``sp``.
     """
@@ -298,10 +295,9 @@ class GAMFit:
     scale: float
     gcv: float
     residual_df: float
-    k: int
     bases: tuple[SmoothBasis, ...]
     _cov_unscaled: np.ndarray = field(repr=False)
-    _tests: list[tuple[float, float, float]] | None = field(default=None, repr=False)
+    _p_values: np.ndarray | None = field(default=None, repr=False)
 
     @property
     def residual_variance(self) -> float:
@@ -310,28 +306,17 @@ class GAMFit:
 
     def p_values(self) -> np.ndarray:
         """Return each term's p-value for ``f_j = 0`` (Wood 2013), shape ``(J,)``."""
-        return np.array([t[0] for t in self._term_tests()])
-
-    def statistics(self) -> np.ndarray:
-        """Return each term's Wood (2013) test statistic, shape ``(J,)``."""
-        return np.array([t[1] for t in self._term_tests()])
-
-    def ref_df(self) -> np.ndarray:
-        """Return the rank each term's test uses, ``min(k - 1, edf1)`` or less, shape ``(J,)``."""
-        return np.array([t[2] for t in self._term_tests()])
-
-    def _term_tests(self) -> list[tuple[float, float, float]]:
-        if self._tests is None:
-            tests = []
+        if self._p_values is None:
+            found = []
             start = 1
             for j, basis in enumerate(self.bases):
                 cols = slice(start, start + basis.X.shape[1])
                 start = cols.stop
                 cov = self._cov_unscaled[cols, cols] * self.scale
                 rank = min(basis.X.shape[1], float(self.edf1[j]))
-                tests.append(_test_stat(self.coef[cols], basis.X, cov, rank, self.residual_df))
-            self._tests = tests
-        return self._tests
+                found.append(_p_value(self.coef[cols], basis.X, cov, rank, self.residual_df))
+            self._p_values = np.array(found)
+        return self._p_values.copy()
 
 
 def effective_k(n: int, n_parents: int, k: int = 10) -> int:
@@ -431,7 +416,7 @@ def fit_additive(
         if sp.shape != (len(bases),) or np.any(sp < 0):
             raise ValueError(f"sp must hold {len(bases)} values >= 0")
         state = problem.solve(sp)
-    return problem.finish(state, k=max(b.X.shape[1] + 1 for b in bases))
+    return problem.finish(state)
 
 
 @dataclass
@@ -474,32 +459,40 @@ class _Problem:
             r += b.root.shape[0]
         self.n_root = r
         Q, self.R = np.linalg.qr(self.X)
-        self.basis = self._identifiable_basis()
+        self._identified: dict[tuple[bool, ...], np.ndarray | None] = {}
+        self.basis = self._identifiable_basis(np.ones(len(self.bases), dtype=bool))
         self.f = Q.T @ y
         resid = y - Q @ self.f
         self.rss0 = float(resid @ resid)
 
-    def _identifiable_basis(self) -> np.ndarray | None:
+    def _identifiable_basis(self, penalized: np.ndarray) -> np.ndarray | None:
         """An orthonormal basis of the coefficients the data and penalties identify, or ``None``.
 
-        A direction ``b`` with ``X b = 0`` and ``S_j b = 0`` for every term (collinear linear parts
-        of several terms) is unidentified for every positive smoothing parameter. It is found once,
-        from the column-normalized ``[R; roots]`` at unit penalties; the fit is then solved in the
+        A direction ``b`` with ``X b = 0`` and ``S_j b = 0`` for every term in ``penalized`` (for
+        example, collinear linear parts of several terms) is unidentified for every positive
+        smoothing parameter of those terms; a term whose smoothing parameter is ``0`` identifies
+        nothing. The directions are found once per ``penalized`` mask, from the column-normalized
+        ``[R; roots]`` at unit penalties on the penalized terms; the fit is then solved in the
         orthogonal complement, the minimum-norm solution, so duplicated terms share their linear
         part equally. ``None`` when every direction is identified.
         """
-        stacked = np.vstack([self.R, self._penalty_root(np.ones(len(self.bases)))])
+        key = tuple(bool(b) for b in penalized)
+        if key in self._identified:
+            return self._identified[key]
+        stacked = np.vstack([self.R, self._penalty_root(np.asarray(penalized, dtype=float))])
         norms = np.linalg.norm(stacked, axis=0)
         stacked /= norms
         diag = np.abs(np.diag(linalg.qr(stacked, mode="r", pivoting=True)[0]))
-        if diag[-1] > _RANK_TOL * diag[0]:
-            return None
-        _, sv, Vt = np.linalg.svd(stacked, full_matrices=False)
-        rank = int(np.sum(sv > _RANK_TOL * sv[0]))
-        null = Vt[rank:].T / norms[:, None]
-        Q, _ = np.linalg.qr(null, mode="complete")
-        _log.info("%d unidentified coefficient direction(s): minimum-norm fit", null.shape[1])
-        return Q[:, null.shape[1] :]
+        basis = None
+        if diag[-1] <= _RANK_TOL * diag[0]:
+            _, sv, Vt = np.linalg.svd(stacked, full_matrices=False)
+            rank = int(np.sum(sv > _RANK_TOL * sv[0]))
+            null = Vt[rank:].T / norms[:, None]
+            Q, _ = np.linalg.qr(null, mode="complete")
+            _log.info("%d unidentified coefficient direction(s): minimum-norm fit", null.shape[1])
+            basis = Q[:, null.shape[1] :]
+        self._identified[key] = basis
+        return basis
 
     def _penalty_root(self, sp: np.ndarray) -> np.ndarray:
         """The block matrix ``B`` with ``B'B = sum_j sp_j S_j``."""
@@ -509,14 +502,19 @@ class _Problem:
         return B
 
     def solve(self, sp: np.ndarray) -> _State:
-        """Penalized least squares at ``sp`` through the QR factor of ``[R; sqrt(sp) roots]``."""
+        """Penalized least squares at ``sp`` through the QR factor of ``[R; sqrt(sp) roots]``.
+
+        A smoothing parameter of ``0`` leaves its term unpenalized, so the directions the fit
+        identifies are those of the penalized terms (:meth:`_identifiable_basis`).
+        """
+        basis = self.basis if np.all(sp > 0) else self._identifiable_basis(sp > 0)
         stacked = np.vstack([self.R, self._penalty_root(sp)])
-        if self.basis is not None:
-            stacked = stacked @ self.basis
+        if basis is not None:
+            stacked = stacked @ basis
         Qs, Rs = np.linalg.qr(stacked)
         P = linalg.solve_triangular(Rs, np.eye(Rs.shape[0]), check_finite=False)
-        if self.basis is not None:
-            P = self.basis @ P
+        if basis is not None:
+            P = basis @ P
         Q1 = Qs[: self.p]
         Q1f = Q1.T @ self.f
         coef = P @ Q1f
@@ -625,7 +623,7 @@ class _Problem:
             rho, st = trial_rho, trial
         return st
 
-    def finish(self, st: _State, *, k: int) -> GAMFit:
+    def finish(self, st: _State) -> GAMFit:
         """Package a solved state as a :class:`GAMFit`."""
         F = st.P @ (st.Q1.T @ self.R)
         edf = np.diag(F)
@@ -641,22 +639,22 @@ class _Problem:
             scale=st.rss / (self.n - st.trace),
             gcv=st.gcv,
             residual_df=self.n - st.trace,
-            k=k,
             bases=self.bases,
             _cov_unscaled=st.P @ st.P.T,
         )
 
 
-def _test_stat(
+def _p_value(
     coef: np.ndarray, X: np.ndarray, cov: np.ndarray, rank: float, residual_df: float
-) -> tuple[float, float, float]:
-    """Wood's (2013) test of ``f = 0`` for one term: ``(p-value, statistic, rank)``.
+) -> float:
+    """The p-value of Wood's (2013) test of ``f = 0`` for one term.
 
     ``cov`` is the term's Bayesian posterior covariance. The statistic is ``f' V_f^{r-} f`` with
     ``f = X coef`` and ``V_f^{r-}`` the rank-``r`` pseudoinverse of the covariance of ``f``. A
     non-integer rank ``r = k + nu`` blends the ``k``-th and ``(k+1)``-th eigen-directions, and the
-    reference distribution is then ``sum_i w_i chi2_1`` against an F-type scaled ``chi2_{df}``; the
-    p-value averages the two sign choices of the blended direction.
+    reference distribution is then ``sum_i w_i chi2_1`` against an F-type scaled ``chi2_{df}``,
+    with the real residual degrees of freedom ``df``; the p-value averages the two sign choices of
+    the blended direction.
     """
     _, R = np.linalg.qr(X)
     V = R @ cov @ R.T
@@ -689,8 +687,6 @@ def _test_stat(
     else:
         vec = vec / np.sqrt(values[0]) if k == 0 else vec / np.sqrt(values[:k])
         vec1 = vec
-        if k == 1:
-            rank = 1.0
     f = R @ coef
     stat = float(np.sum((vec.T @ f) ** 2))
     stat1 = float(np.sum((vec1.T @ f) ** 2))
@@ -704,8 +700,8 @@ def _test_stat(
             rp = nu + 1.0
             wk = (rp + math.sqrt(rp * (2.0 - rp))) / 2.0
             weights = [1.0] * (k - 1) + [wk, rp - wk]
-        df = max(1, round(residual_df))
-        dofs = [1.0] * len(weights) + [float(df)]
+        df = max(1.0, residual_df)
+        dofs = [1.0] * len(weights) + [df]
         p = (
             _quadratic_form_sf([*weights, -stat / df], dofs)
             + _quadratic_form_sf([*weights, -stat1 / df], dofs)
@@ -714,7 +710,7 @@ def _test_stat(
         f_sf = stats.f.sf
         p = float(f_sf(stat / rank1, rank1, residual_df) + f_sf(stat1 / rank1, rank1, residual_df))
         p /= 2.0
-    return min(1.0, max(0.0, p)), stat, rank
+    return min(1.0, max(0.0, p))
 
 
 def _quadratic_form_sf(weights: Sequence[float], dofs: Sequence[float]) -> float:
