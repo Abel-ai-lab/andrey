@@ -114,8 +114,10 @@ shows the common calls:
 as one, and then makes it a valid graph of the method's kind, so `structure` can differ from 0.11's.
 `threshold` takes values from 0.5 to 1: a pair must be adjacent in more than that share of the
 fits, or in all of them. When no valid graph of the kind holds the vote, `structure` is the resample
-graph nearest the others, with a warning, and `metadata["averaged_graph"]` is `"nearest_resample"`;
-`strict=True` raises instead. `frequency` and `table` do not change, so read the weaker edges there:
+graph nearest the others among the resamples that are valid graphs of the kind, with a warning, and
+`metadata["averaged_graph"]` is `"nearest_resample"` (`"nearest_resample_invalid"` when no resample
+is valid either); `strict=True` raises instead. `frequency` and `table` do not change, so read the
+weaker edges there:
 
 ```python
 # 0.11
