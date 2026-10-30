@@ -10,6 +10,14 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `inter_iamb`, `mmhc`, and `rsmax2` are supported and join the quality gate: against bnlearn 5.2.1
+  on simulated linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree
+  2 and 4, none of 72 settings has bnlearn making fewer errors, on the CPDAG, the skeleton, and the
+  moral graph that `inter_iamb` returns, and their median fits are 1.9 to 7.8 times faster.
+  ([#581])
+
 ### Breaking
 
 - These arguments, values, and settings have new names, so that one name means one thing across
@@ -1441,3 +1449,4 @@ First alpha release.
 [#574]: https://github.com/Abel-ai-lab/andrey/pull/574
 [#575]: https://github.com/Abel-ai-lab/andrey/pull/575
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
+[#581]: https://github.com/Abel-ai-lab/andrey/pull/581
