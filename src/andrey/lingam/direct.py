@@ -1,10 +1,10 @@
 """DirectLiNGAM: linear non-Gaussian acyclic causal discovery (Shimizu et al. 2011).
 
 Discovers the causal order of a linear structural-equation model with independent non-Gaussian
-errors by peeling the most-exogenous variable one at a time (the pairwise-likelihood ``pwling``
-measure, :mod:`pwling`), then estimates the weighted adjacency ``B`` (``x_i = sum_j B[i, j] x_j``,
-so ``B[i, j]`` weights edge ``j -> i``) by adaptive Lasso on that order (:mod:`adjacency`).
-Deterministic; ``measure="pwling"`` only.
+errors by peeling the most-exogenous variable one at a time (a pairwise likelihood-ratio measure of
+:mod:`pwling`: ``"pwling"``, ``"skew"``, or ``"tanh"``), then estimates the weighted adjacency ``B``
+(``x_i = sum_j B[i, j] x_j``, so ``B[i, j]`` weights edge ``j -> i``) by adaptive Lasso on that
+order (:mod:`adjacency`). Deterministic.
 """
 
 from __future__ import annotations
@@ -24,19 +24,18 @@ def direct_lingam(
 ) -> tuple[list[int], np.ndarray]:
     """Fit DirectLiNGAM: return ``(causal_order, B)`` for ``x_i = sum_j B[i, j] x_j``.
 
-    ``measure="pwling"`` is the only supported measure; it is deterministic. With background
-    knowledge ``constraints``, the order keeps
+    ``measure`` is one of :data:`~andrey.lingam.pwling.MEASURES` and raises ``ValueError``
+    otherwise; every measure is deterministic. With background knowledge ``constraints``, the order
+    keeps
     :meth:`~andrey.core.knowledge.Constraints.precedence` (required edges and tiers), and the
     regression drops forbidden parents and keeps required ones unpenalized
     (:func:`~andrey.lingam.adjacency.estimate`), so ``B`` has no forbidden edge. A required edge's
     least-squares weight can be ``0``; :func:`andrey.direct_lingam` still puts the edge in its DAG.
     """
-    if measure != "pwling":
-        raise NotImplementedError(f"DirectLiNGAM supports measure='pwling', not {measure!r}")
     X = np.asarray(X, dtype=np.float64)
     if constraints is None:
-        order = pwling.find_causal_order(X)
+        order = pwling.find_causal_order(X, measure=measure)
         return order, adjacency.estimate(X, order)
-    order = pwling.find_causal_order(X, precedence=constraints.precedence())
+    order = pwling.find_causal_order(X, precedence=constraints.precedence(), measure=measure)
     B = adjacency.estimate(X, order, forbidden=constraints.forbidden, required=constraints.required)
     return order, B

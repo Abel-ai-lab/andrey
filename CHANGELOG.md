@@ -148,6 +148,14 @@ names its pull request.
 
 ### Added
 
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` take
+  `measure="skew"` and `measure="tanh"`, the first-order approximations of the pairwise likelihood
+  ratios of Hyvarinen and Smith (2013), beside the default `"pwling"`: `"tanh"` suits sparse noise,
+  as for Laplace, and `"skew"` skewed noise, with either sign. Both read the standardized columns
+  and cost one matrix product per step, so the order search took 0.1 to 0.3 of `"pwling"`'s time.
+  On simulated data with 10 and 20 variables and 500 and 2,000 rows, `"pwling"` made no more
+  errors (SHD) than either in any cell, and with uniform noise `"tanh"` orients backwards and
+  `"skew"` at random, so `"pwling"` stays the default. ([#575])
 - `GraphStructure` answers graph queries: `parents`, `children`, `ancestors`, `descendants`,
   `markov_blanket`, `d_separated`, and `m_separated`, each taking a node by label or by position.
   `d_separated` is d-separation on a DAG or a CPDAG; `m_separated` is m-separation on a MAG, a PAG,
@@ -1410,3 +1418,4 @@ First alpha release.
 [#571]: https://github.com/Abel-ai-lab/andrey/pull/571
 [#573]: https://github.com/Abel-ai-lab/andrey/pull/573
 [#574]: https://github.com/Abel-ai-lab/andrey/pull/574
+[#575]: https://github.com/Abel-ai-lab/andrey/pull/575
