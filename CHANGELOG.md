@@ -16,7 +16,7 @@ names its pull request.
   a new family, nonlinear additive noise, learns a DAG and a causal order from nonlinear additive
   effects with the paper's settings: boosting preselects each variable's possible parents, a
   greedy search adds edges by the drop in log residual variance of additive spline fits, and
-  smooth-term tests prune them; it is experimental. ([#TBD])
+  smooth-term tests prune them; it is experimental. ([#597])
 
 ## [0.12.0] - 2026-10-30
 
@@ -1479,3 +1479,4 @@ First alpha release.
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#597]: https://github.com/Abel-ai-lab/andrey/pull/597
