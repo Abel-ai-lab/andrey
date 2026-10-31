@@ -704,8 +704,8 @@ def mmpc(
     admits the strongest, which is a true neighbor 99.7% of the time. Borderline false edges
     between unrelated pairs, with a statistic just past the cutoff, then survive: about 2 more per
     graph than with an arbitrary order, which happens to admit a strongly correlated non-neighbor
-    that removes them. At mean degree 2 the skeleton there makes 86.9 errors on average against 84.2
-    for bnlearn's. The benchmark covers continuous data; the categorical and mixed-data tests are
+    that removes them. At mean degree 2 the skeleton there makes 75.5 errors on average against 73.9
+    for bnlearn's, and 86.9 against 84.2 on 10 fresh datasets. The benchmark covers continuous data; the categorical and mixed-data tests are
     in the discrete-network lanes only. Tested with exact d-separation on 15 variables. It tests
     each candidate against every subset of the current members, so its cost grows exponentially
     with the size of the set; the symmetry check runs the search once more for each member. The
