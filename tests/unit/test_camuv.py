@@ -142,7 +142,7 @@ def _has_directed_cycle(edges: set[tuple[int, int]], d: int) -> bool:
 
 
 def test_a_fit_whose_parents_close_cycles_drops_and_records_their_edges(caplog):
-    case = sample_scm(functional="additive_noise", d=12, n=500, seed=2, density=2)
+    case = sample_scm(functional="additive_noise", d=12, n=500, seed=14, density=2)
     with caplog.at_level(logging.INFO, logger="andrey.api.fcm"):
         out = _fit(np.asarray(case.data, dtype=float))
     dropped = {tuple(e) for e in out.metadata["cycle_edges"]}

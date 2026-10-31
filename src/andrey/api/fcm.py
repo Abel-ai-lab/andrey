@@ -667,16 +667,17 @@ def camuv(
     algorithm, which tests every member of a set and every pair. Under the model they add no
     conclusion: two independent variables share no noise, so their residuals are independent too,
     and neither a sink test nor step 3 would accept them. With tests at ``alpha`` they skip most
-    sink tests: on the simulated data of **Limitations**, a fit at 50 variables ran 29 times faster
-    with them, and its directed errors were lower on 31 of 40 datasets and higher on 3. A parent
-    whose dependence the test misses, such as a weak parent beside a strong one, is not found.
+    sink tests: on the simulated data of **Limitations** with 20 observed variables, a fit ran 12
+    times faster with them, and its directed errors were lower on 34 of 40 datasets and higher on
+    1. A parent whose dependence the test misses, such as a weak parent beside a strong one, is not
+    found.
 
     The paper does not say what to do when the parents form a directed cycle, which its model rules
     out and failed tests can leave: every edge on a directed cycle is dropped, except a required
     one, and step 3 tests the pair; :func:`~andrey.rcd` raises instead when required edges close a
     cycle with the parents it found. ``metadata["cycle_edges"]`` lists the dropped edges, and an
     INFO log names them. On the simulated data of **Limitations**, the drop fired in 15 of 70 fits,
-    and 81 of the 85 edges it dropped came back as ``o-o``; 17 of the 85 were true edges. The
+    and 74 of the 78 edges it dropped came back as ``o-o``; 24 of the 78 were true edges. The
     child's residual on its reduced parents also enters its other pairs, which can mark them too.
 
     Each regression is an additive model of penalized thin plate regression splines with ten basis
@@ -708,38 +709,47 @@ def camuv(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked against other packages yet. Binary columns, and any column with
-    fewer than 3 distinct values, are not supported: every regression fits a smooth term of each
-    regressor, and such a column raises ``ValueError`` before the fit. Measured on simulated
-    additive-noise data with 1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized
-    columns, on one core. With 20 observed variables and 2 or 4 hidden ones, ten graphs each, 33%
-    and 43% of the pairs it marked ``o-o`` were joined through a hidden variable, and it marked 17%
-    and 20% of the pairs that were. On ten graphs of 20 variables with no hidden variable it marked
-    30 pairs with nonlinear effects and 61 with linear Gaussian ones, each a false mark. Dropping
-    the edges on directed cycles adds to these, from 19 and 38 without the drop, and doubles the
-    hidden pairs found with 4 hidden variables, 20 against 10. Its median errors in the directed
-    edges (SHD) were 10.5 and 11 against the empty graph's 16 and 13 with hidden variables. On the
-    linear Gaussian data, which identify only the Markov equivalence class, it oriented 44% of the
-    true edges, with median errors of 16 against the empty graph's 20. Each sink test reads the
-    candidates found before it, so the order the sets are visited in changes the result: visiting
-    them in the data's column order instead of by rank gave graphs a median of 7 to 17.5 pairs
-    apart, at about the same accuracy. With one hidden variable per ten observed ones, ten graphs
-    per size, its mean directed errors were 87% of the empty graph's at 10 variables, 74% at 20, and
-    60% at 50, though 3 of the ten graphs at 10 and at 20 variables had more errors than the empty
-    graph; at 300 variables, over 8 graphs, they were 95% of it, with 2 graphs above it, and at 400
-    they passed it, 330 against 315 on one graph. A fit took 15 s at 20 variables, and its cost
-    grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes near 130, and
-    an hour near 340. Each HSIC test builds matrices with one row and one column per sample, so time
-    and memory grow with the square of ``n_samples``: at 5 variables a fit took 1.6 s and 0.21 GB
-    with 1,000 rows and 79 s and 3.6 GB with 8,000, and at 20 variables 5.6 minutes and 1.7 GB with
-    4,000; the kernels kept between tests stay within 1 GiB, so above about 11,600 rows none is
-    kept. A cause with a long tail loses its edge: with a lognormal cause of log-sd 2 or 3 and an
-    effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in all 10 fits,
-    where it found the edge in 5 of 5 at log-sd 1; replacing the cause by its ranks found the edge
-    in 9 of the 10, while its logarithm, which makes the pair linear and Gaussian, reversed it in 11
-    of 15 fits. One value of 1e6 in the middle variable of a nonlinear chain of 800 rows turned both
-    of its edges into ``o-o`` marks in 5 of 5 fits. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Binary columns, and any column with fewer than 3 distinct values, are not
+    supported: every regression fits a smooth term of each regressor, and such a column raises
+    ``ValueError`` before the fit. Integer category codes are read as numbers, with a
+    :class:`~andrey.DataTypeWarning`. Measured on simulated additive-noise data from Erdos-Renyi
+    graphs of mean degree 2 with standardized columns, ten graphs per size, on one core. Two
+    settings have hidden variables: one hidden variable per ten observed ones, at 10 to 50 observed
+    variables and 1,000 rows, and one node in five hidden, chosen among those with two or more
+    children, at 5 to 15 nodes and 2,000 rows. Against the reference implementations of CAM-UV, it
+    was on par at every size in both settings, each 95% interval of the paired difference in
+    directed errors (SHD) including zero, with one exception: at 4 observed variables it made 0.8
+    more errors per graph than one of them in the edges that no hidden path joins (interval 0.1 to
+    1.6). It ran 2 to 16 times faster. Where hidden variables take most edges, as in the second
+    setting, neither it nor the reference implementations beat the empty graph: at 12 observed
+    variables each made more errors than the empty graph, 8.3 per graph for this method against
+    6.3. In the first setting its errors fell below the empty graph's as the graphs grew, to 66% of
+    them at 20 variables and 62% at 50, while at 10 they were about the same, 7.0 against 7.1. At
+    50 observed variables it marked half again as many pairs ``o-o`` as the reference
+    implementations, 164 against 112, at lower precision: 18% of its marks were pairs joined
+    through a hidden variable, against 26%. With 20 observed variables and 2 or 4 hidden ones, 23%
+    and 42% of its marks were such pairs. With none hidden, on ten graphs of 20 variables, it
+    marked 40 pairs with nonlinear effects and 19 with linear Gaussian ones, each a false mark;
+    without the drop of the edges on directed cycles it would mark 22 and 16, but would find fewer
+    hidden pairs, 18 against 24 with 4 hidden variables. On the linear Gaussian data, which
+    identify only the Markov equivalence class, it oriented 53% of the true edges, with median
+    errors of 14.5 against the empty graph's 20. Each sink test reads the candidates found before
+    it, so the order the sets are visited in changes the result: visiting them in the data's
+    column order instead of by rank gave graphs a median of 6 to 16.5 pairs apart, at about the
+    same accuracy. A cause with a long tail loses its edge: with a lognormal cause of log-sd 2 or 3
+    and an effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in 10 of 10
+    fits, and replacing the cause by its ranks found the edge in 9 of them. One value of 1e6 in the
+    middle variable of a nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks in
+    5 of 5 fits. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
+
+    **Large graphs and many rows.** On the first setting a fit took 21 s at 20 variables, and its
+    cost grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes near
+    130, and an hour near 340. Each HSIC test builds matrices with one row and one column per
+    sample, so time and memory grow with the square of ``n_samples``: at 5 variables a fit took
+    1.6 s and 0.21 GB with 1,000 rows and 79 s and 3.6 GB with 8,000, and at 20 variables
+    5.6 minutes and 1.7 GB with 4,000. The kernels kept between tests stay within 1 GiB, so above
+    about 11,600 rows none is kept.
 
     References
     ----------
