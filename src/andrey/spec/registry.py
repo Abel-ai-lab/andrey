@@ -334,10 +334,9 @@ _LOCAL_OUTPUT_DOC = (
     "they joined"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
-for _name, _status, _summary, _key, _structure, _kind, _refs in (
+for _name, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
-        "supported",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
         "incremental association: grow by conditional-independence tests, then shrink. With "
         "target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink structure "
@@ -349,7 +348,6 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
     ),
     (
         "inter_iamb",
-        "supported",
         "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
         "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
         "structure learner, or into the skeleton or the moral graph (structure).",
@@ -360,7 +358,6 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
     ),
     (
         "mmpc",
-        "experimental",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
         "check. With target=null, the skeleton that mmhc searches, or, with structure=cpdag, that "
@@ -392,7 +389,7 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
             ),
             determinism="stochastic",
             accel="numpy",
-            status=_status,
+            status="supported",
             column_order="relabels",
             tie_break=True,
             seeded=True,
