@@ -705,13 +705,14 @@ def mmpc(
     between unrelated pairs, with a statistic just past the cutoff, then survive: about 2 more per
     graph than with an arbitrary order, which happens to admit a strongly correlated non-neighbor
     that removes them. At mean degree 2 the skeleton there makes 75.5 errors on average against 73.9
-    for bnlearn's, and 86.9 against 84.2 on 10 fresh datasets. The benchmark covers continuous data; the categorical and mixed-data tests are
-    in the discrete-network lanes only. Tested with exact d-separation on 15 variables. It tests
-    each candidate against every subset of the current members, so its cost grows exponentially
-    with the size of the set; the symmetry check runs the search once more for each member. The
-    CPDAG tests every subset of the smaller blanket for each unshielded triple, and a collider
-    takes all of them. These blankets reach two steps from a variable, so they are larger than a
-    Markov blanket, and a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    for bnlearn's, and 86.9 against 84.2 on 10 fresh datasets. The continuous benchmark does not
+    cover the categorical and mixed-data tests, which only the discrete-network lanes cover. Tested
+    with exact d-separation on 15 variables. It tests each candidate against every subset of the
+    current members, so its cost grows exponentially with the size of the set; the symmetry check
+    runs the search once more for each member. The CPDAG tests every subset of the smaller blanket
+    for each unshielded triple, and a collider takes all of them. These blankets reach two steps
+    from a variable, so they are larger than a Markov blanket, and a triple whose smaller blanket
+    holds ``m`` variables takes up to ``2**m``
     tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
     collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose smaller blanket
     held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s. Missing values are
