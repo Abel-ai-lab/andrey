@@ -34,8 +34,8 @@ names its pull request.
   additive effects with the paper's settings: HSIC tests on the residuals of additive spline fits
   find each variable's direct causes over sets of up to 3 variables, and a pair that a hidden common
   cause or a causal path through a hidden variable joins, whose relation no regression can
-  identify, comes back as `o-o` and in `metadata["latent_pairs"]`; the edges it drops from
-  directed cycles are in `metadata["cycle_edges"]`. It is experimental. ([#TBD])
+  identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
+  directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#TBD])
 
 ### Changed
 
