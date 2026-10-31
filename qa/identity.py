@@ -1,14 +1,13 @@
 """Check that a change returns the same answers, bit for bit, by hashing each method's full output.
 
-Every supported method of the quality gate (:mod:`qa.quality_gate`), and each experimental method of
-:data:`EXPERIMENTAL_DATASETS`, is fitted on the first draws of its gate datasets and of one larger
-dataset (:data:`LARGER`), on the numpy backend with one worker and one BLAS thread. A fit's hash
-covers its whole output: the graph, the edge weights, the causal order, and every metadata value,
-such as a score, a p-value, or a list of nodes. Floats enter as their bytes, never as printed text,
-NaN as one bit pattern, and mappings in key order, so equal hashes mean equal bits. A second hash
-covers only the endpoint marks of the graphs, and each part of the output has its own digest
-(:func:`parts`), so a difference reads as a changed graph, as changed bits under the same graph, or
-as changed metadata values alone, named by key.
+Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on the first draws of
+its gate datasets and of one larger dataset (:data:`LARGER`), on the numpy backend with one worker
+and one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the causal
+order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats enter as
+their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so equal
+hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each part of
+the output has its own digest (:func:`parts`), so a difference reads as a changed graph, as changed
+bits under the same graph, or as changed metadata values alone, named by key.
 
 The manifest holds one row per fit, keyed by method, dataset, seed, permutation, and worker count,
 under a header naming the commit, the imported Andrey package's directory and commit, the Python,
@@ -161,9 +160,6 @@ FITS: dict[str, Fit] = {
 #: two directions on threads.
 WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
 
-#: The gate datasets of the experimental methods, which the quality gate does not fit.
-EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(("IAMB", "MMPC"), qg.CPDAG_DATA)
-
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
 #: step's lagged dynamics stays below 1 and the panel stays bounded.
@@ -240,8 +236,7 @@ def draws(dataset: str) -> tuple[qg.Draw, ...]:
 def corpus(methods: Iterable[str], seeds: int) -> Iterator[tuple[str, str, int, np.ndarray]]:
     """Yield ``(method, dataset, seed, data)`` for the first ``seeds`` draws of each dataset."""
     for method in methods:
-        gate = EXPERIMENTAL_DATASETS.get(method) or qg.SUPPORTED[method].datasets
-        for dataset in (*gate, LARGER[method]):
+        for dataset in (*qg.SUPPORTED[method].datasets, LARGER[method]):
             for seed, draw in enumerate(draws(dataset)[:seeds]):
                 yield method, dataset, seed, np.ascontiguousarray(draw.data)
 
@@ -492,6 +487,9 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
+        (target, x, condition_set, p) for x, p in zip(xs, ps)
+    ],
     "_canonical_pvalues": lambda ps, test, xs, ys, sets: list(zip(xs, ys, sets, ps)),
     "marginal_pvalues": lambda ps, test: [
         (x, y, (), ps[x, y]) for x, y in zip(*np.triu_indices(len(ps), 1))

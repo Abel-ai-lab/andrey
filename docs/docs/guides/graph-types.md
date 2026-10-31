@@ -84,11 +84,12 @@ assumptions. The circle at `X` leaves that endpoint unresolved. This does not es
 effect from `X` to `Y`. A bidirected edge `X <-> Y` indicates a relation through hidden causes;
 it is not a directed feedback loop and does not identify a particular hidden variable.
 
-FCI and GFCI return `kind="pag"`. RCD and BottomUpParceLiNGAM use the same marks without the
-equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD links through
-a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves
-unordered, which holds the variables a hidden common cause confounds and their observed ancestors.
-A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
+FCI and GFCI return `kind="pag"`. RCD, BottomUpParceLiNGAM, and CAM-UV use the same marks without
+the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD links
+through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves unordered,
+which holds the variables a hidden common cause confounds and their observed ancestors, or a pair
+that CAM-UV finds joined through a hidden variable, a common cause or a causal path, whose relation
+it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
 
 ```python
 pag = GraphStructure.from_numpy(
@@ -168,10 +169,10 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `gin`, `anm`, `pnl` |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `gin`, `anm`, `pnl` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
-| `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam` |
+| `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients

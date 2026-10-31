@@ -17,17 +17,16 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 
 ## Identity
 
-A speed change must return the same answers. `identity.py` fits every supported method, and IAMB
-and MMPC, on the first two draws of each of its quality-gate datasets and
-of one larger dataset, on the numpy backend with one worker and one BLAS thread, and hashes each
-fit's full output: the graph, the edge weights, the causal order, and every metadata value, such as
-a score or a p-value. Floats enter as their bytes, so equal hashes mean equal bits; a second hash
-covers only the graphs' endpoint marks. The manifest has one row per fit, keyed by method, dataset,
-seed, permutation, and worker count, under a header naming the commit, the Python, NumPy, and SciPy
-versions, the loaded BLAS, the CPU, and the thread settings. It also names the directory of the
-Andrey package the run imported and, when that directory is in a git work tree, that tree's commit,
-so a manifest made with Andrey imported from another tree through `PYTHONPATH` names the tree it
-ran.
+A speed change must return the same answers. `identity.py` fits every supported method on the first
+two draws of each of its quality-gate datasets and of one larger dataset, on the numpy backend with
+one worker and one BLAS thread, and hashes each fit's full output: the graph, the edge weights, the
+causal order, and every metadata value, such as a score or a p-value. Floats enter as their bytes,
+so equal hashes mean equal bits; a second hash covers only the graphs' endpoint marks. The manifest
+has one row per fit, keyed by method, dataset, seed, permutation, and worker count, under a header
+naming the commit, the Python, NumPy, and SciPy versions, the loaded BLAS, the CPU, and the thread
+settings. It also names the directory of the Andrey package the run imported and, when that
+directory is in a git work tree, that tree's commit, so a manifest made with Andrey imported from
+another tree through `PYTHONPATH` names the tree it ran.
 
 A fit that queries a CI test or a local score also records two counts, which are deterministic, so
 a change can be held to not raising them: the CI-test queries of a pair made after a query of that
@@ -133,15 +132,15 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, Inter-IAMB, GES, GIES, XGES, HC, Tabu, MMHC, RSMAX2, exact
-search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD,
+The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, XGES, HC, Tabu, MMHC,
+RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD,
 BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and
 Granger on the datasets whose assumptions each method needs, and PC with each supported nonlinear
 conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 
 | Dataset | Draws | Methods |
 |---|---|---|
-| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, Inter-IAMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
+| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
@@ -159,9 +158,9 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 | `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
-| ASIA, linear-Gaussian | 10 seeds | PC, Inter-IAMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI |
+| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
-| Sachs, measured | 1 | PC, FCI, GFCI, Inter-IAMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
+| Sachs, measured | 1 | PC, FCI, GFCI, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
@@ -212,20 +211,20 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access.
 
-SHD follows the published summaries: PC, with any test, Inter-IAMB, GES, XGES, HC, Tabu, MMHC,
-RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods, ANM, and
-PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by endpoint SHD
-against the PAG of the observed variables. GIES is scored against the interventional essential graph
-of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the domain index
-orients the edges it reaches. GIN's errors are the latents it misses: the true latents whose
-indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD
-against the latent projection, the edges and pairs their benchmark scores: `i -> j` for a directed
-path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden node
-reaches through hidden nodes only. The time-series methods are scored in their summaries' units:
-PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by endpoint
-SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing
-and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a method
-passes when its median SHD over the draws is:
+SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
+MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
+ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by
+endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
+essential graph of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the
+domain index orients the edges it reaches. GIN's errors are the latents it misses: the true latents
+whose indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by
+endpoint SHD against the latent projection, the edges and pairs their benchmark scores: `i -> j` for
+a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden
+node reaches through hidden nodes only. The time-series methods are scored in their summaries'
+units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by
+endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the
+missing and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a
+method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
@@ -267,6 +266,15 @@ entirely above 0, so a difference within the noise of 20 datasets passes. A row 
 paired datasets is reported, with its counts, and not gated. A randomized test's row is judged by
 its `multi_draw` fields where it has them: each dataset fit several times per package (`draws`),
 and D per dataset the mean over the draws.
+
+A setting whose first run is worse is a candidate, not a finding: judging a hundred settings at a
+one-sided 2.5% gives about two or three worse ones even for identical methods. A row may therefore
+hold a `replication`, the same setting rerun once on fresh seeds with the same build, with the
+`seeds` it ran and the fields of a judged row (`paired`, `andrey_shd_mean`, `comparator_shd_mean`,
+`mean_D`, `bootstrap_95`, `above_zero`). A row with a replication is judged by the replication's own
+interval alone, so the setting counts as worse only if the rerun is worse as well. A replication
+with fewer than 10 paired datasets is reported, not gated. A worse setting that replicates, or
+that has no replication, fails unless the allowlist names its cause.
 
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 

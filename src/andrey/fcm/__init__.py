@@ -6,8 +6,10 @@ of the DAG than the Markov equivalence class that independence tests and scores 
 Zhang, and Spirtes 2019). The family's methods take one of two classes. Linear effects with
 non-Gaussian noise identify the DAG: :mod:`andrey.lingam` holds the LiNGAM methods. Nonlinear
 effects with additive noise, ``x_j = f_j(parents) + e_j``, identify it too (Hoyer et al. 2009;
-Peters et al. 2014): :mod:`andrey.fcm.cam` holds CAM. Methods for time series, hidden variables,
-and a single pair of variables keep families of their own.
+Peters et al. 2014): :mod:`andrey.fcm.cam` holds CAM and :mod:`andrey.fcm.resit` RESIT. Methods
+for time series, hidden variables, and a single pair of variables keep families of their own;
+:mod:`andrey.fcm.camuv` holds CAM-UV, the additive model with hidden variables, a method of the
+latent-variable family.
 
 The shared pieces of the nonlinear fits: :mod:`andrey.fcm.gam` fits additive models of penalized
 thin plate regression splines, and :mod:`andrey.fcm.pruning` removes the edges of a candidate DAG
@@ -23,4 +25,6 @@ models." NeurIPS 21, 689-696, 2009.
 
 Peters, Mooij, Janzing, Scholkopf. "Causal discovery with continuous additive noise models."
 JMLR 15:2009-2053, 2014.
+
+Maeda, Shimizu. "Causal additive models with unobserved variables." UAI, PMLR 161:97-106, 2021.
 """

@@ -195,6 +195,12 @@ the spec exists.
 ## Test a method
 
 A new method ships as experimental and becomes supported once it passes every step below.
+Every step judges the method in the setting it claims: the model, data regime, and scale its paper
+states (a search built for very large sparse graphs is measured on those, not on small dense ones).
+Its recovery tests, quality-gate cells, and benchmark campaign use that setting, and it is compared
+with its reference implementation and the methods that target the same setting, with the empty graph
+as a floor. Settings outside the claim are measured for its **Limitations.** paragraph (where it
+stops working and what to use instead), not as a pass or a fail.
 `tests/unit/test_spec_registry.py` checks most of them and names what is missing: a recovery test
 for an experimental method; a **Limitations.** paragraph for every method; and for a supported
 one, a recorded output, a place in the quality gate, a section in a release card, rows in a
@@ -297,15 +303,15 @@ offline and exits 1 on a flag; the release checklist reviews every flag
 
 Measure speed and accuracy against every package that implements the method: copy
 `benchmarks/benchmark.py`, set its `SOLUTIONS` and `SLICE`, add an adapter for a new package under
-`benchmarks/andrey_bench/adapters/`, and run the campaign on the benchmark machine
+`benchmarks/andrey_bench/adapters/`, add the comparison's row to
+[`benchmarks/CATALOG.md`](benchmarks/CATALOG.md), and run the campaign on the benchmark machine
 ([`benchmarks/README.md`](benchmarks/README.md)). A reference package's answer is measured, not a
 target, but every difference needs a cause. Both packages are deterministic on the same data, so
 each differing series has a first step where they diverge: fix an Andrey defect, with a test that
 fails before the fix; make an arbitrary tie-break independent of column order, or, until it is, add
 a `tie-break` entry to the allowlist with the row's result on the reversed column order; and where
 Andrey is correct by the method's paper or the reference has a defect, add a cited entry to the
-allowlist.
-The fit records stay outside the repository.
+allowlist. The fit records stay outside the repository.
 
 ### 6. Mark it supported
 

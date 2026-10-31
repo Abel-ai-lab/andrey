@@ -334,10 +334,9 @@ _LOCAL_OUTPUT_DOC = (
     "they joined"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
-for _name, _status, _summary, _key, _structure, _kind, _refs in (
+for _name, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
-        "experimental",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
         "incremental association: grow by conditional-independence tests, then shrink. With "
         "target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink structure "
@@ -349,7 +348,6 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
     ),
     (
         "inter_iamb",
-        "supported",
         "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
         "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
         "structure learner, or into the skeleton or the moral graph (structure).",
@@ -360,7 +358,6 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
     ),
     (
         "mmpc",
-        "experimental",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
         "check. With target=null, the skeleton that mmhc searches, or, with structure=cpdag, that "
@@ -392,7 +389,7 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
             ),
             determinism="stochastic",
             accel="numpy",
-            status=_status,
+            status="supported",
             column_order="relabels",
             tie_break=True,
             seeded=True,
@@ -1345,6 +1342,38 @@ _add(
         ),
     )
 )
+_add(
+    MethodSpec(
+        name="resit",
+        family="functional",
+        summary="Regression with subsequent independence test (RESIT) for nonlinear effects with "
+        "additive noise of any distribution: a causal order from the sink up, each sink the "
+        "variable whose additive-model residual an HSIC test finds most independent of the "
+        "others, then each parent removed whose removal leaves the residual independent. Returns "
+        "a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after the edge removal; ordering is the causal order of the sink search.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                doc="Significance level of the edge-removal tests: a parent goes when the "
+                "residual without it is independent of the variable's predecessors at a p-value "
+                "above alpha. 0.05 is the paper's value.",
+            ),
+        ),
+        references=("Peters, Mooij, Janzing & Scholkopf 2014", "Gretton et al. 2007"),
+    )
+)
 
 # --- temporal family ------------------------------------------------------------------------------
 
@@ -1958,6 +1987,53 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="camuv",
+        family="latent",
+        summary="Causal additive models with unobserved variables (CAM-UV) for nonlinear additive "
+        "effects where some causes are hidden: direct causes as ->, and as o-o the pairs a hidden "
+        "common cause or a causal path through a hidden variable joins, whose relation cannot be "
+        "determined. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        params=(
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every HSIC independence test: the sink tests, the "
+                "tests that remove a candidate parent, and the tests that mark a pair. 0.01 is "
+                "the paper's value.",
+            ),
+            ParamSpec(
+                name="max_depth",
+                type="int",
+                default=2,
+                doc="The maximum conditioning-set size of a sink test, the most variables tested "
+                "together as a variable's new candidate parents, at least 1: the search runs over "
+                "sets of up to max_depth + 1 variables. Each sink test also regresses on the "
+                "variable's candidates found so far, however many. Larger values find more parents "
+                "and take longer. The default 2 is the paper's setting, sets of at most 3 "
+                "variables.",
+                minimum=1,
+                concept="max_depth",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="PAG over the observed variables; o-o joins a pair through a hidden variable, a "
+            "common cause or a causal path, metadata latent_pairs lists those pairs, and "
+            "cycle_edges the edges dropped from directed cycles.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        references=("Maeda & Shimizu 2021", "Gretton et al. 2007"),
+    )
+)
+
 # --- background knowledge and the conditioning-set cap ------------------------------------------
 
 _SKELETON_RULE = (
@@ -2046,6 +2122,11 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never possible parents; the boosting that preselects the possible parents reads the data "
     "alone. The search starts from the required edges, and the pruning never removes one. "
     + _ORDER_RULE.rstrip(),
+    "resit": "A variable is the next sink only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no regression and never in the result; each test still "
+    "reads every remaining variable or predecessor. The edge removal never removes a required "
+    "edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE
@@ -2074,6 +2155,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "required ones unpenalized. In the unordered block, a pair forbidden both ways is not "
     "adjacent, a pair forbidden one way has an arrowhead at the cause, and a required edge is "
     "directed.",
+    "camuv": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set never "
+    "make a variable a candidate parent, so a variable is not tried as the sink of a set that "
+    "holds a forbidden parent of it. A required edge's cause is a candidate parent from the start "
+    "and no step removes it; its pair is never marked. A pair forbidden both ways is never marked; "
+    "on a marked pair, a forbidden i -> j whose reverse is not forbidden, such as an edge into an "
+    "earlier tier, puts an arrowhead at i.",
     "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
@@ -2148,6 +2235,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
+    "camuv": ("latent_pairs", "cycle_edges"),
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the

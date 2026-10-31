@@ -150,12 +150,14 @@ ALL_METHODS = (
     "calm",
     *_CONTINUOUS,
     "cam",
+    "resit",
     "mmhc",
     "rsmax2",
     *_LINGAM,
     *PCMCI_FAMILY,
     "granger",
     *_RESIDUAL,
+    "camuv",
 )
 
 _CONCEPTS = (
@@ -174,7 +176,7 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam", "resit", "camuv"),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt("Continuous optimization: no test decides an edge.", *_CONTINUOUS),
@@ -225,6 +227,14 @@ _CONCEPTS = (
                 reason="0.001 is the paper's cutoff of the pruning tests, at every sample size "
                 "(Buhlmann, Peters and Ernest 2014, Section 5.3).",
             ),
+            Deviation(
+                method="camuv",
+                name="alpha",
+                default=0.01,
+                fixed_in=None,
+                reason="0.01 is the level of the method's published experiments (Maeda and Shimizu "
+                "2021 set every level to 0.01).",
+            ),
         ),
     ),
     Concept(
@@ -242,7 +252,10 @@ _CONCEPTS = (
         suitable=(*CI_SEARCHES, *PCMCI_FAMILY),
         exempt=(
             *_exempt(
-                "It tests the independence of residuals as part of its own model.", *_RESIDUAL
+                "It tests the independence of residuals as part of its own model.",
+                *_RESIDUAL,
+                "resit",
+                "camuv",
             ),
             *_exempt("No conditional-independence test.", *_PURE_SCORE, *_CONTINUOUS, *_LINGAM),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
@@ -399,7 +412,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "rcd"),
+        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "rcd", "camuv"),
         exempt=(
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
@@ -411,6 +424,7 @@ _CONCEPTS = (
                 *_PURE_SCORE,
                 "calm",
                 "cam",
+                "resit",
                 *_CONTINUOUS,
                 *_LINGAM,
                 "granger",
@@ -429,6 +443,16 @@ _CONCEPTS = (
                 reason="Maeda and Shimizu set the cap to 2 in their experiments and advise a small "
                 "one when there are fewer rows than variables; the minimum is 1, since the "
                 "smallest ancestor test regresses one variable on another.",
+            ),
+            Deviation(
+                method="camuv",
+                name="max_depth",
+                default=2,
+                fixed_in=None,
+                reason="It caps the variables a sink test adds together as candidate parents; each "
+                "test also regresses on the variable's candidates found so far, however many. "
+                "Maeda and Shimizu 2021 search sets of at most 3 variables in their experiments, a "
+                "cap of 2; the minimum is 1, since the smallest set is a pair.",
             ),
             *(
                 Deviation(
@@ -494,7 +518,12 @@ _CONCEPTS = (
                 "A cardinality cap is not part of the continuous objective.", "calm", *_CONTINUOUS
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *_LINGAM),
-            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
+            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL, "resit"),
+            *_exempt(
+                "The paper's search sets no cap on a variable's parents; max_depth caps the "
+                "candidates one sink test adds.",
+                "camuv",
+            ),
         ),
     ),
     Concept(
@@ -580,12 +609,14 @@ _CONCEPTS = (
                 *(m for m in _PURE_SCORE if m not in _STARTS),
                 *_CONTINUOUS,
                 "cam",
+                "resit",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
                 "longitudinal_lingam",
                 "granger",
                 *_RESIDUAL,
+                "camuv",
             ),
         ),
     ),
@@ -803,10 +834,12 @@ _CONCEPTS = (
                 "calm",
                 *_CONTINUOUS,
                 "cam",
+                "resit",
                 *_LINGAM,
                 "gin",
                 "rcd",
                 "bottom_up_parce_lingam",
+                "camuv",
             ),
             *_exempt("A series cannot drop a step.", "granger"),
         ),

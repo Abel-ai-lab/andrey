@@ -197,9 +197,6 @@ def iamb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -220,7 +217,9 @@ def iamb(
     data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
     unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests.
+    the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
+    candidate with the strongest statistic joins first, as the association measure of [1]_ orders
+    them.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -250,17 +249,25 @@ def iamb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It
-    conditions on the whole current blanket, so each test needs more rows as the blanket grows,
-    and a candidate the grow step adds in error enlarges every later conditioning set. The skeleton
-    and the CPDAG test every subset of the smaller blanket for each pair of the moral graph and
-    each unshielded triple, and a collider takes all of them, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50
-    variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
-    collider tests took 0.07 to 0.7 s on five datasets, and learning the blankets 0.8 to 1.0 s.
-    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random.
+    **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
+    on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
+    the columns standardized and not, and 200 variables with the same rows and degrees. In every
+    setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the empty
+    graph's. The CPDAG is closest to it on unstandardized data at 100 variables, 1,000 rows, and
+    mean degree 2, with 79 pairs wrong against 100 for the empty graph, and on standardized data at
+    20 variables, 1,000 rows, and mean degree 4, with 24 against 40. The median CPDAG fit took 0.03
+    to 6.1 s up to 100 variables, the longest at 5,000 rows and mean degree 4, and 13 to 17 s at 200
+    variables. The benchmark covers continuous data; the categorical and mixed-data tests are not in
+    it yet. Tested with exact d-separation on 15 variables. It conditions on the whole current
+    blanket, so each test needs more rows as the blanket grows, and a candidate the grow step adds
+    in error enlarges every later conditioning set. The skeleton and the CPDAG test every subset of
+    the smaller blanket for each pair of the moral graph and each unshielded triple, and a collider
+    takes all of them, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
+    smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
+    datasets, and learning the blankets 0.8 to 1.0 s. Missing values are not benchmarked yet; the
+    tests run them on up to 20 variables with up to a fifth of the values missing completely at
+    random.
 
     References
     ----------
@@ -629,9 +636,6 @@ def mmpc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -658,7 +662,9 @@ def mmpc(
     the data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
     unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests.
+    the p-value for the other tests. Where the p-values of several candidates are zero to that
+    precision, the candidate with the strongest statistic joins first, as the tie rule of [1]_
+    orders them.
 
     **From sets to a graph.** Without a target, a pair is kept when each variable is in the other's
     set, which gives the skeleton (``structure="skeleton"``). The CPDAG decides each triple
@@ -685,13 +691,28 @@ def mmpc(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It tests
-    each candidate against every subset of the current members, so its cost grows exponentially
-    with the size of the set; the symmetry check runs the search once more for each member. The
-    CPDAG tests every subset of the smaller blanket for each unshielded triple, and a collider
-    takes all of them. These blankets reach two steps from a variable, so they are larger than a
-    Markov blanket, and a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
+    on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
+    the columns standardized and not, and 200 variables with 1,000 and 5,000 rows. Wherever fits
+    finished, the mean skeleton errors stay below the empty graph's; the skeleton is closest to it
+    on unstandardized data at 100 variables, 1,000 rows, and mean degree 2, with 56.9 pairs wrong
+    against 100, and the CPDAG with 78.1 against 100. The median skeleton fit took 0.01 to 1.6 s up
+    to 100 variables and 0.3 to 3.3 s at 200 variables. The CPDAG fit took up to 30 s where it
+    finished and reached the 600 s cap at 100 variables, mean degree 4: on 6 of 20 datasets at 1,000
+    rows and 19 of 20 at 5,000 on standardized data. At 200 variables and 5,000 rows, MMPC's
+    forward step often faces candidates whose dependence is too strong to rank by p-value, and it
+    admits the strongest, which is a true neighbor 99.7% of the time. Borderline false edges
+    between unrelated pairs, with a statistic just past the cutoff, then survive: about 2 more per
+    graph than with an arbitrary order, which happens to admit a strongly correlated non-neighbor
+    that removes them. At mean degree 2 the skeleton there makes 75.5 errors on average against 73.9
+    for bnlearn's, and 86.9 against 84.2 on 10 fresh datasets. The continuous benchmark does not
+    cover the categorical and mixed-data tests, which only the discrete-network lanes cover. Tested
+    with exact d-separation on 15 variables. It tests each candidate against every subset of the
+    current members, so its cost grows exponentially with the size of the set; the symmetry check
+    runs the search once more for each member. The CPDAG tests every subset of the smaller blanket
+    for each unshielded triple, and a collider takes all of them. These blankets reach two steps
+    from a variable, so they are larger than a Markov blanket, and a triple whose smaller blanket
+    holds ``m`` variables takes up to ``2**m``
     tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
     collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose smaller blanket
     held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s. Missing values are
