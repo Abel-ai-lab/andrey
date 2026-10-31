@@ -249,21 +249,25 @@ def iamb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
-    In every setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the
-    empty graph's; the CPDAG is closest at 20 variables, 1,000 rows, and mean degree 4, with 24
-    pairs wrong against 40 for the empty graph. The median CPDAG fit took 0.06 to 5.2 s, the longest
-    at 100 variables, 5,000 rows, and mean degree 4. Tested with exact d-separation on 15 variables.
-    It conditions on the whole current blanket, so each test needs more rows as the blanket grows,
-    and a candidate the grow step adds in error enlarges every later conditioning set. The skeleton
-    and the CPDAG test every subset of the smaller blanket for each pair of the moral graph and each
-    unshielded triple, and a collider takes all of them, so a triple whose smaller blanket holds
-    ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50 variables,
-    5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the collider
-    tests took 0.07 to 0.7 s on five datasets, and learning the blankets 0.8 to 1.0 s. Missing
-    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
-    the values missing completely at random.
+    **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
+    on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
+    the columns standardized and not, and 200 variables with the same rows and degrees. In every
+    setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the empty
+    graph's. The CPDAG is closest to it on unstandardized data at 100 variables, 1,000 rows, and
+    mean degree 2, with 79 pairs wrong against 100 for the empty graph, and on standardized data at
+    20 variables, 1,000 rows, and mean degree 4, with 24 against 40. The median CPDAG fit took 0.03
+    to 6.1 s up to 100 variables, the longest at 5,000 rows and mean degree 4, and 13 to 17 s at 200
+    variables. The benchmark covers continuous data; the categorical and mixed-data tests are not in
+    it yet. Tested with exact d-separation on 15 variables. It conditions on the whole current
+    blanket, so each test needs more rows as the blanket grows, and a candidate the grow step adds
+    in error enlarges every later conditioning set. The skeleton and the CPDAG test every subset of
+    the smaller blanket for each pair of the moral graph and each unshielded triple, and a collider
+    takes all of them, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
+    smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
+    datasets, and learning the blankets 0.8 to 1.0 s. Missing values are not benchmarked yet; the
+    tests run them on up to 20 variables with up to a fifth of the values missing completely at
+    random.
 
     References
     ----------

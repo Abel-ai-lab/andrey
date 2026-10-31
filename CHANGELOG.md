@@ -12,13 +12,17 @@ names its pull request.
 
 ### Highlights
 
-- `iamb` and `mmpc` are supported and join the quality gate: against bnlearn 5.2.1 on simulated
-  linear-Gaussian data with 20 to 100 variables, 1,000 and 5,000 rows, and mean degree 2 and 4,
-  bnlearn makes significantly fewer errors in 2 of 57 judged comparisons, both on the CPDAG, where
-  bnlearn takes the first column among candidates whose p-values underflow to 0 and Andrey the
-  candidate with the strongest test statistic. Three comparisons have under 10 pairs because fits
-  reached the 600 s cap, which Andrey's `mmpc` CPDAG fit did in 25 of 226 cases. The median ratio of
-  bnlearn's fit time to Andrey's is 4.6 for `iamb`'s CPDAG and 18.8 for `mmpc`'s. ([#607])
+- `iamb` is supported and joins the quality gate; `mmpc` stays experimental. Against bnlearn 5.2.1
+  on simulated linear-Gaussian data with 20 to 200 variables, 1,000 and 5,000 rows, and mean degree
+  2 and 4, bnlearn makes significantly fewer errors in 1 of 80 judged comparisons, `iamb`'s CPDAG at
+  50 variables, 5,000 rows, and mean degree 2, where bnlearn takes the first column among candidates
+  whose p-values underflow to 0 and Andrey the candidate with the strongest test statistic; two more
+  comparisons are worse once and tie on a rerun with fresh seeds. Two comparisons have 9 pairs
+  because bnlearn's fits reached the 600 s cap. The median ratio of bnlearn's fit time to Andrey's
+  for the CPDAG is 4.6 on standardized data, 2.7 on unstandardized data, and 2.2 at 200 variables.
+  `mmpc` stays experimental because its skeleton at 200 variables, 5,000 rows, and mean degree 2
+  makes more errors than bnlearn's on two runs (2.7 more on average on the second), a difference
+  whose cause is not yet traced. ([#607])
 
 ### Added
 
