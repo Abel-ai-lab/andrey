@@ -1345,6 +1345,38 @@ _add(
         ),
     )
 )
+_add(
+    MethodSpec(
+        name="resit",
+        family="functional",
+        summary="Regression with subsequent independence test (RESIT) for nonlinear effects with "
+        "additive noise of any distribution: a causal order from the sink up, each sink the "
+        "variable whose additive-model residual an HSIC test finds most independent of the "
+        "others, then each parent removed whose removal leaves the residual independent. Returns "
+        "a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after the edge removal; ordering is the causal order of the sink search.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                doc="Significance level of the edge-removal tests: a parent goes when the "
+                "residual without it is independent of the variable's predecessors at a p-value "
+                "above alpha. 0.05 is the paper's value.",
+            ),
+        ),
+        references=("Peters, Mooij, Janzing & Scholkopf 2014", "Gretton et al. 2007"),
+    )
+)
 
 # --- temporal family ------------------------------------------------------------------------------
 
@@ -2046,6 +2078,11 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never possible parents; the boosting that preselects the possible parents reads the data "
     "alone. The search starts from the required edges, and the pruning never removes one. "
     + _ORDER_RULE.rstrip(),
+    "resit": "A variable is the next sink only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no regression and never in the result; each test still "
+    "reads every remaining variable or predecessor. The edge removal never removes a required "
+    "edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE

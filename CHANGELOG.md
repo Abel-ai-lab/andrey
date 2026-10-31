@@ -24,6 +24,11 @@ names its pull request.
   settings: boosting preselects each variable's possible parents, a greedy search adds edges by the
   drop in log residual variance of additive spline fits, and smooth-term tests prune them; it is
   experimental. ([#597])
+- `resit`, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf
+  2014), a functional causal model, learns a DAG and a causal order from nonlinear effects with
+  additive noise of any distribution, with the paper's settings: it takes as each next sink the
+  variable whose additive-model residual an HSIC test finds most independent of the others, then
+  removes each parent whose removal leaves the residual independent; it is experimental. ([#620])
 
 ### Changed
 
@@ -1519,3 +1524,4 @@ First alpha release.
 [#611]: https://github.com/Abel-ai-lab/andrey/pull/611
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
 [#619]: https://github.com/Abel-ai-lab/andrey/pull/619
+[#620]: https://github.com/Abel-ai-lab/andrey/pull/620

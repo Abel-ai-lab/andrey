@@ -144,6 +144,11 @@ SPEC: dict[str, dict] = {
         "structural": ["adj"],
         "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
     },
+    # RESIT: the DAG and the causal order of its sink search, both exact.
+    "RESIT": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
     # GIN: the latent graph and the clusters in causal order, both exact.
     "GIN": {
         "structural": ["graph", "causal_order"],

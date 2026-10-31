@@ -21,7 +21,7 @@ _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 # Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
 _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
 # DAG and causal-order algorithms: candidate = the DAG and the order.
-_ORDERED_DAG = frozenset({"CAM"})
+_ORDERED_DAG = frozenset({"CAM", "RESIT"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
 _PAIRWISE = frozenset({"ANM", "PNL"})
 # The recorded fields of the pairwise tests, by metadata key and direction.

@@ -8,9 +8,13 @@ independent.
   the bandwidth by the empirical rule. :func:`hsic_statistic_test`, used by ANM, runs the same test
   and returns the statistic, divided by its mean under independence, with the p-value. PNL computes
   the same numbers from kernels it shares across pairs.
-- :func:`hsic_gamma_from_grams`, used by RCD and ParceLiNGAM with the grams of :func:`gamma_gram`,
-  sets the bandwidth by the median distance over the first rows without z-scoring, corrects the
-  variance for bias, and returns the statistic with the p-value.
+- :func:`hsic_gamma_from_grams`, used by RCD, ParceLiNGAM, and GIN with the grams of
+  :func:`gamma_gram`, sets the bandwidth by the median distance over the first rows without
+  z-scoring, corrects the variance for bias, and returns the statistic with the p-value. RESIT runs
+  the same test through :func:`hsic_gamma_log_p`, which returns the logarithm of a p-value that
+  keeps its precision below ``1e-16``, on each side's joint distances with two settings of its own:
+  the bandwidth's median over every row (``median_rows=None``) and the variance's product form
+  (``variance="product"``).
 
 References
 ----------
@@ -23,9 +27,11 @@ and Application in Causal Discovery. https://webdav.tuebingen.mpg.de/causality/U
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from scipy.special import gammainc
+from scipy.special import gammainc, gammaincc, gammaln
 from scipy.stats import zscore
 
 
@@ -180,6 +186,8 @@ def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
 
 
 _TRIU_K1_CACHE: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+#: Most rows whose upper-triangle indices :func:`_triu_k1` keeps: the default median's block.
+_TRIU_CACHED_ROWS = 100
 
 
 def _triu_k1(n: int) -> tuple[np.ndarray, np.ndarray]:
@@ -195,29 +203,49 @@ def _triu_k1(n: int) -> tuple[np.ndarray, np.ndarray]:
     return idx
 
 
-def _median_width_gamma(column: np.ndarray) -> float:
-    """Median-distance Gaussian bandwidth ``sigma`` from up to the first 100 rows of an ``(n, 1)``.
+def _upper(sq_dists: np.ndarray) -> np.ndarray:
+    """The strict upper triangle of a square matrix, row by row.
 
-    ``sigma = sqrt(0.5 * median(positive squared pairwise distances))``; the 100-row cap keeps the
-    median heuristic cheap.
+    Up to :data:`_TRIU_CACHED_ROWS` rows through the memoized indices of :func:`_triu_k1`; a larger
+    matrix, which only a median over every row meets, through a boolean mask of one byte per entry
+    that is not kept, in the same order.
     """
-    data = column[:100] if column.shape[0] > 100 else column
-    n = data.shape[0]
+    n = sq_dists.shape[0]
+    if n <= _TRIU_CACHED_ROWS:
+        return sq_dists[_triu_k1(n)]
+    return sq_dists[np.triu(np.ones((n, n), dtype=bool), k=1)]
+
+
+def _sq_dists(data: np.ndarray) -> np.ndarray:
+    """Squared Euclidean distances between the rows of ``data``, ``x^2 + y^2 - 2xy``."""
     sq_norms = np.sum(data * data, axis=1)
-    sq_dists = sq_norms[None, :] + sq_norms[:, None] - 2.0 * (data @ data.T)
-    upper = sq_dists[_triu_k1(n)]
+    return sq_norms[None, :] + sq_norms[:, None] - 2.0 * (data @ data.T)
+
+
+def _median_width(sq_dists: np.ndarray) -> float:
+    """``sqrt(0.5 * median(positive squared pairwise distances))`` from squared distances."""
+    upper = _upper(sq_dists)
     return float(np.sqrt(0.5 * np.median(upper[upper > 0])))
 
 
-def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
-    """Raw and doubly-centered RBF gram matrices of an ``(n, 1)`` column at bandwidth ``sigma``.
+def _median_width_gamma(column: np.ndarray, rows: int | None = 100) -> float:
+    """Median-distance Gaussian bandwidth ``sigma`` from up to the first ``rows`` rows of a matrix.
+
+    ``sigma = sqrt(0.5 * median(positive squared pairwise distances))`` over the rows of an
+    ``(n, q)`` matrix, its ``q`` columns read jointly; the 100-row cap keeps the median heuristic
+    cheap, and ``rows=None`` reads every row.
+    """
+    data = column[:rows] if rows is not None and column.shape[0] > rows else column
+    return _median_width(_sq_dists(data))
+
+
+def _gram_from_sq_dists(sq_dists: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
+    """Raw and doubly-centered RBF gram matrices from squared distances, which are overwritten.
 
     The centered matrix is ``H K H`` with ``H = I - 1/n`` in row/column-sum form (the biased
     estimate).
     """
-    n = column.shape[0]
-    sq_norms = np.sum(column * column, axis=1)
-    sq_dists = sq_norms[None, :] + sq_norms[:, None] - 2.0 * (column @ column.T)
+    n = sq_dists.shape[0]
     np.negative(sq_dists, out=sq_dists)  # scale the exponent in place: -sq_dists / 2 / width**2
     sq_dists /= 2.0
     sq_dists /= width**2
@@ -228,46 +256,184 @@ def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarra
     return raw, centered
 
 
-def gamma_gram(column: np.ndarray) -> tuple[np.ndarray, float]:
-    """Return one variable's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
+def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
+    """Raw and doubly-centered RBF gram matrices of an ``(n, q)`` matrix at bandwidth ``sigma``."""
+    return _gram_from_sq_dists(_sq_dists(column), width)
+
+
+#: One side of the gamma HSIC: its centered gram and its raw kernel's off-diagonal mean, and
+#: optionally the centered gram's sum of squares, which the product-form variance then reuses.
+Gram = tuple[np.ndarray, float] | tuple[np.ndarray, float, float]
+
+
+def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np.ndarray, float]:
+    """Return one side's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
 
     These are the only per-variable quantities the test needs, so a caller that scores one column
-    against many others (RCD, ParceLiNGAM) computes this once per column and reuses it.
+    against many others (RCD, ParceLiNGAM) computes this once per column and reuses it. ``column``
+    is one variable or an ``(n, q)`` matrix of several, read jointly through their Euclidean
+    distances. The bandwidth's median reads the first ``median_rows`` rows, or every row with
+    ``None`` (RESIT); when it reads every row, the squared distances are computed once for both
+    the bandwidth and the kernel.
 
     The distances are those of the mean-centered column, which are the column's own; computed from
     the raw values as ``x^2 + y^2 - 2xy`` they lose their digits when the column lies far from 0.
+    With ``median_rows=None`` the columns are read as given: RESIT passes columns it has centered
+    before scaling them and residuals of fits with an intercept, whose means are 0 up to rounding.
     """
     col = _as_columns(column)
-    col = col - col.mean(axis=0)
+    if median_rows is not None:
+        col = col - col.mean(axis=0)
     n = col.shape[0]
-    raw, centered = _gram_gamma(col, _median_width_gamma(col))
+    if median_rows is None or n <= median_rows:
+        sq_dists = _sq_dists(col)
+        raw, centered = _gram_from_sq_dists(sq_dists, _median_width(sq_dists))
+    else:
+        raw, centered = _gram_gamma(col, _median_width_gamma(col, median_rows))
     raw[np.diag_indices(n)] = 0.0
     mu = 1.0 / n / (n - 1) * raw.sum()
     return centered, mu
 
 
 def hsic_gamma_from_grams(
-    gram_x: tuple[np.ndarray, float], gram_y: tuple[np.ndarray, float], n: int
+    gram_x: Gram,
+    gram_y: Gram,
+    n: int,
+    *,
+    variance: str = "bias_corrected",
 ) -> tuple[float, float]:
     """Return ``(statistic, p_value)`` of the gamma HSIC from two cached :func:`gamma_gram` outputs.
 
     ``n`` is the sample size. The biased HSIC V-statistic ``T = sum(Kxc.T * Kyc) / n`` is matched to
-    a gamma law through the finite-sample null mean and bias-corrected variance; the p-value is the
-    gamma upper tail. A larger p-value means more independent.
+    a gamma law through the finite-sample null mean ``(1 + mu_x mu_y - mu_x - mu_y) / n`` and a null
+    variance; the p-value is the gamma upper tail ``1 - P``, ``P`` the regularized lower incomplete
+    gamma function, whose resolution ends near ``1e-16``. A larger p-value means more independent.
+
+    ``variance="bias_corrected"`` estimates the variance from the joint products
+    ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
+    ``"product"`` uses the variance's product form in that paper,
+    ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's ``sum(Kc^2) / (n - 1)^2``,
+    the RESIT paper's; a gram that carries its sum of squares as a third element has it read rather
+    than summed again.
     """
-    cen_x, mu_x = gram_x
-    cen_y, mu_y = gram_y
+    statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
+    return float(statistic), float(1.0 - gammainc(shape, x))
+
+
+def hsic_gamma_log_p(
+    gram_x: Gram,
+    gram_y: Gram,
+    n: int,
+    *,
+    variance: str = "bias_corrected",
+) -> float:
+    """Return the natural logarithm of the p-value of :func:`hsic_gamma_from_grams`'s test.
+
+    The tail here is the regularized upper incomplete gamma function rather than ``1 - P``, so it
+    keeps its relative precision far below ``1e-16``. Below about ``1e-308`` the tail underflows to
+    ``0``, as a strongly dependent pair's does once there are a few thousand rows; its logarithm
+    stays finite there and keeps the order of two such tails (:func:`_log_upper_gamma`).
+
+    The statistic, ``tr(Kxc Kyc) / n`` of two positive semidefinite centered grams, is never
+    negative in exact arithmetic. A negative value within :func:`_rounding_bound` of ``0`` is
+    rounding of an exact ``0``, as on a balanced grid of independent values, and gives ``0``, the
+    logarithm of ``p = 1``; one further below ``0``, or a non-finite argument, gives ``nan``.
+    """
+    statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
+    if 0.0 > statistic >= -_rounding_bound(gram_x, gram_y, n):
+        x = 0.0
+    return _log_upper_gamma(float(shape), float(x))
+
+
+def _sum_of_squares(gram: Gram) -> float:
+    """A gram's ``sum(Kc^2)``: its third element when it carries one, else summed here."""
+    return gram[2] if len(gram) == 3 else np.sum(gram[0] * gram[0])
+
+
+def _rounding_bound(gram_x: Gram, gram_y: Gram, n: int) -> float:
+    """How far rounding can move the statistic ``sum(Kxc.T * Kyc) / n``: ``n^2 eps`` times the
+    largest value it can take.
+
+    The statistic sums ``n^2`` products. A floating-point sum of ``N`` terms errs by at most about
+    ``N eps`` times the sum of the terms' magnitudes (Higham 2002, Section 3.1), and by
+    Cauchy-Schwarz that sum is at most ``sqrt(sum(Kxc^2) sum(Kyc^2))``, which over ``n`` bounds the
+    statistic itself. The rounding of the centered entries, a few ``eps`` each against entries of
+    order one, adds less. The bound is therefore ``n eps sqrt(sum(Kxc^2) sum(Kyc^2))``.
+
+    References
+    ----------
+    Higham (2002). Accuracy and Stability of Numerical Algorithms, 2nd ed. SIAM.
+    """
+    return n * _EPS * math.sqrt(_sum_of_squares(gram_x) * _sum_of_squares(gram_y))
+
+
+def _gamma_arguments(
+    gram_x: Gram, gram_y: Gram, n: int, variance: str
+) -> tuple[float, float, float]:
+    """The statistic of the gamma HSIC and the gamma law's ``(shape, statistic / scale)``."""
+    cen_x, mu_x = gram_x[0], gram_x[1]
+    cen_y, mu_y = gram_y[0], gram_y[1]
 
     statistic = 1.0 / n * np.sum(cen_x.T * cen_y)
 
-    prod = cen_x * (1.0 / 6.0)  # 1/6 * cen_x * cen_y then squared, fused into one reused buffer
-    prod *= cen_y
-    prod **= 2
-    var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
-    var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
+    if variance == "bias_corrected":
+        prod = cen_x * (1.0 / 6.0)  # 1/6 * cen_x * cen_y then squared, fused into one reused buffer
+        prod *= cen_y
+        prod **= 2
+        var = 1.0 / n / (n - 1) * (np.sum(prod) - np.trace(prod))
+        var = 72.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3) * var
+    elif variance == "product":
+        sq_x, sq_y = _sum_of_squares(gram_x), _sum_of_squares(gram_y)
+        var = 2.0 * (n - 4) * (n - 5) / n / (n - 1) / (n - 2) / (n - 3)
+        var *= sq_x / (n - 1) ** 2 * sq_y / (n - 1) ** 2
+    else:
+        raise ValueError(f"variance must be 'bias_corrected' or 'product', got {variance!r}")
 
     mean = 1.0 / n * (1 + mu_x * mu_y - mu_x - mu_y)
 
     shape = mean**2 / var
     scale = var * n / mean
-    return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
+    return statistic, shape, statistic / scale
+
+
+#: Upper-tail value below which :func:`_log_upper_gamma` takes the continued fraction: the smallest
+#: normal double, under which ``gammaincc`` loses precision and then underflows to ``0``.
+_LOG_TAIL_FLOOR = float(np.finfo(np.float64).tiny)
+#: The continued fraction's guard against a zero denominator, and its convergence tolerance.
+_CF_TINY = 1e-300
+_CF_EPS = 1e-16
+_CF_MAX_ITER = 10_000
+#: Machine epsilon of a double, the unit of :func:`_rounding_bound`.
+_EPS = float(np.finfo(np.float64).eps)
+
+
+def _log_upper_gamma(a: float, x: float) -> float:
+    """``log Q(a, x)``, ``Q`` the regularized upper incomplete gamma function.
+
+    While ``Q`` is a normal double, at least about ``2.2e-308``, the logarithm of ``gammaincc``, so
+    every such p-value keeps its bits. Below that, which needs ``x > a + 1``,
+    ``log Q = a log x - x - log Gamma(a) + log h`` with ``h`` the continued fraction of
+    ``Gamma(a, x)`` by the modified Lentz method (Press et al., Numerical Recipes, Section 6.2),
+    which agrees with 60-digit arithmetic to a relative ``5e-13`` over shapes from ``0.3`` to
+    ``1000``. A non-finite argument gives ``nan``.
+    """
+    q = gammaincc(a, x)
+    if q >= _LOG_TAIL_FLOOR or not x > a + 1.0:
+        return math.log(q) if q > 0 else math.nan
+    b = x + 1.0 - a
+    c = 1.0 / _CF_TINY
+    d = 1.0 / b
+    h = d
+    for i in range(1, _CF_MAX_ITER + 1):
+        an = -i * (i - a)
+        b += 2.0
+        d = an * d + b
+        d = d if abs(d) > _CF_TINY else _CF_TINY
+        c = b + an / c
+        c = c if abs(c) > _CF_TINY else _CF_TINY
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < _CF_EPS:
+            return a * math.log(x) - x - float(gammaln(a)) + math.log(h)
+    return math.nan

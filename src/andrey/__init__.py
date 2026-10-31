@@ -48,6 +48,7 @@ from .api import (
     pcmciplus,
     pnl,
     rcd,
+    resit,
     rsmax2,
     tabu,
     varma_lingam,
@@ -127,6 +128,7 @@ __all__ = [
     "direct_lingam",
     "ica_lingam",
     "cam",
+    "resit",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).
