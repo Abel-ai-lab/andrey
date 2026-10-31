@@ -2,12 +2,12 @@
 
 Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on the first draws of
 its gate datasets and of one larger dataset (:data:`LARGER`), on the numpy backend with one worker
-and one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the causal order, and every metadata value,
-such as a score, a p-value, or a list of nodes. Floats enter as their bytes, never as printed text,
-NaN as one bit pattern, and mappings in key order, so equal hashes mean equal bits. A second hash
-covers only the endpoint marks of the graphs, and each part of the output has its own digest
-(:func:`parts`), so a difference reads as a changed graph, as changed bits under the same graph, or
-as changed metadata values alone, named by key.
+and one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the causal
+order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats enter as
+their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so equal
+hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each part of
+the output has its own digest (:func:`parts`), so a difference reads as a changed graph, as changed
+bits under the same graph, or as changed metadata values alone, named by key.
 
 The manifest holds one row per fit, keyed by method, dataset, seed, permutation, and worker count,
 under a header naming the commit, the imported Andrey package's directory and commit, the Python,

@@ -471,9 +471,10 @@ def _granger(x: np.ndarray) -> np.ndarray:
 
 #: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
 #: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
-#: fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call
-#: the public functions with the published settings: the domain index of four equal blocks of rows,
-#: and three groups of columns.
+#: fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's optimizer. CD-NOD
+#: and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions
+#: with the published settings: the domain index of four equal blocks of rows, and three groups of
+#: columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
