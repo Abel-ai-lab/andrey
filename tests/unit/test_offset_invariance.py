@@ -6,8 +6,8 @@ sum of terms far from 0, is a numerical artifact. The data here lie on a grid th
 ``1e9`` keeps exactly, so every fit sees the same values at both offsets and any difference comes
 from the method.
 
-``varma_lingam`` keeps its graph on these series but changes it with an offset on larger ones
-(#618); its fits there take minutes, so the case is not repeated here.
+``varma_lingam`` also has a case of its own on a larger series: its likelihood fit takes a constant
+trend, so a column's mean is not part of the model.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ def _quiet():
         warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.DataTypeWarning)
         warnings.simplefilter("ignore", andrey.SampleSizeWarning)
+        warnings.simplefilter("ignore", andrey.SearchLimitWarning)
         yield
 
 
@@ -139,3 +140,15 @@ def test_gamma_hsic_does_not_read_the_columns_offset(offset):
     want = hsic_gamma_from_grams(gamma_gram(x), gamma_gram(y), N)
     got = hsic_gamma_from_grams(gamma_gram(x + offset), gamma_gram(y - offset), N)
     assert got == pytest.approx(want, rel=1e-9)
+
+
+@pytest.mark.parametrize("shift", SHIFTS.values(), ids=SHIFTS.keys())
+def test_varma_lingam_keeps_its_graph_on_shifted_columns(shift):
+    """A series 400 rows by 9 columns, fit with one optimizer iteration, keeps its graphs."""
+    scale, offset = shift
+    data = on_grid(datagen.generate("measurement_chain_9v", replicate=4))
+    want = andrey.varma_lingam(data, max_iter=1)
+    got = andrey.varma_lingam(data * scale + offset, max_iter=1)
+    for have, expected in zip(marks(got), marks(want), strict=True):
+        np.testing.assert_array_equal(have, expected)
+    assert list(got.ordering) == list(want.ordering)

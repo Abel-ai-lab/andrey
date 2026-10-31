@@ -96,6 +96,14 @@ names its pull request.
   GIN assume zero-mean variables (Maeda and Shimizu 2020; Xie et al. 2020). On the identity check's
   239 draws no graph changed; the weights of `rcd` changed in the last bits on 4 of its 6, and every
   other method, `gin` included, is bit-identical. ([#619])
+- `varma_lingam` no longer changes its graph when a constant is added to every column. Its
+  likelihood fit takes a constant trend, so a column's mean is not part of the model, but a mean
+  far from 0 stopped the fit's optimizer at its starting point. With `1e9` added to simulated
+  data, and with `X * 3.7 + 1e6`, it returned another graph on 3 of 6 draws; now it does on none.
+  The series is centered first, as the structural VAR model that VARMA-LiNGAM extends takes
+  zero-mean series (Hyvarinen et al. 2010). On the identity check's 239 draws only the 6 of
+  `varma_lingam` changed: 2 in their graph, with 1 and 2 fewer errors against the true graph, and 4
+  in their weights; every other method is bit-identical. ([#629])
 
 ## [0.12.0] - 2026-10-30
 
@@ -1568,3 +1576,4 @@ First alpha release.
 [#623]: https://github.com/Abel-ai-lab/andrey/pull/623
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
+[#629]: https://github.com/Abel-ai-lab/andrey/pull/629
