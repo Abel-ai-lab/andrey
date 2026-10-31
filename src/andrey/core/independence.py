@@ -233,8 +233,12 @@ def gamma_gram(column: np.ndarray) -> tuple[np.ndarray, float]:
 
     These are the only per-variable quantities the test needs, so a caller that scores one column
     against many others (RCD, ParceLiNGAM) computes this once per column and reuses it.
+
+    The distances are those of the mean-centered column, which are the column's own; computed from
+    the raw values as ``x^2 + y^2 - 2xy`` they lose their digits when the column lies far from 0.
     """
     col = _as_columns(column)
+    col = col - col.mean(axis=0)
     n = col.shape[0]
     raw, centered = _gram_gamma(col, _median_width_gamma(col))
     raw[np.diag_indices(n)] = 0.0
