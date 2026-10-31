@@ -9,7 +9,7 @@ core ``Structure`` style, so fields grow without ossifying a positional contract
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -55,9 +55,14 @@ class SCMParams:
     edges : np.ndarray of shape (m, 2)
         Directed edges ``(parent, child)`` in node-label space; row ``k`` pairs with ``weights[k]``.
     weights : np.ndarray of shape (m,)
-        Structural coefficient of each edge (empty for parameter-free functionals).
+        Structural coefficient of each edge (empty for parameter-free functionals). Under the
+        location-scale functional, the weight of each edge in the location.
     noise_scales : np.ndarray of shape (d,)
-        Per-node exogenous-noise standard deviation.
+        Per-node exogenous-noise standard deviation. Under the location-scale functional the noise
+        of a node is this constant times a scale that depends on its parents.
+    scale_weights : np.ndarray of shape (m,) or (0,), default=empty
+        Under the location-scale functional, the weight of each edge in the scale, row ``k``
+        pairing with ``edges[k]``; empty for every other functional.
     functional : str
         Functional-form name (for example, ``"linear"``).
     noise : str
@@ -69,6 +74,7 @@ class SCMParams:
     noise_scales: np.ndarray
     functional: str
     noise: str
+    scale_weights: np.ndarray = field(default_factory=lambda: np.empty(0))
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -71,8 +71,10 @@ group and read its edges as the group's; no option drops or merges the copies fo
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
 same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
 also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
-such as `'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
-cell, its row and column. A single column gives a one-node graph.
+such as `'a' at lag 1 repeats 'd'`. `cam` and `resit` reject copies the same way, and a column of
+fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit` also
+needs at least twice as many rows as columns. Other data raises a `ValueError` that names the
+argument and, for a bad cell, its row and column. A single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
@@ -102,9 +104,9 @@ first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `direct_lingam`,
-`ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`,
-`pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
+`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
+`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
 {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
 temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
 in the result, whatever its weight, test, or score says. For the time-series methods, an edge
@@ -173,12 +175,13 @@ takes the same three rules for its same-step colliders, with `"majority"` as its
 tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
-`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, and
-`gfci` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
+`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, `gfci`,
+and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
 gives a node more than that many parents. `None`, the default, sets no cap. `ges`, `gies`, `xges`,
 `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss` and
-`grasp` grow no parent set past it, and `exact_search` scores only the parent sets within it.
-`gfci` caps its GES phase; the PAG its tests then orient can put more arrowheads at a node.
+`grasp` grow no parent set past it, `exact_search` scores only the parent sets within it, and
+`cam`'s order search adds no edge past it. `gfci` caps its GES phase; the PAG its tests then orient
+can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
@@ -321,10 +324,10 @@ bound. R8 checks each pair of endpoints in both orders, so it does not depend on
 The rules run in rounds, each setting together the marks every rule implies on the graph as it
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
-Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order and is the
-default under `andrey.config(tie_break="position")`.
+Their possible-d-separation step visits the pairs and nodes by a rank computed from the data, so
+with `possible_dsep="order_free"`, the default, their result does not depend on the column order
+unless two columns are identical; `"fast"` visits them in column order and is the default under
+`andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
@@ -341,12 +344,25 @@ its first call in a process.
 
    notears
    dagma
+   cam
+   resit
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
+smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
+variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
+variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges.
+
+RESIT, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014),
+fits the same kind of model with the noise of any distribution, with the paper's settings: it finds
+a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
+finds most independent of the remaining variables, then removes each parent whose removal leaves
+the residual independent of the variable's predecessors at `alpha=0.05`.
 
 A method becomes supported once it has:
 
@@ -641,6 +657,8 @@ name.
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells (Sachs et al., 2005) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
+| `child` | 20 | 25 | Simulated on the published network (bnlearn) |
+| `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
 | `alarm` | 37 | 46 | Simulated on the published network (bnlearn) |
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
@@ -671,14 +689,16 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
-and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
-time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
-categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
-continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
-true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
-so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
-graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form, and
+noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `functional="location_scale"` gives each variable noise whose scale depends on
+its parents, the location-scale noise model of Immer et al. (2023); with `scale="rescale"` that
+scale stays a smooth function of the parents at every depth of the graph.
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data

@@ -34,6 +34,8 @@ _GRAPH = (
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 # Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
 _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
+# DAG and causal-order algorithms: candidate = the DAG and the order.
+_ORDERED_DAG = frozenset({"CAM", "RESIT"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
 _PAIRWISE = frozenset({"ANM", "PNL"})
 # The recorded fields of the pairwise tests, by metadata key and direction.
@@ -79,6 +81,8 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm == "BottomUpParceLiNGAM":  # the order, unordered variables nested in a list
             candidate["causal_order"] = out.metadata["partial_order"]
         return candidate
+    if algorithm in _ORDERED_DAG:
+        return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
     if algorithm in _PAIRWISE:
         md = out.metadata
         return {"graph": out.structure.to_numpy()} | {

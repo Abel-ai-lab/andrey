@@ -52,7 +52,7 @@ _POSSIBLE_DSEP = ParamSpec(
     default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
-    "order_free = by a rank computed from each column's own data, so the result does not depend "
+    "order_free = by a rank computed from the data, so the result does not depend "
     "on the column order unless two columns are identical; fast = column order. null follows "
     "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
     nullable=True,
@@ -1197,12 +1197,13 @@ _add(
     )
 )
 
-# --- LiNGAM family --------------------------------------------------------------------------------
+# --- functional causal models (Glymour, Zhang & Spirtes 2019) -------------------------------------
+# Linear effects with non-Gaussian noise (LiNGAM).
 
 _add(
     MethodSpec(
         name="direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM for linear non-Gaussian data: recovers a fully-oriented DAG plus a "
         "causal order and edge weights. Use when noise is non-Gaussian and effects are linear.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -1228,7 +1229,7 @@ _add(
 _add(
     MethodSpec(
         name="ica_lingam",
-        family="lingam",
+        family="functional",
         summary="ICA-based LiNGAM for linear non-Gaussian data: FastICA gives a causal order, "
         "adaptive Lasso the edge weights; returns a DAG, the order, and the weights. Seeded "
         "(ANDREY_SEED, else 0), so repeated runs match. DirectLiNGAM is more accurate on the "
@@ -1266,7 +1267,7 @@ _add(
 _add(
     MethodSpec(
         name="multi_group_direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
         "shared causal order and a per-group weighted DAG. Returns one result per group.",
         data=DataSpec(
@@ -1301,6 +1302,76 @@ _add(
             ),
         ),
         references=("Shimizu 2012",),
+    )
+)
+
+# Nonlinear effects with additive noise (Hoyer et al. 2009; Peters et al. 2014).
+
+_add(
+    MethodSpec(
+        name="cam",
+        family="functional",
+        summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
+        "boosting preselects each variable's possible parents, a greedy search adds edges by the "
+        "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
+        "Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the paper's value.",
+            ),
+        ),
+        references=(
+            "Buhlmann, Peters & Ernest 2014",
+            "Hoyer et al. 2009",
+            "Peters, Mooij, Janzing & Scholkopf 2014",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="resit",
+        family="functional",
+        summary="Regression with subsequent independence test (RESIT) for nonlinear effects with "
+        "additive noise of any distribution: a causal order from the sink up, each sink the "
+        "variable whose additive-model residual an HSIC test finds most independent of the "
+        "others, then each parent removed whose removal leaves the residual independent. Returns "
+        "a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after the edge removal; ordering is the causal order of the sink search.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                doc="Significance level of the edge-removal tests: a parent goes when the "
+                "residual without it is independent of the variable's predecessors at a p-value "
+                "above alpha. 0.05 is the paper's value.",
+            ),
+        ),
+        references=("Peters, Mooij, Janzing & Scholkopf 2014", "Gretton et al. 2007"),
     )
 )
 
@@ -2000,6 +2071,15 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
+    "cam": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are "
+    "never possible parents; the boosting that preselects the possible parents reads the data "
+    "alone. The search starts from the required edges, and the pruning never removes one. "
+    + _ORDER_RULE.rstrip(),
+    "resit": "A variable is the next sink only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no regression and never in the result; each test still "
+    "reads every remaining variable or predecessor. The edge removal never removes a required "
+    "edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE

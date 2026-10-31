@@ -213,9 +213,9 @@ def iamb(
     members in the order they joined and drop each one the test finds independent of the target
     given the other current members. With exact tests, the result is the true Markov blanket [1]_.
 
-    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from
-    its own data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column
-    order unless two columns are identical. The strength is the absolute partial correlation for
+    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
+    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
+    unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
     candidate with the strongest statistic joins first, as the association measure of [1]_ orders
@@ -436,9 +436,9 @@ def inter_iamb(
     step repeats one it held after an earlier step, which on sample data could otherwise make it
     cycle. With exact tests, the result is the true Markov blanket [1]_.
 
-    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from
-    its own data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column
-    order unless two columns are identical. The strength is the absolute partial correlation for
+    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
+    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
+    unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests.
 
@@ -655,8 +655,8 @@ def mmpc(
 
     Two candidates whose largest p-values agree to nine decimals are compared by their smallest
     strength, and candidates whose strengths also agree go to the column whose rank, computed from
-    its own data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column
-    order unless two columns are identical. The strength is the absolute partial correlation for
+    the data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
+    unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
     the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
     candidate with the strongest statistic is added first, as [1]_ breaks ties between equal

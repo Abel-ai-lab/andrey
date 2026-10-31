@@ -92,15 +92,15 @@
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "HC": {
-        "linear_gauss_er_d20": {"median_shd": 8.5, "empty_median_shd": 20.0, "shd": [11, 4, 15, 0, 5, 15, 0, 7, 24, 10]},
-        "linear_gauss_er_d50": {"median_shd": 28.5, "empty_median_shd": 50.0, "shd": [21, 57, 30, 41, 41, 21, 16, 25, 35, 27]},
-        "asia_gauss": {"median_shd": 4.5, "empty_median_shd": 8.0, "shd": [4, 9, 6, 4, 4, 5, 1, 13, 4, 9]},
+        "linear_gauss_er_d20": {"median_shd": 11.0, "empty_median_shd": 20.0, "shd": [22, 4, 16, 0, 16, 4, 7, 15, 8, 14]},
+        "linear_gauss_er_d50": {"median_shd": 30.5, "empty_median_shd": 50.0, "shd": [31, 26, 75, 32, 30, 15, 22, 34, 18, 32]},
+        "asia_gauss": {"median_shd": 4.0, "empty_median_shd": 8.0, "shd": [10, 9, 4, 4, 0, 8, 3, 0, 6, 4]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "Tabu": {
-        "linear_gauss_er_d20": {"median_shd": 1.0, "empty_median_shd": 20.0, "shd": [4, 0, 9, 0, 0, 1, 0, 1, 24, 3]},
-        "linear_gauss_er_d50": {"median_shd": 17.0, "empty_median_shd": 50.0, "shd": [11, 26, 19, 29, 11, 3, 15, 21, 34, 5]},
-        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 5, 0, 0, 0, 0, 1, 0, 0, 0]},
+        "linear_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 20.0, "shd": [0, 0, 10, 0, 0, 6, 0, 4, 0, 9]},
+        "linear_gauss_er_d50": {"median_shd": 20.0, "empty_median_shd": 50.0, "shd": [27, 21, 75, 24, 19, 3, 13, 28, 18, 12]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [9, 5, 0, 0, 0, 0, 1, 0, 6, 0]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "MMPC": {
@@ -132,9 +132,9 @@
         "asia_gauss": {"median_shd": 4.0, "empty_median_shd": 8.0, "shd": [4, 6, 6, 0, 1, 4, 0, 0, 4, 6]}
       },
       "BOSS": {
-        "linear_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 20.0, "shd": [0, 0, 1, 0, 0, 6, 0, 12, 0, 4]},
-        "linear_gauss_er_d50": {"median_shd": 1.0, "empty_median_shd": 50.0, "shd": [0, 9, 1, 13, 2, 0, 3, 0, 0, 1]},
-        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 8, 0, 0, 9, 0, 4, 0, 0, 10]},
+        "linear_gauss_er_d20": {"median_shd": 2.5, "empty_median_shd": 20.0, "shd": [0, 0, 1, 0, 4, 6, 4, 12, 21, 0]},
+        "linear_gauss_er_d50": {"median_shd": 0.5, "empty_median_shd": 50.0, "shd": [0, 1, 1, 1, 5, 0, 0, 0, 0, 1]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "GRaSP": {
@@ -150,10 +150,10 @@
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "ICA-LiNGAM": {
-        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [0, 11, 1, 2, 0, 0, 8, 0, 3, 5]},
-        "lingam_sf_d50": {"median_shd": 14.0, "empty_median_shd": 49.0, "shd": [11, 17, 2, 10, 19, 77, 36, 4, 0, 19]},
-        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 4, 0, 0, 0, 0, 0]},
-        "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
+        "lingam_sf_d20": {"median_shd": 1.0, "empty_median_shd": 19.0, "shd": [0, 0, 0, 2, 0, 36, 12, 3, 0, 5]},
+        "lingam_sf_d50": {"median_shd": 8.5, "empty_median_shd": 49.0, "shd": [7, 9, 5, 8, 55, 104, 14, 3, 9, 4]},
+        "asia_lingam": {"median_shd": 1.0, "empty_median_shd": 8.0, "shd": [1, 3, 3, 0, 1, 1, 0, 0, 0, 4]},
+        "sachs": {"median_shd": 15.0, "empty_median_shd": 17.0, "shd": [15]}
       },
       "MultiGroupDirectLiNGAM": {
         "multi_group_er_d10": {"median_shd": 0.0, "empty_median_shd": 30.0, "shd": [0, 0, 1, 1, 0, 0, 1, 0, 0, 2]},

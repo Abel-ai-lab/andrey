@@ -74,6 +74,8 @@ SINGLE = {
     "calm": andrey.calm,
     "notears": andrey.notears,
     "dagma": andrey.dagma,
+    "cam": andrey.cam,
+    "resit": andrey.resit,
     "boss": andrey.boss,
     "grasp": andrey.grasp,
     "direct_lingam": andrey.direct_lingam,
@@ -201,7 +203,7 @@ def _two_groups_of_copies():
 
 
 # The searches that reject copies before the fit: the BIC searches, the partial-correlation
-# constraint searches, and the lagged partial-correlation searches.
+# constraint searches, the lagged partial-correlation searches, CAM, and RESIT.
 COPY_CHECKED = [
     *BIC,
     "pc",
@@ -215,6 +217,8 @@ COPY_CHECKED = [
     "pcmci",
     "pcmciplus",
     "lpcmci",
+    "cam",
+    "resit",
 ]
 
 

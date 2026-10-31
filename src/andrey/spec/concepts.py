@@ -149,6 +149,8 @@ ALL_METHODS = (
     *_PURE_SCORE,
     "calm",
     *_CONTINUOUS,
+    "cam",
+    "resit",
     "mmhc",
     "rsmax2",
     *_LINGAM,
@@ -173,7 +175,7 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam", "resit"),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt("Continuous optimization: no test decides an edge.", *_CONTINUOUS),
@@ -216,6 +218,14 @@ _CONCEPTS = (
                 )
                 for m in ("anm", "pnl")
             ),
+            Deviation(
+                method="cam",
+                name="alpha",
+                default=0.001,
+                fixed_in=None,
+                reason="0.001 is the paper's cutoff of the pruning tests, at every sample size "
+                "(Buhlmann, Peters and Ernest 2014, Section 5.3).",
+            ),
         ),
     ),
     Concept(
@@ -233,11 +243,14 @@ _CONCEPTS = (
         suitable=(*CI_SEARCHES, *PCMCI_FAMILY),
         exempt=(
             *_exempt(
-                "It tests the independence of residuals as part of its own model.", *_RESIDUAL
+                "It tests the independence of residuals as part of its own model.",
+                *_RESIDUAL,
+                "resit",
             ),
             *_exempt("No conditional-independence test.", *_PURE_SCORE, *_CONTINUOUS, *_LINGAM),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger"),
+            *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
         ),
     ),
     Concept(
@@ -400,6 +413,8 @@ _CONCEPTS = (
                 "No conditional-independence tests over growing conditioning sets.",
                 *_PURE_SCORE,
                 "calm",
+                "cam",
+                "resit",
                 *_CONTINUOUS,
                 *_LINGAM,
                 "granger",
@@ -468,7 +483,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "cam"),
         exempt=(
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -483,7 +498,7 @@ _CONCEPTS = (
                 "A cardinality cap is not part of the continuous objective.", "calm", *_CONTINUOUS
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *_LINGAM),
-            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL),
+            *_exempt("No search over parent sets.", *PCMCI_FAMILY, "granger", *_RESIDUAL, "resit"),
         ),
     ),
     Concept(
@@ -568,6 +583,8 @@ _CONCEPTS = (
                 "Deterministic.",
                 *(m for m in _PURE_SCORE if m not in _STARTS),
                 *_CONTINUOUS,
+                "cam",
+                "resit",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -790,6 +807,8 @@ _CONCEPTS = (
                 *_PURE_SCORE,
                 "calm",
                 *_CONTINUOUS,
+                "cam",
+                "resit",
                 *_LINGAM,
                 "gin",
                 "rcd",

@@ -79,7 +79,7 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
     the data, so a comparison can reject a true root more often than ``alpha``, and a correct model
     can still leave the latents from that step on unordered.
 
-    **Column order.** Each column gets a tie rank computed from its own data, as for
+    **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the order of the groups it
     tests, the member each run of a root test takes, and the choice between root candidates whose
     lowest p-values agree to nine decimals follow the rank. Reordering the columns therefore
