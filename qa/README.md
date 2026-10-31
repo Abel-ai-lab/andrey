@@ -276,6 +276,12 @@ interval alone, so the setting counts as worse only if the rerun is worse as wel
 with fewer than 10 paired datasets is reported, not gated. A worse setting that replicates, or
 that has no replication, fails unless the allowlist names its cause.
 
+A method is judged in the setting it claims (`DEVELOPMENT.md`, "Test a method"). A row measured
+outside that setting, for the method's **Limitations.** paragraph, carries `"claim": "out"`, on the
+row or on its entry: the gate prints it with its numbers and does not fail it, whatever its
+interval. A row with `"claim": "in"` or no `claim` is in claim and is judged as above, and a row's
+own `claim` overrides its entry's. Any other value of `claim` is an error.
+
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer

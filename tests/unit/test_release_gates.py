@@ -765,6 +765,41 @@ def test_parity_rejects_a_replication_without_the_paired_bootstrap_rule():
         reference_parity.paired_rows("s", _summary(row))
 
 
+def test_parity_reports_a_row_out_of_claim_without_gating_it():
+    from qa import reference_parity
+
+    # The interval lies above 0: in claim the row fails, marked claim "out" it is reported.
+    worse = _paired_row([0.05, 0.95])
+    assert _paired_failures(worse) != []
+    [parsed] = _paired({**worse, "claim": "out"})
+    assert parsed.reported and parsed.out_of_claim and not parsed.failed
+    assert "out of the method's claim: reported, not gated" in parsed.numbers()
+    assert "mean D +0.50" in parsed.numbers()
+    assert _paired_failures({**worse, "claim": "out"}) == []
+    # The mark holds for the other kinds of row: a replicated one and one under ten pairs.
+    rerun = _replication([0.2, 0.9], mean_D=0.5)
+    assert _paired_failures({**worse, "claim": "out", "replication": rerun}) == []
+    assert _paired_failures({**worse, "replication": rerun}) != []
+    # Only the marked row is exempt: its neighbor in claim still fails.
+    rows = [{**worse, "claim": "out"}, {**worse, "d": 20}]
+    assert len(_paired_failures(*rows)) == 1
+    # A row marked "in" is judged. The mark may sit on the entry, and a row's own mark overrides it.
+    assert len(_paired_failures({**worse, "claim": "in"})) == 1
+    entry = {
+        **_summary(worse, {**worse, "d": 20, "claim": "in"}),
+        "parity_rule": "paired bootstrap",
+    }
+    entry["methods"][0]["claim"] = "out"
+    failures, _ = reference_parity.check(reference_parity.paired_rows("s", entry), [])
+    assert len(failures) == 1 and "d=20" in failures[0]
+
+
+def test_parity_rejects_a_claim_it_does_not_know():
+    for claim in ("outside", True, ""):
+        with pytest.raises(ValueError, match="claim"):
+            _paired({**_paired_row([0.05, 0.95]), "claim": claim})
+
+
 def test_parity_keeps_the_count_rule_for_a_summary_without_a_parity_rule():
     # The same row: the interval reaches 0, but the reference has fewer errors on more datasets.
     row = _paired_row([-0.05, 1.05])
