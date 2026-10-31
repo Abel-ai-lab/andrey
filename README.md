@@ -37,7 +37,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 35 methods, each one function call.
+- **One API**: 30 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -78,22 +78,6 @@ You install andrey-core and then `import andrey`.
 <p align="center"><a href="https://andrey.abel.ai/docs/benchmarks.html">Release cards</a></p>
 
 <!-- CARD:END -->
-
-<!-- WHY_FAST:START -->
-<!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->
-
-Four ideas make it [fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html):
-
-- **Do many things at once**: thousands of independence tests run as one array operation, with the
-  same results.
-- **Never compute twice**: the correlation matrix is computed once and cached; GES memoizes its
-  local scores.
-- **Skip what can't matter**: tests with a closed form settle most edges before any matrix is
-  inverted.
-- **Use the hardware you have**: with the optional PyTorch extra, a GPU computes large entropy
-  tables.
-
-<!-- WHY_FAST:END -->
 
 ## What's inside
 
@@ -181,9 +165,10 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
   browser.
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): benchmark details for each
   release.
+- [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)
 - [FAQ](https://andrey.abel.ai/docs/faq.html) and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
-- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.
+- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, stage by stage.
 
 Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is fully
 tested; macOS and Windows install and run on the CPU, but the full test suite and the GPU speedups
