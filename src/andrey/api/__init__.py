@@ -15,7 +15,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 from .blanket import iamb, inter_iamb, mmpc
 from .constraint import cdnod, fci, gfci, pc
 from .continuous import dagma, notears
-from .fcm import cam, resit
+from .fcm import cam, camuv, resit
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
@@ -71,4 +71,5 @@ __all__ = [
     # hidden-confounder family
     "rcd",
     "bottom_up_parce_lingam",
+    "camuv",
 ]

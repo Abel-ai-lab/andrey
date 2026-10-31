@@ -20,6 +20,8 @@ _GRAPH = (
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 # Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
 _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
+# CAM-UV: candidate = the graph's marks and the marked pairs.
+_MARKED_PAIRS = frozenset({"CAMUV"})
 # DAG and causal-order algorithms: candidate = the DAG and the order.
 _ORDERED_DAG = frozenset({"CAM", "RESIT"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
@@ -67,6 +69,9 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm == "BottomUpParceLiNGAM":  # the order, unordered variables nested in a list
             candidate["causal_order"] = out.metadata["partial_order"]
         return candidate
+    if algorithm in _MARKED_PAIRS:
+        pairs = np.asarray(out.metadata["latent_pairs"], dtype=np.int64).reshape(-1, 2)
+        return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
     if algorithm in _PAIRWISE:

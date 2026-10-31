@@ -71,10 +71,12 @@ group and read its edges as the group's; no option drops or merges the copies fo
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
 same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
 also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
-such as `'a' at lag 1 repeats 'd'`. `cam` and `resit` reject copies the same way, and a column of
-fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit` also
-needs at least twice as many rows as columns. Other data raises a `ValueError` that names the
-argument and, for a bad cell, its row and column. A single column gives a one-node graph.
+such as `'a' at lag 1 repeats 'd'`. `cam`, `resit`, and `camuv` reject copies the same way, and a
+column of fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit;
+`resit` and `camuv` also need at least twice as many rows as columns, and `camuv` rejects a column
+that is a linear function of other columns, such as a total, as the BIC methods do. Other data
+raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
+column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
@@ -106,12 +108,12 @@ first.
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
 `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
 `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
-{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
-temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
-in the result, whatever its weight, test, or score says. For the time-series methods, an edge
-`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`.
-[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take
+`knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to
+be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
+required edge is in the result, whatever its weight, test, or score says. For the time-series
+methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
+time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
 `pcmci`, `pcmciplus`, `lpcmci`, `granger`, and `longitudinal_lingam` take `tau_max`, the largest
@@ -139,11 +141,12 @@ changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, and `rcd` take `max_depth`, the maximum conditioning-set size of their
+`pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum conditioning-set size of their
 conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2` cap their
 restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and `inter_iamb`
 stop growing at the cap.
-`rcd`'s cap is the most variables it regresses out together, with a default of 2, its paper's
+`rcd`'s cap is the most variables it regresses out together, and `camuv`'s the most variables a
+sink test adds together as a variable's candidate parents, each with a default of 2, its paper's
 setting.
 
 % concept: max_p_global
@@ -346,6 +349,7 @@ its first call in a process.
    dagma
    cam
    resit
+   camuv
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -363,6 +367,12 @@ fits the same kind of model with the noise of any distribution, with the paper's
 a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
 finds most independent of the remaining variables, then removes each parent whose removal leaves
 the residual independent of the variable's predecessors at `alpha=0.05`.
+
+CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
+kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
+on the residuals of additive spline fits find each variable's candidate parents over sets of up to
+3 variables and then its parents, and mark `o-o` each pair that a hidden common cause or a causal
+path through a hidden variable joins, whose relation no regression can identify.
 
 A method becomes supported once it has:
 

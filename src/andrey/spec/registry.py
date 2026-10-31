@@ -1990,6 +1990,53 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="camuv",
+        family="latent",
+        summary="Causal additive models with unobserved variables (CAM-UV) for nonlinear additive "
+        "effects where some causes are hidden: direct causes as ->, and as o-o the pairs a hidden "
+        "common cause or a causal path through a hidden variable joins, whose relation cannot be "
+        "determined. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        params=(
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every HSIC independence test: the sink tests, the "
+                "tests that remove a candidate parent, and the tests that mark a pair. 0.01 is "
+                "the paper's value.",
+            ),
+            ParamSpec(
+                name="max_depth",
+                type="int",
+                default=2,
+                doc="The maximum conditioning-set size of a sink test, the most variables tested "
+                "together as a variable's new candidate parents, at least 1: the search runs over "
+                "sets of up to max_depth + 1 variables. Each sink test also regresses on the "
+                "variable's candidates found so far, however many. Larger values find more parents "
+                "and take longer. The default 2 is the paper's setting, sets of at most 3 "
+                "variables.",
+                minimum=1,
+                concept="max_depth",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="PAG over the observed variables; o-o joins a pair through a hidden variable, a "
+            "common cause or a causal path, metadata latent_pairs lists those pairs, and "
+            "cycle_edges the edges dropped from directed cycles.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        references=("Maeda & Shimizu 2021", "Gretton et al. 2007"),
+    )
+)
+
 # --- background knowledge and the conditioning-set cap ------------------------------------------
 
 _SKELETON_RULE = (
@@ -2111,6 +2158,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "required ones unpenalized. In the unordered block, a pair forbidden both ways is not "
     "adjacent, a pair forbidden one way has an arrowhead at the cause, and a required edge is "
     "directed.",
+    "camuv": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set never "
+    "make a variable a candidate parent, so a variable is not tried as the sink of a set that "
+    "holds a forbidden parent of it. A required edge's cause is a candidate parent from the start "
+    "and no step removes it; its pair is never marked. A pair forbidden both ways is never marked; "
+    "on a marked pair, a forbidden i -> j whose reverse is not forbidden, such as an edge into an "
+    "earlier tier, puts an arrowhead at i.",
     "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
@@ -2185,6 +2238,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
+    "camuv": ("latent_pairs", "cycle_edges"),
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the

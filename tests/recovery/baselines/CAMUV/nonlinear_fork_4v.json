@@ -1,0 +1,54 @@
+{
+  "algorithm": "CAMUV",
+  "case": "nonlinear_fork_4v",
+  "input": {
+    "case": "nonlinear_fork_4v",
+    "column_order": [
+      2,
+      0,
+      3,
+      1
+    ],
+    "seed": 20261030,
+    "sha256": "0b827fc464897f1bb377f735fa32c4e655df8e94eab2314ac4d023215fa89565",
+    "shape": [
+      1000,
+      4
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        1,
+        3
+      ],
+      [
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        1,
+        3,
+        0,
+        0
+      ]
+    ],
+    "latent_pairs": [
+      [
+        1,
+        3
+      ]
+    ]
+  },
+  "schema_version": 3
+}

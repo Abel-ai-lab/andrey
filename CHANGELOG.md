@@ -29,6 +29,13 @@ names its pull request.
   additive noise of any distribution, with the paper's settings: it takes as each next sink the
   variable whose additive-model residual an HSIC test finds most independent of the others, then
   removes each parent whose removal leaves the residual independent; it is experimental. ([#620])
+- `camuv`, causal additive models with unobserved variables (Maeda and Shimizu 2021), a
+  latent-variable method, learns the direct causes among the observed variables from nonlinear
+  additive effects with the paper's settings: HSIC tests on the residuals of additive spline fits
+  find each variable's direct causes over sets of up to 3 variables, and a pair that a hidden common
+  cause or a causal path through a hidden variable joins, whose relation no regression can
+  identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
+  directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#623])
 
 ### Changed
 
@@ -1525,3 +1532,4 @@ First alpha release.
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
 [#619]: https://github.com/Abel-ai-lab/andrey/pull/619
 [#620]: https://github.com/Abel-ai-lab/andrey/pull/620
+[#623]: https://github.com/Abel-ai-lab/andrey/pull/623
