@@ -1360,7 +1360,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="supported",
+        status="experimental",
         column_order="relabels",
         tie_break=True,
         params=(

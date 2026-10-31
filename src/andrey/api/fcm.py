@@ -395,6 +395,12 @@ def resit(
     FloatingPointError
         If an HSIC test gives a non-finite value, rather than let it steer a choice.
 
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+
     See Also
     --------
     andrey.cam : Additive effects with Gaussian noise, scored by the likelihood.

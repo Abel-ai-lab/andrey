@@ -129,7 +129,6 @@ FITS: dict[str, Fit] = {
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
     ),
     "CAM": Fit(andrey.cam),
-    "RESIT": Fit(andrey.resit),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
@@ -177,7 +176,6 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "latent_lingam_er_d17": functools.partial(qg.regime_draws, "latent_lingam_er", 17, 2000),
     "linear_gauss_er_d16": functools.partial(qg.regime_draws, "linear_gauss_er", 16, 800),
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
-    "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
     "multi_group_er_d30": functools.partial(qg.model_draws, "multi_group_er", 30, 1000),
@@ -216,7 +214,6 @@ LARGER: dict[str, str] = {
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
     "CAM": "anm_er_n1000_d30",
-    "RESIT": "anm_er_n1000_d12",
     "CALM": "linear_gauss_er_d15",
     "CDNOD": "domain_shift_er_d70",
     "GIES": "interventional_gauss_er_d100",
