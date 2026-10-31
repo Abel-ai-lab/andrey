@@ -60,6 +60,33 @@ def _dependence(test: CITest) -> _Dependence:
     return by_pvalue
 
 
+def _dependences(
+    test: CITest,
+) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
+    """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
+
+    A test with ``pvalues_given`` and no ``statistic_pvalue`` scans the candidates together, which
+    gives the p-values of the calls one by one and the key :func:`_dependence` derives from them.
+    """
+    scan = getattr(test, "pvalues_given", None)
+    if scan is not None and getattr(test, "statistic_pvalue", None) is None:
+
+        def by_scan(
+            target: int, xs: Sequence[int], cond: Sequence[int]
+        ) -> list[tuple[float, float]]:
+            return [(p, round(p, _KEY_DP)) for p in scan(target, xs, cond).tolist()]
+
+        return by_scan
+    dependence = _dependence(test)
+
+    def one_by_one(
+        target: int, xs: Sequence[int], cond: Sequence[int]
+    ) -> list[tuple[float, float]]:
+        return [dependence(target, x, cond) for x in xs]
+
+    return one_by_one
+
+
 def _required(constraints: Constraints | None, target: int, ranks: Sequence[int]) -> list[int]:
     """The variables a required edge joins to ``target``, in rank order; none without
     ``constraints``."""
@@ -97,16 +124,16 @@ def markov_blanket(
     since a child's other parent belongs to the blanket without being adjacent and the later tests
     condition on it, and is dropped from the returned set.
     """
-    dependence = _dependence(test)
+    dependences = _dependences(test)
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
     while max_depth is None or len(blanket) <= max_depth:
         best_key, best_x = None, None
-        for x in range(d):
-            if x == target or x in blanket:
-                continue
-            p, strength = dependence(target, x, blanket)
+        candidates = [x for x in range(d) if x != target and x not in blanket]
+        for x, (p, strength) in zip(
+            candidates, dependences(target, candidates, blanket), strict=True
+        ):
             key = (strength, ranks[x])
             if p <= alpha and (best_key is None or key < best_key):
                 best_key, best_x = key, x
