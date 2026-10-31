@@ -35,6 +35,10 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "IAMB": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
     "InterIAMB": {
         "structural": ["graph"],
         "numeric": {},
@@ -143,6 +147,11 @@ SPEC: dict[str, dict] = {
     "Granger": {
         "structural": ["adj"],
         "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
+    },
+    # CAM-UV: the PAG's marks and the pairs it marks through a hidden variable, both exact.
+    "CAMUV": {
+        "structural": ["graph", "latent_pairs"],
+        "numeric": {},
     },
     # RESIT: the DAG and the causal order of its sink search, both exact.
     "RESIT": {

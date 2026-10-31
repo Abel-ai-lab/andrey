@@ -257,6 +257,24 @@ def _nonmonotone(seed: int, n_samples: int, noise_scale: float) -> np.ndarray:
     return np.column_stack([x0, x1, x2, x3])
 
 
+def _nonlinear_fork(seed: int, n_samples: int, noise_scale: float) -> np.ndarray:
+    """Nonlinear SEM ``x0 <- h -> x1``, ``x1 -> x2``, ``x0 -> x3``, with ``h`` hidden.
+
+    ``h`` is uniform on ``[-1, 1]``; ``x0 = |h| + n``, ``x1 = h**3 + n``,
+    ``x2 = (x1 - 0.2)**2 + n``, and ``x3 = (x0 - 0.5)**2 + n``, each ``n`` an independent uniform
+    draw on ``[-noise_scale, noise_scale]``. Only absolute values, sums, and products: each is
+    exactly rounded on every machine, so the input hash holds across runners.
+    """
+    rng = np.random.default_rng(seed)
+    h = rng.uniform(-1.0, 1.0, n_samples)
+    noise = [noise_scale * rng.uniform(-1.0, 1.0, n_samples) for _ in range(4)]
+    x0 = np.abs(h) + noise[0]
+    x1 = h * h * h + noise[1]
+    x2 = (x1 - 0.2) * (x1 - 0.2) + noise[2]
+    x3 = (x0 - 0.5) * (x0 - 0.5) + noise[3]
+    return np.column_stack([x0, x1, x2, x3])
+
+
 # Full order h, x0, x1, x2, x3 (``weights[j][i]`` is the coefficient of ``i`` in ``j``). A strong
 # hidden effect (1.5 against unit-range noise) leaves a trace in the pair's residuals that the
 # independence tests detect at 2000 rows.
@@ -444,6 +462,16 @@ CASES: dict[str, dict] = {
         "observed": [1, 2, 3, 4],
         "weights": _FORK_WEIGHTS,
     },
+    # Nonlinear additive SEM with a hidden common cause (see ``_nonlinear_fork``): x0 <- h -> x1,
+    # x1 -> x2, x0 -> x3. Over the full order x0, x1, x2, x3, h; h is the dropped fifth node.
+    # CAM-UV.
+    "nonlinear_fork_4v": {
+        "model": "nonlinear_fork",
+        "seed": 20261030,
+        "n_samples": 1000,
+        "noise_scale": 0.2,
+        "edges": [(4, 0), (4, 1), (1, 2), (0, 3)],
+    },
     # The same SEM with h kept as a column: no variable is hidden, so no pair is confounded.
     "fork_5v_observed": {
         "model": "confounded",
@@ -623,7 +651,7 @@ def _n_columns(spec: dict) -> int:
         return len(spec["lags"][0])
     if model == "anm":
         return 2
-    if model == "nonmonotone":
+    if model in ("nonmonotone", "nonlinear_fork"):
         return 4
     if model == "categorical":
         return len(spec["cardinalities"])
@@ -743,6 +771,10 @@ def _generate(case_id: str, replicate: int) -> np.ndarray:
         )
     if model == "nonmonotone":
         return _nonmonotone(seed=seed, n_samples=spec["n_samples"], noise_scale=spec["noise_scale"])
+    if model == "nonlinear_fork":
+        return _nonlinear_fork(
+            seed=seed, n_samples=spec["n_samples"], noise_scale=spec["noise_scale"]
+        )
     if model == "categorical":
         return _categorical_bn(
             seed=seed,
@@ -789,6 +821,8 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
         return 2, 2, np.array([[0, 1]])
     if model == "nonmonotone":
         return 4, 4, np.array(spec["edges"])
+    if model == "nonlinear_fork":
+        return 4, 5, np.array(spec["edges"])
     if model == "categorical":
         k = len(spec["cardinalities"])
         pairs = [(p, c) for c, parents in spec["parents"].items() for p in parents]

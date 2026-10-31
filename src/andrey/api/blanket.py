@@ -197,9 +197,6 @@ def iamb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -220,7 +217,9 @@ def iamb(
     data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
     unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests.
+    the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
+    candidate with the strongest statistic joins first, as the association measure of [1]_ orders
+    them.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -250,17 +249,25 @@ def iamb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It
-    conditions on the whole current blanket, so each test needs more rows as the blanket grows,
-    and a candidate the grow step adds in error enlarges every later conditioning set. The skeleton
-    and the CPDAG test every subset of the smaller blanket for each pair of the moral graph and
-    each unshielded triple, and a collider takes all of them, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50
-    variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
-    collider tests took 0.07 to 0.7 s on five datasets, and learning the blankets 0.8 to 1.0 s.
-    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random.
+    **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
+    on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
+    the columns standardized and not, and 200 variables with the same rows and degrees. In every
+    setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the empty
+    graph's. The CPDAG is closest to it on unstandardized data at 100 variables, 1,000 rows, and
+    mean degree 2, with 79 pairs wrong against 100 for the empty graph, and on standardized data at
+    20 variables, 1,000 rows, and mean degree 4, with 24 against 40. The median CPDAG fit took 0.03
+    to 6.1 s up to 100 variables, the longest at 5,000 rows and mean degree 4, and 13 to 17 s at 200
+    variables. The benchmark covers continuous data; the categorical and mixed-data tests are not in
+    it yet. Tested with exact d-separation on 15 variables. It conditions on the whole current
+    blanket, so each test needs more rows as the blanket grows, and a candidate the grow step adds
+    in error enlarges every later conditioning set. The skeleton and the CPDAG test every subset of
+    the smaller blanket for each pair of the moral graph and each unshielded triple, and a collider
+    takes all of them, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
+    smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
+    datasets, and learning the blankets 0.8 to 1.0 s. Missing values are not benchmarked yet; the
+    tests run them on up to 20 variables with up to a fifth of the values missing completely at
+    random.
 
     References
     ----------

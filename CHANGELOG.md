@@ -10,6 +10,20 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `iamb` is supported and joins the quality gate; `mmpc` stays experimental. Against bnlearn 5.2.1
+  on simulated linear-Gaussian data with 20 to 200 variables, 1,000 and 5,000 rows, and mean degree
+  2 and 4, bnlearn makes significantly fewer errors in 1 of 80 judged comparisons, `iamb`'s CPDAG at
+  50 variables, 5,000 rows, and mean degree 2, where bnlearn takes the first column among candidates
+  whose p-values underflow to 0 and Andrey the candidate with the strongest test statistic; two more
+  comparisons are worse once and tie on a rerun with fresh seeds. Two comparisons have 9 pairs
+  because bnlearn's fits reached the 600 s cap. The median ratio of bnlearn's fit time to Andrey's
+  for the CPDAG is 4.6 on standardized data, 2.7 on unstandardized data, and 2.2 at 200 variables.
+  `mmpc` stays experimental because its skeleton at 200 variables, 5,000 rows, and mean degree 2
+  makes more errors than bnlearn's on two runs (2.7 more on average on the second), a difference
+  whose cause is not yet traced. ([#607])
+
 ### Added
 
 - `andrey.data.sample_scm(functional="location_scale")` and
@@ -29,6 +43,13 @@ names its pull request.
   additive noise of any distribution, with the paper's settings: it takes as each next sink the
   variable whose additive-model residual an HSIC test finds most independent of the others, then
   removes each parent whose removal leaves the residual independent; it is experimental. ([#620])
+- `camuv`, causal additive models with unobserved variables (Maeda and Shimizu 2021), a
+  latent-variable method, learns the direct causes among the observed variables from nonlinear
+  additive effects with the paper's settings: HSIC tests on the residuals of additive spline fits
+  find each variable's direct causes over sets of up to 3 variables, and a pair that a hidden common
+  cause or a causal path through a hidden variable joins, whose relation no regression can
+  identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
+  directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#623])
 
 ### Changed
 
@@ -1531,8 +1552,10 @@ First alpha release.
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
 [#596]: https://github.com/Abel-ai-lab/andrey/pull/596
 [#597]: https://github.com/Abel-ai-lab/andrey/pull/597
+[#607]: https://github.com/Abel-ai-lab/andrey/pull/607
 [#611]: https://github.com/Abel-ai-lab/andrey/pull/611
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
 [#619]: https://github.com/Abel-ai-lab/andrey/pull/619
 [#620]: https://github.com/Abel-ai-lab/andrey/pull/620
+[#623]: https://github.com/Abel-ai-lab/andrey/pull/623
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
