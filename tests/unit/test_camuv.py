@@ -69,20 +69,17 @@ def _additive(seed: int = 0) -> np.ndarray:
     return np.asarray(case.data, dtype=float)
 
 
-@pytest.mark.xfail(strict=True, reason="#591")
 def test_a_new_row_order_changes_nothing():
     X = _additive()
     rows = np.random.default_rng(100).permutation(X.shape[0])
     assert _fit(X[rows]).structure == _fit(X).structure
 
 
-@pytest.mark.xfail(strict=True, reason="#591")
 def test_flipping_a_column_sign_changes_nothing():
     X = _additive()
     assert _fit(X * np.array([1.0, -1.0, 1.0, 1.0, 1.0, 1.0])).structure == _fit(X).structure
 
 
-@pytest.mark.xfail(strict=True, reason="#591")
 def test_a_power_of_two_unit_changes_nothing():
     X = np.arange(60.0)[:, None] + np.random.default_rng(0).uniform(-0.4, 0.4, (60, 4))
     assert _fit(X * np.array([4.0, 1.0, 1.0, 1.0])).structure == _fit(X).structure
