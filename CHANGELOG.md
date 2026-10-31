@@ -35,7 +35,7 @@ names its pull request.
   find each variable's direct causes over sets of up to 3 variables, and a pair that a hidden common
   cause or a causal path through a hidden variable joins, whose relation no regression can
   identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
-  directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#TBD])
+  directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#623])
 
 ### Changed
 
@@ -1532,3 +1532,4 @@ First alpha release.
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
 [#619]: https://github.com/Abel-ai-lab/andrey/pull/619
 [#620]: https://github.com/Abel-ai-lab/andrey/pull/620
+[#623]: https://github.com/Abel-ai-lab/andrey/pull/623
