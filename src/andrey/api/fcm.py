@@ -747,8 +747,8 @@ def camuv(
     cost grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes near
     130, and an hour near 340. Each HSIC test builds matrices with one row and one column per
     sample, so time and memory grow with the square of ``n_samples``: at 5 variables a fit took
-    1.6 s and 0.21 GB with 1,000 rows and 79 s and 3.6 GB with 8,000, and at 20 variables
-    5.6 minutes and 1.7 GB with 4,000. The kernels kept between tests stay within 1 GiB, so above
+    1.5 s and 0.21 GB with 1,000 rows and 78 s and 3.6 GB with 8,000, and at 20 variables
+    6.1 minutes and 1.7 GB with 4,000. The kernels kept between tests stay within 1 GiB, so above
     about 11,600 rows none is kept.
 
     References
