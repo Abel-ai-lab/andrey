@@ -260,11 +260,12 @@ The supported methods are benchmarked compared with other packages, and a qualit
 them against known graphs before each release. Supported means measured, not accurate on every
 workload: the [0.1.0](benchmarks/0.1.0.md#large-graphs),
 [0.2.0](benchmarks/0.2.0.md#known-limits), [0.3.0](benchmarks/0.3.0.md#known-limits),
-[0.5.0](benchmarks/0.5.0.md#known-limits), and [0.7.0](benchmarks/0.7.0.md#limits) release
-cards show where a method scores worse than the empty graph, or about as well, as ICA-LiNGAM does
-at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, hill climbing
-and Tabu search do from 50 variables with ten rows per variable, PCMCI does from 40 series, Granger
-does from 20 series at 1,000 time steps, and GES does at 200 variables with ten rows per variable.
+[0.5.0](benchmarks/0.5.0.md#known-limits), [0.7.0](benchmarks/0.7.0.md#limits), and
+[0.13.0](benchmarks/0.13.0.md#limits) release cards show where a method scores worse than the empty
+graph, or about as well, as ICA-LiNGAM does at the 0.1.0 card's sample size, BottomUpParceLiNGAM
+does from 8 observed variables, hill climbing and Tabu search do from 50 variables with ten rows
+per variable, PCMCI does from 40 series, Granger does from 20 series at 1,000 time steps, GES does
+at 200 variables with ten rows per variable, and RESIT does from 20 variables.
 The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 
 ```{eval-rst}
@@ -295,6 +296,8 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    direct_lingam
    ica_lingam
    multi_group_direct_lingam
+   cam
+   resit
    anm
    pnl
    rcd
@@ -311,6 +314,18 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
+smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
+variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
+variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges. RESIT,
+regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014), fits the
+same kind of model with the noise of any distribution, with the paper's settings: it finds a causal
+order from the sink up, each sink the variable whose additive-model residual an HSIC test finds
+most independent of the remaining variables, then removes each parent whose removal leaves the
+residual independent of the variable's predecessors at `alpha=0.05`. Both return a DAG. The release
+card measures CAM from 10 to 100 variables and RESIT from 5 to 20; RESIT's accuracy claim holds up
+to 10 variables.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -347,8 +362,6 @@ its first call in a process.
 
    notears
    dagma
-   cam
-   resit
    camuv
 ```
 
@@ -356,17 +369,6 @@ NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG b
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
-smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
-variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
-variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges.
-
-RESIT, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014),
-fits the same kind of model with the noise of any distribution, with the paper's settings: it finds
-a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
-finds most independent of the remaining variables, then removes each parent whose removal leaves
-the residual independent of the variable's predecessors at `alpha=0.05`.
 
 CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
 kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`

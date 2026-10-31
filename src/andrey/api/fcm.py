@@ -137,9 +137,6 @@ def cam(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which the fit reads as numbers. Each message warns once per process.
@@ -397,12 +394,6 @@ def resit(
         :class:`~andrey.Knowledge` lists.
     FloatingPointError
         If an HSIC test gives a non-finite value, rather than let it steer a choice.
-
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
 
     See Also
     --------
