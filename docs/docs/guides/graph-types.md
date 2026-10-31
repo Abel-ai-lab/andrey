@@ -120,11 +120,14 @@ when saving or converting a graph.
 ## Undirected graphs: adjacency without direction
 
 `kind="undirected"` holds `(TAIL, TAIL)` pairs only. Its edges claim no direction, and a moral
-graph's edges also join spouses, two parents of one child that need not be adjacent. `iamb` and
-`inter_iamb` return the moral graph of their Markov blankets, and `mmpc` the skeleton of its
-parents-and-children sets. An undirected graph has no CPDAG or DAG, so `andrey.metrics.score`
-scores it on its skeleton alone: `shd` counts the pairs adjacent in one graph and not in the
-other, and no arrowhead metric is reported.
+graph's edges also join spouses, two parents of one child that need not be adjacent. `mmpc` returns
+the skeleton of its parents-and-children sets by default, an undirected graph, and a CPDAG with
+`structure="cpdag"`. `iamb` and `inter_iamb` return a CPDAG by default; with `structure="skeleton"`
+they return its adjacencies as an undirected graph, and with `structure="moral"` the moral graph of
+their Markov blankets. With a `target`, the three return that variable's set as undirected edges. An
+undirected graph has no CPDAG or DAG, so `andrey.metrics.score` scores it on its skeleton alone:
+`shd` counts the pairs adjacent in one graph and not in the other, and no arrowhead metric is
+reported.
 
 ## Temporal graphs
 
@@ -167,8 +170,8 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `gin`, `anm`, `pnl` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp` |
-| `undirected` | `iamb`, `inter_iamb`, `mmpc` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `iamb`, `inter_iamb` |
+| `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger` |
 

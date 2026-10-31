@@ -132,11 +132,11 @@ def mmhc(
         Significance level of the conditional-independence test. Smaller values give sparser
         skeletons, so the score search considers fewer pairs.
     indep_test : str or None, default=None
-        Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``
-        or ``"student_t"`` for continuous data, ``"chisq"`` or ``"gsq"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test. It must read the
-        same kind of data as ``score_func``. ``None`` picks from the declared column types, as for
-        :func:`~andrey.pc`.
+        Conditional-independence test of the MMPC phase, any of :func:`~andrey.pc`'s: ``"fisherz"``,
+        ``"student_t"``, or ``"normal_scores"`` for continuous data, ``"chisq"`` or ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data, or a nonlinear test.
+        It must read the same kind of data as ``score_func``. ``None`` picks from the declared
+        column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     score_func : str or None, default=None
@@ -209,9 +209,6 @@ def mmhc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves.
     DataTypeWarning
@@ -235,7 +232,7 @@ def mmhc(
     skeleton forbidden in both directions. The result is the CPDAG of the DAG it stops at.
 
     Ties between candidates in the MMPC phase and between moves in the hill-climbing phase go to
-    the column whose rank, computed from its own data, comes first, as for :func:`~andrey.hc`, so
+    the column whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so
     the result does not depend on the column order unless two columns are identical. The
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
@@ -256,8 +253,12 @@ def mmhc(
     score of one dataset. Drop the incomplete rows first, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data. An edge the MMPC phase misses is never added, and the
+    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
+    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC,
+    on one core. In every setting the mean CPDAG errors stay below the empty graph's; the closest
+    is at 20 variables and mean degree 4, with 29 to 31 pairs wrong against 40 for the empty
+    graph. A fit took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4.
+    An edge the MMPC phase misses is never added, and the
     hill-climbing phase stops at a local optimum. MMPC tests each candidate against every subset
     of the current members, so its cost grows exponentially with the size of a variable's
     parents-and-children set.
@@ -341,8 +342,9 @@ def rsmax2(
         The restrict phase. ``"mmpc"`` keeps a pair when each variable is in the other's MMPC
         parents and children [2]_, as :func:`~andrey.mmhc` does. ``"iamb"`` and ``"inter_iamb"``
         keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB
-        [3]_, the moral graph, which also joins the parents of a common child. ``"pc"`` keeps the
-        skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
+        [3]_ and no subset of the smaller blanket separates the two, the skeleton of
+        ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child.
+        ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -428,9 +430,6 @@ def rsmax2(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     SearchLimitWarning
         When the maximize phase takes a given ``max_iter`` moves.
     PerformanceWarning
@@ -448,15 +447,16 @@ def rsmax2(
     -----
     **How it works.** The restrict phase follows the sparse candidate idea of [1]_: tests narrow
     the pairs a score search must consider. Each choice finds every true adjacency when its tests
-    are exact. The MMPC skeleton and PC's skeleton then hold only the true adjacencies; the moral
-    graph also joins two parents of a common child, which the maximize phase can leave
-    non-adjacent. The maximize phase starts from the empty graph, or from the required edges, with
-    every pair outside the candidates forbidden in both directions, and returns the CPDAG of the
-    DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and :func:`~andrey.inter_iamb`
-    describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s adjacency search without
-    orienting.
+    are exact. The skeletons of MMPC, IAMB, Inter-IAMB, and PC then hold only the true
+    adjacencies. A Markov blanket also holds the other parents of a common child, so IAMB and
+    Inter-IAMB test each pair of their moral graph against subsets of the smaller blanket and drop
+    the pairs that separate. The maximize phase starts from the empty graph, or from the required
+    edges, with every pair outside the candidates forbidden in both directions, and returns the
+    CPDAG of the DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and
+    :func:`~andrey.inter_iamb` describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s
+    adjacency search without orienting.
 
-    Ties go to the column whose rank, computed from its own data, comes first, as for
+    Ties go to the column whose rank, computed from the data, comes first, as for
     :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are
     identical.
 
@@ -478,8 +478,14 @@ def rsmax2(
     one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
     use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
-    simulated linear-Gaussian data. An edge the restrict phase misses is never added, and the
+    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
+    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC,
+    on one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting
+    the mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean
+    degree 4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for
+    the empty graph. A fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to 8.8 s with ``"iamb"``,
+    the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses
+    is never added, and the
     maximize phase stops at a local optimum. MMPC tests each candidate against every subset of
     the current members, so its cost grows exponentially with the size of a variable's
     parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket, so each

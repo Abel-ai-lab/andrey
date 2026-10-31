@@ -41,6 +41,7 @@ from andrey import GraphStructure
 from andrey.cli import main as andrey_cli
 from andrey.core.structure import Kind
 from andrey.spec import list_specs
+from andrey.spec.concepts import BLANKET_STRUCTURES
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
@@ -62,6 +63,7 @@ RELEASES = (
     "0.9.0",
     "0.10.0",
     "0.11.0",
+    "0.12.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -80,8 +82,7 @@ SPEC_FAMILIES = {
     "constraint": "Constraint-based",
     "score": "Score-based",
     "permutation": "Permutation-based",
-    "lingam": "Linear non-Gaussian",
-    "additive_noise": "Nonlinear additive noise",
+    "functional": "Functional causal models",
     "temporal": "Temporal causal discovery",
     "latent": "Latent variables",
     "pairwise": "Pairwise direction",
@@ -91,8 +92,7 @@ FAMILY_TERMS = {
     "constraint": "constraint-based",
     "score": "score-based",
     "permutation": "permutation-based",
-    "lingam": "linear non-Gaussian",
-    "additive_noise": "nonlinear additive-noise",
+    "functional": "functional causal model",
     "temporal": "temporal",
     "latent": "latent-variable",
     "pairwise": "pairwise",
@@ -1178,10 +1178,16 @@ NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "ei
 
 
 def experimental_kinds() -> set[str]:
-    """The graph kinds that only experimental methods return."""
+    """The graph kinds that only experimental methods return: the kinds their specs declare and
+    the kinds of the graphs their ``structure`` can name."""
     specs = list_specs()
     supported = {spec.output.graph_kind for spec in specs if spec.status == "supported"}
-    return {spec.output.graph_kind for spec in specs if spec.status == "experimental"} - supported
+    experimental = {spec.output.graph_kind for spec in specs if spec.status == "experimental"}
+    for spec in specs:
+        structures = [p.choices for p in spec.params if p.concept == "structure" and p.choices]
+        if spec.status == "experimental" and structures:
+            experimental |= {BLANKET_STRUCTURES[choice] for choice in structures[0]}
+    return experimental - supported
 
 
 def graph_kinds() -> list[str]:

@@ -172,7 +172,11 @@ def test_possible_parents_are_picked_three_times_and_a_tie_at_the_tenth_keeps_fe
 
 @pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
 def test_columns_without_a_smooth_basis_are_named():
-    X = _chain()
-    X[:, 1] = np.arange(N) % 2
-    with pytest.raises(ValueError):
-        _fit(X)
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_chain(), columns=["dose", "flag", "level"])
+    frame["flag"] = np.arange(N) % 2
+    frame["switch"] = np.repeat([0.0, 1.0], N // 2)
+    with pytest.raises(ValueError) as raised:
+        _fit(frame)
+    assert "flag" in str(raised.value) and "switch" in str(raised.value)
+    assert "dose" not in str(raised.value) and "level" not in str(raised.value)

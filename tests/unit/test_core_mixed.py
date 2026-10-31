@@ -353,14 +353,17 @@ def test_on_continuous_columns_a_test_is_the_partial_correlation_ratio(make):
         assert make(x)(a, b, given) == pytest.approx(chi2.sf(statistic, 1), rel=1e-9)
 
 
-def test_cg_test_on_categorical_columns_is_the_g_square_test():
-    """With every joint category occupied, both count the same degrees of freedom."""
+def test_cg_test_on_categorical_columns_has_the_g_square_statistic():
+    """On categorical columns the conditional Gaussian likelihood ratio is G-square's statistic."""
     rng = np.random.default_rng(3)
     x = rng.integers(0, 3, (3000, 3)).astype(np.float64)
     x[:, 2] = np.where(rng.random(3000) < 0.5, x[:, 0], x[:, 2])
     cg, gsq = CGTest(x, np.ones(3, bool)), ChiSquare(x, g_square=True)
     for a, b, given in [(0, 1, ()), (0, 1, (2,)), (1, 2, (0,)), (0, 2, ())]:
-        assert cg(a, b, given) == pytest.approx(gsq(a, b, given), rel=1e-9, abs=1e-300)
+        query = (np.array([a]), np.array([b]), np.array([given], dtype=np.intp).reshape(1, -1))
+        assert cg.statistic_pvalues(*query)[0] == pytest.approx(
+            gsq.statistic_pvalues(*query)[0], rel=1e-9
+        )
 
 
 @pytest.mark.parametrize("rare", [False, True], ids=["common categories", "a two-row category"])

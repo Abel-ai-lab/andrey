@@ -320,6 +320,35 @@ ranking of the links, not as probabilities. `resampling="bootstrap"` draws all t
 replacement instead; a resample then repeats some cells, so PC's tests see more evidence than it
 holds and keep weak links more often than they do on the data.
 
+### Checking a result against the data
+
+A graph implies independences: PC's graph has no link between p38 and jnk, so given the right
+variables the two must look independent in the data. `andrey.markov_check` tests every
+independence the graph implies and asks whether the p-values are uniform, as they are when all of
+them hold. The cells that learned the graph would flatter it, so learn on a random half of the
+cells and check on the other half:
+
+```{code-cell} ipython3
+cells = np.random.default_rng(0).permutation(len(sachs.data))
+learn, held = sachs.data.iloc[cells[: len(cells) // 2]], sachs.data.iloc[cells[len(cells) // 2 :]]
+check = andrey.markov_check(andrey.pc(learn), held, seed=0)
+print(check)
+```
+
+```{code-cell} ipython3
+:tags: [remove-cell]
+
+# The prose below holds only while these do.
+assert check.passed and check.n_tests == 47
+```
+
+The data do not reject the 47 independences of PC's graph. That does not show the graph is right:
+a graph with extra links implies fewer independences and passes too, so read a pass with the number
+of links. A rejection is the informative result, because it means a link is missing or an arrow is
+wrong. `check.table()` lists each independence with its p-value, `check.dag` is the DAG whose
+independences were tested, and `andrey markov-check` runs the same from the shell. The
+[Markov check](../api.md#markov-check) section gives the measured error rates.
+
 ## Your own data
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
@@ -392,7 +421,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`; for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 

@@ -190,7 +190,7 @@ def boss(
     wins. Under the linear-Gaussian BIC each comparison is decided as full local scores decide it:
     a fast update whose rounding-error bound could change the comparison is scored in full.
 
-    **Column order.** Each column gets a tie rank computed from its own data, as for
+    **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
     and the seed shuffles the order in which it visits them. The
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
@@ -481,7 +481,7 @@ def grasp(
     the linear-Gaussian BIC each comparison is decided as full local scores decide it, as for
     :func:`~andrey.boss`.
 
-    **Column order.** Each column gets a tie rank computed from its own data, as for
+    **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
     sorted columns into the starting order and the order of visiting variables, and ties between
     candidate parents go to the lowest rank. The

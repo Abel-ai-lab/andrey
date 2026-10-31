@@ -32,7 +32,9 @@ _INDEP_TEST = concept_param(
     "indep_test",
     doc="Conditional-independence test. For continuous data, on the partial correlation: "
     "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
-    "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
+    "distribution, exact for Gaussian data at any sample size; normal_scores = fisherz on each "
+    "column's normal scores, for data whose columns are monotone transformations of Gaussian "
+    "variables. For categorical data coded by whole "
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
     "columns named by categorical: degen_gauss = degenerate Gaussian and "
     "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
@@ -50,7 +52,7 @@ _POSSIBLE_DSEP = ParamSpec(
     default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
-    "order_free = by a rank computed from each column's own data, so the result does not depend "
+    "order_free = by a rank computed from the data, so the result does not depend "
     "on the column order unless two columns are identical; fast = column order. null follows "
     "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
     nullable=True,
@@ -326,33 +328,55 @@ _TARGET = ParamSpec(
     nullable=True,
 )
 _LOCAL_OUTPUT_DOC = (
-    "undirected edges only, from target to each member, or between each pair in each other's "
-    "set when target is null; metadata['target'] names the target and metadata['{key}'] lists the "
-    "members in the order they joined"
+    "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
+    "the moral graph; with a target, undirected edges from target to each member, "
+    "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
+    "they joined"
 )
-for _name, _summary, _key, _refs in (
+_BLANKET_STRUCTURE = concept_param("structure")
+for _name, _status, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
+        "experimental",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
         "incremental association: grow by conditional-independence tests, then shrink. With "
-        "target=null, the moral graph of every variable's blanket.",
+        "target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink structure "
+        "learner, or into the skeleton or the moral graph (structure).",
         "markov_blanket",
-        ("Tsamardinos, Aliferis & Statnikov 2003",),
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
     ),
     (
         "inter_iamb",
+        "supported",
         "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
-        "With target=null, the moral graph of every variable's blanket.",
+        "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
+        "structure learner, or into the skeleton or the moral graph (structure).",
         "markov_blanket",
-        ("Tsamardinos, Aliferis & Statnikov 2003",),
+        _BLANKET_STRUCTURE,
+        "cpdag",
+        ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
     ),
     (
         "mmpc",
+        "experimental",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
-        "check. With target=null, the skeleton that mmhc searches.",
+        "check. With target=null, the skeleton that mmhc searches, or, with structure=cpdag, that "
+        "skeleton oriented into a CPDAG by the Grow-Shrink structure learner.",
         "parents_and_children",
-        ("Tsamardinos, Brown & Aliferis 2006",),
+        concept_param(
+            "structure",
+            default="skeleton",
+            choices=("skeleton", "cpdag"),
+            doc="The graph returned without a target: skeleton = the adjacencies, each variable "
+            "joined to its parents and children; cpdag = the skeleton with its colliders "
+            "oriented and Meek's rules applied (Margaritis 2003), which costs more. With a "
+            "target, the target's set, whatever the value.",
+        ),
+        "undirected",
+        ("Tsamardinos, Brown & Aliferis 2006", "Margaritis 2003"),
     ),
 ):
     _add(
@@ -363,16 +387,16 @@ for _name, _summary, _key, _refs in (
             data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
             output=OutputSpec(
                 structure_type="graph",
-                graph_kind="undirected",
+                graph_kind=_kind,
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             determinism="stochastic",
             accel="numpy",
-            status="experimental",
+            status=_status,
             column_order="relabels",
             tie_break=True,
             seeded=True,
-            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
+            params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
             references=_refs,
         )
     )
@@ -1004,7 +1028,7 @@ _add(
         ),
         determinism="stochastic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         seeded=True,
@@ -1038,7 +1062,7 @@ _add(
         ),
         determinism="stochastic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         seeded=True,
@@ -1048,8 +1072,9 @@ _add(
                 type="str",
                 default="mmpc",
                 doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
-                "children; iamb and inter_iamb = each in the other's Markov blanket (the moral "
-                "graph); pc = PC's skeleton.",
+                "children; iamb and inter_iamb = each in the other's Markov blanket and not "
+                "separated by a subset of the smaller blanket (their skeleton); pc = PC's "
+                "skeleton.",
                 choices=RESTRICTS,
             ),
             ParamSpec(
@@ -1175,12 +1200,13 @@ _add(
     )
 )
 
-# --- LiNGAM family --------------------------------------------------------------------------------
+# --- functional causal models (Glymour, Zhang & Spirtes 2019) -------------------------------------
+# Linear effects with non-Gaussian noise (LiNGAM).
 
 _add(
     MethodSpec(
         name="direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM for linear non-Gaussian data: recovers a fully-oriented DAG plus a "
         "causal order and edge weights. Use when noise is non-Gaussian and effects are linear.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -1196,7 +1222,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
-                "is the pairwise likelihood-ratio measure.",
+                "is the maximum-entropy approximation of the pairwise likelihood ratio, tanh and "
+                "skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Shimizu et al. 2011", "Hyvarinen & Smith 2013"),
@@ -1205,7 +1232,7 @@ _add(
 _add(
     MethodSpec(
         name="ica_lingam",
-        family="lingam",
+        family="functional",
         summary="ICA-based LiNGAM for linear non-Gaussian data: FastICA gives a causal order, "
         "adaptive Lasso the edge weights; returns a DAG, the order, and the weights. Seeded "
         "(ANDREY_SEED, else 0), so repeated runs match. DirectLiNGAM is more accurate on the "
@@ -1243,7 +1270,7 @@ _add(
 _add(
     MethodSpec(
         name="multi_group_direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
         "shared causal order and a per-group weighted DAG. Returns one result per group.",
         data=DataSpec(
@@ -1273,19 +1300,20 @@ _add(
             concept_param(
                 "measure",
                 doc="How the order search picks the most exogenous variable at each step; pwling "
-                "is the pairwise likelihood-ratio measure.",
+                "is the maximum-entropy approximation of the pairwise likelihood ratio, tanh and "
+                "skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Shimizu 2012",),
     )
 )
 
-# --- nonlinear additive-noise family (Hoyer et al. 2009; Peters et al. 2014) ----------------------
+# Nonlinear effects with additive noise (Hoyer et al. 2009; Peters et al. 2014).
 
 _add(
     MethodSpec(
         name="cam",
-        family="additive_noise",
+        family="functional",
         summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
         "boosting preselects each variable's possible parents, a greedy search adds edges by the "
         "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
@@ -1320,7 +1348,7 @@ _add(
 _add(
     MethodSpec(
         name="resit",
-        family="additive_noise",
+        family="functional",
         summary="Regression with subsequent independence test (RESIT) for nonlinear effects with "
         "additive noise of any distribution: a causal order from the sink up, each sink the "
         "variable whose additive-model residual an HSIC test finds most independent of the "
@@ -1424,7 +1452,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the order search on the innovations picks the most exogenous variable; "
-                "pwling is the pairwise likelihood-ratio measure.",
+                "pwling is the maximum-entropy approximation of the pairwise likelihood ratio, "
+                "tanh and skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
@@ -1465,7 +1494,8 @@ _add(
             concept_param(
                 "measure",
                 doc="How the instantaneous order search picks the most exogenous variable; "
-                "pwling is the pairwise likelihood-ratio measure.",
+                "pwling is the maximum-entropy approximation of the pairwise likelihood ratio, "
+                "tanh and skew their first-order approximations by a nonlinear correlation.",
             ),
         ),
         references=("Kadowaki, Shimizu & Washio 2013",),
@@ -2048,14 +2078,15 @@ _GATE_RULE = (
 _MEMBER_RULE = (
     "Each end of a required edge is in the other's set from the start, and no test removes it. "
 )
-_UNDIRECTED_RULE = (
-    "Tiers and edges forbidden one way constrain orientation, which an undirected result does not "
-    "have, so they do not change the result."
+_BLANKET_ORIENT_RULE = (
+    "Under structure=cpdag, every edge the knowledge decides is directed before the colliders, "
+    "which never reverse it, and Meek's rules R1-R4 follow; the undirected structures do not read "
+    "tiers or edges forbidden one way."
 )
 _BLANKET_RULE = (
     _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent stays a candidate, since a child's other parent "
-    "belongs to the blanket, and is left out of the result. " + _UNDIRECTED_RULE
+    "belongs to the blanket, and is left out of the result. " + _BLANKET_ORIENT_RULE
 )
 _REGRESSION_RULE = (
     "The regression drops forbidden parents and does not penalize required ones; every required "
@@ -2086,7 +2117,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "inter_iamb": _BLANKET_RULE,
     "mmpc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
-    + _UNDIRECTED_RULE,
+    + _BLANKET_ORIENT_RULE,
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,

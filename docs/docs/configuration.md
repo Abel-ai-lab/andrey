@@ -112,11 +112,12 @@ already running in the process, so a CPU fit never pays to start a GPU.
   random one, and a call repeats. A call that gives `seed=` does not depend on it. Deterministic
   methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
-  them by a rank computed from each column's own data, so reordering the columns relabels the
-  result. `position` orders them by column position, which skips computing the ranks, fires the
-  orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, and visits
-  the possible-d-separation step of `fci` and `gfci` in column order; the result can then depend on
-  the column order. A fit whose result the rule can change records it in `metadata["tie_break"]`.
+  them by a rank computed from the data, which a row shuffle, a change of units, or a sign flip
+  leaves in place, so reordering the columns relabels the result. `position` orders them by column
+  position, which skips computing the ranks, fires the orientation rules of `pc`, `cdnod`, `fci`,
+  and `gfci` one at a time in column order, and visits the possible-d-separation step of `fci` and
+  `gfci` in column order; the result can then depend on the column order. A fit whose result the
+  rule can change records it in `metadata["tie_break"]`.
 
 Results repeat on the same machine; across platforms they can differ, CALM's most of all.
 [Column order and machines](guides/column-order.md) lists what each method keeps under a new column
