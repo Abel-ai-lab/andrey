@@ -831,7 +831,11 @@ class ChiSquare:
     rows and counting the statistics above the observed one (a permutation test [4]_) rejected 4.6%
     to 5.0% in the same tables, at about a hundred times the cost; Andrey does not offer it.
 
-    Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
+    Queries are canonicalized as :class:`FisherZ`'s are, and no query's result is memoized. The
+    mean of a G-square cell is a function of its configuration's rows and the two margins alone, so
+    the means of configurations of at most 128 rows are read from a table that every test in the
+    process shares: at most 358 thousand floats (2.9 MB), filled by rows when a lookup first needs
+    them, in under half a second for all of them.
 
     :meth:`batched_call`, :meth:`first_order_pvalues`, :meth:`marginal_pvalues`, and
     :meth:`pvalues_given` answer many queries at once and return the p-values of :meth:`__call__`
@@ -840,7 +844,8 @@ class ChiSquare:
     category-indicator matrix with itself, whose integer counts are exact in float64.
     :meth:`pvalues_given` numbers the configurations of one conditioning set once and counts the
     tables of all its candidates of one shape in one ``bincount``, and :meth:`statistic_pvalues`
-    answers its queries that share a conditioning set the same way. Every step after the counting is
+    answers its queries that share a conditioning set the same way. For G-square, the cell means of
+    every table of such a scan are evaluated in one call. Every step after the counting is
     elementwise on the tables, except the sum of a query's statistic over its cells, which is
     ``np.sum`` over that query's cells in the order :meth:`__call__` sums them, so the sum, and a
     decision on the p-value, does not depend on how the queries are batched.
