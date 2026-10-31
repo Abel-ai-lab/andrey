@@ -212,19 +212,19 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
   and caches it, so the first run needs network access.
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
-MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods, ANM,
-and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by endpoint SHD
-against the PAG of the observed variables. GIES is scored against the interventional essential graph
-of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the domain index
-orients the edges it reaches. GIN's errors are the latents it misses: the true latents whose
-indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD
-against the latent projection, the edges and pairs their benchmark scores: `i -> j` for a directed
-path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden node
-reaches through hidden nodes only. The time-series methods are scored in their summaries' units:
-PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by endpoint
-SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing
-and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a method
-passes when its median SHD over the draws is:
+MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
+ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by
+endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
+essential graph of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the
+domain index orients the edges it reaches. GIN's errors are the latents it misses: the true latents
+whose indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by
+endpoint SHD against the latent projection, the edges and pairs their benchmark scores: `i -> j` for
+a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden
+node reaches through hidden nodes only. The time-series methods are scored in their summaries'
+units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by
+endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the
+missing and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a
+method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.

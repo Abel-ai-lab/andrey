@@ -12,17 +12,25 @@ names its pull request.
 
 ### Highlights
 
-- `iamb` is supported and joins the quality gate; `mmpc` stays experimental. Against bnlearn 5.2.1
-  on simulated linear-Gaussian data with 20 to 200 variables, 1,000 and 5,000 rows, and mean degree
-  2 and 4, bnlearn makes significantly fewer errors in 1 of 80 judged comparisons, `iamb`'s CPDAG at
-  50 variables, 5,000 rows, and mean degree 2, where bnlearn takes the first column among candidates
-  whose p-values underflow to 0 and Andrey the candidate with the strongest test statistic; two more
-  comparisons are worse once and tie on a rerun with fresh seeds. Two comparisons have 9 pairs
-  because bnlearn's fits reached the 600 s cap. The median ratio of bnlearn's fit time to Andrey's
-  for the CPDAG is 4.6 on standardized data, 2.7 on unstandardized data, and 2.2 at 200 variables.
-  `mmpc` stays experimental because its skeleton at 200 variables, 5,000 rows, and mean degree 2
-  makes more errors than bnlearn's on two runs (2.7 more on average on the second), a difference
-  whose cause is not yet traced. ([#607])
+- `iamb` is supported and joins the quality gate. Against bnlearn 5.2.1 on simulated linear-Gaussian
+  data with 20 to 200 variables, 1,000 and 5,000 rows, and mean degree 2 and 4, bnlearn makes
+  significantly fewer errors in 1 of 80 judged comparisons, `iamb`'s CPDAG at 50 variables, 5,000
+  rows, and mean degree 2, where bnlearn takes the first column among candidates whose p-values
+  underflow to 0 and Andrey the candidate with the strongest test statistic; two more comparisons
+  are worse once and tie on a rerun with fresh seeds. Two comparisons have 9 pairs because bnlearn's
+  fits reached the 600 s cap. The median ratio of bnlearn's fit time to Andrey's for the CPDAG is
+  4.6 on standardized data, 2.7 on unstandardized data, and 2.2 at 200 variables. ([#607])
+- `mmpc` is supported and joins the quality gate, and the benchmark report adds the discrete
+  networks asia, child, insurance, alarm, and hepar2 for `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and
+  `rsmax2`, Andrey's chi-square and G-square tests against bnlearn's `x2-adf` and `mi-adf`. On
+  linear-Gaussian data `mmpc`'s skeleton at 200 variables, 5,000 rows, and mean degree 2 makes more
+  errors than bnlearn's on two runs (2.7 more on average on the second), because Andrey admits the
+  candidate with the strongest test statistic where bnlearn takes the first column, and its CPDAG at
+  100 variables, 1,000 rows, and mean degree 2 is worse once (+0.70) and +0.56 on a rerun of 9
+  pairs. On the networks, `iamb`'s moral graph of hepar2 at 5,000 rows is worse on two runs; the two
+  packages run different discrete tests. Andrey is slower than bnlearn in 186 of the 220 network
+  settings, in all 44 on hepar2 (bnlearn's fit time over Andrey's is 0.06 to 0.86), after the faster
+  discrete tests. ([#626])
 
 ### Added
 
@@ -1559,3 +1567,4 @@ First alpha release.
 [#620]: https://github.com/Abel-ai-lab/andrey/pull/620
 [#623]: https://github.com/Abel-ai-lab/andrey/pull/623
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
+[#626]: https://github.com/Abel-ai-lab/andrey/pull/626
