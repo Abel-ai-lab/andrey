@@ -280,6 +280,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    cdnod
    iamb
    inter_iamb
+   mmpc
    ges
    gies
    xges
@@ -344,7 +345,6 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
-   mmpc
    notears
    dagma
    cam

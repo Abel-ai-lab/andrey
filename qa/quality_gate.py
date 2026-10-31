@@ -469,11 +469,12 @@ def _granger(x: np.ndarray) -> np.ndarray:
     return np.stack([np.asarray(w) != 0 for w in out.structure.lag_weights])
 
 
-#: Public defaults, except RSMAX2: its default restrict phase is MMHC's, so the gate fits its IAMB
-#: restrict phase. A fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's
-#: optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call
-#: the public functions with the published settings: the domain index of four equal blocks of rows,
-#: and three groups of columns.
+#: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
+#: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
+#: fixed seed pins BOSS's and GRaSP's search orders, FastICA's start, and CALM's optimizer. CD-NOD
+#: and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions
+#: with the published settings: the domain index of four equal blocks of rows, and three groups of
+#: columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -486,6 +487,7 @@ SUPPORTED: dict[str, Method] = {
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
+    "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),

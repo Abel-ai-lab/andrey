@@ -118,6 +118,10 @@ REGIMES = {
     "diabetes": "categorical data from the diabetes network",
     "mixed_er": "mixed continuous and categorical data from Erdos-Renyi graphs",
     "discrete_er": "categorical data from Erdos-Renyi graphs",
+    "discrete_networks_chisq": "categorical data from the asia, child, insurance, alarm, and "
+    "hepar2 networks, tested with the chi-square test",
+    "discrete_networks_gsq": "categorical data from the asia, child, insurance, alarm, and "
+    "hepar2 networks, tested with the G-square test",
     "interventional_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs with interventions",
     "multi_group_er": "linear non-Gaussian data in three groups sharing one Erdos-Renyi graph",
     "latent_measurement": "linear data with latent variables, each measured by three indicators",
@@ -1173,9 +1177,12 @@ TEMPORAL_CAPTIONS = (
 # Every kind a supported method returns as a GraphStructure (andrey.core.structure.Kind), in the
 # homepage's words, then the graphs over time a TemporalStructure holds. A MAG comes from a
 # conversion, GraphStructure.to_mag, never from a method. The homepage shows supported methods only,
-# so a kind that only experimental methods return is not on it.
+# so a kind that only experimental methods return is not on it. A skeleton, the adjacencies of a
+# causal graph, is not itself a causal graph, so the homepage does not name it: MMPC returns one by
+# default, and the blanket methods with structure="skeleton" or "moral".
 GRAPH_KINDS = {"dag": "DAGs", "cpdag": "CPDAGs", "pag": "PAGs", "digraph": "cyclic graphs"}
 CONVERSION_KINDS = {"mag"}
+SKELETON_KINDS = {"undirected"}
 TEMPORAL_KIND = "graphs over time"
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 
@@ -1195,7 +1202,7 @@ def experimental_kinds() -> set[str]:
 
 def graph_kinds() -> list[str]:
     """Every kind of causal graph the supported methods return, in the homepage's words."""
-    skipped = CONVERSION_KINDS | experimental_kinds()
+    skipped = CONVERSION_KINDS | SKELETON_KINDS | experimental_kinds()
     kinds = [kind for kind in get_args(Kind) if kind not in skipped]
     if set(kinds) != GRAPH_KINDS.keys():
         raise ValueError(f"name every graph kind in GRAPH_KINDS: {sorted(kinds)}")

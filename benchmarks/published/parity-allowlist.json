@@ -180,6 +180,28 @@
       "cause": "correct-by-paper",
       "reason": "On every dataset where the two outputs differ, the difference starts at one node's first grow step. There the p-values of several candidates underflow to exactly 0 in bnlearn, which takes the first column among them. Andrey takes the candidate with the strongest test statistic, the association measure that IAMB maximizes. Applied in Andrey's search, bnlearn's choice reproduces bnlearn's skeleton on all 4 differing datasets. Two of them have skeletons that differ and carry +7 of the row's +10 pairs; the other two have equal skeletons and carry +3, from Meek's rules on a cyclic partially directed graph and from a collider that bnlearn skips for closing a directed cycle.",
       "citation": "Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Algorithms for large scale Markov blanket discovery. FLAIRS, 376-380: the forward phase admits the variable that maximizes a heuristic function f(X ; T | CMB), a measure of association, not a p-value. bnlearn 5.2.1, traced through ia.markov.blanket: candidates whose p-value is 0 are taken in column order."
+    },
+    {
+      "summary": "0.13.0",
+      "method": "MMPC",
+      "comparator": "bnlearn",
+      "row": {"regime": "linear_gauss_er_d200", "mean_degree": 2.0, "d": 200, "n": 5000},
+      "andrey_errors": 86.9,
+      "comparator_errors": 84.2,
+      "cause": "correct-by-paper",
+      "reason": "At 200 variables MMPC's forward step often faces candidates whose dependence is too strong to rank by p-value: the p-values underflow to exactly 0 in bnlearn, which takes the first column among them. Andrey takes the candidate with the strongest test statistic, the tie rule of the paper. That candidate is a true neighbor in 2,376 of 2,384 first picks (99.7%) against 1,176 (49%) for the first column, and the p-value key (no underflow) gives the same forward sets in 4,000 of 4,000 nodes. The extra errors are false edges between unrelated pairs (95% join variables in different components of the true graph or 5 or more steps apart) whose statistic is just past the cutoff (z 2.0 to 3.1; the cutoff is 1.96). An arbitrary pick admits a strongly correlated non-neighbor that removes some of them by chance, and the strongest-first rule keeps 44 such edges the other order removes, about 2 per graph. bnlearn's column-order pick, applied in Andrey's search, gives 843 errors on the 10 datasets of the rerun against bnlearn's recorded 842.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78: the forward phase admits the candidate whose weakest association with the target is the strongest, and the association measure orders candidates whose p-values saturate. bnlearn 5.2.1: candidates whose p-value is 0 are taken in column order."
+    },
+    {
+      "summary": "0.13.0",
+      "method": "IAMB, moral graph, discrete networks",
+      "comparator": "bnlearn",
+      "row": {"regime": "discrete_networks_chisq", "d": 70, "n": 5000},
+      "andrey_errors": 125.6,
+      "comparator_errors": 115.3,
+      "cause": "correct-by-paper",
+      "reason": "The two packages run different discrete tests. Andrey's chi-square test takes the exact permutation mean of the statistic as its degrees of freedom, so a sparse table keeps its level. bnlearn's x2-adf adjusts the degrees of freedom by a rule for sparse tables. On 3,840 random triples from child, insurance, alarm, and hepar2 the two decisions at alpha 0.05 agree in 97.7%, falling to 92% with 3 conditioning variables, and the graphs are not equal on any of the 3,183 datasets of those four networks (595 of 790 on asia). hepar2 has the largest conditioning sets, where the disagreement is widest.",
+      "citation": "Tsamardinos, I., and Borboudakis, G. (2010). Permutation testing improves Bayesian network learning. ECML PKDD, 322-337: the statistic's degrees of freedom are its exact permutation mean. bnlearn 5.2.1: ci.test with test x2-adf."
     }
   ]
 }
