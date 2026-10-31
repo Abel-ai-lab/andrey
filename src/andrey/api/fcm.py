@@ -186,7 +186,7 @@ def cam(
 
     **Ties.** Gains are compared rounded to 9 decimal places, as :func:`~andrey.hc` compares its
     score changes per row, so two gains that differ only in their rounding tie. A tie goes to the
-    edge whose cause, then effect, has the lower rank computed from each column's own data, as for
+    edge whose cause, then effect, has the lower rank computed from the data, as for
     :func:`~andrey.hc`, and so do the variables the causal order could place next; the fit runs on
     the columns in that rank order, so the result does not depend on the column order unless two
     columns are identical. The :doc:`column-order guide </docs/guides/column-order>` says what the
