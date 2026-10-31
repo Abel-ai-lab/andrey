@@ -121,6 +121,10 @@
         "asia_gauss": {"median_shd": 3.5, "empty_median_shd": 8.0, "shd": [3, 7, 4, 3, 6, 0, 0, 4, 0, 5]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
+      "CAM": {
+        "anm_er_n1000_d20": {"median_shd": 2.5, "empty_median_shd": 20.0, "shd": [2, 1, 5, 0, 16, 5, 3, 0, 18, 0]},
+        "anm_er_n1000_d50": {"median_shd": 8.5, "empty_median_shd": 50.0, "shd": [0, 1, 23, 6, 11, 3, 30, 0, 12, 21]}
+      },
       "ExactSearch": {
         "linear_gauss_er_d10": {"median_shd": 1.0, "empty_median_shd": 10.0, "shd": [0, 3, 3, 10, 0, 3, 2, 0, 0, 0]},
         "linear_gauss_er_d15": {"median_shd": 0.0, "empty_median_shd": 15.0, "shd": [1, 0, 0, 5, 1, 0, 0, 0, 0, 0]},
