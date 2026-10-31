@@ -36,6 +36,9 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [CAM](https://cran.r-project.org/src/contrib/Archive/CAM/) 1.0 (R, archived on CRAN) - see
+  [CAM and RESIT](#cam-and-resit)
+- the authors' R code for RESIT, read from disk and never copied - see [CAM and RESIT](#cam-and-resit)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](#categorical-data)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar and tetrad-lib's - see
   [Mixed data](#mixed-data), [GFCI](#gfci), and
@@ -186,6 +189,8 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM | Andrey, lingam |
 | ANM | Andrey, causal-learn |
+| CAM | Andrey, CAM 1.0 (R) |
+| RESIT | Andrey, the authors' R code, lingam |
 | PNL | Andrey, causal-learn |
 | CD-NOD | Andrey, causal-learn |
 | GIN | Andrey, Tetrad, causal-learn |
@@ -753,6 +758,57 @@ Both packages fit the same Gaussian process and the same HSIC test. Andrey stand
 column first, so its answer does not depend on the units; causal-learn fits the data as given. The
 regime's data are standardized, so the two compute the same p-values here up to rounding, and the
 comparison measures time.
+
+### CAM and RESIT
+
+`fcm_cpu.py` compares Andrey's CAM with CAM 1.0 and Andrey's RESIT with the authors' R code and
+lingam's, with the empty graph as the floor. All of them return a DAG, scored against the true
+DAG. The data are Erdos-Renyi graphs of mean degree 2 with 1000 rows, one core per fit, in eight
+regimes: four generators, each z-scored (the default) and at raw scale (the `_raw` regimes).
+
+| regime | generator | identifiable |
+|---|---|---|
+| `anm_er` | additive noise, Gaussian | yes |
+| `anm_gumbel_er` | additive noise, Gumbel | yes |
+| `lsnm_er` | location-scale noise | no: both methods assume constant noise scale |
+| `linear_gauss_er` | linear, Gaussian | no: the control, which neither should orient |
+
+The `andrey` fits run in the interpreter of the build under test, named by
+`$ANDREY_BENCH_CAM_PYTHON` or `$ANDREY_BENCH_RESIT_PYTHON` (an environment with that build
+installed); the driver's environment draws and scores the data and runs the references, so the build
+need not be the driver's. `provenance.json` records the build's environment. The references:
+
+```shell
+benchmarks/start_r.sh          # the R lane first
+benchmarks/start_cam_r.sh      # CAM 1.0 from the CRAN archive, SHA-256 checked
+benchmarks/start_resit_r.sh    # the authors' code, SHA-256 checked; prints the export below
+export ANDREY_BENCH_RESIT_R=$PWD/benchmarks/.resit-r/codeANM/code
+```
+
+The authors' code is supplementary material to Peters, Mooij, Janzing, and Scholkopf (2014) under a
+two-clause BSD license. The benchmark `source()`s it from `$ANDREY_BENCH_RESIT_R`.
+
+Every package runs at its documented defaults, and each difference is named in its adapter's
+docstring rather than tuned away:
+
+| | Andrey | reference |
+|---|---|---|
+| CAM | `alpha=0.001`, no parent cap | CAM 1.0 with `variableSel = TRUE, pruning = TRUE`; `maxNumParents = min(d - 1, round(n / 20))` |
+| RESIT, regression | additive model, thin plate splines, GCV | authors: `mgcv::gam`, `k = 10`, GCV; lingam: random forest, `max_depth=4` |
+| RESIT, `alpha` | 0.05 | authors: 0.05; lingam: 0.01 |
+| RESIT, next sink | the largest HSIC p-value | authors: the same, on p-values not their logarithms; lingam: the smallest HSIC statistic |
+
+A fit takes minutes at the larger sizes, so the driver defaults to one timed fit with no warm-up,
+and `--seed-start`, `--seeds`, and `--regimes` cut a campaign into small runs with their own
+`--out`; ratios pair inside one run. Fill the shared dataset store once with `--prepare-only`:
+
+```shell
+export ANDREY_BENCH_DATA=$PWD/outputs/fcm-data
+$ANDREY_BENCH_PYTHON benchmarks/fcm_cpu.py --lane cam --out outputs/fcm-prep --prepare-only \
+    --ladder 10 20 50 100 --seeds 20
+$ANDREY_BENCH_PYTHON benchmarks/fcm_cpu.py --lane cam --out outputs/cam-anm-d20 \
+    --regimes anm_er --ladder 20 --seeds 20 --cores 1 --cap-wall-s 1800
+```
 
 ### PNL direction test
 
@@ -1585,6 +1641,9 @@ Read `params` before comparing solutions because their defaults may optimize dif
   package's and with Andrey GES, by time, SHD, and BIC under one scorer.
 - `tabu_cpu.py` - compares tabu search and hill climbing with bnlearn, and scores each graph's
   BIC.
+- `fcm_cpu.py` - compares CAM with CAM 1.0 and RESIT with the authors' R code and lingam on
+  additive, location-scale, and linear data. `start_cam_r.sh` and `start_resit_r.sh` install the
+  references.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
 - `nonlinear_ci_cpu.py` - compares PC and FCI with the nonlinear CI tests with causal-learn,
