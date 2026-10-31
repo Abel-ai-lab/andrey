@@ -278,6 +278,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    fci
    gfci
    cdnod
+   iamb
    inter_iamb
    ges
    gies
@@ -343,7 +344,6 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
-   iamb
    mmpc
    notears
    dagma

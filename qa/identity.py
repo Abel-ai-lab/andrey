@@ -162,7 +162,7 @@ FITS: dict[str, Fit] = {
 WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
 
 #: The gate datasets of the experimental methods, which the quality gate does not fit.
-EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(("IAMB", "MMPC"), qg.CPDAG_DATA)
+EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(("MMPC",), qg.CPDAG_DATA)
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every

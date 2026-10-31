@@ -337,7 +337,7 @@ _BLANKET_STRUCTURE = concept_param("structure")
 for _name, _status, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
-        "experimental",
+        "supported",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
         "incremental association: grow by conditional-independence tests, then shrink. With "
         "target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink structure "

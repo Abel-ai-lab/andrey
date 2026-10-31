@@ -479,6 +479,7 @@ SUPPORTED: dict[str, Method] = {
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
     "GFCI": Method(lambda x: andrey.gfci(x), "pag", PAG_DATA),
     "CDNOD": Method(_adapted(AndreyCDNOD()), "essential", _models("domain_shift_er")),
+    "IAMB": Method(lambda x: andrey.iamb(x), "cpdag", CPDAG_DATA),
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
     "GIES": Method(lambda x: andrey.gies(*unstack(x)), "essential", INTERVENTION_DATA),

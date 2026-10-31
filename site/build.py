@@ -64,6 +64,7 @@ RELEASES = (
     "0.10.0",
     "0.11.0",
     "0.12.0",
+    "0.13.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -99,6 +100,8 @@ FAMILY_TERMS = {
 }
 REGIMES = {
     "linear_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs",
+    "linear_gauss_er_unitless": "linear-Gaussian data from Erdos-Renyi graphs, not standardized",
+    "linear_gauss_er_d200": "linear-Gaussian data from Erdos-Renyi graphs with 200 variables",
     "latent_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs with hidden confounders",
     "lingam_sf": "linear non-Gaussian data from scale-free graphs",
     "latent_lingam_er": "linear non-Gaussian data from Erdos-Renyi graphs with hidden confounders",
