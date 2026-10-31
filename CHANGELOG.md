@@ -31,6 +31,14 @@ names its pull request.
   packages run different discrete tests. Andrey is slower than bnlearn in 186 of the 220 network
   settings, in all 44 on hepar2 (bnlearn's fit time over Andrey's is 0.06 to 0.86), after the faster
   discrete tests. ([#626])
+- `cam` is supported and joins the quality gate. Against CAM 1.0, the authors' R package, on
+  simulated nonlinear additive-noise data with Gaussian or Gumbel noise, 10 to 100 variables, 1,000
+  rows, and mean degree 2, `cam` makes no more errors in 14 of 16 judged settings and fewer in 2
+  (Gumbel noise at 100 variables), returns the same graph on 278 of 320 datasets, and fits 6.5 to
+  14.7 times faster on one core. CAM 1.0 caps a variable's parents at the smaller of the variables
+  minus one and the rows over 20, 50 at 1,000 rows, which binds at 100 variables; Andrey sets no cap
+  by default. Location-scale and linear-Gaussian data lie outside the model and are reported, not
+  judged. ([#631])
 
 ### Added
 
@@ -44,8 +52,8 @@ names its pull request.
 - `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014), a functional causal
   model, learns a DAG and a causal order from nonlinear additive effects with the paper's
   settings: boosting preselects each variable's possible parents, a greedy search adds edges by the
-  drop in log residual variance of additive spline fits, and smooth-term tests prune them; it is
-  experimental. ([#597])
+  drop in log residual variance of additive spline fits, and smooth-term tests prune them.
+  ([#597])
 - `resit`, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf
   2014), a functional causal model, learns a DAG and a causal order from nonlinear effects with
   additive noise of any distribution, with the paper's settings: it takes as each next sink the
@@ -84,6 +92,9 @@ names its pull request.
   rows fell from 12.3 s to 3.3 s with chisq and from 28.0 s to 5.5 s with gsq. The identity check's
   233 fits of every method but `calm`, 640 fits of the discrete methods on four networks, and
   86,163 recorded queries returned the same bits. ([#625])
+- The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
+  outside the method's claim, with its numbers and does not fail it; a row without the field is
+  judged as before. ([#631])
 
 ### Fixed
 
@@ -1577,3 +1588,4 @@ First alpha release.
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
+[#631]: https://github.com/Abel-ai-lab/andrey/pull/631
