@@ -45,6 +45,16 @@ names its pull request.
   the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
   restores the former rank; `tie_break="position"` orders ties by column position, a different
   rule. ([#612])
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` return the same graphs and
+  p-values in less time, because the candidates of a grow step share one conditioning set, and the
+  test now numbers that set's configurations once and counts the tables of all its candidates
+  together, where each candidate's call numbered them again; `mmpc` reaches the same counts through
+  the test's batch of statistics. On asia, child, insurance, alarm, and hepar2 with 1,000 and 5,000
+  rows, the geometric mean of the speedup over the ten datasets was 2.4x (chisq) and 2.9x (gsq) for
+  `iamb`, 2.2x and 2.6x for `inter_iamb`, and 1.6x and 1.8x for `mmpc`; `iamb` on hepar2 with 5,000
+  rows fell from 12.3 s to 3.3 s with chisq and from 28.0 s to 5.5 s with gsq. The identity check's
+  233 fits of every method but `calm`, 640 fits of the discrete methods on four networks, and
+  86,163 recorded queries returned the same bits. ([#625])
 
 ### Fixed
 
@@ -1525,3 +1535,4 @@ First alpha release.
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
 [#619]: https://github.com/Abel-ai-lab/andrey/pull/619
 [#620]: https://github.com/Abel-ai-lab/andrey/pull/620
+[#625]: https://github.com/Abel-ai-lab/andrey/pull/625
