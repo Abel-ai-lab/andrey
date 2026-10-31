@@ -267,6 +267,15 @@ paired datasets is reported, with its counts, and not gated. A randomized test's
 its `multi_draw` fields where it has them: each dataset fit several times per package (`draws`),
 and D per dataset the mean over the draws.
 
+A setting whose first run is worse is a candidate, not a finding: judging a hundred settings at a
+one-sided 2.5% gives about two or three worse ones even for identical methods. A row may therefore
+hold a `replication`, the same setting rerun once on fresh seeds with the same build, with the
+`seeds` it ran and the fields of a judged row (`paired`, `andrey_shd_mean`, `comparator_shd_mean`,
+`mean_D`, `bootstrap_95`, `above_zero`). A row with a replication is judged by the replication's own
+interval alone, so the setting counts as worse only if the rerun is worse as well. A replication
+with fewer than 10 paired datasets is reported, not gated. A worse setting that replicates, or
+that has no replication, fails unless the allowlist names its cause.
+
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer

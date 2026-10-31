@@ -10,6 +10,11 @@ summary's ``parity_rule`` sets how its rows are judged:
   lies entirely above 0, and a row with fewer is reported, not gated. A row of a randomized test
   with several draws per dataset (``multi_draw``) is judged by those draws, with D per dataset the
   mean over the draws.
+- ``replication``: a row whose setting came out worse may hold its rerun on fresh seeds, with the
+  same fields (``paired``, ``andrey_shd_mean``, ``comparator_shd_mean``, ``mean_D``,
+  ``bootstrap_95``, ``above_zero``) and the ``seeds`` it ran. A worse setting counts only if it
+  replicates, so a row with a replication is judged by the replication's own interval, and a
+  replication with fewer than ``MIN_PAIRS`` paired datasets is reported, not gated.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -37,7 +42,7 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +80,8 @@ class Row:
     interval, over ``draws`` draws per dataset. A row of a ``paired bootstrap`` summary with fewer
     than ``MIN_PAIRS`` paired datasets keeps its counts or errors and its ``pairs``, and is
     reported. ``column`` holds the column-order arm's ``(reference fewer, Andrey fewer)`` series
-    counts, which are printed but not judged.
+    counts, which are printed but not judged. ``replicated`` marks a row judged by its
+    ``replication`` on fresh seeds: its numbers are the rerun's.
     """
 
     summary: str
@@ -90,6 +96,7 @@ class Row:
     interval: tuple[float, float] | None = None
     draws: int = 1
     column: tuple[int, int] | None = None
+    replicated: bool = False
 
     @property
     def reported(self) -> bool:
@@ -107,6 +114,10 @@ class Row:
         return f"{self.method} vs {self.comparator}, {where} ({self.summary})"
 
     def numbers(self) -> str:
+        text = self._numbers()
+        return f"replication on fresh seeds: {text}" if self.replicated else text
+
+    def _numbers(self) -> str:
         if self.interval is not None:
             lo, hi = self.interval
             each = f", the mean of {self.draws} draws each" if self.draws > 1 else ""
@@ -167,6 +178,11 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
                 raise ValueError(f"{where} has no paired count")
             if pairs == 0:
                 continue
+            if "replication" in row:
+                if rule != PAIRED_BOOTSTRAP:
+                    raise ValueError(f"{where} has a replication, but no paired bootstrap rule")
+                rows.append(_replicated(name, row["replication"], column, where))
+                continue
             if pairs is not None and pairs >= MIN_PAIRS:
                 rows.append(_judged(name, judged, column, where))
                 continue
@@ -219,6 +235,31 @@ def _judged(
         draws=fields.get("draws", 1),
         column=column,
     )
+
+
+def _replicated(
+    name: tuple[str, str, str, dict[str, Any]],
+    replication: dict,
+    column: tuple[int, int] | None,
+    where: str,
+) -> Row:
+    """Return the row as its replication judges it, the rerun on fresh seeds.
+
+    The replication names the ``seeds`` it ran. With ``MIN_PAIRS`` paired datasets it is judged by
+    its own interval, like any row; with fewer, it keeps its means and is reported, not gated.
+    """
+    where = f"{where}, replication"
+    if not str(replication.get("seeds", "")).strip():
+        raise ValueError(f"{where} needs the seeds it ran")
+    pairs = replication.get("paired")
+    if not isinstance(pairs, int):
+        raise ValueError(f"{where} has no paired count")
+    if pairs >= MIN_PAIRS:
+        return replace(_judged(name, replication, column, where), replicated=True)
+    means = (replication.get("andrey_shd_mean"), replication.get("comparator_shd_mean"))
+    if None in means:
+        raise ValueError(f"{where} needs andrey_shd_mean and comparator_shd_mean")
+    return Row(*name, PAIRED_BOOTSTRAP, *means, pairs=pairs, column=column, replicated=True)
 
 
 def _column_series(row: dict, where: str) -> tuple[int, int] | None:
