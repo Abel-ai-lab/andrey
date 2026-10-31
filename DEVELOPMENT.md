@@ -177,6 +177,12 @@ the spec exists.
 ## Test a method
 
 A new method ships as experimental and becomes supported once it passes every step below.
+Every step judges the method in the setting it claims: the model, data regime, and scale its paper
+states (a search built for very large sparse graphs is measured on those, not on small dense ones).
+Its recovery tests, quality-gate cells, and benchmark campaign use that setting, and it is compared
+with its reference implementation and the methods that target the same setting, with the empty graph
+as a floor. Settings outside the claim are measured for its **Limitations.** paragraph (where it
+stops working and what to use instead), not as a pass or a fail.
 `tests/unit/test_spec_registry.py` checks most of them and names what is missing: a recovery test
 for an experimental method; a **Limitations.** paragraph for every method; and for a supported
 one, a recorded output, a place in the quality gate, a section in a release card, rows in a
