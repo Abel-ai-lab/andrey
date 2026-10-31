@@ -713,35 +713,35 @@ def camuv(
     supported: every regression fits a smooth term of each regressor, and such a column raises
     ``ValueError`` before the fit. Integer category codes are read as numbers, with a
     :class:`~andrey.DataTypeWarning`. Measured on simulated additive-noise data from Erdos-Renyi
-    graphs of mean degree 2 with standardized columns, ten graphs per size, on one core. Two
-    settings have hidden variables: one hidden variable per ten observed ones, at 10 to 50 observed
-    variables and 1,000 rows, and one node in five hidden, chosen among those with two or more
-    children, at 5 to 15 nodes and 2,000 rows. Against the reference implementations of CAM-UV, it
-    was on par at every size in both settings, each 95% interval of the paired difference in
-    directed errors (SHD) including zero, with one exception: at 4 observed variables it made 0.8
-    more errors per graph than one of them in the edges that no hidden path joins (interval 0.1 to
-    1.6). It ran 2 to 16 times faster. Where hidden variables take most edges, as in the second
-    setting, neither it nor the reference implementations beat the empty graph: at 12 observed
-    variables each made more errors than the empty graph, 8.3 per graph for this method against
-    6.3. In the first setting its errors fell below the empty graph's as the graphs grew, to 66% of
-    them at 20 variables and 62% at 50, while at 10 they were about the same, 7.0 against 7.1. At
-    50 observed variables it marked half again as many pairs ``o-o`` as the reference
-    implementations, 164 against 112, at lower precision: 18% of its marks were pairs joined
-    through a hidden variable, against 26%. With 20 observed variables and 2 or 4 hidden ones, 23%
-    and 42% of its marks were such pairs. With none hidden, on ten graphs of 20 variables, it
-    marked 40 pairs with nonlinear effects and 19 with linear Gaussian ones, each a false mark;
-    without the drop of the edges on directed cycles it would mark 22 and 16, but would find fewer
-    hidden pairs, 18 against 24 with 4 hidden variables. On the linear Gaussian data, which
-    identify only the Markov equivalence class, it oriented 53% of the true edges, with median
+    graphs of mean degree 2 with standardized columns, ten graphs per size, on one core. The
+    comparison with the reference implementations of CAM-UV used two settings with hidden variables:
+    one hidden variable per ten observed ones, at 10 to 50 observed variables and 1,000 rows, and
+    one node in five hidden, chosen among those with two or more children, at 5 to 15 nodes and
+    2,000 rows. Against them it was on par at every size in both settings, each 95% interval of the
+    paired difference in directed errors (SHD) including zero, with one exception: at 4 observed
+    variables it made 0.8 more errors per graph than one of them in the edges that no hidden path
+    joins (interval 0.1 to 1.6). It ran 2 to 16 times faster. Where hidden variables take most
+    edges, as in the second setting, neither it nor the reference implementations beat the empty
+    graph: at 12 observed variables each made more errors than the empty graph, 8.3 per graph for
+    this method against 6.3. In the first setting its errors fell below the empty graph's as the
+    graphs grew, to 66% of them at 20 variables and 62% at 50, while at 10 they were about the same,
+    7.0 against 7.1. At 50 observed variables it marked half again as many pairs ``o-o`` as the
+    reference implementations, 164 against 112, at lower precision: 18% of its marks were pairs
+    joined through a hidden variable, against 26%. With 20 observed variables, 1,000 rows, and 2 or
+    4 hidden ones, 23% and 42% of its marks were such pairs. With none hidden, on ten graphs of 20
+    variables, it marked 40 pairs with nonlinear effects and 19 with linear Gaussian ones, each a
+    false mark; without the drop of the edges on directed cycles it would mark 22 and 16, but would
+    find fewer hidden pairs, 18 against 24 with 4 hidden variables. On the linear Gaussian data,
+    which identify only the Markov equivalence class, it oriented 53% of the true edges, with median
     errors of 14.5 against the empty graph's 20. Each sink test reads the candidates found before
-    it, so the order the sets are visited in changes the result: visiting them in the data's
-    column order instead of by rank gave graphs a median of 6 to 16.5 pairs apart, at about the
-    same accuracy. A cause with a long tail loses its edge: with a lognormal cause of log-sd 2 or 3
-    and an effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in 10 of 10
-    fits, and replacing the cause by its ranks found the edge in 9 of them. One value of 1e6 in the
-    middle variable of a nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks in
-    5 of 5 fits. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    it, so the order the sets are visited in changes the result: visiting them in the data's column
+    order instead of by rank gave graphs a median of 6 to 16.5 pairs apart, at about the same
+    accuracy. A cause with a long tail loses its edge: with a lognormal cause of log-sd 2 or 3 and
+    an effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in 10 of 10 fits,
+    and replacing the cause by its ranks found the edge in 9 of them. One value of 1e6 in the middle
+    variable of a nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks in 5 of 5
+    fits. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     **Large graphs and many rows.** On the first setting a fit took 21 s at 20 variables, and its
     cost grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes near
