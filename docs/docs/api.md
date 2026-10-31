@@ -284,7 +284,6 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    tabu
    exact_search
    calm
-   mmpc
    mmhc
    rsmax2
    boss
@@ -342,6 +341,7 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
+   mmpc
    notears
    dagma
    cam

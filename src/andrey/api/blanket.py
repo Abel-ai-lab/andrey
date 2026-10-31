@@ -632,6 +632,9 @@ def mmpc(
 
     Warns
     -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -658,9 +661,7 @@ def mmpc(
     the data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
     unless two columns are identical. The strength is the absolute partial correlation for
     ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
-    candidate with the strongest statistic is added first, as [1]_ breaks ties between equal
-    p-values.
+    the p-value for the other tests.
 
     **From sets to a graph.** Without a target, a pair is kept when each variable is in the other's
     set, which gives the skeleton (``structure="skeleton"``). The CPDAG decides each triple
@@ -687,23 +688,18 @@ def mmpc(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
-    In every setting where fits finished, the mean errors of the skeleton and of the CPDAG stay
-    below the empty graph's; the CPDAG is closest at 20 variables, 1,000 rows, and mean degree 4,
-    with 30 pairs wrong against 40 for the empty graph. The median skeleton fit took 0.01 to 1.6 s
-    and the median CPDAG fit 0.02 to 30 s. At 100 variables and mean degree 4, the CPDAG fit reached
-    a 600 s cap in 6 of 20 datasets at 1,000 rows and in 19 of 20 at 5,000 rows. Tested with exact
-    d-separation on 15 variables. It tests each candidate against every subset of the current
-    members, so its cost grows exponentially with the size of the set; the symmetry check runs the
-    search once more for each member. The CPDAG tests every subset of the smaller blanket for each
-    unshielded triple, and a collider takes all of them. These blankets reach two steps from a
-    variable, so they are larger than a Markov blanket, and a triple whose smaller blanket holds
-    ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50 variables,
-    5,000 rows, and mean degree 4, the collider tests took 1.6 to 2.2 s on four datasets and 277 s
-    on a fifth, whose smaller blanket held 24 variables (38 million tests), and learning the sets
-    0.13 to 0.18 s. Missing values are not benchmarked yet; the tests run them on up to 20 variables
-    with up to a fifth of the values missing completely at random.
+    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
+    simulated linear-Gaussian data, and on 15 variables with exact d-separation tests. It tests
+    each candidate against every subset of the current members, so its cost grows exponentially
+    with the size of the set; the symmetry check runs the search once more for each member. The
+    CPDAG tests every subset of the smaller blanket for each unshielded triple, and a collider
+    takes all of them. These blankets reach two steps from a variable, so they are larger than a
+    Markov blanket, and a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
+    collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose smaller blanket
+    held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s. Missing values are
+    not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of the values
+    missing completely at random.
 
     References
     ----------

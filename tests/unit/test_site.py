@@ -1011,9 +1011,8 @@ def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
     # all, with graphs over time, and draws each one; its dialog draws them with captions, and
     # leads to the guide that explains them. The homepage shows supported methods only, so a kind
     # that only experimental methods return is not on the tile, and neither is a conversion's kind
-    # (a MAG) or a skeleton (an undirected graph, which is not a causal graph).
+    # (a MAG).
     supported = {s.output.graph_kind for s in list_specs() if s.status == "supported"}
-    supported -= build.SKELETON_KINDS
     experimental = {s.output.graph_kind for s in list_specs() if s.status == "experimental"}
     kinds = build.graph_kinds()
     assert {build.GRAPH_KINDS[kind] for kind in supported - {None}} <= set(kinds)

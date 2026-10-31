@@ -102,7 +102,6 @@ ALGORITHMS = {
     "Tabu": (_facade("tabu"), "gauss_5v"),
     "IAMB": (_facade("iamb"), "gauss_5v"),
     "InterIAMB": (_facade("inter_iamb"), "gauss_5v"),
-    "MMPC": (_facade("mmpc", structure="cpdag"), "gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),

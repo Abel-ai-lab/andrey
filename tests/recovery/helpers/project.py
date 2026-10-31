@@ -14,19 +14,7 @@ _SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2"}
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = (
     frozenset(
-        {
-            "PC",
-            "FCI",
-            "GFCI",
-            "CDNOD",
-            "IAMB",
-            "InterIAMB",
-            "MMPC",
-            "ExactSearch",
-            "BOSS",
-            "GRaSP",
-            "CALM",
-        }
+        {"PC", "FCI", "GFCI", "CDNOD", "IAMB", "InterIAMB", "ExactSearch", "BOSS", "GRaSP", "CALM"}
     )
     | _SCORE_GRAPH
 )
