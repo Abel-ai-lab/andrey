@@ -46,6 +46,18 @@ names its pull request.
   restores the former rank; `tie_break="position"` orders ties by column position, a different
   rule. ([#612])
 
+### Fixed
+
+- `rcd` and `gin` no longer change their graph when a constant is added to every column. The kernel
+  independence test they share computed squared distances as `x^2 + y^2 - 2xy`, which loses its
+  digits far from 0. With `1e9` added to simulated data, `rcd` returned another graph on 5 of 6
+  draws and `gin` on 6 of 6; now neither does on any. The statistic of a dependent pair fell from
+  5.83 to 0.056 and its p-value rose from 0 to 0.005 at that offset. The test now takes the
+  distances between mean-centered columns, and both methods center their columns first, as RCD and
+  GIN assume zero-mean variables (Maeda and Shimizu 2020; Xie et al. 2020). On the identity check's
+  239 draws no graph changed; the weights of `rcd` changed in the last bits on 4 of its 6, and every
+  other method, `gin` included, is bit-identical. ([#619])
+
 ## [0.12.0] - 2026-10-30
 
 ### Highlights
@@ -1511,3 +1523,4 @@ First alpha release.
 [#597]: https://github.com/Abel-ai-lab/andrey/pull/597
 [#611]: https://github.com/Abel-ai-lab/andrey/pull/611
 [#612]: https://github.com/Abel-ai-lab/andrey/pull/612
+[#619]: https://github.com/Abel-ai-lab/andrey/pull/619

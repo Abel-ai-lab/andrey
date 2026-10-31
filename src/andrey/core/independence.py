@@ -275,8 +275,15 @@ def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np
     distances. The bandwidth's median reads the first ``median_rows`` rows, or every row with
     ``None`` (RESIT); when it reads every row, the squared distances are computed once for both
     the bandwidth and the kernel.
+
+    The distances are those of the mean-centered column, which are the column's own; computed from
+    the raw values as ``x^2 + y^2 - 2xy`` they lose their digits when the column lies far from 0.
+    With ``median_rows=None`` the columns are read as given: RESIT passes columns it has centered
+    before scaling them and residuals of fits with an intercept, whose means are 0 up to rounding.
     """
     col = _as_columns(column)
+    if median_rows is not None:
+        col = col - col.mean(axis=0)
     n = col.shape[0]
     if median_rows is None or n <= median_rows:
         sq_dists = _sq_dists(col)
