@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 """Benchmark Granger causality on CPU: Andrey's coefficient tests against causal-learn's lasso.
 
-Runs Andrey's ``granger``, which tests each lagged coefficient of a least-squares vector
-autoregression at ``alpha``, and causal-learn's ``Granger.granger_lasso``, a cross-validated lasso,
-on vector-autoregressive time series with known lagged edges: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t`` with Gaussian
+Runs Andrey's ``granger`` and causal-learn's ``Granger.granger_lasso`` on vector-autoregressive
+time series with known lagged edges: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t`` with Gaussian
 noise and no instantaneous effects, drawn by ``andrey.data`` (:func:`sample`). Every variable keeps
 its own lags, and each other variable enters a lag with probability ``LAG_DEGREE / (d - 1)``. The
-lag matrices are scaled so the process is stationary. Each variable is z-scored before the fits,
-and both fit with the same ``maxlag``; ``cv`` is the lasso's.
+lag matrices are scaled so the process is stationary. Each variable is z-scored before the fits.
+
+Andrey fits each variable on the past ``tau_max`` steps of every variable by least squares and keeps
+a lagged link when the F-test of its coefficient, adjusted by Benjamini-Hochberg over all the
+links, has a p-value of at most ``alpha``. The driver leaves ``alpha`` and ``fdr_method`` at
+Andrey's defaults, 0.05 and ``"fdr_bh"``. causal-learn fits a cross-validated lasso per variable
+and keeps its nonzero coefficients. ``--maxlag`` is the lag count both fit, Andrey's ``tau_max``
+and causal-learn's ``maxlag``; ``--cv``, causal-learn's folds, is passed to causal-learn alone.
+The two fit different models, so ``agree`` in the summary compares the F-test's edges with the
+lasso's support.
 
 Each fit runs isolated, with the variables' count ``d`` as the ladder, under a per-fit wall cap; a
 fit past the cap is recorded as ``timeout`` and has no scores. A fit's lagged edges, the nonzero
@@ -37,6 +44,7 @@ from andrey.data.noise import gaussian
 from andrey.data.scm import SCM
 from andrey_bench.adapters.andrey_granger import andrey_granger_adapters
 from andrey_bench.adapters.causal_learn_granger import CausalLearnGranger
+from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.runner import available_cores, run_task, split_cores
 
 LANE = [*andrey_granger_adapters(), CausalLearnGranger()]
@@ -78,6 +86,14 @@ def sample(d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
         raise AssertionError("the process has instantaneous effects")
     data = np.asarray(ds.data, dtype=np.float64)
     return (data - data.mean(axis=0)) / data.std(axis=0), weights[1:] != 0
+
+
+def fit_params(adapter: SolutionAdapter, maxlag: int, cv: int) -> dict[str, int]:
+    """Return the settings one solution is fitted with.
+
+    Both packages take the lag count, as ``maxlag``; only causal-learn's lasso takes ``cv``.
+    """
+    return {"maxlag": maxlag, "cv": cv} if adapter.package == "causal-learn" else {"maxlag": maxlag}
 
 
 def lag_support(coeff: np.ndarray) -> np.ndarray:
@@ -161,7 +177,9 @@ def rescore(out: Path) -> list[dict]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Lasso Granger, Andrey against causal-learn, CPU")
+    p = argparse.ArgumentParser(
+        description="Granger causality, Andrey's F-test against causal-learn's lasso, CPU"
+    )
     p.add_argument("--out", required=True, help="output directory, created if absent")
     p.add_argument(
         "--ladder",
@@ -172,8 +190,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--seeds", type=int, default=5, help="series per rung (default: 5)")
     p.add_argument("--n", type=int, default=1000, help="time steps per series (default: 1000)")
-    p.add_argument("--maxlag", type=int, default=LAGS, help=f"lags fitted (default: {LAGS})")
-    p.add_argument("--cv", type=int, default=5, help="cross-validation folds (default: 5)")
+    p.add_argument(
+        "--maxlag",
+        type=int,
+        default=LAGS,
+        help=f"lags both packages fit: Andrey's tau_max, causal-learn's maxlag (default: {LAGS})",
+    )
+    p.add_argument(
+        "--cv",
+        type=int,
+        default=5,
+        help="causal-learn's cross-validation folds for its lasso; Andrey takes none (default: 5)",
+    )
     p.add_argument("--repeats", type=int, default=1, help="timed repeats per fit (default: 1)")
     p.add_argument("--warmup", type=int, default=0, help="untimed fits per repeat (default: 0)")
     p.add_argument("--cap-wall-s", type=float, default=1800.0, help="wall cap per repeat, seconds")
@@ -220,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     if (out / RECORDS).exists() and not args.resume:
         raise SystemExit(f"{out} already holds a run; pass --resume to continue it")
     out.mkdir(parents=True, exist_ok=True)
-    params = {"maxlag": args.maxlag, "cv": args.cv}
+    params = {a.name: fit_params(a, args.maxlag, args.cv) for a in LANE}
     run_meta = {
         "driver": Path(__file__).name,
         "solution list": [a.name for a in LANE],
@@ -243,7 +271,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.resume and meta_path.exists() and json.loads(meta_path.read_text()) != run_meta:
         raise SystemExit(f"--resume: {meta_path} differs from these flags; pass the first run's")
     meta_path.write_text(json.dumps(run_meta, indent=2))
-    _log(f"=== Lasso Granger, Andrey and causal-learn -> {out} ===")
+    _log(f"=== Granger causality, Andrey's F-test and causal-learn's lasso -> {out} ===")
     for name, value in run_meta.items():
         _log(f"{name:12s}: {value}")
     _log("")
@@ -262,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
                     measures = run_task(
                         adapter,
                         data,
-                        params,
+                        params[adapter.name],
                         cap_wall_s=args.cap_wall_s,
                         cap_mem_mb=args.cap_mem_mb,
                         repeats=args.repeats,
@@ -286,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
                             "cpu_s": m.get("cpu_s"),
                             "peak_rss_mb": m.get("peak_rss_mb"),
                             "error_text": m.get("error_text") or m.get("stderr"),
-                            "params": params,
+                            "params": params[adapter.name],
                             "machine_id": args.machine_id,
                         }
                         if m.get("status") == "ok" and m.get("adj") is not None:

@@ -1108,7 +1108,7 @@ def test_a_family_where_andrey_is_not_faster_shows_no_number():
     tiles = {t["family"]: t for t in build.family_tiles(summaries)}
     assert tiles["constraint"]["number"] is None
     assert build.family_number(tiles["constraint"]) == ""
-    assert tiles["lingam"]["number"] is not None
+    assert tiles["functional"]["number"] is not None
 
 
 def test_a_new_family_gets_a_tile_with_no_code_change(monkeypatch):

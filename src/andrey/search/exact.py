@@ -409,10 +409,9 @@ def exact_search(
 
     Every DAG of the optimal Markov equivalence class scores the same, so the result is the member
     :func:`_canonical_member` fixes: the class's reversible edges that ``constraints`` leave open
-    are oriented by the order of :func:`~andrey.search.hc.tie_ranks`, ranks computed from each
-    column's own data. Both searches
-    return this member, it does not depend on last-bit rounding, and reordering the columns
-    relabels it.
+    are oriented by the order of :func:`~andrey.search.hc.tie_ranks`, ranks computed from the data.
+    Both searches return this member, it does not depend on last-bit rounding, and reordering the
+    columns relabels it.
 
     Parameters
     ----------

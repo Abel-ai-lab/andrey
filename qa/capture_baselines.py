@@ -107,6 +107,7 @@ ALGORITHMS = {
     "BOSS": (_facade("boss", penalty_discount=2.0), "gauss_5v"),
     "GRaSP": (_facade("grasp", penalty_discount=2.0), "gauss_5v"),
     "CALM": (_facade("calm"), "gauss_tree_5v"),
+    "CAM": (_facade("cam"), "nonmonotone_4v"),
     "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
     "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
     "VARMALiNGAMPruned": (_run_varmalingam_pruned, "varma_3v"),

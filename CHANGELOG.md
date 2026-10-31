@@ -10,6 +10,49 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `andrey.data.sample_scm(functional="location_scale")` and
+  `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
+  noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
+  between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
+  ([#596])
+- `andrey.data.load_dataset("child")` and `load_dataset("insurance")`, the bnlearn child network
+  (20 variables, 25 arcs) and insurance network (27 variables, 52 arcs). ([#611])
+- `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014), a functional causal
+  model, learns a DAG and a causal order from nonlinear additive effects with the paper's
+  settings: boosting preselects each variable's possible parents, a greedy search adds edges by the
+  drop in log residual variance of additive spline fits, and smooth-term tests prune them; it is
+  experimental. ([#597])
+
+### Changed
+
+- `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` now belong to the family
+  "Functional causal models", with `cam` (Glymour, Zhang, and Spirtes 2019): their `family` value
+  in `andrey list` and in the method contracts of `andrey --help --json` is `"functional"` in place
+  of `"lingam"`, and nothing else in the API changes. ([#597])
+- The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
+  on a column's units or sign: it is a hash of each column's relations to the other columns, and a
+  new column order still relabels it; only columns that no row order, unit, or sign tells apart
+  fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
+  `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
+  changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
+  the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
+  restores the former rank; `tie_break="position"` orders ties by column position, a different
+  rule. ([#612])
+
+### Fixed
+
+- `rcd` and `gin` no longer change their graph when a constant is added to every column. The kernel
+  independence test they share computed squared distances as `x^2 + y^2 - 2xy`, which loses its
+  digits far from 0. With `1e9` added to simulated data, `rcd` returned another graph on 5 of 6
+  draws and `gin` on 6 of 6; now neither does on any. The statistic of a dependent pair fell from
+  5.83 to 0.056 and its p-value rose from 0 to 0.005 at that offset. The test now takes the
+  distances between mean-centered columns, and both methods center their columns first, as RCD and
+  GIN assume zero-mean variables (Maeda and Shimizu 2020; Xie et al. 2020). On the identity check's
+  239 draws no graph changed; the weights of `rcd` changed in the last bits on 4 of its 6, and every
+  other method, `gin` included, is bit-identical. ([#619])
+
 ## [0.12.0] - 2026-10-30
 
 ### Highlights
@@ -1471,3 +1514,8 @@ First alpha release.
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#596]: https://github.com/Abel-ai-lab/andrey/pull/596
+[#597]: https://github.com/Abel-ai-lab/andrey/pull/597
+[#611]: https://github.com/Abel-ai-lab/andrey/pull/611
+[#612]: https://github.com/Abel-ai-lab/andrey/pull/612
+[#619]: https://github.com/Abel-ai-lab/andrey/pull/619

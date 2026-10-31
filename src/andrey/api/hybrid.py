@@ -232,7 +232,7 @@ def mmhc(
     skeleton forbidden in both directions. The result is the CPDAG of the DAG it stops at.
 
     Ties between candidates in the MMPC phase and between moves in the hill-climbing phase go to
-    the column whose rank, computed from its own data, comes first, as for :func:`~andrey.hc`, so
+    the column whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so
     the result does not depend on the column order unless two columns are identical. The
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
@@ -456,7 +456,7 @@ def rsmax2(
     :func:`~andrey.inter_iamb` describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s
     adjacency search without orienting.
 
-    Ties go to the column whose rank, computed from its own data, comes first, as for
+    Ties go to the column whose rank, computed from the data, comes first, as for
     :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are
     identical.
 

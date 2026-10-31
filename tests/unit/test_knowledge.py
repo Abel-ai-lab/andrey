@@ -582,7 +582,12 @@ def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edg
 
 
 @pytest.mark.parametrize(
-    "name", [m for m in METHODS if REGISTRY[m].family in ("lingam", "latent") and m != "gin"]
+    "name",
+    [
+        m
+        for m in METHODS
+        if REGISTRY[m].family in ("functional", "latent") and m not in ("gin", "cam")
+    ],
 )
 def test_lingam_knowledge_that_fits_the_truth_does_not_add_errors(name, data):
     def errors(out) -> int:
