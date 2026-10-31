@@ -199,31 +199,37 @@ def cam(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked against other packages yet. Measured on simulated data with
-    1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized columns, ten graphs at 20
-    and at 100 variables, on one core. On additive-noise data with Gaussian noise it oriented 88.5%
-    to 95% of the true edges correctly at 20 variables, depending on the generator, and 97.5% at
-    100, with median errors (SHD) of 2 to 2.5 and 8 against the empty graph's 20 and 100; with
-    Gumbel noise at 20 variables it reversed 22.5% of them. Location-scale data, whose noise scale
-    changes with the parents, break the model's fixed noise variance: it reversed 42% of the true
-    edges at 20 variables and 32% at 100, with median errors of 11.5 and 55.5. Linear Gaussian data
-    identify only the Markov equivalence class, and there the two directions of an edge fit equally,
-    their gains differing by less than ``1e-6``, so the direction of an edge the class leaves
-    undirected is arbitrary: it reversed 36% of the true edges at 20 variables and 32% at 100, with
-    median errors of 11 and 68. The model has no hidden common causes: with 2 hidden variables among
-    22, over ten graphs of the Gaussian additive-noise generator, its median errors were 12 against
-    the empty graph's 16, mostly extra edges, and it joined 42 of the 49 pairs of observed variables
-    that share only a hidden cause. Effects that interact are outside the model too: with ``x3`` the
-    product of ``x1`` and ``x2`` plus noise, on 1,000 rows and standard normal causes, whose product
-    has no additive part, it found at most one of the two edges into ``x3`` and returned an edge out
-    of ``x3`` in 6 of 10 fits; with causes uniform on ``(0, 2)`` it made ``x3`` the cause of both,
-    and added an edge between them, in 8 of 10. On the additive-noise data a fit took a median of 3
-    s at 20 variables and 21 s at 100, about 40% of it in the neighbor preselection and 55% in the
-    order search. The smoothing of each fit is a local minimum of its GCV score, which can have
-    several, so two edges of nearly equal gain can be added in either order. Binary columns, and any
-    column with fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so
-    such a column raises ``ValueError``. Categorical columns are not modeled: text labels raise
-    ``ValueError``, and integer codes are read as numbers, a smooth function of the code, with a
+    **Limitations.** On additive-noise data with Gaussian or Gumbel noise, 10 to 100 variables, and
+    1,000 rows, standardized and not (the 0.13.0 release card), it made no more errors than the
+    paper's reference implementation in 14 of 16 settings and fewer in 2, returned the same graph on
+    278 of 320 datasets, and fit 6.5 to 14.7 times faster on one core. The reference implementation
+    caps a variable's parents at the smaller of the variables minus one and the rows over 20, 50 at
+    1,000 rows, which binds at 100 variables, where ``max_parents`` sets none by default. The
+    numbers below were measured on simulated data with 1,000 rows from Erdos-Renyi graphs of mean
+    degree 2 with standardized columns, ten graphs at 20 and at 100 variables, on one core. On
+    additive-noise data with Gaussian noise it oriented 88.5% to 95% of the true edges correctly at
+    20 variables, depending on the generator, and 97.5% at 100, with median errors (SHD) of 2 to 2.5
+    and 8 against the empty graph's 20 and 100; with Gumbel noise at 20 variables it reversed 22.5%
+    of them. Location-scale data, whose noise scale changes with the parents, break the model's
+    fixed noise variance: it reversed 42% of the true edges at 20 variables and 32% at 100, with
+    median errors of 11.5 and 55.5. Linear Gaussian data identify only the Markov equivalence class,
+    and there the two directions of an edge fit equally, their gains differing by less than
+    ``1e-6``, so the direction of an edge the class leaves undirected is arbitrary: it reversed 36%
+    of the true edges at 20 variables and 32% at 100, with median errors of 11 and 68. The model has
+    no hidden common causes: with 2 hidden variables among 22, over ten graphs of the Gaussian
+    additive-noise generator, its median errors were 12 against the empty graph's 16, mostly extra
+    edges, and it joined 42 of the 49 pairs of observed variables that share only a hidden cause.
+    Effects that interact are outside the model too: with ``x3`` the product of ``x1`` and ``x2``
+    plus noise, on 1,000 rows and standard normal causes, whose product has no additive part, it
+    found at most one of the two edges into ``x3`` and returned an edge out of ``x3`` in 6 of 10
+    fits; with causes uniform on ``(0, 2)`` it made ``x3`` the cause of both, and added an edge
+    between them, in 8 of 10. On the additive-noise data a fit took a median of 3 s at 20 variables
+    and 21 s at 100, about 40% of it in the neighbor preselection and 55% in the order search. The
+    smoothing of each fit is a local minimum of its GCV score, which can have several, so two edges
+    of nearly equal gain can be added in either order. Binary columns, and any column with fewer
+    than 3 distinct values, are not supported: a smooth term needs at least 3, so such a column
+    raises ``ValueError``. Categorical columns are not modeled: text labels raise ``ValueError``,
+    and integer codes are read as numbers, a smooth function of the code, with a
     :class:`~andrey.DataTypeWarning`. The numbers are a reference, not a hard limit: they change
     with the data generator, the density, the method's settings, and the machine.
 
