@@ -29,6 +29,7 @@
       "GIN": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, three times. One allows a single borderline cluster or order decision to differ on another host."},
       "ANM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
       "PNL": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
+      "CAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline edge-gain comparison among the additive-spline fits to differ on another host."},
       "PCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "PCMCIplus": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "LPCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},

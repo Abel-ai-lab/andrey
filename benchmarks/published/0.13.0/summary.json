@@ -14642,7 +14642,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 20,
@@ -14696,7 +14697,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 50,
@@ -14750,7 +14752,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 100,
@@ -14804,7 +14807,8 @@
       0.0015000000000000013
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     }
    ]
   },
@@ -14877,7 +14881,8 @@
       0.06
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 20,
@@ -14931,7 +14936,8 @@
       0.0024999999999999996
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 50,
@@ -14985,7 +14991,8 @@
       0.011999999999999993
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 100,
@@ -15039,7 +15046,8 @@
       0.01999999999999999
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     }
    ]
   },
@@ -15614,7 +15622,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 20,
@@ -15668,7 +15677,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 50,
@@ -15722,7 +15732,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 100,
@@ -15776,7 +15787,8 @@
       0.0
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     }
    ]
   },
@@ -15849,7 +15861,8 @@
       0.075
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 20,
@@ -15903,7 +15916,8 @@
       0.05499999999999999
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 50,
@@ -15957,7 +15971,8 @@
       0.02400000000000002
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     },
     {
      "d": 100,
@@ -16011,7 +16026,8 @@
       0.044000000000000004
      ],
      "complete": true,
-     "claim": "out"
+     "claim": "out",
+     "above_zero": false
     }
    ]
   }
