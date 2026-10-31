@@ -603,3 +603,40 @@ def test_a_true_independence_is_rejected_at_the_level_it_is_tested_at(g_square, 
         rejected += ChiSquare(data, g_square=g_square)(0, 1, (2, 3)) < alpha
     sd = math.sqrt(alpha * (1 - alpha) / draws)
     assert alpha - 3.5 * sd < rejected / draws < alpha + 3.5 * sd
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+@pytest.mark.parametrize(
+    ("batch", "table"),
+    [(1 << 22, 1 << 20), (64, 1 << 20), (1 << 22, 40)],
+    ids=["one count", "a count per block", "tables over the size limit on the scalar path"],
+)
+def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square, batch, table):
+    """``pvalues_given`` and the queries of ``statistic_pvalues`` that share a conditioning set
+    return the statistic and p-value of each candidate's own call, bit for bit, on random discrete
+    data with few rows, one-category columns, and any order of candidates and conditioners."""
+    from andrey.core import ci
+
+    monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
+    monkeypatch.setattr(ci, "_DENSE_CELLS", table)
+    rng = np.random.default_rng(0)
+    for _ in range(20):
+        n, d = int(rng.integers(3, 500)), 7
+        x = np.column_stack([rng.integers(0, k, n) for k in rng.integers(1, 6, d)]).astype(float)
+        x[:, 1] = np.where(rng.random(n) < 0.5, x[:, 0], x[:, 1])
+        test = ChiSquare(x, g_square=g_square)
+        target = int(rng.integers(d))
+        rest = rng.permutation([v for v in range(d) if v != target])
+        cond = rest[: int(rng.integers(0, 4))].tolist()
+        xs = rest[len(cond) :].tolist()
+        alone = [test._statistic_pvalue(target, v, cond) for v in xs]
+        p = test.pvalues_given(target, xs, cond)
+        assert p.view(np.int64).tolist() == np.array([a[1] for a in alone]).view(np.int64).tolist()
+        shuffled = [int(i) for i in rng.permutation(len(xs))]
+        got = test.statistic_pvalues(
+            np.array([target] * len(xs))[shuffled],
+            np.array(xs)[shuffled],
+            np.array([cond] * len(xs)).reshape(len(xs), -1)[shuffled],
+        )
+        want = np.array(alone)[shuffled].T
+        assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))

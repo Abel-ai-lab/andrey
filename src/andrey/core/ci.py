@@ -743,14 +743,17 @@ class ChiSquare:
 
     Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
 
-    :meth:`batched_call`, :meth:`first_order_pvalues`, and :meth:`marginal_pvalues` answer many
-    queries at once and return the p-values of :meth:`__call__` exactly. They count the tables of
-    many queries together, with ``bincount`` over the configurations that occur, or, for the
-    marginal tables of all pairs, one product of the category-indicator matrix with itself, whose
-    integer counts are exact in float64. Every step after the counting is elementwise on the
-    tables, except the sum of a query's statistic over its cells, which is ``np.sum`` over that
-    query's cells in the order :meth:`__call__` sums them, so the sum, and a decision on the
-    p-value, does not depend on how the queries are batched.
+    :meth:`batched_call`, :meth:`first_order_pvalues`, :meth:`marginal_pvalues`, and
+    :meth:`pvalues_given` answer many queries at once and return the p-values of :meth:`__call__`
+    exactly. They count the tables of many queries together, with ``bincount`` over the
+    configurations that occur, or, for the marginal tables of all pairs, one product of the
+    category-indicator matrix with itself, whose integer counts are exact in float64.
+    :meth:`pvalues_given` numbers the configurations of one conditioning set once and counts the
+    tables of all its candidates of one shape in one ``bincount``, and :meth:`statistic_pvalues`
+    answers its queries that share a conditioning set the same way. Every step after the counting is
+    elementwise on the tables, except the sum of a query's statistic over its cells, which is
+    ``np.sum`` over that query's cells in the order :meth:`__call__` sums them, so the sum, and a
+    decision on the p-value, does not depend on how the queries are batched.
 
     Parameters
     ----------
@@ -804,8 +807,72 @@ class ChiSquare:
 
         ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
         conditioning sets; entry ``i`` holds query ``i``'s statistic and :meth:`__call__`'s p-value.
+        The queries that share a conditioning set are answered together (:meth:`pvalues_given`).
         """
-        return per_query(self._statistic_pvalue, x, y, conditions)
+        xs = np.asarray(x, dtype=np.intp)
+        ys = np.asarray(y, dtype=np.intp)
+        conds = np.sort(np.asarray(conditions, dtype=np.intp).reshape(len(xs), -1), axis=1)
+        groups: dict[tuple[int, ...], list[int]] = {}
+        for k, row in enumerate(conds.tolist()):
+            groups.setdefault(tuple(row), []).append(k)
+        statistics = np.empty(len(xs), dtype=np.float64)
+        p_values = np.empty(len(xs), dtype=np.float64)
+        for key, members in groups.items():
+            at = np.array(members, dtype=np.intp)
+            statistics[at], p_values[at] = self._given(xs[at], ys[at], sorted(set(key)))
+        return statistics, p_values
+
+    def pvalues_given(
+        self, target: int, xs: Iterable[int], condition_set: Iterable[int] = ()
+    ) -> np.ndarray:
+        """The p-values of ``target`` and each of ``xs`` given one ``condition_set``.
+
+        Entry ``i`` equals ``self(target, xs[i], condition_set)`` bit for bit. The configurations of
+        the conditioning set are numbered once, and the tables of the candidates that share a
+        shape are counted together, so a scan of many candidates costs a fraction of as many calls.
+        """
+        xs = np.fromiter((int(x) for x in xs), dtype=np.intp)
+        ys = np.full(len(xs), int(target), dtype=np.intp)
+        return self._given(xs, ys, sorted(set(int(c) for c in condition_set)))[1]
+
+    def _given(
+        self, xs: np.ndarray, ys: np.ndarray, cond: list[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The statistics and p-values of the pairs ``(xs[i], ys[i])`` given the sorted ``cond``.
+
+        Each pair is ordered as :meth:`__call__` orders it. The pairs whose tables over the
+        configurations of ``cond`` have at most ``_DENSE_CELLS`` cells are counted together, in
+        blocks of at most ``_BATCH_CELLS`` row indices and table cells, a block per table shape;
+        the others, and a single pair, take the scalar path.
+        """
+        a, b = np.minimum(xs, ys), np.maximum(xs, ys)
+        assert not np.isin(np.concatenate([a, b]), cond).any(), "x, y cannot be in condition_set."
+        statistics = np.empty(len(a), dtype=np.float64)
+        p_values = np.empty(len(a), dtype=np.float64)
+        n, cards = self._n, self._cardinalities
+        scan = len(a) > 1 and n > 0
+        layer, m = categorical.configurations(self._codes, cards, cond) if scan else (a, 0)
+        shapes = cards[a] * (int(cards.max(initial=0)) + 1) + cards[b]
+        for shape in np.unique(shapes):
+            members = np.flatnonzero(shapes == shape)
+            kx, ky = int(cards[a[members[0]]]), int(cards[b[members[0]]])
+            cells = kx * ky
+            if not scan or m * cells > _DENSE_CELLS:
+                for i in members:
+                    statistics[i], p_values[i] = self._statistic_pvalue(a[i], b[i], cond)
+                continue
+            step = max(1, _BATCH_CELLS // max(n, m * cells))
+            for at in range(0, len(members), step):
+                part = members[at : at + step]
+                index = self._rows[a[part]] * ky + self._rows[b[part]]  # each row's (x, y) cell
+                index = (
+                    index + (layer * cells)[None, :] + (np.arange(len(part)) * (m * cells))[:, None]
+                )
+                tables = np.bincount(index.ravel(), minlength=len(part) * m * cells)
+                statistics[part], p_values[part] = self._table_statistics(
+                    tables.reshape(-1, kx, ky), np.arange(len(part) + 1) * m
+                )
+        return statistics, p_values
 
     def _statistic_pvalue(
         self, x: int, y: int, condition_set: Iterable[int]
@@ -1020,7 +1087,14 @@ class ChiSquare:
         return self._table_pvalues(tables.reshape(-1, kx, ky), bounds)
 
     def _table_pvalues(self, tables: np.ndarray, bounds: np.ndarray) -> np.ndarray:
-        """P-values of the tests whose ``(kx, ky)`` tables are stacked in ``tables``.
+        """P-values of the tests whose ``(kx, ky)`` tables are stacked in ``tables``
+        (:meth:`_table_statistics`)."""
+        return self._table_statistics(tables, bounds)[1]
+
+    def _table_statistics(
+        self, tables: np.ndarray, bounds: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Statistics and p-values of the tests whose ``(kx, ky)`` tables are stacked in ``tables``.
 
         Test ``i`` owns ``tables[bounds[i]:bounds[i + 1]]``, one table per configuration that
         occurs, in :meth:`__call__`'s order. Each step repeats :meth:`__call__`'s arithmetic on the
@@ -1050,7 +1124,7 @@ class ChiSquare:
         out = np.ones(len(dof))
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
-        return out
+        return statistic, out
 
 
 # A conditional covariance's eigenvalue, on the scale of unit-variance columns, at or below this
