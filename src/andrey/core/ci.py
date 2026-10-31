@@ -743,14 +743,17 @@ class ChiSquare:
 
     Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
 
-    :meth:`batched_call`, :meth:`first_order_pvalues`, and :meth:`marginal_pvalues` answer many
-    queries at once and return the p-values of :meth:`__call__` exactly. They count the tables of
-    many queries together, with ``bincount`` over the configurations that occur, or, for the
-    marginal tables of all pairs, one product of the category-indicator matrix with itself, whose
-    integer counts are exact in float64. Every step after the counting is elementwise on the
-    tables, except the sum of a query's statistic over its cells, which is ``np.sum`` over that
-    query's cells in the order :meth:`__call__` sums them, so the sum, and a decision on the
-    p-value, does not depend on how the queries are batched.
+    :meth:`batched_call`, :meth:`first_order_pvalues`, :meth:`marginal_pvalues`, and
+    :meth:`pvalues_given` answer many queries at once and return the p-values of :meth:`__call__`
+    exactly. They count the tables of many queries together, with ``bincount`` over the
+    configurations that occur, or, for the marginal tables of all pairs, one product of the
+    category-indicator matrix with itself, whose integer counts are exact in float64.
+    :meth:`pvalues_given` numbers the configurations of one conditioning set once and counts the
+    tables of all its candidates of one shape in one ``bincount``, and :meth:`statistic_pvalues`
+    answers its queries that share a conditioning set the same way. Every step after the counting is
+    elementwise on the tables, except the sum of a query's statistic over its cells, which is
+    ``np.sum`` over that query's cells in the order :meth:`__call__` sums them, so the sum, and a
+    decision on the p-value, does not depend on how the queries are batched.
 
     Parameters
     ----------
