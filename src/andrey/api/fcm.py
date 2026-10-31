@@ -723,28 +723,29 @@ def camuv(
     the second setting, neither it nor the reference implementations beat the empty graph: at 12
     observed variables each made more errors than the empty graph, 8.3 per graph for this method
     against 6.3. In the first setting its errors fell below the empty graph's as the graphs grew, to
-    66% of them at 20 variables and 62% at 50, and rose back to 86% over two graphs at 200; at 10
-    they were about the same, 7.0 against 7.1. At 50 observed variables it marked half again as many
-    pairs ``o-o`` as the reference implementations, 164 against 112, at lower precision: 18% of its
-    marks were pairs joined through a hidden variable, against 26%. With 20 observed variables,
-    1,000 rows, and 2 or 4 hidden ones, 23% and 42% of its marks were such pairs. With none hidden,
-    on ten graphs of 20 variables, it marked 40 pairs with nonlinear effects and 19 with linear
-    Gaussian ones, each a false mark; without the drop of the edges on directed cycles it would mark
-    22 and 16, but would find fewer hidden pairs, 18 against 24 with 4 hidden variables. On the
-    linear Gaussian data, which identify only the Markov equivalence class, it oriented 53% of the
-    true edges, with median errors of 14.5 against the empty graph's 20. Each sink test reads the
-    candidates found before it, so the order the sets are visited in changes the result: visiting
-    them in the data's column order instead of by rank gave graphs a median of 6 to 16.5 pairs
-    apart, at about the same accuracy. A cause with a long tail loses its edge: with a lognormal
-    cause of log-sd 2 or 3 and an effect of its logarithm plus noise, on 500 rows, it marked the
-    pair ``o-o`` in 10 of 10 fits, and replacing the cause by its ranks found the edge in 9 of them.
-    One value of 1e6 in the middle variable of a nonlinear chain of 800 rows turned both of its
-    edges into ``o-o`` marks in 5 of 5 fits. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    62% of them at 50 variables, then rose back to 96% at 300, over eight graphs, and passed them at
+    400, 317 against 315 on one graph; at 10 they were about the same, 7.0 against 7.1. At 50
+    observed variables it marked half again as many pairs ``o-o`` as the reference implementations,
+    164 against 112, at lower precision: 18% of its marks were pairs joined through a hidden
+    variable, against 26%. With 20 observed variables, 1,000 rows, and 2 or 4 hidden ones, 23% and
+    42% of its marks were such pairs. With none hidden, on ten graphs of 20 variables, it marked 40
+    pairs with nonlinear effects and 19 with linear Gaussian ones, each a false mark; without the
+    drop of the edges on directed cycles it would mark 22 and 16, but would find fewer hidden pairs,
+    18 against 24 with 4 hidden variables. On the linear Gaussian data, which identify only the
+    Markov equivalence class, it oriented 53% of the true edges, with median errors of 14.5 against
+    the empty graph's 20. Each sink test reads the candidates found before it, so the order the sets
+    are visited in changes the result: visiting them in the data's column order instead of by rank
+    gave graphs a median of 6 to 16.5 pairs apart, at about the same accuracy. A cause with a long
+    tail loses its edge: with a lognormal cause of log-sd 2 or 3 and an effect of its logarithm plus
+    noise, on 500 rows, it marked the pair ``o-o`` in 10 of 10 fits, and replacing the cause by its
+    ranks found the edge in 9 of them. One value of 1e6 in the middle variable of a nonlinear chain
+    of 800 rows turned both of its edges into ``o-o`` marks in 5 of 5 fits. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     **Large graphs and many rows.** On the first setting a fit took 21 s at 20 variables, and its
     cost grows about as ``d^2``: a fit passes about a minute near 40 variables, 10 minutes near
-    130, and an hour near 340. Each HSIC test builds matrices with one row and one column per
+    130, and an hour near 300. Each HSIC test builds matrices with one row and one column per
     sample, so time and memory grow with the square of ``n_samples``: at 5 variables a fit took
     1.5 s and 0.21 GB with 1,000 rows and 78 s and 3.6 GB with 8,000, and at 20 variables
     6.1 minutes and 1.7 GB with 4,000. The kernels kept between tests stay within 1 GiB, so above
