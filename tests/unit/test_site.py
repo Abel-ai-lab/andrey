@@ -1011,11 +1011,19 @@ def test_the_graphs_tile_draws_every_kind_of_causal_graph(placeholder_page):
     # all, with graphs over time, and draws each one; its dialog draws them with captions, and
     # leads to the guide that explains them. The homepage shows supported methods only, so a kind
     # that only experimental methods return is not on the tile, and neither is a conversion's kind
-    # (a MAG).
+    # (a MAG). A skeleton is not a causal graph: a supported method may return one by default, as
+    # MMPC does, and the tile names the four kinds of causal graph without it.
     supported = {s.output.graph_kind for s in list_specs() if s.status == "supported"}
     experimental = {s.output.graph_kind for s in list_specs() if s.status == "experimental"}
     kinds = build.graph_kinds()
-    assert {build.GRAPH_KINDS[kind] for kind in supported - {None}} <= set(kinds)
+    assert supported - {None} <= build.GRAPH_KINDS.keys() | build.SKELETON_KINDS
+    assert not build.GRAPH_KINDS.keys() & (build.SKELETON_KINDS | build.CONVERSION_KINDS)
+    assert {build.GRAPH_KINDS[kind] for kind in supported - build.SKELETON_KINDS - {None}} <= set(
+        kinds
+    )
+    assert kinds == [*build.GRAPH_KINDS.values(), build.TEMPORAL_KIND]
+    mmpc = next(s for s in list_specs() if s.name == "mmpc")
+    assert mmpc.status == "supported" and mmpc.output.graph_kind in build.SKELETON_KINDS
     assert not (experimental - supported) & build.GRAPH_KINDS.keys()
     tile = placeholder_page[placeholder_page.index('data-tile="graphs"') :]
     tile = tile[: tile.index("</li>")]
