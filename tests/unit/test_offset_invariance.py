@@ -5,6 +5,9 @@ reads the offset through its arithmetic, such as squared distances from ``x^2 + 
 sum of terms far from 0, is a numerical artifact. The data here lie on a grid that an offset of
 ``1e9`` keeps exactly, so every fit sees the same values at both offsets and any difference comes
 from the method.
+
+``varma_lingam`` keeps its graph on these series but changes it with an offset on larger ones
+(#618); its fits there take minutes, so the case is not repeated here.
 """
 
 from __future__ import annotations
