@@ -1,7 +1,7 @@
 """Andrey PCMCI, PCMCI+, and LPCMCI solution adapters.
 
 PCMCI calls the public facade ``andrey.pcmci(X, tau_max=..., pc1_alpha=0.2, alpha=0.05,
-indep_test=...)``, one solution per partial-correlation test. ``pc_alpha`` and ``alpha`` are
+indep_test=...)``, one solution per partial-correlation test. ``pc1_alpha`` and ``alpha`` are
 Andrey's defaults, which are also tigramite's ``run_pcmci`` settings in
 :mod:`~andrey_bench.adapters.tigramite_pcmci`. Andrey's PCMCI tests lags ``1..tau_max`` and no lag 0.
 
