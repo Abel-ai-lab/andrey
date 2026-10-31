@@ -285,15 +285,15 @@ offline and exits 1 on a flag; the release checklist reviews every flag
 
 Measure speed and accuracy against every package that implements the method: copy
 `benchmarks/benchmark.py`, set its `SOLUTIONS` and `SLICE`, add an adapter for a new package under
-`benchmarks/andrey_bench/adapters/`, and run the campaign on the benchmark machine
+`benchmarks/andrey_bench/adapters/`, add the comparison's row to
+[`benchmarks/CATALOG.md`](benchmarks/CATALOG.md), and run the campaign on the benchmark machine
 ([`benchmarks/README.md`](benchmarks/README.md)). A reference package's answer is measured, not a
 target, but every difference needs a cause. Both packages are deterministic on the same data, so
 each differing series has a first step where they diverge: fix an Andrey defect, with a test that
 fails before the fix; make an arbitrary tie-break independent of column order, or, until it is, add
 a `tie-break` entry to the allowlist with the row's result on the reversed column order; and where
 Andrey is correct by the method's paper or the reference has a defect, add a cited entry to the
-allowlist.
-The fit records stay outside the repository.
+allowlist. The fit records stay outside the repository.
 
 ### 6. Mark it supported
 
