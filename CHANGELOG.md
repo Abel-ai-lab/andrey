@@ -103,7 +103,7 @@ names its pull request.
   The series is centered first, as the structural VAR model that VARMA-LiNGAM extends takes
   zero-mean series (Hyvarinen et al. 2010). On the identity check's 239 draws only the 6 of
   `varma_lingam` changed: 2 in their graph, with 1 and 2 fewer errors against the true graph, and 4
-  in their weights; every other method is bit-identical. ([#628])
+  in their weights; every other method is bit-identical. ([#629])
 
 ## [0.12.0] - 2026-10-30
 
@@ -1576,4 +1576,4 @@ First alpha release.
 [#623]: https://github.com/Abel-ai-lab/andrey/pull/623
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
-[#628]: https://github.com/Abel-ai-lab/andrey/pull/628
+[#629]: https://github.com/Abel-ai-lab/andrey/pull/629
