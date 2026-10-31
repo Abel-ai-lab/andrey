@@ -58,6 +58,11 @@ names its pull request.
   cause or a causal path through a hidden variable joins, whose relation no regression can
   identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
   directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#623])
+- `dynotears`, DYNOTEARS (Pamfil et al. 2020), a time-series method, learns a linear structural
+  vector autoregression from one series, same-step and lagged effects with their weights, by least
+  squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
+  the paper's settings for 500 time steps: `lambda1=0.05`, `w_threshold=0.3`, `lag_threshold=0.1`,
+  and `tau_max=1`; it is experimental. ([#TBD])
 
 ### Changed
 

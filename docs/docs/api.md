@@ -47,7 +47,7 @@ edges in any unit of the data. A step that would read the units only through a n
 such as a least-squares rank cutoff, the linear combination that `gin` tests, or the VARMA fit of
 `varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
 units. The causal order of `ica_lingam` still reads the magnitudes of its unmixing matrix, and the
-least-squares score of `notears` and `dagma` reads the units, as their pages describe.
+least-squares scores of `notears`, `dagma`, and `dynotears` read the units, as their pages describe.
 The categorical
 settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_bic"`, read text,
 boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
@@ -108,17 +108,19 @@ first.
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
 `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
 `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take
-`knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to
-be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors them. Every
-required edge is in the result, whatever its weight, test, or score says. For the time-series
-methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
-time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and
+`camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs
+allowed to be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors
+them. Every required edge is in the result, whatever its weight, test, or score says. For the
+time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
+`effect` at time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows
+them in use.
 
 % concept: tau_max
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, and `longitudinal_lingam` take `tau_max`, the largest
-lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points of the
-panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its name.
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take `tau_max`,
+the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points
+of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its
+name.
 
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
@@ -350,6 +352,7 @@ its first call in a process.
    cam
    resit
    camuv
+   dynotears
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -367,6 +370,14 @@ fits the same kind of model with the noise of any distribution, with the paper's
 a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
 finds most independent of the remaining variables, then removes each parent whose removal leaves
 the residual independent of the variable's predecessors at `alpha=0.05`.
+
+DYNOTEARS (Pamfil et al. 2020) learns a linear structural vector autoregression from one time
+series the way NOTEARS learns a DAG: the least-squares loss of each step on the same step and the
+`tau_max` steps before it, with an l1 penalty, under the acyclicity constraint on the same-step
+weights alone, since a lagged edge points forward in time. It keeps the paper's settings for 500
+time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-step weights and 0.1
+on the lagged ones. It returns a temporal structure whose `lag_weights` are the coefficients in the
+data's units, with a `dag` at lag 0.
 
 CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
 kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`

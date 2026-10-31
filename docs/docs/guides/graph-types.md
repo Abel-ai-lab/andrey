@@ -173,7 +173,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
-| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger` |
+| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
 edges that the CPDAG of observational data leaves undirected, so score it against the graph CD-NOD

@@ -86,6 +86,7 @@ SINGLE = {
     "pcmciplus": andrey.pcmciplus,
     "lpcmci": andrey.lpcmci,
     "granger": andrey.granger,
+    "dynotears": andrey.dynotears,
     "gin": andrey.gin,
     "rcd": andrey.rcd,
     "bottom_up_parce_lingam": andrey.bottom_up_parce_lingam,
@@ -150,7 +151,7 @@ def test_a_dataframe_error_names_the_constant_column():
     [
         m
         for m in SINGLE
-        if m not in ("calm", "varma_lingam", "pcmci", "pcmciplus", "lpcmci", "granger")
+        if m not in ("calm", "varma_lingam", "pcmci", "pcmciplus", "lpcmci", "granger", "dynotears")
     ],
 )
 def test_one_column_gives_a_one_node_graph(method):

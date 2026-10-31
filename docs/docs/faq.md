@@ -214,7 +214,8 @@ Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and 
 graphs over time lags; `lpcmci` also allows hidden common causes. The [release cards](benchmarks.md)
 benchmark them against tigramite, lingam, and causal-learn. `multi_group_direct_lingam` fits
 several datasets that share one causal order, `cdnod` takes data from several domains, and `gies`
-takes data that mixes observation with interventions. All are supported.
+takes data that mixes observation with interventions. All are supported. `dynotears`, which fits a
+linear structural vector autoregression by continuous optimization, is experimental.
 
 ## Command line and agents
 

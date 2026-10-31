@@ -147,6 +147,12 @@ SPEC: dict[str, dict] = {
             "omegas": {"atol": 1e-6, "rtol": 1e-5},
         },
     },
+    # DYNOTEARS: the per-lag graphs exactly; the weights within what L-BFGS-B's stopping rule
+    # leaves open across BLAS builds.
+    "DYNOTEARS": {
+        "structural": ["graph"],
+        "numeric": {"lag_weights": {"atol": 1e-5, "rtol": 1e-4}},
+    },
     # Granger has no causal order; its structural gate is the binary support.
     "Granger": {
         "structural": ["adj"],
