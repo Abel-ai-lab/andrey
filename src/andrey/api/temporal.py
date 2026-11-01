@@ -1566,7 +1566,40 @@ def dynotears(
     steps first, as dropping one would join the steps around it, or use :func:`~andrey.pcmci`,
     :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet.
+    **Limitations.** The least-squares score with an ``l1`` penalty and the weight thresholds read
+    the data's units, as in NOTEARS [4]_ [5]_: rescaling a column changes the fit, and [1]_
+    standardizes its stock returns so that the penalty does not favor the series of low variance. On
+    series whose variance grows along the causal order the fit gains from that order; in the
+    Gaussian series below, 87 to 96% of the same-step causal paths ran from lower to higher
+    variance, on average by size. Measured on linear structural vector autoregressions of the
+    paper's design [1]_: one lag; Erdos-Renyi same-step graphs of mean degree 2 with weights of
+    magnitude 0.5 to 2; lagged graphs of mean in-degree 2, self-lags included, with weights of
+    magnitude 0.3 to 0.5; Gaussian or centered exponential noise of unit scale; 500 time steps; ten
+    series for each of 5, 10, 20, 50, and 100 variables; in the data's units at the default
+    settings. Errors are SHD over the same-step and lagged edges together, means over the ten
+    series. With Gaussian noise they were 0.7 to 2.5 at every size, against the empty graph's 12.8
+    to 294, with F1 at least 0.96; :func:`~andrey.pcmciplus` with ``fisherz`` had 7.7 to 153, and
+    :func:`~andrey.varma_lingam` with ``order=(1, 0)`` and ``prune=True`` had 8.2 to 234 through 50
+    variables, above the empty graph's from 20, and did not finish within 1 h at 100. With
+    exponential noise they were 0.6 to 3, and :func:`~andrey.varma_lingam`, which non-Gaussian noise
+    suits, had 0.8 and 1.5 at 5 and 10 variables and 4.7 and 18.4 at 20 and 50. With 50 time steps,
+    the paper's settings for them, ``lambda1=0.2`` and ``lag_threshold=0.2``, gave 5.1 to 145 errors
+    at 5 to 100 variables, against the empty graph's 12.8 to 294; the defaults gave 22.4 at 10
+    variables and more than the empty graph from 20 on (78.1 against 56.9), so set those two
+    arguments for a short series. On the same Gaussian series of 500 steps with standardized columns
+    the errors rose to 7.7, 19.5, 31.4, and 63.9 at 5 to 50 variables, about those of
+    :func:`~andrey.pcmciplus`, which reads no units. On a nonlinear vector autoregression, the sine
+    of each same-step parent and the hyperbolic tangent of each lagged one in place of the linear
+    terms, the errors were 4.5, 10, and 13.3 at 5, 10, and 20 variables, against the empty graph's
+    13.8, 30.8, and 59; :func:`~andrey.pcmciplus` had 9.3 to 26.7 with ``fisherz`` and 9.1 to 30.8
+    with ``rcot``. With 500 time steps on one core, four fits at a time on four cores, the median
+    fit took 0.3 s at 5 variables, 29 s at 50, and 278 s at 100. One fit each took 218 s at 75
+    variables, 944 s at 150, and 3,492 s at 200, with errors of 0, 5, and 12 against the empty
+    graph's 259, 409, and 550, and one at 250 was stopped after 1 h: a fit passes 1 min between 50
+    and 75 variables, 10 min between 100 and 150, and 1 h at about 200. The time grows faster than
+    the cube of the number of variables, from the matrix exponential of every evaluation and the
+    ``(tau_max + 1) * d * d`` weights. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1577,6 +1610,10 @@ def dynotears(
        Continuous optimization for structure learning. NeurIPS 31, 9472-9483.
     .. [3] Deng, C., Bello, K., Ravikumar, P., and Aragam, B. (2024). Markov equivalence and
        consistency in differentiable structure learning. NeurIPS 37.
+    .. [4] Reisach, A. G., Seiler, C., and Weichwald, S. (2021). Beware of the simulated DAG!
+       Causal discovery benchmarks may be easy to game. NeurIPS 34.
+    .. [5] Kaiser, M. and Sipos, M. (2022). Unsuitability of NOTEARS for causal graph discovery
+       when dealing with dimensional quantities. Neural Processing Letters 54(3), 1587-1595.
 
     Examples
     --------

@@ -376,8 +376,9 @@ series the way NOTEARS learns a DAG: the least-squares loss of each step on the 
 `tau_max` steps before it, with an l1 penalty, under the acyclicity constraint on the same-step
 weights alone, since a lagged edge points forward in time. It keeps the paper's settings for 500
 time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-step weights and 0.1
-on the lagged ones. It returns a temporal structure whose `lag_weights` are the coefficients in the
-data's units, with a `dag` at lag 0.
+on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
+temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
+lag 0.
 
 CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
 kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
