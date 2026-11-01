@@ -113,12 +113,13 @@ NONLINEAR_SIZES: tuple[tuple[int, int], ...] = ((5, 250), (10, 500))
 #: ``latent_lingam_er`` keeps its benchmark's 2,000 rows; ``d`` counts the hidden nodes. At
 #: ``d = 20`` BottomUpParceLiNGAM's median SHD is no lower than the empty graph's (37.5 and 36 over
 #: ten seeds), so the check would have no power there.
-#: ``anm_er_n1000`` is the additive-noise regime of CAM's benchmark, at its 1,000 rows.
+#: ``anm_er_n1000`` is the additive-noise regime of CAM's and RESIT's benchmark, at its 1,000 rows:
+#: CAM on 20 and 50 variables, RESIT, whose claim stops at 10, on 5 and 10.
 REGIME_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "latent_lingam_er": ((10, 2000), (15, 2000)),
     "anm_er": NONLINEAR_SIZES,
     "nonmonotone_er": NONLINEAR_SIZES,
-    "anm_er_n1000": ((20, 1000), (50, 1000)),
+    "anm_er_n1000": ((5, 1000), (10, 1000), (20, 1000), (50, 1000)),
 }
 #: The benchmark regime a gate regime that is named for its rows draws: ``anm_er_n1000`` is
 #: ``anm_er`` at 1,000 rows.
@@ -497,6 +498,7 @@ SUPPORTED: dict[str, Method] = {
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
+    "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
