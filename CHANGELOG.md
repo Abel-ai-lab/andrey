@@ -95,6 +95,9 @@ names its pull request.
 - The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
   outside the method's claim, with its numbers and does not fail it; a row without the field is
   judged as before. ([#631])
+- Every method's docstring opens its Notes with a **When to use.** paragraph: the data, model,
+  and scale the method is designed for, what it returns, and the method to use outside that
+  setting. ([#633])
 
 ### Fixed
 
@@ -1589,3 +1592,4 @@ First alpha release.
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
+[#633]: https://github.com/Abel-ai-lab/andrey/pull/633

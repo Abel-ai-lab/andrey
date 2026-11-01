@@ -326,6 +326,7 @@ SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
 GRADUATE = "mark it experimental until it meets the criteria in docs/docs/api.md"
 LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
+WHEN_TO_USE = "DEVELOPMENT.md (Docstring standard) says what the paragraph holds"
 
 
 def _normalized(name: str) -> str:
@@ -461,16 +462,35 @@ def test_supported_method_has_an_example(name):
     assert name in called, f"{name}: no example notebook calls it; {GRADUATE}"
 
 
-@pytest.mark.parametrize("name", _SPEC_NAMES)
-def test_method_declares_its_limitations(name):
-    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
+def _notes(name: str) -> str:
+    """The Notes section of the method's docstring, or an empty string."""
     doc = inspect.getdoc(getattr(andrey, name)) or ""
     notes = re.search(
         r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
     )
+    return notes.group(1) if notes else ""
+
+
+@pytest.mark.parametrize("name", _SPEC_NAMES)
+def test_method_declares_its_limitations(name):
+    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
+    notes = _notes(name)
     assert notes, f"{name}: no Notes section; {LIMITATIONS}"
-    assert re.search(r"^\*\*Limitations\.\*\* ", notes.group(1), re.MULTILINE), (
+    assert re.search(r"^\*\*Limitations\.\*\* ", notes, re.MULTILINE), (
         f"{name}: no **Limitations.** paragraph in Notes; {LIMITATIONS}"
+    )
+
+
+@pytest.mark.parametrize("name", _SPEC_NAMES)
+def test_method_declares_when_to_use_it(name):
+    """The docstring's Notes open with a **When to use.** paragraph, the method's claimed setting,
+    ahead of **Limitations.**."""
+    notes = _notes(name)
+    assert notes.startswith("**When to use.** "), (
+        f"{name}: Notes do not open with a **When to use.** paragraph; {WHEN_TO_USE}"
+    )
+    assert "**When to use it.**" not in notes and "**When not to.**" not in notes, (
+        f"{name}: **When to use.** holds the advice on when not to use it; {WHEN_TO_USE}"
     )
 
 

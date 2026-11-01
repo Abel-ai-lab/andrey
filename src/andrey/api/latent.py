@@ -63,6 +63,18 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
 
     Notes
     -----
+    **When to use.** GIN suits i.i.d. continuous observational data in which the observed variables
+    are noisy indicators of a few unobserved common causes, the latents, rather than causes of one
+    another [1]_. It assumes linear, acyclic effects with non-Gaussian noise, no observed variable
+    causing a latent, no edge between two observed variables, and, for each set of ``k`` latents
+    that cause the same observed variables, at least ``2k`` pure indicators among their children
+    [1]_; indicators that share several latents appear as one cluster and one latent. It returns a
+    DAG over the observed variables and one latent per cluster of indicators, flagged in
+    ``structure.node_types``: each latent points to its cluster, and each ordered latent to every
+    later or unordered latent, edges that follow the order rather than direct effects found. When
+    the observed variables cause one another, use :func:`~andrey.direct_lingam` with no hidden
+    variables, and :func:`~andrey.rcd` or :func:`~andrey.fci` with hidden common causes.
+
     A group of observed variables forms a cluster when the linear combination of the group with
     the smallest correlation with the other variables not yet in a cluster is independent of each of
     them; groups grow from pairs upward, and clusters that share a variable merge. The latents are
