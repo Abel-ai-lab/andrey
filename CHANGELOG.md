@@ -48,7 +48,7 @@ names its pull request.
   variables on Gaussian noise no implementation clearly beats the empty graph, so that range is for
   speed. The paper fixes no order for removing a variable's parents; Andrey's order is no worse than
   a random one on datasets not used before. Location-scale and linear-Gaussian data lie outside the
-  model and are reported, not judged. ([#PRNUM])
+  model and are reported, not judged. ([#634])
 
 ### Added
 
@@ -1599,4 +1599,4 @@ First alpha release.
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
-[#PRNUM]: https://github.com/Abel-ai-lab/andrey/pull/PRNUM
+[#634]: https://github.com/Abel-ai-lab/andrey/pull/634
