@@ -26,6 +26,7 @@ from .api import (
     cdnod,
     dagma,
     direct_lingam,
+    dynotears,
     exact_search,
     fci,
     ges,
@@ -141,6 +142,7 @@ __all__ = [
     "pcmciplus",
     "lpcmci",
     "granger",
+    "dynotears",
     # Pairwise direction tests.
     "anm",
     "pnl",

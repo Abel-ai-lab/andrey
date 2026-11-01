@@ -76,6 +76,11 @@ names its pull request.
   cause or a causal path through a hidden variable joins, whose relation no regression can
   identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
   directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#623])
+- `dynotears`, DYNOTEARS (Pamfil et al. 2020), a time-series method, learns a linear structural
+  vector autoregression from one series, same-step and lagged effects with their weights, by least
+  squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
+  the paper's settings: `lambda1=0.05`, `w_threshold=0.3`, and `lag_threshold=0.1` for 500 time
+  steps, and `tau_max=1`; it is experimental. ([#639])
 
 ### Changed
 
@@ -120,6 +125,8 @@ names its pull request.
 
 ### Fixed
 
+- `notears` rejects a `rho_max` at or below 1, the penalty weight its fit starts from, which ended
+  the fit before its first solve and returned an empty graph without a warning. ([#639])
 - `rcd` and `gin` no longer change their graph when a constant is added to every column. The kernel
   independence test they share computed squared distances as `x^2 + y^2 - 2xy`, which loses its
   digits far from 0. With `1e9` added to simulated data, `rcd` returned another graph on 5 of 6
@@ -1613,3 +1620,4 @@ First alpha release.
 [#630]: https://github.com/Abel-ai-lab/andrey/pull/630
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
+[#639]: https://github.com/Abel-ai-lab/andrey/pull/639

@@ -916,12 +916,12 @@ _add(
             ),
             ParamSpec(
                 name="rho_max",
-                minimum=0,
+                minimum=1,
                 exclusive_minimum=True,
                 type="float",
                 default=1e16,
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
-                "this value, above 0.",
+                "this value, above 1, the weight the fit starts from.",
             ),
             *_CONTINUOUS_PATH_PARAMS,
         ),
@@ -1752,6 +1752,90 @@ _add(
         references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
+_add(
+    MethodSpec(
+        name="dynotears",
+        family="temporal",
+        summary="DYNOTEARS for a single multivariate time series: a linear structural vector "
+        "autoregression, same-step and lagged effects, by least squares with an l1 penalty under "
+        "the NOTEARS acyclicity constraint on the same-step weights. Returns a weighted temporal "
+        "structure. Deterministic; no torch.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a dag at lag 0 and lag graphs for lags 1..tau_max, with their lag_weights; "
+            "h_final and edges_removed in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "tau_max",
+                doc="The largest lag: each step is fit on the same step and the tau_max steps "
+                "before it, at least 1.",
+            ),
+            concept_param(
+                "lambda1",
+                default=0.05,
+                doc="Weight of the l1 penalty on every same-step and lagged weight, at least 0. "
+                "0.05 is the paper's value for 500 time steps.",
+            ),
+            concept_param(
+                "w_threshold",
+                doc="A same-step edge is kept when its weight magnitude reaches this value, at "
+                "least 0.",
+            ),
+            ParamSpec(
+                name="lag_threshold",
+                minimum=0,
+                type="float",
+                default=0.1,
+                doc="A lagged edge is kept when its weight magnitude reaches this value, at least "
+                "0. 0.1 is the paper's value for 500 time steps.",
+            ),
+            concept_param(
+                "max_iter",
+                default=100,
+                doc="Most dual steps of the augmented Lagrangian, at least 1.",
+                nullable=False,
+            ),
+            ParamSpec(
+                name="h_tol",
+                minimum=0,
+                exclusive_minimum=True,
+                type="float",
+                default=1e-8,
+                doc="The fit stops when the acyclicity function of the same-step weights falls to "
+                "this value, above 0.",
+            ),
+            ParamSpec(
+                name="rho_max",
+                minimum=1,
+                exclusive_minimum=True,
+                type="float",
+                default=1e16,
+                doc="The fit stops when the penalty weight on the acyclicity function reaches "
+                "this value, above 1, the weight the fit starts from.",
+            ),
+        ),
+        references=(
+            "Pamfil et al. 2020",
+            "Zheng, Aragam, Ravikumar & Xing 2018",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+        ),
+    )
+)
 
 # --- pairwise family ------------------------------------------------------------------------------
 
@@ -2144,6 +2228,10 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "granger": _LINK_RULE + "Lags run from 1 to tau_max; a required link needs its lag, and "
     "same-step links are not learned. Each regression drops forbidden lagged regressors and keeps "
     "required ones unpenalized.",
+    "dynotears": _LINK_RULE + "Lags run from 0 to tau_max. Forbidden links, links into an "
+    "earlier tier, and pairs outside the allowed set are held at zero in the fit; a required "
+    "link leaves the penalty and the threshold, and the cycle repair of the same-step graph "
+    "never removes it.",
     "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
     "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
     "fit of its effect's lagged weights; every other lagged weight stays.",
@@ -2228,6 +2316,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "multi_group_direct_lingam": ("group_index",),
     "longitudinal_lingam": ("causal_orders",),
     "granger": ("p_values",),
+    "dynotears": ("h_final", "edges_removed"),
     "pcmci": ("p_values", "statistics", "parents"),
     "pcmciplus": ("p_values", "statistics", "parents", "conflicts"),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
