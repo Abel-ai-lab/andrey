@@ -208,6 +208,16 @@ def iamb(
 
     Notes
     -----
+    **When to use.** IAMB suits i.i.d. observational data with no unmeasured common causes, in
+    which every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test
+    assumes continuous data with linear effects and Gaussian noise; the other tests read
+    categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. It is
+    designed for many variables [1]_, each with a small blanket, since every test conditions on the
+    whole current blanket. With ``target``, it returns an undirected graph joining ``target`` to
+    each member of its Markov blanket; without, the graph ``structure`` names: the CPDAG by default,
+    or the undirected skeleton or moral graph. For the parents and children alone, use
+    :func:`~andrey.mmpc`; when unmeasured common causes are plausible, use :func:`~andrey.fci`.
+
     **How it works.** Grow: add the candidate most dependent on the target given the current
     blanket, among those whose p-value is at or below ``alpha``, until none is. Shrink: visit the
     members in the order they joined and drop each one the test finds independent of the target
@@ -433,6 +443,18 @@ def inter_iamb(
 
     Notes
     -----
+    **When to use.** Inter-IAMB suits i.i.d. observational data with no unmeasured common causes,
+    in which every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z
+    test assumes continuous data with linear effects and Gaussian noise; the other tests read
+    categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. It is
+    designed for many variables [1]_, and shrinking after each addition keeps its conditioning sets
+    smaller than IAMB's, since a member that becomes independent leaves before it enlarges the
+    later ones. With ``target``, it returns an undirected graph joining ``target`` to each member
+    of its Markov blanket, which holds its parents, its children, and its children's other parents;
+    without, the graph ``structure`` names: the CPDAG by default, or the undirected skeleton or
+    moral graph. For the parents and children alone, use :func:`~andrey.mmpc`; when unmeasured
+    common causes are plausible, use :func:`~andrey.fci`.
+
     **How it works.** Each step adds the candidate most dependent on the target given the current
     blanket, among those whose p-value is at or below ``alpha``, then visits the members in the
     order they joined and drops each one the test finds independent of the target given the other
@@ -647,6 +669,17 @@ def mmpc(
 
     Notes
     -----
+    **When to use.** MMPC suits i.i.d. observational data with no unmeasured common causes, in
+    which every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test
+    assumes continuous data with linear effects and Gaussian noise; the other tests read
+    categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. It is
+    designed for many variables, each with few parents and children [1]_, since each candidate is
+    tested given subsets of the members found so far. With ``target``, it returns an undirected
+    graph joining ``target`` to each of its parents and children, without telling the two apart;
+    without, the graph ``structure`` names: the undirected skeleton by default, or the CPDAG. For
+    the Markov blanket, which adds the children's other parents, use :func:`~andrey.iamb`; to
+    orient the skeleton by a score search, use :func:`~andrey.mmhc`.
+
     **How it works.** A candidate's association with the target is its weakest over every
     conditioning set drawn from the current members: the largest p-value among those tests. The
     forward phase adds, one at a time, the candidate whose weakest association is the strongest,

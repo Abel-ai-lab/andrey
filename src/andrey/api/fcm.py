@@ -153,11 +153,11 @@ def cam(
 
     Notes
     -----
-    **When to use it.** CAM suits continuous data whose effects are nonlinear and additive in the
-    parents, with additive noise and no unmeasured common causes [1]_. Its score is the Gaussian
-    likelihood of that model.
-
-    **When not to.** With linear effects and Gaussian noise only the Markov equivalence class is
+    **When to use.** CAM suits i.i.d. continuous observational data whose effects are nonlinear and
+    additive in the parents, with additive Gaussian noise and no unmeasured common causes [1]_;
+    under that model the DAG is identified [6]_ [7]_, and it returns the DAG with a causal order.
+    Its preselection of each variable's possible parents is designed for many variables with few
+    parents each [1]_. With linear effects and Gaussian noise only the Markov equivalence class is
     identified, and the orientation of the edges it leaves undirected is arbitrary: use
     :func:`~andrey.pc` or :func:`~andrey.ges`. Noise whose scale depends on the parents
     (location-scale data) can reverse edges, because the model's noise variance is fixed.
@@ -413,15 +413,15 @@ def resit(
 
     Notes
     -----
-    **When to use it.** RESIT suits continuous data whose effects are nonlinear and additive in the
-    parents, with additive noise of any distribution and no unmeasured common causes [1]_. It reads
-    the noise through independence tests, not a likelihood, so the noise need not be Gaussian.
-
-    **When not to.** With linear effects and Gaussian noise only the Markov equivalence class is
-    identified: use :func:`~andrey.pc` or :func:`~andrey.ges`. Noise whose scale depends on the
-    parents breaks the independence of the residuals. Each test of the causal order reads all the
-    remaining variables jointly, so its power falls as the variables grow, and an early wrong sink
-    carries through the rest of the order [1]_.
+    **When to use.** RESIT suits i.i.d. continuous observational data whose effects are nonlinear
+    and additive in the parents, with additive noise of any distribution and no unmeasured common
+    causes [1]_; it reads the noise through independence tests, not a likelihood, so the noise need
+    not be Gaussian, but noise whose scale depends on the parents breaks the independence of the
+    residuals. Each test of the causal order reads all the remaining variables jointly, so it is
+    designed for a handful of variables [1]_. It returns a DAG and a causal order. With linear
+    effects and Gaussian noise only the Markov equivalence class is identified: use
+    :func:`~andrey.pc` or :func:`~andrey.ges`; for more variables with Gaussian noise, use
+    :func:`~andrey.cam`, and with hidden variables, :func:`~andrey.camuv`.
 
     **The steps.** The paper's settings, in its two phases [1]_:
 
@@ -635,15 +635,16 @@ def camuv(
 
     Notes
     -----
-    **When to use it.** CAM-UV suits continuous data whose effects are nonlinear and additive in
-    the causes, with independent noise of any distribution, where some causes may be unmeasured
-    [1]_. An ``o-o`` pair shares a hidden common cause, or one of its variables causes the other
-    through a hidden variable; the method does not tell the two apart.
-
-    **When not to.** With linear effects, a path through a hidden variable can be regressed away
-    and the pairs are identified differently: use :func:`~andrey.rcd` for non-Gaussian noise.
-    Without hidden variables, :func:`~andrey.cam` and :func:`~andrey.resit` also give a causal
-    order.
+    **When to use.** CAM-UV suits i.i.d. continuous observational data whose effects are nonlinear
+    and additive in the causes, with independent noise of any distribution, where some causes may
+    be unmeasured [1]_. Its kernel independence tests compare every pair of rows, and its search
+    tests sets of up to ``max_depth + 1`` variables, so it suits a moderate number of variables and
+    rows. It returns a PAG: ``i -> j`` for a direct cause and ``i o-o j`` for a pair that shares a
+    hidden common cause or of which one causes the other through a hidden variable, which the
+    method does not tell apart. With linear effects, a path through a hidden variable can be
+    regressed away and the pairs are identified differently: use :func:`~andrey.rcd` for
+    non-Gaussian noise and :func:`~andrey.fci` for Gaussian noise. Without hidden variables,
+    :func:`~andrey.cam` and :func:`~andrey.resit` also give a causal order.
 
     **The steps.** Every pair of variables is first tested for dependence; then come the paper's
     three steps, with its settings [1]_:

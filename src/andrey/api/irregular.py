@@ -100,6 +100,17 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Notes
     -----
+    **When to use.** ANM decides the direction between two continuous variables observed i.i.d.,
+    under the model ``y = f(x) + e`` with the noise ``e`` independent of the cause ``x``, and no
+    hidden common cause of the two [1]_. The direction is identifiable when ``f`` is nonlinear or
+    the noise is non-Gaussian; a linear pair with Gaussian noise fits an additive noise model in
+    both directions [1]_. It is designed for one pair with a moderate number of rows, as
+    the cost of its Gaussian-process regression grows quickly with the rows. It returns a two-node
+    DAG whose edge depends on ``alpha``: with ``None``, the direction of the larger p-value, and
+    with a significance level, an edge only when exactly one direction passes. For more than two
+    variables, use :func:`~andrey.resit` or :func:`~andrey.cam`, and when the effect also passes
+    through an invertible nonlinear transform, :func:`~andrey.pnl`.
+
     With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
     sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
     the choice to the HSIC statistics, each divided by its mean under independence, and the edge
@@ -119,9 +130,6 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Hoyer et al. (2008) [1]_ use a level of 0.02. Both p-values and both statistics remain in
     ``metadata``.
-
-    The direction is identifiable when ``f`` is nonlinear or the noise is non-Gaussian; a linear
-    pair with Gaussian noise fits an additive noise model in both directions [1]_.
 
     Each column is standardized to zero mean and unit variance first, so the result does not
     depend on the units of either variable. The regression is a Gaussian process with a scaled RBF
@@ -229,6 +237,17 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Notes
     -----
+    **When to use.** PNL decides the direction between two continuous variables observed i.i.d.,
+    under the model ``y = f2(f1(x) + e)`` with ``f2`` invertible, the noise ``e`` independent of
+    the cause ``x``, and no hidden common cause of the two [1]_. The direction is identifiable in
+    all but a few special cases, such as a linear pair with Gaussian noise [1]_. It is designed for
+    one pair with a moderate number of rows, as its kernel tests compare every pair of rows. It
+    returns a two-node DAG whose edge depends on ``alpha``: with ``None``, the direction of the
+    larger p-value, and with a significance level, an edge only when exactly one direction passes.
+    When the noise is additive with no outer transform, :func:`~andrey.anm` fits that simpler
+    model; for more than two variables, use :func:`~andrey.resit` or :func:`~andrey.cam`, which
+    assume additive noise.
+
     With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
     sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
     the choice to the HSIC statistics, each divided by its mean under independence, and the edge
@@ -398,8 +417,14 @@ def rcd(
 
     Notes
     -----
-    RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
-    tests compare residuals, and a weak hidden cause leaves only a small trace in them.
+    **When to use.** RCD suits i.i.d. continuous observational data with linear effects and
+    non-Gaussian noise, where hidden common causes may affect pairs of observed variables [1]_. It
+    is designed for a moderate number of variables and needs more rows than
+    :func:`~andrey.direct_lingam`: its tests compare residuals, and a weak hidden cause leaves only
+    a small trace in them. It returns a PAG: ``i -> j`` for a direct cause and ``i <-> j`` for a
+    pair with a hidden common cause, with the edge coefficients in ``weighted_adjacency``. With no
+    hidden common causes, use :func:`~andrey.direct_lingam`; with nonlinear effects,
+    :func:`~andrey.camuv`, and with Gaussian noise, :func:`~andrey.fci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
@@ -507,6 +532,16 @@ def bottom_up_parce_lingam(
 
     Notes
     -----
+    **When to use.** BottomUpParceLiNGAM suits i.i.d. continuous observational data with linear
+    effects and non-Gaussian noise, where hidden common causes may affect some of the observed
+    variables [1]_. It is designed for a moderate number of variables and needs more rows than
+    variables. It returns a PAG: ``i -> j`` for a direct cause and ``i o-o j`` between variables
+    whose order a hidden common cause leaves unresolved, with the partial order in
+    ``metadata["partial_order"]`` and the edge coefficients in ``weighted_adjacency``. With no
+    hidden common causes, :func:`~andrey.direct_lingam` orders every variable; to name the pairs
+    that share a hidden common cause, use :func:`~andrey.rcd`, and with nonlinear effects,
+    :func:`~andrey.camuv`.
+
     The search finds sinks from the bottom up and stops at the first variable it cannot separate,
     leaving it and every variable above it in one unordered block: the variables a hidden cause
     confounds, their observed ancestors, and any other confounded pairs. Candidates whose test

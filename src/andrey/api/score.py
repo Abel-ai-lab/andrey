@@ -151,14 +151,16 @@ def ges(
 
     Notes
     -----
-    **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
-    assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
-    in that setting it is a fast, accurate default. When every column is categorical, the default is
-    ``"bdeu"``, and on mixed data ``"cond_gauss"``;
-    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data.
-
-    **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
-    noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
+    **When to use.** GES suits i.i.d. observational data with no unmeasured common causes, in which
+    every independence follows from the graph (faithfulness) [1]_. Its default BIC score assumes
+    continuous data, where each variable depends linearly on its causes with Gaussian noise; when
+    every column is categorical the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``,
+    and ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. It suits sparse graphs,
+    where every variable has few parents, on which a faster version of its search scaled to very
+    many variables [2]_; it returns a CPDAG. When unmeasured common causes are plausible, use
+    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`; when some rows come from interventions, use
+    :func:`~andrey.gies`.
 
     **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``penalty_discount *
     log(n_samples)`` per parent and adds ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``,
@@ -462,12 +464,18 @@ def gies(
 
     Notes
     -----
-    **When to use it.** GIES makes the assumptions of :func:`~andrey.ges`: no unmeasured common
-    causes and, with the default BIC score on continuous data, linear relations with Gaussian
-    noise. When every column is categorical, the default is ``"bdeu"``, and on mixed data
-    ``"cond_gauss"``; ``"discrete_bic"`` and ``"degen_gauss"`` also score those data, as
-    :func:`~andrey.ges` describes. An intervention replaces the intervened variable's mechanism and
-    leaves every other variable's unchanged.
+    **When to use.** GIES suits i.i.d. data that mix observational rows with rows in which some
+    variables were set by an intervention, marked in ``interventions`` [1]_. It makes the
+    assumptions of :func:`~andrey.ges`, no unmeasured common causes and, with the default BIC score
+    on continuous data, linear relations with Gaussian noise, and assumes that an intervention
+    replaces the intervened variable's mechanism and leaves every other variable's unchanged;
+    categorical and mixed data take the scores and defaults of :func:`~andrey.ges`. It suits sparse
+    graphs: its authors note that bounding the number of edges at each variable keeps the cost of a
+    step polynomial in the number of variables [1]_. It returns the interventional essential graph,
+    a CPDAG whose directed edges are those every graph of the interventional class orients alike.
+    On observational data alone, use :func:`~andrey.ges`; when the rows come from several domains
+    and which variables changed is unknown, use :func:`~andrey.cdnod`; when unmeasured common causes
+    are plausible, use :func:`~andrey.fci`.
 
     **Scores under interventions.** Each score reads a variable only on the rows where it was not
     intervened on, as the likelihood of interventional data does [1]_, and every BIC charges
@@ -713,13 +721,15 @@ def xges(
 
     Notes
     -----
-    **When to use it.** XGES makes the assumptions of :func:`~andrey.ges`: no unmeasured common
-    causes and, with the default BIC score on continuous data, linear relations with Gaussian
-    noise. When every column is categorical, the default is ``"bdeu"``, and on mixed data
-    ``"cond_gauss"``; ``"discrete_bic"`` and ``"degen_gauss"`` also score those data, as
-    :func:`~andrey.ges` describes. Its moves need only a score that adds one term per variable and
-    gives equivalent graphs the same score [1]_, which each of these does. It returns the
-    equivalence class.
+    **When to use.** XGES makes the assumptions of :func:`~andrey.ges`: i.i.d. observational data,
+    no unmeasured common causes and, with the default BIC score on continuous data, linear
+    relations with Gaussian noise. Categorical and mixed data take the scores and defaults of
+    :func:`~andrey.ges`; its moves need only a score that adds one term per variable and gives
+    equivalent graphs the same score [1]_, which each of these does. It suits the same sparse
+    graphs as GES and on linear-Gaussian data often finds a graph with a better score; it returns a
+    CPDAG. When unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is
+    non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`; when some
+    rows come from interventions, use :func:`~andrey.gies`.
 
     **How it works.** Each step takes the best improving deletion, else reversal of a directed edge,
     else addition; the search stops when no move improves the score [1]_. The extended search then
@@ -956,6 +966,16 @@ def hc(
 
     Notes
     -----
+    **When to use.** Hill climbing suits i.i.d. observational data with no unmeasured common
+    causes. Its default BIC score assumes continuous data, where each variable depends linearly on
+    its causes with Gaussian noise; categorical and mixed data take the scores and defaults of
+    :func:`~andrey.ges`. Each move adds, removes, or reverses one edge of a DAG [1]_, and the
+    search suits sparse graphs: on dense ones it more often stops at a DAG that no single move
+    improves but that scores worse than the true one. It returns the CPDAG of the DAG found. When
+    unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian
+    and every edge should be oriented, use :func:`~andrey.direct_lingam`; with nonlinear effects,
+    use :func:`~andrey.cam`.
+
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set; with ``n_starts``, each climb stops so. Under a mixed-data
     score, no move gives a categorical column a continuous parent, so the DAG found is a
@@ -1214,6 +1234,16 @@ def tabu(
 
     Notes
     -----
+    **When to use.** Tabu search suits the data of :func:`~andrey.hc`: i.i.d. observational data
+    with no unmeasured common causes. Its default BIC score assumes continuous data, where each
+    variable depends linearly on its causes with Gaussian noise; categorical and mixed data take
+    the scores and defaults of :func:`~andrey.ges`. Its non-improving moves [1]_ let it leave a DAG
+    that no single move improves, where hill climbing stops, and it suits sparse graphs: on dense
+    ones it can still stop at a DAG that scores worse than the true one. It returns the CPDAG of
+    the best-scoring DAG visited. When unmeasured common causes are plausible, use
+    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`; with nonlinear effects, use :func:`~andrey.cam`.
+
     The search starts from the empty graph. Each step adds the current DAG to the tabu list, which
     keeps the last ``tabu_length`` DAGs visited, then takes the best improving move outside the
     list. Without one, it stops if ``max_tabu`` non-improving moves have occurred since the best
@@ -1445,11 +1475,14 @@ def exact_search(
 
     Notes
     -----
-    **When to use it.** With ``"bic"``, exact search makes the assumptions of
-    :func:`~andrey.ges`: continuous data, no unmeasured common causes, and linear relations with
-    Gaussian noise; the categorical and mixed-data scores below make theirs. It suits a few
-    variables, where it returns a graph with the best score rather than a greedy search's local
-    optimum.
+    **When to use.** With ``"bic"``, exact search makes the assumptions of :func:`~andrey.ges`:
+    i.i.d. continuous observational data, no unmeasured common causes, and linear relations with
+    Gaussian noise; the categorical and mixed-data scores below make theirs. Its run time grows
+    exponentially with the number of variables, so it suits a few variables, roughly 20 or fewer,
+    where it finds a DAG with the best score [1]_ [2]_ rather than a greedy search's local
+    optimum. It returns the CPDAG of that DAG's equivalence class and keeps the DAG in
+    ``metadata["dag"]``. With more variables, use :func:`~andrey.ges` or :func:`~andrey.boss`;
+    when unmeasured common causes are plausible, use :func:`~andrey.fci`.
 
     **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
     own pick among them would follow last-bit rounding and the column order. The returned CPDAG
@@ -1681,6 +1714,17 @@ def calm(
 
     Notes
     -----
+    **When to use.** CALM suits i.i.d. continuous observational data from a linear model with
+    Gaussian noise, each variable with its own noise variance, and no unmeasured common causes
+    [1]_; the Fisher-Z tests of its screen assume the same model. Under that model the data
+    identify the DAG only up to its Markov equivalence class, so an edge the class leaves
+    undirected gets a direction the data do not determine. The screen keeps only the edges of the
+    estimated moral graph, which joins each variable to its parents, its children, and its
+    children's other parents, so it suits sparse graphs; it returns a DAG with the coefficient of
+    each edge. When the equivalence class is enough, :func:`~andrey.ges` returns it as a CPDAG; when
+    the noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`;
+    with nonlinear effects, use :func:`~andrey.cam`.
+
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
     the variable most dependent on it given those already added (Fisher-Z at level
     ``screen_alpha``), then drops any member the others make independent of it. The most dependent

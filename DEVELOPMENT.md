@@ -93,6 +93,13 @@ lives in the registry. Every facade docstring has, in order:
 - **Returns**: always `StructureOutput`, naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
   and the contents of `.metadata`, `.ordering`, and `.weighted_adjacency`.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
+- **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
+  claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time
+  series; observational, interventional, or multi-domain), the model assumptions that matter
+  to a user, the scale it is designed for, what it returns, and the method to use outside that
+  setting. A **Limitations.** paragraph follows with the measured failures
+  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); the two do not
+  repeat each other.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
   shape, `ordering`), never a repr. Stochastic methods are seeded (`seed=0`); `[torch]`-only ones
   carry `# doctest: +SKIP`.
@@ -111,9 +118,11 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    argument against the method's `ParamSpec`, resolves a seeded method's seed, gives the
    experimental warning, and sets `metadata["algorithm"]` and `metadata["seed"]`, so the facade
    holds only the method's own logic.
-   End the docstring's Notes with a **Limitations.** paragraph: "Not benchmarked yet.", the largest
-   problem its tests run it on (variables, and rows where they matter), and any known structural
-   limit, such as an assumption on the data or a cost that grows fast with the size.
+   Open the docstring's Notes with a **When to use.** paragraph, as the
+   [docstring standard](#docstring-standard) describes, and end them with a **Limitations.**
+   paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and
+   rows where they matter), and any known structural limit, such as an assumption on the data or
+   a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"` until the method is supported. A
    method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`
@@ -178,16 +187,17 @@ the spec exists.
 
 A new method ships as experimental and becomes supported once it passes every step below.
 Every step judges the method in the setting it claims: the model, data regime, and scale its paper
-states (a search built for very large sparse graphs is measured on those, not on small dense ones).
+states and its **When to use.** paragraph gives (a search built for very large sparse graphs is
+measured on those, not on small dense ones).
 Its recovery tests, quality-gate cells, and benchmark campaign use that setting, and it is compared
 with its reference implementation and the methods that target the same setting, with the empty graph
 as a floor. Settings outside the claim are measured for its **Limitations.** paragraph (where it
 stops working and what to use instead), not as a pass or a fail.
 `tests/unit/test_spec_registry.py` checks most of them and names what is missing: a recovery test
-for an experimental method; a **Limitations.** paragraph for every method; and for a supported
-one, a recorded output, a place in the quality gate, a section in a release card, rows in a
-published summary, an example notebook, and an entry under "Supported methods" in the API
-reference. Review checks device parity and the card's "Reproduce" table.
+for an experimental method; a **When to use.** and a **Limitations.** paragraph for every
+method; and for a supported one, a recorded output, a place in the quality gate, a section in a
+release card, rows in a published summary, an example notebook, and an entry under "Supported
+methods" in the API reference. Review checks device parity and the card's "Reproduce" table.
 
 | Step | Where | When it runs | Required for |
 |---|---|---|---|
