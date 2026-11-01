@@ -40,6 +40,8 @@
     of every shape, with gaps in the rows like missing values. One jar is amber.
   - `art-plumb.jpg`: 0.12.0, a plumb bob hanging on a taut thread from a bracket beside an
     engraved measuring column, the thread along the column's vertical. The bob is amber.
+  - `art-gears.jpg`: 0.13.0, a train of three spoked gears in engraved lines, meshing from an input
+    shaft to an output shaft on a cast-iron base, seen from 45 degrees. The output gear is amber.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at
