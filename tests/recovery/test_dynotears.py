@@ -128,6 +128,17 @@ def test_reordering_the_columns_only_reorders_the_result(planted, planted_fit):
     )
 
 
+def test_an_offset_on_every_column_leaves_the_fit_unchanged(planted, planted_fit):
+    """Each column is centered first, so a constant added to a series changes no link and moves
+    the weights only within the solver's precision."""
+    moved = _fit(planted + [5.0, -1e3, 1e6, 0.0], tau_max=2)
+    assert _same_step(moved) == _same_step(planted_fit)
+    assert _lagged(moved) == _lagged(planted_fit)
+    np.testing.assert_allclose(
+        moved.structure.lag_weights, planted_fit.structure.lag_weights, rtol=0.0, atol=5e-3
+    )
+
+
 def test_matches_the_recorded_output():
     out = _fit(datagen.generate("svar_4v_gauss"))
     assert_recorded_output(out, "DYNOTEARS", case="svar_4v_gauss")

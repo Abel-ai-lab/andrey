@@ -1473,8 +1473,8 @@ def dynotears(
     w_threshold : float, default=0.3
         A same-step edge is kept when its weight magnitude reaches this value, at least ``0``.
     lag_threshold : float, default=0.1
-        A lagged edge is kept when its weight magnitude reaches this value, at least ``0``. The
-        paper used ``0.1`` for 500 time steps and ``0.2`` for 50.
+        A lagged edge is kept when its weight is not ``0`` and its magnitude reaches this value,
+        at least ``0``. The paper used ``0.1`` for 500 time steps and ``0.2`` for 50.
     max_iter : int, default=100
         Most dual steps of the augmented Lagrangian, at least ``1``. Stopping on it rather than on
         ``h_tol`` or ``rho_max`` warns with :class:`~andrey.SearchLimitWarning`.
@@ -1483,7 +1483,7 @@ def dynotears(
         above ``0``.
     rho_max : float, default=1e16
         The fit stops when the penalty weight on the acyclicity function reaches this value, above
-        ``0``.
+        ``1``, the weight the fit starts from.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``0`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -1506,7 +1506,8 @@ def dynotears(
         of that edge in the data's units, and ``0`` where there is no edge. ``ordering`` is
         ``None``. ``metadata`` holds ``"algorithm"`` (``"dynotears"``), ``"h_final"`` (the
         acyclicity function of the same-step weights before the threshold), and
-        ``"edges_removed"`` (same-step edges the threshold kept that the cycle repair dropped).
+        ``"edges_removed"`` (same-step edges the threshold kept that the cycle repair dropped), and
+        ``"tie_break"`` (the rule ties followed).
 
     Raises
     ------
@@ -1528,15 +1529,18 @@ def dynotears(
 
     Notes
     -----
-    **When to use.** DYNOTEARS suits one continuous, observational multivariate time series from a
-    linear structural vector autoregression: each variable is a weighted sum of the other variables
-    at the same step and of every variable at the past ``tau_max`` steps, plus noise, with weights
-    that do not change over time, same-step effects that form no cycle, and no unmeasured variable
-    that causes two measured ones [1]_. Its least-squares fit reads the columns in their given
-    units, so its graph can depend on how each column is scaled [4]_ [5]_. Its ``l1`` penalty
-    favors sparse graphs, and it fits ``(tau_max + 1) * d * d`` weights under an acyclicity function
-    that takes a matrix exponential, so it suits a moderate number of variables, a few lags, and a
-    long series. It returns a temporal structure with a DAG at lag ``0`` and the graphs at lags
+    **When to use.** DYNOTEARS suits one continuous, observational, stationary multivariate time
+    series from a linear structural vector autoregression: each variable is a weighted sum of the
+    other variables at the same step and of every variable at the past ``tau_max`` steps, plus
+    noise, with weights that do not change over time, same-step effects that form no cycle, and no
+    unmeasured variable that causes two measured ones [1]_. Its ``l1`` penalty and both thresholds
+    act on the weights in the data's units, so the columns should be in comparable units [4]_ [5]_:
+    a cause recorded in thousandths multiplies its weight by 1,000, and the penalty can then remove
+    a true edge, or every edge, without a warning; convert such columns to comparable units first,
+    as standardizing them falls outside the setting the paper's simulations measure (see
+    Limitations). It fits ``(tau_max + 1) * d * d`` weights under an acyclicity function that takes
+    a matrix exponential, so it suits a moderate number of variables, a few lags, and a long
+    series. It returns a temporal structure with a DAG at lag ``0`` and the graphs at lags
     ``1`` to ``tau_max``, self-lags included, with the weight of each edge. For nonlinear effects,
     use :func:`~andrey.pcmciplus` with a nonlinear test such as ``"gpdc"`` or ``"rcot"``, and for
     many lags, :func:`~andrey.pcmciplus` with its default test; when unmeasured common causes are
@@ -1553,13 +1557,17 @@ def dynotears(
     where the ``n`` rows of ``X`` are the steps with ``p`` steps before them, ``Y`` holds the same
     rows' ``p`` earlier steps side by side, and ``A`` stacks the ``A_k``. Every column of ``X`` and
     of ``Y`` is centered on its own mean first, which is the same as fitting an intercept, so a
-    series with a nonzero mean adds no weight. The paper's loss fits no intercept: on the simulated
-    series below, whose mean is zero, it made 3.3 fewer errors of about 140 at 50 time steps and 100
-    variables, and no fewer at 500 steps; on series with exponential noise of mean 1 it made 5.8 and
-    7.3 more at 20 and 10 variables. The paper's experiments give ``W`` and ``A`` the same penalty,
-    and ``lambda1`` is that one value. A lagged edge points forward in time and closes no cycle, so
-    the constraint reads ``W`` alone; a lagged self-loop, a variable's effect on its own future, is
-    an edge like any other. As in NOTEARS, the weights are written as ``W = W+ - W-`` with both
+    series with a nonzero mean adds no weight, to the solver's precision. The paper's loss fits no
+    intercept, as its model takes noise of mean zero [1]_. On the Gaussian series that Limitations
+    describes, whose mean is zero, fitting without an intercept made 3.3 fewer errors of about 140
+    at 50 time steps and 100 variables, with the paper's settings for 50 steps (``lambda1=0.2`` and
+    ``lag_threshold=0.2``), and no fewer at 500 steps. On the same design at 500 steps with
+    exponential noise of mean 1, not centered, so that every series has a nonzero mean, it made 7.3
+    and 5.8 more errors at 10 and 20 variables. The paper's experiments give ``W`` and ``A`` the
+    same penalty, and ``lambda1`` is that one value. A lagged edge points forward in time and
+    closes no cycle, so the constraint reads ``W`` alone; a lagged self-loop, a variable's effect on
+    its own future, is an edge like any other. As in NOTEARS, the weights are written as
+    ``W = W+ - W-`` with both
     parts non-negative and the diagonal of ``W`` held at zero, and the augmented Lagrangian
     ``f + 0.5 * rho * h**2 + alpha * h`` is minimized by L-BFGS-B from the zero matrix. After each
     solve ``rho`` grows tenfold while ``h`` has not fallen to a quarter of its previous value, and
@@ -1575,8 +1583,11 @@ def dynotears(
     is shown for independent samples only, so this method has no such option.
 
     The fit runs on the columns sorted by a rank computed from the data, as for
-    :func:`~andrey.hc`, so reordering the columns relabels the result and changes nothing else,
-    unless two columns are identical. The fit draws no random numbers and runs on one BLAS thread,
+    :func:`~andrey.hc`, so under the default tie-break reordering the columns relabels the result
+    and changes nothing else, unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order, and how ``andrey.config(tie_break="position")`` sorts the columns by position
+    instead. The fit draws no random numbers and runs on one BLAS thread,
     so the host's thread count does not change it.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every step on

@@ -916,12 +916,12 @@ _add(
             ),
             ParamSpec(
                 name="rho_max",
-                minimum=0,
+                minimum=1,
                 exclusive_minimum=True,
                 type="float",
                 default=1e16,
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
-                "this value, above 0.",
+                "this value, above 1, the weight the fit starts from.",
             ),
             *_CONTINUOUS_PATH_PARAMS,
         ),
@@ -1821,12 +1821,12 @@ _add(
             ),
             ParamSpec(
                 name="rho_max",
-                minimum=0,
+                minimum=1,
                 exclusive_minimum=True,
                 type="float",
                 default=1e16,
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
-                "this value, above 0.",
+                "this value, above 1, the weight the fit starts from.",
             ),
         ),
         references=(

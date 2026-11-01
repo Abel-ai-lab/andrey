@@ -92,6 +92,8 @@ names its pull request.
 
 ### Fixed
 
+- `notears` rejects a `rho_max` at or below 1, the penalty weight its fit starts from, which ended
+  the fit before its first solve and returned an empty graph without a warning. ([#TBD])
 - `rcd` and `gin` no longer change their graph when a constant is added to every column. The kernel
   independence test they share computed squared distances as `x^2 + y^2 - 2xy`, which loses its
   digits far from 0. With `1e9` added to simulated data, `rcd` returned another graph on 5 of 6

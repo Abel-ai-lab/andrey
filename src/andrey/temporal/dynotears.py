@@ -112,7 +112,9 @@ def dynotears(
     same_step = Canonical(cov[:d, :d], order, back, forbidden[0], required[0])
     h_final, _ = trace_exponential(stacked[0])
     contemporaneous, removed = threshold_dag(stacked[0], same_step, w_threshold)
-    lagged = required[1:] | ((np.abs(stacked[1:]) >= lag_threshold) & ~forbidden[1:])
+    lagged = required[1:] | (
+        (np.abs(stacked[1:]) >= lag_threshold) & (stacked[1:] != 0) & ~forbidden[1:]
+    )
     support = np.concatenate((contemporaneous.astype(bool)[None], lagged))
     weights = np.where(support, stacked, 0.0)
     return DynotearsResult(

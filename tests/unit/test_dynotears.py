@@ -77,13 +77,26 @@ def test_kept_weights_reach_their_threshold_and_the_rest_are_zero(series):
     assert not weights[~kept].any()
 
 
-def test_a_larger_penalty_gives_smaller_weights(series, default_fit):
-    """The l1 penalty shrinks every weight toward 0, the same-step and the lagged ones."""
-    heavier = fit(series, lambda1=0.2).structure.lag_weights
-    lighter = default_fit.structure.lag_weights
-    both = (heavier != 0) & (lighter != 0)
-    assert both[0].any() and both[1:].any()
-    assert (np.abs(heavier[both]) < np.abs(lighter[both])).all()
+def test_a_larger_penalty_gives_no_larger_l1_norm(series):
+    """Over the same constraint, a heavier ``l1`` penalty never raises the total ``|W|_1 + |A|_1``
+    of the fit; without thresholds the weights are the fit's own."""
+    norms = [
+        np.abs(
+            fit(series, lambda1=lam, w_threshold=0.0, lag_threshold=0.0).structure.lag_weights
+        ).sum()
+        for lam in (0.01, 0.05, 0.2, 0.8)
+    ]
+    assert all(later <= earlier for earlier, later in zip(norms, norms[1:], strict=False))
+    assert norms[-1] < norms[0]
+
+
+def test_a_zero_lag_threshold_keeps_no_lagged_link_of_weight_zero(series):
+    out = fit(series, lambda1=0.2, lag_threshold=0.0)
+    weights = out.structure.lag_weights
+    lagged = [(i, j, lag) for i, j, lag in links(out) if lag > 0]
+    assert lagged
+    assert all(weights[lag, i, j] != 0 for i, j, lag in lagged)
+    assert len(lagged) < 16
 
 
 def test_tau_max_sets_the_lags_and_the_weights(series):
@@ -111,6 +124,31 @@ def test_a_required_same_step_link_is_kept_on_independent_noise():
     noise = np.random.default_rng(2).standard_normal((300, 3))
     out = fit(noise, knowledge=andrey.Knowledge(required=[(2, 0, 0)]))
     assert (2, 0, 0) in links(out)
+
+
+def test_a_required_lagged_link_is_kept_on_independent_noise():
+    noise = np.random.default_rng(2).standard_normal((300, 3))
+    out = fit(noise, knowledge=andrey.Knowledge(required=[(2, 0, 1)]))
+    assert (2, 0, 1) in links(out)
+
+
+def test_a_pair_left_out_of_allowed_has_no_link_at_any_lag(series):
+    """``allowed`` lists the only pairs that may be linked; a series keeps its own past."""
+    pairs = {frozenset((0, 1)), frozenset((1, 2))}
+    out = fit(series, knowledge=andrey.Knowledge(allowed=[(0, 1), (1, 2)]))
+    across = {frozenset((i, j)) for i, j, _ in links(out) if i != j}
+    assert across
+    assert across <= pairs
+    assert (3, 3, 1) in links(out)
+
+
+def test_a_lagged_two_cycle_is_kept_as_acyclicity_reads_the_same_step_only():
+    """``x0(t-1) -> x2(t)`` and ``x2(t-1) -> x0(t)`` close no cycle in time, so both stay."""
+    lag_1 = np.diag([0.3, 0.3, 0.3])
+    lag_1[0, 2] = lag_1[2, 0] = 0.4
+    innovations = np.random.default_rng(3).standard_normal((800, 3))
+    cyclic = temporal.generate(np.eye(3), lag_1.T[None], None, innovations, burn_in=200)
+    assert {(0, 2, 1), (2, 0, 1)} <= links(fit(cyclic))
 
 
 def test_tiers_forbid_every_link_into_an_earlier_tier_but_a_series_keeps_its_own_past(series):
