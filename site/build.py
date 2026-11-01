@@ -127,6 +127,22 @@ REGIMES = {
     "latent_measurement": "linear data with latent variables, each measured by three indicators",
     "domain_shift_er": "linear-Gaussian data from Erdos-Renyi graphs whose mechanisms shift "
     "across domains",
+    "fcm_anm_er": "additive-noise data with Gaussian noise from Erdos-Renyi graphs, standardized, "
+    "in the method's claim",
+    "fcm_anm_gumbel_er": "additive-noise data with Gumbel noise from Erdos-Renyi graphs, "
+    "standardized, in the method's claim",
+    "fcm_anm_er_raw": "additive-noise data with Gaussian noise from Erdos-Renyi graphs, not "
+    "standardized, in the method's claim",
+    "fcm_anm_gumbel_er_raw": "additive-noise data with Gumbel noise from Erdos-Renyi graphs, not "
+    "standardized, in the method's claim",
+    "fcm_lsnm_er": "location-scale noise data from Erdos-Renyi graphs, standardized, outside the "
+    "method's claim",
+    "fcm_lsnm_er_raw": "location-scale noise data from Erdos-Renyi graphs, not standardized, "
+    "outside the method's claim",
+    "fcm_linear_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs, standardized, outside "
+    "the method's claim",
+    "fcm_linear_gauss_er_raw": "linear-Gaussian data from Erdos-Renyi graphs, not standardized, "
+    "outside the method's claim",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
