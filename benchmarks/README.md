@@ -35,6 +35,8 @@ Packages:
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
+- [CausalNex](https://github.com/mckinsey/causalnex) - uses a separate environment; see below and
+  [DYNOTEARS](comparisons/dynotears.md)
 
 ## Setup
 
@@ -92,6 +94,14 @@ lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
 ```shell
 benchmarks/start_lingam.sh
 export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
+```
+
+CausalNex 0.12.2, the reference for DYNOTEARS, pins Python below 3.11, NumPy below 1.24, and pandas
+below 2, so its fits run in an environment on Python 3.10:
+
+```shell
+benchmarks/start_causalnex.sh
+export ANDREY_BENCH_CAUSALNEX_PYTHON=$PWD/benchmarks/.venv-causalnex/bin/python
 ```
 
 An adapter selects another environment by setting `python_env` to the name of the variable that

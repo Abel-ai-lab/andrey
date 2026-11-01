@@ -38,13 +38,15 @@ whose Reproduce table lists the driver.
 | [PCMCI+ and LPCMCI](comparisons/pcmciplus-lpcmci.md) | `pcmci_cpu.py` | PCMCI+, LPCMCI | tigramite | 0.5.0, 0.9.0 |
 | [Granger causality](comparisons/granger.md) | `granger_var.py` | Granger | causal-learn | 0.5.0, 0.9.0 |
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
+| [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | |
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
-`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, and `start_lingam_ts.sh` build the
-separate environments some comparisons need ([setup](README.md#setup)).
+`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, and
+`start_causalnex.sh` build the separate environments some comparisons need
+([setup](README.md#setup)).
 
 ## Release cards
 

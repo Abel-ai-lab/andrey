@@ -25,9 +25,10 @@ whose reduced-form lag matrix ``A (I - W)^-1`` has spectral radius 1 or more is 
 :data:`MAX_DRAWS` times. The Barabasi-Albert and block-model graphs need more draws than that at 100
 variables for some seeds, so no draw is rescaled and such a size raises instead.
 
-``dynotears2020_sin_tanh`` keeps the linear model's graphs and weights and replaces each same-step
-parent ``x_i(t)`` by ``sin(x_i(t))`` and each lagged one by ``tanh(x_i(t-1))``: a nonlinear series
-the paper's linear model does not describe. Its terms are bounded, so it needs no stationarity draw.
+``dynotears2020_sin_tanh`` draws its graphs and weights as ``dynotears2020`` does and replaces each
+same-step parent ``x_i(t)`` by ``sin(x_i(t))`` and each lagged one by ``tanh(x_i(t-1))``: a
+nonlinear series the paper's linear model does not describe. Its terms are bounded, so its first
+draw is kept, without the stationarity check.
 
 A series has ``n + 1`` steps, so the fit regresses ``n`` steps on the step before each, the paper's
 ``n``. ``standardize="standardized"`` z-scores every column of the same series.
