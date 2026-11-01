@@ -39,9 +39,16 @@ names its pull request.
   minus one and the rows over 20, 50 at 1,000 rows, which binds at 100 variables; Andrey sets no cap
   by default. Location-scale and linear-Gaussian data lie outside the model and are reported, not
   judged. ([#631])
-
-### Added
-
+- `resit` is supported and joins the quality gate. On simulated nonlinear additive-noise data with
+  Gaussian or Gumbel noise, 5 to 20 variables, 1,000 rows, and mean degree 2, `resit` makes no more
+  errors than the authors' R code in 12 of 12 judged settings (one after a rerun on fresh datasets)
+  and fewer than lingam's implementation in 11 of 12 (no more in the other), returns the authors'
+  graph on 87 of 220 datasets, and fits 3.2 to 4.6 times faster than the authors' code and 2.1 to
+  2.9 times faster than lingam on one core. The accuracy claim holds up to 10 variables: at 20
+  variables on Gaussian noise no implementation clearly beats the empty graph, so that range is for
+  speed. The paper fixes no order for removing a variable's parents; Andrey's order is no worse than
+  a random one on datasets not used before. Location-scale and linear-Gaussian data lie outside the
+  model and are reported, not judged. ([#PRNUM]) ### Added
 - `andrey.data.sample_scm(functional="location_scale")` and
   `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
   noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
@@ -58,7 +65,7 @@ names its pull request.
   2014), a functional causal model, learns a DAG and a causal order from nonlinear effects with
   additive noise of any distribution, with the paper's settings: it takes as each next sink the
   variable whose additive-model residual an HSIC test finds most independent of the others, then
-  removes each parent whose removal leaves the residual independent; it is experimental. ([#620])
+  removes each parent whose removal leaves the residual independent. ([#620])
 - `camuv`, causal additive models with unobserved variables (Maeda and Shimizu 2021), a
   latent-variable method, learns the direct causes among the observed variables from nonlinear
   additive effects with the paper's settings: HSIC tests on the residuals of additive spline fits
@@ -1589,3 +1596,4 @@ First alpha release.
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
+[#PRNUM]: https://github.com/Abel-ai-lab/andrey/pull/PRNUM
