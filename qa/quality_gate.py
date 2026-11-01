@@ -120,6 +120,9 @@ REGIME_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "nonmonotone_er": NONLINEAR_SIZES,
     "anm_er_n1000": ((20, 1000), (50, 1000)),
 }
+#: The benchmark regime a gate regime that is named for its rows draws: ``anm_er_n1000`` is
+#: ``anm_er`` at 1,000 rows.
+BENCHMARK_REGIME: dict[str, str] = {"anm_er_n1000": "anm_er"}
 #: Smaller ``linear_gauss_er`` draws, at ``n = 50d``, for exact search, whose run time at least
 #: doubles with each variable, and CALM, whose optimizer step's cost grows with the cube of the
 #: variable count, so it runs on the smaller one and ASIA only.
