@@ -443,17 +443,17 @@ def inter_iamb(
 
     Notes
     -----
-    **When to use.** Inter-IAMB suits i.i.d. observational data with no unmeasured common causes,
-    in which every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z
-    test assumes continuous data with linear effects and Gaussian noise; the other tests read
-    categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. It is
-    designed for many variables [1]_, and shrinking after each addition keeps its conditioning sets
-    smaller than IAMB's, since a member that becomes independent leaves before it enlarges the
-    later ones. With ``target``, it returns an undirected graph joining ``target`` to each member
-    of its Markov blanket, which holds its parents, its children, and its children's other parents;
-    without, the graph ``structure`` names: the CPDAG by default, or the undirected skeleton or
-    moral graph. For the parents and children alone, use :func:`~andrey.mmpc`; when unmeasured
-    common causes are plausible, use :func:`~andrey.fci`.
+    **When to use.** Inter-IAMB suits i.i.d. observational data with no unmeasured common causes, in
+    which every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test
+    assumes continuous data with linear effects and Gaussian noise; the other tests read categorical
+    or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes. It is designed for
+    many variables whose Markov blankets are small relative to the rows [1]_: shrinking after each
+    addition aims to keep the current blanket, and so the conditioning sets, small at every step.
+    With ``target``, it returns an undirected graph joining ``target`` to each member of its Markov
+    blanket, which holds its parents, its children, and its children's other parents; without, the
+    graph ``structure`` names: the CPDAG by default, or the undirected skeleton or moral graph. For
+    the parents and children alone, use :func:`~andrey.mmpc`; when unmeasured common causes are
+    plausible, use :func:`~andrey.fci`.
 
     **How it works.** Each step adds the candidate most dependent on the target given the current
     blanket, among those whose p-value is at or below ``alpha``, then visits the members in the

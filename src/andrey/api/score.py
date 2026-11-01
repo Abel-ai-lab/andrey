@@ -463,18 +463,20 @@ def gies(
 
     Notes
     -----
-    **When to use.** GIES suits i.i.d. data that mix observational rows with rows in which some
-    variables were set by an intervention, marked in ``interventions`` [1]_. It makes the
-    assumptions of :func:`~andrey.ges`, no unmeasured common causes and, with the default BIC score
-    on continuous data, linear relations with Gaussian noise, and assumes that an intervention
-    replaces the intervened variable's mechanism and leaves every other variable's unchanged;
-    categorical and mixed data take the scores and defaults of :func:`~andrey.ges`. It suits sparse
-    graphs: its authors note that bounding the number of edges at each variable keeps the cost of a
-    step polynomial in the number of variables [1]_. It returns the interventional essential graph,
-    a CPDAG whose directed edges are those every graph of the interventional class orients alike.
-    On observational data alone, use :func:`~andrey.ges`; when the rows come from several domains
-    and which variables changed is unknown, use :func:`~andrey.cdnod`; when unmeasured common causes
-    are plausible, use :func:`~andrey.fci`.
+    **When to use.** GIES suits independent rows drawn from the observational distribution and from
+    the distributions of known interventions, with the variables set in each row marked in
+    ``interventions``; the rows are not identically distributed [1]_. It makes the assumptions of
+    :func:`~andrey.ges`, no unmeasured common causes and, with the default BIC score on continuous
+    data, linear relations with Gaussian noise, and assumes that an intervention replaces the
+    intervened variable's mechanism and leaves every other variable's unchanged; categorical and
+    mixed data take the scores and defaults of :func:`~andrey.ges`. It suits sparse graphs: its
+    authors note that bounding the number of edges at each variable keeps the cost of a step
+    polynomial in the number of variables [1]_. It returns the interventional essential graph, whose
+    directed edges are those every graph of the interventional equivalence class orients alike, so
+    interventions can orient edges that a CPDAG leaves undirected. On observational data alone, use
+    :func:`~andrey.ges`; when the rows come from several domains and which variables changed is
+    unknown, use :func:`~andrey.cdnod`; and with unmeasured common causes, :func:`~andrey.fci` takes
+    observational rows only.
 
     **Scores under interventions.** Each score reads a variable only on the rows where it was not
     intervened on, as the likelihood of interventional data does [1]_, and every BIC charges

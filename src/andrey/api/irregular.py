@@ -102,14 +102,16 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     -----
     **When to use.** ANM decides the direction between two continuous variables observed i.i.d.,
     under the model ``y = f(x) + e`` with the noise ``e`` independent of the cause ``x``, and no
-    hidden common cause of the two [1]_. The direction is identifiable when ``f`` is nonlinear or
-    the noise is non-Gaussian; a linear pair with Gaussian noise fits an additive noise model in
-    both directions [1]_. It is designed for one pair with a moderate number of rows, as
-    the cost of its Gaussian-process regression grows quickly with the rows. It returns a two-node
-    DAG whose edge depends on ``alpha``: with ``None``, the direction of the larger p-value, and
-    with a significance level, an edge only when exactly one direction passes. For more than two
-    variables, use :func:`~andrey.resit` or :func:`~andrey.cam`, and when the effect also passes
-    through an invertible nonlinear transform, :func:`~andrey.pnl`.
+    hidden common cause of the two [1]_. For strictly positive, smooth densities, the direction is
+    identifiable for generic choices of ``f`` and of the densities of ``x`` and ``e``; a model in
+    the reverse direction exists only for exceptional combinations, among them a linear ``f`` with
+    Gaussian ``x`` and ``e``, which fits an additive noise model in both directions [1]_. It is
+    designed for one pair with a moderate number of rows, as the cost of its Gaussian-process
+    regression grows quickly with the rows. It returns a two-node DAG whose edge depends on
+    ``alpha``: with ``None``, the direction of the larger p-value, and with a significance level, an
+    edge only when exactly one direction passes. For more than two variables, use
+    :func:`~andrey.resit` or :func:`~andrey.cam`, and when the effect also passes through an
+    invertible nonlinear transform, :func:`~andrey.pnl`.
 
     With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
     sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
@@ -419,12 +421,10 @@ def rcd(
     -----
     **When to use.** RCD suits i.i.d. continuous observational data with linear effects and
     non-Gaussian noise, where hidden common causes may affect pairs of observed variables [1]_. It
-    is designed for a moderate number of variables and needs more rows than
-    :func:`~andrey.direct_lingam`: its tests compare residuals, and a weak hidden cause leaves only
-    a small trace in them. It returns a PAG: ``i -> j`` for a direct cause and ``i <-> j`` for a
-    pair with a hidden common cause, with the edge coefficients in ``weighted_adjacency``. With no
-    hidden common causes, use :func:`~andrey.direct_lingam`; with nonlinear effects,
-    :func:`~andrey.camuv`, and with Gaussian noise, :func:`~andrey.fci`.
+    is designed for a moderate number of variables. It returns a PAG: ``i -> j`` for a direct
+    cause and ``i <-> j`` for a pair with a hidden common cause, with the edge coefficients in
+    ``weighted_adjacency``. With no hidden common causes, use :func:`~andrey.direct_lingam`; with
+    nonlinear effects, :func:`~andrey.camuv`, and with Gaussian noise, :func:`~andrey.fci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in

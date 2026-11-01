@@ -575,8 +575,8 @@ def fci(
     tests suit sparse graphs, where every variable has few neighbors, as PC's do, and it runs an
     extra round of tests that PC does not. It returns a PAG, which claims less than PC's CPDAG: an
     arrowhead at a node rules out that node causing the node at the edge's other end, and a circle
-    leaves the mark open. When every common cause is measured, use :func:`~andrey.pc`, which
-    orients more of the graph with fewer tests.
+    leaves the mark open. When every common cause is measured and no selection bias is possible, use
+    :func:`~andrey.pc`, which returns a CPDAG without that extra round of tests.
 
     **Choosing alpha.** A larger ``alpha`` keeps more edges, true and false.
 
@@ -917,11 +917,13 @@ def gfci(
     score and Fisher-Z test assume continuous data with linear effects and Gaussian noise; with
     categorical or mixed columns, the defaults follow the declared column types, as for
     :func:`~andrey.ges` and :func:`~andrey.pc`. Its tests start from the adjacencies of a full GES
-    search rather than a complete graph, so it suits the graph sizes GES suits, and its scored
-    skeleton is usually more accurate than FCI's test-only one [1]_. It returns a PAG, whose circle
-    marks (``o``) are the endpoints the data cannot determine and whose bidirected edges (``<->``)
-    mark probable latent common causes. When every common cause is measured, use
-    :func:`~andrey.ges`, whose CPDAG the first phase of GFCI already computes.
+    search rather than a complete graph, which shrinks the candidate edges, but its
+    possible-d-separation round of tests is exponential in the worst case and can make it much
+    slower than GES, while its authors report more accurate adjacencies and endpoints than FCI's on
+    simulated data [1]_. It returns a PAG, whose circle marks (``o``) are the endpoints the data
+    cannot determine and whose bidirected edges (``<->``) mark probable latent common causes. When
+    every common cause is measured, use :func:`~andrey.ges`, whose CPDAG the first phase of GFCI
+    already computes.
 
     GFCI first runs :func:`~andrey.ges` and keeps its CPDAG. FCI's adjacency search then starts
     from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` at the
