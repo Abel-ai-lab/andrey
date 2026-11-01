@@ -401,12 +401,6 @@ def resit(
     FloatingPointError
         If an HSIC test gives a non-finite value, rather than let it steer a choice.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
-
     See Also
     --------
     andrey.cam : Additive effects with Gaussian noise, scored by the likelihood.
@@ -464,43 +458,55 @@ def resit(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked against other packages yet. Binary columns, and any column with
-    fewer than 3 distinct values, are not supported: every regression fits a smooth term of each
-    parent, and such a column raises ``ValueError`` before the fit. Measured on simulated
-    additive-noise data with 1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized
-    columns, on one core. It oriented 88% of the true edges correctly at 5 variables and 80% at 10,
-    with median errors (SHD) of 1 and 5 against the empty graph's 5 and 10. From 20 variables its
-    median errors on these data come near the empty graph's or exceed them, 18 against 20 at 20
-    variables, 31 against 30 at 30, and 91 against 50 at 50: each test of the causal order reads all
-    the remaining variables at once and loses power, and an early wrong sink carries through the
-    rest of the order. At 20 variables, over ten graphs per generator, it oriented 65.5% to 78% of
-    the true edges correctly on four additive-noise generators, the most with Gumbel noise, with
-    median errors of 18 to 19.5 against the empty graph's 20; it oriented 46% on linear Gaussian
-    data and 28% on location-scale data, whose noise scale changes with the parents. A fit took a
-    median of 1.5 s at 5 variables, 45 s at 20, 3.3 minutes at 30, and 21 minutes at 50. The causal
-    order fits about ``d^2 / 2`` additive models of up to ``d - 1`` terms; their cost grows with the
-    terms up to about 35, past which each term's basis shrinks to keep three rows per basis
-    function, so a fit's cost grows about as ``d^3.3`` up to 50 variables and as ``d^2`` beyond. A
-    fit passes about a minute near 20 variables, 10 minutes near 40, and an hour near 75; at 100
-    variables, a fit stopped after an hour had run 3,565 of the 5,049 tests of its causal order, and
-    the measured cost per test puts the whole fit near two hours. Its accuracy ends sooner: over
-    five graphs per size, its median errors are at most half the empty graph's up to 10 variables
-    and 73% or more of it from 12 variables. Each HSIC test builds matrices with one row and one
-    column per sample, so time and memory grow with the square of ``n_samples``: at 5 variables a
-    fit took 1.7 s and peaked at 0.17 GB with 1,000 rows, 25 s and 0.75 GB with 4,000, and 107 s and
-    2.6 GB with 8,000; on Sachs's 7,466 rows and 11 variables it took 6.7 minutes and 2.3 GB, and
-    kept all 55 possible edges, as every removal test rejected. The edge removal tests each parent
-    against all the variable's predecessors at once, and many of those p-values lie near ``alpha``,
-    so the order the parents are tried in changes the result: trying them in the data's column order
-    instead of by rank gave the same causal orders at 20 variables but graphs a median of 10 to 19.5
-    edges apart, at about the same accuracy. A cause with a long tail can reverse its edge: with a
-    lognormal cause of log-sd 3 and an effect of its logarithm plus noise, on 500 rows, the true
-    order came out in 0 of 5 fits, against 5 of 5 at log-sd 1 and 2; replacing the cause by its
-    ranks before the fit gave 5 of 5 at every log-sd, while its logarithm, which makes that pair
-    linear and Gaussian, did not. The smoothing of each fit is a local minimum of its GCV score,
-    which can have several, so two variables of nearly equal p-value can be taken as the sink in
-    either order. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On additive-noise data with Gaussian or Gumbel noise, 5 to 20 variables, and
+    1,000 rows, standardized and not (the 0.13.0 release card), it made no more errors than the
+    paper's reference implementation in 12 of 12 settings, one of them after a rerun on fresh
+    datasets, returned the same graph on 87 of 220 datasets, and fit 3.2 to 4.6 times faster on one
+    core; against an implementation that regresses with random forests it made fewer errors in 11 of
+    12 settings and no more in the other, and fit 2.1 to 2.9 times faster. The accuracy claim holds
+    up to 10 variables: at 20 variables, on Gaussian additive-noise data, no implementation clearly
+    beats the empty graph (mean errors of 19.4 for this fit and 20.2 for the reference
+    implementation against 20.0), so 20 variables is a range for speed. The edge removal tries a
+    variable's parents one at a time and the paper's algorithm fixes no order, so the order is
+    arbitrary and can move a graph by about one edge: over 40 datasets of 10 variables, 48 orders
+    moved the mean errors (SHD) from 0.8 below to 0.8 above the column order's, and returned its
+    graph on 9 to 17 of the 40. Binary columns, and any column with fewer than 3 distinct values,
+    are not supported: every regression fits a smooth term of each parent, and such a column raises
+    ``ValueError`` before the fit. Measured on simulated additive-noise data with 1,000 rows from
+    Erdos-Renyi graphs of mean degree 2 with standardized columns, on one core. It oriented 88% of
+    the true edges correctly at 5 variables and 80% at 10, with median errors (SHD) of 1 and 5
+    against the empty graph's 5 and 10. From 20 variables its median errors on these data come near
+    the empty graph's or exceed them, 18 against 20 at 20 variables, 31 against 30 at 30, and 91
+    against 50 at 50: each test of the causal order reads all the remaining variables at once and
+    loses power, and an early wrong sink carries through the rest of the order. At 20 variables,
+    over ten graphs per generator, it oriented 65.5% to 78% of the true edges correctly on four
+    additive-noise generators, the most with Gumbel noise, with median errors of 18 to 19.5 against
+    the empty graph's 20; it oriented 46% on linear Gaussian data and 28% on location-scale data,
+    whose noise scale changes with the parents. A fit took a median of 1.5 s at 5 variables, 45 s at
+    20, 3.3 minutes at 30, and 21 minutes at 50. The causal order fits about ``d^2 / 2`` additive
+    models of up to ``d - 1`` terms; their cost grows with the terms up to about 35, past which each
+    term's basis shrinks to keep three rows per basis function, so a fit's cost grows about as
+    ``d^3.3`` up to 50 variables and as ``d^2`` beyond. A fit passes about a minute near 20
+    variables, 10 minutes near 40, and an hour near 75; at 100 variables, a fit stopped after an
+    hour had run 3,565 of the 5,049 tests of its causal order, and the measured cost per test puts
+    the whole fit near two hours. Its accuracy ends sooner: over five graphs per size, its median
+    errors are at most half the empty graph's up to 10 variables and 73% or more of it from 12
+    variables. Each HSIC test builds matrices with one row and one column per sample, so time and
+    memory grow with the square of ``n_samples``: at 5 variables a fit took 1.7 s and peaked at 0.17
+    GB with 1,000 rows, 25 s and 0.75 GB with 4,000, and 107 s and 2.6 GB with 8,000; on Sachs's
+    7,466 rows and 11 variables it took 6.7 minutes and 2.3 GB, and kept all 55 possible edges, as
+    every removal test rejected. The edge removal tests each parent against all the variable's
+    predecessors at once, and many of those p-values lie near ``alpha``, so the order the parents
+    are tried in changes the result: trying them in the data's column order instead of by rank gave
+    the same causal orders at 20 variables but graphs a median of 10 to 19.5 edges apart, at about
+    the same accuracy. A cause with a long tail can reverse its edge: with a lognormal cause of
+    log-sd 3 and an effect of its logarithm plus noise, on 500 rows, the true order came out in 0 of
+    5 fits, against 5 of 5 at log-sd 1 and 2; replacing the cause by its ranks before the fit gave 5
+    of 5 at every log-sd, while its logarithm, which makes that pair linear and Gaussian, did not.
+    The smoothing of each fit is a local minimum of its GCV score, which can have several, so two
+    variables of nearly equal p-value can be taken as the sink in either order. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
