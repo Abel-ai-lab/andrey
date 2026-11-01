@@ -31,6 +31,24 @@ names its pull request.
   packages run different discrete tests. Andrey is slower than bnlearn in 186 of the 220 network
   settings, in all 44 on hepar2 (bnlearn's fit time over Andrey's is 0.06 to 0.86), after the faster
   discrete tests. ([#626])
+- `cam` is supported and joins the quality gate. Against CAM 1.0, the authors' R package, on
+  simulated nonlinear additive-noise data with Gaussian or Gumbel noise, 10 to 100 variables, 1,000
+  rows, and mean degree 2, `cam` makes no more errors in 14 of 16 judged settings and fewer in 2
+  (Gumbel noise at 100 variables), returns the same graph on 278 of 320 datasets, and fits 6.5 to
+  14.7 times faster on one core. CAM 1.0 caps a variable's parents at the smaller of the variables
+  minus one and the rows over 20, 50 at 1,000 rows, which binds at 100 variables; Andrey sets no cap
+  by default. Location-scale and linear-Gaussian data lie outside the model and are reported, not
+  judged. ([#631])
+- `resit` is supported and joins the quality gate. On simulated nonlinear additive-noise data with
+  Gaussian or Gumbel noise, 5 to 20 variables, 1,000 rows, and mean degree 2, `resit` makes no more
+  errors than the authors' R code in 12 of 12 judged settings (one after a rerun on fresh datasets)
+  and fewer than lingam's implementation in 11 of 12 (no more in the other), returns the authors'
+  graph on 87 of 220 datasets, and fits 3.2 to 4.6 times faster than the authors' code and 2.1 to
+  2.9 times faster than lingam on one core. The accuracy claim holds up to 10 variables: at 20
+  variables on Gaussian noise no implementation clearly beats the empty graph, so that range is for
+  speed. The paper fixes no order for removing a variable's parents; Andrey's order is no worse than
+  a random one on datasets not used before. Location-scale and linear-Gaussian data lie outside the
+  model and are reported, not judged. ([#634])
 
 ### Added
 
@@ -44,13 +62,13 @@ names its pull request.
 - `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014), a functional causal
   model, learns a DAG and a causal order from nonlinear additive effects with the paper's
   settings: boosting preselects each variable's possible parents, a greedy search adds edges by the
-  drop in log residual variance of additive spline fits, and smooth-term tests prune them; it is
-  experimental. ([#597])
+  drop in log residual variance of additive spline fits, and smooth-term tests prune them.
+  ([#597])
 - `resit`, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf
   2014), a functional causal model, learns a DAG and a causal order from nonlinear effects with
   additive noise of any distribution, with the paper's settings: it takes as each next sink the
   variable whose additive-model residual an HSIC test finds most independent of the others, then
-  removes each parent whose removal leaves the residual independent; it is experimental. ([#620])
+  removes each parent whose removal leaves the residual independent. ([#620])
 - `camuv`, causal additive models with unobserved variables (Maeda and Shimizu 2021), a
   latent-variable method, learns the direct causes among the observed variables from nonlinear
   additive effects with the paper's settings: HSIC tests on the residuals of additive spline fits
@@ -89,6 +107,9 @@ names its pull request.
   rows fell from 12.3 s to 3.3 s with chisq and from 28.0 s to 5.5 s with gsq. The identity check's
   233 fits of every method but `calm`, 640 fits of the discrete methods on four networks, and
   86,163 recorded queries returned the same bits. ([#625])
+- The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
+  outside the method's claim, with its numbers and does not fail it; a row without the field is
+  judged as before. ([#631])
 
 ### Fixed
 
@@ -103,6 +124,14 @@ names its pull request.
   GIN assume zero-mean variables (Maeda and Shimizu 2020; Xie et al. 2020). On the identity check's
   239 draws no graph changed; the weights of `rcd` changed in the last bits on 4 of its 6, and every
   other method, `gin` included, is bit-identical. ([#619])
+- `varma_lingam` no longer changes its graph when a constant is added to every column. Its
+  likelihood fit takes a constant trend, so a column's mean is not part of the model, but a mean
+  far from 0 stopped the fit's optimizer at its starting point. With `1e9` added to simulated
+  data, and with `X * 3.7 + 1e6`, it returned another graph on 3 of 6 draws; now it does on none.
+  The series is centered first, as the structural VAR model that VARMA-LiNGAM extends takes
+  zero-mean series (Hyvarinen et al. 2010). On the identity check's 239 draws only the 6 of
+  `varma_lingam` changed: 2 in their graph, with 1 and 2 fewer errors against the true graph, and 4
+  in their weights; every other method is bit-identical. ([#629])
 
 ## [0.12.0] - 2026-10-30
 
@@ -1575,3 +1604,6 @@ First alpha release.
 [#623]: https://github.com/Abel-ai-lab/andrey/pull/623
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
+[#629]: https://github.com/Abel-ai-lab/andrey/pull/629
+[#631]: https://github.com/Abel-ai-lab/andrey/pull/631
+[#634]: https://github.com/Abel-ai-lab/andrey/pull/634

@@ -297,6 +297,8 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    direct_lingam
    ica_lingam
    multi_group_direct_lingam
+   cam
+   resit
    anm
    pnl
    rcd
@@ -313,6 +315,21 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
+smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
+variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
+variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges. It
+returns a DAG. The [0.13.0](benchmarks/0.13.0.md#cam) release card measures it from 10 to 100
+variables against CAM 1.0.
+
+RESIT, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014),
+fits the same kind of model with the noise of any distribution, with the paper's settings: it finds
+a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
+finds most independent of the remaining variables, then removes each parent whose removal leaves
+the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
+causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
+variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -349,8 +366,6 @@ its first call in a process.
 
    notears
    dagma
-   cam
-   resit
    camuv
    dynotears
 ```
@@ -360,16 +375,11 @@ under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` f
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
 
-CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
-smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
-variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
-variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges.
-
-RESIT, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014),
-fits the same kind of model with the noise of any distribution, with the paper's settings: it finds
-a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
-finds most independent of the remaining variables, then removes each parent whose removal leaves
-the residual independent of the variable's predecessors at `alpha=0.05`.
+CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
+kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
+on the residuals of additive spline fits find each variable's candidate parents over sets of up to
+3 variables and then its parents, and mark `o-o` each pair that a hidden common cause or a causal
+path through a hidden variable joins, whose relation no regression can identify.
 
 DYNOTEARS (Pamfil et al. 2020) learns a linear structural vector autoregression from one time
 series the way NOTEARS learns a DAG: the least-squares loss of each step on the same step and the
@@ -379,12 +389,6 @@ time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-ste
 on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
 temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
 lag 0.
-
-CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
-kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
-on the residuals of additive spline fits find each variable's candidate parents over sets of up to
-3 variables and then its parents, and mark `o-o` each pair that a hidden common cause or a causal
-path through a hidden variable joins, whose relation no regression can identify.
 
 A method becomes supported once it has:
 
