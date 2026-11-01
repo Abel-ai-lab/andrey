@@ -776,8 +776,8 @@ def gfci(
 
     GFCI [1]_ starts from the adjacencies of a score-based GES search, removes those that
     conditional-independence tests reject, and orients the endpoints with FCI's rules to account
-    for possible latent confounding. Its scored skeleton is usually more accurate than FCI's
-    test-only one.
+    for possible latent confounding. Its authors report a more accurate skeleton than FCI's
+    test-only one on simulated data.
 
     Parameters
     ----------
