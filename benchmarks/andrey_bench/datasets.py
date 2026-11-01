@@ -73,6 +73,7 @@ TOPOLOGY_TO_GRAPH = {
 FUNCTIONAL_TO_ANDREY = {
     "linear": "linear",
     "anm": "additive_noise",
+    "lsnm": "location_scale",
     "pnl": "post_nonlinear",
     "nonmonotone": "nonmonotone",
     "var": "var",
@@ -119,6 +120,16 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
     # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
     "anm_er": ("er", "anm", "gaussian", "standardized"),
+    # The regimes of the functional-causal-model lanes (CAM, RESIT): additive noise with Gaussian and
+    # with Gumbel noise, the location-scale generator, and linear-Gaussian data as the control, each
+    # z-scored (the default) and at raw scale. ``anm_er`` and ``linear_gauss_er`` are the z-scored
+    # Gaussian pair.
+    "anm_gumbel_er": ("er", "anm", "gumbel", "standardized"),
+    "lsnm_er": ("er", "lsnm", "gaussian", "standardized"),
+    "anm_er_raw": ("er", "anm", "gaussian", "raw"),
+    "anm_gumbel_er_raw": ("er", "anm", "gumbel", "raw"),
+    "lsnm_er_raw": ("er", "lsnm", "gaussian", "raw"),
+    "linear_gauss_er_raw": ("er", "linear", "gaussian", "raw"),
     # Additive noise through cos, an even function: a child is uncorrelated with a symmetric
     # parent, so partial correlation misses edges the nonlinear CI tests find.
     "nonmonotone_er": ("er", "nonmonotone", "gaussian", "standardized"),

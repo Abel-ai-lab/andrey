@@ -50,6 +50,8 @@ _PAIRWISE_FIELDS = {
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
+# Weighted temporal fits: candidate = the per-lag graphs and their weights.
+_WEIGHTED_LAGS = frozenset({"DYNOTEARS"})
 
 
 def found_dag(out: Any) -> GraphStructure:
@@ -108,6 +110,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm != "PCMCI":
             candidate["conflicts"] = out.metadata["conflicts"]
         return candidate
+    if algorithm in _WEIGHTED_LAGS:
+        s = out.structure
+        return {
+            "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
+            "lag_weights": np.asarray(s.lag_weights),
+        }
     if algorithm == "LongitudinalLiNGAM":
         return {
             "causal_orders": [list(order) for order in out.metadata["causal_orders"]],

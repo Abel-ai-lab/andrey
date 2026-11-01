@@ -24,6 +24,10 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [CAM](https://cran.r-project.org/src/contrib/Archive/CAM/) 1.0 (R, archived on CRAN) - see
+  [CAM and RESIT](comparisons/cam-resit.md)
+- the authors' R code for RESIT, read from disk and never copied - see
+  [CAM and RESIT](comparisons/cam-resit.md)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](comparisons/categorical.md)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar and tetrad-lib's - see
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md), and
