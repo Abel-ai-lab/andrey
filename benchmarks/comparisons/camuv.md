@@ -170,8 +170,8 @@ table in [Settings](#settings): lingam run on the columns in Andrey's rank order
 Andrey's HSIC test; then with Andrey's regressions; then Andrey's engine with lingam's algorithm,
 which removes a variable's non-parents together and drops no edge on a directed cycle; then
 Andrey's phase 2, one candidate at a time; then the cycle drop, which is `andrey.camuv`. At 50
-observed variables 5 of the 20 datasets were traced, at every other size all of them. Three facts
-close the question:
+observed variables 5 of the 20 datasets were traced, at every other size every dataset where a graph
+differed. Three facts close the question:
 
 - lingam's own code run with Andrey's test and regressions returns the graph of Andrey's engine
   run with lingam's algorithm on every traced dataset, so each difference is made of the five
@@ -180,7 +180,8 @@ close the question:
   references differ: their difference is the HSIC implementation, whose bandwidth reads every row
   in causal-learn and the first 100 rows in lingam;
 - no traced lingam fit made two variables each other's parent, which the adapters' marks would hold
-  as one edge, and the refit lingam graph is the lane's on every traced dataset.
+  as one edge, and a lingam fit in an environment of the same package versions returns the lane's
+  graph on every traced dataset.
 
 The table counts, per setting, the switch after which the graph is Andrey's. On the additive-noise
 data with up to 12 observed variables the visiting order alone, lingam run in Andrey's rank order,
