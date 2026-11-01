@@ -3,8 +3,9 @@
 The algorithm, its settings, and its references are described on :func:`andrey.varma_lingam`.
 
 The reduced-form VARMA(p, q) ``x(t) = sum_i Phi_i x(t-i) + e(t) + sum_j Theta_j e(t-j)`` is fit
-by Gaussian maximum likelihood (a Kalman filter) on the series scaled to unit standard deviation,
-with its matrices and innovations mapped back to the data's units (:func:`_reduced_form`).
+by Gaussian maximum likelihood (a Kalman filter) on the series centered and scaled to unit standard
+deviation, with its matrices and innovations mapped back to the data's units
+(:func:`_reduced_form`).
 DirectLiNGAM on the innovations, with least-squares pairwise slopes, gives the causal order and
 the instantaneous matrix ``B0``. The structural matrices are ``psi[0] = B0``,
 ``psi[tau] = (I - B0) Phi_tau``, and ``omega[j] = (I - B0) Theta_j``, or
@@ -76,6 +77,11 @@ def varma_lingam(
     The likelihood fit, which can stop before it converges, then starts from and stops at the same
     point for every column order.
 
+    The columns are centered first, as the structural VAR model that VARMA-LiNGAM extends takes
+    zero-mean series (Hyvarinen et al. 2010, Sec. 2.1). The likelihood fit takes a constant trend,
+    so the mean is not part of the model, but a mean far from 0 stops its optimizer at the
+    starting point.
+
     With background knowledge ``constraints`` over the autoregressive lags ``0`` to ``order[0]``,
     DirectLiNGAM on the innovations honors the lag-0 part, and with ``prune=True`` each
     variable's regression drops its forbidden regressors and keeps its required ones unpenalized
@@ -84,6 +90,7 @@ def varma_lingam(
     selected ``p`` is below the lag of a required link; ``name`` names a column in the message.
     """
     X = np.asarray(X, dtype=np.float64)
+    X = X - X.mean(axis=0)
     by_rank = np.argsort(tie_ranks(X))  # the fit's column k is the data's column by_rank[k]
     back = np.argsort(by_rank)
     X = np.ascontiguousarray(X[:, by_rank])
@@ -215,6 +222,8 @@ def _prune(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Sparse structural matrices on the causal order: adaptive-Lasso selection, then OLS refit.
 
+    ``X`` is the centered series.
+
     Each variable ``x_i(t)`` is regressed on the contemporaneous values of its causal predecessors,
     all ``p`` autoregressive lags of every variable, and all ``q`` lags of the independent
     innovations ``n(t) = (I - B0) e(t)``, with ``B0`` the least-squares refit of the residuals on
@@ -229,7 +238,6 @@ def _prune(
     """
     n = X.shape[1]
     s = max(p, q)
-    Xc = X - X.mean(axis=0)
 
     if constraints is None:
         b0 = estimate(residuals, list(causal_order), refit=True)
@@ -247,8 +255,8 @@ def _prune(
     innov[n_samples - residuals.shape[0] :] = residuals @ (np.eye(n) - b0).T
 
     rows = np.arange(s, n_samples)
-    blocks = [Xc[rows]]  # contemporaneous block
-    blocks += [Xc[rows - i] for i in range(1, p + 1)]  # AR lags
+    blocks = [X[rows]]  # contemporaneous block
+    blocks += [X[rows - i] for i in range(1, p + 1)]  # AR lags
     blocks += [innov[rows - j] for j in range(1, q + 1)]  # MA innovation lags
     design = np.concatenate(blocks, axis=1)
 
