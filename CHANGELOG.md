@@ -48,7 +48,10 @@ names its pull request.
   variables on Gaussian noise no implementation clearly beats the empty graph, so that range is for
   speed. The paper fixes no order for removing a variable's parents; Andrey's order is no worse than
   a random one on datasets not used before. Location-scale and linear-Gaussian data lie outside the
-  model and are reported, not judged. ([#PRNUM]) ### Added
+  model and are reported, not judged. ([#PRNUM])
+
+### Added
+
 - `andrey.data.sample_scm(functional="location_scale")` and
   `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
   noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
