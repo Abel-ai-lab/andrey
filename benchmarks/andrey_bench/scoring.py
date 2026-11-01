@@ -379,6 +379,13 @@ def _pag_of(truth: GraphStructure) -> GraphStructure:
     return hit[1]
 
 
+def _hidden(truth: GraphStructure) -> np.ndarray:
+    """The hidden nodes of `truth` as a boolean mask; none when it has no node types."""
+    if truth.node_types is None:
+        return np.zeros(truth.n_nodes, dtype=bool)
+    return np.asarray(truth.node_types) == LATENT
+
+
 def _directed_adjacency(truth: GraphStructure) -> np.ndarray:
     """Return binary adjacency where ``A[i, j] = 1`` represents ``i -> j``."""
     marks = np.asarray(truth.to_numpy())
@@ -419,7 +426,7 @@ def _marked_pairs(marks: np.ndarray, mark: int) -> set[tuple[int, int]]:
 def _hidden_cause_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
     """Return the observed pairs ``i < j`` that one hidden node reaches through hidden nodes only."""
     directed = _directed_adjacency(truth).astype(bool)
-    hidden = np.asarray(truth.node_types) == LATENT
+    hidden = _hidden(truth)
     pairs: set[tuple[int, int]] = set()
     for source in np.flatnonzero(hidden):
         seen, stack, reached = {int(source)}, [int(source)], set()
@@ -441,7 +448,7 @@ def projected_directed(truth: GraphStructure) -> set[tuple[int, int]]:
     them hidden, a direct edge included.
     """
     directed = _directed_adjacency(truth).astype(bool)
-    hidden = np.asarray(truth.node_types) == LATENT
+    hidden = _hidden(truth)
     edges: set[tuple[int, int]] = set()
     for source in np.flatnonzero(~hidden):
         seen, stack = {int(source)}, [int(source)]
@@ -464,7 +471,7 @@ def unobserved_path_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
     inside either path may be observed.
     """
     directed = _directed_adjacency(truth).astype(bool)
-    hidden = np.asarray(truth.node_types) == LATENT
+    hidden = _hidden(truth)
     reach = directed | np.eye(len(hidden), dtype=bool)  # reach[a, b]: a is b or an ancestor of b
     for k in range(len(hidden)):
         reach |= reach[:, [k]] & reach[[k], :]
@@ -489,7 +496,7 @@ def direct_edges(truth: GraphStructure) -> set[tuple[int, int]]:
     (:func:`unobserved_path_pairs`): CAM-UV marks a pair with such a path instead of orienting it,
     even when one node is the other's parent.
     """
-    hidden = np.asarray(truth.node_types) == LATENT
+    hidden = _hidden(truth)
     directed = _directed_adjacency(truth).astype(bool) & ~hidden[:, None] & ~hidden[None, :]
     unresolved = unobserved_path_pairs(truth)
     return {

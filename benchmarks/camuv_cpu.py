@@ -146,11 +146,15 @@ def regime_keys(regime: str, d: int, n: int, seeds: int, seed_start: int = 0) ->
 
 
 def as_bidirected(estimate: GraphStructure) -> GraphStructure:
-    """`estimate` with every ``o-o`` pair drawn ``<->``, the reference implementations' mark."""
+    """`estimate` as a PAG with every ``o-o`` pair drawn ``<->``, the references' mark.
+
+    The empty graph, a CPDAG, becomes the empty PAG, so it is scored against the PAG of the observed
+    variables too when nothing is hidden.
+    """
     marks = np.asarray(estimate.to_numpy()).copy()
     pairs = (marks == 3) & (marks.T == 3)
     marks[pairs] = 2
-    return GraphStructure.from_numpy(marks, kind=estimate.kind)
+    return GraphStructure.from_numpy(marks, kind="pag")
 
 
 def graph_key(estimate: GraphStructure, mark: str) -> str:

@@ -153,6 +153,14 @@ def test_a_hidden_cause_or_intermediate_leaves_its_pairs_unresolved() -> None:
     assert scoring.true_confounded_pairs(HAND, "hidden_cause") == {(0, 1)}
 
 
+def test_with_nothing_hidden_every_edge_is_direct_and_no_pair_is_true() -> None:
+    marks = _dag([(0, 1), (1, 2)], 3, 0).to_numpy()
+    truth = GraphStructure.from_numpy(marks, kind="dag")  # no node types, as a plain DAG has
+    assert scoring.direct_edges(truth) == scoring.projected_directed(truth) == {(0, 1), (1, 2)}
+    assert scoring.unobserved_path_pairs(truth) == set()
+    assert scoring.true_confounded_pairs(truth, "hidden_cause") == set()
+
+
 def test_the_direct_target_scores_edges_and_marks_apart() -> None:
     estimate = _pag([(0, 2), (1, 3)], [(0, 1)], _CIRCLE, 4)
     directed = scoring.directed_edge_scores(estimate, HAND)
