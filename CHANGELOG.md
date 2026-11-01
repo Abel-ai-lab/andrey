@@ -84,6 +84,9 @@ names its pull request.
   rows fell from 12.3 s to 3.3 s with chisq and from 28.0 s to 5.5 s with gsq. The identity check's
   233 fits of every method but `calm`, 640 fits of the discrete methods on four networks, and
   86,163 recorded queries returned the same bits. ([#625])
+- Every method's docstring opens its Notes with a **When to use.** paragraph: the data, model,
+  and scale the method is designed for, what it returns, and the method to use outside that
+  setting. ([#633])
 
 ### Fixed
 
@@ -1577,3 +1580,4 @@ First alpha release.
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
+[#633]: https://github.com/Abel-ai-lab/andrey/pull/633
