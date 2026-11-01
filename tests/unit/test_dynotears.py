@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 import andrey
+from andrey.core.score import CopiedColumnsError
 from andrey.data import temporal
 from andrey.search.continuous import least_squares
 from andrey.temporal.dynotears import lagged_covariance, lagged_design
@@ -170,6 +171,16 @@ def test_a_missing_value_raises_and_names_the_method(series):
     data[10, 2] = np.nan
     with pytest.raises(ValueError, match="dynotears"):
         fit(data)
+
+
+def test_columns_that_repeat_up_to_scale_and_shift_raise_and_are_named():
+    """Copies of one series leave their direction unidentifiable, so the fit refuses them."""
+    x = np.r_[0.0, np.random.default_rng(10).integers(-10, 11, 127), 0.0]
+    frame = pd.DataFrame({"a": x, "b": x + 1.0})
+    with pytest.raises(CopiedColumnsError) as error:
+        fit(frame)
+    assert error.value.groups == ((0, 1),)
+    assert [error.value.column_name(j) for j in (0, 1)] == ["'a'", "'b'"]
 
 
 def test_column_names_become_the_labels(series):

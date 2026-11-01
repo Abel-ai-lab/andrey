@@ -18,6 +18,7 @@ from andrey.api._method import method_spec
 from andrey.core.backend import one_blas_thread
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve_lagged
+from andrey.core.score import copies_error, copy_groups
 
 from ._adapt import (
     DROP_UNITS,
@@ -1518,7 +1519,10 @@ def dynotears(
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``data`` is
         not a finite numeric matrix without a constant column, or has fewer than ``tau_max + 2``
-        rows, so that fewer than 2 steps have ``tau_max`` steps before them. Also if ``knowledge``
+        rows, so that fewer than 2 steps have ``tau_max`` steps before them. Also if a column
+        repeats another up to scale and shift, as the direction between copies cannot be told
+        apart; one message names every group of copies and says to keep one column per group.
+        Also if ``knowledge``
         names a column ``data`` lacks, contradicts itself, or requires a link without a lag or
         beyond ``tau_max``.
 
@@ -1668,6 +1672,10 @@ def dynotears(
             f"that 2 steps have tau_max={tau_max} steps before them, got {X.shape[0]}"
         )
     labels = column_labels(data)
+    if X.shape[1] > 1:
+        groups = copy_groups(np.corrcoef(X, rowvar=False), X.shape[0])
+        if groups:
+            raise copies_error(groups, column_namer(labels))
     constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="dynotears")
     with one_blas_thread():
         result = _native(
