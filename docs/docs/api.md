@@ -295,6 +295,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    direct_lingam
    ica_lingam
    multi_group_direct_lingam
+   cam
    anm
    pnl
    rcd
@@ -311,6 +312,13 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
+
+CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
+smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
+variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
+variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges. It
+returns a DAG. The [0.13.0](benchmarks/0.13.0.md#cam) release card measures it from 10 to 100
+variables against CAM 1.0.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -347,7 +355,6 @@ its first call in a process.
 
    notears
    dagma
-   cam
    resit
    camuv
 ```
@@ -356,11 +363,6 @@ NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG b
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
-smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
-variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
-variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges.
 
 RESIT, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014),
 fits the same kind of model with the noise of any distribution, with the paper's settings: it finds
