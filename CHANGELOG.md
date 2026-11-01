@@ -102,6 +102,18 @@ names its pull request.
   rows fell from 12.3 s to 3.3 s with chisq and from 28.0 s to 5.5 s with gsq. The identity check's
   233 fits of every method but `calm`, 640 fits of the discrete methods on four networks, and
   86,163 recorded queries returned the same bits. ([#625])
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="gsq"` return the same graphs and p-values in
+  less time: the test evaluates the degrees of freedom of all the tables of a scan in one pass,
+  where each table shape evaluated its own, and reads the mean of a cell in a configuration of at
+  most 128 rows from a table of 358 thousand floats (2.9 MB) that every test in the process shares
+  and that fills as lookups need it. On asia, child, insurance, alarm, and hepar2 with 1,000 and
+  5,000 rows, the geometric mean of the speedup over the ten datasets was 1.63x for `iamb`, 1.49x
+  for `inter_iamb`, and 1.40x for `mmpc`, from 0.91x to 2.25x over the 30 settings; the three fits
+  on asia with 5,000 rows were 3 to 7 ms slower, and `iamb` on hepar2 with 5,000 rows fell from 7.2
+  to 4.8 seconds. Andrey stays slower than bnlearn's `mi-adf` in 28 of the 30 settings, taking 1.7
+  to 10.7 times as long. The identity check's 239 fits of every method, 640 fits of the discrete
+  methods on four networks, 68 on hepar2, and 86,163 recorded queries returned the same bits.
+  ([#630])
 - The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
   outside the method's claim, with its numbers and does not fail it; a row without the field is
   judged as before. ([#631])
@@ -1598,5 +1610,6 @@ First alpha release.
 [#625]: https://github.com/Abel-ai-lab/andrey/pull/625
 [#626]: https://github.com/Abel-ai-lab/andrey/pull/626
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
+[#630]: https://github.com/Abel-ai-lab/andrey/pull/630
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
