@@ -17,8 +17,9 @@ and ``CONFLICT`` 4, a mark that orientation rules set both ways.
 
 Both packages' outputs reach this layout through :func:`marks_from_link_strings`, which reads the
 three-character link strings that tigramite returns in ``results["graph"]`` and that Andrey's
-LPCMCI returns in ``metadata["links"]``. This module imports nothing but numpy, because the worker
-in the tigramite environment imports it.
+LPCMCI returns in ``metadata["links"]``. A solution that returns directed edges, a same-step DAG and
+lagged links, reaches it through :func:`marks_from_edges`. This module imports nothing but numpy,
+because the workers in the tigramite and CausalNex environments import it.
 """
 
 from __future__ import annotations
@@ -70,6 +71,30 @@ def marks_from_link_strings(graph: np.ndarray) -> np.ndarray:
             raise RuntimeError(f"lagged link {link!r} at ({i}, {j}, lag {k}) points back in time")
         else:
             marks[k, i, j] = _FIRST[link[0]]
+    return marks
+
+
+def marks_from_edges(same_step: np.ndarray, lagged: np.ndarray) -> np.ndarray:
+    """Convert directed edges to the ``(L + 1, n, n)`` window marks of a graph whose lag 0 is a DAG.
+
+    ``same_step[i, j]`` is the edge ``X_i(t) -> X_j(t)`` and ``lagged[k - 1, i, j]`` the link
+    ``X_i(t-k) -> X_j(t)``, self-links included; both are read as booleans. Raises ``RuntimeError``
+    when the same-step edges form a cycle, which a DAG's marks cannot hold.
+    """
+    edges = np.asarray(same_step) != 0
+    links = np.asarray(lagged) != 0
+    if edges.ndim != 2 or edges.shape[0] != edges.shape[1] or links.shape[1:] != edges.shape:
+        raise RuntimeError(f"edges of shape {edges.shape} and links of shape {links.shape}")
+    remaining = edges.copy()
+    while remaining.any():  # drop every node without a parent until none or only cycles are left
+        sources = ~remaining.any(axis=0) & remaining.any(axis=1)
+        if not sources.any():
+            raise RuntimeError("the same-step edges form a cycle, so they are not a DAG")
+        remaining[sources] = False
+    marks = np.zeros((len(links) + 1, *edges.shape), dtype=np.int8)
+    marks[0][edges] = TAIL
+    marks[0][edges.T] = ARROW
+    marks[1:][links] = TAIL
     return marks
 
 

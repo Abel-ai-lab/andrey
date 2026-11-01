@@ -151,6 +151,9 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
     - ``lagged_tail``, ``lagged_circle``, ``lagged_arrow``: the true lagged links found, by the mark
       at their earlier end (a tail is the true one).
 
+    An estimate whose lag 0 is a DAG, scored against a truth without unobserved variables, also gets
+    the edge columns of :func:`_edge_scores`, the units of the DYNOTEARS paper.
+
     Conflicts are read by :func:`_scored_marks`. A truth with unobserved variables is scored as its
     true PAG over the observed ones at the estimate's ``tau_max``
     (:func:`andrey_bench.window_pag.true_window_pag`), the class LPCMCI recovers: a circle in both
@@ -162,6 +165,7 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
         raise TypeError("window_scores needs a window estimate and a window truth")
     if truth.lag0 != "dag":
         raise ValueError("window_scores needs a truth whose lag 0 is a DAG")
+    directed = estimate.lag0 == "dag" and not truth.latents
     if truth.latents:
         truth = _window_pag_of(truth, estimate.tau_max)
     if estimate.n_nodes != truth.n_nodes:
@@ -200,7 +204,9 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
     precision = tp / (tp + fp) if tp + fp else 1.0
     recall = tp / (tp + fn) if tp + fn else 1.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    edges = _edge_scores(est, true_) if directed else {}
     return {
+        **edges,
         "family": "temporal_window",
         "endpoint_shd": float(lag0_shd + lagged_shd),
         "lag0_endpoint_shd": float(lag0_shd),
@@ -214,6 +220,43 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
         "lagged_tail": float((found == W.TAIL).sum()),
         "lagged_circle": float((found == W.CIRCLE).sum()),
         "lagged_arrow": float((found == W.ARROW).sum()),
+    }
+
+
+def _f1(tp: int, n_est: int, n_true: int) -> float:
+    """F1 of ``tp`` matches among ``n_est`` estimated and ``n_true`` true edges.
+
+    A ratio with no denominator scores 1, as :func:`window_scores` scores it.
+    """
+    precision = tp / n_est if n_est else 1.0
+    recall = tp / n_true if n_true else 1.0
+    return 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+
+
+def _edge_scores(est: np.ndarray, true_: np.ndarray) -> dict[str, float]:
+    """Edge SHD and directed-edge F1 of window marks whose lag 0 is a DAG, padded to equal lags.
+
+    An edge is a directed same-step pair ``i -> j`` or a lagged link. ``lag0_shd`` counts the
+    same-step pairs whose state differs (no edge, ``i -> j``, ``j -> i``): a missing, an extra, and
+    a reversed edge each cost 1, the structural Hamming distance of Pamfil et al. (2020),
+    Appendix B.7. ``lagged_shd`` counts the lagged links in one graph and not the other, and
+    ``shd`` is their sum. ``lag0_f1``, ``lagged_f1``, and ``f1`` are the F1 of the directed edges, a
+    reversed edge one false and one missed, the paper's F1 per block, and over both blocks pooled.
+    """
+    est0 = (est[0] == W.TAIL) & (est[0].T == W.ARROW)
+    true0 = (true_[0] == W.TAIL) & (true_[0].T == W.ARROW)
+    lag0_shd = int(np.triu((est0 != true0) | (est0.T != true0.T), 1).sum())
+    est_l, true_l = est[1:] != W.NULL, true_[1:] != W.NULL
+    tp0, tpl = int((est0 & true0).sum()), int((est_l & true_l).sum())
+    n0, nl = (int(est0.sum()), int(true0.sum())), (int(est_l.sum()), int(true_l.sum()))
+    lagged_shd = int((est_l ^ true_l).sum())
+    return {
+        "shd": float(lag0_shd + lagged_shd),
+        "lag0_shd": float(lag0_shd),
+        "lagged_shd": float(lagged_shd),
+        "f1": _f1(tp0 + tpl, n0[0] + nl[0], n0[1] + nl[1]),
+        "lag0_f1": _f1(tp0, *n0),
+        "lagged_f1": _f1(tpl, *nl),
     }
 
 

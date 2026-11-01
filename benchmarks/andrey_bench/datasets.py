@@ -27,6 +27,11 @@ as a coefficient stack (:mod:`andrey_bench.coefficients`), with the kind ``"temp
 or ``"panel_coefficients"``. A panel key's ``times`` is its number of time points, and its ``n``
 the number of units observed at each; a panel dataset's data has shape ``(times, n, d)``.
 
+The structural vector autoregressions of the DYNOTEARS paper are drawn by
+:mod:`andrey_bench.svar_models` (functional ``dynotears2020`` and its variants; the key's density is
+the same-step graph's mean degree) and store their truth as window marks over lags 0 and 1, with
+the kind ``"temporal_window"``.
+
 The data of CD-NOD, MultiGroupDirectLiNGAM, and GIN are drawn by :mod:`andrey_bench.regime_models`
 instead (functional ``domain_shift``, ``multi_group``, or ``measurement``); that module gives each
 layout, truth, and column order.
@@ -52,7 +57,7 @@ import numpy as np
 import andrey.data as data
 from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
-from andrey_bench import lingam_models, regime_models, temporal_models
+from andrey_bench import lingam_models, regime_models, svar_models, temporal_models
 from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -164,6 +169,17 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # 5.4, with one moving-average matrix; Kadowaki et al. (2013), JSAI Sect. 6.1.
     "varma_lingam_paper": ("random", "varma2010", "nongaussian", "raw"),
     "longitudinal_lingam_paper": ("random", "panel2013", "nongaussian", "raw"),
+    # The structural vector autoregressions of the DYNOTEARS paper, one lag, at raw scale, with
+    # Gaussian or centered exponential noise, Erdos-Renyi graphs or the Barabasi-Albert and
+    # block-model pair; andrey_bench.svar_models gives each setup and its source: Pamfil et al.
+    # (2020), Appendix B.4. The z-scored, uncentered-noise, and nonlinear regimes lie outside the
+    # paper's model or scale.
+    "dynotears_paper": ("er", "dynotears2020", "gaussian", "raw"),
+    "dynotears_paper_exponential": ("er", "dynotears2020", "exponential", "raw"),
+    "dynotears_paper_ba_sbm": ("ba_sbm", "dynotears2020_ba_sbm", "gaussian", "raw"),
+    "dynotears_paper_standardized": ("er", "dynotears2020", "gaussian", "standardized"),
+    "dynotears_paper_uncentered": ("er", "dynotears2020", "exponential_uncentered", "raw"),
+    "dynotears_sin_tanh": ("er", "dynotears2020_sin_tanh", "gaussian", "raw"),
 }
 
 #: The functional label of :data:`REGIMES` that ``andrey.data.sample_discrete`` generates, with the
@@ -199,6 +215,12 @@ TEMPORAL_REGIMES: dict[str, float] = {
     # The LiNGAM paper models record no density: each fixes its own link counts.
     "varma_lingam_paper": 0.0,
     "longitudinal_lingam_paper": 0.0,
+    # The DYNOTEARS models' same-step mean degree.
+    **{
+        regime: svar_models.MODELS[functional].same_step_degree
+        for regime, (_, functional, _, _) in REGIMES.items()
+        if functional in svar_models.MODELS
+    },
 }
 
 #: The registry's ``graph_kind`` for a truth stored as window marks.
@@ -209,10 +231,11 @@ COEFFICIENT_KINDS = {"varma2010": "temporal_coefficients", "panel2013": "panel_c
 
 #: Functionals whose column order carries no information about the graph, so their keys take no
 #: shuffle step: the PCMCI-family models draw each variable independently and link uniformly drawn
-#: pairs, the longitudinal LiNGAM panel lists its variables in a random order, and the GIN
-#: measurement model lists its indicators in a random order. A model that draws its graph with
+#: pairs, the DYNOTEARS models relabel their nodes by a random permutation, the longitudinal LiNGAM
+#: panel lists its variables in a random order, and the GIN measurement model lists its indicators
+#: in a random order. A model that draws its graph with
 #: ``andrey.data.graphs``, as the other :mod:`~andrey_bench.regime_models` models do, takes the step.
-ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013", "measurement"})
+ORDER_FREE = frozenset({*temporal_models.MODELS, *svar_models.MODELS, "panel2013", "measurement"})
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
@@ -401,6 +424,27 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
         if key.latents != temporal_models.hidden_count(key.functional, key.d):
             raise ValueError(f"{key.label}: latents must be the model's unobserved variables")
         return call
+    if key.functional in svar_models.MODELS:
+        model = svar_models.MODELS[key.functional]
+        if (
+            key.topology != svar_models.TOPOLOGIES[key.functional]
+            or key.density != model.same_step_degree
+            or key.latents
+            or key.times
+        ):
+            raise ValueError(
+                f"{key.label}: topology and density are the model's, latents and times are 0"
+            )
+        return {
+            "generator": "andrey_bench.svar_models.sample",
+            "model": key.functional,
+            "setup": svar_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+            "noise": key.noise,
+            "standardize": key.standardize,
+        }
     if key.functional in lingam_models.MODELS:
         panel = key.functional == "panel2013"
         if panel != bool(key.times) or key.latents:
@@ -521,6 +565,13 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
             "density": key.density,
             "params": {"cross_links_per_variable": key.density},
         }
+    if key.functional in svar_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": svar_models.model_params(key.functional),
+        }
     if key.functional in lingam_models.MODELS:
         return {
             "model": key.functional,
@@ -572,6 +623,11 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
         if temporal_models.MODELS[key.functional].same_step:
             return series, window, WINDOW_KIND, None
         return series, lag_marks(window[1:] != 0), "temporal", None
+    if key.functional in svar_models.MODELS:
+        series, window = svar_models.sample(
+            key.functional, key.d, key.n, key.seed, key.noise, key.standardize
+        )
+        return series, window, WINDOW_KIND, None
     if key.functional == "varma2010":
         series, stack, columns = lingam_models.sample_varma(
             key.functional, key.d, key.n, key.seed, shuffle=key.shuffle
