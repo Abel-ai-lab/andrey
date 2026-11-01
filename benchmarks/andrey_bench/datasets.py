@@ -103,6 +103,15 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # Linear with uniform noise and hidden confounders, where RCD and BottomUpParceLiNGAM are
     # identifiable.
     "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
+    # Nonlinear additive noise with hidden nodes, CAM-UV's model: `latent_anm_er` hides one node in
+    # five, `latent_anm_er_tenth` one in ten; the key sets `latents` using LATENT_REGIMES.
+    "latent_anm_er": ("er", "anm", "gaussian", "standardized"),
+    "latent_anm_er_tenth": ("er", "anm", "gaussian", "standardized"),
+    # The simulation of the CAM-UV paper, Maeda and Shimizu (2021), Sect. 5.1: polynomial effects,
+    # uniform noise, two hidden common causes and two hidden intermediates
+    # (andrey_bench.regime_models; the key's density is the observed graph's expected mean degree,
+    # its d counts the hidden nodes).
+    "camuv_paper": ("er", "camuv2021", "uniform", "raw"),
     # The four linear regimes with unitless weights and noise (Herman et al. 2025): every variable
     # has unit variance and R^2-sortability is close to chance, so neither the variances nor the
     # share of each variable the others explain gives the causal order away. The generator keeps a
@@ -218,16 +227,20 @@ ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013", "measurement"})
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
 #: ``latent_gauss_er``, at ER density 3.0 instead of 2.0.
 #:
-#: The two non-Gaussian regimes hide one node in five, so ``d = 5, 10, 15`` hide one, two, and three.
-#: Each hidden node has two or more children. The hidden node latest in causal order has no hidden
-#: child, so at least one hidden node has two observed children at every ``d``. A seed fails to
-#: generate when fewer nodes have two or more children than nodes to hide. That is about 3% of seeds
-#: at ``d = 10`` and ``d = 15``; seeds 0 to 28 all generate on that ladder.
+#: The non-Gaussian and the additive-noise regimes hide one node in five, so ``d = 5, 10, 15`` hide
+#: one, two, and three; ``latent_anm_er_tenth`` hides one in ten, so ``d = 11, 22, 55`` hide one,
+#: two, and five, one per ten observed. Each hidden node has two or more children. The hidden node
+#: latest in causal order has no hidden child, so at least one hidden node has two observed children
+#: at every ``d``. A seed fails to generate when fewer nodes have two or more children than nodes to
+#: hide. That is about 3% of the non-Gaussian regime's seeds at ``d = 10`` and ``d = 15``; seeds 0
+#: to 28 all generate on that ladder.
 LATENT_REGIMES: dict[str, int] = {
     "latent_gauss_er": 10,
     "latent_lingam_er": 5,
     "latent_gauss_er_unitless": 10,
     "latent_lingam_er_unitless": 5,
+    "latent_anm_er": 5,
+    "latent_anm_er_tenth": 10,
 }
 
 DEFAULT_REGIME = "linear_gauss_er"

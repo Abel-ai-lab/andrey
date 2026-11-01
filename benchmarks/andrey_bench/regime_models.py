@@ -1,4 +1,4 @@
-"""Data for the methods whose input is not one plain sample: domains, groups, and latent indicators.
+"""Data for the methods whose input is not one plain sample, and the simulation of the CAM-UV paper.
 
 Each model draws a dataset of the usual ``(n, columns)`` layout, with its truth as endpoint marks,
 so the harness stores, fits, and scores it like any other dataset:
@@ -24,17 +24,31 @@ so the harness stores, fits, and scores it like any other dataset:
   parent; linear with uniform noise. The indicators come in a random column order; the latents
   are the last ``m`` nodes of the truth and have no data column. The key's ``d`` counts both.
 
-Every variable is rescaled to unit variance in causal order before its children are drawn, as
-``andrey.data`` does for ``scale="rescale"``, so values stay bounded on long paths. Weights are
-uniform in magnitude on :data:`WEIGHT_RANGE` with a random sign. The domain shift is added after a
-variable's rescaling, in units of its standard deviation.
+- ``camuv2021`` (CAM-UV): the simulation of Maeda and Shimizu (2021), Sect. 5.1. ``d - 4`` observed
+  variables in a causal order, each pair joined with probability ``density / (d - 5)``, so the key's
+  density is the observed graph's expected mean degree: 2.7 is the paper's probability 0.3 over 10
+  observed variables. Two hidden common causes each point into two observed variables drawn at
+  random, and two hidden intermediates each take the place of an observed edge drawn at random,
+  ``x_j -> y -> x_i`` for ``x_j -> x_i``; the paper inserts an intermediate "between each variable
+  pair" without saying whether the pair keeps its edge, and here it does not. Each variable is
+  ``h / sd(h)`` with ``h = sum_j ((v_j + a_j)^c_j + b_j) + e`` over its parents, observed or
+  hidden: ``a_j`` uniform on :attr:`CamUV2021.shift`, ``b_j`` on :attr:`CamUV2021.offset`, ``c_j``
+  2 or 3 with equal odds, and ``e`` uniform on ``(-10 + m, 10 + m)`` with ``m`` uniform on
+  :attr:`CamUV2021.noise_center`. The hidden nodes are the last four of the truth, the two common
+  causes first, and have no data column.
 
-``domain_shift`` and ``multi_group`` then list their variables in an order drawn from the seed's
-column-order stream (:func:`andrey_bench.lingam_models.column_order`), with the truth permuted the
-same way, so the column order does not follow how the graph was drawn. The rows keep their order, so
-each domain keeps its block of rows; a multi-group dataset repeats one order of its ``d`` variables
-in every group, so each group keeps its block of columns and lists the variables as the others do.
-``measurement`` already draws its column order and takes no such step.
+Every variable of the other models is rescaled to unit variance in causal order before its
+children are drawn, as ``andrey.data`` does for ``scale="rescale"``, so values stay bounded on long
+paths. Weights are uniform in magnitude on :data:`WEIGHT_RANGE` with a random sign. The domain
+shift is added after a variable's rescaling, in units of its standard deviation.
+
+``domain_shift``, ``multi_group``, and ``camuv2021`` then list their variables in an order drawn
+from the seed's column-order stream (:func:`andrey_bench.lingam_models.column_order`), with the
+truth permuted the same way, so the column order does not follow how the graph was drawn; the
+CAM-UV paper permutes its observed variables the same way, and the hidden nodes stay last. The rows
+keep their order, so each domain keeps its block of rows; a multi-group dataset repeats one order
+of its ``d`` variables in every group, so each group keeps its block of columns and lists the
+variables as the others do. ``measurement`` already draws its column order and takes no such step.
 """
 
 from __future__ import annotations
@@ -79,11 +93,31 @@ class Measurement:
     indicator_noise_sd: float = 0.5  # before the indicator's rescaling; the latent has variance 1
 
 
+@dataclass(frozen=True)
+class CamUV2021:
+    """The CAM-UV paper's simulation, Maeda and Shimizu (2021), Sect. 5.1; see the module docstring."""
+
+    common_causes: int = 2  # hidden roots
+    common_cause_children: int = 2  # observed children of each
+    intermediates: int = 2  # hidden nodes, each on an observed edge
+    shift: tuple[float, float] = (-5.0, 5.0)  # a in (v + a)^c + b
+    offset: tuple[float, float] = (-1.0, 1.0)  # b
+    powers: tuple[int, int] = (2, 3)  # c, each with probability 1/2
+    noise_half_width: float = 10.0  # e uniform on (-10 + m, 10 + m)
+    noise_center: tuple[float, float] = (-2.0, 2.0)  # m
+
+    @property
+    def hidden(self) -> int:
+        """The hidden nodes of a dataset: the common causes and the intermediates."""
+        return self.common_causes + self.intermediates
+
+
 #: Each model, keyed by the ``functional`` label its datasets carry.
-MODELS: dict[str, DomainShift | MultiGroup | Measurement] = {
+MODELS: dict[str, DomainShift | MultiGroup | Measurement | CamUV2021] = {
     "domain_shift": DomainShift(),
     "multi_group": MultiGroup(),
     "measurement": Measurement(),
+    "camuv2021": CamUV2021(),
 }
 
 #: Noise draws with variance 1.
@@ -121,15 +155,24 @@ def block_diagonal(adjacencies: list[np.ndarray]) -> np.ndarray:
 
 def model_params(model: str) -> dict:
     """Return `model`'s setup, recorded in each dataset's generation call."""
-    return {**asdict(MODELS[model]), "weight_range": list(WEIGHT_RANGE)}
+    spec = MODELS[model]
+    if isinstance(spec, CamUV2021):  # its effects have no weights
+        return asdict(spec)
+    return {**asdict(spec), "weight_range": list(WEIGHT_RANGE)}
 
 
 def latents_for(model: str, d: int) -> int:
-    """Return the hidden nodes of a `model` dataset with `d` nodes: the latents of ``measurement``.
+    """Return the hidden nodes of a `model` dataset with `d` nodes: the latents of ``measurement``,
+    the common causes and intermediates of ``camuv2021``.
 
-    Raises ``ValueError`` when `d` is not a whole number of latents with their indicators.
+    Raises ``ValueError`` when `d` is not a whole number of latents with their indicators, or leaves
+    ``camuv2021`` fewer than 2 observed variables.
     """
     spec = MODELS[model]
+    if isinstance(spec, CamUV2021):
+        if d - spec.hidden < max(2, spec.common_cause_children):
+            raise ValueError(f"a camuv2021 model on {d} nodes leaves too few observed variables")
+        return spec.hidden
     if not isinstance(spec, Measurement):
         return 0
     per = spec.indicators + 1
@@ -145,17 +188,28 @@ def sample(
 
     For ``domain_shift`` and ``multi_group``, `d` is the variable count and `density` the
     Erdos-Renyi mean degree; for ``measurement``, `d` counts the latents and their indicators and
-    `density` is unused. `noise` names the noise family (:data:`_NOISE`).
+    `density` is unused; for ``camuv2021``, `d` counts the observed and hidden nodes and `density` is
+    the observed graph's expected mean degree. `noise` names the noise family (:data:`_NOISE`);
+    ``camuv2021`` draws the paper's uniform noise and takes ``"uniform"`` alone.
 
     ``column_order[j]`` is the column that column ``j`` holds with `shuffle` off, so the identity
     then. With `shuffle`, ``domain_shift`` and ``multi_group`` permute their variables, and the truth
     with them, as the module docstring says; a multi-group order covers every group's columns.
-    ``measurement`` takes no shuffle step and returns ``None``.
+    ``measurement`` takes no shuffle step and returns ``None``. ``camuv2021`` permutes its observed
+    variables and keeps the hidden ones last; its order covers the observed columns.
     """
     rng = np.random.default_rng(seed)
     draw = _NOISE[noise]
     if model == "measurement":
         return (*_measurement(MODELS[model], d, n, draw, rng), None)
+    if model == "camuv2021":
+        if noise != "uniform":
+            raise ValueError(f"camuv2021 draws the paper's uniform noise, not {noise!r}")
+        x, marks = _camuv2021(MODELS[model], d, n, density, rng)
+        columns = column_order(model, x.shape[1], seed, shuffle)
+        nodes = np.concatenate([columns, np.arange(x.shape[1], d)])
+        data = np.ascontiguousarray(np.take(x, columns, axis=1))
+        return data, np.ascontiguousarray(marks[np.ix_(nodes, nodes)]), "dag", columns
     if model == "domain_shift":
         x, marks, kind = _domain_shift(MODELS[model], d, n, density, draw, rng)
     elif model == "multi_group":
@@ -267,3 +321,44 @@ def _measurement(spec: Measurement, d, n, draw, rng):
     parents = np.concatenate([observed + cluster, *[observed + np.arange(j) for j in range(m)]])
     children = np.concatenate([np.arange(observed), *[np.full(j, observed + j) for j in range(m)]])
     return x, _marks(d, parents, children), "dag"
+
+
+def _camuv2021(spec: CamUV2021, d, n, density, rng):
+    """The data of the observed nodes and the marks of the whole DAG; see the module docstring."""
+    p = d - spec.hidden
+    observed = [(j, i) for i in range(p) for j in range(i) if rng.random() < density / (p - 1)]
+    if len(observed) < spec.intermediates:
+        raise ValueError(
+            f"the observed graph has {len(observed)} edge(s); "
+            f"cannot hide {spec.intermediates} intermediate(s) on them"
+        )
+    edges = []
+    for c in range(spec.common_causes):
+        children = rng.choice(p, spec.common_cause_children, replace=False)
+        edges += [(p + c, int(i)) for i in sorted(children)]
+    split = set(rng.choice(len(observed), spec.intermediates, replace=False).tolist())
+    y = p + spec.common_causes
+    for k, (j, i) in enumerate(observed):
+        if k in split:
+            edges += [(j, y), (y, i)]
+            y += 1
+        else:
+            edges.append((j, i))
+    parents = [sorted(j for j, i in edges if i == v) for v in range(d)]
+    # The common causes are roots, and an intermediate comes right after its observed parent, which
+    # precedes its child in the index order.
+    order = list(range(p, p + spec.common_causes))
+    for v in range(p):
+        order += [v, *(y for y in range(p + spec.common_causes, d) if parents[y] == [v])]
+    values = np.zeros((n, d))
+    for v in order:
+        center = rng.uniform(*spec.noise_center)
+        h = rng.uniform(center - spec.noise_half_width, center + spec.noise_half_width, n)
+        for j in parents[v]:
+            a, b = rng.uniform(*spec.shift), rng.uniform(*spec.offset)
+            h = h + (values[:, j] + a) ** rng.choice(spec.powers) + b
+        values[:, v] = h / h.std()
+    marks = np.zeros((d, d), dtype=np.int8)
+    for j, i in edges:
+        marks[j, i], marks[i, j] = _TAIL, _ARROW
+    return values[:, :p], marks

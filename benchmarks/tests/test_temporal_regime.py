@@ -91,6 +91,8 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
         "pnl_small_world": ("82e655de5fd9", "e8b438a8b9ab"),
         "latent_gauss_er": ("fba98d7ca345", "72e95ac72b33"),
         "latent_lingam_er": ("424a811a2462", "a04ce0fceceb"),
+        "latent_anm_er": ("90d312224645", "ac7e8fa030c0"),
+        "latent_anm_er_tenth": ("25b750f47ff2", "55bc65f94f79"),
         "linear_gauss_er_unitless": ("9a2189e75495", "d011f3db5e71"),
         "lingam_sf_unitless": ("7b0021544bba", "c4f798175f6a"),
         "latent_gauss_er_unitless": ("da6131497173", "cd03e607a6dc"),

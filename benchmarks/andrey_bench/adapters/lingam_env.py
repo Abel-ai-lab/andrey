@@ -1,8 +1,9 @@
-"""The environment lingam's fits run in, and its package versions.
+"""The environment lingam's fits, and causal-learn's CAM-UV, run in, and its package versions.
 
-lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17;
-neither installs beside the bench environment's scipy on its Python.
-``benchmarks/start_lingam.sh`` builds ``.venv-lingam`` on Python 3.12, and an adapter that declares
+lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports and causal-learn's CAM-UV
+fits with, pins scipy below 1.17; neither installs beside the bench environment's scipy on its
+Python. ``benchmarks/start_lingam.sh`` builds ``.venv-lingam`` on Python 3.12, with causal-learn
+0.1.4.8 beside lingam, and an adapter that declares
 ``python_env = PYTHON_ENV_VAR`` has its fits started there. Only ``fit`` runs in that environment;
 ``to_structure`` and scoring run in the parent, so such an adapter's module imports nothing but
 numpy at import time and builds its marks without Andrey.
