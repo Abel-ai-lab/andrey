@@ -61,8 +61,8 @@ names its pull request.
 - `dynotears`, DYNOTEARS (Pamfil et al. 2020), a time-series method, learns a linear structural
   vector autoregression from one series, same-step and lagged effects with their weights, by least
   squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
-  the paper's settings for 500 time steps: `lambda1=0.05`, `w_threshold=0.3`, `lag_threshold=0.1`,
-  and `tau_max=1`; it is experimental. ([#TBD])
+  the paper's settings: `lambda1=0.05`, `w_threshold=0.3`, and `lag_threshold=0.1` for 500 time
+  steps, and `tau_max=1`; it is experimental. ([#TBD])
 
 ### Changed
 
