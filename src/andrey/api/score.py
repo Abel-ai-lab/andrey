@@ -154,12 +154,11 @@ def ges(
     **When to use.** GES suits i.i.d. observational data with no unmeasured common causes, in which
     every independence follows from the graph (faithfulness) [1]_. Its default BIC score assumes
     continuous data, where each variable depends linearly on its causes with Gaussian noise; when
-    every column is categorical the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``,
-    and ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. It suits sparse graphs,
-    where every variable has few parents, on which a faster version of its search scaled to very
-    many variables [2]_; it returns a CPDAG. When unmeasured common causes are plausible, use
-    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`; when some rows come from interventions, use
+    every column is categorical the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``, and
+    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. It suits sparse graphs, where
+    every variable has few parents [2]_; it returns a CPDAG. When unmeasured common causes are
+    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
+    oriented, use :func:`~andrey.direct_lingam`; when some rows come from interventions, use
     :func:`~andrey.gies`.
 
     **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``penalty_discount *

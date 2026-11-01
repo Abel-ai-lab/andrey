@@ -75,8 +75,8 @@ repository.
   `% concept: <key>` names exactly the methods that take the concept.
 - Every `ANDREY_*` variable the source reads has an `EnvVarSpec` and one parser in
   `andrey.core.env`.
-- Every method has a status and a **Limitations.** paragraph; the status checks are listed under
-  [Test a method](#test-a-method).
+- Every method has a status, a **When to use.** paragraph, and a **Limitations.** paragraph; the
+  status checks are listed under [Test a method](#test-a-method).
 
 `tests/unit/test_spec_generate.py` keeps the generated surfaces consistent with the specs.
 

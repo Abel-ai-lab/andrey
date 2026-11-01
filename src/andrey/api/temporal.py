@@ -866,20 +866,17 @@ def pcmciplus(
 
     Notes
     -----
-    **When to use.** PCMCI+ suits one observational multivariate time series that is stationary
-    (its causal links and noise do not change over time), with no unmeasured variable that causes
-    two measured ones, and in which every independence follows from the graph (faithfulness); its
-    effects can act within one time step as well as across steps, and the same-step effects form
-    no cycle [1]_. With a partial-correlation test, the default for continuous data, it assumes
-    linear effects; ``"cmiknn"``, ``"gpdc"``, ``"kci"``, and ``"rcot"`` detect nonlinear effects at
-    a far higher cost per test, and the categorical and mixed-data tests take other data. It is
-    designed for many variables, each strongly dependent
-    on its own past (autocorrelated) [1]_; its tests grow exponentially with the same-step
-    neighbors of one variable, so it suits sparse same-step links. It returns a temporal structure
-    over lags ``0`` to ``tau_max``: a CPDAG of the same-step links and a directed graph of the
-    lagged links at each lag ``1`` to ``tau_max``. When unmeasured common causes are plausible, use
-    :func:`~andrey.lpcmci`; when the noise is non-Gaussian and every same-step link should be
-    oriented, use :func:`~andrey.varma_lingam`.
+    **When to use.** PCMCI+ suits one observational multivariate time series that is stationary (its
+    causal links and noise do not change over time), with no unmeasured variable that causes two
+    measured ones, and in which every independence follows from the graph (faithfulness); its
+    effects can act within one time step as well as across steps, and the same-step effects form no
+    cycle [1]_. Its tests, and the data each suits, are those of :func:`~andrey.pcmci`. It is
+    designed for many variables, each strongly dependent on its own past (autocorrelated) [1]_; its
+    tests grow exponentially with the same-step neighbors of one variable, so it suits sparse
+    same-step links. It returns a temporal structure over lags ``0`` to ``tau_max``: a CPDAG of the
+    same-step links and a directed graph of the lagged links at each lag ``1`` to ``tau_max``. When
+    unmeasured common causes are plausible, use :func:`~andrey.lpcmci`; when the noise is
+    non-Gaussian and every same-step link should be oriented, use :func:`~andrey.varma_lingam`.
 
     The method runs in four phases. The lagged phase selects the lagged parents of each variable
     as PCMCI's PC1 step does, with equal strengths ordered by each variable's rank. The skeleton
@@ -1161,20 +1158,18 @@ def lpcmci(
 
     Notes
     -----
-    **When to use.** LPCMCI suits one observational multivariate time series that is stationary
-    (its causal links and noise do not change over time), in which every independence follows from
-    the graph (faithfulness), and in which unmeasured variables may cause several measured ones;
-    it assumes no selection bias, that is, no time step is kept or dropped by the values of the
-    variables [1]_. Its effects can act within one time step as well as across steps. With a
-    partial-correlation test, the default for continuous data, it assumes linear effects;
-    ``"cmiknn"``, ``"gpdc"``, ``"kci"``, and ``"rcot"`` detect nonlinear effects at a far higher
-    cost per test, and the categorical and mixed-data tests take other data. It is designed for
-    series in which each variable strongly depends on its own past (autocorrelated) [1]_, and suits
-    few links at each variable, since its tests grow exponentially with them; it returns a temporal
-    structure over lags ``0`` to ``tau_max``: a PAG of the same-step links, a directed graph of the
-    definite lagged causes at each lag ``1`` to ``tau_max``, and the marks of every link in
-    ``metadata["links"]``. When every common cause is measured, use :func:`~andrey.pcmciplus`, or
-    :func:`~andrey.pcmci` when every effect also takes at least one time step.
+    **When to use.** LPCMCI suits one observational multivariate time series that is stationary (its
+    causal links and noise do not change over time), in which every independence follows from the
+    graph (faithfulness), and in which unmeasured variables may cause several measured ones; it
+    assumes no selection bias, that is, no time step is kept or dropped by the values of the
+    variables [1]_. Its effects can act within one time step as well as across steps. Its tests, and
+    the data each suits, are those of :func:`~andrey.pcmci`. It is designed for series in which each
+    variable strongly depends on its own past (autocorrelated) [1]_, and suits few links at each
+    variable, since its tests grow exponentially with them; it returns a temporal structure over
+    lags ``0`` to ``tau_max``: a PAG of the same-step links, a directed graph of the definite lagged
+    causes at each lag ``1`` to ``tau_max``, and the marks of every link in ``metadata["links"]``.
+    When every common cause is measured, use :func:`~andrey.pcmciplus`, or :func:`~andrey.pcmci`
+    when every effect also takes at least one time step.
 
     The graph starts complete, with every lagged link ``o->`` (time order rules out the later end
     as a cause of the earlier one) and every same-step link ``o-o``. A round removes links in
