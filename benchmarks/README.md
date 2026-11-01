@@ -87,7 +87,8 @@ export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
 Its adapter calls the package's public API only.
 
 lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
-lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
+lingam's MultiGroupDirectLiNGAM and CAM-UV, and causal-learn's CAM-UV, which fits with pygam too,
+run in a third environment, on Python 3.12 (see [CAM-UV](comparisons/camuv.md)):
 
 ```shell
 benchmarks/start_lingam.sh
@@ -192,6 +193,8 @@ has neither. A solution's fit receives the data matrix alone.
 
 `latent_gauss_er` hides one node in ten, at least one, from an Erdos-Renyi linear-Gaussian graph.
 Hidden nodes are chosen among nodes with two or more children, so hiding one confounds its children.
+`latent_lingam_er` and `latent_anm_er` hide one node in five, and `latent_anm_er_tenth` one in ten,
+the last two with nonlinear additive effects ([CAM-UV](comparisons/camuv.md)).
 Set `latents` on the `DatasetKey` with `datasets.latents_for`, as `fci_latent.py` does. `d` includes
 hidden nodes: the data has `d - latents` columns; the stored truth keeps all `d` nodes.
 
