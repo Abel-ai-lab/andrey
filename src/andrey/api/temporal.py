@@ -1528,6 +1528,21 @@ def dynotears(
 
     Notes
     -----
+    **When to use.** DYNOTEARS suits one continuous, observational multivariate time series from a
+    linear structural vector autoregression: each variable is a weighted sum of the other variables
+    at the same step and of every variable at the past ``tau_max`` steps, plus noise, with weights
+    that do not change over time, same-step effects that form no cycle, and no unmeasured variable
+    that causes two measured ones [1]_. Its least-squares fit reads the columns in their given
+    units, so its graph can depend on how each column is scaled [4]_ [5]_. Its ``l1`` penalty
+    favors sparse graphs, and it fits ``(tau_max + 1) * d * d`` weights under an acyclicity function
+    that takes a matrix exponential, so it suits a moderate number of variables, a few lags, and a
+    long series. It returns a temporal structure with a DAG at lag ``0`` and the graphs at lags
+    ``1`` to ``tau_max``, self-lags included, with the weight of each edge. For nonlinear effects,
+    use :func:`~andrey.pcmciplus` with a nonlinear test such as ``"gpdc"`` or ``"rcot"``, and for
+    many lags, :func:`~andrey.pcmciplus` with its default test; when unmeasured common causes are
+    plausible, use :func:`~andrey.lpcmci`; and for i.i.d. rows rather than a series,
+    :func:`~andrey.notears`.
+
     The model is ``x_t = x_t W + x_{t-1} A_1 + ... + x_{t-p} A_p + z_t`` for the row vector
     ``x_t`` of the variables at step ``t`` and ``p = tau_max``, where ``W`` is acyclic and the
     noise ``z_t`` is independent within and across steps [1]_. The fit minimizes
