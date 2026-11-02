@@ -81,12 +81,14 @@ ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/disc
     pgmpy.hc.BDeu pgmpy.hc.BIC_categorical
 ```
 
-The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
-is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
-the two packages' PC and GES return the same graph, with Andrey's PC on the column-order collider
-rule that causal-learn's PC runs; PC's default p-value order can orient conflicting colliders
-differently. BOSS and GRaSP run on search seed 0 in both packages, but each package draws its orders
-from its own random streams, so their graphs can differ at equal settings.
+The chi-square and G-square statistics and the BDeu scores of Andrey and causal-learn follow the
+same definitions (Andrey's BDeu is `-2` times causal-learn's), and on the datasets of
+`benchmarks/tests/test_adapters_discrete.py` the two packages' GES return the same graph. Their
+p-values differ on sparse tables: Andrey refers the statistic to its mean when `y` is shuffled
+within each configuration of the conditioning set, and causal-learn to `(r - 1) * (c - 1)` degrees
+of freedom per configuration, so the two packages' PC can return different graphs. BOSS and GRaSP
+run on search seed 0 in both packages, but each package draws its orders from its own random
+streams, so their graphs can differ at equal settings.
 Each comparator's objective is checked against Andrey's in
 `benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
 agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets, and
