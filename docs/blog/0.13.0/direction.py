@@ -35,11 +35,11 @@ ROW_LABELS = ["Data", "Fit y from x", "Fit x from y"]
 def pairs(rng: np.random.Generator) -> list[tuple[str, np.ndarray, np.ndarray]]:
     """The three pairs, each ``(title, x, y)`` with ``x`` the cause."""
     x = rng.normal(size=N)
-    gaussian = ("Line, Gaussian noise", x, 0.8 * x + 0.6 * rng.normal(size=N))
+    gaussian = ("(a) Line, Gaussian noise", x, 0.8 * x + 0.6 * rng.normal(size=N))
     x = rng.uniform(-1.7, 1.7, size=N)
-    uniform = ("Line, uniform noise", x, 0.8 * x + 0.6 * rng.uniform(-1.7, 1.7, size=N))
+    uniform = ("(b) Line, uniform noise", x, 0.8 * x + 0.6 * rng.uniform(-1.7, 1.7, size=N))
     x = rng.uniform(-2.0, 2.0, size=N)
-    curve = ("Curve, Gaussian noise", x, 0.5 * x**3 - x + 0.5 * rng.normal(size=N))
+    curve = ("(c) Curve, Gaussian noise", x, 0.5 * x**3 - x + 0.5 * rng.normal(size=N))
     return [gaussian, uniform, curve]
 
 
@@ -114,8 +114,9 @@ def figure() -> str:
         f'two directions for three pairs">{"".join(parts)}</svg>'
     )
     caption = (
-        "<figcaption>Three pairs in which x causes y. Only in the first does the fit in the wrong "
-        "direction also leave an independent residual.</figcaption>"
+        "<figcaption>Three pairs in which x causes y: (a) a line with Gaussian noise, (b) a line "
+        "with uniform noise, and (c) a curve with Gaussian noise. Only in (a) does the fit in the "
+        "wrong direction also leave an independent residual.</figcaption>"
     )
     return f'{style}<figure class="fcm-figure">{svg}{caption}</figure>\n'
 
