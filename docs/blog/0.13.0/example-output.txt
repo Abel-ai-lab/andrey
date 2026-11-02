@@ -1,0 +1,5 @@
+true graph: 10 edges
+pc:            2 errors, 2 edges undirected
+direct_lingam: 20 errors
+cam:           0 errors, causal order (5, 0, 8, 9, 4, 7, 1, 2, 6, 3)
+resit:         0 errors on 5 variables, Gumbel noise
