@@ -114,9 +114,8 @@ def figure() -> str:
         f'two directions for three pairs">{"".join(parts)}</svg>'
     )
     caption = (
-        "<figcaption>Each column is a pair in which x causes y. The second row is what is left of "
-        "y after a smooth fit on x, the third what is left of x after a fit on y, each tested "
-        "against the variable it was fit on.</figcaption>"
+        "<figcaption>Three pairs in which x causes y. Only in the first does the fit in the wrong "
+        "direction also leave an independent residual.</figcaption>"
     )
     return f'{style}<figure class="fcm-figure">{svg}{caption}</figure>\n'
 
