@@ -14,7 +14,6 @@ import contextlib
 import importlib.util
 import io
 import re
-import runpy
 import textwrap
 from html import escape
 from pathlib import Path
@@ -133,7 +132,7 @@ def pitch_block(summary):
             f"- **Fast**: {builder.CLAIM}",
             f"- **Accurate**: {accuracy.lower()} {fewer}% fewer errors than other popular"
             " packages.",
-            f"- **One API**: {len(list_specs())} methods, each one function call.",
+            f"- **One API**: {supported_count()} supported methods, each one function call.",
             "- **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden"
             " confounders.",
             "- **Agent-ready**: a command line that answers in JSON, and a skill for coding"
@@ -177,6 +176,47 @@ def methods_block():
             *rows,
             "",
             *(footnote if any(s.status == "experimental" for s in specs) else []),
+            end,
+        ]
+    )
+
+
+# Methods planned for each family that are not in the registry yet, by their usual names; the
+# registry's experimental methods join them in the roadmap. Methods for interventional data are
+# planned in the roadmap's own stage for them.
+PLANNED = {
+    "functional": ["RESIT"],
+    "temporal": ["DYNOTEARS"],
+    "latent": ["CAM-UV", "FOFC"],
+}
+
+
+def roadmap_block():
+    """Stage 1's table: each family's supported methods, from the registry, and its planned ones,
+    the registry's experimental methods first, then ``PLANNED``."""
+    builder = site_builder()
+    specs = builder.list_specs()
+
+    def link(spec):
+        return f"[`{spec.name}`]({SITE_URL}/docs/api/andrey.{spec.name}.html)"
+
+    rows = []
+    for family, label in builder.SPEC_FAMILIES.items():
+        members = [s for s in specs if s.family == family]
+        supported = ", ".join(link(s) for s in members if s.status == "supported")
+        planned = [link(s) + " (experimental)" for s in members if s.status == "experimental"]
+        planned += PLANNED.get(family, [])
+        rows.append(f"| {label} | {supported} | {', '.join(planned)} |")
+    start, end = markers("ROADMAP")
+    return "\n".join(
+        [
+            start,
+            "<!-- Generated from andrey.spec by apps/build_launch.py; do not edit. -->",
+            "",
+            "| Family | Supported | Planned |",
+            "|---|---|---|",
+            *rows,
+            "",
             end,
         ]
     )
@@ -305,48 +345,33 @@ def card_block():
     )
 
 
-def why_fast_block():
-    """The four ideas behind the speed, one line each, for readers who cannot play the animations
-    (the README, and so the package index); the guide animates each."""
-    scenes = runpy.run_path(str(ROOT / "site" / "why_fast.py"))["SCENES"]
-    start, end = markers("WHY_FAST")
-    lines = [
-        start,
-        "<!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->",
-        "",
-        f"Four ideas make it [fast]({SITE_URL}/blog/20261008-why-andrey-is-fast.html):",
-        "",
-    ]
-    for scene in scenes:
-        text = f"- **{scene['title']}**: {scene['line']}"
-        lines += textwrap.wrap(text, width=100, subsequent_indent="  ", break_on_hyphens=False)
-    return "\n".join([*lines, "", end])
-
-
 def update_readme(summary, check=False):
     """Replace only the generated marker blocks, or check them for drift."""
-    path = ROOT / "README.md"
-    source = path.read_text()
-    updated = source
-    blocks = (
-        ("PITCH", pitch_block(summary)),
-        ("CARD", card_block()),
-        ("WHY_FAST", why_fast_block()),
-        ("METHODS", methods_block()),
-        ("QUICKSTART", quickstart_block()),
-    )
-    for name, block in blocks:
-        start, end = markers(name)
-        pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.S)
-        if len(pattern.findall(updated)) != 1:
-            raise ValueError(f"README needs exactly one {name} marker block.")
-        updated = pattern.sub(lambda _, block=block: block, updated)
-    if check and updated != source:
-        raise ValueError(
-            "README generated blocks differ from the summaries, andrey.spec, or a run."
-        )
-    if not check:
-        path.write_text(updated)
+    files = {
+        "README.md": (
+            ("PITCH", pitch_block(summary)),
+            ("CARD", card_block()),
+            ("METHODS", methods_block()),
+            ("QUICKSTART", quickstart_block()),
+        ),
+        "ROADMAP.md": (("ROADMAP", roadmap_block()),),
+    }
+    for file, blocks in files.items():
+        path = ROOT / file
+        source = path.read_text()
+        updated = source
+        for name, block in blocks:
+            start, end = markers(name)
+            pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.S)
+            if len(pattern.findall(updated)) != 1:
+                raise ValueError(f"{file} needs exactly one {name} marker block.")
+            updated = pattern.sub(lambda _, block=block: block, updated)
+        if check and updated != source:
+            raise ValueError(
+                f"{file} generated blocks differ from the summaries, andrey.spec, or a run."
+            )
+        if not check:
+            path.write_text(updated)
     for name, card in readme_cards().items():
         target = ROOT / IMAGES / name
         if check and (not target.is_file() or target.read_text() != card):

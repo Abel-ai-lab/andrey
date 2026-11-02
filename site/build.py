@@ -1653,7 +1653,7 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
     best = max((t for t in family_tiles(summaries) if t["number"]), key=lambda t: t["number"])
     speed, fastest = more_than(best["best"][1]["ratio"])
     accuracy, fewer = more_than(fewest_errors(summaries))
-    count = len(list_specs())
+    count = sum(spec.status == "supported" for spec in list_specs())
     kinds = NUMBER_WORDS[len(graph_kinds())]
     return {
         "accelerated": (
@@ -1670,7 +1670,8 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
         ),
         "all-in-one": (
             f"{count} methods, {kinds} kinds of graph",
-            f"<b>{count} methods</b> for every kind of data, and {kinds} kinds of causal graph.",
+            f"<b>{count} supported methods</b> for every kind of data, and {kinds} kinds of causal"
+            " graph.",
         ),
     }
 
@@ -2386,9 +2387,23 @@ COMPARISON = (
 # Distinct methods per package, each a published algorithm that returns a whole graph, counted
 # once: a variant chosen by an argument, a multi-dataset or instance-specific version, another
 # score or test in the same search, a wrapper, and a search that only orients a given graph count
-# with the method they extend, or not at all. Andrey's gies runs ges's search and its
-# multi_group_direct_lingam extends direct_lingam. Read from each package's released code.
-METHOD_COUNTS = {"Andrey": 25, "causal-learn": 21, "Tetrad": 21, "pcalg": 8, "bnlearn": 10}
+# with the method they extend, or not at all. Andrey's count follows its registry: gies runs ges's
+# search, multi_group_direct_lingam extends direct_lingam, inter_iamb is a variant of iamb, and mmhc
+# is rsmax2 with its default phases, as bnlearn's are counted. The others are read from each
+# package's released code.
+COUNTED_WITH = {
+    "gies": "ges",
+    "multi_group_direct_lingam": "direct_lingam",
+    "inter_iamb": "iamb",
+    "mmhc": "rsmax2",
+}
+METHOD_COUNTS = {
+    "Andrey": sum(s.name not in COUNTED_WITH for s in list_specs()),
+    "causal-learn": 21,
+    "Tetrad": 21,
+    "pcalg": 8,
+    "bnlearn": 10,
+}
 
 
 def measured_rows(summaries: list[dict]) -> list[tuple[str, str, list[str | None]]]:
