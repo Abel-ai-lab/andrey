@@ -5,15 +5,16 @@ category codes into a factor, inside the timed call, then runs:
 
 - ``pc.stable`` with ``test="x2-adf"`` or ``"mi-adf"``, at ``alpha=0.05`` and no limit on the size
   of a conditioning set (``max.sx`` at its default): the chi-square and G-square tests, Andrey's
-  ``indep_test="chisq"`` and ``"gsq"``. It returns a CPDAG. ``x2`` is Pearson's statistic and
-  ``mi`` is the G statistic, 2 N times the mutual information. Each has an ``-adf`` form that
-  takes the empty rows and columns of a table out of the degrees of freedom, as Andrey's tests do;
-  the plain forms do not, and differ from Andrey's p-values in every table with an empty row or
-  column. The ``-adf`` p-values equal Andrey's to rounding, with one exception: a table with fewer
-  than 5 observations per cell on average (``n < 5 * r * c * q``, for ``r`` and ``c`` categories
-  in the two variables and ``q`` configurations of the conditioning set) gets ``p = 1``, and
-  Andrey's tests have no such rule. At 2000 rows and three categories per variable that starts at
-  four conditioning variables, where bnlearn declares independence and Andrey tests it.
+  ``indep_test="chisq"`` and ``"gsq"``. It returns a CPDAG. ``x2`` is Pearson's statistic and ``mi``
+  is the G statistic, 2 N times the mutual information, the statistics of Andrey's tests. Each has
+  an ``-adf`` form that takes the empty rows and columns of a table out of the degrees of freedom,
+  as the statistic's mean does when ``y`` is shuffled within each configuration of the conditioning
+  set, the degrees of freedom of Andrey's tests; the plain forms keep them. The two degrees of
+  freedom are not equal, so the ``-adf`` p-values can differ from Andrey's. A table with fewer than
+  5 observations per cell on average (``n < 5 * r * c * q``, for ``r`` and ``c`` categories in the
+  two variables and ``q`` configurations of the conditioning set) gets ``p = 1``, and Andrey's tests
+  have no such rule. At 2000 rows and three categories per variable that starts at four conditioning
+  variables, where bnlearn declares independence and Andrey tests it.
 - ``hc`` and ``tabu`` with ``score="bde"``, ``iss=1``, ``prior="vsp"``, and ``beta = 1 / (d - 1)``:
   BDeu with equivalent sample size 1 and the structure prior that makes each other variable a
   parent with probability ``1 / (d - 1)``, Andrey's ``score_func="local_score_BDeu"``. bnlearn's
