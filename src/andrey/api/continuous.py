@@ -81,7 +81,7 @@ def notears(
         The fit stops when the acyclicity function falls to this value, above ``0``.
     rho_max : float, default=1e16
         The fit stops when the penalty weight on the acyclicity function reaches this value, above
-        ``0``.
+        ``1``, the weight the fit starts from.
     robust : bool, default=False
         ``True`` follows the first fit with the likelihood path of [2]_ (see Notes).
     mcp_lambda : float, default=0.4
@@ -129,6 +129,17 @@ def notears(
 
     Notes
     -----
+    **When to use.** NOTEARS suits i.i.d. continuous observational data from a linear structural
+    equation model, in which each variable is a weighted sum of its causes plus noise, with no
+    unmeasured common causes [1]_. Its default least-squares fit reads the columns in their given
+    units, so its graph can depend on how each column is scaled [4]_ [5]_; ``robust=True`` follows
+    it with the Gaussian-likelihood path of [2]_. Its ``l1`` penalty favors sparse graphs, and its
+    acyclicity function takes a matrix exponential of the full weight matrix, so it suits a
+    moderate number of variables; it returns a DAG with the coefficient of each edge. With
+    nonlinear effects, use :func:`~andrey.cam`; when the noise is non-Gaussian and every edge
+    should be oriented, use :func:`~andrey.direct_lingam`; when a CPDAG is enough on
+    linear-Gaussian data, use :func:`~andrey.ges`.
+
     The first fit writes the weights as ``W = W+ - W-`` with both parts non-negative and solves the
     augmented Lagrangian ``loss + 0.5 * rho * h**2 + alpha * h + lambda1 * sum(W+ + W-)`` with
     L-BFGS-B, where ``loss = 0.5 * tr((I - W).T @ S @ (I - W))`` for the sample covariance ``S``.
@@ -153,7 +164,7 @@ def notears(
     the same DAG structures for the raw and the standardized data; the path finds a local solution,
     and the cost of a step is the number of its Adam iterations times a matrix exponential.
 
-    Ties between equal weights go to the column whose rank, computed from its own data, comes
+    Ties between equal weights go to the column whose rank, computed from the data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
     columns are identical. The :doc:`column-order guide </docs/guides/column-order>` lists what
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS
@@ -338,6 +349,17 @@ def dagma(
 
     Notes
     -----
+    **When to use.** DAGMA suits i.i.d. continuous observational data from a linear structural
+    equation model, in which each variable is a weighted sum of its causes plus noise, with no
+    unmeasured common causes [1]_. Its default least-squares fit reads the columns in their given
+    units, so its graph can depend on how each column is scaled [4]_ [5]_; ``robust=True`` follows
+    it with the Gaussian-likelihood path of [2]_. Its ``l1`` penalty favors sparse graphs, and its
+    acyclicity function takes a log-determinant of the full weight matrix, so it suits a moderate
+    number of variables; it returns a DAG with the coefficient of each edge. With nonlinear
+    effects, use :func:`~andrey.cam`; when the noise is non-Gaussian and every edge should be
+    oriented, use :func:`~andrey.direct_lingam`; when a CPDAG is enough on linear-Gaussian data,
+    use :func:`~andrey.ges`.
+
     The first fit starts from the zero matrix. Stage ``t`` of the central path runs Adam [3]_
     (betas ``0.99`` and ``0.999``) on ``mu * (loss + lambda1 * |W|_1) + h(W)`` with
     ``loss = 0.5 * tr((I - W).T @ S @ (I - W))`` for the sample covariance ``S`` and
@@ -365,7 +387,7 @@ def dagma(
     raw and the standardized data; the path finds a local solution, and each step repeats the whole
     central path.
 
-    Ties between equal weights go to the column whose rank, computed from its own data, comes
+    Ties between equal weights go to the column whose rank, computed from the data, comes
     first, as for :func:`~andrey.hc`, so the result does not depend on the column order unless two
     columns are identical. The :doc:`column-order guide </docs/guides/column-order>` lists what
     reordering the columns does to each method. The fit draws no random numbers and runs on one BLAS

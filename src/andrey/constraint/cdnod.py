@@ -33,10 +33,10 @@ walk that ends in an arrow into ``vk`` or an undirected edge at ``vk`` puts it i
 set ``Z2``.
 
 The step runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed
-from each column's own data, so the order in which it visits the pairs, the directions of a pair,
-and the subsets of ``Z2``, and the order of the columns in each kernel, do not depend on the column
-order. Reordering the columns relabels the step's orientations and changes nothing else, unless two
-columns are identical.
+from the data, so the order in which it visits the pairs, the directions of a pair, and the subsets
+of ``Z2``, and the order of the columns in each kernel, do not depend on the column order.
+Reordering the columns relabels the step's orientations and changes nothing else, unless two columns
+are identical.
 """
 
 from __future__ import annotations

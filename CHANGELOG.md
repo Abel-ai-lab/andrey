@@ -10,6 +10,148 @@ names its pull request.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-03
+
+### Highlights
+
+- `iamb` is supported and joins the quality gate. Against bnlearn 5.2.1 on simulated linear-Gaussian
+  data with 20 to 200 variables, 1,000 and 5,000 rows, and mean degree 2 and 4, bnlearn makes
+  significantly fewer errors in 1 of 80 judged comparisons, `iamb`'s CPDAG at 50 variables, 5,000
+  rows, and mean degree 2, where bnlearn takes the first column among candidates whose p-values
+  underflow to 0 and Andrey the candidate with the strongest test statistic; two more comparisons
+  are worse once and tie on a rerun with fresh seeds. Two comparisons have 9 pairs because bnlearn's
+  fits reached the 600 s cap. The median ratio of bnlearn's fit time to Andrey's for the CPDAG is
+  4.6 on standardized data, 2.7 on unstandardized data, and 2.2 at 200 variables. ([#607])
+- `mmpc` is supported and joins the quality gate, and the benchmark report adds the discrete
+  networks asia, child, insurance, alarm, and hepar2 for `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and
+  `rsmax2`, Andrey's chi-square and G-square tests against bnlearn's `x2-adf` and `mi-adf`. On
+  linear-Gaussian data `mmpc`'s skeleton at 200 variables, 5,000 rows, and mean degree 2 makes more
+  errors than bnlearn's on two runs (2.7 more on average on the second), because Andrey admits the
+  candidate with the strongest test statistic where bnlearn takes the first column, and its CPDAG at
+  100 variables, 1,000 rows, and mean degree 2 is worse once (+0.70) and +0.56 on a rerun of 9
+  pairs. On the networks, `iamb`'s moral graph of hepar2 at 5,000 rows is worse on two runs; the two
+  packages run different discrete tests. Andrey is slower than bnlearn in 186 of the 220 network
+  settings, in all 44 on hepar2 (bnlearn's fit time over Andrey's is 0.06 to 0.86), after the faster
+  discrete tests. ([#626])
+- `cam` is supported and joins the quality gate. Against CAM 1.0, the authors' R package, on
+  simulated nonlinear additive-noise data with Gaussian or Gumbel noise, 10 to 100 variables, 1,000
+  rows, and mean degree 2, `cam` makes no more errors in 14 of 16 judged settings and fewer in 2
+  (Gumbel noise at 100 variables), returns the same graph on 278 of 320 datasets, and fits 6.5 to
+  14.7 times faster on one core. CAM 1.0 caps a variable's parents at the smaller of the variables
+  minus one and the rows over 20, 50 at 1,000 rows, which binds at 100 variables; Andrey sets no cap
+  by default. Location-scale and linear-Gaussian data lie outside the model and are reported, not
+  judged. ([#631])
+- `resit` is supported and joins the quality gate. On simulated nonlinear additive-noise data with
+  Gaussian or Gumbel noise, 5 to 20 variables, 1,000 rows, and mean degree 2, `resit` makes no more
+  errors than the authors' R code in 12 of 12 judged settings (one after a rerun on fresh datasets)
+  and fewer than lingam's implementation in 11 of 12 (no more in the other), returns the authors'
+  graph on 87 of 220 datasets, and fits 3.2 to 4.6 times faster than the authors' code and 2.1 to
+  2.9 times faster than lingam on one core. The accuracy claim holds up to 10 variables: at 20
+  variables on Gaussian noise no implementation clearly beats the empty graph, so that range is for
+  speed. The paper fixes no order for removing a variable's parents; Andrey's order is no worse than
+  a random one on datasets not used before. Location-scale and linear-Gaussian data lie outside the
+  model and are reported, not judged. ([#634])
+
+### Added
+
+- `andrey.data.sample_scm(functional="location_scale")` and
+  `andrey.data.functional.location_scale(scale_range=)`, location-scale noise: each variable's
+  noise scale is a function of its parents, with weights of its own in `params.scale_weights`,
+  between the bounds of `scale_range`, by default those of the benchmark of Immer et al. (2023).
+  ([#596])
+- `andrey.data.load_dataset("child")` and `load_dataset("insurance")`, the bnlearn child network
+  (20 variables, 25 arcs) and insurance network (27 variables, 52 arcs). ([#611])
+- `cam`, the causal additive model of Buhlmann, Peters, and Ernest (2014), a functional causal
+  model, learns a DAG and a causal order from nonlinear additive effects with the paper's
+  settings: boosting preselects each variable's possible parents, a greedy search adds edges by the
+  drop in log residual variance of additive spline fits, and smooth-term tests prune them.
+  ([#597])
+- `resit`, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf
+  2014), a functional causal model, learns a DAG and a causal order from nonlinear effects with
+  additive noise of any distribution, with the paper's settings: it takes as each next sink the
+  variable whose additive-model residual an HSIC test finds most independent of the others, then
+  removes each parent whose removal leaves the residual independent. ([#620])
+- `camuv`, causal additive models with unobserved variables (Maeda and Shimizu 2021), a
+  latent-variable method, learns the direct causes among the observed variables from nonlinear
+  additive effects with the paper's settings: HSIC tests on the residuals of additive spline fits
+  find each variable's direct causes over sets of up to 3 variables, and a pair that a hidden common
+  cause or a causal path through a hidden variable joins, whose relation no regression can
+  identify, comes back as `o-o` and in `metadata["latent_pairs"]`, and the edges it drops from
+  directed cycles in `metadata["cycle_edges"]`; it is experimental. ([#623])
+- `dynotears`, DYNOTEARS (Pamfil et al. 2020), a time-series method, learns a linear structural
+  vector autoregression from one series, same-step and lagged effects with their weights, by least
+  squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
+  the paper's settings: `lambda1=0.05`, `w_threshold=0.3`, and `lag_threshold=0.1` for 500 time
+  steps, and `tau_max=1`; it is experimental. ([#639])
+
+### Changed
+
+- `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` now belong to the family
+  "Functional causal models", with `cam` (Glymour, Zhang, and Spirtes 2019): their `family` value
+  in `andrey list` and in the method contracts of `andrey --help --json` is `"functional"` in place
+  of `"lingam"`, and nothing else in the API changes. ([#597])
+- The rank that breaks ties (`tie_break="rank"`, the default) no longer depends on the row order or
+  on a column's units or sign: it is a hash of each column's relations to the other columns, and a
+  new column order still relabels it; only columns that no row order, unit, or sign tells apart
+  fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
+  `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
+  changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
+  the true graph on fresh draws were indistinguishable from those of a random ranking. Without
+  changing a graph, the rank also moves `exact_search`'s `metadata["dag"]`, the member of the class
+  it orients, and the last bits of the weights of `bottom_up_parce_lingam` and
+  `longitudinal_lingam`, which order their regressions by it. No setting restores the former rank;
+  `tie_break="position"` orders ties by column position, a different rule. ([#612])
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` return the same graphs and
+  p-values in less time, because the candidates of a grow step share one conditioning set, and the
+  test now numbers that set's configurations once and counts the tables of all its candidates
+  together, where each candidate's call numbered them again; `mmpc` reaches the same counts through
+  the test's batch of statistics. On asia, child, insurance, alarm, and hepar2 with 1,000 and 5,000
+  rows, the geometric mean of the speedup over the ten datasets was 2.4x (chisq) and 2.9x (gsq) for
+  `iamb`, 2.2x and 2.6x for `inter_iamb`, and 1.6x and 1.8x for `mmpc`; `iamb` on hepar2 with 5,000
+  rows fell from 12.3 s to 3.3 s with chisq and from 28.0 s to 5.5 s with gsq. The identity check's
+  233 fits of every method but `calm`, 640 fits of the discrete methods on four networks, and
+  86,163 recorded queries returned the same bits. ([#625])
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="gsq"` return the same graphs and p-values in
+  less time: the test evaluates the degrees of freedom of all the tables of a scan in one pass,
+  where each table shape evaluated its own, and reads the mean of a cell in a configuration of at
+  most 128 rows from a table of 358 thousand floats (2.9 MB) that every test in the process shares
+  and that fills as lookups need it. On asia, child, insurance, alarm, and hepar2 with 1,000 and
+  5,000 rows, the geometric mean of the speedup over the ten datasets was 1.63x for `iamb`, 1.49x
+  for `inter_iamb`, and 1.40x for `mmpc`, from 0.91x to 2.25x over the 30 settings; the three fits
+  on asia with 5,000 rows were 3 to 7 ms slower, and `iamb` on hepar2 with 5,000 rows fell from 7.2
+  to 4.8 seconds. Andrey stays slower than bnlearn's `mi-adf` in 28 of the 30 settings, taking 1.7
+  to 10.7 times as long. The identity check's 239 fits of every method, 640 fits of the discrete
+  methods on four networks, 68 on hepar2, and 86,163 recorded queries returned the same bits.
+  ([#630])
+- The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
+  outside the method's claim, with its numbers and does not fail it; a row without the field is
+  judged as before. ([#631])
+- Every method's docstring opens its Notes with a **When to use.** paragraph: the data, model,
+  and scale the method is designed for, what it returns, and the method to use outside that
+  setting. ([#633])
+
+### Fixed
+
+- `notears` rejects a `rho_max` at or below 1, the penalty weight its fit starts from, which ended
+  the fit before its first solve and returned an empty graph without a warning. ([#639])
+- `rcd` and `gin` no longer change their graph when a constant is added to every column. The kernel
+  independence test they share computed squared distances as `x^2 + y^2 - 2xy`, which loses its
+  digits far from 0. With `1e9` added to simulated data, `rcd` returned another graph on 5 of 6
+  draws and `gin` on 6 of 6; now neither does on any. The statistic of a dependent pair fell from
+  5.83 to 0.056 and its p-value rose from 0 to 0.005 at that offset. The test now takes the
+  distances between mean-centered columns, and both methods center their columns first, as RCD and
+  GIN assume zero-mean variables (Maeda and Shimizu 2020; Xie et al. 2020). On the identity check's
+  239 draws no graph changed; the weights of `rcd` changed in the last bits on 4 of its 6, and every
+  other method, `gin` included, is bit-identical. ([#619])
+- `varma_lingam` no longer changes its graph when a constant is added to every column. Its
+  likelihood fit takes a constant trend, so a column's mean is not part of the model, but a mean
+  far from 0 stopped the fit's optimizer at its starting point. With `1e9` added to simulated
+  data, and with `X * 3.7 + 1e6`, it returned another graph on 3 of 6 draws; now it does on none.
+  The series is centered first, as the structural VAR model that VARMA-LiNGAM extends takes
+  zero-mean series (Hyvarinen et al. 2010). On the identity check's 239 draws only the 6 of
+  `varma_lingam` changed: 2 in their graph, with 1 and 2 fewer errors against the true graph, and 4
+  in their weights; every other method is bit-identical. ([#629])
+
 ## [0.12.0] - 2026-10-30
 
 ### Highlights
@@ -1296,7 +1438,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
@@ -1471,3 +1614,19 @@ First alpha release.
 [#577]: https://github.com/Abel-ai-lab/andrey/pull/577
 [#581]: https://github.com/Abel-ai-lab/andrey/pull/581
 [#584]: https://github.com/Abel-ai-lab/andrey/pull/584
+[#596]: https://github.com/Abel-ai-lab/andrey/pull/596
+[#597]: https://github.com/Abel-ai-lab/andrey/pull/597
+[#607]: https://github.com/Abel-ai-lab/andrey/pull/607
+[#611]: https://github.com/Abel-ai-lab/andrey/pull/611
+[#612]: https://github.com/Abel-ai-lab/andrey/pull/612
+[#619]: https://github.com/Abel-ai-lab/andrey/pull/619
+[#620]: https://github.com/Abel-ai-lab/andrey/pull/620
+[#623]: https://github.com/Abel-ai-lab/andrey/pull/623
+[#625]: https://github.com/Abel-ai-lab/andrey/pull/625
+[#626]: https://github.com/Abel-ai-lab/andrey/pull/626
+[#629]: https://github.com/Abel-ai-lab/andrey/pull/629
+[#630]: https://github.com/Abel-ai-lab/andrey/pull/630
+[#631]: https://github.com/Abel-ai-lab/andrey/pull/631
+[#633]: https://github.com/Abel-ai-lab/andrey/pull/633
+[#634]: https://github.com/Abel-ai-lab/andrey/pull/634
+[#639]: https://github.com/Abel-ai-lab/andrey/pull/639

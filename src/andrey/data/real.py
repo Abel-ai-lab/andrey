@@ -5,14 +5,15 @@ it in a cache directory, so later loads need no network. The cache directory is 
 when given, else ``ANDREY_DATA_DIR``, else ``$XDG_CACHE_HOME/andrey`` (``~/.cache/andrey`` when
 ``XDG_CACHE_HOME`` is unset). Without network access, put the file at the path the error names.
 
-``sachs`` is measured data. ``asia``, ``alarm``, ``hepar2``, ``andes``, and ``diabetes`` are
-published Bayesian-network structures from the bnlearn repository; their data are simulated on the
-graph by a seeded linear-Gaussian model or, with ``discrete=True``, sampled from the networks' own
-conditional probability tables, and their columns come in an order drawn from the seed.
+``sachs`` is measured data. ``asia``, ``child``, ``insurance``, ``alarm``, ``hepar2``, ``andes``,
+and ``diabetes`` are published Bayesian-network structures from the bnlearn repository; their data
+are simulated on the graph by a seeded linear-Gaussian model or, with ``discrete=True``, sampled
+from the networks' own conditional probability tables, and their columns come in an order drawn
+from the seed.
 
 >>> from andrey.data import list_datasets
 >>> list_datasets()
-('sachs', 'asia', 'alarm', 'hepar2', 'andes', 'diabetes')
+('sachs', 'asia', 'child', 'insurance', 'alarm', 'hepar2', 'andes', 'diabetes')
 """
 
 from __future__ import annotations
@@ -337,6 +338,23 @@ DATASETS: dict[str, Remote] = {
         "structures and their application to expert systems. Journal of the Royal Statistical "
         "Society B 50(2):157-224, 1988.",
     ),
+    "child": _bnlearn(
+        "child",
+        "2bc3236dcbdbf9c9f1bbdeb060aa93c0bdee389d23a549b7248b9d89ed8a980c",
+        "CHILD (Spiegelhalter and Cowell, 1992): a diagnosis of congenital heart disease in "
+        "newborn babies; 20 variables and 25 arcs.",
+        "D. J. Spiegelhalter, R. G. Cowell. Learning in probabilistic expert systems. In Bayesian "
+        "Statistics 4 (J. M. Bernardo, J. O. Berger, A. P. Dawid, A. F. M. Smith, eds.), "
+        "447-466. Clarendon Press, Oxford, 1992.",
+    ),
+    "insurance": _bnlearn(
+        "insurance",
+        "92bcecd1b85387726af564bf1b50cd400ddbbea1b017303cc54d4654e50a8971",
+        "INSURANCE (Binder et al., 1997): a car insurance risk assessment, from a driver's and a "
+        "car's attributes to the expected claim costs; 27 variables and 52 arcs.",
+        "J. Binder, D. Koller, S. Russell, K. Kanazawa. Adaptive probabilistic networks with "
+        "hidden variables. Machine Learning 29(2-3):213-244, 1997.",
+    ),
     "alarm": _bnlearn(
         "alarm",
         "f5860caa7137b5817e0c4f169cce0f1451ce6c246b96f5ce4fb4a8167993be29",
@@ -390,7 +408,7 @@ def list_datasets() -> tuple[str, ...]:
     --------
     >>> from andrey.data import list_datasets
     >>> list_datasets()
-    ('sachs', 'asia', 'alarm', 'hepar2', 'andes', 'diabetes')
+    ('sachs', 'asia', 'child', 'insurance', 'alarm', 'hepar2', 'andes', 'diabetes')
     """
     return tuple(DATASETS)
 
@@ -467,11 +485,12 @@ def load_dataset(
         - ``"sachs"``: the protein-signaling measurements of Sachs et al. (2005) [1]_, 853
           observational cells by 11 proteins and phospholipids, with the 17-arc consensus
           network.
-        - ``"asia"`` (8 variables, 8 arcs), ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123),
-          ``"andes"`` (223, 338), and ``"diabetes"`` (413, 602): published Bayesian networks
-          [2]_. The graph is the network's structure; the data are simulated on it by a
-          linear-Gaussian structural causal model, standardized, or, with ``discrete=True``,
-          sampled from the network's own conditional probability tables.
+        - ``"asia"`` (8 variables, 8 arcs), ``"child"`` (20, 25), ``"insurance"`` (27, 52),
+          ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123), ``"andes"`` (223, 338), and
+          ``"diabetes"`` (413, 602): published Bayesian networks [2]_. The graph is the
+          network's structure; the data are simulated on it by a linear-Gaussian structural
+          causal model, standardized, or, with ``discrete=True``, sampled from the network's own
+          conditional probability tables.
     n : int or None, default=None
         Rows to simulate on a published network; ``None`` gives 1000. Measured data such as
         ``"sachs"`` take no ``n``.

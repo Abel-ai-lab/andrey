@@ -35,7 +35,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "IAMB": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
     "InterIAMB": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
+    "MMPC": {
         "structural": ["graph"],
         "numeric": {},
     },
@@ -57,6 +65,11 @@ SPEC: dict[str, dict] = {
     },
     "GFCI": {
         "structural": ["graph"],
+        "numeric": {},
+    },
+    # CAM records no weights: its DAG and its causal order.
+    "CAM": {
+        "structural": ["graph", "causal_order"],
         "numeric": {},
     },
     # CALM's weights come from a torch optimizer, so only the graph is recorded.
@@ -134,10 +147,26 @@ SPEC: dict[str, dict] = {
             "omegas": {"atol": 1e-6, "rtol": 1e-5},
         },
     },
+    # DYNOTEARS: the per-lag graphs exactly; the weights within what L-BFGS-B's stopping rule
+    # leaves open: a change of the input in its last bits moved them by up to 1e-3.
+    "DYNOTEARS": {
+        "structural": ["graph"],
+        "numeric": {"lag_weights": {"atol": 5e-3, "rtol": 0.0}},
+    },
     # Granger has no causal order; its structural gate is the binary support.
     "Granger": {
         "structural": ["adj"],
         "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
+    },
+    # CAM-UV: the PAG's marks and the pairs it marks through a hidden variable, both exact.
+    "CAMUV": {
+        "structural": ["graph", "latent_pairs"],
+        "numeric": {},
+    },
+    # RESIT: the DAG and the causal order of its sink search, both exact.
+    "RESIT": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
     },
     # GIN: the latent graph and the clusters in causal order, both exact.
     "GIN": {

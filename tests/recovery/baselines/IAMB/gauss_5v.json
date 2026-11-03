@@ -1,0 +1,60 @@
+{
+  "algorithm": "IAMB",
+  "case": "gauss_5v",
+  "input": {
+    "case": "gauss_5v",
+    "column_order": [
+      4,
+      2,
+      3,
+      0,
+      1
+    ],
+    "seed": 20240612,
+    "sha256": "f0c639f0173f1ceea5b71c8a2a8fa3ae2bc3597ad0817bee52cda3935bbfc0ba",
+    "shape": [
+      1000,
+      5
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        1,
+        0
+      ],
+      [
+        1,
+        1,
+        0,
+        1,
+        1
+      ],
+      [
+        0,
+        1,
+        1,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1,
+        1,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

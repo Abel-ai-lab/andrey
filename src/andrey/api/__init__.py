@@ -15,13 +15,22 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 from .blanket import iamb, inter_iamb, mmpc
 from .constraint import cdnod, fci, gfci, pc
 from .continuous import dagma, notears
+from .fcm import cam, camuv, resit
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
 from .permutation import boss, grasp
 from .score import calm, exact_search, ges, gies, hc, tabu, xges
-from .temporal import granger, longitudinal_lingam, lpcmci, pcmci, pcmciplus, varma_lingam
+from .temporal import (
+    dynotears,
+    granger,
+    longitudinal_lingam,
+    lpcmci,
+    pcmci,
+    pcmciplus,
+    varma_lingam,
+)
 
 __all__ = [
     # constraint-based
@@ -49,10 +58,12 @@ __all__ = [
     # permutation-based
     "boss",
     "grasp",
-    # LiNGAM family
+    # functional causal models: LiNGAM, then nonlinear additive noise
     "direct_lingam",
     "ica_lingam",
     "multi_group_direct_lingam",
+    "cam",
+    "resit",
     # temporal family
     "varma_lingam",
     "longitudinal_lingam",
@@ -60,6 +71,7 @@ __all__ = [
     "pcmciplus",
     "lpcmci",
     "granger",
+    "dynotears",
     # irregular / pairwise family
     "anm",
     "pnl",
@@ -68,4 +80,5 @@ __all__ = [
     # hidden-confounder family
     "rcd",
     "bottom_up_parce_lingam",
+    "camuv",
 ]

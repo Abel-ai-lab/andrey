@@ -172,6 +172,9 @@ Release cards, then links the page (`NAV_NEWEST` in `conf.py`). To add a release
    `release-opening` block.
 6. Add the summary's folder to `RELEASES` in `site/build.py`, so the homepage and the README count
    it.
+7. Add the release's row to the release-card table in
+   [`benchmarks/CATALOG.md`](../benchmarks/CATALOG.md), and the release to the cards column of each
+   comparison its Reproduce table names.
 
 ## The documentation sidebars
 

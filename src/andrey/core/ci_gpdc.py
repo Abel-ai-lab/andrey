@@ -77,7 +77,7 @@ class GPDC:
     are ordered by a random key per row and variable, drawn once from ``seed``, so that every
     ranking stays equally likely under the null. Each variable takes its keys, and its place among
     the regressors of a conditioning set, by its :func:`~andrey.search.hc.tie_ranks` rank, a rank
-    computed from each column's own data, so a p-value does not depend on the column order. The
+    computed from the data, so a p-value does not depend on the column order. The
     statistic is their squared distance correlation, from the doubly centered matrices of their
     pairwise distances [3]_. After ranking, the null is the same statistic between the ranks and a
     random permutation of them, drawn ``n_null`` times [1]_. With ``b`` of the ``n_null`` draws at

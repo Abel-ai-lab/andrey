@@ -13,13 +13,31 @@ from andrey.core.structure import GraphStructure
 _SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = (
-    frozenset({"PC", "FCI", "GFCI", "CDNOD", "InterIAMB", "ExactSearch", "BOSS", "GRaSP", "CALM"})
+    frozenset(
+        {
+            "PC",
+            "FCI",
+            "GFCI",
+            "CDNOD",
+            "IAMB",
+            "InterIAMB",
+            "MMPC",
+            "ExactSearch",
+            "BOSS",
+            "GRaSP",
+            "CALM",
+        }
+    )
     | _SCORE_GRAPH
 )
 # LiNGAM: candidate = ordering + weighted_adjacency, transposing native W back to the B layout.
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 # Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
 _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
+# CAM-UV: candidate = the graph's marks and the marked pairs.
+_MARKED_PAIRS = frozenset({"CAMUV"})
+# DAG and causal-order algorithms: candidate = the DAG and the order.
+_ORDERED_DAG = frozenset({"CAM", "RESIT"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
 _PAIRWISE = frozenset({"ANM", "PNL"})
 # The recorded fields of the pairwise tests, by metadata key and direction.
@@ -32,6 +50,8 @@ _PAIRWISE_FIELDS = {
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
+# Weighted temporal fits: candidate = the per-lag graphs and their weights.
+_WEIGHTED_LAGS = frozenset({"DYNOTEARS"})
 
 
 def found_dag(out: Any) -> GraphStructure:
@@ -65,6 +85,11 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm == "BottomUpParceLiNGAM":  # the order, unordered variables nested in a list
             candidate["causal_order"] = out.metadata["partial_order"]
         return candidate
+    if algorithm in _MARKED_PAIRS:
+        pairs = np.asarray(out.metadata["latent_pairs"], dtype=np.int64).reshape(-1, 2)
+        return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
+    if algorithm in _ORDERED_DAG:
+        return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
     if algorithm in _PAIRWISE:
         md = out.metadata
         return {"graph": out.structure.to_numpy()} | {
@@ -85,6 +110,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm != "PCMCI":
             candidate["conflicts"] = out.metadata["conflicts"]
         return candidate
+    if algorithm in _WEIGHTED_LAGS:
+        s = out.structure
+        return {
+            "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
+            "lag_weights": np.asarray(s.lag_weights),
+        }
     if algorithm == "LongitudinalLiNGAM":
         return {
             "causal_orders": [list(order) for order in out.metadata["causal_orders"]],

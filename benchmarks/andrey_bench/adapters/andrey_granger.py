@@ -1,7 +1,8 @@
 """Andrey Granger solution adapter for multivariate time series.
 
 Wraps ``andrey.granger``, the ordinary least-squares fit of each variable on the past ``maxlag``
-steps of every variable, with a test of each lagged coefficient at ``alpha``. The fit returns the
+steps of every variable, with an F-test of each lagged coefficient at ``alpha`` after the
+Benjamini-Hochberg adjustment, ``fdr_method="fdr_bh"``. The fit returns the
 coefficients in causal-learn's ``granger_lasso`` layout, a ``(d, d * maxlag)`` matrix whose
 ``[i, j + d * (k - 1)]`` entry weights ``x_j(t - k)`` in ``x_i(t)``, so every solution is scored
 from the same encoding. A coefficient that is not significant is zero.

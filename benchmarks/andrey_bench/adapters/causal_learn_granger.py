@@ -4,9 +4,9 @@ Calls ``Granger(maxlag=..., cv=...).granger_lasso(X)``, which returns a ``(d, d 
 coefficient matrix whose ``[i, j + d * (k - 1)]`` entry weights ``x_j(t - k)`` in ``x_i(t)``. A
 nonzero coefficient is a lagged edge.
 
-causal-learn fits the lasso on the data as given. Andrey standardizes each variable first and
-returns the coefficients in the data's units, so its edges do not depend on the units; on
-standardized data the two fit the same model.
+causal-learn fits a cross-validated lasso per variable on the data as given. Andrey's ``granger``
+fits a different model, a least-squares regression whose lagged coefficients are kept by an F-test,
+so the two solutions' edges are compared as two methods' answers, not as one model's two fits.
 """
 
 from __future__ import annotations

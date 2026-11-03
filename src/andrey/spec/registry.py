@@ -52,7 +52,7 @@ _POSSIBLE_DSEP = ParamSpec(
     default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
-    "order_free = by a rank computed from each column's own data, so the result does not depend "
+    "order_free = by a rank computed from the data, so the result does not depend "
     "on the column order unless two columns are identical; fast = column order. null follows "
     "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
     nullable=True,
@@ -334,10 +334,9 @@ _LOCAL_OUTPUT_DOC = (
     "they joined"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
-for _name, _status, _summary, _key, _structure, _kind, _refs in (
+for _name, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
-        "experimental",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
         "incremental association: grow by conditional-independence tests, then shrink. With "
         "target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink structure "
@@ -349,7 +348,6 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
     ),
     (
         "inter_iamb",
-        "supported",
         "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
         "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
         "structure learner, or into the skeleton or the moral graph (structure).",
@@ -360,7 +358,6 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
     ),
     (
         "mmpc",
-        "experimental",
         "One variable's parents and children, undirected, by max-min parents and children: "
         "conditional-independence tests over subsets of the members so far, with a symmetry "
         "check. With target=null, the skeleton that mmhc searches, or, with structure=cpdag, that "
@@ -392,7 +389,7 @@ for _name, _status, _summary, _key, _structure, _kind, _refs in (
             ),
             determinism="stochastic",
             accel="numpy",
-            status=_status,
+            status="supported",
             column_order="relabels",
             tie_break=True,
             seeded=True,
@@ -919,12 +916,12 @@ _add(
             ),
             ParamSpec(
                 name="rho_max",
-                minimum=0,
+                minimum=1,
                 exclusive_minimum=True,
                 type="float",
                 default=1e16,
                 doc="The fit stops when the penalty weight on the acyclicity function reaches "
-                "this value, above 0.",
+                "this value, above 1, the weight the fit starts from.",
             ),
             *_CONTINUOUS_PATH_PARAMS,
         ),
@@ -1200,12 +1197,13 @@ _add(
     )
 )
 
-# --- LiNGAM family --------------------------------------------------------------------------------
+# --- functional causal models (Glymour, Zhang & Spirtes 2019) -------------------------------------
+# Linear effects with non-Gaussian noise (LiNGAM).
 
 _add(
     MethodSpec(
         name="direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM for linear non-Gaussian data: recovers a fully-oriented DAG plus a "
         "causal order and edge weights. Use when noise is non-Gaussian and effects are linear.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -1231,7 +1229,7 @@ _add(
 _add(
     MethodSpec(
         name="ica_lingam",
-        family="lingam",
+        family="functional",
         summary="ICA-based LiNGAM for linear non-Gaussian data: FastICA gives a causal order, "
         "adaptive Lasso the edge weights; returns a DAG, the order, and the weights. Seeded "
         "(ANDREY_SEED, else 0), so repeated runs match. DirectLiNGAM is more accurate on the "
@@ -1269,7 +1267,7 @@ _add(
 _add(
     MethodSpec(
         name="multi_group_direct_lingam",
-        family="lingam",
+        family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
         "shared causal order and a per-group weighted DAG. Returns one result per group.",
         data=DataSpec(
@@ -1304,6 +1302,76 @@ _add(
             ),
         ),
         references=("Shimizu 2012",),
+    )
+)
+
+# Nonlinear effects with additive noise (Hoyer et al. 2009; Peters et al. 2014).
+
+_add(
+    MethodSpec(
+        name="cam",
+        family="functional",
+        summary="Causal additive model (CAM) for nonlinear additive effects with additive noise: "
+        "boosting preselects each variable's possible parents, a greedy search adds edges by the "
+        "drop in log residual variance of additive spline fits, and smooth-term tests prune them. "
+        "Returns a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a parent stays when its smooth "
+                "term's p-value is at most alpha. 0.001 is the paper's value.",
+            ),
+        ),
+        references=(
+            "Buhlmann, Peters & Ernest 2014",
+            "Hoyer et al. 2009",
+            "Peters, Mooij, Janzing & Scholkopf 2014",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="resit",
+        family="functional",
+        summary="Regression with subsequent independence test (RESIT) for nonlinear effects with "
+        "additive noise of any distribution: a causal order from the sink up, each sink the "
+        "variable whose additive-model residual an HSIC test finds most independent of the "
+        "others, then each parent removed whose removal leaves the residual independent. Returns "
+        "a DAG and a causal order. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after the edge removal; ordering is the causal order of the sink search.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                doc="Significance level of the edge-removal tests: a parent goes when the "
+                "residual without it is independent of the variable's predecessors at a p-value "
+                "above alpha. 0.05 is the paper's value.",
+            ),
+        ),
+        references=("Peters, Mooij, Janzing & Scholkopf 2014", "Gretton et al. 2007"),
     )
 )
 
@@ -1684,6 +1752,90 @@ _add(
         references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
+_add(
+    MethodSpec(
+        name="dynotears",
+        family="temporal",
+        summary="DYNOTEARS for a single multivariate time series: a linear structural vector "
+        "autoregression, same-step and lagged effects, by least squares with an l1 penalty under "
+        "the NOTEARS acyclicity constraint on the same-step weights. Returns a weighted temporal "
+        "structure. Deterministic; no torch.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a dag at lag 0 and lag graphs for lags 1..tau_max, with their lag_weights; "
+            "h_final and edges_removed in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "tau_max",
+                doc="The largest lag: each step is fit on the same step and the tau_max steps "
+                "before it, at least 1.",
+            ),
+            concept_param(
+                "lambda1",
+                default=0.05,
+                doc="Weight of the l1 penalty on every same-step and lagged weight, at least 0. "
+                "0.05 is the paper's value for 500 time steps.",
+            ),
+            concept_param(
+                "w_threshold",
+                doc="A same-step edge is kept when its weight magnitude reaches this value, at "
+                "least 0.",
+            ),
+            ParamSpec(
+                name="lag_threshold",
+                minimum=0,
+                type="float",
+                default=0.1,
+                doc="A lagged edge is kept when its weight magnitude reaches this value, at least "
+                "0. 0.1 is the paper's value for 500 time steps.",
+            ),
+            concept_param(
+                "max_iter",
+                default=100,
+                doc="Most dual steps of the augmented Lagrangian, at least 1.",
+                nullable=False,
+            ),
+            ParamSpec(
+                name="h_tol",
+                minimum=0,
+                exclusive_minimum=True,
+                type="float",
+                default=1e-8,
+                doc="The fit stops when the acyclicity function of the same-step weights falls to "
+                "this value, above 0.",
+            ),
+            ParamSpec(
+                name="rho_max",
+                minimum=1,
+                exclusive_minimum=True,
+                type="float",
+                default=1e16,
+                doc="The fit stops when the penalty weight on the acyclicity function reaches "
+                "this value, above 1, the weight the fit starts from.",
+            ),
+        ),
+        references=(
+            "Pamfil et al. 2020",
+            "Zheng, Aragam, Ravikumar & Xing 2018",
+            "Deng, Bello, Ravikumar & Aragam 2024",
+        ),
+    )
+)
 
 # --- pairwise family ------------------------------------------------------------------------------
 
@@ -1919,6 +2071,53 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="camuv",
+        family="latent",
+        summary="Causal additive models with unobserved variables (CAM-UV) for nonlinear additive "
+        "effects where some causes are hidden: direct causes as ->, and as o-o the pairs a hidden "
+        "common cause or a causal path through a hidden variable joins, whose relation cannot be "
+        "determined. Deterministic; no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        params=(
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of every HSIC independence test: the sink tests, the "
+                "tests that remove a candidate parent, and the tests that mark a pair. 0.01 is "
+                "the paper's value.",
+            ),
+            ParamSpec(
+                name="max_depth",
+                type="int",
+                default=2,
+                doc="The maximum conditioning-set size of a sink test, the most variables tested "
+                "together as a variable's new candidate parents, at least 1: the search runs over "
+                "sets of up to max_depth + 1 variables. Each sink test also regresses on the "
+                "variable's candidates found so far, however many. Larger values find more parents "
+                "and take longer. The default 2 is the paper's setting, sets of at most 3 "
+                "variables.",
+                minimum=1,
+                concept="max_depth",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="PAG over the observed variables; o-o joins a pair through a hidden variable, a "
+            "common cause or a causal path, metadata latent_pairs lists those pairs, and "
+            "cycle_edges the edges dropped from directed cycles.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        references=("Maeda & Shimizu 2021", "Gretton et al. 2007"),
+    )
+)
+
 # --- background knowledge and the conditioning-set cap ------------------------------------------
 
 _SKELETON_RULE = (
@@ -2003,6 +2202,15 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
+    "cam": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are "
+    "never possible parents; the boosting that preselects the possible parents reads the data "
+    "alone. The search starts from the required edges, and the pruning never removes one. "
+    + _ORDER_RULE.rstrip(),
+    "resit": "A variable is the next sink only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are in no regression and never in the result; each test still "
+    "reads every remaining variable or predecessor. The edge removal never removes a required "
+    "edge.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE
@@ -2020,6 +2228,10 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "granger": _LINK_RULE + "Lags run from 1 to tau_max; a required link needs its lag, and "
     "same-step links are not learned. Each regression drops forbidden lagged regressors and keeps "
     "required ones unpenalized.",
+    "dynotears": _LINK_RULE + "Lags run from 0 to tau_max. Forbidden links, links into an "
+    "earlier tier, and pairs outside the allowed set are held at zero in the fit; a required "
+    "link leaves the penalty and the threshold, and the cycle repair of the same-step graph "
+    "never removes it.",
     "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
     "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
     "fit of its effect's lagged weights; every other lagged weight stays.",
@@ -2031,6 +2243,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "required ones unpenalized. In the unordered block, a pair forbidden both ways is not "
     "adjacent, a pair forbidden one way has an arrowhead at the cause, and a required edge is "
     "directed.",
+    "camuv": "Forbidden edges, edges into an earlier tier, and pairs outside the allowed set never "
+    "make a variable a candidate parent, so a variable is not tried as the sink of a set that "
+    "holds a forbidden parent of it. A required edge's cause is a candidate parent from the start "
+    "and no step removes it; its pair is never marked. A pair forbidden both ways is never marked; "
+    "on a marked pair, a forbidden i -> j whose reverse is not forbidden, such as an edge into an "
+    "earlier tier, puts an arrowhead at i.",
     "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
@@ -2098,6 +2316,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "multi_group_direct_lingam": ("group_index",),
     "longitudinal_lingam": ("causal_orders",),
     "granger": ("p_values",),
+    "dynotears": ("h_final", "edges_removed"),
     "pcmci": ("p_values", "statistics", "parents"),
     "pcmciplus": ("p_values", "statistics", "parents", "conflicts"),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
@@ -2105,6 +2324,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
+    "camuv": ("latent_pairs", "cycle_edges"),
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the

@@ -38,9 +38,12 @@ def least_squares(cov: np.ndarray, weights: np.ndarray) -> tuple[float, np.ndarr
     """Value and gradient of ``0.5 * tr((I - W)^T S (I - W))`` for the sample covariance ``S``.
 
     This is half the mean squared residual summed over the variables, so it equals
-    ``0.5 / n * ||X - X W||^2`` for centered data ``X``.
+    ``0.5 / n * ||X - X W||^2`` for centered data ``X``. ``W`` may have more rows than columns:
+    for ``d`` columns, ``I`` is then the ``d x d`` identity above zero rows, and ``S`` the
+    covariance of ``[X | Y]``, so the value is ``0.5 / n * ||X - X W_0 - Y A||^2`` for ``W``
+    stacking ``W_0`` above ``A``.
     """
-    residual = np.eye(cov.shape[0]) - weights
+    residual = np.eye(*weights.shape) - weights
     product = cov @ residual
     return 0.5 * float(np.trace(residual.T @ product)), -product
 
@@ -160,38 +163,54 @@ def canonicalize(data: np.ndarray, constraints: Constraints | None = None) -> Ca
 
 
 def augmented_lagrangian(
-    canonical: Canonical, *, lambda1: float, max_iter: int, h_tol: float, rho_max: float
+    cov: np.ndarray,
+    forbidden: np.ndarray,
+    required: np.ndarray,
+    *,
+    lambda1: float,
+    max_iter: int,
+    h_tol: float,
+    rho_max: float,
+    method: str = "notears",
 ) -> np.ndarray:
-    """Minimize ``loss(W) + lambda1 * |W|_1`` subject to ``h(W) = 0``; return the weights.
+    """Minimize ``loss(W) + lambda1 * |W|_1`` subject to ``h(W[:d]) = 0``; return the weights.
 
-    The loss is over ``canonical.cov``. Entries the knowledge forbids stay at zero, and entries it
-    requires leave the ``l1`` term. Writes ``W = W+ - W-`` with both parts non-negative and zero
-    on the diagonal and on the forbidden entries. The inner problem
-    ``loss + 0.5 * rho * h**2 + alpha * h + lambda1 * sum(W+ + W-)`` is solved by L-BFGS-B from the
-    previous solution. After each solve, ``rho`` grows tenfold while ``h`` has not fallen to a
-    quarter of its previous value; then ``alpha`` takes a dual step ``alpha += rho * h``. The loop
-    stops when ``h <= h_tol``, ``rho >= rho_max``, or after ``max_iter`` dual steps.
+    ``W`` has ``r`` rows and ``d = forbidden.shape[1]`` columns, ``r = d`` for a DAG and a multiple
+    of ``d`` when lag blocks stack below the ``d x d`` block that ``h`` reads. The loss is
+    :func:`least_squares` over ``cov``, of shape ``(r, r)``. Entries ``forbidden`` marks stay at
+    zero, and entries ``required`` marks leave the ``l1`` term. Writes ``W = W+ - W-`` with both
+    parts non-negative and zero on the diagonal of the top block and on the forbidden entries. The
+    inner problem ``loss + 0.5 * rho * h**2 + alpha * h + lambda1 * sum(W+ + W-)`` is solved by
+    L-BFGS-B from the previous solution. After each solve, ``rho`` grows tenfold while ``h`` has
+    not fallen to a quarter of its previous value; then ``alpha`` takes a dual step
+    ``alpha += rho * h``. The loop stops when ``h <= h_tol``, ``rho >= rho_max``, or after
+    ``max_iter`` dual steps, which warns in ``method``'s name.
     """
-    cov = canonical.cov
-    d = cov.shape[0]
-    penalty = lambda1 * (~canonical.required).astype(np.float64)
+    r, d = forbidden.shape
+    penalty = lambda1 * (~required).astype(np.float64)
 
     def split_to_weights(w: np.ndarray) -> np.ndarray:
-        return (w[: d * d] - w[d * d :]).reshape(d, d)
+        return (w[: r * d] - w[r * d :]).reshape(r, d)
+
+    def acyclicity(weights: np.ndarray) -> tuple[float, np.ndarray]:
+        h, grad_top = trace_exponential(weights[:d])
+        if r == d:
+            return h, grad_top
+        return h, np.vstack((grad_top, np.zeros((r - d, d))))
 
     def objective(w: np.ndarray, rho: float, alpha: float) -> tuple[float, np.ndarray]:
         weights = split_to_weights(w)
         loss, grad_loss = least_squares(cov, weights)
-        h, grad_h = trace_exponential(weights)
-        value = loss + 0.5 * rho * h * h + alpha * h + penalty.ravel() @ (w[: d * d] + w[d * d :])
+        h, grad_h = acyclicity(weights)
+        value = loss + 0.5 * rho * h * h + alpha * h + penalty.ravel() @ (w[: r * d] + w[r * d :])
         smooth = grad_loss + (rho * h + alpha) * grad_h
         return float(value), np.concatenate((smooth + penalty, -smooth + penalty), axis=None)
 
-    fixed = canonical.forbidden | np.eye(d, dtype=bool)
+    fixed = forbidden | np.eye(r, d, dtype=bool)
     bounds = [
-        (0, 0) if fixed[i, j] else (0, None) for _ in range(2) for i in range(d) for j in range(d)
+        (0, 0) if fixed[i, j] else (0, None) for _ in range(2) for i in range(r) for j in range(d)
     ]
-    w_est, rho, alpha, h = np.zeros(2 * d * d), 1.0, 0.0, np.inf
+    w_est, rho, alpha, h = np.zeros(2 * r * d), 1.0, 0.0, np.inf
     for _ in range(max_iter):
         w_new, h_new = w_est, h
         while rho < rho_max:
@@ -199,7 +218,7 @@ def augmented_lagrangian(
                 objective, w_est, args=(rho, alpha), method="L-BFGS-B", jac=True, bounds=bounds
             )
             w_new = solution.x
-            h_new, _ = trace_exponential(split_to_weights(w_new))
+            h_new, _ = trace_exponential(split_to_weights(w_new)[:d])
             if h_new > 0.25 * h:
                 rho *= 10.0
             else:
@@ -209,7 +228,7 @@ def augmented_lagrangian(
         if h <= h_tol or rho >= rho_max:
             break
     else:
-        warn_search_limit("notears", "max_iter", max_iter, "dual steps")
+        warn_search_limit(method, "max_iter", max_iter, "dual steps")
     return split_to_weights(w_est)
 
 
@@ -572,7 +591,13 @@ def notears(
     """
     canonical = canonicalize(data, constraints)
     weights = augmented_lagrangian(
-        canonical, lambda1=lambda1, max_iter=max_iter, h_tol=h_tol, rho_max=rho_max
+        canonical.cov,
+        canonical.forbidden,
+        canonical.required,
+        lambda1=lambda1,
+        max_iter=max_iter,
+        h_tol=h_tol,
+        rho_max=rho_max,
     )
     steps = 0
     if robust:

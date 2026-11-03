@@ -29,8 +29,9 @@ def _reset_backend_state():
 def serve_datasets_offline(monkeypatch, cache):
     """Serve dataset downloads from fixtures/, into the empty directory ``cache``, with no network.
 
-    Sachs is the 853-row file, under its own SHA-256; ASIA is the published BIF, under the
-    recorded one. Returns the list of URLs fetched, so a test can tell a download from a cache hit.
+    Sachs is the 853-row file, under its own SHA-256; ASIA, CHILD, and INSURANCE are the published
+    BIFs, under the recorded ones. Returns the list of URLs fetched, so a test can tell a download
+    from a cache hit.
     """
     import dataclasses
     import gzip
@@ -43,7 +44,10 @@ def serve_datasets_offline(monkeypatch, cache):
     fixtures = Path(__file__).parent / "fixtures"
     sachs = gzip.decompress((fixtures / "sachs-observational.txt.gz").read_bytes())
     served = {"https://example.invalid/sachs.txt": sachs}
-    served |= dict.fromkeys(real.DATASETS["asia"].sources, (fixtures / "asia.bif.gz").read_bytes())
+    for name in ("asia", "child", "insurance"):
+        served |= dict.fromkeys(
+            real.DATASETS[name].sources, (fixtures / f"{name}.bif.gz").read_bytes()
+        )
     fetched: list[str] = []
 
     def fetch(url):

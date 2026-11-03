@@ -123,7 +123,8 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
     bench = importlib.import_module("andrey_bench.datasets")
     for regime in qg.REGIMES:
-        topology, functional, noise, standardize = bench.REGIMES[regime]
+        harness = qg.BENCHMARK_REGIME.get(regime, regime)
+        topology, functional, noise, standardize = bench.REGIMES[harness]
         for d, n in qg.sizes(regime):
             key = bench.DatasetKey(
                 topology=topology,
@@ -134,7 +135,7 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
                 n=n,
                 seed=3,
                 standardize=standardize,
-                latents=bench.latents_for(regime, d),
+                latents=bench.latents_for(harness, d),
             )
             assert qg.regime_kwargs(regime, d, n, 3) == bench.generation_kwargs(key)
 

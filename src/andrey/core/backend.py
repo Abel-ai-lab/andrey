@@ -147,16 +147,16 @@ class _Config:
     workers.
 
     ``tie_break`` sets how a method chooses between candidates that tie, such as two moves with
-    equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from each
-    column's own data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the
-    result. ``"position"`` orders them by column position instead, which skips computing the ranks,
-    and the result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
+    equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from the
+    data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the result.
+    ``"position"`` orders them by column position instead, which skips computing the ranks, and the
+    result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
     ``collider_order``, and ``fci`` and ``gfci`` their ``possible_dsep``, from it when the call
     gives none: ``"p_value"`` and ``"order_free"`` under ``"rank"``, ``"column"`` and ``"fast"``
-    under ``"position"``. ``pc``, ``cdnod``, ``fci``, and ``gfci`` also fire their orientation
-    rules one at a time in column order under ``"position"``, where ``"rank"`` runs them in
-    order-free rounds. The speed difference is small, except for ``fci`` and ``gfci`` on large
-    dense graphs. Each fit reads the setting once, when it starts. The
+    under ``"position"``. ``pc``, ``cdnod``, ``fci``, and ``gfci`` also fire their orientation rules
+    one at a time in column order under ``"position"``, where ``"rank"`` runs them in order-free
+    rounds. The speed difference is small, except for ``fci`` and ``gfci`` on large dense graphs.
+    Each fit reads the setting once, when it starts. The
     :doc:`column-order guide </docs/guides/column-order>` gives the numbers and lists the methods
     it reaches.
     """

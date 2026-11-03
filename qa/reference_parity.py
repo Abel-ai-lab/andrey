@@ -10,6 +10,16 @@ summary's ``parity_rule`` sets how its rows are judged:
   lies entirely above 0, and a row with fewer is reported, not gated. A row of a randomized test
   with several draws per dataset (``multi_draw``) is judged by those draws, with D per dataset the
   mean over the draws.
+- ``replication``: a row whose setting came out worse may hold its rerun on fresh seeds, with the
+  same fields (``paired``, ``andrey_shd_mean``, ``comparator_shd_mean``, ``mean_D``,
+  ``bootstrap_95``, ``above_zero``) and the ``seeds`` it ran. A worse setting counts only if it
+  replicates, so a row with a replication is judged by the replication's own interval, and a
+  replication with fewer than ``MIN_PAIRS`` paired datasets is reported, not gated.
+- ``claim``: ``"out"``, on a row or on the entry that holds it, marks a row measured outside the
+  setting its method claims (the model, data regime, and scale its paper states). Such a row is
+  measured for the method's Limitations, so it is reported with its numbers and never gated. A row
+  with ``"claim": "in"``, or with no ``claim``, is in claim and is judged as above; the row's own
+  field overrides its entry's.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -37,7 +47,7 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +70,8 @@ COLUMN_SERIES: tuple[str, str] = ("andrey_column_shd_by_seed", "comparator_shd_b
 ERRORS: tuple[str, ...] = ("shd", "directed_errors")
 #: Row fields that name a row within its method's table.
 ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
+#: The ``claim`` values: a row in the setting its method claims, and one outside it.
+IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect", "tie-break"})
 
@@ -75,7 +87,9 @@ class Row:
     interval, over ``draws`` draws per dataset. A row of a ``paired bootstrap`` summary with fewer
     than ``MIN_PAIRS`` paired datasets keeps its counts or errors and its ``pairs``, and is
     reported. ``column`` holds the column-order arm's ``(reference fewer, Andrey fewer)`` series
-    counts, which are printed but not judged.
+    counts, which are printed but not judged. ``replicated`` marks a row judged by its
+    ``replication`` on fresh seeds: its numbers are the rerun's. ``out_of_claim`` marks a row
+    measured outside its method's claim: it is reported with its numbers and never gated.
     """
 
     summary: str
@@ -90,14 +104,18 @@ class Row:
     interval: tuple[float, float] | None = None
     draws: int = 1
     column: tuple[int, int] | None = None
+    replicated: bool = False
+    out_of_claim: bool = False
 
     @property
     def reported(self) -> bool:
-        """Whether the row is too small to gate: under ``MIN_PAIRS`` paired datasets."""
-        return self.pairs is not None and self.pairs < MIN_PAIRS
+        """Whether the row is not gated: out of claim, or under ``MIN_PAIRS`` paired datasets."""
+        return self.out_of_claim or (self.pairs is not None and self.pairs < MIN_PAIRS)
 
     @property
     def failed(self) -> bool:
+        if self.out_of_claim:
+            return False
         if self.interval is not None:
             return self.interval[0] > 0
         return not self.reported and self.andrey > self.reference
@@ -107,6 +125,10 @@ class Row:
         return f"{self.method} vs {self.comparator}, {where} ({self.summary})"
 
     def numbers(self) -> str:
+        text = self._numbers()
+        return f"replication on fresh seeds: {text}" if self.replicated else text
+
+    def _numbers(self) -> str:
         if self.interval is not None:
             lo, hi = self.interval
             each = f", the mean of {self.draws} draws each" if self.draws > 1 else ""
@@ -122,7 +144,9 @@ class Row:
             )
         else:
             text = f"{self.rule} Andrey {self.andrey:g}, {self.comparator} {self.reference:g}"
-        if self.reported:
+        if self.out_of_claim:
+            text += "; out of the method's claim: reported, not gated"
+        elif self.reported:
             text += f"; {self.pairs} paired datasets, under {MIN_PAIRS}: reported, not gated"
         if self.column is not None:
             text += (
@@ -137,9 +161,10 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
 
     A row where either side has no result (a fit over the time cap) is skipped, and so is a series
     of the column-order arm. A paired row with no known error field, a ``paired bootstrap`` row
-    with ``MIN_PAIRS`` paired datasets and no consistent interval, an unknown ``parity_rule``, and
-    a column-order arm on a reference not marked order-dependent or with one of its two series
-    missing or of unequal lengths raise, so a new summary format cannot pass unchecked.
+    with ``MIN_PAIRS`` paired datasets and no consistent interval, an unknown ``parity_rule``, an
+    unknown ``claim``, and a column-order arm on a reference not marked order-dependent or with one
+    of its two series missing or of unequal lengths raise, so a new summary format cannot pass
+    unchecked.
     """
     rule = data.get("parity_rule")
     if rule not in (None, PAIRED_BOOTSTRAP):
@@ -161,19 +186,39 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
             where = f"{summary}: {method['method']} vs {comparator} {key}"
             name = (summary, method["method"], comparator, key)
             column = _column_series(row, where)
+            out = _out_of_claim(row, method, where)
             judged = row.get("multi_draw") or row
             pairs = judged.get("paired") if rule == PAIRED_BOOTSTRAP else None
             if rule == PAIRED_BOOTSTRAP and not isinstance(pairs, int):
                 raise ValueError(f"{where} has no paired count")
             if pairs == 0:
                 continue
+            if "replication" in row:
+                if rule != PAIRED_BOOTSTRAP:
+                    raise ValueError(f"{where} has a replication, but no paired bootstrap rule")
+                rows.append(
+                    replace(_replicated(name, row["replication"], column, where), out_of_claim=out)
+                )
+                continue
             if pairs is not None and pairs >= MIN_PAIRS:
-                rows.append(_judged(name, judged, column, where))
+                rows.append(replace(_judged(name, judged, column, where), out_of_claim=out))
                 continue
             counted = _errors(row, where)
             if counted is not None:
-                rows.append(Row(*name, *counted, pairs=pairs, column=column))
+                rows.append(Row(*name, *counted, pairs=pairs, column=column, out_of_claim=out))
     return rows
+
+
+def _out_of_claim(row: dict, method: dict, where: str) -> bool:
+    """Return whether the row is marked ``claim: "out"``, on itself or on its entry.
+
+    The row's own ``claim`` overrides its entry's. A ``claim`` other than ``"in"`` and ``"out"``
+    raises.
+    """
+    claim = row.get("claim", method.get("claim", IN_CLAIM))
+    if claim not in (IN_CLAIM, OUT_OF_CLAIM):
+        raise ValueError(f"{where}: claim must be {IN_CLAIM!r} or {OUT_OF_CLAIM!r}, not {claim!r}")
+    return claim == OUT_OF_CLAIM
 
 
 def _errors(row: dict, where: str) -> tuple[str, float, float] | None:
@@ -219,6 +264,31 @@ def _judged(
         draws=fields.get("draws", 1),
         column=column,
     )
+
+
+def _replicated(
+    name: tuple[str, str, str, dict[str, Any]],
+    replication: dict,
+    column: tuple[int, int] | None,
+    where: str,
+) -> Row:
+    """Return the row as its replication judges it, the rerun on fresh seeds.
+
+    The replication names the ``seeds`` it ran. With ``MIN_PAIRS`` paired datasets it is judged by
+    its own interval, like any row; with fewer, it keeps its means and is reported, not gated.
+    """
+    where = f"{where}, replication"
+    if not str(replication.get("seeds", "")).strip():
+        raise ValueError(f"{where} needs the seeds it ran")
+    pairs = replication.get("paired")
+    if not isinstance(pairs, int):
+        raise ValueError(f"{where} has no paired count")
+    if pairs >= MIN_PAIRS:
+        return replace(_judged(name, replication, column, where), replicated=True)
+    means = (replication.get("andrey_shd_mean"), replication.get("comparator_shd_mean"))
+    if None in means:
+        raise ValueError(f"{where} needs andrey_shd_mean and comparator_shd_mean")
+    return Row(*name, PAIRED_BOOTSTRAP, *means, pairs=pairs, column=column, replicated=True)
 
 
 def _column_series(row: dict, where: str) -> tuple[int, int] | None:
@@ -323,8 +393,8 @@ def main() -> int:
     for line in exemptions + reported + failures:
         print(line)
     print(
-        f"\n{len(rows)} rows, {len(exemptions)} exempt, {len(reported)} reported (under "
-        f"{MIN_PAIRS} paired datasets, not gated), {len(failures)} failed."
+        f"\n{len(rows)} rows, {len(exemptions)} exempt, {len(reported)} reported (out of "
+        f"claim, or under {MIN_PAIRS} paired datasets; not gated), {len(failures)} failed."
     )
     return 1 if failures else 0
 

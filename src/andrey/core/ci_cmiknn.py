@@ -240,7 +240,7 @@ class CMIknn:
     share the bias.
 
     Of ``x`` and ``y``, the one with the lower :func:`~andrey.search.hc.tie_ranks` rank, a rank
-    computed from each column's own data, is shuffled. The tie-breaking is drawn once, from
+    computed from the data, is shuffled. The tie-breaking is drawn once, from
     ``seed``, when the test is built, and each column takes its keys by that rank. The shuffles
     come from a generator seeded by ``seed`` and the ranks of the conditioning set, so every query
     with the same conditioning set uses the same shuffles, and the test object keeps them for later

@@ -47,7 +47,7 @@ edges in any unit of the data. A step that would read the units only through a n
 such as a least-squares rank cutoff, the linear combination that `gin` tests, or the VARMA fit of
 `varma_lingam`, runs on columns brought to unit scale, with its results mapped back to the data's
 units. The causal order of `ica_lingam` still reads the magnitudes of its unmixing matrix, and the
-least-squares score of `notears` and `dagma` reads the units, as their pages describe.
+least-squares scores of `notears`, `dagma`, and `dynotears` read the units, as their pages describe.
 The categorical
 settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_bic"`, read text,
 boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
@@ -71,8 +71,12 @@ group and read its edges as the group's; no option drops or merges the copies fo
 `gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
 same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
 also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
-such as `'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
-cell, its row and column. A single column gives a one-node graph.
+such as `'a' at lag 1 repeats 'd'`. `cam`, `resit`, and `camuv` reject copies the same way, and a
+column of fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit;
+`resit` and `camuv` also need at least twice as many rows as columns, and `camuv` rejects a column
+that is a linear function of other columns, such as a total, as the BIC methods do. Other data
+raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
+column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
@@ -102,19 +106,21 @@ first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `direct_lingam`,
-`ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`,
-`pcmciplus`, `lpcmci`, `granger`, `rcd`, and `bottom_up_parce_lingam` take `knowledge`, a
-{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
-temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
-in the result, whatever its weight, test, or score says. For the time-series methods, an edge
-`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`.
-[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
+`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
+`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and
+`camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs
+allowed to be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors
+them. Every required edge is in the result, whatever its weight, test, or score says. For the
+time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
+`effect` at time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows
+them in use.
 
 % concept: tau_max
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, and `longitudinal_lingam` take `tau_max`, the largest
-lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points of the
-panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its name.
+`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take `tau_max`,
+the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts time points
+of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and keeps its
+name.
 
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
@@ -137,11 +143,12 @@ changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, and `rcd` take `max_depth`, the maximum conditioning-set size of their
+`pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum conditioning-set size of their
 conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2` cap their
 restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and `inter_iamb`
 stop growing at the cap.
-`rcd`'s cap is the most variables it regresses out together, with a default of 2, its paper's
+`rcd`'s cap is the most variables it regresses out together, and `camuv`'s the most variables a
+sink test adds together as a variable's candidate parents, each with a default of 2, its paper's
 setting.
 
 % concept: max_p_global
@@ -173,12 +180,13 @@ takes the same three rules for its same-step colliders, with `"majority"` as its
 tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
-`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, and
-`gfci` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
+`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, `gfci`,
+and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
 gives a node more than that many parents. `None`, the default, sets no cap. `ges`, `gies`, `xges`,
 `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss` and
-`grasp` grow no parent set past it, and `exact_search` scores only the parent sets within it.
-`gfci` caps its GES phase; the PAG its tests then orient can put more arrowheads at a node.
+`grasp` grow no parent set past it, `exact_search` scores only the parent sets within it, and
+`cam`'s order search adds no edge past it. `gfci` caps its GES phase; the PAG its tests then orient
+can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
@@ -272,7 +280,9 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    fci
    gfci
    cdnod
+   iamb
    inter_iamb
+   mmpc
    ges
    gies
    xges
@@ -287,6 +297,8 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    direct_lingam
    ica_lingam
    multi_group_direct_lingam
+   cam
+   resit
    anm
    pnl
    rcd
@@ -304,6 +316,21 @@ CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andr
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
 
+CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
+smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
+variable's possible parents, a greedy search adds the edge whose additive spline fit most lowers a
+variable's log residual variance, and smooth-term tests at `alpha=0.001` prune the edges. It
+returns a DAG. The [0.13.0](benchmarks/0.13.0.md#cam) release card measures it from 10 to 100
+variables against CAM 1.0.
+
+RESIT, regression with subsequent independence test (Peters, Mooij, Janzing, and Scholkopf 2014),
+fits the same kind of model with the noise of any distribution, with the paper's settings: it finds
+a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
+finds most independent of the remaining variables, then removes each parent whose removal leaves
+the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
+causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
+variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
 `structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
@@ -319,10 +346,10 @@ bound. R8 checks each pair of endpoints in both orders, so it does not depend on
 The rules run in rounds, each setting together the marks every rule implies on the graph as it
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
-Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order and is the
-default under `andrey.config(tie_break="position")`.
+Their possible-d-separation step visits the pairs and nodes by a rank computed from the data, so
+with `possible_dsep="order_free"`, the default, their result does not depend on the column order
+unless two columns are identical; `"fast"` visits them in column order and is the default under
+`andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
@@ -337,16 +364,31 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
-   iamb
-   mmpc
    notears
    dagma
+   camuv
+   dynotears
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
+kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
+on the residuals of additive spline fits find each variable's candidate parents over sets of up to
+3 variables and then its parents, and mark `o-o` each pair that a hidden common cause or a causal
+path through a hidden variable joins, whose relation no regression can identify.
+
+DYNOTEARS (Pamfil et al. 2020) learns a linear structural vector autoregression from one time
+series the way NOTEARS learns a DAG: the least-squares loss of each step on the same step and the
+`tau_max` steps before it, with an l1 penalty, under the acyclicity constraint on the same-step
+weights alone, since a lagged edge points forward in time. It keeps the paper's settings for 500
+time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-step weights and 0.1
+on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
+temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
+lag 0.
 
 A method becomes supported once it has:
 
@@ -641,6 +683,8 @@ name.
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells (Sachs et al., 2005) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
+| `child` | 20 | 25 | Simulated on the published network (bnlearn) |
+| `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
 | `alarm` | 37 | 46 | Simulated on the published network (bnlearn) |
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
@@ -671,14 +715,16 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
-and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
-time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
-categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
-continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
-true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
-so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
-graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form, and
+noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `functional="location_scale"` gives each variable noise whose scale depends on
+its parents, the location-scale noise model of Immer et al. (2023); with `scale="rescale"` that
+scale stays a smooth function of the parents at every depth of the graph.
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data

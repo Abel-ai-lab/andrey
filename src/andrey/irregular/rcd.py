@@ -434,8 +434,12 @@ def fit_rcd(
     ``constraints``, the ancestor search runs as without them; the parent sets then drop the
     forbidden parents and gain the required ones (:func:`apply_knowledge`), and no pair the
     knowledge keeps non-adjacent is flagged as confounded.
+
+    The columns are centered first, as RCD's model has zero-mean disturbances and confounders
+    (Maeda and Shimizu 2020, Sec. 2), so that no test reads where a column's zero lies.
     """
     X = np.asarray(X, dtype=np.float64)
+    X = X - X.mean(axis=0)
     caches = _FitCaches()
     M = extract_ancestors(
         X,

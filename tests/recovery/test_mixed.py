@@ -14,8 +14,10 @@ import pytest
 
 import andrey
 from andrey.core import ARROW
+from andrey.core.score import make_score
 from andrey.data import sample_mixed
 from andrey.metrics import shd, to_cpdag
+from tests.recovery.helpers.moves import class_gain, grid
 from tests.recovery.helpers.project import found_dag
 
 CATEGORICAL = [0, 4]
@@ -84,12 +86,27 @@ def _edges(out, kinds):
     return {(a, b) for a, b, kind in out.structure.oriented_edges() if kind in kinds}
 
 
-@pytest.mark.parametrize("fit", list(CPDAG_FITS))
+@pytest.mark.parametrize("fit", [fit for fit in CPDAG_FITS if not fit.startswith("hc-")])
 def test_cpdag_methods_recover_the_mixed_network(fit):
     out = CPDAG_FITS[fit](_network(), CATEGORICAL)
     assert out.structure.kind == "cpdag"
     assert _edges(out, {"directed"}) == DIRECTED
     assert _edges(out, {"undirected"}) == UNDIRECTED
+
+
+@pytest.mark.parametrize("score_func", ["degen_gauss", "cond_gauss"])
+def test_hill_climbing_stops_at_a_local_optimum_on_the_mixed_network(score_func):
+    """Hill climbing ends at a DAG that no legal edge addition, removal, or reversal improves
+    beyond the rounding grid, where no legal move adds an edge from a continuous column into a
+    categorical one."""
+    x = _network()
+    categorical = np.isin(np.arange(x.shape[1]), CATEGORICAL)
+    out = CPDAG_FITS[f"hc-{score_func}"](x, CATEGORICAL)
+    score = make_score(score_func, x, categorical=categorical)
+    forbidden = (
+        ~categorical[:, None] & categorical[None, :]
+    )  # [u, v]: continuous u -> categorical v
+    assert class_gain(out.structure, score, forbidden=forbidden) <= grid(len(x))
 
 
 @pytest.mark.parametrize("fit", list(PAG_FITS))

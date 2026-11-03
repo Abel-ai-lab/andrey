@@ -248,7 +248,7 @@ def copies_error(
     return error
 
 
-def check_columns(cov: np.ndarray, n: int) -> None:
+def check_columns(cov: np.ndarray, n: int, name: Callable[[int], str] | None = None) -> None:
     """Raise ``ValueError`` when a column of the data behind ``cov`` makes BIC scoring meaningless.
 
     A column is rejected when it is constant; with more than two rows ``n``, when its residual
@@ -270,6 +270,9 @@ def check_columns(cov: np.ndarray, n: int) -> None:
         Sample covariance matrix.
     n : int
         Sample count.
+    name : callable or None
+        Names a column position in the message of linearly dependent columns; ``None`` gives the
+        positions as a list.
 
     Raises
     ------
@@ -302,8 +305,9 @@ def check_columns(cov: np.ndarray, n: int) -> None:
     residual = 1.0 / ((vectors**2) @ (1.0 / np.maximum(values, floor)))
     columns = np.flatnonzero(~(residual > ZERO_RESIDUAL)).tolist()
     if columns:
+        named = columns if name is None else ", ".join(name(j) for j in columns)
         raise ValueError(
-            f"data columns {columns} are linearly dependent: one is a linear function of the "
+            f"data columns {named} are linearly dependent: one is a linear function of the "
             "others; drop one of them before the fit"
         )
 

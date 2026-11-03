@@ -366,7 +366,7 @@ _FAMILY_TITLES = {
     "constraint": "Constraint-based",
     "score": "Score-based",
     "permutation": "Permutation-based",
-    "lingam": "LiNGAM (linear non-Gaussian)",
+    "functional": "Functional causal models",
     "temporal": "Temporal",
     "latent": "Latent-variable",
     "pairwise": "Pairwise",

@@ -33,6 +33,15 @@ def test_an_adapter_survives_the_record_and_the_worker(adapter) -> None:
     assert pickle.loads(pickle.dumps(adapter)).name == adapter.name
 
 
+@pytest.mark.parametrize("adapter", ADAPTERS, ids=lambda a: a.name)
+def test_each_package_gets_only_the_settings_it_takes(adapter) -> None:
+    """The driver sends causal-learn the lasso's folds and Andrey none, and nothing is dropped."""
+    given = granger_var.fit_params(adapter, maxlag=3, cv=7)
+    assert given.keys() == adapter.params().keys()
+    assert given["maxlag"] == 3
+    assert ("cv" in given) == (adapter.package == "causal-learn")
+
+
 @pytest.fixture(scope="module")
 def series() -> tuple[np.ndarray, np.ndarray]:
     """A standardized series from the driver's generator."""
