@@ -796,10 +796,11 @@ def gnies(
     parents with one noise variance over every environment, and a target with one set of
     coefficients and a noise variance per environment, fitted by alternating weighted least
     squares from the regression over every environment. The search keeps one set of targets for
-    all environments [1]_. For each set it visits, a greedy search over interventional
-    equivalence classes [2]_ adds, removes, and turns edges from the empty graph while the score
-    improves; under these classes, Markov equivalent graphs that orient every edge at a target
-    alike get the same score [4]_. The outer search starts from the known targets, adds the
+    all environments [1]_. The equivalence class of a set of targets holds the graphs with the
+    same adjacencies and v-structures that orient every edge at a target alike [4]_, and all of
+    them get the same score [1]_. For each set it visits, a greedy search over these classes [2]_,
+    which extends greedy equivalence search [3]_, adds, removes, and turns edges from the empty
+    graph while the score improves. The outer search starts from the known targets, adds the
     variable whose set scores best while that improves the score, then removes added variables
     the same way. Steps whose score changes are equal after rounding are chosen by each column's
     rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>`
