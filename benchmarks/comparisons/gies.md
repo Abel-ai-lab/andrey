@@ -1,13 +1,17 @@
 # GIES
 
 `gies_cpu.py` compares Andrey's `gies` with pcalg's on data that mixes observation with
-interventions. Its data follows the simulation of Hauser and Buhlmann (2012, Section 5.2.1): a
-random DAG with mean vertex degree 2; edge weights from `U([-1, -0.1] U [0.1, 1])` and error
-variances from `U(0.5, 1)`, rescaled to unit variance without interventions; single-variable
-intervention targets, `0.4 * d` of them by default, each setting its variable from `N(2, 0.2^2)`;
-and `10 * d` rows, split evenly between no intervention and each target. A fit takes the samples
-and the 0/1 intervention matrix side by side; pcalg's adapter turns the matrix into its `targets`
-and `target.index` inside the timed fit.
+interventions. Andrey's `andrey.data` draws it in the setting of Hauser and Buhlmann (2012, Section
+5.2.1): an Erdos-Renyi DAG with mean vertex degree 2; edge weights from `U([-1, -0.1] U [0.1, 1])`
+and standard Gaussian errors, each variable divided by its standard deviation as it is generated
+(`scale="rescale"`), so every variable has variance 1 without interventions; single-variable
+intervention targets, `0.4 * d` of them by default, each environment cutting its target from its
+parents and setting it from `N(2, 0.2^2)`; and `10 * d` rows, split evenly between the environment
+without intervention and each target's. A fit takes the samples and the 0/1 intervention matrix,
+built from the sample's `env` and `targets`, side by side; pcalg's adapter turns the matrix into its
+`targets` and `target.index` inside the timed fit. The 0.7.0 and 0.9.0 reports drew their data
+with an earlier sampler of the harness, with error variances from `U(0.5, 1)` and the unit variance
+exact rather than of the sample; `--rescore` refuses their runs.
 
 Both packages score BIC with every row counted in the penalty, pcalg's `lambda = 0.5 * log(n)` in
 log-likelihood units and Andrey's `penalty_discount=1.0` in deviance units, and both fit an

@@ -265,14 +265,17 @@ _add(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="domain_index",
+                    name="env",
                     kind="context",
-                    doc="Domain / context index, (n_samples,) or (n_samples, 1), aligned to the "
-                    "data rows.",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
+                    "1, ... in sorted order.",
+                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
-            notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
+            notes="env becomes a trailing pseudo-node, then projected out of the result.",
             missing=True,
         ),
         output=OutputSpec(
@@ -453,11 +456,11 @@ _add(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="interventions",
+                    name="env",
                     kind="context",
-                    doc="(n_samples, n_variables) 0/1 matrix aligned to the data: 1 where the "
-                    "row's value of the variable was set by an intervention. Omit it for "
-                    "observational data.",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets. Omit both for observational data.",
                     required=False,
                 ),
             ),
@@ -475,6 +478,18 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"]}; [] marks an '
+                "observational environment. Every environment needs an entry. null, with no env, "
+                "is observational data.",
+                nullable=True,
+                aliases=("interventions",),
+            ),
             concept_param(
                 "score_func",
                 doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
@@ -486,6 +501,69 @@ _add(
             _CATEGORICAL,
         ),
         references=("Hauser & Buhlmann 2012", "Cooper & Yoo 1999"),
+    )
+)
+_add(
+    MethodSpec(
+        name="gnies",
+        family="score",
+        summary="Greedy noise-interventional equivalence search: learns the variables whose noise "
+        "variance changes between environments (unknown targets) together with the graph, for "
+        "linear-Gaussian data from two or more environments that share one set of weights. "
+        "Returns the interventional essential graph + score; the learned targets are "
+        "metadata['index_edges'].",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Two or more environments of 2+ rows each. null takes the environments from "
+                    "targets given as a column or a 0/1 matrix.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; the learned targets in metadata['index_edges'] as "
+            "[variable, 'directed']; the environments' labels in metadata['environments']",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables known to be intervened on: a JSON object mapping labels of env "
+                "to lists of variables, by the data file's header or 0-based position, such as "
+                '{"0": [], "1": ["x"]}; null, or a label left out, marks an environment whose '
+                "targets are unknown, and the search may add targets there. null for the whole "
+                "argument (the default) learns every target.",
+                nullable=True,
+            ),
+            concept_param(
+                "penalty_discount",
+                doc="Multiplier on the BIC penalty of log(n_samples) per parent and per extra "
+                "noise variance of a target. Larger values give sparser graphs and fewer targets; "
+                "1.0 with ebic_gamma=0.0 is the standard BIC.",
+            ),
+            concept_param(
+                "ebic_gamma",
+                doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, "
+                "n_parents) added per variable, on parents only, from 0 to 1. Larger values give "
+                "sparser graphs; 0.0 is the standard BIC, the paper's score.",
+            ),
+        ),
+        references=("Gamella et al. 2022", "Hauser & Buhlmann 2012"),
     )
 )
 _add(
@@ -2186,6 +2264,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
+    "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
@@ -2310,6 +2389,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     **dict.fromkeys(
         ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
     ),
+    "gnies": ("score", "index_edges", "environments"),
     "exact_search": ("dag",),
     "calm": ("h_final", "objective"),
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),

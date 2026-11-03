@@ -112,6 +112,12 @@ the same data and machines: fit time, error counts, and where Andrey is not fast
 [homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and speed
 support.
 
+It is not the fastest on every method. On discrete data, bnlearn is faster than Andrey for IAMB,
+Inter-IAMB, MMPC, MMHC, and RSMAX2 with the chi-square and G-square tests, in most settings of the
+0.13.0 release card. Each of these tests counts a new table over every row: bnlearn does that in
+compiled C, and Andrey does it with NumPy, which costs more per test. We keep Andrey pure Python,
+so it installs anywhere without a compiler, and the cards report these cases with the rest.
+
 ### Why is it faster?
 
 It batches independent tests and scores into array operations, reuses work across steps, skips
@@ -215,7 +221,8 @@ graphs over time lags; `lpcmci` also allows hidden common causes. The [release c
 benchmark them against tigramite, lingam, and causal-learn. `multi_group_direct_lingam` fits
 several datasets that share one causal order, `cdnod` takes data from several domains, and `gies`
 takes data that mixes observation with interventions. All are supported. `dynotears`, which fits a
-linear structural vector autoregression by continuous optimization, is experimental.
+linear structural vector autoregression by continuous optimization, is experimental, and so is
+`gnies`, which learns from several environments the variables whose noise variance changed.
 
 ## Command line and agents
 
@@ -296,7 +303,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.12.0},
+  version = {0.13.0},
   url = {https://andrey.abel.ai},
 }
 ```

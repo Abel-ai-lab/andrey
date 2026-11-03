@@ -158,14 +158,13 @@ def boss(
 
     Notes
     -----
-    **When to use it.** BOSS suits the same data as :func:`~andrey.ges`: continuous data with linear
-    effects, Gaussian noise, and no unmeasured common causes. It was designed for hundreds of highly
-    connected variables [1]_. When every column is categorical, the default score is
-    ``"bdeu"``, and on mixed data ``"cond_gauss"``;
-    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data.
-
-    **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
-    noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
+    **When to use.** BOSS suits the same data as :func:`~andrey.ges`: i.i.d. observational
+    continuous data with linear effects, Gaussian noise, and no unmeasured common causes. When every
+    column is categorical, the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``, and
+    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. It was designed for hundreds of
+    highly connected variables [1]_; it returns a CPDAG. When unmeasured common causes are
+    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
+    oriented, use :func:`~andrey.direct_lingam`.
 
     **Choosing seed.** The search visits variables in a random order and stops when no move improves
     the order. Different seeds can therefore reach different graphs; comparing a few shows whether
@@ -440,14 +439,13 @@ def grasp(
 
     Notes
     -----
-    **When to use it.** GRaSP suits the same data as :func:`~andrey.ges`: continuous data with
-    linear effects, Gaussian noise, and no unmeasured common causes. Its authors report accurate
-    search even on dense graphs [1]_. When every column is categorical, the default score is
-    ``"bdeu"``, and on mixed data ``"cond_gauss"``;
-    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data.
-
-    **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
-    noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
+    **When to use.** GRaSP suits the same data as :func:`~andrey.ges`: i.i.d. observational
+    continuous data with linear effects, Gaussian noise, and no unmeasured common causes. When every
+    column is categorical, the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``, and
+    ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. Its authors report accurate
+    search even on dense graphs [1]_; it returns a CPDAG. When unmeasured common causes are
+    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
+    oriented, use :func:`~andrey.direct_lingam`.
 
     **GRaSP or BOSS.** Both search the same space of orders with different moves. Either can reach
     the better score on a given dataset. On the published benchmarks, GRaSP took far longer than

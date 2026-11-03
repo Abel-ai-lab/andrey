@@ -20,6 +20,10 @@ summary's ``parity_rule`` sets how its rows are judged:
   measured for the method's Limitations, so it is reported with its numbers and never gated. A row
   with ``"claim": "in"``, or with no ``claim``, is in claim and is judged as above; the row's own
   field overrides its entry's.
+- ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent) or
+  ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
+  targets); the row's ``*_shd_mean`` fields then hold that error's means. A method with a gated
+  metric beside SHD has one entry per metric, and a row's key names the ``metric``.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -72,6 +76,8 @@ ERRORS: tuple[str, ...] = ("shd", "directed_errors")
 ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
 #: The ``claim`` values: a row in the setting its method claims, and one outside it.
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
+#: The ``metric`` values an entry may name, with the text a row prints for each.
+METRICS: dict[str, str] = {"shd": "SHD", "target_error": "target error"}
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect", "tie-break"})
 
@@ -106,6 +112,7 @@ class Row:
     column: tuple[int, int] | None = None
     replicated: bool = False
     out_of_claim: bool = False
+    metric: str = "shd"
 
     @property
     def reported(self) -> bool:
@@ -134,8 +141,8 @@ class Row:
             each = f", the mean of {self.draws} draws each" if self.draws > 1 else ""
             text = (
                 f"mean D {self.mean_d:+.2f}, bootstrap 95% [{lo:+.2f}, {hi:+.2f}], over "
-                f"{self.pairs} paired datasets{each} (mean SHD Andrey {self.andrey:.2f}, "
-                f"{self.comparator} {self.reference:.2f})"
+                f"{self.pairs} paired datasets{each} (mean {METRICS[self.metric]} Andrey "
+                f"{self.andrey:.2f}, {self.comparator} {self.reference:.2f})"
             )
         elif self.rule == "series":
             text = (
@@ -159,29 +166,38 @@ class Row:
 def paired_rows(summary: str, data: dict) -> list[Row]:
     """Return the rows of one summary that pair Andrey with a reference package.
 
-    A row where either side has no result (a fit over the time cap) is skipped, and so is a series
-    of the column-order arm. A paired row with no known error field, a ``paired bootstrap`` row
-    with ``MIN_PAIRS`` paired datasets and no consistent interval, an unknown ``parity_rule``, an
-    unknown ``claim``, and a column-order arm on a reference not marked order-dependent or with one
-    of its two series missing or of unequal lengths raise, so a new summary format cannot pass
+    An entry's ``metric`` joins the key of each of its rows, and two entries of one method against
+    one reference need a ``regime`` only when they also share their metric. A row where either
+    side has no result (a fit over the time cap) is skipped, and so is a series of the column-order
+    arm. A paired row with no known error field, a ``paired bootstrap`` row with ``MIN_PAIRS``
+    paired datasets and no consistent interval, an unknown ``parity_rule``, an unknown ``claim``,
+    an unknown ``metric``, and a column-order arm on a reference not marked order-dependent or with
+    one of its two series missing or of unequal lengths raise, so a new summary format cannot pass
     unchecked.
     """
     rule = data.get("parity_rule")
     if rule not in (None, PAIRED_BOOTSTRAP):
         raise ValueError(f"{summary}: unknown parity_rule {rule!r}")
-    entries = Counter((m["method"], m.get("comparator")) for m in data["methods"])
-    rows = []
+    entries = Counter(
+        (m["method"], m.get("comparator"), m.get("metric", "shd")) for m in data["methods"]
+    )
+    rows: list[Row] = []
     for method in data["methods"]:
         comparator = method.get("comparator")
         if not comparator:
             continue
-        by_regime = entries[(method["method"], comparator)] > 1
+        metric = method.get("metric", "shd")
+        if metric not in METRICS:
+            raise ValueError(f"{summary}: {method['method']} has an unknown metric {metric!r}")
+        by_regime = entries[(method["method"], comparator, metric)] > 1
         if by_regime and not method.get("regime"):
             raise ValueError(
                 f"{summary}: {method['method']} vs {comparator} has two entries and no regime"
             )
         for row in method.get("rows", []):
             key = {"regime": method["regime"]} if by_regime else {}
+            if "metric" in method:
+                key["metric"] = metric
             key.update({k: row[k] for k in ROW_KEYS if k in row})
             where = f"{summary}: {method['method']} vs {comparator} {key}"
             name = (summary, method["method"], comparator, key)
@@ -196,16 +212,15 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
             if "replication" in row:
                 if rule != PAIRED_BOOTSTRAP:
                     raise ValueError(f"{where} has a replication, but no paired bootstrap rule")
-                rows.append(
-                    replace(_replicated(name, row["replication"], column, where), out_of_claim=out)
-                )
-                continue
-            if pairs is not None and pairs >= MIN_PAIRS:
-                rows.append(replace(_judged(name, judged, column, where), out_of_claim=out))
-                continue
-            counted = _errors(row, where)
-            if counted is not None:
-                rows.append(Row(*name, *counted, pairs=pairs, column=column, out_of_claim=out))
+                found = _replicated(name, row["replication"], column, where)
+            elif pairs is not None and pairs >= MIN_PAIRS:
+                found = _judged(name, judged, column, where)
+            else:
+                counted = _errors(row, where)
+                if counted is None:
+                    continue
+                found = Row(*name, *counted, pairs=pairs, column=column)
+            rows.append(replace(found, out_of_claim=out, metric=metric))
     return rows
 
 

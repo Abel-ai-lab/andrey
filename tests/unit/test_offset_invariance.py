@@ -70,7 +70,8 @@ def marks(out) -> list[np.ndarray]:
 
 
 def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
-    """The method's required inputs built from ``data`` shifted to ``data * scale + offset``."""
+    """The method's required inputs, and gnies's env, built from ``data`` shifted to ``data *
+    scale + offset``."""
     scale, offset = shift
 
     def moved(x: np.ndarray) -> np.ndarray:
@@ -78,7 +79,7 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
 
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
             continue
         if inp.kind == "matrix":
             args.append(moved(data[:, :2] if spec.family == "pairwise" else data))

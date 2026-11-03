@@ -58,8 +58,11 @@ def _run(adapter):
 
 
 def test_a_pinned_cuda_fit_reports_the_card_and_its_allocation():
+    # The peak counts what is already allocated, such as the cuBLAS workspace of an earlier fit in
+    # this process.
+    live = torch.cuda.memory_allocated() / _MIB
     out = _run(_Allocating("torch-cuda", mib=16))
     device = torch.cuda.current_device()
     assert out["device_id"].startswith("cuda:")
     assert torch.cuda.get_device_name(device) in out["device_id"]
-    assert out["gpu_peak_alloc_mb"] == pytest.approx(16, rel=0.1)
+    assert out["gpu_peak_alloc_mb"] - live == pytest.approx(16, rel=0.1)

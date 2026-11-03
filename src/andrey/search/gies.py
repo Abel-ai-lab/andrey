@@ -12,6 +12,12 @@ rebuilds the essential graph by turning every arrow that is not strongly protect
 undirected edge. The algorithm, its settings, and its reference are described on
 :func:`andrey.gies`.
 
+Diagnostics go to the ``andrey.search.gies`` logger at DEBUG level: a step whose two best moves
+share the rounded score change (the first part of
+:func:`~andrey.search._parallel_ges.move_key`) and lead to different graphs, so the tie ranks
+decided it. The records are built only when that level is enabled, so the result does not depend
+on it.
+
 References
 ----------
 Hauser and Buhlmann (2012). Characterization and greedy learning of interventional Markov
@@ -24,9 +30,12 @@ Proceedings of the Fifteenth Conference on Uncertainty in Artificial Intelligenc
 from __future__ import annotations
 
 import heapq
+import itertools
+import logging
 import math
 from collections import deque
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -53,27 +62,45 @@ from andrey.search._parallel_ges import move_key
 from andrey.search.ges import _reachable, _recompute_objective, required_dag
 from andrey.search.hc import tie_ranks
 
+logger = logging.getLogger(__name__)
+
 # The moves a scan skips, as ``(u, v, C)``: under background knowledge, those whose class holds no
 # DAG that satisfies it on the current graph.
 Excluded = set[tuple[int, int, frozenset[int]]]
 
 
-def intervention_mask(interventions: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
-    """Return ``interventions`` as a boolean ``(n_samples, n_variables)`` matrix, checked.
+class FamilyScore(Protocol):
+    """What the search reads from a score: a family's local score and the change of each addition.
+
+    :class:`InterventionalScore` is one; any decomposable score whose Markov equivalent graphs of
+    an interventional class get one total can drive :func:`search_class`.
+    """
+
+    def score(self, node: int, parents: Iterable[int]) -> float:
+        """The local score of ``node`` given ``parents``; lower is better."""
+        ...
+
+    def add_deltas(self, node: int, parents: Iterable[int]) -> np.ndarray:
+        """``score(node, parents + u) - score(node, parents)`` for every variable ``u``."""
+        ...
+
+
+def intervention_mask(targets: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
+    """Return the 0/1 matrix ``targets`` as a boolean ``(n_samples, n_variables)`` matrix, checked.
 
     Raises ``ValueError`` when the shape differs from ``data``'s, a value is neither 0 nor 1, or a
     variable has fewer than two rows without an intervention, or the same value in all of them.
     """
     try:
-        values = np.asarray(interventions, dtype=np.float64)
+        values = np.asarray(targets, dtype=np.float64)
     except (TypeError, ValueError) as error:
-        raise ValueError(f"interventions must hold 0/1 or booleans: {error}") from error
+        raise ValueError(f"gies: a targets matrix must hold 0/1 or booleans: {error}") from error
     if values.shape != data.shape:
         raise ValueError(
-            f"interventions must have the shape of data, {data.shape}, got {values.shape}"
+            f"gies: a targets matrix must have the shape of data, {data.shape}, got {values.shape}"
         )
     if not np.isin(values, (0.0, 1.0)).all():
-        raise ValueError("interventions must hold 0/1 or booleans")
+        raise ValueError("gies: a targets matrix must hold 0/1 or booleans")
     mask = values.astype(bool)
     for v in range(data.shape[1]):
         kept = data[~mask[:, v], v]
@@ -401,7 +428,7 @@ class _Objective:
     it never revisits a graph and stops.
     """
 
-    def __init__(self, score: InterventionalScore, n: int) -> None:
+    def __init__(self, score: FamilyScore, n: int) -> None:
         self.score = score
         self.terms = [score.score(v, ()) for v in range(n)]
         self.total = math.fsum(self.terms)
@@ -432,7 +459,7 @@ class _Objective:
 def _forward_candidates(
     v: int,
     adj: np.ndarray,
-    score: InterventionalScore,
+    score: FamilyScore,
     n: int,
     ranks: Sequence[int],
     forbidden: np.ndarray | None = None,
@@ -490,18 +517,20 @@ def _forward_candidates(
 def _backward_candidate(
     v: int,
     adj: np.ndarray,
-    score: InterventionalScore,
+    score: FamilyScore,
     n: int,
     ranks: Sequence[int],
     constraints: Constraints | None = None,
     excluded: Excluded | None = None,
+    found: list[tuple[tuple, tuple[int, int, set[int]]]] | None = None,
 ) -> tuple[tuple, int, set[int]] | None:
     """The best-improving deletion of an edge at ``v`` as ``(key, u, C)``, or None.
 
     ``C`` is ``v``'s neighbors kept as its parents (Prop. 28); ``key`` is
     :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``. With ``constraints``, a
     required pair is never deleted, and a neighbor ``h`` whose orientation ``v -> h`` or ``u -> h``
-    is forbidden is never dropped. A move in ``excluded`` is never returned.
+    is forbidden is never dropped. A move in ``excluded`` is never returned. With ``found``, every
+    improving deletion not in ``excluded`` is appended to it as ``(key, (u, v, C))``.
     """
     row = adj[v]
     pa = set(np.flatnonzero(row == ARROW).tolist())
@@ -524,6 +553,8 @@ def _backward_candidate(
             delta = score.score(v, kept - {u}) - score.score(v, kept | {u})
             if delta < -_EPS_IMPROVE:
                 key = move_key(delta, n, u, v, C, ranks)
+                if found is not None and not (excluded and (u, v, frozenset(C)) in excluded):
+                    found.append((key, (u, v, C)))
                 if best is None or key < best[0]:
                     if excluded and (u, v, frozenset(C)) in excluded:
                         continue
@@ -568,12 +599,13 @@ def _separated(
 
 def _turning_best(
     adj: np.ndarray,
-    score: InterventionalScore,
+    score: FamilyScore,
     n: int,
     ranks: Sequence[int],
     constraints: Constraints | None = None,
     excluded: Excluded | None = None,
     cap: int | None = None,
+    found: list[tuple[tuple, tuple[int, int, set[int], bool]]] | None = None,
 ) -> tuple[int, int, set[int], bool] | None:
     """The best-improving turn as ``(u, v, C, essential)``: ``v -> u`` (or ``v -- u``) becomes
     ``u -> v`` with ``C`` the parents of ``v`` in its component.
@@ -583,7 +615,8 @@ def _turning_best(
     ``constraints``, a turn never makes a forbidden ``u -> v`` (the reverse of a required edge
     included) or a forbidden ``c -> v`` for a ``c`` of ``C`` not adjacent to ``u``, which the
     v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned. With ``cap``,
-    a turn that gives ``v`` more than ``cap`` parents is left out before scoring.
+    a turn that gives ``v`` more than ``cap`` parents is left out before scoring. With ``found``,
+    every improving turn not in ``excluded`` is appended to it as ``(key, move)``.
     """
     pa, nbr, adj_sets = _neighborhoods(adj)
     succ = ops.tail_successor_lists(adj)
@@ -593,6 +626,9 @@ def _turning_best(
 
     def offer(delta: float, key: tuple, move: tuple[int, int, set[int], bool]) -> None:
         nonlocal best_key, best
+        if found is not None and delta < -_EPS_IMPROVE:
+            if not (excluded and (move[0], move[1], frozenset(move[2])) in excluded):
+                found.append((key, move))
         if delta < -_EPS_IMPROVE and (best_key is None or key < best_key):
             if excluded and (move[0], move[1], frozenset(move[2])) in excluded:
                 return
@@ -668,16 +704,26 @@ def _turn(
     return replace_unprotected(adj, cut)
 
 
+#: Each move's phase, as the tie records name it.
+_PHASES: dict[Callable[..., np.ndarray], str] = {
+    _insert: "forward",
+    _delete: "backward",
+    _turn: "turning",
+}
+
+
 class _Search:
     """The GIES search state: the essential graph, the cached candidates, and the objective.
 
     ``constraints`` and ``cap``, the most parents a step may give a vertex, filter the candidates,
     and ``start``, an essential graph, replaces the empty graph the search otherwise starts from.
+    When the logger is enabled for DEBUG, each selection also keeps its two best moves as ``(key,
+    move)`` in ``lowest``, and the backward candidates keep every improving deletion per target.
     """
 
     def __init__(
         self,
-        score: InterventionalScore,
+        score: FamilyScore,
         n: int,
         ranks: Sequence[int],
         constraints: Constraints | None = None,
@@ -696,9 +742,16 @@ class _Search:
             self.objective.update(start, np.ones(n, dtype=bool))
         self.forward: dict[int, list[tuple[tuple, int, set[int]]]] = {}
         self.backward: dict[int, tuple[tuple, int, set[int]] | None] = {}
+        self.debug = logger.isEnabledFor(logging.DEBUG)
+        self.steps = 0
+        self.lowest: list[tuple[tuple, tuple]] = []
+        self.deletions: dict[int, list[tuple[tuple, tuple[int, int, set[int]]]]] = {}
 
-    def forward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
-        """The best-improving insertion not in ``excluded`` as ``(u, v, C)`` (Prop. 25)."""
+    def insertions(
+        self, excluded: Excluded | None
+    ) -> Iterator[tuple[tuple, tuple[int, int, set[int]]]]:
+        """The insertions not in ``excluded`` that Prop. 25 allows, as ``(key, (u, v, C))``, by
+        increasing key."""
         adj, n = self.adj, self.n
         for v in range(n):
             if v not in self.forward:
@@ -707,19 +760,27 @@ class _Search:
                 )
         heap = [(moves[0][0], v, 0) for v, moves in self.forward.items() if moves]
         if not heap:
-            return None
+            return
         heapq.heapify(heap)
         reachable = _reachable(adj)
         while heap:
             _key, v, i = heapq.heappop(heap)
             moves = self.forward[v]
-            _key, u, C = moves[i]
-            if not reachable(v, u, C):  # Prop. 25(iii): every path from v to u meets C
-                if not (excluded and (u, v, frozenset(C)) in excluded):
-                    return u, v, C
+            key, u, C = moves[i]
             if i + 1 < len(moves):
                 heapq.heappush(heap, (moves[i + 1][0], v, i + 1))
-        return None
+            if not reachable(v, u, C):  # Prop. 25(iii): every path from v to u meets C
+                if not (excluded and (u, v, frozenset(C)) in excluded):
+                    yield key, (u, v, C)
+
+    def forward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
+        """The best-improving insertion not in ``excluded`` as ``(u, v, C)`` (Prop. 25)."""
+        moves = self.insertions(excluded)
+        if self.debug:
+            self.lowest = list(itertools.islice(moves, 2))
+            return self.lowest[0][1] if self.lowest else None
+        best = next(moves, None)
+        return None if best is None else best[1]
 
     def backward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
         """The best-improving deletion not in ``excluded`` as ``(u, v, C)`` (Prop. 28).
@@ -730,9 +791,23 @@ class _Search:
         adj, n = self.adj, self.n
         for v in range(n):
             if v not in self.backward:
+                found = [] if self.debug else None
                 self.backward[v] = _backward_candidate(
-                    v, adj, self.score, n, self.ranks, self.constraints
+                    v, adj, self.score, n, self.ranks, self.constraints, found=found
                 )
+                if found is not None:
+                    self.deletions[v] = found
+        if self.debug:
+            self.lowest = heapq.nsmallest(
+                2,
+                (
+                    (key, (u, v, C))
+                    for deletions in self.deletions.values()
+                    for key, (u, v, C) in deletions
+                    if not (excluded and (u, v, frozenset(C)) in excluded)
+                ),
+                key=lambda found: found[0],
+            )
         moves = []
         for v, move in self.backward.items():
             if move is not None and excluded and (move[1], v, frozenset(move[2])) in excluded:
@@ -751,9 +826,13 @@ class _Search:
         self, excluded: Excluded | None = None
     ) -> tuple[int, int, set[int], bool] | None:
         """The best-improving turn not in ``excluded`` (:func:`_turning_best`)."""
-        return _turning_best(
-            self.adj, self.score, self.n, self.ranks, self.constraints, excluded, self.cap
+        found = [] if self.debug else None
+        best = _turning_best(
+            self.adj, self.score, self.n, self.ranks, self.constraints, excluded, self.cap, found
         )
+        if found is not None:
+            self.lowest = heapq.nsmallest(2, found, key=lambda turn: turn[0])
+        return best
 
     def step(self, best: Callable, move: Callable[..., np.ndarray], cut: np.ndarray) -> bool:
         """Apply the move ``best`` selects, built by ``move``; False when it selects none.
@@ -765,10 +844,22 @@ class _Search:
         while (found := best(excluded)) is not None:
             adj = move(self.adj.copy(), *found, cut)
             if self.constraints is None or admits(adj, self.constraints, cut):
+                if self.debug:
+                    self.log_tie(move, adj, cut)
                 self.apply(adj)
                 return True
             excluded.add((found[0], found[1], frozenset(found[2])))
         return False
+
+    def log_tie(self, move: Callable[..., np.ndarray], adj: np.ndarray, cut: np.ndarray) -> None:
+        """Log the step to ``adj`` when the second-best move in ``lowest`` has the same rounded
+        score change and leads to a different graph."""
+        if len(self.lowest) < 2:
+            return
+        (key, _chosen), (other_key, other) = self.lowest
+        if key[0] == other_key[0] and not np.array_equal(move(self.adj.copy(), *other, cut), adj):
+            phase = _PHASES[move]
+            logger.debug("%s step %d: two moves tie at key %r", phase, self.steps + 1, key[0])
 
     def apply(self, adj: np.ndarray) -> None:
         """Move to ``adj``, the graph after one step; raise unless it lowers the score."""
@@ -783,7 +874,9 @@ class _Search:
         for v in _touched_targets(adj, changed):
             self.forward.pop(v, None)
             self.backward.pop(v, None)
+            self.deletions.pop(v, None)
         self.adj = adj
+        self.steps += 1
 
 
 def gies(
@@ -873,6 +966,56 @@ def gies(
     if score_func in MIXED_SCORES:
         columns = column_mask(categorical, n)
     ranks = tie_ranks(X, columns).tolist()
+    adj, total = search_class(score, cut, ranks, constraints, max_parents)
+    if constraints is not None:
+        adj = mpdag(adj, constraints)
+    return to_structure(adj, kind="cpdag"), total
+
+
+def search_class(
+    score: FamilyScore,
+    cut: np.ndarray,
+    ranks: Sequence[int],
+    constraints: Constraints | None = None,
+    max_parents: int | None = None,
+) -> tuple[np.ndarray, float]:
+    """Run the GIES phases over the interventional classes that ``cut`` defines.
+
+    Starts from the empty graph, or under ``constraints`` from the class of the required edges, and
+    repeats the forward, backward, and turning phases, each until it finds no improving step, until
+    a round of backward and turning phases changes nothing. Ties between moves go to the lower
+    ``ranks`` (:func:`~andrey.search.hc.tie_ranks`), as :func:`gies` describes. When the start's
+    total is ``inf``, the required edges giving some node a family the score makes unavailable, the
+    search takes no step and returns the start with total ``inf``.
+
+    Parameters
+    ----------
+    score : FamilyScore
+        The local score. Every DAG of one class must get the same total from it.
+    cut : ndarray of bool, shape (d, d)
+        ``cut[a, b]`` is True when an edge between ``a`` and ``b`` has one orientation in every DAG
+        of its class, as :func:`cut_pairs` returns.
+    ranks : sequence of int
+        Each variable's tie rank.
+    constraints : Constraints or None
+        Background knowledge, as for :func:`gies`; the returned graph does not yet direct the edges
+        it decides.
+    max_parents : int or None
+        The cap on any DAG's parents, as for :func:`gies`.
+
+    Returns
+    -------
+    tuple[ndarray, float]
+        The interventional essential graph as a mark matrix, and its total score (lower is better).
+
+    Raises
+    ------
+    ValueError
+        If the required edges give a node more than ``max_parents`` parents.
+    RuntimeError
+        If a step does not lower the score, which a correct search never does.
+    """
+    n = len(ranks)
     start = None
     if constraints is not None and constraints.required.any():
         start = replace_unprotected(required_dag(constraints), cut)
@@ -883,6 +1026,8 @@ def gies(
         )
     with backend.one_blas_thread():
         search = _Search(score, n, ranks, constraints, start, max_parents)
+        if math.isinf(search.objective.total):
+            return search.adj, math.inf
         while True:
             while search.step(search.forward_best, _insert, cut):
                 pass
@@ -894,5 +1039,4 @@ def gies(
             if not changed:
                 break
         total = _recompute_objective(search.adj, score, n)
-    adj = search.adj if constraints is None else mpdag(search.adj, constraints)
-    return to_structure(adj, kind="cpdag"), total
+    return search.adj, total

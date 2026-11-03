@@ -10,6 +10,7 @@ on the column order.
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import numpy as np
@@ -188,16 +189,49 @@ def test_exact_ties_break_independently_of_column_order(search, score_func) -> N
 
 
 def test_tie_ranks_move_with_the_columns() -> None:
-    """Reordering columns reorders their ranks, also for columns that only their values in row
-    order tell apart; identical columns rank by position."""
+    """Reordering columns reorders their ranks, also for columns that only their pattern or their
+    values in row order tell apart; identical columns rank by position."""
     x = _data(0, 50, 6)
     order = np.array([3, 0, 5, 1, 4, 2])
     np.testing.assert_array_equal(tie_ranks(x[:, order]), tie_ranks(x)[order])
     np.testing.assert_array_equal(tie_ranks(x[:, [2, 2, 2]]), [0, 1, 2])
     copies = x[:, [2, 2]] * np.array([1.0, -3.7]) + np.array([0.0, 10.0])
     swapped = np.vstack([x[:, :3], x[:, [1, 0, 2]]])  # columns 0 and 1 trade places row by row
-    for data, order in ((copies, [1, 0]), (swapped, [1, 0, 2])):
+    near = x[:, [2, 2]] + np.column_stack([np.zeros(50), 1e-11 * np.sin(np.arange(50))])
+    for data, order in ((copies, [1, 0]), (swapped, [1, 0, 2]), (near, [1, 0])):
         np.testing.assert_array_equal(tie_ranks(data[:, order]), tie_ranks(data)[order])
+
+
+_COPIED = np.r_[0, np.random.default_rng(10).integers(-10, 11, 127), 0].astype(np.float64)
+
+
+@pytest.mark.parametrize("scale", [0.5, 2, 3.7])
+@pytest.mark.parametrize("offset", [1, -2.5, 1000])
+@pytest.mark.parametrize("unrelated", [False, True])
+def test_copies_in_other_units_rank_by_position(scale, offset, unrelated) -> None:
+    """Copies ``scale * x + offset`` of one column, which nothing in the data tells apart, rank in
+    the order of their columns, beside an unrelated column or alone."""
+    x, copy = _COPIED, scale * _COPIED + offset
+    other = [np.random.default_rng(11).standard_normal(len(x))] if unrelated else []
+    for first, second in ((x, copy), (copy, x)):
+        ranks = tie_ranks(np.column_stack([first, *other, second]))
+        assert ranks[0] < ranks[-1]
+
+
+@pytest.mark.parametrize("unrelated", [False, True])
+def test_relabeled_categories_rank_by_position(unrelated) -> None:
+    """A categorical column and its relabelings share one partition of the rows, so they rank in
+    the order of their columns."""
+    rng = np.random.default_rng(4)
+    codes = rng.integers(0, 3, 200)
+    labels = [
+        np.array(labeling, dtype=np.float64)[codes]
+        for labeling in ([0, 1, 2], [2, 0, 1], [5, 3, 9])
+    ]
+    other = [rng.integers(0, 2, 200).astype(np.float64)] if unrelated else []
+    for first, second in itertools.permutations(labels, 2):
+        ranks = tie_ranks(np.column_stack([first, *other, second]), np.ones(2 + len(other), bool))
+        assert ranks[0] < ranks[-1]
 
 
 _ROWS = np.random.default_rng(1).permutation(300)

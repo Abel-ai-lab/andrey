@@ -150,11 +150,11 @@ def cam(
 
     Notes
     -----
-    **When to use it.** CAM suits continuous data whose effects are nonlinear and additive in the
-    parents, with additive noise and no unmeasured common causes [1]_. Its score is the Gaussian
-    likelihood of that model.
-
-    **When not to.** With linear effects and Gaussian noise only the Markov equivalence class is
+    **When to use.** CAM suits i.i.d. continuous observational data whose effects are nonlinear and
+    additive in the parents, with additive Gaussian noise and no unmeasured common causes [1]_;
+    under that model the DAG is identified [6]_ [7]_, and it returns the DAG with a causal order.
+    Its preselection of each variable's possible parents is designed for many variables with few
+    parents each [1]_. With linear effects and Gaussian noise only the Markov equivalence class is
     identified, and the orientation of the edges it leaves undirected is arbitrary: use
     :func:`~andrey.pc` or :func:`~andrey.ges`. Noise whose scale depends on the parents
     (location-scale data) can reverse edges, because the model's noise variance is fixed.
@@ -410,15 +410,15 @@ def resit(
 
     Notes
     -----
-    **When to use it.** RESIT suits continuous data whose effects are nonlinear and additive in the
-    parents, with additive noise of any distribution and no unmeasured common causes [1]_. It reads
-    the noise through independence tests, not a likelihood, so the noise need not be Gaussian.
-
-    **When not to.** With linear effects and Gaussian noise only the Markov equivalence class is
-    identified: use :func:`~andrey.pc` or :func:`~andrey.ges`. Noise whose scale depends on the
-    parents breaks the independence of the residuals. Each test of the causal order reads all the
-    remaining variables jointly, so its power falls as the variables grow, and an early wrong sink
-    carries through the rest of the order [1]_.
+    **When to use.** RESIT suits i.i.d. continuous observational data whose effects are nonlinear
+    and additive in the parents, with additive noise of any distribution and no unmeasured common
+    causes [1]_; it reads the noise through independence tests, not a likelihood, so the noise need
+    not be Gaussian, but noise whose scale depends on the parents breaks the independence of the
+    residuals. Each test of the causal order reads all the remaining variables jointly, so it is
+    designed for a handful of variables [1]_. It returns a DAG and a causal order. With linear
+    effects and Gaussian noise only the Markov equivalence class is identified: use
+    :func:`~andrey.pc` or :func:`~andrey.ges`; for more variables with Gaussian noise, use
+    :func:`~andrey.cam`, and with hidden variables, :func:`~andrey.camuv`.
 
     **The steps.** The paper's settings, in its two phases [1]_:
 

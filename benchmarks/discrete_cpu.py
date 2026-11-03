@@ -89,9 +89,12 @@ PAIRS = {
     "grasp bdeu": (AndreyGRaSPBDeu(), CausalLearnGRaSPBDeu()),
 }
 
-#: The pairs whose two packages return the same graph on the same data. BOSS and GRaSP draw their
-#: orders from each package's own random streams, so their graphs can differ at equal settings.
-SAME_GRAPH_PAIRS = ("pc chisq", "pc gsq", "ges bdeu")
+#: The pairs whose two packages return the same graph on the same data. Andrey's chi-square and
+#: G-square tests refer the statistic to its mean when ``y`` is shuffled within each configuration,
+#: and causal-learn's to ``(r_x - 1) * (r_y - 1)`` degrees of freedom, so their PC graphs can
+#: differ on sparse tables. BOSS and GRaSP draw their orders from each package's own random
+#: streams, so their graphs can differ at equal settings.
+SAME_GRAPH_PAIRS = ("ges bdeu",)
 
 #: Andrey's and a comparator's run of one method with one test or score and the same settings, by
 #: ``"<method> <setting> <package>"``. One Andrey solution is paired with each package that runs
