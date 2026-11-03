@@ -15,10 +15,11 @@ column orders, so its answer does not depend on a draw.
     $ANDREY_BENCH_PYTHON benchmarks/ut_igsp_cases.py compare
 
 ``record`` runs the reference on each candidate and writes ``ut_igsp_cases.json`` beside this file:
-per case the generator settings, the SHA-256 of the data's float64 bytes, NumPy's version, and the
-reference's essential graph (endpoint marks) and targets. The reference runs in its own
+per case the generator settings, each column's mean and standard deviation, NumPy's version, and
+the reference's essential graph (endpoint marks) and targets. The moments, not the data's bytes,
+identify the data: the generator's last bits differ between CPUs. The reference runs in its own
 interpreter (``child`` mode), which reads only the stored data and imports NumPy and the reference
-packages. ``compare`` regenerates each case, checks its hash, fits ``andrey.ut_igsp`` at its
+packages. ``compare`` regenerates each case, checks its moments to a relative 1e-9, fits ``andrey.ut_igsp`` at its
 defaults, and prints where the two agree; it exits with 1 when they differ on a case.
 
 Both sides test at ``alpha = 1e-5``, the paper's level. The reference runs at its library
@@ -29,7 +30,6 @@ score them.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -78,8 +78,9 @@ def dataset(case: dict):
     return ds, known
 
 
-def digest(X: np.ndarray) -> str:
-    return hashlib.sha256(np.ascontiguousarray(X, dtype=np.float64).tobytes()).hexdigest()
+def moments(X: np.ndarray) -> list[float]:
+    """Each column's mean and standard deviation, which identify the data on any CPU."""
+    return np.concatenate([X.mean(axis=0), X.std(axis=0)]).tolist()
 
 
 def essential(p: int, arcs: list, targets: list[list[int]]) -> list[list[int]]:
@@ -133,7 +134,7 @@ def record(python: str) -> None:
                 "n": N_ROWS,
                 "settings": N_SETTINGS,
                 "shift": SHIFT,
-                "sha256": digest(ds.data),
+                "moments": moments(ds.data),
                 "numpy": np.__version__,
                 "marks": marks,
                 "targets": targets,
@@ -155,7 +156,7 @@ def compare() -> list[dict]:
     rows = []
     for case in json.loads(RECORD.read_text())["cases"]:
         ds, known = dataset(case)
-        if digest(ds.data) != case["sha256"]:
+        if not np.allclose(moments(ds.data), case["moments"], rtol=1e-9, atol=1e-12):
             raise ValueError(
                 f"case seed {case['seed']}: the data differ from the recorded case; re-record"
             )
