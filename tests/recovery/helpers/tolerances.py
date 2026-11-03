@@ -89,6 +89,10 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    "UT-IGSP": {
+        "structural": ["graph", "score", "targets"],
+        "numeric": {},
+    },
     "ICALiNGAM": {
         "structural": ["causal_order"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},

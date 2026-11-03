@@ -97,6 +97,13 @@ def project_output(out: Any, algorithm: str) -> dict:
         }
     if algorithm == "GIN":  # the graph over indicators and latents, and the clusters in order
         return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["cluster_order"]}
+    if algorithm == "UT-IGSP":  # the graph, its objective, and each environment's targets
+        targets = out.metadata["targets"]
+        return {
+            "graph": out.structure.to_numpy(),
+            "score": out.metadata["score"],
+            "targets": [targets[key] for key in sorted(targets)],
+        }
     if algorithm in _PCMCI:
         s = out.structure
         candidate = {

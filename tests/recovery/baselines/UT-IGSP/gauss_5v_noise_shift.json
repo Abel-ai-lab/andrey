@@ -1,0 +1,70 @@
+{
+  "algorithm": "UT-IGSP",
+  "case": "gauss_5v_noise_shift",
+  "input": {
+    "case": "gauss_5v_noise_shift",
+    "column_order": [
+      3,
+      4,
+      1,
+      2,
+      0
+    ],
+    "seed": 20261104,
+    "sha256": "fd09af58b6eb5305ef44d081e961d4a1388feb25e94d79b17f1e69010ab7c5d0",
+    "shape": [
+      1500,
+      5
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        1,
+        2,
+        2,
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1,
+        1,
+        0
+      ]
+    ],
+    "score": 7,
+    "targets": [
+      [],
+      [
+        0
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  "schema_version": 3
+}
