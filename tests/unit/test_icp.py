@@ -1,10 +1,9 @@
-"""ICP's invariance tests and outputs equal a direct computation, and its arguments behave as
-documented.
+"""ICP's outputs follow from its invariance tests, and its arguments behave as documented.
 
-The reference fits every regression on the rows themselves: the approximate test by Welch's t-test
-and the F-test on the pooled residuals, the exact test by Chow's statistic with its full
-covariance matrix (Peters, Buhlmann and Meinshausen 2016, eq. 17), and the intervals by the
-regression's covariance. ICP computes the same numbers from Gram matrices.
+The reference takes every tested set's p-value from :mod:`andrey.core.invariance`, whose tests
+``tests/unit/test_core_invariance.py`` checks against the rows, and builds the accepted sets, the
+estimate, the per-variable p-values, and the intervals from them and from regressions on the
+rows.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ import pytest
 from scipy import stats
 
 import andrey
+from andrey.core.invariance import make_invariance_test
 from andrey.core.score import CopiedColumnsError
 
 
@@ -46,41 +46,14 @@ def _residuals(X, y):
     return y - design @ coef, coef, design
 
 
-def _set_p_value(X, y, env, test):
-    """The p-value of one set's invariance test, from the rows."""
-    labels = np.unique(env)
-    p = []
-    for e in labels:
-        inside = env == e
-        if test == "approximate":
-            r, _, _ = _residuals(X, y)
-            a, b = r[inside], r[~inside]
-            p_mean = stats.ttest_ind(a, b, equal_var=False).pvalue
-            ratio = a.var(ddof=1) / b.var(ddof=1)
-            f = stats.f(len(a) - 1, len(b) - 1)
-            p.append(2 * min(p_mean, 2 * min(f.cdf(ratio), f.sf(ratio))))
-        else:
-            r, coef, design = _residuals(X[~inside], y[~inside])
-            out_design = design
-            in_design = np.column_stack([np.ones(inside.sum()), X[inside]])
-            D = y[inside] - in_design @ coef
-            cov = np.eye(inside.sum()) + in_design @ np.linalg.solve(
-                out_design.T @ out_design, in_design.T
-            )
-            df = (~inside).sum() - in_design.shape[1]
-            statistic = D @ np.linalg.solve(cov, D) / (inside.sum() * (r @ r / df))
-            p.append(stats.f.sf(statistic, inside.sum(), df))
-    factor = 1 if (test == "approximate" and len(labels) == 2) else len(labels)
-    return min(1.0, factor * min(p))
-
-
 def _reference(X, env, target, test, alpha, max_parents=None):
     """Every output of ICP from the per-set p-values and regressions on the rows."""
     others = [j for j in range(X.shape[1]) if j != target]
     y = X[:, target]
     largest = len(others) if max_parents is None else max_parents
     tested = [S for s in range(largest + 1) for S in itertools.combinations(others, s)]
-    p = {S: _set_p_value(X[:, list(S)], y, env, test) for S in tested}
+    invariance = make_invariance_test(f"icp_{test}", X, env, indep_test="fisherz")
+    p = {S: invariance(target, S) for S in tested}
     accepted = [S for S in tested if p[S] > alpha]
     p_values = [
         None if j == target else max(v for S, v in p.items() if j not in S)
@@ -130,17 +103,6 @@ def test_every_output_equals_the_direct_computation(sizes, invariance_test, max_
     assert meta["model_rejected"] is False
     edges = [(j, 2, "directed") for j in want["parents"]]
     assert out.structure.oriented_edges() == edges
-
-
-def test_two_environments_compare_once_under_the_approximate_test():
-    """With two environments, each one against the other is the same test, so the factor is 1."""
-    X, env = _data((70, 50))
-    y, rows = X[:, 2], X[:, [0]]
-    r, _, _ = _residuals(rows, y)
-    first = stats.ttest_ind(r[env == 0], r[env == 1], equal_var=False).pvalue
-    second = stats.ttest_ind(r[env == 1], r[env == 0], equal_var=False).pvalue
-    assert first == pytest.approx(second, rel=1e-12)
-    assert _set_p_value(rows, y, env, "approximate") < 1.0
 
 
 def test_no_invariant_set_rejects_the_model():

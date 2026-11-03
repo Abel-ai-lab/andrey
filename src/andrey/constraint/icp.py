@@ -4,26 +4,12 @@ The algorithm, its settings, and its references are described on :func:`andrey.i
 
 For each set ``S`` of the target's candidate predictors, of at most ``max_parents`` of them, the
 engine tests whether the regression of the target on ``S`` (with an intercept) is the same in every
-environment (Peters, Buhlmann and Meinshausen 2016, Section 3.1):
-
-- ``"approximate"`` (Method II): one regression on the pooled rows; for each environment, Welch's
-  t-test of the residual means and the two-sided F-test of the residual variances, in the
-  environment against the other rows, each p-value twice the smaller of the two.
-- ``"exact"`` (Method I): for each environment, the regression on the other rows predicts the
-  environment's rows, and Chow's statistic ``(RSS_all - RSS_out) / n_e`` over the residual
-  variance ``RSS_out / (n_out - |S| - 1)`` is ``F(n_e, n_out - |S| - 1)`` under the null (the
-  prediction errors' quadratic form of eq. 17 equals ``RSS_all - RSS_out``).
-
-A set's p-value is the smallest environment's times the number of distinct comparisons, ``K``,
-capped at 1. With two environments the approximate test's two comparisons are one test, since
-Welch's statistic and the two-sided F p-value do not depend on which group comes first, so the
-factor is 1. A set is accepted when its p-value exceeds ``alpha``; the estimate is the intersection
-of the accepted sets (eq. 12).
-
-Every regression reads Gram matrices of ``[1, x, y]`` per environment, with each column centered on
-its pooled mean, computed once: a set costs ``O(K s^3)`` in its size ``s``, whatever the number of
-rows, and the sets of one size run in batches. The result does not depend on the order in which
-the sets are tested.
+environment (Peters, Buhlmann and Meinshausen 2016, Section 3.1), by the invariance test
+``"icp_approximate"`` (Method II) or ``"icp_exact"`` (Method I) of :mod:`andrey.core.invariance`,
+built once through :func:`~andrey.core.invariance.make_invariance_test` with the environments as
+its groups. A set is accepted when its p-value exceeds ``alpha``; the estimate is the intersection
+of the accepted sets (eq. 12). The sets of one size are tested in batches, and the result does not
+depend on the order in which they are tested.
 """
 
 from __future__ import annotations
@@ -31,14 +17,18 @@ from __future__ import annotations
 import itertools
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 from scipy import stats
 
-__all__ = ["INVARIANCE_TESTS", "Invariance", "icp"]
+from andrey.core.invariance import RegressionInvariance, SingularRegression, make_invariance_test
 
-#: The invariance tests: the paper's Method II and Method I.
-INVARIANCE_TESTS = ("approximate", "exact")
+__all__ = ["TESTS", "Invariance", "icp"]
+
+#: Each ``invariance_test`` of :func:`andrey.icp` and the invariance test it builds: the paper's
+#: Method II and Method I.
+TESTS = {"approximate": "icp_approximate", "exact": "icp_exact"}
 #: The most sets one batch holds.
 BATCH = 2048
 
@@ -83,11 +73,11 @@ def icp(
     n, d = X.shape
     others = np.array([j for j in range(d) if j != target], dtype=np.intp)
     p = others.size
-    K = int(codes.max()) + 1
-    columns = np.column_stack([X[:, others], X[:, target]])
-    Z = np.column_stack([np.ones(n), columns - columns.mean(axis=0)])
-    grams = np.stack([Z[codes == k].T @ Z[codes == k] for k in range(K)])
-    sizes = np.bincount(codes, minlength=K).astype(np.float64)
+    # The regressions are linear-Gaussian; the invariance tests read no indep_test.
+    test = cast(
+        RegressionInvariance,
+        make_invariance_test(TESTS[invariance_test], X, codes, indep_test="fisherz"),
+    )
     largest = p if max_parents is None else min(max_parents, p)
 
     accepted: list[tuple[int, ...]] = []
@@ -98,11 +88,19 @@ def icp(
     best = -np.inf
     for size in range(largest + 1):
         for sets in _batches(p, size):
-            pooled, beta, rss = _pooled(grams, sets)
-            if invariance_test == "exact":
-                pv = _exact(grams, sizes, sets, pooled, rss, environments)
-            else:
-                pv = _approximate(grams, sizes, sets, beta)
+            try:
+                pv, pooled, beta, rss = test.fit(target, others[sets])
+            except SingularRegression as error:
+                where = (
+                    "every environment"
+                    if error.group is None
+                    else f"every environment but {environments[error.group]!r}"
+                )
+                raise ValueError(
+                    f"icp: the predictors are linearly dependent on the rows of {where}, so a "
+                    "regression's coefficients are undetermined; drop a column that is a linear "
+                    "function of others there, or lower max_parents"
+                ) from None
             best = max(best, float(pv.max()))
             member = np.zeros((len(sets), p), dtype=bool)
             member[np.arange(len(sets))[:, None], sets] = True
@@ -136,89 +134,6 @@ def _batches(p: int, size: int) -> Iterator[np.ndarray]:
     combinations = itertools.combinations(range(p), size)
     while chunk := list(itertools.islice(combinations, BATCH)):
         yield np.array(chunk, dtype=np.intp).reshape(len(chunk), size)
-
-
-def _rows(sets: np.ndarray) -> np.ndarray:
-    """The Gram rows of each set's regression: the intercept, then its predictors."""
-    return np.column_stack([np.zeros(len(sets), dtype=np.intp), sets + 1])
-
-
-def _solve(A: np.ndarray, b: np.ndarray, what: str) -> np.ndarray:
-    """Solve each system ``A x = b``; ``ValueError`` names ``what`` when one has no solution."""
-    try:
-        return np.linalg.solve(A, b[..., None])[..., 0]
-    except np.linalg.LinAlgError:
-        raise ValueError(
-            f"icp: the predictors are linearly dependent on the rows of {what}, so a regression's "
-            "coefficients are undetermined; drop a column that is a linear function of others "
-            "there, or lower max_parents"
-        ) from None
-
-
-def _pooled(grams: np.ndarray, sets: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Each set's pooled Gram block, coefficients, and residual sum of squares."""
-    G = grams.sum(axis=0)
-    rows, y = _rows(sets), G.shape[0] - 1
-    A = G[rows[:, :, None], rows[:, None, :]]
-    b = G[rows, y]
-    beta = _solve(A, b, "every environment")
-    return A, beta, G[y, y] - (b * beta).sum(axis=1)
-
-
-def _approximate(
-    grams: np.ndarray, sizes: np.ndarray, sets: np.ndarray, beta: np.ndarray
-) -> np.ndarray:
-    """Method II: each set's p-value from its pooled residuals' means and variances."""
-    rows, y = _rows(sets), grams.shape[1] - 1
-    A = grams[:, rows[:, :, None], rows[:, None, :]]
-    # Each environment's residual sum and sum of squares, from its Gram block.
-    total = grams[:, 0, y][:, None] - (grams[:, 0, rows] * beta).sum(axis=2)
-    squares = (
-        grams[:, y, y][:, None]
-        - 2.0 * (grams[:, rows, y] * beta).sum(axis=2)
-        + np.einsum("mi,kmij,mj->km", beta, A, beta)
-    )
-    n_in, n_out = sizes[:, None], sizes.sum() - sizes[:, None]
-    mean_in = total / n_in
-    mean_out = (total.sum(axis=0) - total) / n_out
-    var_in = (squares - n_in * mean_in**2) / (n_in - 1.0)
-    var_out = (squares.sum(axis=0) - squares - n_out * mean_out**2) / (n_out - 1.0)
-    se_in, se_out = var_in / n_in, var_out / n_out
-    t = (mean_in - mean_out) / np.sqrt(se_in + se_out)
-    df = (se_in + se_out) ** 2 / (se_in**2 / (n_in - 1.0) + se_out**2 / (n_out - 1.0))
-    p_mean = 2.0 * stats.t.sf(np.abs(t), df)
-    ratio = var_in / var_out
-    below = stats.f.cdf(ratio, n_in - 1.0, n_out - 1.0)
-    above = stats.f.sf(ratio, n_in - 1.0, n_out - 1.0)
-    p_variance = 2.0 * np.minimum(below, above)
-    p_env = 2.0 * np.minimum(p_mean, p_variance)
-    factor = 1.0 if len(sizes) == 2 else float(len(sizes))
-    return np.minimum(1.0, factor * p_env.min(axis=0))
-
-
-def _exact(
-    grams: np.ndarray,
-    sizes: np.ndarray,
-    sets: np.ndarray,
-    pooled: np.ndarray,
-    rss: np.ndarray,
-    environments: Sequence[object],
-) -> np.ndarray:
-    """Method I: each set's p-value from Chow's test of every environment against the others."""
-    rows, y = _rows(sets), grams.shape[1] - 1
-    G = grams.sum(axis=0)
-    k = rows.shape[1]
-    p_env = np.empty((len(sizes), len(sets)))
-    for e in range(len(sizes)):
-        out = G - grams[e]
-        b = out[rows, y]
-        A = pooled - grams[e][rows[:, :, None], rows[:, None, :]]
-        beta = _solve(A, b, f"every environment but {environments[e]!r}")
-        rss_out = out[y, y] - (b * beta).sum(axis=1)
-        n_e, df = sizes[e], sizes.sum() - sizes[e] - k
-        statistic = np.maximum(rss - rss_out, 0.0) / n_e / (rss_out / df)
-        p_env[e] = stats.f.sf(statistic, n_e, df)
-    return np.minimum(1.0, len(sizes) * p_env.min(axis=0))
 
 
 def _intervals(
