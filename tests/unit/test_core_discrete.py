@@ -653,9 +653,10 @@ def test_a_true_independence_is_rejected_at_the_level_it_is_tested_at(g_square, 
 def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square, batch, table):
     """``pvalues_given`` and the queries of ``statistic_pvalues`` that share a conditioning set
     return the statistic and p-value of each candidate's own call, bit for bit, on random discrete
-    data with few rows, one-category columns, and any order of candidates and conditioners. A
-    candidate's own call evaluates every cell mean; the scan reads the small ones from the table
-    and evaluates the blocks of a scan together or, with a small batch, one at a time."""
+    data with few rows, one-category columns, and any order of candidates and conditioners, and
+    so do the same queries asked again of the same test. A candidate's own call evaluates every
+    cell mean; the scan reads the small ones from the table and evaluates the blocks of a scan
+    together or, with a small batch, one at a time."""
     from andrey.core import ci
 
     monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
@@ -672,14 +673,17 @@ def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square,
         xs = rest[len(cond) :].tolist()
         with monkeypatch.context() as direct:
             direct.setattr(ci, "_MEANS_N", 0)  # no cell mean comes from the table
-            alone = [test._statistic_pvalue(target, v, cond) for v in xs]
+            alone_test = ChiSquare(x, g_square=g_square)
+            alone = [alone_test._statistic_pvalue(target, v, cond) for v in xs]
         p = test.pvalues_given(target, xs, cond)
         assert p.view(np.int64).tolist() == np.array([a[1] for a in alone]).view(np.int64).tolist()
         shuffled = [int(i) for i in rng.permutation(len(xs))]
-        got = test.statistic_pvalues(
+        queries = (
             np.array([target] * len(xs))[shuffled],
             np.array(xs)[shuffled],
             np.array([cond] * len(xs)).reshape(len(xs), -1)[shuffled],
         )
         want = np.array(alone)[shuffled].T
-        assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))
+        for asked in (ChiSquare(x, g_square=g_square), test):
+            got = asked.statistic_pvalues(*queries)
+            assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))

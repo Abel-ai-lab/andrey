@@ -846,7 +846,10 @@ class ChiSquare:
     rows and counting the statistics above the observed one (a permutation test [4]_) rejected 4.6%
     to 5.0% in the same tables, at about a hundred times the cost; Andrey does not offer it.
 
-    Queries are canonicalized as :class:`FisherZ`'s are, and no query's result is memoized. The
+    Queries are canonicalized as :class:`FisherZ`'s are. The statistic and p-value of each pair's
+    marginal (``|S| == 0``) query are kept once computed, so a pair asked again, as IAMB and MMPC
+    ask each pair from both ends, is not counted again; they take two ``(d, d)`` float arrays,
+    kept when there are no more columns than rows. No other query's result is memoized. The
     mean of a G-square cell is a function of its configuration's rows and the two margins alone, so
     the means of configurations of at most 128 rows are read from a table that every test in the
     process shares: at most 358 thousand floats (2.9 MB), filled by rows when a lookup first needs
@@ -902,6 +905,8 @@ class ChiSquare:
         # memory those counts stream through.
         self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
+        # The marginal queries' statistics and p-values, by pair, and which pairs are known.
+        self._marginals: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
@@ -910,6 +915,14 @@ class ChiSquare:
         p-value is independent of argument order. A larger p-value means more independence.
         """
         return self._statistic_pvalue(x, y, condition_set)[1]
+
+    def _marginal_memo(self) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """The kept marginal answers ``(known, statistics, p_values)``, each ``(d, d)`` and read at
+        ``[x, y]`` for ``x < y``; ``None`` when there are more columns than rows."""
+        d = self._codes.shape[1]
+        if self._marginals is None and d <= self._n:
+            self._marginals = (np.zeros((d, d), dtype=bool), np.empty((d, d)), np.empty((d, d)))
+        return self._marginals
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -961,10 +974,26 @@ class ChiSquare:
         blocks of at most ``_BATCH_CELLS`` row indices and table cells, a block per table shape;
         the others, and a single pair, take the scalar path. The blocks of a scan are counted
         first, and their degrees of freedom are evaluated together (:func:`_null_means_batch`),
-        for as many blocks as hold ``_BATCH_CELLS`` table cells at once.
+        for as many blocks as hold ``_BATCH_CELLS`` table cells at once. Without ``cond``, the
+        pairs answered before are read from the kept answers (:meth:`_marginal_memo`).
         """
         a, b = np.minimum(xs, ys), np.maximum(xs, ys)
         assert not np.isin(np.concatenate([a, b]), cond).any(), "x, y cannot be in condition_set."
+        memo = None if cond else self._marginal_memo()
+        if memo is not None:
+            known, kept_statistics, kept_p_values = memo
+            new = np.flatnonzero(~known[a, b])
+            if len(new):
+                found = self._counted_given(a[new], b[new], cond)
+                kept_statistics[a[new], b[new]], kept_p_values[a[new], b[new]] = found
+                known[a[new], b[new]] = True
+            return kept_statistics[a, b], kept_p_values[a, b]
+        return self._counted_given(a, b, cond)
+
+    def _counted_given(
+        self, a: np.ndarray, b: np.ndarray, cond: list[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """:meth:`_given` of the ordered pairs ``a[i] < b[i]``, every one counted."""
         statistics = np.empty(len(a), dtype=np.float64)
         p_values = np.empty(len(a), dtype=np.float64)
         n, cards = self._n, self._cardinalities
@@ -1026,6 +1055,21 @@ class ChiSquare:
     ) -> tuple[float, float]:
         """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
+        memo = None if cond else self._marginal_memo()
+        if memo is not None:
+            known, kept_statistics, kept_p_values = memo
+            if not known[x_int, y_int]:
+                found = self._counted_statistic_pvalue(x_int, y_int, cond)
+                kept_statistics[x_int, y_int], kept_p_values[x_int, y_int] = found
+                known[x_int, y_int] = True
+            return float(kept_statistics[x_int, y_int]), float(kept_p_values[x_int, y_int])
+        return self._counted_statistic_pvalue(x_int, y_int, cond)
+
+    def _counted_statistic_pvalue(
+        self, x_int: int, y_int: int, cond: list[int]
+    ) -> tuple[float, float]:
+        """:meth:`_statistic_pvalue` of the canonical query ``x_int < y_int`` given ``cond``,
+        counted."""
         codes = self._codes
         kx = int(self._cardinalities[x_int])
         ky = int(self._cardinalities[y_int])
