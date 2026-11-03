@@ -203,6 +203,12 @@ def test_a_timeout_on_a_dataset_the_reference_finished_fails_the_cell():
     assert any("finished by" in f for f in failures)
 
 
+def test_a_resumed_run_may_change_host_and_workers_but_not_its_fits():
+    meta = {"arm": "G1", "andrey_fits": {"c": [{"alpha": 1e-5}]}, "machine_id": "a", "workers": 4}
+    assert lane.same_run(meta, {**meta, "machine_id": "b", "workers": 2})
+    assert not lane.same_run(meta, {**meta, "andrey_fits": {"c": [{"alpha": 1e-3}]}})
+
+
 def test_block_a_picks_the_candidate_better_in_the_most_cells():
     cells = ["A_shift_l0_n1000", "A_shift_l3_n1000", "A_perfect_l0_n1000"]
     base = lane.config_name(lane.J1_ANDREY)
