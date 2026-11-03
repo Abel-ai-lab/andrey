@@ -13,7 +13,7 @@ names its pull request.
 ### Changed
 
 - `iamb`, `inter_iamb` and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
-  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs.
+  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 
 ## [0.13.0] - 2026-11-03
 
@@ -1635,3 +1635,4 @@ First alpha release.
 [#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
+[#662]: https://github.com/Abel-ai-lab/andrey/pull/662
