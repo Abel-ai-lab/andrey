@@ -81,6 +81,12 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    # ICP: the DAG into the target and the accepted sets exactly; the p-values, NaN at the target,
+    # within rounding.
+    "ICP": {
+        "structural": ["graph", "accepted_sets"],
+        "numeric": {"p_values": {"atol": 1e-8, "rtol": 1e-6}},
+    },
     "BOSS": {
         "structural": ["graph"],
         "numeric": {},

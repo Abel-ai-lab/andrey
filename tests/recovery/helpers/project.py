@@ -50,6 +50,9 @@ _PAIRWISE_FIELDS = {
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
+# ICP: candidate = the DAG into the target, the accepted sets, and each column's p-value, ``None``
+# at the target.
+_INVARIANT = frozenset({"ICP"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS"})
 
@@ -90,6 +93,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
+    if algorithm in _INVARIANT:
+        return {
+            "graph": out.structure.to_numpy(),
+            "accepted_sets": out.metadata["accepted_sets"],
+            "p_values": out.metadata["p_values"],
+        }
     if algorithm in _PAIRWISE:
         md = out.metadata
         return {"graph": out.structure.to_numpy()} | {
