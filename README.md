@@ -18,15 +18,15 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.12.0
+## ⭐ What's new in 0.13.0
 
-Calibration: tests that keep their stated level. A rank-based test holds it on skewed columns, the
-G-square test on sparse tables, and PCMCI and Granger control the false discovery rate over many
-lags. `andrey.markov_check` tests a graph against data it was not learned from, and Inter-IAMB,
-MMHC, and RSMAX2 are supported.
+Functional causal models: each variable is a function of its causes plus independent noise, and the
+shape of the function or the noise shows which way an effect runs. CAM and RESIT learn nonlinear
+graphs as accurately as their authors' code and faster, IAMB and MMPC are supported, and CAM-UV
+and DYNOTEARS are experimental.
 
-**[Read the post](https://andrey.abel.ai/blog/20261030-andrey-0-12-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.12.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.13.0.html)**
 
 ---
 
@@ -37,7 +37,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 38 methods, each one function call.
+- **One API**: 34 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -78,22 +78,6 @@ You install andrey-core and then `import andrey`.
 <p align="center"><a href="https://andrey.abel.ai/docs/benchmarks.html">Release cards</a></p>
 
 <!-- CARD:END -->
-
-<!-- WHY_FAST:START -->
-<!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->
-
-Four ideas make it [fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html):
-
-- **Do many things at once**: thousands of independence tests run as one array operation, with the
-  same results.
-- **Never compute twice**: the correlation matrix is computed once and cached; GES memoizes its
-  local scores.
-- **Skip what can't matter**: tests with a closed form settle most edges before any matrix is
-  inverted.
-- **Use the hardware you have**: with the optional PyTorch extra, a GPU computes large entropy
-  tables.
-
-<!-- WHY_FAST:END -->
 
 ## What's inside
 
@@ -181,9 +165,10 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
   browser.
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): benchmark details for each
   release.
+- [Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)
 - [FAQ](https://andrey.abel.ai/docs/faq.html) and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
-- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.
+- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, stage by stage.
 
 Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is fully
 tested; macOS and Windows install and run on the CPU, but the full test suite and the GPU speedups
@@ -199,7 +184,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.12.0},
+  version = {0.13.0},
   url = {https://andrey.abel.ai},
 }
 ```

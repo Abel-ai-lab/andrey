@@ -182,15 +182,16 @@ def pc(
 
     Notes
     -----
-    **When to use it.** PC suits data with no unmeasured common causes. Its default Fisher-Z test
+    **When to use.** PC suits i.i.d. observational data with no unmeasured common causes, in which
+    every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test
     assumes continuous data, where each variable depends linearly on its causes with roughly
     Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, for mixed data
     ``"degen_gauss"`` or ``"cond_gauss"``, and for nonlinear effects in continuous data ``"kci"``,
-    ``"rcot"``, ``"cmiknn"``, or ``"gpdc"``, at a far higher cost per test.
-    It is fastest on sparse graphs, where every variable has few neighbors [5]_.
-
-    **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
-    noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
+    ``"rcot"``, ``"cmiknn"``, or ``"gpdc"``, at a far higher cost per test. It is designed for
+    sparse graphs, where every variable has few neighbors, and then stays feasible with many
+    variables [5]_; it returns a CPDAG. When unmeasured common causes are plausible, use
+    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`.
 
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
@@ -566,15 +567,16 @@ def fci(
 
     Notes
     -----
-    **When to use it.** FCI suits data that may be affected by unmeasured common causes or sample
-    selection. Its default Fisher-Z test assumes continuous data with linear effects and roughly
+    **When to use.** FCI suits i.i.d. observational data that may be affected by unmeasured common
+    causes or sample selection, in which every independence follows from the graph (faithfulness)
+    [1]_ [2]_. Its default Fisher-Z test assumes continuous data with linear effects and roughly
     Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, and for mixed data
     ``"degen_gauss"`` or ``"cond_gauss"``, which read the data as :func:`~andrey.pc` describes. Its
-    PAG claims less than PC's CPDAG: an arrowhead at a node rules out that node causing the node at
-    the edge's other end, and a circle leaves the mark open.
-
-    **When not to.** When every common cause is measured, :func:`~andrey.pc` orients more of the
-    graph with fewer tests. FCI's possible-d-separation step runs tests PC does not.
+    tests suit sparse graphs, where every variable has few neighbors, as PC's do, and it runs an
+    extra round of tests that PC does not. It returns a PAG, which claims less than PC's CPDAG: an
+    arrowhead at a node rules out that node causing the node at the edge's other end, and a circle
+    leaves the mark open. When every common cause is measured and no selection bias is possible, use
+    :func:`~andrey.pc`, which returns a CPDAG without that extra round of tests.
 
     **Choosing alpha.** A larger ``alpha`` keeps more edges, true and false.
 
@@ -774,8 +776,8 @@ def gfci(
 
     GFCI [1]_ starts from the adjacencies of a score-based GES search, removes those that
     conditional-independence tests reject, and orients the endpoints with FCI's rules to account
-    for possible latent confounding. Its scored skeleton is usually more accurate than FCI's
-    test-only one.
+    for possible latent confounding. Its authors report a more accurate skeleton than FCI's
+    test-only one on simulated data.
 
     Parameters
     ----------
@@ -910,6 +912,19 @@ def gfci(
 
     Notes
     -----
+    **When to use.** GFCI suits i.i.d. observational data that may be affected by unmeasured common
+    causes, in which every independence follows from the graph (faithfulness) [1]_. Its default BIC
+    score and Fisher-Z test assume continuous data with linear effects and Gaussian noise; with
+    categorical or mixed columns, the defaults follow the declared column types, as for
+    :func:`~andrey.ges` and :func:`~andrey.pc`. Its tests start from the adjacencies of a full GES
+    search rather than a complete graph, which shrinks the candidate edges, but its
+    possible-d-separation round of tests is exponential in the worst case and can make it much
+    slower than GES, while its authors report more accurate adjacencies and endpoints than FCI's on
+    simulated data [1]_. It returns a PAG, whose circle marks (``o``) are the endpoints the data
+    cannot determine and whose bidirected edges (``<->``) mark probable latent common causes. When
+    every common cause is measured, use :func:`~andrey.ges`, whose CPDAG the first phase of GFCI
+    already computes.
+
     GFCI first runs :func:`~andrey.ges` and keeps its CPDAG. FCI's adjacency search then starts
     from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` at the
     smallest size at which a subset of ``x``'s or ``y``'s neighbors makes the two independent, and
@@ -1208,6 +1223,19 @@ def cdnod(
 
     Notes
     -----
+    **When to use.** CD-NOD suits data pooled from several domains or regimes, or data whose
+    distribution drifts over time, in which the causal mechanisms may change with
+    ``domain_index``, any unmeasured common cause is a function of that index, and every
+    independence follows from the graph with the index added (faithfulness) [1]_. Its default
+    Fisher-Z test assumes continuous data with linear effects and Gaussian noise and detects only a
+    change in a variable's mean that follows the index's values; ``"chisq"``, ``"gsq"``,
+    ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category. Its search is
+    PC's with the index as one more variable, so it suits the sparse graphs PC suits. It returns a
+    partially directed graph over the data variables, tagged ``cpdag``, in which the index can
+    orient edges that the CPDAG of one domain leaves undirected. With data from one domain, use
+    :func:`~andrey.pc`; when each row records which variables were intervened on, use
+    :func:`~andrey.gies`.
+
     The index is added as a variable that can only be a cause. When a variable's distribution
     changes with the index, the edge from the index into it is directed, and Meek's rules can then
     orient edges that PC leaves undirected on the same data.
