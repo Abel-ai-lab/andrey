@@ -100,10 +100,14 @@ environment of its own as well, built from the lock file `requirements-utigsp.tx
 ```shell
 benchmarks/start_utigsp.sh
 export ANDREY_BENCH_UTIGSP_PYTHON=$PWD/benchmarks/.venv-utigsp/bin/python
+export ANDREY_BENCH_GML_DEF42_PYTHON=$PWD/benchmarks/.venv-gml-def42/bin/python
 ```
 
-Its lane, `ut_igsp_cpu.py`, starts one child process per package and dataset rather than one per
-fit, since each child fits several draws; [its page](comparisons/ut-igsp.md) describes it.
+Its lanes, `ut_igsp_cpu.py` and `igsp_cpu.py`, start one child process per package and dataset
+rather than one per fit, since each child fits several draws;
+[UT-IGSP's page](comparisons/ut-igsp.md) and [IGSP's](comparisons/igsp.md) describe them. The
+second interpreter is the same environment with `patches/gml-igsp-def42.patch` applied, the IGSP
+lane's second reference.
 
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and

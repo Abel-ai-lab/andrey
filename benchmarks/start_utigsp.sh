@@ -3,6 +3,7 @@
 #
 #   benchmarks/start_utigsp.sh
 #   export ANDREY_BENCH_UTIGSP_PYTHON=$PWD/benchmarks/.venv-utigsp/bin/python
+#   export ANDREY_BENCH_GML_DEF42_PYTHON=$PWD/benchmarks/.venv-gml-def42/bin/python
 #
 # The reference is graphical-model-learning 0.1a8 with conditional-independence 0.1a6 and
 # graphical-models 0.1a21, the authors' library; requirements-utigsp.txt pins all 73 packages of
@@ -11,6 +12,11 @@
 # in this environment imports NumPy and the reference packages and nothing more; andrey stays in
 # bench-env, where the parent scores the results. The check fits UT-IGSP, IGSP, the lane's JCI-GSP
 # copy (andrey_bench/adapters/gml_interventional.py), and UT-IGSP with the kernel tests.
+#
+# The IGSP lane also builds .venv-gml-def42: the same packages, with
+# patches/gml-igsp-def42.patch applied to the installed graphical-model-learning, so that IGSP's
+# I-contradicting test follows Definition 4.2 of Yang, Katcoff, and Uhler (2018) when a setting has
+# two or more targets (comparisons/igsp.md).
 
 set -euo pipefail
 
@@ -73,5 +79,17 @@ print(
     f"{len(kci['arcs'])} arcs"
 )
 PY
+
+echo ">> gml-def42-env"
+DEF42="$REPO/benchmarks/.venv-gml-def42"
+uv venv "$DEF42" --python 3.11 --clear
+# Copies, not links, so the patch reaches neither uv's cache nor .venv-utigsp.
+uv pip install --python "$DEF42/bin/python" --link-mode copy -r "$LOCK"
+SITE=$("$DEF42/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+patch -p1 -N -s -d "$SITE" < "$REPO/benchmarks/patches/gml-igsp-def42.patch"
+# The package exports a function named gsp, which hides the module of that name.
+"$DEF42/bin/python" -c 'import importlib, inspect; \
+g = importlib.import_module("graphical_model_learning.algorithms.dag.gsp"); \
+assert "j_not_i" in inspect.getsource(g.igsp); print("gml-def42-env OK: Definition 4.2 patch applied")'
 
 echo ">> done"

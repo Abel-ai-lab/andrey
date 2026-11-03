@@ -1,6 +1,6 @@
 """Run Andrey's interventional methods: one request in, one JSON line per draw out.
 
-``ut_igsp_cpu.py`` starts this file with ``ANDREY_BENCH_PYTHON`` as
+``ut_igsp_cpu.py`` and ``igsp_cpu.py`` start this file with ``ANDREY_BENCH_PYTHON`` as
 ``python andrey_interventional.py <request.npz> <out.jsonl>``. The request is the one the
 reference child reads (:mod:`andrey_bench.adapters.gml_interventional`): the pooled rows ``X``,
 each row's environment ``env`` (0 the observational one, 1..K the settings), ``known``, the 0/1 mask
@@ -11,7 +11,9 @@ of each row's known targets, and ``fits``, a JSON list. Each fit names an ``algo
   settings with no known targets left out of the mapping, which reads them as unknown. A fit's
   ``objective`` sets ``andrey.search.igsp.UT_IGSP_OBJECTIVE`` for its calls. Its targets are
   ``metadata["targets"]`` per setting.
+- ``igsp``: ``andrey.igsp(X, env, targets={0: [], k: known_k}, seed=draw, **kwargs)``.
 - ``gies``: ``andrey.gies(X, env, targets={0: [], k: known_k})``, at its defaults.
+- ``grasp``: ``andrey.grasp(X[env == 0], **kwargs)``, the observational rows alone.
 - ``cdnod``: ``andrey.cdnod(X, env=env, **kwargs)``; no targets.
 
 Each line holds the graph's endpoint marks. Before the first draw of each fit, one untimed warm-up
@@ -51,8 +53,18 @@ def run_fit(fit: dict, X: np.ndarray, env: np.ndarray, known: dict[int, list[int
             "targets": targets,
             "score": out.metadata.get("score"),
         }
+    if algorithm == "igsp":
+        out = andrey.igsp(X, env, targets={0: [], **known}, seed=seed, **kwargs)
+        return {
+            "marks": out.structure.to_numpy().astype(int).tolist(),
+            "score": out.metadata.get("score"),
+            "n_contradicting": out.metadata.get("n_contradicting"),
+        }
     if algorithm == "gies":
         out = andrey.gies(X, env, targets={0: [], **known}, **kwargs)
+        return {"marks": out.structure.to_numpy().astype(int).tolist()}
+    if algorithm == "grasp":
+        out = andrey.grasp(X[env == 0], **kwargs)
         return {"marks": out.structure.to_numpy().astype(int).tolist()}
     if algorithm == "cdnod":
         out = andrey.cdnod(X, env=env, **kwargs)

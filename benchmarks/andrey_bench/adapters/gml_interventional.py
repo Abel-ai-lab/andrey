@@ -1,9 +1,11 @@
 """Run the UT-IGSP reference in its own environment: one request in, one JSON line per draw out.
 
-``ut_igsp_cpu.py`` starts this file with ``ANDREY_BENCH_UTIGSP_PYTHON``, the interpreter
-``start_utigsp.sh`` builds, as ``python gml_interventional.py <request.npz> <out.jsonl>``. It
-imports NumPy and the authors' library alone: graphical-model-learning 0.1a8,
-conditional-independence 0.1a6, and graphical-models 0.1a21. Nothing here imports Andrey.
+``ut_igsp_cpu.py`` and ``igsp_cpu.py`` start this file with ``ANDREY_BENCH_UTIGSP_PYTHON``, the
+interpreter ``start_utigsp.sh`` builds, or with ``ANDREY_BENCH_GML_DEF42_PYTHON``, the same
+packages with IGSP's I-contradicting test patched to Definition 4.2 of Yang, Katcoff, and Uhler
+(2018), as ``python gml_interventional.py <request.npz> <out.jsonl>``. It imports NumPy and the
+authors' library alone: graphical-model-learning 0.1a8, conditional-independence 0.1a6, and
+graphical-models 0.1a21. Nothing here imports Andrey.
 
 A ``fit`` request holds the pooled rows ``X``, each row's environment ``env`` (0 the observational
 one, 1..K the settings), ``known``, the 0/1 mask of each row's known targets, and ``fits``, a JSON
@@ -30,6 +32,17 @@ appends one line as it finishes, so a killed child keeps the draws it finished.
 
 An ``icpdag`` request holds ``pairs``, a JSON list of ``{"p", "arcs", "interventions"}``, and
 answers each with graphical-models' ``DAG.interventional_cpdag``: its ``arcs`` and ``edges``.
+
+An ``oracle`` request holds ``cases``, a JSON list of ``{"p", "arcs", "family", "queries",
+"seeds"}``: a DAG, its settings' targets, and the tests answered by d-separation in the DAG with one
+context node per setting into its targets (:class:`OracleTesters`). Each query ``{"arcs", "arc"}``
+asks whether IGSP's I-contradicting test, as the installed package builds it for ``family``, marks
+``arc`` in the DAG ``arcs``; each seed runs ``igsp`` with the oracle testers at the library
+defaults. One line per case: ``contradicting`` (one answer per query) and ``found`` (the arcs of
+each seed's DAG).
+
+A ``probe`` request holds ``Xs``, several datasets of one shape with one ``env``, and one ``fits``
+entry; each dataset runs one draw, its ``seeds`` entry, and answers one line with its ``arcs``.
 """
 
 from __future__ import annotations
@@ -255,6 +268,95 @@ def fit_request(request, sink) -> None:
             sink.flush()
 
 
+class OracleTesters:
+    """IGSP's two tests answered by d-separation: the DAG ``arcs`` on ``p`` variables with context
+    node ``p + k`` into the targets of setting ``k``. Every context but the tested one is given, as
+    in the observational distribution."""
+
+    def __init__(self, p: int, arcs: list, family: list[list[int]]):
+        import graphical_models as gm
+
+        self.p, self.contexts = p, set(range(p, p + len(family)))
+        edges = {(int(i), int(j)) for i, j in arcs}
+        edges |= {(p + k, int(v)) for k, targets in enumerate(family) for v in targets}
+        self.dag = gm.DAG(nodes=set(range(p + len(family))), arcs=edges)
+
+    def is_ci(self, i, j, cond_set=()) -> bool:
+        return self.dag.dsep({i}, {j}, set(cond_set) | self.contexts)
+
+    def is_invariant(self, node, context, cond_set=()) -> bool:
+        given = set(cond_set) | (self.contexts - {self.p + context})
+        return self.dag.dsep({self.p + context}, {node}, given)
+
+
+class _Found(Exception):
+    pass
+
+
+def i_contradicting(setting_list: list[dict], nodes: set, invariance_tester):
+    """The I-contradicting test ``igsp`` builds for ``setting_list``, taken from its frame.
+
+    ``igsp`` defines the test inside its body before its first CI test; a CI tester that raises on
+    its first call stops ``igsp`` there and reads the test from the frame.
+    """
+    import inspect
+
+    import graphical_model_learning as gml
+
+    found: dict = {}
+
+    class Stop:
+        def is_ci(self, *args, **kwargs):
+            frame = inspect.currentframe()
+            while frame is not None and "_is_i_contradicting" not in frame.f_locals:
+                frame = frame.f_back
+            if frame is not None:
+                found.update(frame.f_locals)
+            raise _Found
+
+    try:
+        gml.igsp(setting_list, nodes, Stop(), invariance_tester, nruns=1)
+    except _Found:
+        pass
+    return found["_is_i_contradicting"]
+
+
+def oracle_request(request, sink) -> None:
+    import graphical_model_learning as gml
+    import graphical_models as gm
+
+    for case in json.loads(str(request["cases"])):
+        p, family = case["p"], case["family"]
+        testers = OracleTesters(p, case["arcs"], family)
+        settings = [{"interventions": list(t)} for t in family]
+        nodes = set(range(p))
+        test = i_contradicting(settings, nodes, testers)
+        answers = []
+        for query in case["queries"]:
+            dag = gm.DAG(nodes=nodes, arcs={(int(i), int(j)) for i, j in query["arcs"]})
+            answers.append(bool(test(*query["arc"], dag)))
+        found = []
+        for seed in case["seeds"]:
+            random.seed(seed)
+            np.random.seed(seed)
+            dag = gml.igsp(settings, nodes, testers, testers)
+            found.append(sorted([int(i), int(j)] for i, j in dag.arcs))
+        sink.write(json.dumps({"contradicting": answers, "found": found}) + "\n")
+        sink.flush()
+
+
+def probe_request(request, sink) -> None:
+    Xs, env = request["Xs"], request["env"]
+    (fit,) = json.loads(str(request["fits"]))
+    known = json.loads(str(request["known"]))
+    for X, seed in zip(Xs, json.loads(str(request["seeds"])), strict=True):
+        random.seed(seed)
+        np.random.seed(seed)
+        result = run_fit(fit, X, env, known)
+        sink.write(json.dumps({"seed": seed, "arcs": result["arcs"]}) + "\n")
+        sink.flush()
+
+
 def icpdag_request(request, sink) -> None:
     import graphical_models as gm
 
@@ -275,8 +377,13 @@ def main(argv: list[str]) -> int:
     warnings.simplefilter("ignore")
     request = np.load(argv[1])
     with open(argv[2], "a") as sink:
-        if str(request["mode"]) == "icpdag":
+        mode = str(request["mode"])
+        if mode == "icpdag":
             icpdag_request(request, sink)
+        elif mode == "oracle":
+            oracle_request(request, sink)
+        elif mode == "probe":
+            probe_request(request, sink)
         else:
             fit_request(request, sink)
     return 0
