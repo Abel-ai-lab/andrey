@@ -132,11 +132,11 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, XGES, HC, Tabu, MMHC,
-RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD,
-BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and
-Granger on the datasets whose assumptions each method needs, and PC with each supported nonlinear
-conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
+The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, ICP, XGES, HC, Tabu,
+MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM,
+RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM,
+and Granger on the datasets whose assumptions each method needs, and PC with each supported
+nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -145,6 +145,7 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
+| `icp_do` at `d = 6, 10`, `n = 200` per environment, every other variable intervened | 10 seeds each | ICP |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
@@ -202,6 +203,14 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
   gate draws 5 variables, where it is below. PCMCI and Granger run at their default
   `fdr_method`, `"fdr_bh"`. A test keeps the Granger draws in step with the benchmark driver and
   the regime names with the harness.
+- **Environments.** `icp_do` follows ICP's published regime of that name: an observational
+  environment and environments of do-interventions `N(2, 0.2^2)`, at 6 or 10 variables and 200
+  rows each. The data are `andrey.data`'s linear-Gaussian Erdos-Renyi graphs of mean degree 2,
+  standardized, as in the regimes above. The published regime intervenes on 2 or 3 variables
+  other than the target, where ICP's median error equals the empty set's; the gate intervenes on
+  every variable but the target, which identifies the target's parents (Peters, Buhlmann and
+  Meinshausen 2016, Theorem 2), so the check has power. Each seed draws its target among the
+  variables with parents, and ICP runs at its defaults.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -223,8 +232,10 @@ a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a p
 node reaches through hidden nodes only. The time-series methods are scored in their summaries'
 units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by
 endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the
-missing and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a
-method passes when its median SHD over the draws is:
+missing and extra cross-links, and Granger by the missing and extra lagged edges. A method that
+estimates a set of variables is scored by the set's false members plus its missed ones, where the
+empty set makes as many errors as the true set has members: ICP by the target's parents. On each
+dataset, a method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
