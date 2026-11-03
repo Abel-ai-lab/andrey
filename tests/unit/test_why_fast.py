@@ -58,13 +58,12 @@ def test_counts_without_script_are_the_scenes_final_counts():
         assert counts[0] < counts[1]
 
 
-def test_the_readme_gives_each_idea_in_one_line():
-    # The text version for places without the animations: each scene's own line, in order.
-    readme = " ".join((ROOT / "README.md").read_text().split())
-    lines = [f"**{s['title']}**: {s['line']}" for s in SCENES]
-    assert all(line in readme for line in lines)
-    assert sorted(lines, key=readme.index) == lines
-    assert all(s["line"].endswith(".") for s in SCENES)
+def test_the_readme_links_the_post_in_learn_more():
+    readme = (ROOT / "README.md").read_text()
+    learn_more = readme[readme.index("## Learn more") :]
+    assert "[Why Andrey is fast](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html)" in (
+        learn_more
+    )
 
 
 def test_the_scenes_load_only_where_they_appear():

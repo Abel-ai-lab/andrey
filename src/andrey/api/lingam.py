@@ -130,14 +130,14 @@ def direct_lingam(
 
     Notes
     -----
-    **When to use it.** DirectLiNGAM suits continuous data with linear effects, independent
-    non-Gaussian noise, and no unmeasured common causes [1]_. These assumptions allow the causal
-    order to be identified. The result includes a DAG with every edge oriented, the edge weights,
-    and the order.
-
-    **When not to.** With Gaussian noise, the order cannot be identified, so the returned order is
-    unreliable. Use :func:`~andrey.pc` or :func:`~andrey.ges`, which return the equivalence class.
-    When unmeasured common causes are plausible, use :func:`~andrey.fci`.
+    **When to use.** DirectLiNGAM suits i.i.d. continuous observational data in which each variable
+    is a linear function of its causes plus independent non-Gaussian noise, with no unmeasured
+    common causes [1]_; under these assumptions the causal order is identified. It is designed for
+    more rows than variables and a moderate number of variables, as its order search compares them
+    in pairs. It returns a DAG with every edge oriented, the edge weights, and the causal order.
+    With Gaussian noise the order cannot be identified: use :func:`~andrey.pc` or
+    :func:`~andrey.ges`, which return the equivalence class. When unmeasured common causes are
+    plausible, use :func:`~andrey.rcd` or :func:`~andrey.fci`.
 
     **Cost.** Each step compares the remaining variables in pairs, so runtime grows quickly with the
     number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
@@ -311,10 +311,14 @@ def ica_lingam(
 
     Notes
     -----
-    **When to use it.** ICA-LiNGAM assumes linear effects, independent non-Gaussian noise, and no
-    unmeasured common causes, like :func:`~andrey.direct_lingam`. On the published benchmark data,
-    it scored worse than the empty graph at the benchmarks' sample size, while DirectLiNGAM
-    recovered most edges. Prefer :func:`~andrey.direct_lingam` unless ICA is needed.
+    **When to use.** ICA-LiNGAM suits i.i.d. continuous observational data in which each variable is
+    a linear function of its causes plus independent non-Gaussian noise, with no unmeasured common
+    causes [1]_, the model of :func:`~andrey.direct_lingam`. It needs more rows than variables, and
+    FastICA converges less reliably with few rows per variable. It returns a DAG with every edge
+    oriented, the edge weights, and the causal order. FastICA is an iterative search from a random
+    starting point that may not reach the correct solution, so the order can change with ``seed``
+    [2]_: prefer :func:`~andrey.direct_lingam`, whose order search is deterministic, unless ICA
+    itself is needed, and with Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`.
 
     **Choosing seed and max_iter.** Different seeds can give different orders; compare a few when
     the result matters. If FastICA reaches ``max_iter`` before converging, the fit warns with
@@ -447,6 +451,16 @@ def multi_group_direct_lingam(
 
     Notes
     -----
+    **When to use.** Multi-group DirectLiNGAM suits two or more i.i.d. continuous observational
+    datasets over the same variables, such as one per condition or population, that share one
+    causal order but may differ in edge weights [1]_. In every group each variable is a linear
+    function of its causes plus independent non-Gaussian noise, with no unmeasured common causes.
+    It fits the shared order on more rows than any one group holds, and like
+    :func:`~andrey.direct_lingam` suits a moderate number of variables. It returns a list with one
+    DAG per group, all with the same causal order and each with its own edge weights. For a single
+    dataset, use :func:`~andrey.direct_lingam`; when the graph itself may change across domains,
+    use :func:`~andrey.cdnod`.
+
     **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
     :func:`~andrey.direct_lingam`, whose Notes and Limitations give the numbers; each group is
     standardized, and for ``"skew"`` sign-corrected, on its own.

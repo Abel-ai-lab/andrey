@@ -10,6 +10,16 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
+  interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
+  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
+  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
+  columns, for the linear, nonlinear, location-scale, and discrete models. ([#PR])
+
+## [0.13.0] - 2026-11-03
+
 ### Highlights
 
 - `iamb` is supported and joins the quality gate. Against bnlearn 5.2.1 on simulated linear-Gaussian
@@ -81,11 +91,6 @@ names its pull request.
   squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
   the paper's settings: `lambda1=0.05`, `w_threshold=0.3`, and `lag_threshold=0.1` for 500 time
   steps, and `tau_max=1`; it is experimental. ([#639])
-- `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
-  interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
-  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
-  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
-  columns, for the linear, nonlinear, location-scale, and discrete models.
 
 ### Changed
 
@@ -99,9 +104,11 @@ names its pull request.
   fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
   `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
   changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
-  the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
-  restores the former rank; `tie_break="position"` orders ties by column position, a different
-  rule. ([#612])
+  the true graph on fresh draws were indistinguishable from those of a random ranking. Without
+  changing a graph, the rank also moves `exact_search`'s `metadata["dag"]`, the member of the class
+  it orients, and the last bits of the weights of `bottom_up_parce_lingam` and
+  `longitudinal_lingam`, which order their regressions by it. No setting restores the former rank;
+  `tie_break="position"` orders ties by column position, a different rule. ([#612])
 - `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` return the same graphs and
   p-values in less time, because the candidates of a grow step share one conditioning set, and the
   test now numbers that set's configurations once and counts the tables of all its candidates
@@ -127,6 +134,9 @@ names its pull request.
 - The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
   outside the method's claim, with its numbers and does not fail it; a row without the field is
   judged as before. ([#631])
+- Every method's docstring opens its Notes with a **When to use.** paragraph: the data, model,
+  and scale the method is designed for, what it returns, and the method to use outside that
+  setting. ([#633])
 
 ### Fixed
 
@@ -1436,7 +1446,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
@@ -1624,5 +1635,6 @@ First alpha release.
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
 [#630]: https://github.com/Abel-ai-lab/andrey/pull/630
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
+[#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
