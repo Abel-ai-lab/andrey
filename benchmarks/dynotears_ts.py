@@ -7,8 +7,8 @@ Every series is drawn by :mod:`andrey_bench.svar_models`, one per seed: ``d`` va
     dynotears_paper               Erdos-Renyi graphs, Gaussian noise, raw scale       (in claim)
     dynotears_paper_exponential   the same graphs, centered exponential noise         (in claim)
     dynotears_paper_ba_sbm        Barabasi-Albert and block-model graphs, Gaussian    (in claim)
+    dynotears_paper_uncentered    exponential noise of mean 1, not centered           (in claim)
     dynotears_paper_standardized  dynotears_paper with every column z-scored          (out)
-    dynotears_paper_uncentered    exponential noise of mean 1, not centered           (out)
     dynotears_sin_tanh            sin of same-step and tanh of lagged parents         (out)
 
 Every solution in a run takes one of the paper's two settings (:data:`SETTINGS`): ``n500``, the
@@ -50,19 +50,20 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores, check_interpreters
 
-#: The regimes, in ``datasets.REGIMES``: the three the lane judges first, then three it reports.
+#: The regimes, in ``datasets.REGIMES``: the four the lane judges first, then two it reports.
 REGIMES = [
     "dynotears_paper",
     "dynotears_paper_exponential",
     "dynotears_paper_ba_sbm",
-    "dynotears_paper_standardized",
     "dynotears_paper_uncentered",
+    "dynotears_paper_standardized",
     "dynotears_sin_tanh",
 ]
 
-#: The regimes the lane judges: the paper's design, Pamfil et al. (2020), Appendix B.4, with the
-#: noise centered as its Sect. 2.1 takes it.
-PAPER_REGIMES = frozenset(REGIMES[:3])
+#: The regimes the lane judges: the paper's design, Pamfil et al. (2020), Appendix B.4, with its
+#: exponential noise both centered, as its Sect. 2.1 takes the noise, and of mean 1, as its
+#: simulations draw it.
+PAPER_REGIMES = frozenset(REGIMES[:4])
 
 #: The paper's settings, Appendix B.3, in Andrey's names: for 500 steps (Andrey's defaults) and 50.
 SETTINGS = {

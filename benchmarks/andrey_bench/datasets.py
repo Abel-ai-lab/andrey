@@ -170,11 +170,10 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "varma_lingam_paper": ("random", "varma2010", "nongaussian", "raw"),
     "longitudinal_lingam_paper": ("random", "panel2013", "nongaussian", "raw"),
     # The structural vector autoregressions of the DYNOTEARS paper, one lag, at raw scale, with
-    # Gaussian or centered exponential noise, Erdos-Renyi graphs or the Barabasi-Albert and
-    # block-model pair; andrey_bench.svar_models gives each setup and its source: Pamfil et al.
-    # (2020), Appendix B.4. The z-scored and nonlinear regimes lie outside the paper's scale or
-    # model; the uncentered noise is that of the paper's simulations and lies outside the centered
-    # noise of its Sect. 2.1.
+    # Gaussian noise, exponential noise centered (Sect. 2.1) or of mean 1 (the simulations), and
+    # Erdos-Renyi graphs or the Barabasi-Albert and block-model pair; andrey_bench.svar_models gives
+    # each setup and its source: Pamfil et al. (2020), Appendix B.4. The z-scored and nonlinear
+    # regimes lie outside the paper's scale or model.
     "dynotears_paper": ("er", "dynotears2020", "gaussian", "raw"),
     "dynotears_paper_exponential": ("er", "dynotears2020", "exponential", "raw"),
     "dynotears_paper_ba_sbm": ("ba_sbm", "dynotears2020_ba_sbm", "gaussian", "raw"),

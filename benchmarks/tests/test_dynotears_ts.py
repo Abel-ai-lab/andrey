@@ -227,12 +227,9 @@ def test_a_regime_is_in_claim_only_at_the_papers_settings_for_its_length() -> No
     assert (
         claim("dynotears_paper", 500, "n500") == claim("dynotears_paper_ba_sbm", 50, "n50") == "in"
     )
+    assert claim("dynotears_paper_uncentered", 50, "n50") == "in"
     assert claim("dynotears_paper", 50, "n500") == "out"
-    for regime in (
-        "dynotears_paper_standardized",
-        "dynotears_paper_uncentered",
-        "dynotears_sin_tanh",
-    ):
+    for regime in ("dynotears_paper_standardized", "dynotears_sin_tanh"):
         assert claim(regime, 500, "n500") == "out"
 
 
