@@ -81,6 +81,11 @@ names its pull request.
   squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
   the paper's settings: `lambda1=0.05`, `w_threshold=0.3`, and `lag_threshold=0.1` for 500 time
   steps, and `tau_max=1`; it is experimental. ([#639])
+- `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
+  interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
+  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
+  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
+  columns, for the linear, nonlinear, location-scale, and discrete models.
 
 ### Changed
 

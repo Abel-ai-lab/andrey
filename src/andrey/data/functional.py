@@ -11,6 +11,7 @@ one topological-evaluation loop and differ only in the per-node combine rule.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -78,21 +79,60 @@ class Functional:
             empty, :meth:`_node` receives each child's ``(k, 2)`` block of location and scale
             weights.
         """
+        return self.propagate(draw, weights, noise, rescale=rescale, scale_weights=scale_weights)[0]
+
+    def propagate(
+        self,
+        draw: DAGDraw,
+        weights: np.ndarray,
+        noise: np.ndarray,
+        *,
+        rescale: bool = False,
+        scale_weights: np.ndarray | None = None,
+        divisors: np.ndarray | None = None,
+        fixed: Mapping[int, np.ndarray] | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Evaluate ``X`` as :meth:`evaluate` does, with set nodes and given rescale divisors.
+
+        Parameters
+        ----------
+        divisors : np.ndarray of shape (d,) or None, default=None
+            Under ``rescale``, each node is divided by its entry here rather than by its own sample
+            standard deviation, so a model under intervention keeps the divisors of the model
+            without one.
+        fixed : mapping of int to np.ndarray of shape (n,), or None, default=None
+            Nodes set from outside: each listed node takes its column as given, its parents unread
+            and no divisor applied.
+
+        Returns
+        -------
+        x : np.ndarray of shape (n, d)
+            The values.
+        divisors : np.ndarray of shape (d,)
+            The divisor of each node; ``1`` for every node without ``rescale``, and for a node set
+            by ``fixed`` or with a sample standard deviation of ``0``.
+        """
         x = noise.astype(np.float64, copy=True)
+        fixed = fixed or {}
+        used = np.ones(noise.shape[1])
         if scale_weights is not None and scale_weights.size:
             weights = np.column_stack([weights, scale_weights])
         child_block = _parents_by_child(draw.children, draw.parents, weights)
         for c in draw.topo_order:
             c = int(c)
+            if c in fixed:
+                x[:, c] = fixed[c]
+                continue
             block = child_block.get(c)
             if block is not None:
                 pa, w = block
                 x[:, c] = self._node(x[:, pa], w, noise[:, c])
             if rescale:
-                sd = x[:, c].std()
+                sd = x[:, c].std() if divisors is None else divisors[c]
                 if sd > 0:
                     x[:, c] /= sd
-        return x
+                    used[c] = sd
+        return x, used
 
 
 @dataclass(frozen=True, kw_only=True)
