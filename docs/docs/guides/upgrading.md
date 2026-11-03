@@ -24,11 +24,11 @@ import andrey
 warnings.simplefilter("error", andrey.DeprecatedArgumentWarning)
 ```
 
-## From 0.12 to 0.13
+## From 0.13 to 0.14
 
-Andrey 0.13.0 names each row's environment `env` in both `cdnod` and `gies`, and `gies` takes the
+Andrey 0.14.0 names each row's environment `env` in both `cdnod` and `gies`, and `gies` takes the
 variables intervened on in each environment as `targets`. A former name in the table still works
-in 0.13, with an `andrey.DeprecatedArgumentWarning`, and stops working in the next release:
+in 0.14, with an `andrey.DeprecatedArgumentWarning`, and stops working in the release after:
 
 | Method | Former name | Name now |
 | --- | --- | --- |
@@ -36,12 +36,12 @@ in 0.13, with an `andrey.DeprecatedArgumentWarning`, and stops working in the ne
 | `gies` | `interventions` (`--interventions`), or the 0/1 matrix as the second argument | `targets`, with `env` (`--env` and `targets=`) |
 
 ```python
-# 0.12
+# 0.13
 out = andrey.cdnod(data, domain_index=index)
 out = andrey.gies(data, intervened)  # a 0/1 matrix shaped like data
 out = andrey.gies(data, interventions=intervened)
 
-# 0.13
+# 0.14
 out = andrey.cdnod(data, env=index)
 out = andrey.gies(data, targets=intervened)  # the same matrix, now one form of targets
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
