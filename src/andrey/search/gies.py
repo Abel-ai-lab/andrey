@@ -908,7 +908,9 @@ def search_class(
     Starts from the empty graph, or under ``constraints`` from the class of the required edges, and
     repeats the forward, backward, and turning phases, each until it finds no improving step, until
     a round of backward and turning phases changes nothing. Ties between moves go to the lower
-    ``ranks`` (:func:`~andrey.search.hc.tie_ranks`), as :func:`gies` describes.
+    ``ranks`` (:func:`~andrey.search.hc.tie_ranks`), as :func:`gies` describes. When the start's
+    total is ``inf``, the required edges giving some node a family the score makes unavailable, the
+    search takes no step and returns the start with total ``inf``.
 
     Parameters
     ----------
@@ -948,6 +950,8 @@ def search_class(
         )
     with backend.one_blas_thread():
         search = _Search(score, n, ranks, constraints, start, max_parents)
+        if math.isinf(search.objective.total):
+            return search.adj, math.inf
         while True:
             while search.step(search.forward_best, _insert, cut):
                 pass

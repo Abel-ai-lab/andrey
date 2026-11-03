@@ -522,6 +522,7 @@ _add(
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Two or more environments of 2+ rows each. null takes the environments from "
                     "targets given as a column or a 0/1 matrix.",
+                    required=False,
                 ),
             ),
             layout=_MATRIX_LAYOUT,

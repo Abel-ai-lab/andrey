@@ -28,11 +28,11 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 
 import numpy as np
 
-from andrey.core import GraphStructure, score_delta
+from andrey.core import GraphStructure, backend, score_delta
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import to_structure
 from andrey.core.score import ZERO_RESIDUAL, BICScore, _solve, check_columns, ebic_penalty
@@ -146,12 +146,16 @@ class NoiseInterventionScore:
         Weight on the ``log(N)`` charged per parameter.
     ebic_gamma : float, default=1.0
         Weight on the extended-BIC term of each node's parent count.
+    column_name : callable or None
+        Names a column position in the message of linearly dependent columns.
 
     Raises
     ------
     ValueError
         If there are fewer than two environments, an environment has fewer than two rows, or
-        :func:`~andrey.core.score.check_columns` rejects a column of ``S``.
+        :func:`~andrey.core.score.check_columns` rejects a column of ``S``. Centering each
+        environment leaves ``S`` a rank of at most ``N - K``, so the check counts ``N - K + 1``
+        rows, as for a covariance with divisor ``n - 1``.
     """
 
     def __init__(
@@ -161,6 +165,7 @@ class NoiseInterventionScore:
         *,
         penalty_discount: float = 1.0,
         ebic_gamma: float = 1.0,
+        column_name: Callable[[int], str] | None = None,
     ) -> None:
         X = np.asarray(data, dtype=np.float64)
         codes = np.asarray(env_codes, dtype=np.intp)
@@ -181,7 +186,7 @@ class NoiseInterventionScore:
         self.sizes = self.sizes[order]
         self.covs = covs[order]
         self.cov = scatter[order].sum(axis=0) / self.N
-        check_columns(self.cov, self.N)
+        check_columns(self.cov, self.N - self.K + 1, column_name)
         self.penalty_discount = float(penalty_discount)
         self.ebic_gamma = float(ebic_gamma)
         self.log_n = math.log(self.N)
@@ -287,6 +292,7 @@ def gnies(
     ebic_gamma: float = 1.0,
     max_parents: int | None = None,
     constraints: Constraints | None = None,
+    column_name: Callable[[int], str] | None = None,
 ) -> tuple[GraphStructure, float, list[int]]:
     """Learn the targets and the interventional essential graph by greedy search.
 
@@ -297,7 +303,9 @@ def gnies(
     whose set scores lowest while that lowers the total by more than ``1e-9``; the backward phase
     then removes a variable not in ``known`` the same way. Candidates are compared by their total
     divided by the variable count and rounded to nine decimal places, then by
-    :func:`~andrey.search.hc.tie_ranks` of the per-environment centered data.
+    :func:`~andrey.search.hc.tie_ranks` of the per-environment centered data. A set whose required
+    edges give a family the score makes unavailable totals ``inf`` and is never chosen. The fit
+    runs on one BLAS thread, so the host's thread count does not change its bits.
 
     Parameters
     ----------
@@ -316,20 +324,33 @@ def gnies(
     constraints : Constraints or None
         Background knowledge in every inner search; the result then directs the edges it decides,
         and Meek's rules with R4 (:func:`~andrey.core.knowledge.mpdag`).
+    column_name : callable or None
+        Names a column position in the message of linearly dependent columns.
 
     Returns
     -------
     tuple[GraphStructure, float, list[int]]
         The interventional essential graph (``kind="cpdag"``), its total score (lower is better),
         and the targets, sorted.
+
+    Raises
+    ------
+    ValueError
+        If :class:`NoiseInterventionScore` rejects the data, or if no set of targets the search
+        visits has a finite total: some family of the required edges is unavailable.
     """
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
     known = frozenset(int(j) for j in known)
-    score = NoiseInterventionScore(
-        X, env_codes, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
-    )
-    ranks = tie_ranks(score.centered, np.zeros(d, dtype=bool)).tolist()
+    with backend.one_blas_thread():
+        score = NoiseInterventionScore(
+            X,
+            env_codes,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            column_name=column_name,
+        )
+        ranks = tie_ranks(score.centered, np.zeros(d, dtype=bool)).tolist()
     runs: dict[frozenset[int], tuple[np.ndarray, float]] = {}
 
     def inner(targets: frozenset[int]) -> tuple[np.ndarray, float]:
@@ -357,5 +378,11 @@ def gnies(
                     break
                 current = step
                 adj, total = runs[current]
+    if math.isinf(total):
+        raise ValueError(
+            "gnies: no graph with the required edges has a finite score under the targets "
+            f"{sorted(current)}: the required edges give a variable more parents than its rows "
+            "allow, or fit it exactly"
+        )
     adj = adj.copy() if constraints is None else mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total, sorted(current)

@@ -10,11 +10,14 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
+from threadpoolctl import threadpool_limits
 
 import andrey
 from andrey.core import ARROW, TAIL
+from andrey.core.knowledge import resolve
 from andrey.core.score import BICScore
 from andrey.search import gnies as engine
+from andrey.search.ges import required_dag
 from andrey.search.gies import replace_unprotected, search_class
 from andrey.search.gnies import NoiseInterventionScore, alternating_fit, singleton_cut
 from andrey.search.hc import tie_ranks
@@ -170,6 +173,32 @@ def test_a_target_family_needs_two_rows_more_than_parents_in_every_environment(c
         assert np.sum((marks[target] == ARROW) & (marks[:, target] == TAIL)) <= 4 - 2
 
 
+def test_the_column_check_counts_the_rows_left_after_centering_each_environment():
+    rng = np.random.default_rng(3)
+    env = np.repeat(np.arange(5), 2)  # 10 rows, 5 left after centering each environment
+    _fit(rng.standard_normal((10, 5)), env)  # as many rows left as variables
+    with pytest.raises(ValueError, match="leave 5 once each environment's mean"):
+        _fit(rng.standard_normal((10, 6)), env)
+    X, env = _sem(_chain_weights(), [60, 40], [{}, {1: 2.0}], seed=5)
+    data = pd.DataFrame(X, columns=list("abcde")).assign(f=lambda t: t["a"] - 2.0 * t["c"])
+    with pytest.raises(ValueError, match="linearly dependent") as raised:
+        _fit(data, env)
+    assert "'f'" in str(raised.value)
+
+
+def test_the_score_bits_do_not_depend_on_the_blas_thread_count():
+    rng = np.random.default_rng(0)
+    d = 20  # large enough that a multithreaded BLAS sums the covariances in another order
+    weights = np.triu(rng.uniform(-0.8, 0.8, (d, d)) * (rng.random((d, d)) < 0.15), 1)
+    X = rng.standard_normal((12_000, d)) @ np.linalg.inv(np.eye(d) - weights)
+    env = np.repeat(np.arange(4), 3_000)
+    scores = []
+    for threads in (1, 8):
+        with threadpool_limits(limits=threads):
+            scores.append(_fit(X, env, targets=dict.fromkeys(range(4), [])).metadata["score"])
+    assert scores[0] == scores[1]
+
+
 def _class_members(dag: np.ndarray, targets: set[int]) -> list[np.ndarray]:
     """Every DAG with ``dag``'s skeleton and v-structures that orients each edge at a target
     alike (Gamella et al. 2022, Def. 2), as 0/1 matrices."""
@@ -268,6 +297,26 @@ def test_max_parents_and_knowledge_hold(case):
     assert not any({i, j} == {0, 1} for i, j, _ in edges)
 
 
+def test_required_edges_a_target_cannot_carry_keep_the_variable_out_of_the_targets():
+    # The second environment has 3 rows, so a target has at most one parent; 3 must have two.
+    X, env = _sem(_chain_weights(), [200, 3], [{}, {3: 3.0}], seed=6)
+    knowledge = andrey.Knowledge(required=[(0, 3), (2, 3)])
+    out = _fit(X, env, knowledge=knowledge)
+    assert 3 not in _targets(out)
+    assert {(0, 3, "directed"), (2, 3, "directed")} <= set(out.structure.oriented_edges())
+    with pytest.raises(ValueError, match="2 parents to the known target 3"):
+        _fit(X, env, targets={0: [], 1: [3]}, knowledge=knowledge)
+    constraints = resolve(knowledge, D, None, method="gnies")
+    score = NoiseInterventionScore(X, env)
+    ranks = tie_ranks(score.centered, np.zeros(D, dtype=bool)).tolist()
+    cut = singleton_cut({3}, D)
+    adj, total = search_class(score.view({3}), cut, ranks, constraints)
+    assert total == math.inf
+    assert np.array_equal(adj, replace_unprotected(required_dag(constraints), cut))
+    with pytest.raises(ValueError, match="no graph with the required edges"):
+        engine.gnies(X, env, known={3}, fixed=True, constraints=constraints)
+
+
 # ---- invariances --------------------------------------------------------------------------------
 
 
@@ -332,9 +381,23 @@ def test_labels_name_the_targets_and_environments_without_env(case):
     X, env = case
     data = pd.DataFrame(X, columns=list("abcde"))
     data["changed"] = np.array(["", "b", "e"], dtype=object)[env]
-    out = _fit(data, None, targets="changed")
+    out = _fit(data, targets="changed")
     assert out.metadata["index_edges"] == [["b", "directed"], ["e", "directed"]]
     assert out.metadata["environments"] == [[], ["e"], ["b"]]  # numpy.unique's row order
+
+
+def test_errors_name_an_environment_from_targets_by_its_targets(case):
+    X, env = case
+    data = pd.DataFrame(X, columns=list("abcde"))
+    data["changed"] = np.array(["", "b", "e"], dtype=object)[env]
+    one_row = data.copy()
+    one_row.loc[0, "changed"] = "c"
+    with pytest.raises(ValueError, match=r"^gnies: .*\[\['c'\]\] have fewer"):
+        _fit(one_row, targets="changed")
+    flat = data.copy()
+    flat.loc[env == 2, "a"] = 1.0
+    with pytest.raises(ValueError, match=r"^gnies: column 'a' is constant in environment \['e'\]"):
+        _fit(flat, targets="changed")
 
 
 @pytest.mark.parametrize(

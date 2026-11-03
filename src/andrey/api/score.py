@@ -668,7 +668,7 @@ def gies(
 @method_spec("gnies")
 def gnies(
     data: npt.ArrayLike,
-    env: npt.ArrayLike | str | None,
+    env: npt.ArrayLike | str | None = None,
     *,
     targets: Mapping | npt.ArrayLike | str | None = None,
     penalty_discount: float = 1.0,
@@ -690,11 +690,13 @@ def gnies(
         become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
         variable: it leaves the data before the fit, and ``knowledge``, ``targets``, and the
         result's positions count the other columns.
-    env : array-like of shape (n_samples,), str, or None
+    env : array-like of shape (n_samples,), str, or None, default=None
         The environment of each row: one label per row, strings or numbers, not both, or the name
         of a column of the DataFrame ``data`` that holds them. GnIES needs two or more
-        environments, each with at least two rows; one of them may be observational, but none has
-        to be. ``None`` takes the environments from ``targets``, as a column or a 0/1 matrix.
+        environments, each with at least two rows, and at least as many rows as variables once
+        each environment's mean is taken out: ``n_samples - n_environments >= n_variables``. One of
+        them may be observational, but none has to be. ``None`` takes the environments from
+        ``targets``, as a column or a 0/1 matrix.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables known to be intervened on, by column label or 0-based position. ``None``,
         the setting GnIES is built for, leaves every environment's targets unknown, and the search
@@ -751,16 +753,18 @@ def gnies(
         not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
         column; if a column is declared categorical by a DataFrame's ``category``, ``bool``, or
         text type; if the rows come from fewer than two environments, an environment has fewer
-        than two rows, or a column is constant within one environment; if a column repeats another
-        up to scale and shift or is a linear function of other columns, within the environments
-        (one message names every group of copies and says to keep one column per group). Also if
-        ``env`` does not hold one label per row, misses a label, or mixes strings and numbers; if
-        a ``targets`` mapping comes without ``env`` or names a label ``env`` lacks; if a column or
-        an array of ``targets`` gives two rows of one environment different targets, or an array
-        does not have ``data``'s shape or holds a value other than 0 or 1; if ``targets`` names a
-        variable ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks. Also
-        if a given ``max_parents`` is below the parents some graph of the required edges of
-        ``knowledge`` gives a node, or if ``knowledge`` names a column ``data`` lacks or
+        than two rows, ``n_samples - n_environments`` is below the variable count, or a column is
+        constant within one environment; if a column repeats another up to scale and shift or is a
+        linear function of other columns, within the environments (one message names every group
+        of copies and says to keep one column per group). Also if ``env`` does not hold one label
+        per row, misses a label, or mixes strings and numbers; if a ``targets`` mapping comes
+        without ``env`` or names a label ``env`` lacks; if a column or an array of ``targets``
+        gives two rows of one environment different targets, or an array does not have ``data``'s
+        shape or holds a value other than 0 or 1; if ``targets`` names a variable ``data`` lacks;
+        or if ``env`` or ``targets`` names a column ``data`` lacks. Also if a given
+        ``max_parents`` is below the parents some graph of the required edges of ``knowledge``
+        gives a node; if the required edges give a known target more parents than the smallest
+        environment's rows minus 2; or if ``knowledge`` names a column ``data`` lacks or
         contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
@@ -834,7 +838,8 @@ def gnies(
     searches per fit, so the cost grows fast with the number of variables. A target's
     coefficients are shared across environments and its variances are not, so a target with
     ``k`` parents needs at least ``k + 2`` rows in every environment: no parent set larger than
-    the smallest environment's row count minus 2 is selected for a target. Hard interventions,
+    the smallest environment's row count minus 2 is selected for a target, and a variable that the
+    required edges of ``knowledge`` give more parents is not learned as one. Hard interventions,
     shifted means alone, changed weights, non-Gaussian noise, and nonlinear relations fall outside
     its model.
 
@@ -883,24 +888,44 @@ def gnies(
     X = data_matrix(data, method="gnies")
     labels = column_labels(data)
     name = column_namer(labels)
+    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
+    # An environment taken from targets is named by its targets.
+    shown = [[variable(j) for j in sorted(e)] if isinstance(e, frozenset) else e for e in envs]
     sizes = np.bincount(codes, minlength=len(envs))
     if len(envs) < 2:
         raise ValueError(
             "gnies needs rows from two or more environments; pass env, each row's environment"
         )
-    small = [envs[k] for k in np.flatnonzero(sizes < 2)]
+    small = [shown[k] for k in np.flatnonzero(sizes < 2)]
     if small:
-        raise ValueError(f"gnies needs at least 2 rows in each environment; {small} have fewer")
-    for k, label in enumerate(envs):
+        raise ValueError(f"gnies: each environment needs at least 2 rows; {small} have fewer")
+    n, d = X.shape
+    if n - len(envs) < d:
+        raise ValueError(
+            f"gnies: {n} rows in {len(envs)} environments leave {n - len(envs)} once each "
+            f"environment's mean is taken out, fewer than the {d} variables; the score needs at "
+            "least as many"
+        )
+    for k in range(len(envs)):
         flat = np.flatnonzero(np.ptp(X[codes == k], axis=0) == 0)
         if flat.size:
             raise ValueError(
-                f"gnies: column {name(int(flat[0]))} is constant in environment {label!r}; the "
-                "model needs a positive noise variance in every environment"
+                f"gnies: column {name(int(flat[0]))} is constant in environment {shown[k]!r}; "
+                "the model needs a positive noise variance in every environment"
             )
-    constraints = resolve(knowledge, X.shape[1], labels, method="gnies")
+    constraints = resolve(knowledge, d, labels, method="gnies")
     known = frozenset().union(*(s for s in by_code.values() if s is not None))
     fixed = all(s is not None for s in by_code.values())
+    if constraints is not None:
+        required = constraints.required.sum(axis=0)
+        most = int(sizes.min()) - 2
+        over = sorted(j for j in known if required[j] > most)
+        if over:
+            raise ValueError(
+                f"gnies: the required edges give {int(required[over[0]])} parents to the known "
+                f"target {name(over[0])}; a target can have at most {most}, the smallest "
+                f"environment's {most + 2} rows minus 2"
+            )
     with copies_named(labels):
         graph, score, learned = _gnies(
             X,
@@ -911,14 +936,12 @@ def gnies(
             ebic_gamma=ebic_gamma,
             max_parents=max_parents,
             constraints=constraints,
+            column_name=name,
         )
-    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
     metadata = {
         "score": json_safe(score),
         "index_edges": [[variable(j), "directed"] for j in learned],
-        "environments": [
-            [variable(j) for j in sorted(e)] if isinstance(e, frozenset) else e for e in envs
-        ],
+        "environments": shown,
     }
     return structure_output(graph, labels=labels, metadata=metadata)
 

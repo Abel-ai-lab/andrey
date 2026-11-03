@@ -204,12 +204,18 @@ def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
     return data
 
 
+def needed(method: str, inp) -> bool:
+    """Whether a fit of ``method`` here takes the input ``inp``: a required one, or gnies's
+    ``env``, which every fit on data alone needs."""
+    return inp.required or (method, inp.name) == ("gnies", "env")
+
+
 def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
     frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not needed(method, inp):
             continue
         if inp.kind == "matrix":
             args.append(frames[0].iloc[:, :2] if spec.family == "pairwise" else frames[0])
@@ -303,7 +309,7 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
     factors = np.ldexp(1.0, exponents)
     args = []
     for inp in REGISTRY[method].data.inputs:
-        if not inp.required:
+        if not needed(method, inp):
             continue
         if inp.kind == "panel":
             groups = datagen.generate_groups(case)
@@ -390,8 +396,8 @@ def typed_frame(kind: str, n: int = N) -> pd.DataFrame:
 
 def args_for(method: str, tables: list[pd.DataFrame]) -> list:
     """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
-    domain column for CD-NOD."""
-    kinds = (i.kind for i in REGISTRY[method].data.inputs if i.required)
+    domain column for CD-NOD and GnIES."""
+    kinds = (i.kind for i in REGISTRY[method].data.inputs if needed(method, i))
     domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
     return [
         tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
