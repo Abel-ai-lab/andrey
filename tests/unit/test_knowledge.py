@@ -107,8 +107,8 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
         kwargs = {**SHORT_CALM, **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if name == "cdnod":
-            return andrey.cdnod(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
+        if name in ("cdnod", "gnies"):
+            return getattr(andrey, name)(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
         if name == "exact_search":
             return andrey.exact_search(data, **kwargs)
         if REGISTRY[name].output.multi:  # the first of two groups, the halves of the rows
