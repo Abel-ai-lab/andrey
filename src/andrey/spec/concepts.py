@@ -301,7 +301,8 @@ _CONCEPTS = (
         ),
         fragment="invariance test",
         suitable=("ut_igsp",),
-        others_exempt="Tests no invariance across environments.",
+        others_exempt="Takes no invariance test: its data come from one environment, or its "
+        "environments enter its own tests or score.",
     ),
     Concept(
         key="score_func",
