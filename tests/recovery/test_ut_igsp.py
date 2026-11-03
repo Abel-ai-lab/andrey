@@ -23,8 +23,8 @@ from andrey.search.gies import cut_pairs, replace_unprotected
 P, K = 20, 5
 INTERVENTIONS = {"shift": soft(shift=1.0), "perfect": hard(1.0, sd=0.1**0.5)}
 #: Each dataset's recorded SHD and target errors (false plus missed targets over the settings).
-#: The one miss: with 5 starts the search stops at a DAG whose objective, 37, is above the true
-#: DAG's 35.
+#: The one miss comes from the sum objective: the searches stop at a DAG whose sum, 37, is above
+#: the true DAG's 35, at any search depth, where the lexicographic objective finds the true DAG.
 RECORDED = {
     (seed, off, kind): (0, 0) for seed in range(3) for off in (0, 3) for kind in INTERVENTIONS
 } | {(1, 3, "shift"): (2, 3)}
