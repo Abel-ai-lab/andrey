@@ -85,12 +85,22 @@ def test_every_form_of_env_and_targets_gives_one_result_when_the_known_targets_d
     assert alone.metadata["targets"] == {"": [], "x1": ["x1"], "x3": ["x3", "x4"], "x5": ["x5"]}
 
 
-def test_a_numbered_array_names_targets_by_position():
+def test_a_numbered_array_names_targets_by_position_and_numbered_environments_by_text():
     frame, env, _, truth = sample()
-    out = andrey.ut_igsp(frame.to_numpy(), env, targets={"observed": [], "one": [1], "two": [3]})
+    number = {"observed": 0, "one": 1, "two": 2, "three": 3}
+    codes = np.array([number[label] for label in env])
+    out = andrey.ut_igsp(frame.to_numpy(), codes, targets={0: [], 1: [1], 2: [3]})
     assert out.metadata["targets"] == {
-        k: [int(v[1:]) for v in variables] for k, variables in truth.items()
+        str(number[k]): [int(v[1:]) for v in variables] for k, variables in truth.items()
     }
+
+
+def test_without_env_two_environments_with_one_key_raise():
+    frame, env, _, _ = sample(n=50)
+    frame = frame.rename(columns={"x1": "a,b", "x3": "a", "x4": "b"})
+    known = {"observed": [], "one": ["a,b"], "two": ["a", "b"], "three": ["x5"]}
+    with pytest.raises(ValueError, match="names more than one"):
+        andrey.ut_igsp(frame.assign(t=[known[label] for label in env]), targets="t")
 
 
 @pytest.mark.parametrize(
@@ -183,6 +193,21 @@ def test_reordering_the_columns_relabels_the_graph_and_the_targets(n_starts):
         }
 
 
+def test_without_env_reordering_the_columns_keeps_the_keys():
+    frame, env, _, _ = sample(seed=3)
+    known = {"observed": [], "one": ["x1"], "two": ["x3", "x4"], "three": ["x5"]}
+    cells = [known[label] for label in env]
+    want = andrey.ut_igsp(frame.assign(t=cells), targets="t", n_starts=1)
+    assert set(want.metadata["targets"]) == {"", "x1", "x3,x4", "x5"}
+    for order in ([5, 4, 3, 2, 1, 0], [2, 0, 5, 1, 3, 4]):
+        columns = [frame.columns[k] for k in order]
+        out = andrey.ut_igsp(frame[columns].assign(t=cells), targets="t", n_starts=1)
+        assert marks(out) == marks(want)
+        assert {k: sorted(v) for k, v in out.metadata["targets"].items()} == {
+            k: sorted(v) for k, v in want.metadata["targets"].items()
+        }
+
+
 def test_a_seed_repeats_and_one_start_does_not_depend_on_it(monkeypatch):
     frame, env, targets, _ = sample(seed=5)
     first = andrey.ut_igsp(frame, env, targets=targets, seed=3)
@@ -211,17 +236,38 @@ def test_knowledge_keeps_required_edges_drops_forbidden_ones_and_orients_by_it()
     assert present[:2] not in edges
 
 
-def test_the_indicator_form_with_a_categorical_test_reads_categories():
+def test_the_indicator_form_with_a_categorical_test_reads_categories_whatever_their_codes():
     rng = np.random.default_rng(0)
     n = 1500
     env = np.repeat(["observed", "set b"], n)
+    targets = {"observed": [], "set b": None}
     a = rng.integers(0, 3, 2 * n)
     b = np.where(rng.random(2 * n) < 0.8, a, rng.integers(0, 3, 2 * n))
     b[n:] = rng.choice(3, size=n, p=[0.7, 0.2, 0.1])  # set from outside, with a new marginal
     c = np.where(rng.random(2 * n) < 0.8, b, rng.integers(0, 3, 2 * n))
-    table = pd.DataFrame({k: pd.Categorical(v) for k, v in zip("abc", (a, b, c), strict=True)})
-    out = andrey.ut_igsp(table, env, targets={"observed": [], "set b": None})
+
+    def table(codes: list[int]) -> pd.DataFrame:
+        """The columns as categories, category ``k`` coded ``codes[k]``."""
+        return pd.DataFrame(
+            {k: pd.Categorical(np.asarray(codes)[v]) for k, v in zip("abc", (a, b, c), strict=True)}
+        )
+
+    out = andrey.ut_igsp(table([0, 1, 2]), env, targets=targets)
     assert out.metadata["indep_test"] == "gsq"
     assert out.metadata["invariance_test"] == "indicator"
     assert out.metadata["targets"]["set b"] == ["b"]
     assert ("a", "b", "directed") in out.structure.oriented_edges()
+    for codes in ([2, 0, 1], [1, 2, 0]):
+        recoded = andrey.ut_igsp(table(codes), env, targets=targets)
+        assert marks(recoded) == marks(out)
+        assert recoded.metadata["targets"] == out.metadata["targets"]
+    # The Gaussian form would regress on the codes, so it refuses the categorical tests.
+    for indep_test in ("gsq", "cond_gauss"):
+        with pytest.raises(ValueError, match="invariance_test='gaussian'"):
+            andrey.ut_igsp(
+                table([0, 1, 2]),
+                env,
+                targets=targets,
+                indep_test=indep_test,
+                invariance_test="gaussian",
+            )

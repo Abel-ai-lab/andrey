@@ -677,8 +677,9 @@ def ut_igsp(
         and their residual variances by an F-test, each at half the level. ``"indicator"`` runs
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"``, ``"student_t"``, and
-        ``"normal_scores"``, else ``"indicator"``. ``metadata["invariance_test"]`` names the test
-        the fit used. See Notes.
+        ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
+        so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
+        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
     n_starts : int, default=5
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -711,14 +712,16 @@ def ut_igsp(
         of the DAG found under the observational environment and each setting's targets in
         ``metadata["targets"]``: directed marks (``->``) are the edges that every DAG of the class
         orients alike, undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is
-        ``"ut_igsp"``; ``metadata["targets"]`` maps each environment, by its label of ``env``
-        (without ``env``, by its known targets joined by commas, ``""`` for the observational
-        one), to its targets, known and learned, by column label or 0-based position, ``[]`` for an
-        observational one; ``metadata["score"]`` is the objective of the DAG found, its number of
-        edges plus its number of targets over the settings, lower is better;
-        ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests used;
-        ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a mixed-data
-        test, ``metadata["categorical"]`` lists the categorical columns it read.
+        ``"ut_igsp"``; ``metadata["targets"]`` maps each environment to its targets, known and
+        learned, by column label or 0-based position, ``[]`` for an observational one. Its keys are
+        text, as every metadata key is: an environment's label of ``env`` as ``str(label)``, so
+        the label ``1`` is the key ``"1"``, to be converted back before it is passed as
+        ``targets``; without ``env``, its known targets joined by commas, labels sorted as text or
+        positions sorted, ``""`` for the observational one. ``metadata["score"]`` is the objective
+        of the DAG found, its number of edges plus its number of targets over the settings, lower
+        is better; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests
+        used; ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a
+        mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read.
 
     Raises
     ------
@@ -729,12 +732,14 @@ def ut_igsp(
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. If ``env`` or
         ``targets`` is malformed, as :func:`~andrey.gies` lists; if no environment is
-        observational, or every one is; if an environment has fewer than 3 rows; if ``data`` holds
-        a missing or infinite value, a column constant on every row or on the observational rows,
-        or does not suit the test, as for :func:`~andrey.pc`. With a partial-correlation test, also
-        if a column repeats another up to scale and shift on the observational rows; one message
-        names every group of copies. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        observational, or every one is; if an environment has fewer than 3 rows; if, without
+        ``env``, two environments' known targets join to one key, as when a column label holds a
+        comma; if ``invariance_test="gaussian"`` comes with a categorical or mixed-data
+        ``indep_test``; if ``data`` holds a missing or infinite value, a column constant on every
+        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`.
+        With a partial-correlation test, also if a column repeats another up to scale and shift on
+        the observational rows; one message names every group of copies. Also if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -784,11 +789,15 @@ def ut_igsp(
     equal coefficients and intercept and the F-test of equal residual variances [3]_, exact under
     Gaussian noise, each at half the level, so a variable is a target when either rejects. A
     regressor constant within a group, as under a hard intervention without noise, costs that
-    group one degree of freedom. Under ``"normal_scores"`` the regressions read every column's
-    normal scores over all rows. Under ``"indicator"``, a variable is invariant when ``indep_test``
-    finds it independent of a 0/1 indicator of the setting's rows given the others, on the rows of
-    the setting and the observational ones [4]_; under ``"fisherz"`` and ``"student_t"`` this sees
-    a change of the mean alone, which is why ``"gaussian"`` is their default.
+    group one degree of freedom. A group with no more rows than the regression has parameters, as
+    a setting of 3 rows given 2 other variables, leaves nothing to compare, and the variable reads
+    as invariant: such a setting learns no target from that query and blocks the reversal of an
+    edge from one of its known targets into that variable. Under ``"normal_scores"`` the
+    regressions read every column's normal scores over all rows. Under ``"indicator"``, a variable
+    is invariant when ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows
+    given the others, on the rows of the setting and the observational ones [4]_; under
+    ``"fisherz"`` and ``"student_t"`` this sees a change of the mean alone, which is why
+    ``"gaussian"`` is their default.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -851,6 +860,7 @@ def ut_igsp(
     >>> out.metadata["targets"]
     {'observed': [], 'shift x': ['x'], 'unknown': ['y']}
     """
+    from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
     from andrey.core.environments import normalize_env_targets
     from andrey.core.invariance import default_invariance_test
     from andrey.search.igsp import ut_igsp as _ut_igsp
@@ -860,10 +870,23 @@ def ut_igsp(
     )
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     invariance_test = invariance_test or default_invariance_test(indep_test)
+    if invariance_test == "gaussian" and indep_test in DISCRETE_INDEP_TESTS + MIXED_INDEP_TESTS:
+        raise ValueError(
+            "ut_igsp: invariance_test='gaussian' regresses on the columns' values and so cannot "
+            f"read categorical columns, which indep_test={indep_test!r} reads; use 'indicator' "
+            "or None"
+        )
     X, mask = checked_data(data, categorical, "indep_test", indep_test, method="ut_igsp")
     labels = column_labels(data)
     observational = [code for code, t in by_code.items() if t == frozenset()]
     named = [_env_name(env_labels[c], env is None, labels) for c in sorted(by_code)]
+    shared = [name for name in dict.fromkeys(named) if named.count(name) > 1]
+    if shared:
+        raise ValueError(
+            "ut_igsp names each environment by its known targets joined by commas when env is "
+            f"None, and {shared} names more than one, as a column label holds a comma or is "
+            "empty; pass env"
+        )
     if not observational:
         raise ValueError(
             f"ut_igsp needs an observational environment, but none of {named} has targets []; "
@@ -917,8 +940,9 @@ def _env_name(label: object, from_targets: bool, labels: tuple[str, ...] | None)
     """Return an environment's key in ``metadata["targets"]``.
 
     The key is its label of ``env``, or, when the environments come from the targets, its known
-    targets joined by commas.
+    targets joined by commas: their labels sorted as text, or their positions sorted.
     """
     if not from_targets:
         return label.item() if isinstance(label, np.generic) else label
-    return ",".join(labels[j] if labels else str(j) for j in sorted(label))  # ty: ignore[invalid-argument-type]
+    positions = sorted(label)  # ty: ignore[invalid-argument-type]
+    return ",".join(sorted(labels[j] for j in positions) if labels else map(str, positions))
