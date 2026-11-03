@@ -18,6 +18,13 @@ names its pull request.
   comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
   columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
 
+### Fixed
+
+- Copies of one column in other units, such as `x` and `2 * x + 1`, and categorical columns that
+  group the rows alike under other labels break ties by column position, as identical columns do,
+  so adding a constant to a copy or relabeling its categories no longer changes which column a tie
+  goes to. ([#660])
+
 ## [0.13.0] - 2026-11-03
 
 ### Highlights
@@ -1639,3 +1646,4 @@ First alpha release.
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
 [#659]: https://github.com/Abel-ai-lab/andrey/pull/659
+[#660]: https://github.com/Abel-ai-lab/andrey/pull/660
