@@ -16,7 +16,7 @@ names its pull request.
   methods; the former ones still work in this release, in Python and on the command line, but give
   an `andrey.DeprecatedArgumentWarning` that names the replacement, and they stop working in the
   next release. The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the
-  calls before and after.
+  calls before and after. ([#663])
 
   | Method | Former name | Name now |
   | --- | --- | --- |
@@ -29,12 +29,12 @@ names its pull request.
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
-  for `gies` or text labels keep the same share of every environment's rows.
+  for `gies` or text labels keep the same share of every environment's rows. ([#663])
 
 ### Changed
 
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
-  `cdnod`'s `domain_index`.
+  `cdnod`'s `domain_index`. ([#663])
 
 ## [0.13.0] - 2026-11-03
 
@@ -1656,3 +1656,4 @@ First alpha release.
 [#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
+[#663]: https://github.com/Abel-ai-lab/andrey/pull/663
