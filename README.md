@@ -18,15 +18,15 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.12.0
+## ⭐ What's new in 0.13.0
 
-Calibration: tests that keep their stated level. A rank-based test holds it on skewed columns, the
-G-square test on sparse tables, and PCMCI and Granger control the false discovery rate over many
-lags. `andrey.markov_check` tests a graph against data it was not learned from, and Inter-IAMB,
-MMHC, and RSMAX2 are supported.
+Functional causal models: each variable is a function of its causes plus independent noise, and the
+shape of the function or the noise shows which way an effect runs. CAM and RESIT learn nonlinear
+graphs as accurately as their authors' code and faster, IAMB and MMPC are supported, and CAM-UV
+and DYNOTEARS are experimental.
 
-**[Read the post](https://andrey.abel.ai/blog/20261030-andrey-0-12-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.12.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.13.0.html)**
 
 ---
 
@@ -184,7 +184,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.12.0},
+  version = {0.13.0},
   url = {https://andrey.abel.ai},
 }
 ```

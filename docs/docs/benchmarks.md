@@ -17,39 +17,71 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.12.0
+:link: benchmarks/0.13.0
 :link-type: doc
-:link-alt: The 0.12.0 release card: calibration
-:class-card: release-cover release-art release-art-0-12-0
+:link-alt: The 0.13.0 release card: functional causal models
+:class-card: release-cover release-art release-art-0-13-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Calibration
+Functional causal models
 
-0.12.0
+0.13.0
 :::
 
 ::::{div} release-tldr
 
-0.12.0 is here: calibration. The card measures the three methods it makes supported, Inter-IAMB,
-MMHC, and RSMAX2, against bnlearn on the CPDAG, the skeleton, and the moral graph each returns.
+0.13.0 is here: functional causal models. The card measures the four methods it makes supported:
+CAM and RESIT against their authors' code, and IAMB and MMPC against bnlearn, on linear-Gaussian
+data and five discrete networks.
 
 :::{div} release-stats
 
-- **3 methods** newly supported: Inter-IAMB, MMHC, and RSMAX2
-- **0 of 72** comparisons where bnlearn makes significantly fewer errors
-- **7.8x** RSMAX2's median speed over bnlearn's, and 6.6x for MMHC
+- **4 methods** newly supported: CAM, RESIT, IAMB, and MMPC
+- **0 of 16** settings where CAM 1.0 makes significantly fewer errors than CAM
+- **9.7x** CAM's median speed over CAM 1.0's, and 3.7x for RESIT over the authors' code
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.12.0.md)
+[Read the release card](benchmarks/0.13.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.12.0
+:link-type: doc
+:link-alt: The 0.12.0 release card: calibration
+:class-card: release-tile release-art-0-12-0
+:shadow: none
+:margin: 0
+
+0.12.0
+:::
+
+:::{div} release-body
+<h3>Calibration</h3>
+
+Inter-IAMB, MMHC, and RSMAX2 against bnlearn on the CPDAG, the skeleton, and the moral graph each
+returns.
+
+- **0 of 72** comparisons where bnlearn makes significantly fewer errors
+- RSMAX2 **7.8x** faster than bnlearn in the median, MMHC 6.6x
+:::
+
+:::{div} release-meta
+Released October 30, 2026
+
+- [Release card<span class="visually-hidden"> 0.12.0</span>](benchmarks/0.12.0.md)
+- [Post: Calibration](../blog/20261030-andrey-0-12-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -395,6 +427,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.13.0: functional causal models <benchmarks/0.13.0>
 0.12.0: calibration <benchmarks/0.12.0>
 0.11.0: ready for real data <benchmarks/0.11.0>
 0.10.0: the boundary <benchmarks/0.10.0>

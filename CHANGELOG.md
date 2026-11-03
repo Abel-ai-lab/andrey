@@ -10,6 +10,8 @@ names its pull request.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-03
+
 ### Highlights
 
 - `iamb` is supported and joins the quality gate. Against bnlearn 5.2.1 on simulated linear-Gaussian
@@ -94,9 +96,11 @@ names its pull request.
   fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
   `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
   changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
-  the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
-  restores the former rank; `tie_break="position"` orders ties by column position, a different
-  rule. ([#612])
+  the true graph on fresh draws were indistinguishable from those of a random ranking. Without
+  changing a graph, the rank also moves `exact_search`'s `metadata["dag"]`, the member of the class
+  it orients, and the last bits of the weights of `bottom_up_parce_lingam` and
+  `longitudinal_lingam`, which order their regressions by it. No setting restores the former rank;
+  `tie_break="position"` orders ties by column position, a different rule. ([#612])
 - `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` return the same graphs and
   p-values in less time, because the candidates of a grow step share one conditioning set, and the
   test now numbers that set's configurations once and counts the tables of all its candidates
@@ -1431,7 +1435,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
