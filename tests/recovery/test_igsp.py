@@ -22,6 +22,7 @@ import pytest
 
 import andrey
 import andrey.data as data
+from andrey.core import ARROW, TAIL
 from andrey.data.interventions import hard
 from andrey.search.gies import cut_pairs, replace_unprotected
 
@@ -79,7 +80,7 @@ def effective(ds, targets: dict[int, list[int]], keeps_root_noise: bool) -> list
     """Each setting's targets whose distribution the intervention changes: all of them, less the
     roots when a perfect intervention keeps their noise."""
     dag = ds.graph.to_numpy()
-    roots = {j for j in range(dag.shape[0]) if not ((dag[:, j] == 1) & (dag[j, :] == 2)).any()}
+    roots = {j for j in range(dag.shape[0]) if not ((dag[:, j] == TAIL) & (dag[j] == ARROW)).any()}
     return [set(t) - (roots if keeps_root_noise else set()) for k, t in targets.items() if k]
 
 
