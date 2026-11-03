@@ -127,10 +127,10 @@ first.
 `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
-parameter says how it honors them. Every required edge is in the result, whatever its weight, test, or score says. For the
-time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
-`effect` at time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows
-them in use.
+parameter says how it honors them. Every required edge is in the result, whatever its weight, test,
+or score says. For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause`
+at time `t - lag` to `effect` at time `t`.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
 `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take `tau_max`,
@@ -211,8 +211,9 @@ can put more arrowheads at a node.
 the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
 exactly. The methods that test independence draw random numbers only under `indep_test="rcot"`,
 `"cmiknn"`, or `"gpdc"`, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with
-`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
+that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
+seed.
 
 % concept: n_starts
 `boss`, `grasp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs:
@@ -221,10 +222,9 @@ the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` f
 minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
 after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
 replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
-count of edges and targets). `ut_igsp` runs 5 by default, the number its authors' implementation
-runs. Each search
-builds its own caches and drops the previous one's, so more starts take more time but little more
-memory. `1`, the default for the others, runs one search.
+count of edges and targets). `ut_igsp` runs 5 by default, the default number of runs of its
+authors' library. Each search builds its own caches and drops the previous one's, so more starts
+take more time but little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
