@@ -11,9 +11,8 @@ from __future__ import annotations
 
 from html import escape
 
-# Each scene: its title and narration, its one-line summary for places without the animation (the
-# README), what each lane does, the counter's unit, and the illustration's size, which the script
-# reads from the markup and which fixes the final counts.
+# Each scene: its title and narration, what each lane does, the counter's unit, and the
+# illustration's size, which the script reads from the markup and which fixes the final counts.
 SCENES = (
     dict(
         key="parallel",
@@ -21,7 +20,6 @@ SCENES = (
         text="Within one round of PC, each independence test stands alone, and within one pass of "
         "GES, so does each candidate move. Andrey runs them as one batched array operation, "
         "thousands at a time, with the same results as one at a time.",
-        line="thousands of independence tests run as one array operation, with the same results.",
         andrey="one call for the batch",
         others="one call per test",
         unit=("call", "calls"),
@@ -33,7 +31,6 @@ SCENES = (
         text="Andrey computes the correlation matrix once, up front, and caches it. Each test "
         "reads the few entries it needs instead of recomputing them, and GES memoizes its local "
         "scores the same way.",
-        line="the correlation matrix is computed once and cached; GES memoizes its local scores.",
         andrey="computed once, then read",
         others="recomputed for each test",
         unit=("computation", "computations"),
@@ -45,7 +42,6 @@ SCENES = (
         text="Tests given zero or one other variable have a closed form, so a quick pass settles "
         "most edges before any matrix is inverted. GES rules out invalid candidates with bit masks "
         "before scoring them.",
-        line="tests with a closed form settle most edges before any matrix is inverted.",
         andrey="a quick check first",
         others="every test inverts a matrix",
         unit=("inversion", "inversions"),
@@ -56,7 +52,6 @@ SCENES = (
         title="Use the hardware you have",
         text="With the optional PyTorch extra, a CUDA GPU computes large entropy tables many cells "
         "at a time, once they are large enough to repay the transfer.",
-        line="with the optional PyTorch extra, a GPU computes large entropy tables.",
         andrey="a GPU, many cells per step",
         others="one core, one cell per step",
         unit=("step", "steps"),
