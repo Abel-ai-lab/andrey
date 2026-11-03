@@ -1,0 +1,2419 @@
+{
+ "release": "0.14.0",
+ "generated": "2026-11-03",
+ "theme": "ICP against InvariantCausalPrediction, in and out of the claim",
+ "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+ "regimes": {
+  "icp_appendix_g": "linear Gaussian SEMs drawn as in Peters, Buhlmann and Meinshausen (2016, Appendix G): 5 to 12 nodes, two environments of 100 to 500 rows, noise interventions per row on one or more variables but the target, new weights a third of the time; one SEM per scenario",
+  "icp_appendix_g_target": "the icp_appendix_g scenarios with Appendix G's intervened set, which can hold the target (out of the claim)",
+  "icp_do": "observation and 2 or 3 single-variable do-interventions N(2, 0.2^2) on other variables than the target, 6 or 10 nodes, 200 rows per environment, drawn by andrey.data",
+  "icp_appendix_g_capped": "icp_appendix_g at 16, 21, or 40 nodes, targets with at most 3 parents, max_parents=3",
+  "icp_hidden": "icp_appendix_g with a hidden parent of the target and of one other variable (out of the claim)",
+  "icp_nonlinear": "icp_appendix_g with tanh of one parent in the target's equation (out of the claim)",
+  "icp_speed": "icp_appendix_g weights at 9, 12, and 15 nodes with 500 + 500 rows, and 12 nodes with 5000 + 5000 rows"
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise",
+ "fit_protocol": "every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone",
+ "error_metric": "each entry's own, in its error_metric",
+ "packages": {
+  "InvariantCausalPrediction": "0.8",
+  "R": "4.6.1"
+ },
+ "hardware": {
+  "cpu_models": [
+   "Intel(R) Core(TM) i7-7820X CPU @ 3.60GHz"
+  ],
+  "hosts": 1,
+  "cores_per_fit": 1
+ },
+ "complete": true,
+ "complete_definition": "true when every planned fit finished; no fit timed out",
+ "seeds_note": "scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target",
+ "coverage": {
+  "A": {
+   "scenarios": 100,
+   "andrey_fits_per_test": 100000
+  },
+  "B": {
+   "scenarios": 100,
+   "andrey_fits_per_test": 20000
+  },
+  "C": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "D": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "D40": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 1000
+  },
+  "E-hidden": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "E-nonlinear": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "speed-9": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  },
+  "speed-12": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  },
+  "speed-12-large": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  },
+  "speed-15": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  }
+ },
+ "pending_fits": 0,
+ "incomplete": [],
+ "methods": [
+  {
+   "method": "ICP, approximate test",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.normal",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.approximate",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_appendix_g",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 5,
+     "seeds": 450,
+     "scenarios": 9,
+     "environments": [
+      2
+     ],
+     "fits": 450,
+     "andrey_ok": 450,
+     "andrey_timeouts": 0,
+     "comparator_ok": 450,
+     "comparator_timeouts": 0,
+     "paired": 450,
+     "andrey_s": 0.0044824834913015366,
+     "comparator_s": 0.04,
+     "ratio": 8.884859425275442,
+     "same_graph": 450,
+     "same_accepted_sets": 450,
+     "andrey_fwer": 0.015555555555555555,
+     "comparator_fwer": 0.015555555555555555,
+     "andrey_fwer_95": [
+      0.006276,
+      0.031787
+     ],
+     "comparator_fwer_95": [
+      0.006276,
+      0.031787
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 2.0,
+     "andrey_shd_mean": 1.0377777777777777,
+     "comparator_shd_mean": 1.0377777777777777,
+     "empty_shd_mean": 1.3333333333333333,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 6,
+     "seeds": 550,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 550,
+     "andrey_ok": 550,
+     "andrey_timeouts": 0,
+     "comparator_ok": 550,
+     "comparator_timeouts": 0,
+     "paired": 550,
+     "andrey_s": 0.005365509539842606,
+     "comparator_s": 0.0790000000000004,
+     "ratio": 14.67739442217987,
+     "same_graph": 550,
+     "same_accepted_sets": 550,
+     "andrey_fwer": 0.01090909090909091,
+     "comparator_fwer": 0.01090909090909091,
+     "andrey_fwer_95": [
+      0.004014,
+      0.023592
+     ],
+     "comparator_fwer_95": [
+      0.004014,
+      0.023592
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.7345454545454545,
+     "comparator_shd_mean": 0.7345454545454545,
+     "empty_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 7,
+     "seeds": 700,
+     "scenarios": 14,
+     "environments": [
+      2
+     ],
+     "fits": 700,
+     "andrey_ok": 700,
+     "andrey_timeouts": 0,
+     "comparator_ok": 700,
+     "comparator_timeouts": 0,
+     "paired": 700,
+     "andrey_s": 0.00611176248639822,
+     "comparator_s": 0.146,
+     "ratio": 23.944444224672086,
+     "same_graph": 700,
+     "same_accepted_sets": 700,
+     "andrey_fwer": 0.014285714285714285,
+     "comparator_fwer": 0.014285714285714285,
+     "andrey_fwer_95": [
+      0.006871,
+      0.026115
+     ],
+     "comparator_fwer_95": [
+      0.006871,
+      0.026115
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.2857142857142858,
+     "comparator_shd_mean": 1.2857142857142858,
+     "empty_shd_mean": 1.3571428571428572,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 8,
+     "seeds": 850,
+     "scenarios": 17,
+     "environments": [
+      2
+     ],
+     "fits": 850,
+     "andrey_ok": 850,
+     "andrey_timeouts": 0,
+     "comparator_ok": 850,
+     "comparator_timeouts": 0,
+     "paired": 850,
+     "andrey_s": 0.007696852087974548,
+     "comparator_s": 0.318999999999996,
+     "ratio": 41.128182656336335,
+     "same_graph": 850,
+     "same_accepted_sets": 850,
+     "andrey_fwer": 0.0035294117647058825,
+     "comparator_fwer": 0.0035294117647058825,
+     "andrey_fwer_95": [
+      0.000728,
+      0.010279
+     ],
+     "comparator_fwer_95": [
+      0.000728,
+      0.010279
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.7658823529411765,
+     "comparator_shd_mean": 0.7658823529411765,
+     "empty_shd_mean": 0.8235294117647058,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 9,
+     "seeds": 600,
+     "scenarios": 12,
+     "environments": [
+      2
+     ],
+     "fits": 600,
+     "andrey_ok": 600,
+     "andrey_timeouts": 0,
+     "comparator_ok": 600,
+     "comparator_timeouts": 0,
+     "paired": 600,
+     "andrey_s": 0.009643110446631908,
+     "comparator_s": 0.606999999999999,
+     "ratio": 63.83569212137749,
+     "same_graph": 600,
+     "same_accepted_sets": 600,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.006129
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.006129
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.9166666666666666,
+     "comparator_shd_mean": 0.9166666666666666,
+     "empty_shd_mean": 0.9166666666666666,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "seeds": 550,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 550,
+     "andrey_ok": 550,
+     "andrey_timeouts": 0,
+     "comparator_ok": 550,
+     "comparator_timeouts": 0,
+     "paired": 550,
+     "andrey_s": 0.013034729287028313,
+     "comparator_s": 1.201,
+     "ratio": 93.03169894535162,
+     "same_graph": 550,
+     "same_accepted_sets": 550,
+     "andrey_fwer": 0.007272727272727273,
+     "comparator_fwer": 0.007272727272727273,
+     "andrey_fwer_95": [
+      0.001985,
+      0.018516
+     ],
+     "comparator_fwer_95": [
+      0.001985,
+      0.018516
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.1036363636363635,
+     "comparator_shd_mean": 1.1036363636363635,
+     "empty_shd_mean": 1.1818181818181819,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 11,
+     "seeds": 850,
+     "scenarios": 17,
+     "environments": [
+      2
+     ],
+     "fits": 850,
+     "andrey_ok": 850,
+     "andrey_timeouts": 0,
+     "comparator_ok": 850,
+     "comparator_timeouts": 0,
+     "paired": 850,
+     "andrey_s": 0.019718839786946774,
+     "comparator_s": 2.2924999999999747,
+     "ratio": 123.25799050402175,
+     "same_graph": 850,
+     "same_accepted_sets": 850,
+     "andrey_fwer": 0.00823529411764706,
+     "comparator_fwer": 0.00823529411764706,
+     "andrey_fwer_95": [
+      0.003317,
+      0.016894
+     ],
+     "comparator_fwer_95": [
+      0.003317,
+      0.016894
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.0447058823529412,
+     "comparator_shd_mean": 1.0447058823529412,
+     "empty_shd_mean": 1.1764705882352942,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "seeds": 450,
+     "scenarios": 9,
+     "environments": [
+      2
+     ],
+     "fits": 450,
+     "andrey_ok": 450,
+     "andrey_timeouts": 0,
+     "comparator_ok": 450,
+     "comparator_timeouts": 0,
+     "paired": 450,
+     "andrey_s": 0.036753544583916664,
+     "comparator_s": 5.35450000000003,
+     "ratio": 147.58314882138401,
+     "same_graph": 450,
+     "same_accepted_sets": 450,
+     "andrey_fwer": 0.006666666666666667,
+     "comparator_fwer": 0.006666666666666667,
+     "andrey_fwer_95": [
+      0.001377,
+      0.019358
+     ],
+     "comparator_fwer_95": [
+      0.001377,
+      0.019358
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.7888888888888889,
+     "comparator_shd_mean": 0.7888888888888889,
+     "empty_shd_mean": 0.7777777777777778,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, approximate test",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.normal",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.approximate",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_do",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 6,
+     "seeds": 500,
+     "scenarios": 10,
+     "environments": [
+      3,
+      4
+     ],
+     "fits": 500,
+     "andrey_ok": 500,
+     "andrey_timeouts": 0,
+     "comparator_ok": 500,
+     "comparator_timeouts": 0,
+     "paired": 500,
+     "andrey_s": 0.0053519606590271,
+     "comparator_s": 0.09000000000000116,
+     "ratio": 16.92907297852649,
+     "same_graph": 479,
+     "same_accepted_sets": 351,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.018,
+     "andrey_fwer_95": [
+      0.003255,
+      0.023181
+     ],
+     "comparator_fwer_95": [
+      0.008263,
+      0.033894
+     ],
+     "andrey_fewer_errors": 4,
+     "comparator_fewer_errors": 17,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.606,
+     "comparator_shd_mean": 1.582,
+     "empty_shd_mean": 1.8,
+     "mean_D": 0.024,
+     "bootstrap_95": [
+      0.002,
+      0.046
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "seeds": 500,
+     "scenarios": 10,
+     "environments": [
+      3,
+      4
+     ],
+     "fits": 500,
+     "andrey_ok": 500,
+     "andrey_timeouts": 0,
+     "comparator_ok": 500,
+     "comparator_timeouts": 0,
+     "paired": 500,
+     "andrey_s": 0.013352694921195507,
+     "comparator_s": 1.408999999999995,
+     "ratio": 103.21361797817421,
+     "same_graph": 496,
+     "same_accepted_sets": 233,
+     "andrey_fwer": 0.008,
+     "comparator_fwer": 0.012,
+     "andrey_fwer_95": [
+      0.002184,
+      0.020356
+     ],
+     "comparator_fwer_95": [
+      0.004416,
+      0.025935
+     ],
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.406,
+     "comparator_shd_mean": 0.42,
+     "empty_shd_mean": 0.7,
+     "mean_D": -0.014,
+     "bootstrap_95": [
+      -0.038,
+      0.002
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, approximate test",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.normal",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.approximate",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_appendix_g_capped",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 16,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.009258555248379707,
+     "comparator_s": 1.4460000000000002,
+     "ratio": 157.4514259607377,
+     "same_graph": 100,
+     "same_accepted_sets": 100,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "comparator_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "empty_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 21,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.01167566142976284,
+     "comparator_s": 13.0345,
+     "ratio": 1121.1481275939489,
+     "same_graph": 100,
+     "same_accepted_sets": 100,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "comparator_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.75,
+     "comparator_shd_mean": 0.75,
+     "empty_shd_mean": 1.2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, approximate test",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.normal",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.approximate",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_speed",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 9,
+     "n": 1000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.010155722498893738,
+     "comparator_s": 0.723,
+     "ratio": 71.90139531630432,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "n": 1000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.03521771356463432,
+     "comparator_s": 6.149,
+     "ratio": 169.48857253453497,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 2,
+     "andrey_shd_mean": 1.2,
+     "comparator_shd_mean": 1.2,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "n": 10000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.04874303936958313,
+     "comparator_s": 31.995,
+     "ratio": 656.4014147210869,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0,
+     "comparator_shd": 0,
+     "empty_shd": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "empty_shd_mean": 0.2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 15,
+     "n": 1000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.24291394650936127,
+     "comparator_s": 58.015,
+     "ratio": 240.56294492925494,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 0.8,
+     "comparator_shd_mean": 0.8,
+     "empty_shd_mean": 0.8,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, approximate test",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.normal",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.approximate.target_hit",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_appendix_g_target",
+   "claim": "out",
+   "rows": [
+    {
+     "d": 5,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.003755650483071804,
+     "comparator_s": 0.038,
+     "ratio": 10.26902678442627,
+     "same_graph": 100,
+     "same_accepted_sets": 100,
+     "andrey_fwer": 0.22,
+     "comparator_fwer": 0.22,
+     "andrey_fwer_95": [
+      0.143304,
+      0.31392
+     ],
+     "comparator_fwer_95": [
+      0.143304,
+      0.31392
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 2.0,
+     "comparator_shd": 2.0,
+     "empty_shd": 2.0,
+     "andrey_shd_mean": 1.43,
+     "comparator_shd_mean": 1.43,
+     "empty_shd_mean": 1.2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 6,
+     "seeds": 120,
+     "scenarios": 6,
+     "environments": [
+      2
+     ],
+     "fits": 120,
+     "andrey_ok": 120,
+     "andrey_timeouts": 0,
+     "comparator_ok": 120,
+     "comparator_timeouts": 0,
+     "paired": 120,
+     "andrey_s": 0.004382067359983921,
+     "comparator_s": 0.0800000000000001,
+     "ratio": 17.12735031247037,
+     "same_graph": 120,
+     "same_accepted_sets": 120,
+     "andrey_fwer": 0.3,
+     "comparator_fwer": 0.3,
+     "andrey_fwer_95": [
+      0.219756,
+      0.390396
+     ],
+     "comparator_fwer_95": [
+      0.219756,
+      0.390396
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 0.5,
+     "andrey_shd_mean": 1.0583333333333333,
+     "comparator_shd_mean": 1.0583333333333333,
+     "empty_shd_mean": 0.6666666666666666,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 7,
+     "seeds": 220,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 220,
+     "andrey_ok": 220,
+     "andrey_timeouts": 0,
+     "comparator_ok": 220,
+     "comparator_timeouts": 0,
+     "paired": 220,
+     "andrey_s": 0.005285849794745445,
+     "comparator_s": 0.1454999999999995,
+     "ratio": 27.964506526951403,
+     "same_graph": 220,
+     "same_accepted_sets": 220,
+     "andrey_fwer": 0.23636363636363636,
+     "comparator_fwer": 0.23636363636363636,
+     "andrey_fwer_95": [
+      0.181852,
+      0.298128
+     ],
+     "comparator_fwer_95": [
+      0.181852,
+      0.298128
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.7636363636363637,
+     "comparator_shd_mean": 1.7636363636363637,
+     "empty_shd_mean": 1.3636363636363635,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 8,
+     "seeds": 160,
+     "scenarios": 8,
+     "environments": [
+      2
+     ],
+     "fits": 160,
+     "andrey_ok": 160,
+     "andrey_timeouts": 0,
+     "comparator_ok": 160,
+     "comparator_timeouts": 0,
+     "paired": 160,
+     "andrey_s": 0.0061072539538145065,
+     "comparator_s": 0.3084999999999995,
+     "ratio": 49.39805531094241,
+     "same_graph": 160,
+     "same_accepted_sets": 160,
+     "andrey_fwer": 0.2125,
+     "comparator_fwer": 0.2125,
+     "andrey_fwer_95": [
+      0.151877,
+      0.284083
+     ],
+     "comparator_fwer_95": [
+      0.151877,
+      0.284083
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 1.225,
+     "comparator_shd_mean": 1.225,
+     "empty_shd_mean": 0.625,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 9,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.006554925814270973,
+     "comparator_s": 0.6404999999999995,
+     "ratio": 83.18366509201958,
+     "same_graph": 100,
+     "same_accepted_sets": 100,
+     "andrey_fwer": 0.05,
+     "comparator_fwer": 0.05,
+     "andrey_fwer_95": [
+      0.016432,
+      0.112835
+     ],
+     "comparator_fwer_95": [
+      0.016432,
+      0.112835
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.67,
+     "comparator_shd_mean": 0.67,
+     "empty_shd_mean": 0.6,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "seeds": 40,
+     "scenarios": 2,
+     "environments": [
+      2
+     ],
+     "fits": 40,
+     "andrey_ok": 40,
+     "andrey_timeouts": 0,
+     "comparator_ok": 40,
+     "comparator_timeouts": 0,
+     "paired": 40,
+     "andrey_s": 0.007753542624413967,
+     "comparator_s": 1.053499999999995,
+     "ratio": 136.9946650744276,
+     "same_graph": 40,
+     "same_accepted_sets": 40,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.088097
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.088097
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 2.5,
+     "comparator_shd": 2.5,
+     "empty_shd": 2.5,
+     "andrey_shd_mean": 2.5,
+     "comparator_shd_mean": 2.5,
+     "empty_shd_mean": 2.5,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 11,
+     "seeds": 220,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 220,
+     "andrey_ok": 220,
+     "andrey_timeouts": 0,
+     "comparator_ok": 220,
+     "comparator_timeouts": 0,
+     "paired": 220,
+     "andrey_s": 0.011339860036969185,
+     "comparator_s": 2.1995,
+     "ratio": 188.28577413499934,
+     "same_graph": 220,
+     "same_accepted_sets": 220,
+     "andrey_fwer": 0.25,
+     "comparator_fwer": 0.25,
+     "andrey_fwer_95": [
+      0.194232,
+      0.312639
+     ],
+     "comparator_fwer_95": [
+      0.194232,
+      0.312639
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.559090909090909,
+     "comparator_shd_mean": 1.559090909090909,
+     "empty_shd_mean": 1.1818181818181819,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "seeds": 140,
+     "scenarios": 7,
+     "environments": [
+      2
+     ],
+     "fits": 140,
+     "andrey_ok": 140,
+     "andrey_timeouts": 0,
+     "comparator_ok": 140,
+     "comparator_timeouts": 0,
+     "paired": 140,
+     "andrey_s": 0.01761810015887022,
+     "comparator_s": 4.9905,
+     "ratio": 270.60944546857957,
+     "same_graph": 140,
+     "same_accepted_sets": 140,
+     "andrey_fwer": 0.06428571428571428,
+     "comparator_fwer": 0.06428571428571428,
+     "andrey_fwer_95": [
+      0.029814,
+      0.118526
+     ],
+     "comparator_fwer_95": [
+      0.029814,
+      0.118526
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.7785714285714286,
+     "comparator_shd_mean": 0.7785714285714286,
+     "empty_shd_mean": 0.7142857142857143,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.exact",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.exact",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_appendix_g",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 5,
+     "seeds": 450,
+     "scenarios": 9,
+     "environments": [
+      2
+     ],
+     "fits": 450,
+     "andrey_ok": 450,
+     "andrey_timeouts": 0,
+     "comparator_ok": 450,
+     "comparator_timeouts": 0,
+     "paired": 450,
+     "andrey_s": 0.004146900959312916,
+     "comparator_s": 0.121,
+     "ratio": 28.597670614401714,
+     "same_graph": 448,
+     "same_accepted_sets": 433,
+     "andrey_fwer": 0.02,
+     "comparator_fwer": 0.015555555555555555,
+     "andrey_fwer_95": [
+      0.009185,
+      0.037626
+     ],
+     "comparator_fwer_95": [
+      0.006276,
+      0.031787
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 2,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 2.0,
+     "andrey_shd_mean": 1.0355555555555556,
+     "comparator_shd_mean": 1.031111111111111,
+     "empty_shd_mean": 1.3333333333333333,
+     "mean_D": 0.0044444444444444444,
+     "bootstrap_95": [
+      0.0,
+      0.011111111111111112
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 6,
+     "seeds": 550,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 550,
+     "andrey_ok": 550,
+     "andrey_timeouts": 0,
+     "comparator_ok": 550,
+     "comparator_timeouts": 0,
+     "paired": 550,
+     "andrey_s": 0.004855095408856869,
+     "comparator_s": 0.2954999999999995,
+     "ratio": 60.201679747470465,
+     "same_graph": 546,
+     "same_accepted_sets": 515,
+     "andrey_fwer": 0.007272727272727273,
+     "comparator_fwer": 0.007272727272727273,
+     "andrey_fwer_95": [
+      0.001985,
+      0.018516
+     ],
+     "comparator_fwer_95": [
+      0.001985,
+      0.018516
+     ],
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.5236363636363637,
+     "comparator_shd_mean": 0.5272727272727272,
+     "empty_shd_mean": 1.0,
+     "mean_D": -0.0036363636363636364,
+     "bootstrap_95": [
+      -0.01090909090909091,
+      0.0036363636363636364
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 7,
+     "seeds": 700,
+     "scenarios": 14,
+     "environments": [
+      2
+     ],
+     "fits": 700,
+     "andrey_ok": 700,
+     "andrey_timeouts": 0,
+     "comparator_ok": 700,
+     "comparator_timeouts": 0,
+     "paired": 700,
+     "andrey_s": 0.0053965849801898,
+     "comparator_s": 0.404,
+     "ratio": 72.61941069227817,
+     "same_graph": 691,
+     "same_accepted_sets": 581,
+     "andrey_fwer": 0.012857142857142857,
+     "comparator_fwer": 0.014285714285714285,
+     "andrey_fwer_95": [
+      0.005896,
+      0.024266
+     ],
+     "comparator_fwer_95": [
+      0.006871,
+      0.026115
+     ],
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 3,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.177142857142857,
+     "comparator_shd_mean": 1.1828571428571428,
+     "empty_shd_mean": 1.3571428571428572,
+     "mean_D": -0.005714285714285714,
+     "bootstrap_95": [
+      -0.018571428571428572,
+      0.005714285714285714
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 8,
+     "seeds": 850,
+     "scenarios": 17,
+     "environments": [
+      2
+     ],
+     "fits": 850,
+     "andrey_ok": 850,
+     "andrey_timeouts": 0,
+     "comparator_ok": 850,
+     "comparator_timeouts": 0,
+     "paired": 850,
+     "andrey_s": 0.006860421039164066,
+     "comparator_s": 1.1695,
+     "ratio": 165.5728134793821,
+     "same_graph": 847,
+     "same_accepted_sets": 684,
+     "andrey_fwer": 0.001176470588235294,
+     "comparator_fwer": 0.001176470588235294,
+     "andrey_fwer_95": [
+      3e-05,
+      0.006537
+     ],
+     "comparator_fwer_95": [
+      3e-05,
+      0.006537
+     ],
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.7235294117647059,
+     "comparator_shd_mean": 0.7247058823529412,
+     "empty_shd_mean": 0.8235294117647058,
+     "mean_D": -0.001176470588235294,
+     "bootstrap_95": [
+      -0.00823529411764706,
+      0.0058823529411764705
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 9,
+     "seeds": 600,
+     "scenarios": 12,
+     "environments": [
+      2
+     ],
+     "fits": 600,
+     "andrey_ok": 600,
+     "andrey_timeouts": 0,
+     "comparator_ok": 600,
+     "comparator_timeouts": 0,
+     "paired": 600,
+     "andrey_s": 0.008500318974256516,
+     "comparator_s": 1.9180000000000001,
+     "ratio": 214.25305580401613,
+     "same_graph": 594,
+     "same_accepted_sets": 421,
+     "andrey_fwer": 0.0016666666666666668,
+     "comparator_fwer": 0.0016666666666666668,
+     "andrey_fwer_95": [
+      4.2e-05,
+      0.009251
+     ],
+     "comparator_fwer_95": [
+      4.2e-05,
+      0.009251
+     ],
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.8383333333333334,
+     "comparator_shd_mean": 0.85,
+     "empty_shd_mean": 0.9166666666666666,
+     "mean_D": -0.011666666666666667,
+     "bootstrap_95": [
+      -0.021666666666666667,
+      -0.0033333333333333335
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "seeds": 550,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 550,
+     "andrey_ok": 550,
+     "andrey_timeouts": 0,
+     "comparator_ok": 550,
+     "comparator_timeouts": 0,
+     "paired": 550,
+     "andrey_s": 0.011027411557734013,
+     "comparator_s": 4.2724999999999795,
+     "ratio": 340.1626428231794,
+     "same_graph": 544,
+     "same_accepted_sets": 291,
+     "andrey_fwer": 0.0036363636363636364,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.000441,
+      0.013074
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.006685
+     ],
+     "andrey_fewer_errors": 4,
+     "comparator_fewer_errors": 2,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.0254545454545454,
+     "comparator_shd_mean": 1.029090909090909,
+     "empty_shd_mean": 1.1818181818181819,
+     "mean_D": -0.0036363636363636364,
+     "bootstrap_95": [
+      -0.012727272727272728,
+      0.005454545454545455
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 11,
+     "seeds": 850,
+     "scenarios": 17,
+     "environments": [
+      2
+     ],
+     "fits": 850,
+     "andrey_ok": 850,
+     "andrey_timeouts": 0,
+     "comparator_ok": 850,
+     "comparator_timeouts": 0,
+     "paired": 850,
+     "andrey_s": 0.015806490555405617,
+     "comparator_s": 5.263,
+     "ratio": 327.8259299122992,
+     "same_graph": 848,
+     "same_accepted_sets": 457,
+     "andrey_fwer": 0.0035294117647058825,
+     "comparator_fwer": 0.0035294117647058825,
+     "andrey_fwer_95": [
+      0.000728,
+      0.010279
+     ],
+     "comparator_fwer_95": [
+      0.000728,
+      0.010279
+     ],
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.9823529411764705,
+     "comparator_shd_mean": 0.9847058823529412,
+     "empty_shd_mean": 1.1764705882352942,
+     "mean_D": -0.002352941176470588,
+     "bootstrap_95": [
+      -0.0058823529411764705,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "seeds": 450,
+     "scenarios": 9,
+     "environments": [
+      2
+     ],
+     "fits": 450,
+     "andrey_ok": 450,
+     "andrey_timeouts": 0,
+     "comparator_ok": 450,
+     "comparator_timeouts": 0,
+     "paired": 450,
+     "andrey_s": 0.031671660020947456,
+     "comparator_s": 17.926499999999997,
+     "ratio": 627.7732849629301,
+     "same_graph": 446,
+     "same_accepted_sets": 186,
+     "andrey_fwer": 0.006666666666666667,
+     "comparator_fwer": 0.0044444444444444444,
+     "andrey_fwer_95": [
+      0.001377,
+      0.019358
+     ],
+     "comparator_fwer_95": [
+      0.000539,
+      0.015962
+     ],
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 3,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.7822222222222223,
+     "comparator_shd_mean": 0.78,
+     "empty_shd_mean": 0.7777777777777778,
+     "mean_D": 0.0022222222222222222,
+     "bootstrap_95": [
+      -0.013388888888888886,
+      0.017777777777777778
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.exact",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.exact",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_do",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 6,
+     "seeds": 500,
+     "scenarios": 10,
+     "environments": [
+      3,
+      4
+     ],
+     "fits": 500,
+     "andrey_ok": 500,
+     "andrey_timeouts": 0,
+     "comparator_ok": 500,
+     "comparator_timeouts": 0,
+     "paired": 500,
+     "andrey_s": 0.005637387745082378,
+     "comparator_s": 0.192,
+     "ratio": 32.0287373074877,
+     "same_graph": 496,
+     "same_accepted_sets": 466,
+     "andrey_fwer": 0.016,
+     "comparator_fwer": 0.014,
+     "andrey_fwer_95": [
+      0.006932,
+      0.031282
+     ],
+     "comparator_fwer_95": [
+      0.005647,
+      0.028632
+     ],
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.75,
+     "comparator_shd_mean": 1.754,
+     "empty_shd_mean": 1.8,
+     "mean_D": -0.004,
+     "bootstrap_95": [
+      -0.012,
+      0.004
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "seeds": 500,
+     "scenarios": 10,
+     "environments": [
+      3,
+      4
+     ],
+     "fits": 500,
+     "andrey_ok": 500,
+     "andrey_timeouts": 0,
+     "comparator_ok": 500,
+     "comparator_timeouts": 0,
+     "paired": 500,
+     "andrey_s": 0.012991856783628464,
+     "comparator_s": 3.0315,
+     "ratio": 214.8023391376031,
+     "same_graph": 495,
+     "same_accepted_sets": 347,
+     "andrey_fwer": 0.012,
+     "comparator_fwer": 0.008,
+     "andrey_fwer_95": [
+      0.004416,
+      0.025935
+     ],
+     "comparator_fwer_95": [
+      0.002184,
+      0.020356
+     ],
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 2,
+     "andrey_shd": 0.5,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.6,
+     "comparator_shd_mean": 0.6,
+     "empty_shd_mean": 0.7,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.01,
+      0.012
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.exact",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.exact",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_appendix_g_capped",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 16,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.00800959300249815,
+     "comparator_s": 3.0164999999999997,
+     "ratio": 427.0696651353459,
+     "same_graph": 100,
+     "same_accepted_sets": 58,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "comparator_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.03,
+     "comparator_shd_mean": 1.03,
+     "empty_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 21,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.009660830721259117,
+     "comparator_s": 20.02650000000005,
+     "ratio": 1736.5195178907552,
+     "same_graph": 100,
+     "same_accepted_sets": 73,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "comparator_fwer_95": [
+      0.000253,
+      0.054459
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.64,
+     "comparator_shd_mean": 0.64,
+     "empty_shd_mean": 1.2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.exact",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.exact",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_speed",
+   "claim": "in",
+   "rows": [
+    {
+     "d": 9,
+     "n": 1000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.009077971801161766,
+     "comparator_s": 4.161,
+     "ratio": 458.3622962419304,
+     "same_graph": 5,
+     "same_accepted_sets": 4,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "n": 1000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.029468148946762085,
+     "comparator_s": 34.157,
+     "ratio": 1159.1159004153574,
+     "same_graph": 5,
+     "same_accepted_sets": 2,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 2,
+     "andrey_shd_mean": 1.2,
+     "comparator_shd_mean": 1.2,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 15,
+     "n": 1000,
+     "seeds": 5,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.17346196621656418,
+     "comparator_s": 272.516,
+     "ratio": 1554.1735510101485,
+     "same_graph": 5,
+     "same_accepted_sets": 1,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 0.8,
+     "comparator_shd_mean": 0.8,
+     "empty_shd_mean": 0.8,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.exact",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "lane": "icp.exact.target_hit",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "regime": "icp_appendix_g_target",
+   "claim": "out",
+   "rows": [
+    {
+     "d": 5,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.0034621907398104668,
+     "comparator_s": 0.0869999999999997,
+     "ratio": 26.243015457137936,
+     "same_graph": 99,
+     "same_accepted_sets": 97,
+     "andrey_fwer": 0.3,
+     "comparator_fwer": 0.29,
+     "andrey_fwer_95": [
+      0.212406,
+      0.399815
+     ],
+     "comparator_fwer_95": [
+      0.203574,
+      0.389266
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 2.0,
+     "comparator_shd": 2.0,
+     "empty_shd": 2.0,
+     "andrey_shd_mean": 1.5,
+     "comparator_shd_mean": 1.49,
+     "empty_shd_mean": 1.2,
+     "mean_D": 0.01,
+     "bootstrap_95": [
+      0.0,
+      0.030249999999998636
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 6,
+     "seeds": 120,
+     "scenarios": 6,
+     "environments": [
+      2
+     ],
+     "fits": 120,
+     "andrey_ok": 120,
+     "andrey_timeouts": 0,
+     "comparator_ok": 120,
+     "comparator_timeouts": 0,
+     "paired": 120,
+     "andrey_s": 0.0038028378039598465,
+     "comparator_s": 0.3069999999999995,
+     "ratio": 78.76070460402433,
+     "same_graph": 120,
+     "same_accepted_sets": 120,
+     "andrey_fwer": 0.125,
+     "comparator_fwer": 0.125,
+     "andrey_fwer_95": [
+      0.07168,
+      0.197776
+     ],
+     "comparator_fwer_95": [
+      0.07168,
+      0.197776
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.5,
+     "comparator_shd": 0.5,
+     "empty_shd": 0.5,
+     "andrey_shd_mean": 0.5416666666666666,
+     "comparator_shd_mean": 0.5416666666666666,
+     "empty_shd_mean": 0.6666666666666666,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 7,
+     "seeds": 220,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 220,
+     "andrey_ok": 220,
+     "andrey_timeouts": 0,
+     "comparator_ok": 220,
+     "comparator_timeouts": 0,
+     "paired": 220,
+     "andrey_s": 0.004425225779414177,
+     "comparator_s": 0.4005,
+     "ratio": 99.60893353145498,
+     "same_graph": 217,
+     "same_accepted_sets": 199,
+     "andrey_fwer": 0.13636363636363635,
+     "comparator_fwer": 0.1409090909090909,
+     "andrey_fwer_95": [
+      0.093932,
+      0.188912
+     ],
+     "comparator_fwer_95": [
+      0.097791,
+      0.194009
+     ],
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 2,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.4545454545454546,
+     "comparator_shd_mean": 1.459090909090909,
+     "empty_shd_mean": 1.3636363636363635,
+     "mean_D": -0.004545454545454545,
+     "bootstrap_95": [
+      -0.04090909090909091,
+      0.022727272727272728
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 8,
+     "seeds": 160,
+     "scenarios": 8,
+     "environments": [
+      2
+     ],
+     "fits": 160,
+     "andrey_ok": 160,
+     "andrey_timeouts": 0,
+     "comparator_ok": 160,
+     "comparator_timeouts": 0,
+     "paired": 160,
+     "andrey_s": 0.005198914557695389,
+     "comparator_s": 1.284,
+     "ratio": 214.37626460607865,
+     "same_graph": 159,
+     "same_accepted_sets": 129,
+     "andrey_fwer": 0.1625,
+     "comparator_fwer": 0.1625,
+     "andrey_fwer_95": [
+      0.108981,
+      0.228964
+     ],
+     "comparator_fwer_95": [
+      0.108981,
+      0.228964
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.93125,
+     "comparator_shd_mean": 0.925,
+     "empty_shd_mean": 0.625,
+     "mean_D": 0.00625,
+     "bootstrap_95": [
+      0.0,
+      0.01875
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 9,
+     "seeds": 100,
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 100,
+     "comparator_timeouts": 0,
+     "paired": 100,
+     "andrey_s": 0.0056377314031124115,
+     "comparator_s": 2.7380000000000004,
+     "ratio": 322.8952818394164,
+     "same_graph": 100,
+     "same_accepted_sets": 77,
+     "andrey_fwer": 0.02,
+     "comparator_fwer": 0.02,
+     "andrey_fwer_95": [
+      0.002431,
+      0.070384
+     ],
+     "comparator_fwer_95": [
+      0.002431,
+      0.070384
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 0.0,
+     "andrey_shd_mean": 0.64,
+     "comparator_shd_mean": 0.64,
+     "empty_shd_mean": 0.6,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "seeds": 40,
+     "scenarios": 2,
+     "environments": [
+      2
+     ],
+     "fits": 40,
+     "andrey_ok": 40,
+     "andrey_timeouts": 0,
+     "comparator_ok": 40,
+     "comparator_timeouts": 0,
+     "paired": 40,
+     "andrey_s": 0.006413312628865242,
+     "comparator_s": 2.4265,
+     "ratio": 379.47449452126483,
+     "same_graph": 40,
+     "same_accepted_sets": 40,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.088097
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.088097
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 2.5,
+     "comparator_shd": 2.5,
+     "empty_shd": 2.5,
+     "andrey_shd_mean": 2.5,
+     "comparator_shd_mean": 2.5,
+     "empty_shd_mean": 2.5,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 11,
+     "seeds": 220,
+     "scenarios": 11,
+     "environments": [
+      2
+     ],
+     "fits": 220,
+     "andrey_ok": 220,
+     "andrey_timeouts": 0,
+     "comparator_ok": 220,
+     "comparator_timeouts": 0,
+     "paired": 220,
+     "andrey_s": 0.009056256152689457,
+     "comparator_s": 5.151500000000005,
+     "ratio": 556.5785195513693,
+     "same_graph": 219,
+     "same_accepted_sets": 213,
+     "andrey_fwer": 0.12272727272727273,
+     "comparator_fwer": 0.12272727272727273,
+     "andrey_fwer_95": [
+      0.082458,
+      0.17352
+     ],
+     "comparator_fwer_95": [
+      0.082458,
+      0.17352
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 1,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.459090909090909,
+     "comparator_shd_mean": 1.4545454545454546,
+     "empty_shd_mean": 1.1818181818181819,
+     "mean_D": 0.004545454545454545,
+     "bootstrap_95": [
+      0.0,
+      0.013636363636363636
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 12,
+     "seeds": 140,
+     "scenarios": 7,
+     "environments": [
+      2
+     ],
+     "fits": 140,
+     "andrey_ok": 140,
+     "andrey_timeouts": 0,
+     "comparator_ok": 140,
+     "comparator_timeouts": 0,
+     "paired": 140,
+     "andrey_s": 0.014016863889992237,
+     "comparator_s": 17.076,
+     "ratio": 1265.3564867700536,
+     "same_graph": 140,
+     "same_accepted_sets": 121,
+     "andrey_fwer": 0.03571428571428571,
+     "comparator_fwer": 0.03571428571428571,
+     "andrey_fwer_95": [
+      0.011696,
+      0.081376
+     ],
+     "comparator_fwer_95": [
+      0.011696,
+      0.081376
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.8142857142857143,
+     "comparator_shd_mean": 0.8142857142857143,
+     "empty_shd_mean": 0.7142857142857143,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  }
+ ]
+}
