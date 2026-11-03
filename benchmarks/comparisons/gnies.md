@@ -64,6 +64,82 @@ The two packages differ in ways a larger comparison can show:
 - The default penalty. Andrey's default adds the extended-BIC term; the reference's is the standard
   BIC, which Andrey runs with `ebic_gamma=0.0`.
 
+## Campaign
+
+`gnies_cpu.py` compares the two packages on the regimes of the paper's simulations (Gamella et al.
+2022, Sec. 5.1 and App. H) and on the regimes the paper claims without showing numbers for them.
+Each cell draws 20 datasets, seeds 0 to 19, one SCM each, with `andrey.data`: an Erdos-Renyi DAG
+on 10 variables, linear equations with weights `U[0.5, 1]`, positive as the paper's code draws
+them, Gaussian noise with variances `U[1, 2]`, and environments that each set the noise variance of
+their targets to `v`. The targets of every environment are distinct, and every environment draws
+its own noise. The rows are standardized on the pooled sample, as the paper does.
+
+| Cell | Mean degree | Environments (rows each) | Targets per environment | `v` | Source |
+|---|---|---|---|---|---|
+| A10, A100, A1000 | 2.7 | observational + 3 (10, 100, 1,000) | 1 | `U[5, 10]` | Fig. 3 |
+| B10, B100, B1000 | 4 | observational + 3 (10, 100, 1,000) | 1 | `U[5, 10]` | Fig. 8 |
+| C10, C100, C1000 | 2.7 | observational + 3 (10, 100, 1,000) | 3 | `U[5, 10]` | Fig. 9 |
+| D10, D100, D1000 | 2.7 | observational + 3 (10, 100, 1,000) | 1 | `U[3, 4]` | Sec. 5.1 text |
+| E100, E1000 | 2.7 | 4, none observational (100, 1,000) | 1 | `U[5, 10]` | Sec. 5.1, claim |
+| F10, F100 | 2.7 | observational + 9 (10, 100) | 1 | `U[5, 10]` | Sec. 1 and 6, claim |
+| G | 2.7 | observational 1,000 + 3 x 100 | 1 | `U[5, 10]` | claim |
+| H1, H2 | 2.7 | observational + 1, observational + 2 (1,000) | 1 | `U[5, 10]` | Theorem 1, claim |
+| S100, S1000 | 2.7 | observational + 3 (100, 1,000) | 1 | ratio `U[5, 10] / U[1, 2]` | claim |
+
+The S cells draw weights of either sign and unit noise variances, and multiply a target's noise
+variance by the ratio. The paper's code sets `v` from `U[5, 10]`, its text from `U[3, 4]`: the D
+cells measure the text's range. No released command produced Figs. 8 and 9; we take `U[5, 10]`
+for B and C from the Fig. 3 results those figures overlay. Five more differences from the paper's
+simulations: the DAG has exactly `round(k p / 2)` edges instead of a binomial count; environments
+draw independent noise instead of sharing one random state; each cell has 20 datasets instead of
+100 SCMs with 10 datasets each; the reference is gnies 0.3.3 instead of 0.3.2; and each package
+runs at its default penalty only.
+
+Cells outside the method's claim are measured with the same arms and metrics for its limitations,
+and never judged: hard interventions (O1), a mean shift alone (O2), weights halved (O3), Laplace
+noise (O4), additive nonlinear equations (O5), and 20 to 100 variables (O6).
+
+Every arm fits the same rows, one after another on one CPU with one BLAS thread:
+
+- Andrey's `gnies` at its defaults, the judged arm, and four more settings: the standard BIC
+  (`ebic_gamma=0.0`), the true targets given at the standard BIC and at the defaults, and ties
+  broken by column position (`andrey.config(tie_break="position")`);
+- gnies at every default, the judged reference, and with the true targets fixed
+  (`known_targets=I*, phases=[]`), which runs one search over graphs at the true targets;
+- Andrey's `ges` on the pooled rows, Andrey's `gies` given the true targets (its score drops a
+  target's rows in its environments, so it is not a ceiling here), and the empty graph.
+
+A fit gets 30 minutes, the reference's known-target call 5; a fit past its cap is recorded as a
+timeout, never as an empty graph. One code path scores every result:
+
+- `shd` against the true interventional essential graph, the true DAG with every edge at a true
+  target oriented;
+- the target error, the number of targets learned wrongly or missed;
+- target precision and recall, whether the class and the targets are both exact, skeleton and
+  orientation errors, and the paper's TDP and FDP over the members of both classes;
+- the score gap to the truth in deviance units, lower is better, under Andrey's score at the
+  standard BIC for every package and under each fit's own objective. Under its own objective, a
+  gap above 2 means that fit's search stopped short of the truth's score.
+
+Before scoring, each SCM is checked against the paper's Assumption 2 at its drawn parameters, for
+every member of the true DAG's Markov equivalence class and every environment, and in C against
+Assumption 1. A dataset that fails leaves its cell's judged pairs for both packages.
+
+Each cell is judged on `shd` and on the target error. Per dataset, D is Andrey's error minus the
+reference's; the cell is worse when the 95% percentile bootstrap interval of the mean of D lies
+entirely above 0, and counts as worse only if a rerun on seeds 20 to 39 is worse too. In every cell
+with 100 rows per environment or more, Andrey must also beat the empty graph on both errors.
+
+Run it with the reference's environment built as above:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/gnies_cpu.py --out outputs/gnies --cells A100 --seeds 0 1 2
+```
+
+`--cells` and `--seeds` default to every in-claim cell and seeds 0 to 19, `--arms` to every arm.
+Each fit writes one line to `records.jsonl` in the output directory, with its marks, so
+`--rescore` recomputes the scores without fitting.
+
 ## References
 
 - Gamella, J. L., Taeb, A., Heinze-Deml, C., and Buhlmann, P. (2022). Characterization and greedy

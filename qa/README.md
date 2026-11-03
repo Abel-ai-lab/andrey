@@ -292,6 +292,13 @@ A row where either side has no result is skipped. A released summary never chang
 re-measured against the same reference in a later summary is judged by the later rows only. Where
 a summary has one entry per regime for a method and reference, a row's key names its `regime`.
 
+An entry's `metric` names the error its rows pair: `"shd"`, the default, or `"target_error"`, the
+number of intervention targets a method learned wrongly or missed (the size of the symmetric
+difference of its targets and the true ones), for a method that learns its targets. The row's
+`andrey_shd_mean` and `comparator_shd_mean` then hold that error's means. Such a method has one
+entry per metric, each judged by the rules above, and a row's key names its `metric`; any other
+value of `metric` is an error.
+
 A row of a reference whose result depends on the column order (`reference_order_dependent`) may
 also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,
 `comparator_shd_by_seed`). It is context: the check prints the datasets on which each side has
