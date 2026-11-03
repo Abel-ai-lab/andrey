@@ -332,13 +332,11 @@ minutes. Each rate is over 2,000 datasets, with its 95% Clopper-Pearson interval
 | hard | 3 | 100 | 0.05 | 0.0175 (0.0122-0.0243) | 0.0315 (0.0243-0.0401) | 0.0750 | 0.0135 (0.0089-0.0196) | 0.0265 (0.0199-0.0345) |
 | hard | 3 | 100 | 0.10 | 0.0455 (0.0368-0.0556) | 0.0645 (0.0541-0.0762) | 0.1500 | 0.0400 (0.0318-0.0495) | 0.0575 (0.0477-0.0686) |
 
-Under `K`, the rejection rate of `S*` stayed within sampling error of `alpha` or below it in every
-cell, lowest at `K = 3` and nearer `alpha` as `K` grows. `K - 1` raised it by about `K / (K - 1)`,
-to near `alpha` itself, pooled 0.0494 at `alpha=0.05` over the grid, and far below the worst case
-of `K / (K - 1)` times `alpha`: the one-vs-rest tests share their rows, and the rate under `K`
-sits below `alpha` by about the factor that `K - 1` adds back. One of the 62 intervals under
-`K - 1` lies above `alpha`, about as many as chance gives over 62 intervals, and a rerun of that
-cell with `--seed 1` and 10,000 datasets put its rate at `alpha`.
-
-The FWER of the full fit stayed below `alpha` under both factors in every cell. In the hard cell it
-followed the rejection rate of `S*`, and `K - 1` raised both by about the same ratio.
+Under `K`, the rejection rate of `S*` stayed at or below `alpha`, within sampling error, in every
+cell, and `K - 1` raised it by about `K / (K - 1)`, to near `alpha`, pooled 0.0494 at `alpha=0.05`
+over the grid: well below
+the worst case at `K = 3` and 4, where it is 1.5 and 1.33 times `alpha`, and at it for `K` = 8 and
+10, where the worst case is within a tenth of `alpha`. One of the 62 intervals under `K - 1` lies
+above `alpha`, as chance gives over 62, and a rerun of that cell with `--seed 1` and 10,000
+datasets put its rate at `alpha`. The FWER of the full fit stayed below `alpha` under both factors
+in every cell, and in the hard cell it followed the rejection rate of `S*`.
