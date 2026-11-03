@@ -38,7 +38,13 @@ names its pull request.
 - `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
   environments that differ in the noise variances of variables it is not told: it returns those
   variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
-  they orient (Gamella et al. 2022). Known targets go in `targets`. ([#PR])
+  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  authors' package, on simulated data in the paper's settings and the settings it claims, 10
+  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` makes no more errors
+  in all 21 settings, on the graph and on the targets, and fewer in 2 with 10 rows per environment,
+  on fresh datasets too; at the standard BIC the two return the same graph and targets on 412 of
+  420 datasets. It fits about 34 times faster on one core (median) and reaches 100 variables, with
+  a median SHD of 2.5 against the empty graph's 135 in a median 176 s. ([#PR])
 
 ### Changed
 

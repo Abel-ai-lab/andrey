@@ -783,17 +783,19 @@ def gnies(
 
     Notes
     -----
-    **When to use.** GnIES suits independent rows from two or more environments, with or without
-    an observational one, of one linear structural equation model with Gaussian noise, in which
-    every environment keeps the same weights and differs only in the noise variances of some
-    variables, its targets, which need not be known [1]_. It assumes no unmeasured common causes
-    and a faithful distribution. Its authors simulate graphs of 10 variables and present it as most
-    useful with many environments of few rows each. It returns the learned targets and the
-    interventional essential graph, which directs every edge at a target, so the environments can
-    orient edges that a CPDAG leaves undirected. When an intervention replaces a variable's
-    mechanism and the targets are known, use :func:`~andrey.gies`; when how the environments
-    differ is not linear and Gaussian, :func:`~andrey.cdnod`; and on observational data alone,
-    :func:`~andrey.ges`.
+    **When to use.** GnIES suits independent rows from two or more environments, with or without an
+    observational one, of one linear structural equation model with Gaussian noise, in which every
+    environment keeps the same weights and differs only in the noise variances of some variables,
+    its targets, which it learns without being told them [1]_. It assumes no unmeasured common
+    causes and a faithful distribution. It returns the learned targets and the interventional
+    essential graph, which directs every edge at a target, so the environments can orient edges that
+    a CPDAG leaves undirected. Its authors simulate graphs of 10 variables and present it as most
+    useful with many environments of few rows each; measured with 100 or more rows per environment,
+    it learned graphs of 10 to 100 variables with errors far below the empty graph's, a fit taking
+    about a second at 10 variables and three minutes at 100 (see Limitations). When an intervention
+    replaces a variable's mechanism and the targets are known, use :func:`~andrey.gies`; when how
+    the environments differ is not linear and Gaussian, :func:`~andrey.cdnod`; and on observational
+    data alone, :func:`~andrey.ges`.
 
     **How it works.** Each environment's columns are centered by their own means. For a set of
     targets, a variable outside it is scored by the Gaussian likelihood of its regression on its
@@ -821,27 +823,50 @@ def gnies(
     **Choosing the penalty.** The paper's score is the standard BIC, ``penalty_discount=1.0`` with
     ``ebic_gamma=0.0`` [1]_. The default adds the extended-BIC term [5]_, as :func:`~andrey.ges`
     and :func:`~andrey.gies` do, which describe the choice; with 10 variables it adds ``2 * log 9
-    = 4.4`` to the first parent's penalty, against ``log(n_samples)``, 8.3 with 4,000 rows. Which
-    default makes fewer errors with GnIES is not measured yet.
+    = 4.4`` to the first parent's penalty, against ``log(n_samples)``, 8.3 with 4,000 rows. On the
+    simulated data of the Limitations, paired per setting, the default made fewer errors than the
+    standard BIC in 7 of the 21 settings of 10 variables on the SHD and in 1 on the target error,
+    and more in none; with 50 and 100 variables its median SHD was 1 and 2.5, against 16.5 and
+    54.5 at the standard BIC.
 
     **Data scaling.** Rescaling or shifting a column alike in every row does not change the
     result, nor does shifting one environment's rows. Do not standardize each environment on its
     own: that rescales the noise variances the method reads, and changes the result.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 10 variables with an observational
-    environment and three environments that each change one variable's noise variance, with
-    1,000 or 10,000 rows each. There, at the default penalty, it returned the true targets and the
-    true class on 13 of 20 simulated datasets with 1,000 rows per environment and on 19 of 20 with
-    10,000; the others had one false or missing target or a few wrong edges, where the greedy
-    search stopped at a graph that scores worse than the true one. Each set of targets it visits
-    costs one search over graphs from the empty graph, about ``n_variables * (n_targets + 1)``
-    searches per fit, so the cost grows fast with the number of variables. A target's
-    coefficients are shared across environments and its variances are not, so a target with
-    ``k`` parents needs at least ``k + 2`` rows in every environment: no parent set larger than
-    the smallest environment's row count minus 2 is selected for a target, and a variable that the
-    required edges of ``knowledge`` give more parents than that is not learned as one. Hard
-    interventions, shifted means alone, changed weights, non-Gaussian noise, and nonlinear
-    relations fall outside its model.
+    **Limitations.** Measured with the targets unknown on simulated data from the model above:
+    Erdos-Renyi graphs of 10 variables at mean degree 2.7 or 4, two to ten environments with 10 to
+    1,000 rows each, with or without an observational one, one or three targets per environment, 20
+    datasets per setting, one core per fit. In each of the 21 settings it made no more errors than
+    the paper's reference implementation, on the SHD against the interventional essential graph and
+    on the targets learned wrongly or missed, and fewer on the SHD in 2 settings with 10 rows per
+    environment and on the targets in 1 of them, on 20 more datasets too; at the standard BIC the
+    two returned the same graph and targets on 412 of the 420 datasets. With 100 or more rows per
+    environment its errors were below the empty graph's on both counts in every setting. With 10
+    rows per environment its target errors were 1.85 to 3 with 3 true targets and 4.35 and 7.7 with
+    9, and its SHD was not reliably below the empty graph's at mean degree 4 (20 against 20) or with
+    the targets' noise variances set to 3 to 4 instead of 5 to 10 (11.9 against 14; the 95% interval
+    of the difference reached above 0 on both sets of 20 datasets). Outside its model, with 1,000
+    rows per environment: after hard interventions, which replace a target's mechanism, its mean SHD
+    was 3.75 against the empty graph's 14; a shifted mean alone is invisible to it, so it learned
+    almost no targets (3.1 target errors with 3 true targets) and returned close to the
+    observational class (SHD 2.55 against it); after a target's incoming weights were halved it beat
+    the empty graph on neither count (SHD 11.6 against 14, 3.05 target errors with 3 true targets);
+    with Laplace noise its SHD was 1.65, and with additive nonlinear relations 7.55. With 1,000 rows
+    in each of four environments, three of them with one target, its median SHD at 20, 30, 50, and
+    100 variables was 0, 0, 1, and 2.5, against the empty graph's 27, 40, 68, and 135, and its
+    median fit took 3.5, 9.0, 30, and 176 s. At 10 variables its median fit took 0.3 to 1.3 s per
+    setting, a median 0.03 times the paper's reference implementation's time on the same core; at 20
+    variables the reference implementation took a median 388 s, and at 30 it finished 2 of 3 fits,
+    in 2,735 and 3,327 s, within a cap of 3,600 s. Each set of targets it visits costs one search
+    over graphs from the empty graph, about ``n_variables * (n_targets + 1)`` searches per fit.
+    Given every environment's targets, one search over graphs runs, and it can stop at a graph that
+    scores worse than one the target search reaches: with the true targets given, its mean SHD was
+    higher than when it learned them in 17 of the 21 settings. A target's coefficients are shared
+    across environments and its variances are not, so a target with ``k`` parents needs at least ``k
+    + 2`` rows in every environment: no parent set larger than the smallest environment's row count
+    minus 2 is selected for a target, and a variable that the required edges of ``knowledge`` give
+    more parents than that is not learned as one. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
