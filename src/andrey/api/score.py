@@ -839,9 +839,9 @@ def gnies(
     coefficients are shared across environments and its variances are not, so a target with
     ``k`` parents needs at least ``k + 2`` rows in every environment: no parent set larger than
     the smallest environment's row count minus 2 is selected for a target, and a variable that the
-    required edges of ``knowledge`` give more parents is not learned as one. Hard interventions,
-    shifted means alone, changed weights, non-Gaussian noise, and nonlinear relations fall outside
-    its model.
+    required edges of ``knowledge`` give more parents than that is not learned as one. Hard
+    interventions, shifted means alone, changed weights, non-Gaussian noise, and nonlinear
+    relations fall outside its model.
 
     References
     ----------
