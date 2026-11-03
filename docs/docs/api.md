@@ -76,9 +76,9 @@ distinct value of a column one category. Every method defaults to `indep_test=No
 `category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
 `"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`; the
 result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score the fit
-used. Values never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
-hold category codes, from every method that reads columns as numbers, as [Data
-types](guides/getting-started.md#data-types) describes. The mixed-data settings,
+used. Values never decide: a column of a few whole numbers reads as numbers, with a
+`DataTypeWarning` that it may hold category codes, from every method that reads columns as
+numbers, as [Data types](guides/getting-started.md#data-types) describes. The mixed-data settings,
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
 the categorical columns that `categorical` lists, or a DataFrame's `category`, `bool`, and text
 columns, and never a column by its values; a categorical column of numbers needs whole numbers. A
@@ -114,8 +114,9 @@ why.
 % concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
 `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
-`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
-for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
+`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
+`"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
 from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
 `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
@@ -788,8 +789,8 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    sample_mixed
    interventions.hard
    interventions.soft
-   interventions.Hard
-   interventions.Soft
+   interventions.HardIntervention
+   interventions.SoftIntervention
 ```
 
 #### Scale
