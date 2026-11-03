@@ -10,6 +10,11 @@ names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- `iamb`, `inter_iamb` and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
+  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs.
+
 ## [0.13.0] - 2026-11-03
 
 ### Highlights
