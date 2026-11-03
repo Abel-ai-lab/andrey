@@ -871,6 +871,10 @@ def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     # Only coverage is counted; speed has no pooled number, which would mix different methods.
     rows = build.measured_rows(build.release_summaries(SUMMARY))
     assert [(section, label) for section, label, _ in rows] == [("Coverage", "Distinct methods")]
+    # Andrey's count follows the registry; each method counted with another names two real ones.
+    names = {spec.name for spec in build.list_specs()}
+    assert set(build.COUNTED_WITH) | set(build.COUNTED_WITH.values()) <= names
+    assert build.METHOD_COUNTS["Andrey"] == len(names) - len(build.COUNTED_WITH)
     # A partial mark has its own symbol, a half-filled circle.
     assert build.MARKS["part"][0] == "half" and "half" in build.ICON
     assert "Compared with other packages" in tiles and "bento-note" not in tiles
