@@ -1,7 +1,7 @@
 {
  "lane": "CAM-UV: Andrey against lingam 1.13.0, causal-learn 0.1.4.8, and the empty graph",
  "generated": "2026-11-01",
- "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026",
+ "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day",
  "source": "Maeda and Shimizu (2021), Causal additive models with unobserved variables, UAI, PMLR 161, 97-106: the model of Sect. 2 and the simulation of Sect. 5.1, at the settings of Sect. 5",
  "packages": {
   "lingam": "1.13.0 with pygam 0.12.0 (Python 3.12, NumPy 2.2.6, SciPy 1.13.1)",
@@ -17,13 +17,14 @@
   "fits_at_a_time": 4
  },
  "fit_protocol": "one timed fit per dataset, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; *_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired datasets of the reference's CPU time over Andrey's, with its bootstrap 95% interval",
- "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks",
+ "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; no score here uses it",
  "parity_rule": "paired bootstrap",
  "verdict_rule": "D = direct_errors(Andrey) - direct_errors(reference) per dataset on the datasets both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a cell in claim is worse when the interval lies above 0, better when below, a tie otherwise; a cell worse or better is run again on 20 fresh seeds (20-39, the replication rows) and keeps its verdict only if the replication's interval lies on the same side of 0 (final_verdict). Cells with claim 'out' are reported, not judged",
  "seeds_note": "20 datasets per cell in claim (seeds 0-19), 10 per cell out of claim (seeds 0-9), and replications on seeds 20-39; a seed whose graph cannot hide its nodes is skipped and the next one taken, which no cell of this campaign needed",
  "settings": {
   "andrey": "andrey.camuv defaults: alpha 0.01, max_depth 2 (sets of up to 3 variables)",
-  "mapping": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->"
+  "mapping": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+  "defaults": "lingam's documented default is num_explanatory_vals=2, sets of up to 2 variables; every package here runs 3, the paper's d (Sect. 5) and Andrey's default, so the lingam fits visit sets of 3 as well; causal-learn's num_explanatory_vals has no default"
  },
  "regimes": {
   "latent_anm_er": "additive noise X_c = sum w g(X_p) + e with g(z) = z + sin(z), Gaussian noise, Erdos-Renyi graph of mean degree 2, standardized; one node in five hidden, chosen among nodes with two or more children; 2,000 rows (in claim)",
@@ -2351,8 +2352,7 @@
       "cpu_ratio_95": [
        2.71,
        3.282
-      ],
-      "verdict": "tie"
+      ]
      },
      "vs_causal_learn": {
       "paired": 10,
@@ -2390,8 +2390,7 @@
       "cpu_ratio_95": [
        8.785,
        10.698
-      ],
-      "verdict": "tie"
+      ]
      },
      "vs_empty": {
       "paired": 10,
@@ -2574,8 +2573,7 @@
       "cpu_ratio_95": [
        2.943,
        3.333
-      ],
-      "verdict": "tie"
+      ]
      },
      "vs_causal_learn": {
       "paired": 10,
@@ -2616,8 +2614,7 @@
       "cpu_ratio_95": [
        8.645,
        10.903
-      ],
-      "verdict": "better"
+      ]
      },
      "vs_empty": {
       "paired": 10,

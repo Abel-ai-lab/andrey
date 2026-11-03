@@ -37,9 +37,11 @@ from the paper's simulation in the effects, close to linear where `z` is large, 
 the sparser graph, and the share of hidden nodes. `camuv_paper` is the paper's simulation
 (`andrey_bench/regime_models.py`): the paper inserts each intermediate "between each variable pair"
 without saying whether the pair keeps its edge, and here the intermediate takes the place of an
-observed edge drawn at random. Out of claim, `anm_er` hides nothing, so every marked pair is false,
-and `latent_gauss_er` has linear effects, where a path through a hidden variable can be regressed
-away, which the method assumes it cannot.
+observed edge drawn at random. Out of claim, `anm_er` hides nothing, so every marked pair is false;
+the paper's model allows no hidden variable, and its test on simulated fMRI data includes runs with
+none omitted, but this lane runs the setting on ten datasets and reports it without a verdict.
+`latent_gauss_er` has linear effects, where a path through a hidden variable can be regressed away,
+which the method assumes it cannot.
 
 ## Settings
 
@@ -48,8 +50,13 @@ Every package runs the paper's settings, which are Andrey's defaults:
 | Andrey (`andrey.camuv`) | lingam 1.13.0 `CAMUV` | causal-learn 0.1.4.8 `CAMUV.execute` |
 |---|---|---|
 | `alpha=0.01` | `alpha=0.01` | `alpha=0.01` |
-| `max_depth=2`, sets of up to 3 variables | `num_explanatory_vals=3` | `num_explanatory_vals=3` |
+| `max_depth=2`, sets of up to 3 variables | `num_explanatory_vals=3` (default 2) | `num_explanatory_vals=3` (no default) |
 | a pair marked `o-o` | a pair marked `<->` (`NaN` in `adjacency_matrix_`) | a pair marked `<->` (its `U`) |
+
+lingam's documented default is `num_explanatory_vals=2`, sets of up to 2 variables. The lane runs
+it at 3, the paper's d (Sect. 5), so the three packages search the same sets. At its default lingam
+visits fewer sets, so the CPU ratios against lingam below compare fits at the same set size, not
+lingam as it ships.
 
 lingam and causal-learn fit their regressions with pygam, which does not install beside
 `.venv-bench`'s SciPy, so their fits run in `.venv-lingam` (`benchmarks/start_lingam.sh`, with
@@ -76,8 +83,13 @@ from the stored estimates:
 | `shd_endpoint_bidirected` | the same with the marked pairs drawn `<->`, the references' mark, so the packages' graphs are compared without the mark convention |
 | `confounded_unobserved_path_*` | the marked pairs against the pairs an unobserved causal or backdoor path joins: precision and recall |
 
-The verdict reads the directed-edge errors. The paper's comparison also "only used directed
-edges", the 0.7.0 CAM-UV lane read the same errors, and they do not depend on the mark. Two graphs
+The verdict reads the directed-edge errors, which do not depend on the mark; the paper's comparison
+also "only used directed edges", and the 0.7.0 CAM-UV lane read the same errors. The paper scores
+them against another truth (Sect. 5): `x_j -> x_i` wherever a directed path from `x_j` to `x_i` has
+no other observed variable on it. That truth also holds the pairs joined through a hidden
+intermediate and the direct edges a hidden common cause confounds, pairs CAM-UV marks rather than
+orients. This lane scores only the edges CAM-UV can identify, a truth with fewer edges, so the empty
+graph makes fewer errors under it than under the paper's. Two graphs
 are the same when they have the same directed edges and the same marked pairs, whatever the mark. A
 pair is one dataset fitted by both solutions in one run. D is Andrey's errors minus the other
 solution's, and its interval the percentile bootstrap 95% interval of the mean D over the pairs
@@ -88,9 +100,10 @@ timeout: it is counted in the coverage and never scored.
 
 ## Results
 
-The numbers come from [`published/0.13.0/camuv.json`](../published/0.13.0/camuv.json): an Andrey
-pre-release build of the 0.13.0 branch (1 November 2026) against lingam 1.13.0 and causal-learn
-0.1.4.8, on one Intel Core i7-7820X, one core and one BLAS thread per fit, four fits at a time.
+The numbers come from [`published/0.14.0/camuv.json`](../published/0.14.0/camuv.json): an Andrey
+pre-release build of the 0.13.0 branch (1 November 2026), whose CAM-UV code is the 0.13.0
+release's, against lingam 1.13.0 and causal-learn 0.1.4.8, on one Intel Core i7-7820X, one core and
+one BLAS thread per fit, four fits at a time.
 Every setting in claim has 20 datasets (seeds 0 to 19), every one out of claim 10 (seeds 0 to 9),
 each fitted once with a 3,600 s cap; every fit finished under it, so no setting has a timeout.
 Errors are means over the datasets, CPU s the median CPU time of a fit, and the CPU ratio the
@@ -99,7 +112,8 @@ median over the datasets of a reference's CPU time over Andrey's.
 In claim, every setting is a tie with both references once replicated; none is worse. On the
 paper's simulation Andrey made fewer errors than both on seeds 0 to 19, at 500 and at 1,000 rows,
 but not on seeds 20 to 39 (the replication below), so both count as ties. Andrey ran 2.1 to 3.1
-times faster than lingam and 7.4 to 13.5 times faster than causal-learn.
+times faster than lingam and 7.4 to 13.5 times faster than causal-learn, each searching sets of up
+to 3 variables.
 
 | setting | observed + hidden | rows | same graph, lingam / causal-learn | errors Andrey | errors lingam | errors causal-learn | errors empty | D vs lingam [95% CI] | D vs causal-learn [95% CI] | D vs empty [95% CI] |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -112,11 +126,17 @@ times faster than lingam and 7.4 to 13.5 times faster than causal-learn.
 | the paper's simulation | 10 + 4 | 500 | 6 / 6 | 6.90 | 7.95 | 8.10 | 9.35 | -1.05 [-2.00, -0.25] | -1.20 [-2.10, -0.40] | -2.45 [-3.80, -0.80] |
 | the paper's simulation | 10 + 4 | 1,000 | 3 / 2 | 5.55 | 7.55 | 7.00 | 9.35 | -2.00 [-3.35, -0.80] | -1.45 [-2.65, -0.45] | -3.80 [-4.75, -2.85] |
 
-With one node in five hidden, the hidden nodes are an end of about half of the edges, and no CAM-UV
-makes fewer errors than the empty graph on average: at 8 + 2 variables Andrey's interval against it
-lies above 0, and the references tie with Andrey. With one node in ten hidden every package makes
-fewer errors than the empty graph from 20 observed variables on, and on the paper's simulation at
-both sizes. At 50 observed variables the intervals are wide, so the tie there is a wide one.
+With one node in five hidden no CAM-UV makes fewer errors than the empty graph on average, at any
+of the three sizes. At 8 + 2 variables Andrey's interval against it lies above 0 on seeds 0 to 19, a
+cell not run again on fresh seeds; the references' means there lie further above it, 5.45 and 5.40
+against 3.55, and the summary holds no interval for them. At 10 + 1 Andrey's interval against the
+empty graph includes 0 as well. Every package makes fewer errors than the empty graph from 20
+observed variables on, and on the paper's simulation at both sizes. The share of true edges with a
+hidden end does not separate these settings: it is 0.52 to 0.57 with one node in five hidden, 0.32
+at 10 + 1, 0.27 from 20 + 2 on, and 0.40 to 0.43 on the paper's simulation. Andrey's interval
+against the empty graph lies below 0 in every setting with 20 observed variables or more and on the
+paper's simulation, and in none of the additive-noise settings with 12 or fewer. At 50 observed
+variables the intervals are wide, so the tie there is a wide one.
 
 The endpoint SHD reads the marked pairs too. Andrey's marks are `o-o` and the references' `<->`,
 so the intervals compare Andrey's graph with its pairs drawn `<->`; none lies above 0.
@@ -134,7 +154,8 @@ so the intervals compare Andrey's graph with its pairs drawn `<->`; none lies ab
 
 The marked pairs are scored against the pairs an unobserved causal or backdoor path joins, pooled
 over the datasets of a setting. At 50 observed variables Andrey marks more pairs than either
-reference, at a lower precision and a higher recall.
+reference, at a higher recall, whose interval against each lies above 0, and a lower precision,
+whose interval includes 0.
 
 | setting | observed + hidden | rows | true pairs per graph | marked, Andrey / lingam / causal-learn | precision | recall | CPU s, Andrey / lingam / causal-learn | CPU ratio, lingam / causal-learn |
 |---|---|---|---|---|---|---|---|---|
@@ -204,12 +225,18 @@ drop.
 | nothing hidden | 20 | 1,000 | 0 to 9 | 10 | 10 | 1 / 1 / 4 / 4 / 0 | 4 of 4 |
 | linear Gaussian, one in ten hidden | 20 + 2 | 1,000 | 0 to 9 | 10 | 10 | 0 / 0 / 3 / 5 / 2 | 6 of 6 |
 
+On the paper's simulation at 1,000 rows, seeds 0 to 19, 2 of the 19 traced datasets have Andrey's
+graph equal to lingam's and different from causal-learn's. The switches start from lingam's graph,
+so these 2 have none, and the first-switch counts sum to 17; the HSIC test explains both, among the
+8 where the references differ.
+
 ## Out of claim
 
 Out of claim, at ten datasets per setting: nothing hidden, and linear Gaussian effects with one
 node in ten hidden. With nothing hidden every marked pair is false, and each package marks three
-or four per graph. With linear effects every CAM-UV makes more errors than the empty graph, by 7 or
-more per graph.
+or four per graph; Andrey's mean errors there are the highest of the three, 11.00 against 9.40 and
+10.20, with each interval including 0. With linear effects every CAM-UV makes more errors than the
+empty graph, by 7 or more per graph.
 
 | setting | observed + hidden | rows | same graph, lingam / causal-learn | errors Andrey | errors lingam | errors causal-learn | errors empty | D vs lingam [95% CI] | D vs causal-learn [95% CI] | D vs empty [95% CI] |
 |---|---|---|---|---|---|---|---|---|---|---|
