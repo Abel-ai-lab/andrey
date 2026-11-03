@@ -771,28 +771,30 @@ def ut_igsp(
     mechanism, such as a shift of its mean, a change of its noise variance, or a change of the
     weights of its causes; their simulations use about 20 variables, 5 settings, and 1,000 or
     more rows per setting. It returns the interventional essential graph and each setting's
-    targets. When every target is known, use :func:`~andrey.gies`; with no observational
-    environment, or with environments that differ in ways that are not interventions, use
-    :func:`~andrey.cdnod`.
+    targets. Measured in that setting against the paper's reference implementation, with every
+    kind of intervention above and up to 3 unknown targets per setting, it was worse in none of 112
+    comparisons and better in 18, on fresh datasets too (see Limitations). When every target is
+    known, use :func:`~andrey.gies`; with no observational environment, or with environments that
+    differ in ways that are not interventions, use :func:`~andrey.cdnod`.
 
     **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' setting,
     with 20 variables at mean degree 1.5, linear effects, Gaussian noise, and 5 settings, 5 seeds
-    per dataset. A comparison counts as better or worse when the 95% bootstrap interval of the mean
-    difference in errors, paired by dataset, lies wholly below or above 0. On 15 groups of datasets
-    with mean shifts and perfect interventions at 300 to 5,000 rows per setting, 20 datasets each
-    and 10 in the one at 50 variables, 10 starts made fewer SHD errors than 5 in 4 groups, by 0.2 to
-    0.4 edges, and more in none, at a median of 0.24 s per fit on 20 variables against 0.21 s; the
-    target errors were worse in no group. The level was then chosen on 56 further groups at 1,000 to
-    5,000 rows per setting, 20 datasets each, with mean shifts, perfect interventions, and changes
-    of the noise variance or of the weights, 0 to 3 unknown targets per setting, and in 4 groups no
-    known ones: each candidate against the paper's reference implementation at the authors' level,
-    ``alpha=1e-5`` [1]_, in SHD and in target errors, 112 comparisons. With one over the number of
-    observational rows the fit was worse in none and better in 20, by 0.13 to 2.6 errors per
-    dataset, 11 of them in SHD at 1,000 rows per setting; ``alpha=0.001`` was better in 15 and worse
-    in 3, in SHD at 5,000 rows, though none of the 3 repeated on 20 more datasets per group;
-    ``alpha=1e-5`` was better in 7 and worse in none. Against ``alpha=0.001`` itself the default
-    made fewer SHD errors in 4 comparisons, all at 5,000 rows, by 0.2 to 0.65 edges, and more in
-    none.
+    per dataset. A comparison's errors count as lower or higher when the 95% bootstrap interval of
+    the mean difference in errors, paired by dataset, lies wholly below or above 0. On 15 groups of
+    datasets with mean shifts and perfect interventions at 300 to 5,000 rows per setting, 20
+    datasets each and 10 in the one at 50 variables, 10 starts made fewer SHD errors than 5 in 4
+    groups, by 0.17 to 0.42 edges, and more in none, at a median of 0.24 s per fit on 20 variables
+    against 0.21 s; the target errors were higher in no group. The level was then chosen on 56
+    further groups at 1,000 to 5,000 rows per setting, 20 datasets each, with mean shifts, perfect
+    interventions, and changes of the noise variance or of the weights, 0 to 3 unknown targets per
+    setting, and in 4 groups no known ones: each candidate against the paper's reference
+    implementation at the authors' level, ``alpha=1e-5`` [1]_, in SHD and in target errors, 112
+    comparisons, each one above 0 rerun on 20 more datasets per group. With one over the number of
+    observational rows the errors were higher in none and lower in 20, by 0.13 to 2.63 errors per
+    dataset, 11 of them in SHD at 1,000 rows per setting; ``alpha=0.001`` was lower in 15 and higher
+    in 3, in SHD at 5,000 rows, none of which repeated on the rerun; ``alpha=1e-5`` was lower in 7
+    and higher in none. Against ``alpha=0.001`` itself the default made fewer SHD errors in 4
+    comparisons, all at 5,000 rows, by 0.2 to 0.65 edges, and more in none.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other
@@ -842,22 +844,34 @@ def ut_igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5 settings
-    and 5,000 rows per setting, the authors' simulated setting, and on smaller fixed cases with the
-    kernel and categorical tests. The search's cost grows with the number of I-covered edges to
-    the power of its depth, and each start tests every pair given all other variables, so time
-    grows fast with the number of variables. The objective counts targets, so a setting whose
-    intervention leaves its target's distribution unchanged, such as a shift of a variable's mean
-    by an amount the test cannot tell apart, orients nothing through that target. Unmeasured common
-    causes and nonlinear effects with ``"fisherz"`` are outside its model. Its authors state a
-    nonparametric version but run none; the kernel tests are not benchmarked with it. One level
-    serves both tests unless ``invariance_alpha`` is given. At 300 rows per setting, fewer than the
-    authors' simulations use, the default level made fewer SHD errors than the paper's reference
-    implementation at ``alpha=1e-5``, by 1.5 with no unknown targets and 2.1 with 3 per setting, but
-    more target errors with no unknown targets, by 0.35 per dataset; against ``alpha=0.001`` its SHD
-    errors did not differ clearly and its target errors were higher at both, by 0.31 and 0.45. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** Measured on simulated data, 20 datasets per setting (10 at 50 and 100
+    variables and on categorical data), one core per fit, against the paper's reference
+    implementation at its defaults, ``alpha=1e-5`` [1]_. In the authors' setting every fit finished,
+    and in all 56 groups its SHD was below the empty graph's 15 and, where the given targets missed
+    some, its target errors were below those of the given targets alone. Its lead there comes from
+    the default level: run at the same level with 10 starts, the reference implementation tied it in
+    107 of the 112 comparisons, and at ``alpha=1e-5`` with 5 starts it was worse in none and better
+    in none. Outside the authors' setting, at the default level: with 100 rows per setting its SHD
+    was 8.35 against the reference implementation's 12.95 and the empty graph's 15, but with no
+    unknown targets it named more false targets, 1.50 per dataset against 0.25; on a denser graph,
+    50 variables at mean degree 5 with 3 settings, neither beat the empty graph, its SHD 130.2 and
+    123.9 against 125 at 500 and 2,000 rows per setting; with additive nonlinear effects and the
+    Gaussian tests its SHD was 1.55 and 1.4, close to the reference implementation's, but its target
+    errors were higher, 1.85 against 0.75 with no unknown targets and 4.85 against 2.90 with 3 per
+    setting. Its authors state a nonparametric version but run none; with ``indep_test="kci"`` on 10
+    variables with additive nonlinear effects its SHD was 5.3 and 5.5 at 200 rows per setting and
+    2.4 and 2.35 at 400, against the empty graph's 8, a fit taking 8 to 30 s. On categorical data
+    with ``indep_test="gsq"``, 10 variables, its SHD was 5.4 at 1,000 rows per setting and 1.6 at
+    5,000, against 10. With 2,000 rows per setting and 3 unknown targets per setting, its SHD was
+    1.5 at 50 variables and 4.8 at 100, against 38 and 75, a median fit taking 1.7 s and 15.2 s. A
+    median fit on 20 variables took 0.24 s, about 1.7 times the reference implementation's time on
+    the same core. The search's cost grows with the number of I-covered edges to the power of its
+    depth, and each start tests every pair given all other variables, so time grows fast with the
+    number of variables. The objective counts targets, so a setting whose intervention leaves its
+    target's distribution unchanged orients nothing through that target. Unmeasured common causes
+    are outside its model and not measured. One level serves both tests unless
+    ``invariance_alpha`` is given. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

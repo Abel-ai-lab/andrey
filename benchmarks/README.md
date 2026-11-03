@@ -35,6 +35,8 @@ Packages:
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
   [GnIES](comparisons/gnies.md)
+- [graphical-model-learning](https://github.com/uhlerlab/graphical_model_learning) - uses a
+  separate environment; see below and [UT-IGSP](comparisons/ut-igsp.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
 

@@ -54,7 +54,9 @@ Each release card publishes its numbers from a summary in `published/<release>/`
 hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
 fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
 fix. [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json) holds the comparison of the
-experimental GnIES with gnies, which its [comparison page](comparisons/gnies.md) presents.
+experimental GnIES with gnies, and [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
+that of the experimental UT-IGSP with graphical-model-learning; their comparison pages,
+[GnIES](comparisons/gnies.md) and [UT-IGSP](comparisons/ut-igsp.md), present them.
 
 | Release | Release card | Summary |
 |---|---|---|
