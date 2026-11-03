@@ -169,7 +169,7 @@ def test_the_summary_entries_are_read_and_judged_by_the_parity_check():
     failures, _ = reference_parity.check(rows, [])
     # Andrey has 2.5 more SHD on average: worse. Its targets are better: not a failure.
     [failure] = failures
-    assert "regime=G1_shift_l3_J1 " in failure and "on target_error" not in failure
+    assert "metric=shd " in failure
 
 
 def test_a_worse_cell_counts_only_when_its_rerun_on_fresh_seeds_is_worse():
@@ -183,7 +183,7 @@ def test_a_worse_cell_counts_only_when_its_rerun_on_fresh_seeds_is_worse():
     [entry] = [e for e in summary["methods"] if e["regime"] == "G2_perfect_l3_J1"]
     assert entry["rows"][0]["replication"]["seeds"] == "2000-2019"
     rows = reference_parity.paired_rows("lane", summary)
-    [row] = [r for r in rows if r.key["regime"] == "G2_perfect_l3_J1"]
+    [row] = [r for r in rows if r.key["metric"] == "shd"]
     assert row.replicated and not row.failed
     assert reference_parity.check(
         reference_parity.paired_rows("lane", lane.summarize(records)), []

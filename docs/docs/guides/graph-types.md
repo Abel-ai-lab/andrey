@@ -58,7 +58,8 @@ Andrey uses `kind="cpdag"`. The pair `(TAIL, TAIL)` means an unresolved directio
 opposite causal effects. PC and GES, among other methods, return this kind. GIES returns it too
 for data with interventions, where the class holds only the DAGs that also agree on the data under
 each set of intervened variables, so it can direct more edges
-([Hauser and Buhlmann (2012)](#references)).
+([Hauser and Buhlmann (2012)](#references)). GnIES returns the same kind of class for the targets
+it learns, with every edge at a target directed.
 
 ```python
 cpdag = GraphStructure.from_numpy(
@@ -170,7 +171,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `gin`, `anm`, `pnl` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `iamb`, `inter_iamb` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears` |

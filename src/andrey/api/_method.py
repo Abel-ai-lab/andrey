@@ -225,12 +225,14 @@ def used_penalties(
 
     ``penalty_discount`` weighs every score but BDeu, ``ebic_gamma`` only the linear-Gaussian BIC,
     and ``equivalent_sample_size`` only BDeu (:data:`PENALTIES`); a penalty the score ignores is
-    left out. The value is the call's, or the default.
+    left out. A method without ``score_func`` has one score, which uses every penalty it takes. The
+    value is the call's, or the default.
     """
+    one_score = not any(p.concept == "score_func" for p in spec.params)
     return {
         p.name: arguments.get(p.name, p.default)
         for p in spec.params
-        if score in PENALTIES.get(p.concept or "", ())
+        if score in PENALTIES.get(p.concept or "", ()) or (one_score and p.concept in PENALTIES)
     }
 
 
@@ -240,12 +242,13 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any]) -> None:
     ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` alone, and ``equivalent_sample_size``
     the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). The score is the one the fit uses:
     the call's ``score_func``, or, for ``None``, the one picked from the declared column types
-    (:func:`chosen_settings`).
+    (:func:`chosen_settings`). A method without ``score_func`` has one score, which reads every
+    argument it takes.
     """
     passed = [
         (p.name, p.concept) for p in spec.params if p.concept in SCORE_ONLY and p.name in arguments
     ]
-    if not passed:
+    if not passed or not any(p.concept == "score_func" for p in spec.params):
         return
     score = chosen_settings(spec, arguments).get("score_func")
     for name, concept in passed:

@@ -29,11 +29,11 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix,
-    and the environments of a method in ``CONTEXT``."""
+    """The method's required positional inputs, gnies's env, and the environments of a method in
+    ``CONTEXT``, with a DataFrame wherever it takes a data matrix."""
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
             if spec.name in CONTEXT and inp.kind == "context":
                 args.append(np.arange(N) * 3 // N)
             continue

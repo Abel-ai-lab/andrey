@@ -20,8 +20,11 @@ summary's ``parity_rule`` sets how its rows are judged:
   measured for the method's Limitations, so it is reported with its numbers and never gated. A row
   with ``"claim": "in"``, or with no ``claim``, is in claim and is judged as above; the row's own
   field overrides its entry's.
-- ``metric``, on an entry (default ``"shd"``): the error its rows compare. A row's means are
-  ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, and its label names the metric.
+- ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent) or
+  ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
+  targets). A row's means are ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the
+  ``*_shd_mean`` fields, which then hold that error's means. A method with a gated metric beside
+  SHD has one entry per metric, and a row's key names the ``metric``.
 - ``role``: ``"context"`` on an entry marks a comparator the method is reported against and never
   judged by, such as another method on the same data. Its rows are reported with their numbers.
 - ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
@@ -86,6 +89,8 @@ IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 CONTEXT = "context"
 #: A row's floor intervals: Andrey's error minus the empty graph's, and minus the given targets'.
 FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95")
+#: The ``metric`` values an entry may name, with the text a row prints for each.
+METRICS: dict[str, str] = {"shd": "SHD", "target_error": "target error"}
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect", "tie-break"})
 
@@ -148,8 +153,7 @@ class Row:
 
     def label(self) -> str:
         where = " ".join(f"{k}={v}" for k, v in self.key.items())
-        metric = "" if self.metric == "shd" else f" on {self.metric}"
-        return f"{self.method} vs {self.comparator}{metric}, {where} ({self.summary})"
+        return f"{self.method} vs {self.comparator}, {where} ({self.summary})"
 
     def numbers(self) -> str:
         text = self._numbers()
@@ -159,11 +163,10 @@ class Row:
         if self.interval is not None:
             lo, hi = self.interval
             each = f", the mean of {self.draws} draws each" if self.draws > 1 else ""
-            name = "SHD" if self.metric == "shd" else self.metric
             text = (
                 f"mean D {self.mean_d:+.2f}, bootstrap 95% [{lo:+.2f}, {hi:+.2f}], over "
-                f"{self.pairs} paired datasets{each} (mean {name} Andrey {self.andrey:.2f}, "
-                f"{self.comparator} {self.reference:.2f})"
+                f"{self.pairs} paired datasets{each} (mean {METRICS[self.metric]} Andrey "
+                f"{self.andrey:.2f}, {self.comparator} {self.reference:.2f})"
             )
         elif self.pairs == 0:
             text = "no paired dataset"
@@ -199,29 +202,34 @@ class Row:
 def paired_rows(summary: str, data: dict) -> list[Row]:
     """Return the rows of one summary that pair Andrey with a reference package.
 
-    A row where either side has no result (a fit over the time cap) is skipped, and so is a series
-    of the column-order arm. A paired row with no known error field, a ``paired bootstrap`` row
-    with ``MIN_PAIRS`` paired datasets and no consistent interval, an unknown ``parity_rule``, an
-    unknown ``claim`` or ``role``, a ``coverage`` without ``andrey_short``, a floor that is not
-    an interval, and a column-order arm on a reference not marked order-dependent or with one
-    of its two series missing or of unequal lengths raise, so a new summary format cannot pass
-    unchecked.
+    An entry's ``metric`` joins the key of each of its rows, and two entries of one method against
+    one reference need a ``regime`` only when they also share their metric. A row where either side
+    has no result (a fit over the time cap) is skipped, and so is a series of the column-order arm.
+    A paired row with no known error field, a ``paired bootstrap`` row with ``MIN_PAIRS`` paired
+    datasets and no consistent interval, an unknown ``parity_rule``, an unknown ``claim``,
+    ``metric`` or ``role``, a ``coverage`` without ``andrey_short``, a floor that is not an
+    interval, and a column-order arm on a reference not marked order-dependent or with one of its
+    two series missing or of unequal lengths raise, so a new summary format cannot pass unchecked.
     """
     rule = data.get("parity_rule")
     if rule not in (None, PAIRED_BOOTSTRAP):
         raise ValueError(f"{summary}: unknown parity_rule {rule!r}")
-    entries = Counter((m["method"], m.get("comparator")) for m in data["methods"])
-    rows = []
+    entries = Counter(
+        (m["method"], m.get("comparator"), m.get("metric", "shd")) for m in data["methods"]
+    )
+    rows: list[Row] = []
     for method in data["methods"]:
         comparator = method.get("comparator")
         if not comparator:
             continue
-        by_regime = entries[(method["method"], comparator)] > 1
+        metric = method.get("metric", "shd")
+        if metric not in METRICS:
+            raise ValueError(f"{summary}: {method['method']} has an unknown metric {metric!r}")
+        by_regime = entries[(method["method"], comparator, metric)] > 1
         if by_regime and not method.get("regime"):
             raise ValueError(
                 f"{summary}: {method['method']} vs {comparator} has two entries and no regime"
             )
-        metric = method.get("metric", "shd")
         role = method.get("role")
         if role not in (None, CONTEXT):
             raise ValueError(
@@ -229,6 +237,8 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
             )
         for row in method.get("rows", []):
             key = {"regime": method["regime"]} if by_regime else {}
+            if "metric" in method:
+                key["metric"] = metric
             key.update({k: row[k] for k in ROW_KEYS if k in row})
             where = f"{summary}: {method['method']} vs {comparator} {key}"
             name = (summary, method["method"], comparator, key)
@@ -319,6 +329,16 @@ def _errors(row: dict, where: str) -> tuple[str, float, float] | None:
     return rule, andrey, reference
 
 
+def _means(fields: dict, metric: str) -> tuple[str, str]:
+    """Return the names of the row's mean fields for ``metric``: ``andrey_<metric>_mean`` and
+    ``comparator_<metric>_mean``, or, when neither is there, the ``*_shd_mean`` fields that hold
+    the metric's means."""
+    names = (f"andrey_{metric}_mean", f"comparator_{metric}_mean")
+    if all(fields.get(name) is None for name in names):
+        return ("andrey_shd_mean", "comparator_shd_mean")
+    return names
+
+
 def _judged(
     name: tuple[str, str, str, dict[str, Any]],
     fields: dict,
@@ -331,7 +351,7 @@ def _judged(
     The fields must all be present, with the means of ``metric``, and ``above_zero`` must say what
     the interval says.
     """
-    means = (f"andrey_{metric}_mean", f"comparator_{metric}_mean")
+    means = _means(fields, metric)
     names = (*means, "mean_D", "bootstrap_95", "above_zero")
     if any(fields.get(field) is None for field in names):
         raise ValueError(f"{where} needs {names} for the paired bootstrap rule")
@@ -371,7 +391,7 @@ def _replicated(
         raise ValueError(f"{where} has no paired count")
     if pairs >= MIN_PAIRS:
         return replace(_judged(name, replication, column, where, metric), replicated=True)
-    fields = (f"andrey_{metric}_mean", f"comparator_{metric}_mean")
+    fields = _means(replication, metric)
     means = (replication.get(fields[0]), replication.get(fields[1]))
     if None in means:
         raise ValueError(f"{where} needs {fields[0]} and {fields[1]}")

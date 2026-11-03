@@ -505,6 +505,69 @@ _add(
 )
 _add(
     MethodSpec(
+        name="gnies",
+        family="score",
+        summary="Greedy noise-interventional equivalence search: learns the variables whose noise "
+        "variance changes between environments (unknown targets) together with the graph, for "
+        "linear-Gaussian data from two or more environments that share one set of weights. "
+        "Returns the interventional essential graph + score; the learned targets are "
+        "metadata['index_edges'].",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Two or more environments of 2+ rows each. null takes the environments from "
+                    "targets given as a column or a 0/1 matrix.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; the learned targets in metadata['index_edges'] as "
+            "[variable, 'directed']; the environments' labels in metadata['environments']",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables known to be intervened on: a JSON object mapping labels of env "
+                "to lists of variables, by the data file's header or 0-based position, such as "
+                '{"0": [], "1": ["x"]}; null, or a label left out, marks an environment whose '
+                "targets are unknown, and the search may add targets there. null for the whole "
+                "argument (the default) learns every target.",
+                nullable=True,
+            ),
+            concept_param(
+                "penalty_discount",
+                doc="Multiplier on the BIC penalty of log(n_samples) per parent and per extra "
+                "noise variance of a target. Larger values give sparser graphs and fewer targets; "
+                "1.0 with ebic_gamma=0.0 is the standard BIC.",
+            ),
+            concept_param(
+                "ebic_gamma",
+                doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, "
+                "n_parents) added per variable, on parents only, from 0 to 1. Larger values give "
+                "sparser graphs; 0.0 is the standard BIC, the paper's score.",
+            ),
+        ),
+        references=("Gamella et al. 2022", "Hauser & Buhlmann 2012"),
+    )
+)
+_add(
+    MethodSpec(
         name="xges",
         family="score",
         summary="Extremely greedy equivalence search: GES's moves and scores, deleting an edge "
@@ -2282,6 +2345,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
+    "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
@@ -2411,6 +2475,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     **dict.fromkeys(
         ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
     ),
+    "gnies": ("score", "index_edges", "environments"),
     "exact_search": ("dag",),
     "ut_igsp": ("targets", "score", "invariance_test"),
     "calm": ("h_final", "objective"),
