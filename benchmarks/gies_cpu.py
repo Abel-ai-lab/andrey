@@ -2,14 +2,18 @@
 """Benchmark GIES on CPU: Andrey against pcalg, on interventional data.
 
 Runs Andrey's `gies` and pcalg's `gies` on linear-Gaussian data that mixes observation with
-interventions, simulated as in Hauser and Buhlmann (2012, Section 5.2.1) (:func:`sample`):
+interventions, drawn with ``andrey.data`` in the setting of Hauser and Buhlmann (2012, Section
+5.2.1) (:func:`sample`):
 
-- a random DAG on ``d`` variables whose vertex degrees have mean :data:`DEGREE`;
-- edge weights drawn from ``U([-1, -0.1] U [0.1, 1])`` and error variances from ``U(0.5, 1)``,
-  rescaled so every variable has unit variance without interventions;
+- an Erdos-Renyi DAG on ``d`` variables with mean vertex degree :data:`DEGREE`, its columns in an
+  order drawn from the seed;
+- edge weights of magnitude ``U(0.1, 1)`` with a random sign and standard Gaussian errors, each
+  variable divided by its standard deviation as it is generated (``scale="rescale"``), so every
+  variable has variance 1 without interventions;
 - ``round(target_share * d)`` single-variable intervention targets, chosen at random; each target's
-  rows set its variable from ``N(2, 0.2^2)``;
-- ``rows_per_variable * d`` rows, split evenly between no intervention and each target.
+  environment cuts it from its parents and sets it from ``N(2, 0.2^2)``;
+- ``rows_per_variable * d`` rows, split evenly between the environment without intervention and
+  each target's.
 
 Each fit gets the samples and the 0/1 intervention matrix side by side
 (:func:`andrey_bench.adapters.andrey_gies.stack`) and runs isolated, under a per-fit wall cap; a fit
@@ -49,6 +53,12 @@ SOLUTIONS = [AndreyGIES(), PcalgGIES()]
 #: Mean vertex degree of the generating DAG.
 DEGREE = 2.0
 
+#: Magnitude range of the edge weights.
+WEIGHTS = (0.1, 1.0)
+
+#: The generator a run's records come from; a run recorded with another cannot be rescored.
+SAMPLER = "andrey.data, scale='rescale'"
+
 #: The level of an intervened variable: mean and standard deviation.
 LEVEL = (2.0, 0.2)
 
@@ -66,37 +76,24 @@ def sample(
     ``interventions[r, j]`` is True when row ``r`` set variable ``j`` by intervention; ``dag`` holds
     the generating DAG's endpoint marks.
     """
-    rng = np.random.default_rng([d, seed])
-    # The causal order is a uniformly random permutation of the columns and the targets are drawn
-    # uniformly, so the column order carries nothing of the graph and needs no shuffle step.
-    order = rng.permutation(d)
-    B = np.zeros((d, d))  # B[i, j]: the weight of j -> i
-    for a in range(d):
-        for b in range(a + 1, d):
-            if rng.random() < DEGREE / max(d - 1, 1):
-                B[order[b], order[a]] = rng.uniform(0.1, 1.0) * rng.choice((-1.0, 1.0))
-    variance = rng.uniform(0.5, 1.0, d)
-    inverse = np.linalg.inv(np.eye(d) - B)
-    scale = 1.0 / np.sqrt(np.diag(inverse @ np.diag(variance) @ inverse.T))
-    B = scale[:, None] * B / scale[None, :]
-    variance = scale**2 * variance
+    from andrey.data import SCM, functional, graphs, noise
+    from andrey.data.interventions import hard
 
-    n = rows_per_variable * d
-    targets = rng.choice(d, size=round(target_share * d), replace=False)
-    setting = np.arange(n) % (len(targets) + 1)  # 0: no intervention; k: the k-th target
-    interventions = np.zeros((n, d), dtype=bool)
-    for k, target in enumerate(targets, start=1):
-        interventions[setting == k, target] = True
-    X = np.zeros((n, d))
-    for j in order:
-        X[:, j] = X @ B[j] + rng.normal(0.0, np.sqrt(variance[j]), n)
-        hit = interventions[:, j]
-        X[hit, j] = rng.normal(*LEVEL, hit.sum())
-
-    dag = np.zeros((d, d), dtype=np.int8)
-    child, parent = np.nonzero(B)
-    dag[parent, child], dag[child, parent] = 1, 2  # parent -> child
-    return X, interventions, dag
+    scm = SCM(
+        graph=graphs.erdos_renyi(d, avg_degree=DEGREE),
+        functional=functional.linear(weight_range=WEIGHTS),
+        noise=noise.gaussian(),
+    )
+    targets = np.random.default_rng([d, seed]).choice(d, round(target_share * d), replace=False)
+    envs = [{}] + [{int(t): hard(LEVEL[0], sd=LEVEL[1])} for t in targets]
+    n, k = rows_per_variable * d, len(envs)
+    ds = scm.sample(
+        n=[n // k + (e < n % k) for e in range(k)], seed=seed, envs=envs, scale="rescale"
+    )
+    interventions = np.zeros(ds.data.shape, dtype=bool)
+    for env, columns in ds.targets.items():
+        interventions[np.ix_(ds.env == env, columns)] = True
+    return ds.data, interventions, np.asarray(ds.graph.to_numpy(), dtype=np.int8)
 
 
 def essential_graph(dag: np.ndarray, interventions: np.ndarray) -> np.ndarray:
@@ -142,6 +139,11 @@ def _read(out: Path) -> list[dict]:
 
 def rescore(out: Path, meta: dict) -> list[dict]:
     """Recompute every record's scores from its stored marks and rewrite the records."""
+    if meta.get("sampler") != SAMPLER:
+        raise SystemExit(
+            f"--rescore: the run's data came from {meta.get('sampler', 'an earlier sampler')}, "
+            f"not {SAMPLER}; rescore it with the build that recorded it"
+        )
     records = _read(out)
     for record in records:
         if record.get("marks") is None:
@@ -245,7 +247,9 @@ def main(argv: list[str] | None = None) -> int:
         "solution list": [a.name for a in field],
         "params": {a.name: dict(a.params()) for a in field},
         "r environment": rsession.check_environment("pcalg") if needs_r else {},
+        "sampler": SAMPLER,
         "degree": DEGREE,
+        "weights": list(WEIGHTS),
         "level": list(LEVEL),
         "ladder": args.ladder,
         "seeds": args.seeds,
