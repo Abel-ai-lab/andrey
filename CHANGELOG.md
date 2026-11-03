@@ -10,6 +10,11 @@ names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
+  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
+
 ### Fixed
 
 - Copies of one column in other units, such as `x` and `2 * x + 1`, and categorical columns that
@@ -1638,3 +1643,4 @@ First alpha release.
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
+[#662]: https://github.com/Abel-ai-lab/andrey/pull/662

@@ -791,6 +791,21 @@ _TABLE_MIN = 1 << 16
 _BATCH_CELLS = 1 << 22
 
 
+def _segment_sums(values: np.ndarray, cuts: np.ndarray) -> np.ndarray:
+    """``np.sum(values[cuts[i]:cuts[i + 1]])`` for each ``i``.
+
+    When every segment has one length, as each query's tables in a scan do, the segments are summed
+    as the rows of one array with ``np.sum(axis=1)``, which adds each row's values in the order
+    ``np.sum`` adds a segment's, so every sum is the one a call per segment returns, bit for bit;
+    otherwise each segment is summed alone.
+    """
+    bounds = cuts.tolist()
+    if len(bounds) > 2 and all(b - a == bounds[1] - bounds[0] for a, b in zip(bounds, bounds[1:])):
+        rows = values[bounds[0] : bounds[-1]].reshape(len(bounds) - 1, bounds[1] - bounds[0])
+        return np.sum(rows, axis=1)
+    return np.array([np.sum(values[a:b]) for a, b in zip(bounds[:-1], bounds[1:])])
+
+
 class ChiSquare:
     """Pearson chi-square or G-square test of conditional independence on category codes.
 
@@ -831,7 +846,10 @@ class ChiSquare:
     rows and counting the statistics above the observed one (a permutation test [4]_) rejected 4.6%
     to 5.0% in the same tables, at about a hundred times the cost; Andrey does not offer it.
 
-    Queries are canonicalized as :class:`FisherZ`'s are, and no query's result is memoized. The
+    Queries are canonicalized as :class:`FisherZ`'s are. The statistic and p-value of each pair's
+    marginal (``|S| == 0``) query are kept once computed, so a pair asked again, as IAMB and MMPC
+    ask each pair from both ends, is not counted again; they take two ``(d, d)`` float arrays,
+    kept when there are no more columns than rows. No other query's result is memoized. The
     mean of a G-square cell is a function of its configuration's rows and the two margins alone, so
     the means of configurations of at most 128 rows are read from a table that every test in the
     process shares: at most 358 thousand floats (2.9 MB), filled by rows when a lookup first needs
@@ -844,7 +862,8 @@ class ChiSquare:
     category-indicator matrix with itself, whose integer counts are exact in float64.
     :meth:`pvalues_given` numbers the configurations of one conditioning set once and counts the
     tables of all its candidates of one shape in one ``bincount``, and :meth:`statistic_pvalues`
-    answers its queries that share a conditioning set the same way. For G-square, the cell means of
+    answers its queries that share a conditioning set the same way, and queries of one pair over
+    many conditioning sets as :meth:`batched_call` does. For G-square, the cell means of
     every table of such a scan are evaluated in one call. Every step after the counting is
     elementwise on the tables, except the sum of a query's statistic over its cells, which is
     ``np.sum`` over that query's cells in the order :meth:`__call__` sums them, so the sum, and a
@@ -882,10 +901,13 @@ class ChiSquare:
             raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
-        # Each column's codes as one contiguous row, for the batched counts; int32 halves the
-        # memory those counts stream through.
+        # Each column's codes as one contiguous row, for the batched counts and for numbering
+        # configurations, which read a column at a time; int32 halves the memory those counts
+        # stream through.
         self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
+        # The marginal queries' statistics and p-values, by pair, and which pairs are known.
+        self._marginals: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
@@ -895,6 +917,14 @@ class ChiSquare:
         """
         return self._statistic_pvalue(x, y, condition_set)[1]
 
+    def _marginal_memo(self) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """The kept marginal answers ``(known, statistics, p_values)``, each ``(d, d)`` and read at
+        ``[x, y]`` for ``x < y``; ``None`` when there are more columns than rows."""
+        d = self._codes.shape[1]
+        if self._marginals is None and d <= self._n:
+            self._marginals = (np.zeros((d, d), dtype=bool), np.empty((d, d)), np.empty((d, d)))
+        return self._marginals
+
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -902,11 +932,16 @@ class ChiSquare:
 
         ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
         conditioning sets; entry ``i`` holds query ``i``'s statistic and :meth:`__call__`'s p-value.
-        The queries that share a conditioning set are answered together (:meth:`pvalues_given`).
+        Queries of one pair are answered together as :meth:`batched_call` answers them; otherwise
+        the queries that share a conditioning set are (:meth:`pvalues_given`).
         """
         xs = np.asarray(x, dtype=np.intp)
         ys = np.asarray(y, dtype=np.intp)
         conds = np.sort(np.asarray(conditions, dtype=np.intp).reshape(len(xs), -1), axis=1)
+        lo, hi = np.minimum(xs, ys), np.maximum(xs, ys)
+        if len(xs) > 1 and (lo == lo[0]).all() and (hi == hi[0]).all():
+            sets = [_canonical(lo[0], hi[0], row)[2] for row in conds.tolist()]
+            return self._pair_statistics(int(lo[0]), int(hi[0]), sets)
         groups: dict[tuple[int, ...], list[int]] = {}
         for k, row in enumerate(conds.tolist()):
             groups.setdefault(tuple(row), []).append(k)
@@ -940,15 +975,31 @@ class ChiSquare:
         blocks of at most ``_BATCH_CELLS`` row indices and table cells, a block per table shape;
         the others, and a single pair, take the scalar path. The blocks of a scan are counted
         first, and their degrees of freedom are evaluated together (:func:`_null_means_batch`),
-        for as many blocks as hold ``_BATCH_CELLS`` table cells at once.
+        for as many blocks as hold ``_BATCH_CELLS`` table cells at once. Without ``cond``, the
+        pairs answered before are read from the kept answers (:meth:`_marginal_memo`).
         """
         a, b = np.minimum(xs, ys), np.maximum(xs, ys)
         assert not np.isin(np.concatenate([a, b]), cond).any(), "x, y cannot be in condition_set."
+        memo = None if cond else self._marginal_memo()
+        if memo is not None:
+            known, kept_statistics, kept_p_values = memo
+            new = np.flatnonzero(~known[a, b])
+            if len(new):
+                found = self._counted_given(a[new], b[new], cond)
+                kept_statistics[a[new], b[new]], kept_p_values[a[new], b[new]] = found
+                known[a[new], b[new]] = True
+            return kept_statistics[a, b], kept_p_values[a, b]
+        return self._counted_given(a, b, cond)
+
+    def _counted_given(
+        self, a: np.ndarray, b: np.ndarray, cond: list[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """:meth:`_given` of the ordered pairs ``a[i] < b[i]``, every one counted."""
         statistics = np.empty(len(a), dtype=np.float64)
         p_values = np.empty(len(a), dtype=np.float64)
         n, cards = self._n, self._cardinalities
         scan = len(a) > 1 and n > 0
-        layer, m = categorical.configurations(self._codes, cards, cond) if scan else (a, 0)
+        layer, m = categorical.configurations(self._rows.T, cards, cond) if scan else (a, 0)
         shapes = cards[a] * (int(cards.max(initial=0)) + 1) + cards[b]
         counted: list[_Counted] = []
         held = 0
@@ -961,12 +1012,18 @@ class ChiSquare:
                     statistics[i], p_values[i] = self._statistic_pvalue(a[i], b[i], cond)
                 continue
             step = max(1, _BATCH_CELLS // max(n, m * cells))
+            # Each row's first cell in its configuration. A block's tables hold at most
+            # max(_BATCH_CELLS, _DENSE_CELLS) cells, so its indices are built in place in the
+            # rows' dtype.
+            dtype = self._rows.dtype
+            first = (layer * cells).astype(dtype)
             for at in range(0, len(members), step):
                 part = members[at : at + step]
-                index = self._rows[a[part]] * ky + self._rows[b[part]]  # each row's (x, y) cell
-                index = (
-                    index + (layer * cells)[None, :] + (np.arange(len(part)) * (m * cells))[:, None]
-                )
+                index = self._rows[a[part]]
+                index *= dtype.type(ky)
+                index += self._rows[b[part]]  # each row's (x, y) cell
+                index += first
+                index += (np.arange(len(part), dtype=dtype) * dtype.type(m * cells))[:, None]
                 tables = np.bincount(index.ravel(), minlength=len(part) * m * cells)
                 bounds = np.arange(len(part) + 1) * m
                 counted.append(
@@ -999,16 +1056,31 @@ class ChiSquare:
     ) -> tuple[float, float]:
         """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
-        codes = self._codes
+        memo = None if cond else self._marginal_memo()
+        if memo is not None:
+            known, kept_statistics, kept_p_values = memo
+            if not known[x_int, y_int]:
+                found = self._counted_statistic_pvalue(x_int, y_int, cond)
+                kept_statistics[x_int, y_int], kept_p_values[x_int, y_int] = found
+                known[x_int, y_int] = True
+            return float(kept_statistics[x_int, y_int]), float(kept_p_values[x_int, y_int])
+        return self._counted_statistic_pvalue(x_int, y_int, cond)
+
+    def _counted_statistic_pvalue(
+        self, x_int: int, y_int: int, cond: list[int]
+    ) -> tuple[float, float]:
+        """:meth:`_statistic_pvalue` of the canonical query ``x_int < y_int`` given ``cond``,
+        counted."""
+        rows = self._rows
         kx = int(self._cardinalities[x_int])
         ky = int(self._cardinalities[y_int])
-        layer, m = categorical.configurations(codes, self._cardinalities, cond)
-        xs = layer * kx + codes[:, x_int]  # (configuration, x) cell of each row
-        ys = layer * ky + codes[:, y_int]
+        layer, m = categorical.configurations(rows.T, self._cardinalities, cond)
+        xs = layer * kx + rows[x_int]  # (configuration, x) cell of each row
+        ys = layer * ky + rows[y_int]
         n_sx = np.bincount(xs, minlength=m * kx).reshape(m, kx)
         n_sy = np.bincount(ys, minlength=m * ky).reshape(m, ky)
         n_s = n_sx.sum(axis=1)
-        cells = xs * ky + codes[:, y_int]
+        cells = xs * ky + rows[y_int]
         if m * kx * ky <= _DENSE_CELLS:
             table = np.bincount(cells, minlength=m * kx * ky)
             occupied = np.flatnonzero(table)
@@ -1043,7 +1115,7 @@ class ChiSquare:
             return [self(x, y, condition_set) for condition_set in condition_sets]
         x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
         conds = [_canonical(x_int, y_int, condition_set)[2] for condition_set in condition_sets]
-        return self._pvalues(x_int, y_int, conds).tolist()
+        return self._pair_statistics(x_int, y_int, conds)[1].tolist()
 
     def separating_prefix(
         self, x: int, y: int, condition_sets: Sequence[Iterable[int]], alpha: float
@@ -1062,7 +1134,7 @@ class ChiSquare:
         Entry ``i`` equals ``self(x, y, (zs[i],))``; ``zs`` must exclude ``x`` and ``y``.
         """
         x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
-        return self._pvalues(x_int, y_int, [[int(z)] for z in zs])
+        return self._pair_statistics(x_int, y_int, [[int(z)] for z in zs])[1]
 
     def marginal_pvalues(self) -> np.ndarray:
         """All-pairs marginal (``|S| == 0``) p-values as a symmetric ``(d, d)`` matrix.
@@ -1121,13 +1193,16 @@ class ChiSquare:
                 tables = gram[rows, cols].astype(np.int64)
                 out[xs[part], ys[part]] = self._table_pvalues(tables, np.arange(part.size + 1))
 
-    def _pvalues(self, x: int, y: int, conds: list[list[int]]) -> np.ndarray:
-        """P-values of the pair ``x < y`` given each canonical conditioning set in ``conds``.
+    def _pair_statistics(
+        self, x: int, y: int, conds: list[list[int]]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Statistics and p-values of the pair ``x < y`` given each canonical set in ``conds``.
 
         The sets whose tables have at most ``max(4 * n, 65536)`` possible cells are counted in
-        blocks, grouped by size (:meth:`_block_pvalues`); the others take :meth:`__call__`.
+        blocks, grouped by size (:meth:`_block_statistics`); the others take the scalar path.
         """
-        out = np.empty(len(conds))
+        statistics = np.empty(len(conds))
+        p_values = np.empty(len(conds))
         n = self._n
         cards = self._cardinalities
         kx, ky = int(cards[x]), int(cards[y])
@@ -1137,11 +1212,11 @@ class ChiSquare:
         configurations = [math.prod(int(cards[c]) for c in cond) for cond in conds]
         for i, cond in enumerate(conds):
             if n == 0 or configurations[i] * cells > limit:
-                out[i] = self(x, y, cond)
+                statistics[i], p_values[i] = self._statistic_pvalue(x, y, cond)
             else:
                 by_size.setdefault(len(cond), []).append(i)
         if not by_size:
-            return out
+            return statistics, p_values
         target = self._rows[x] * ky + self._rows[y]  # each row's (x, y) cell
         rows_per_block = max(1, _BATCH_CELLS // n)
         for size, members in by_size.items():
@@ -1154,16 +1229,17 @@ class ChiSquare:
                         break
                     stop += 1
                 block = members[start:stop]
-                out[block] = self._block_pvalues(
+                statistics[block], p_values[block] = self._block_statistics(
                     target, cells, kx, ky, [conds[i] for i in block], size
                 )
                 start = stop
-        return out
+        return statistics, p_values
 
-    def _block_pvalues(
+    def _block_statistics(
         self, target: np.ndarray, cells: int, kx: int, ky: int, conds: list[list[int]], size: int
-    ) -> np.ndarray:
-        """P-values of one block of conditioning sets of equal ``size``, counted together.
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Statistics and p-values of one block of conditioning sets of equal ``size``, counted
+        together.
 
         Row ``r`` of set ``i`` falls in configuration ``offset[i] + code``, with ``code`` the
         mixed-radix code of its conditioning categories, the first column most significant: the
@@ -1204,7 +1280,7 @@ class ChiSquare:
             index += target
             tables = np.bincount(index.ravel(), minlength=int(rank[-1]) * cells)
         bounds = np.concatenate(([0], rank[offset + q - 1]))
-        return self._table_pvalues(tables.reshape(-1, kx, ky), bounds)
+        return self._table_statistics(tables.reshape(-1, kx, ky), bounds)
 
     def _table_pvalues(self, tables: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         """P-values of the tests whose ``(kx, ky)`` tables are stacked in ``tables``
@@ -1242,8 +1318,7 @@ class ChiSquare:
             values = observed * np.log(observed / expected)
         else:
             values = observed * (observed / expected)
-        cuts = np.searchsorted(occupied, bounds * (kx * ky)).tolist()
-        sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
+        sums = _segment_sums(values, np.searchsorted(occupied, bounds * (kx * ky)))
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
         return statistic, (n_sx, n_sy, n_s)
 
@@ -1253,8 +1328,7 @@ class ChiSquare:
     ) -> np.ndarray:
         """The p-values of tests with ``statistic`` and the null means ``per_table`` of their
         tables, test ``i`` owning ``per_table[bounds[i]:bounds[i + 1]]``."""
-        cuts = bounds.tolist()
-        dof = np.array([np.sum(per_table[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
+        dof = _segment_sums(per_table, bounds)
         out = np.ones(len(dof))
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
