@@ -27,7 +27,7 @@ factor, and the comparison checks Andrey against R's p-values with that factor a
   `K - 1` (`getpval.R`, line 42); the paper's Method II corrects over the `K` environments
   (Section 3.1). Andrey multiplies by `K`, and by 1 with two environments, where the two
   comparisons are one test. With three or more environments, Andrey's p-values are R's times
-  `K / (K - 1)`.
+  `K / (K - 1)`; [The correction](#the-correction) measures the guarantee under each factor.
 - **The exact test's residual variance.** R's is `var(r) n_out / (n_out - p)` (`getpval.R`, line
   65), larger than the residual variance of the regression, `RSS / (n_out - p)`, by
   `n_out / (n_out - 1)`. With the latter, Chow's statistic follows the F distribution of eq. 17,
@@ -218,3 +218,127 @@ effect of one parent on the target (E-nonlinear) gave 0.0030 and 0.0100, with su
 Each row is 5 scenarios, one fit each, Andrey's the median of 3 timed fits after one untimed one.
 Andrey's exact test reads the same Gram matrices as its approximate one, so it costs no more; R's
 solves an `n_e x n_e` system per environment and set.
+
+## The correction
+
+`icp_correction.py` tests the approximate test's correction directly, Andrey's factor `K` against
+R's `K - 1`. The guarantee holds when the test rejects the true parents' set `S*` with probability
+at most `alpha`, so the driver measures that rate and the FWER of the full fit, the share of fits
+whose parents are not a subset of `S*`, under each factor. The test with the factor `K - 1` is
+Andrey's approximate test with the factor changed, registered beside it in the invariance-test
+registry, so that `icp`'s own set search runs with it. At the factor `K` it returns Andrey's
+p-values bit for bit on every set of 20 datasets, and SciPy's Welch and F tests on the pooled
+residuals give the same p-values within `1e-12` relative.
+
+Each dataset comes from `andrey.data`, `SCM.sample` with `envs=`, on a fixed linear Gaussian SEM
+of 6 variables with unit noise: `0 -> 1`, `2 -> 1`, `0 -> 3`, `1 -> 3`, `3 -> 4`, `4 -> 5`, and
+`2 -> 5`, with the target 3, so `S* = {0, 1}`, 4 is its child, and 2 is neither a parent nor a
+descendant of it. The first environment is observational; each other one intervenes on one of the
+five other variables, drawn per dataset, by a do-intervention `hard(2.0, sd=1.0)` or a mean shift
+`soft(shift=2.0)`, each with probability 1/2. The grid crosses `K` = 3, 4, 5, 8, and 10
+environments with `n` = 30, 100, and 500 rows per environment, every environment at `n` rows or
+the observational one at `5 n`, with 2,000 datasets per cell, so a rate of 0.05 has a standard
+error of about 0.005. One fit at `alpha=0.05` gives both levels, since a fit's per-variable
+p-values and its largest set p-value do not depend on `alpha`; the driver checks this against a
+fit at `alpha=0.10`, and that every decision under `K - 1` at `alpha` is the decision under `K` at
+`alpha K / (K - 1)`.
+
+In the grid, most rejections of `S*` yield no false parent, since a set with a variable outside
+`S*` is either rejected too or meets another accepted set that leaves the variable out. The hard
+cell removes both exits, so that its FWER follows the rejection rate of `S*`. Its SEM has 5
+variables, `0 -> 1`, `1 -> 3`, `2 -> 3`, and `3 -> 4`, with the target 3, `S* = {1, 2}`, and the
+child 4 a near copy of it, `x_4 = 2 x_3 + N(0, 0.5^2)`. With `K = 3` environments of 100 rows,
+the second sets parent 1 by `hard(3.0, sd=1.0)` and the third shifts parent 2 by
+`soft(shift=3.0)`, so every set without both parents is far from invariant unless it holds the
+child; both shift the child by 0.1, a fifth of its noise, so the sets with both parents and the
+child are nearly invariant without being invariant. The only other invariant set, `{0, 1, 2}`, has
+nearly the residuals of `S*`, so it is rejected with it. When `S*` is rejected, the accepted sets
+are then the near-invariant ones with the child, and their intersection holds it: a false parent.
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/icp_correction.py --seed 0 --out outputs/icp-correction
+```
+
+`correction.json` holds each cell's counts and rates, with their 95% Clopper-Pearson intervals,
+and the checks.
+
+### Rates
+
+One run with `--seed 0`, on the machine of [Results](#results) with 4 worker processes, took 3
+minutes. Each rate is over 2,000 datasets, with its 95% Clopper-Pearson interval.
+
+| Cell | K | Rows per environment | alpha | `S*` rejected, K | `S*` rejected, K - 1 | K / (K - 1) x alpha | FWER, K | FWER, K - 1 |
+|---|---|---|---|---|---|---|---|---|
+| grid | 3 | 30 | 0.05 | 0.0300 (0.0230-0.0384) | 0.0485 (0.0395-0.0588) | 0.0750 | 0.0020 (0.0005-0.0051) | 0.0030 (0.0011-0.0065) |
+| grid | 3 | 30 | 0.10 | 0.0645 (0.0541-0.0762) | 0.0955 (0.0830-0.1092) | 0.1500 | 0.0055 (0.0027-0.0098) | 0.0115 (0.0073-0.0172) |
+| grid | 3 | 100 | 0.05 | 0.0350 (0.0274-0.0440) | 0.0505 (0.0413-0.0610) | 0.0750 | 0.0045 (0.0021-0.0085) | 0.0090 (0.0053-0.0142) |
+| grid | 3 | 100 | 0.10 | 0.0655 (0.0551-0.0772) | 0.1095 (0.0961-0.1240) | 0.1500 | 0.0125 (0.0081-0.0184) | 0.0225 (0.0165-0.0300) |
+| grid | 3 | 500 | 0.05 | 0.0285 (0.0217-0.0368) | 0.0415 (0.0332-0.0512) | 0.0750 | 0.0070 (0.0038-0.0117) | 0.0115 (0.0073-0.0172) |
+| grid | 3 | 500 | 0.10 | 0.0650 (0.0546-0.0767) | 0.0950 (0.0825-0.1087) | 0.1500 | 0.0190 (0.0135-0.0260) | 0.0240 (0.0177-0.0317) |
+| grid | 4 | 30 | 0.05 | 0.0385 (0.0305-0.0479) | 0.0520 (0.0427-0.0627) | 0.0667 | 0.0065 (0.0035-0.0111) | 0.0070 (0.0038-0.0117) |
+| grid | 4 | 30 | 0.10 | 0.0750 (0.0638-0.0874) | 0.1050 (0.0919-0.1193) | 0.1333 | 0.0135 (0.0089-0.0196) | 0.0215 (0.0156-0.0289) |
+| grid | 4 | 100 | 0.05 | 0.0405 (0.0323-0.0501) | 0.0530 (0.0436-0.0637) | 0.0667 | 0.0090 (0.0053-0.0142) | 0.0115 (0.0073-0.0172) |
+| grid | 4 | 100 | 0.10 | 0.0715 (0.0606-0.0837) | 0.0930 (0.0806-0.1066) | 0.1333 | 0.0140 (0.0093-0.0202) | 0.0185 (0.0131-0.0254) |
+| grid | 4 | 500 | 0.05 | 0.0420 (0.0336-0.0517) | 0.0550 (0.0454-0.0659) | 0.0667 | 0.0115 (0.0073-0.0172) | 0.0170 (0.0118-0.0237) |
+| grid | 4 | 500 | 0.10 | 0.0780 (0.0666-0.0906) | 0.1035 (0.0905-0.1177) | 0.1333 | 0.0265 (0.0199-0.0345) | 0.0380 (0.0301-0.0473) |
+| grid | 5 | 30 | 0.05 | 0.0400 (0.0318-0.0495) | 0.0500 (0.0409-0.0605) | 0.0625 | 0.0080 (0.0046-0.0130) | 0.0100 (0.0061-0.0154) |
+| grid | 5 | 30 | 0.10 | 0.0785 (0.0671-0.0912) | 0.0950 (0.0825-0.1087) | 0.1250 | 0.0165 (0.0114-0.0231) | 0.0220 (0.0160-0.0294) |
+| grid | 5 | 100 | 0.05 | 0.0355 (0.0278-0.0446) | 0.0425 (0.0341-0.0523) | 0.0625 | 0.0130 (0.0085-0.0190) | 0.0120 (0.0077-0.0178) |
+| grid | 5 | 100 | 0.10 | 0.0725 (0.0615-0.0848) | 0.0930 (0.0806-0.1066) | 0.1250 | 0.0200 (0.0143-0.0271) | 0.0300 (0.0230-0.0384) |
+| grid | 5 | 500 | 0.05 | 0.0365 (0.0287-0.0457) | 0.0415 (0.0332-0.0512) | 0.0625 | 0.0135 (0.0089-0.0196) | 0.0135 (0.0089-0.0196) |
+| grid | 5 | 500 | 0.10 | 0.0730 (0.0620-0.0853) | 0.0915 (0.0792-0.1050) | 0.1250 | 0.0265 (0.0199-0.0345) | 0.0335 (0.0261-0.0424) |
+| grid | 8 | 30 | 0.05 | 0.0415 (0.0332-0.0512) | 0.0505 (0.0413-0.0610) | 0.0571 | 0.0160 (0.0110-0.0225) | 0.0185 (0.0131-0.0254) |
+| grid | 8 | 30 | 0.10 | 0.0875 (0.0755-0.1007) | 0.0980 (0.0853-0.1119) | 0.1143 | 0.0285 (0.0217-0.0368) | 0.0340 (0.0265-0.0429) |
+| grid | 8 | 100 | 0.05 | 0.0430 (0.0345-0.0528) | 0.0480 (0.0391-0.0583) | 0.0571 | 0.0120 (0.0077-0.0178) | 0.0115 (0.0073-0.0172) |
+| grid | 8 | 100 | 0.10 | 0.0780 (0.0666-0.0906) | 0.0890 (0.0769-0.1023) | 0.1143 | 0.0255 (0.0190-0.0334) | 0.0275 (0.0208-0.0356) |
+| grid | 8 | 500 | 0.05 | 0.0390 (0.0309-0.0484) | 0.0455 (0.0368-0.0556) | 0.0571 | 0.0130 (0.0085-0.0190) | 0.0160 (0.0110-0.0225) |
+| grid | 8 | 500 | 0.10 | 0.0805 (0.0689-0.0933) | 0.0900 (0.0778-0.1034) | 0.1143 | 0.0290 (0.0221-0.0373) | 0.0305 (0.0234-0.0390) |
+| grid | 10 | 30 | 0.05 | 0.0465 (0.0377-0.0567) | 0.0510 (0.0418-0.0616) | 0.0556 | 0.0195 (0.0139-0.0266) | 0.0240 (0.0177-0.0317) |
+| grid | 10 | 30 | 0.10 | 0.0910 (0.0788-0.1045) | 0.1030 (0.0900-0.1172) | 0.1111 | 0.0295 (0.0225-0.0379) | 0.0345 (0.0269-0.0435) |
+| grid | 10 | 100 | 0.05 | 0.0420 (0.0336-0.0517) | 0.0485 (0.0395-0.0588) | 0.0556 | 0.0135 (0.0089-0.0196) | 0.0155 (0.0106-0.0219) |
+| grid | 10 | 100 | 0.10 | 0.0860 (0.0741-0.0992) | 0.0980 (0.0853-0.1119) | 0.1111 | 0.0265 (0.0199-0.0345) | 0.0300 (0.0230-0.0384) |
+| grid | 10 | 500 | 0.05 | 0.0440 (0.0354-0.0539) | 0.0520 (0.0427-0.0627) | 0.0556 | 0.0145 (0.0097-0.0208) | 0.0160 (0.0110-0.0225) |
+| grid | 10 | 500 | 0.10 | 0.0775 (0.0662-0.0901) | 0.0835 (0.0717-0.0965) | 0.1111 | 0.0220 (0.0160-0.0294) | 0.0245 (0.0182-0.0323) |
+| grid | 3 | 150 + 2 x 30 | 0.05 | 0.0320 (0.0247-0.0407) | 0.0505 (0.0413-0.0610) | 0.0750 | 0.0040 (0.0017-0.0079) | 0.0100 (0.0061-0.0154) |
+| grid | 3 | 150 + 2 x 30 | 0.10 | 0.0680 (0.0574-0.0799) | 0.1010 (0.0881-0.1150) | 0.1500 | 0.0105 (0.0065-0.0160) | 0.0195 (0.0139-0.0266) |
+| grid | 3 | 500 + 2 x 100 | 0.05 | 0.0345 (0.0269-0.0435) | 0.0560 (0.0463-0.0670) | 0.0750 | 0.0080 (0.0046-0.0130) | 0.0115 (0.0073-0.0172) |
+| grid | 3 | 500 + 2 x 100 | 0.10 | 0.0800 (0.0685-0.0928) | 0.1075 (0.0943-0.1219) | 0.1500 | 0.0175 (0.0122-0.0243) | 0.0250 (0.0186-0.0328) |
+| grid | 3 | 2,500 + 2 x 500 | 0.05 | 0.0350 (0.0274-0.0440) | 0.0560 (0.0463-0.0670) | 0.0750 | 0.0065 (0.0035-0.0111) | 0.0120 (0.0077-0.0178) |
+| grid | 3 | 2,500 + 2 x 500 | 0.10 | 0.0750 (0.0638-0.0874) | 0.1035 (0.0905-0.1177) | 0.1500 | 0.0205 (0.0148-0.0277) | 0.0265 (0.0199-0.0345) |
+| grid | 4 | 150 + 3 x 30 | 0.05 | 0.0420 (0.0336-0.0517) | 0.0535 (0.0440-0.0643) | 0.0667 | 0.0055 (0.0027-0.0098) | 0.0090 (0.0053-0.0142) |
+| grid | 4 | 150 + 3 x 30 | 0.10 | 0.0850 (0.0731-0.0981) | 0.1155 (0.1018-0.1303) | 0.1333 | 0.0145 (0.0097-0.0208) | 0.0200 (0.0143-0.0271) |
+| grid | 4 | 500 + 3 x 100 | 0.05 | 0.0400 (0.0318-0.0495) | 0.0515 (0.0422-0.0621) | 0.0667 | 0.0120 (0.0077-0.0178) | 0.0160 (0.0110-0.0225) |
+| grid | 4 | 500 + 3 x 100 | 0.10 | 0.0715 (0.0606-0.0837) | 0.0945 (0.0820-0.1082) | 0.1333 | 0.0230 (0.0169-0.0306) | 0.0280 (0.0212-0.0362) |
+| grid | 4 | 2,500 + 3 x 500 | 0.05 | 0.0375 (0.0296-0.0468) | 0.0490 (0.0400-0.0594) | 0.0667 | 0.0155 (0.0106-0.0219) | 0.0190 (0.0135-0.0260) |
+| grid | 4 | 2,500 + 3 x 500 | 0.10 | 0.0780 (0.0666-0.0906) | 0.1060 (0.0928-0.1203) | 0.1333 | 0.0295 (0.0225-0.0379) | 0.0395 (0.0314-0.0490) |
+| grid | 5 | 150 + 4 x 30 | 0.05 | 0.0370 (0.0292-0.0462) | 0.0450 (0.0363-0.0550) | 0.0625 | 0.0080 (0.0046-0.0130) | 0.0120 (0.0077-0.0178) |
+| grid | 5 | 150 + 4 x 30 | 0.10 | 0.0710 (0.0601-0.0831) | 0.0940 (0.0816-0.1076) | 0.1250 | 0.0210 (0.0152-0.0283) | 0.0265 (0.0199-0.0345) |
+| grid | 5 | 500 + 4 x 100 | 0.05 | 0.0380 (0.0301-0.0473) | 0.0485 (0.0395-0.0588) | 0.0625 | 0.0130 (0.0085-0.0190) | 0.0165 (0.0114-0.0231) |
+| grid | 5 | 500 + 4 x 100 | 0.10 | 0.0805 (0.0689-0.0933) | 0.0975 (0.0848-0.1113) | 0.1250 | 0.0285 (0.0217-0.0368) | 0.0355 (0.0278-0.0446) |
+| grid | 5 | 2,500 + 4 x 500 | 0.05 | 0.0410 (0.0327-0.0506) | 0.0510 (0.0418-0.0616) | 0.0625 | 0.0190 (0.0135-0.0260) | 0.0220 (0.0160-0.0294) |
+| grid | 5 | 2,500 + 4 x 500 | 0.10 | 0.0735 (0.0624-0.0858) | 0.0935 (0.0811-0.1071) | 0.1250 | 0.0350 (0.0274-0.0440) | 0.0410 (0.0327-0.0506) |
+| grid | 8 | 150 + 7 x 30 | 0.05 | 0.0385 (0.0305-0.0479) | 0.0440 (0.0354-0.0539) | 0.0571 | 0.0135 (0.0089-0.0196) | 0.0145 (0.0097-0.0208) |
+| grid | 8 | 150 + 7 x 30 | 0.10 | 0.0805 (0.0689-0.0933) | 0.0945 (0.0820-0.1082) | 0.1143 | 0.0255 (0.0190-0.0334) | 0.0275 (0.0208-0.0356) |
+| grid | 8 | 500 + 7 x 100 | 0.05 | 0.0400 (0.0318-0.0495) | 0.0450 (0.0363-0.0550) | 0.0571 | 0.0115 (0.0073-0.0172) | 0.0135 (0.0089-0.0196) |
+| grid | 8 | 500 + 7 x 100 | 0.10 | 0.0835 (0.0717-0.0965) | 0.0925 (0.0802-0.1061) | 0.1143 | 0.0285 (0.0217-0.0368) | 0.0285 (0.0217-0.0368) |
+| grid | 8 | 2,500 + 7 x 500 | 0.05 | 0.0375 (0.0296-0.0468) | 0.0450 (0.0363-0.0550) | 0.0571 | 0.0120 (0.0077-0.0178) | 0.0140 (0.0093-0.0202) |
+| grid | 8 | 2,500 + 7 x 500 | 0.10 | 0.0740 (0.0629-0.0864) | 0.0820 (0.0703-0.0949) | 0.1143 | 0.0240 (0.0177-0.0317) | 0.0300 (0.0230-0.0384) |
+| grid | 10 | 150 + 9 x 30 | 0.05 | 0.0460 (0.0372-0.0561) | 0.0480 (0.0391-0.0583) | 0.0556 | 0.0165 (0.0114-0.0231) | 0.0145 (0.0097-0.0208) |
+| grid | 10 | 150 + 9 x 30 | 0.10 | 0.0780 (0.0666-0.0906) | 0.0890 (0.0769-0.1023) | 0.1111 | 0.0230 (0.0169-0.0306) | 0.0275 (0.0208-0.0356) |
+| grid | 10 | 500 + 9 x 100 | 0.05 | 0.0445 (0.0359-0.0545) | 0.0520 (0.0427-0.0627) | 0.0556 | 0.0110 (0.0069-0.0166) | 0.0135 (0.0089-0.0196) |
+| grid | 10 | 500 + 9 x 100 | 0.10 | 0.0870 (0.0750-0.1002) | 0.0945 (0.0820-0.1082) | 0.1111 | 0.0220 (0.0160-0.0294) | 0.0250 (0.0186-0.0328) |
+| grid | 10 | 2,500 + 9 x 500 | 0.05 | 0.0520 (0.0427-0.0627) | 0.0580 (0.0482-0.0692) | 0.0556 | 0.0110 (0.0069-0.0166) | 0.0140 (0.0093-0.0202) |
+| grid | 10 | 2,500 + 9 x 500 | 0.10 | 0.0870 (0.0750-0.1002) | 0.0960 (0.0834-0.1098) | 0.1111 | 0.0185 (0.0131-0.0254) | 0.0220 (0.0160-0.0294) |
+| hard | 3 | 100 | 0.05 | 0.0175 (0.0122-0.0243) | 0.0315 (0.0243-0.0401) | 0.0750 | 0.0135 (0.0089-0.0196) | 0.0265 (0.0199-0.0345) |
+| hard | 3 | 100 | 0.10 | 0.0455 (0.0368-0.0556) | 0.0645 (0.0541-0.0762) | 0.1500 | 0.0400 (0.0318-0.0495) | 0.0575 (0.0477-0.0686) |
+
+Under `K`, the rejection rate of `S*` stayed within sampling error of `alpha` or below it in every
+cell, lowest at `K = 3` and nearer `alpha` as `K` grows. `K - 1` raised it by about `K / (K - 1)`,
+to near `alpha` itself, pooled 0.0494 at `alpha=0.05` over the grid, and far below the worst case
+of `K / (K - 1)` times `alpha`: the one-vs-rest tests share their rows, and the rate under `K`
+sits below `alpha` by about the factor that `K - 1` adds back. One of the 62 intervals under
+`K - 1` lies above `alpha`, about as many as chance gives over 62 intervals, and a rerun of that
+cell with `--seed 1` and 10,000 datasets put its rate at `alpha`.
+
+The FWER of the full fit stayed below `alpha` under both factors in every cell. In the hard cell it
+followed the rejection rate of `S*`, and `K - 1` raised both by about the same ratio.
