@@ -220,7 +220,7 @@ def test_a_context_input_is_read_from_its_flag(tmp_path, capsys):
     data, domain = tmp_path / "d.csv", tmp_path / "domain.csv"
     chain(150).to_csv(data, index=False)
     pd.DataFrame({"domain": np.repeat([0, 1, 2], 50)}).to_csv(domain, index=False)
-    argv = ["bootstrap", "cdnod", "--data", str(data), "--domain-index", str(domain)]
+    argv = ["bootstrap", "cdnod", "--data", str(data), "--env", str(domain)]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["a", "b", "c", "d"]
 

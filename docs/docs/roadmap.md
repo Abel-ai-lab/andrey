@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: The order of Andrey's planned work, stage by stage.
+description: Andrey's planned work, stage by stage, in a rough order.
 meta:
   type: guide
   tags: [roadmap]

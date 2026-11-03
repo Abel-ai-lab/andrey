@@ -59,7 +59,7 @@ SINGLE = {
     "pc": andrey.pc,
     "fci": andrey.fci,
     "gfci": andrey.gfci,
-    "cdnod": lambda data, **kw: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2, **kw),
+    "cdnod": lambda data, **kw: andrey.cdnod(data, env=np.arange(len(data)) % 2, **kw),
     "iamb": andrey.iamb,
     "inter_iamb": andrey.inter_iamb,
     "mmpc": andrey.mmpc,
@@ -245,13 +245,13 @@ def test_constraint_searches_reject_copies_no_test_meets(method, indep_test):
         SINGLE[method](x, indep_test=indep_test)
 
 
-def test_cdnod_names_a_column_that_repeats_the_domain_index():
+def test_cdnod_names_a_column_that_repeats_the_env_index():
     pd = pytest.importorskip("pandas")
     x = _data(200, 3)
     index = np.arange(200) % 2
     frame = pd.DataFrame(np.column_stack([x, 0.5 * index + 0.25]), columns=["a", "b", "c", "d"])
-    with pytest.raises(ValueError, match=r"domain_index repeats 'd'"):
-        andrey.cdnod(frame, domain_index=index)
+    with pytest.raises(ValueError, match=r"env repeats 'd'"):
+        andrey.cdnod(frame, env=index)
 
 
 @pytest.mark.parametrize("method", [m for m in BIC if m != "exact_search"])
@@ -546,13 +546,13 @@ def test_cdnod_with_one_domain_gives_the_pc_graph():
     rng = np.random.default_rng(1)
     w = np.triu(rng.uniform(0.5, 1.5, (6, 6)) * (rng.random((6, 6)) < 0.4), 1)
     x = rng.standard_normal((500, 6)) @ np.linalg.inv(np.eye(6) - w)
-    one_domain = andrey.cdnod(x, domain_index=np.full(500, 3.0)).structure
+    one_domain = andrey.cdnod(x, env=np.full(500, 3.0)).structure
     assert np.array_equal(one_domain.to_numpy(), andrey.pc(x).structure.to_numpy())
 
 
-def test_cdnod_rejects_nan_in_domain_index():
-    with pytest.raises(ValueError, match="domain_index contains NaN"):
-        andrey.cdnod(_data(), domain_index=np.r_[np.nan, np.zeros(59)])
+def test_cdnod_rejects_nan_in_env():
+    with pytest.raises(ValueError, match="env contains NaN"):
+        andrey.cdnod(_data(), env=np.r_[np.nan, np.zeros(59)])
 
 
 # Every categorical setting of each facade that takes one, called on one data matrix.
@@ -663,7 +663,7 @@ def test_bdeu_still_checks_penalty_discount(fit):
 
 def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
     c_indx = np.r_[0.5, np.zeros(99), np.ones(100)]
-    with pytest.raises(ValueError, match=r"domain_index .* 0\.5 at row 0"):
+    with pytest.raises(ValueError, match=r"env .* 0\.5 at row 0"):
         andrey.cdnod(_categories(), c_indx, indep_test="chisq")
 
 
@@ -1252,7 +1252,7 @@ def test_cdnod_with_a_mixed_test_takes_continuous_data_and_rejects_a_fractional_
     x = _mixed_data()[:, [1]]
     c_indx = np.repeat([0.0, 1.0], 100)
     assert andrey.cdnod(x, c_indx, indep_test="degen_gauss").structure.n_nodes == 1
-    with pytest.raises(ValueError, match=r"domain_index .* 0\.5 at row 0"):
+    with pytest.raises(ValueError, match=r"env .* 0\.5 at row 0"):
         andrey.cdnod(x, np.r_[0.5, c_indx[1:]], indep_test="cond_gauss")
 
 
@@ -1263,7 +1263,7 @@ def _intervened(rows, column):
 
 
 @pytest.mark.parametrize(
-    ("interventions", "message"),
+    ("targets", "message"),
     [
         (np.zeros((60, 2)), "the shape of data"),
         (np.zeros((59, 3)), "the shape of data"),
@@ -1272,9 +1272,9 @@ def _intervened(rows, column):
         (_intervened(slice(1, None), 2), "variable 2 needs at least two rows"),
     ],
 )
-def test_gies_rejects_unusable_interventions(interventions, message):
+def test_gies_rejects_an_unusable_targets_matrix(targets, message):
     with pytest.raises(ValueError, match=message):
-        andrey.gies(_data(), interventions)
+        andrey.gies(_data(), targets=targets)
 
 
 @pytest.mark.parametrize("fit", [andrey.pc, andrey.fci, andrey.mmhc, andrey.gfci])

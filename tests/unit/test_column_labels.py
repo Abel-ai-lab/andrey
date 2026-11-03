@@ -29,10 +29,11 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix."""
+    """The method's required positional inputs, and gnies's env, with a DataFrame wherever it
+    takes a data matrix."""
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
             continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"

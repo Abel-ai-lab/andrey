@@ -10,6 +10,7 @@ has not been built.
 
 from __future__ import annotations
 
+import inspect
 import subprocess
 import sys
 from pathlib import Path
@@ -119,7 +120,9 @@ def test_both_packages_run_the_same_settings() -> None:
         assert andrey_params[name] == tigramite_params[tigramite_name]
     # Lag 0 is PCMCI+'s scope: tigramite tests it at its own tau_min=0.
     assert tigramite_params["tau_min"] == 1
-    assert tigramite_params["fdr_method"] == "none"
+    # Andrey's adapter leaves fdr_method at the method's default; tigramite's names it.
+    default_fdr = inspect.signature(andrey.pcmci).parameters["fdr_method"].default
+    assert tigramite_params["fdr_method"] == default_fdr
     assert tigramite_params["significance"] == "analytic"
 
 

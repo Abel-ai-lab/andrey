@@ -18,6 +18,7 @@ whose Reproduce table lists the driver.
 | [XGES](comparisons/xges.md) | `xges_cpu.py` | XGES, with and without the extended search; GES | xges | 0.3.0, 0.9.0 |
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
+| [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
 | BOSS and GRaSP | `boss_grasp_cpu.py`, `boss_grasp_reach.py` | BOSS, GRaSP | causal-learn | 0.1.0, 0.9.0 |
@@ -53,7 +54,8 @@ whose Reproduce table lists the driver.
 Each release card publishes its numbers from a summary in `published/<release>/`. Two more folders
 hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
 fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
-fix.
+fix. [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json) holds the comparison of the
+experimental GnIES with gnies, which its [comparison page](comparisons/gnies.md) presents.
 
 | Release | Release card | Summary |
 |---|---|---|

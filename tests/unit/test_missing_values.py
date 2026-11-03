@@ -371,7 +371,7 @@ def test_cdnod_reads_a_complete_domain_index_and_refuses_the_independent_change_
     assert "rows_tested" in andrey.cdnod(x, domains).metadata
     gappy = domains.copy()
     gappy[3] = np.nan
-    with pytest.raises(ValueError, match="domain_index contains NaN"):
+    with pytest.raises(ValueError, match="env contains NaN"):
         andrey.cdnod(x, gappy)
     with pytest.raises(ValueError, match="dependence_threshold step .* does not accept missing"):
         andrey.cdnod(x, domains, dependence_threshold=0.1)

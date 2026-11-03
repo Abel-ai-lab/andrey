@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from andrey.api._adapt import default_score, default_test
 from andrey.api._experimental import warn_experimental
+from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
 from andrey.core.removed import removal_hint
@@ -51,7 +52,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     or a choice that an earlier release removed raises as an unknown one does, and the message
     gives its current name (:mod:`andrey.core.removed`); every argument the call passes is checked
     and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
-    ``ValueError``; a
+    ``ValueError``; a row-aligned argument that names a column of the data is taken out of it
+    (:func:`take_columns`); a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
     an int; a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with a score that does
     not use it raises ``ValueError`` (:func:`check_penalties`); an experimental method warns
@@ -81,6 +83,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             for key, value in bound.arguments.items():
                 if key in params:
                     bound.arguments[key] = check_argument(params[key], value, name)
+            take_columns(spec, bound.arguments)
             stamp: dict[str, object] = {"algorithm": name}
             if spec.seeded:
                 seed = bound.arguments["seed"] = resolve_seed(bound.arguments.get("seed"))
@@ -117,6 +120,24 @@ def removed_name_error(
         if hint is not None:
             return TypeError(f"{method}() got an unexpected keyword argument {key!r}; {hint}")
     return None
+
+
+def take_columns(spec: MethodSpec, arguments: dict[str, Any]) -> None:
+    """Take each column that a row-aligned argument names out of the data, in ``arguments``.
+
+    The row-aligned arguments are the inputs after the data and a ``targets`` parameter. One given
+    as a string names a column of the DataFrame ``data``: the data lose that column, and the
+    argument becomes the column's values, so the method, its default test or score, and its
+    metadata read only the variables. Raises ``ValueError`` when the data have no such column or
+    two arguments name the same one (:func:`~andrey.core.environments.take_columns`).
+    """
+    keys = [i.name for i in spec.data.inputs[1:]] + [
+        p.name for p in spec.params if p.type == "targets"
+    ]
+    named = {key: arguments[key] for key in keys if isinstance(arguments.get(key), str)}
+    data_key = spec.data.inputs[0].name
+    arguments[data_key], values = environments.take_columns(arguments[data_key], named, spec.name)
+    arguments.update(values)
 
 
 def check_argument(param: ParamSpec, value: Any, method: str) -> object:
@@ -201,12 +222,14 @@ def used_penalties(
 
     ``penalty_discount`` weighs every score but BDeu, ``ebic_gamma`` only the linear-Gaussian BIC,
     and ``equivalent_sample_size`` only BDeu (:data:`PENALTIES`); a penalty the score ignores is
-    left out. The value is the call's, or the default.
+    left out. A method without ``score_func`` has one score, which uses every penalty it takes. The
+    value is the call's, or the default.
     """
+    one_score = not any(p.concept == "score_func" for p in spec.params)
     return {
         p.name: arguments.get(p.name, p.default)
         for p in spec.params
-        if score in PENALTIES.get(p.concept or "", ())
+        if score in PENALTIES.get(p.concept or "", ()) or (one_score and p.concept in PENALTIES)
     }
 
 
@@ -216,12 +239,13 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any]) -> None:
     ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` alone, and ``equivalent_sample_size``
     the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). The score is the one the fit uses:
     the call's ``score_func``, or, for ``None``, the one picked from the declared column types
-    (:func:`chosen_settings`).
+    (:func:`chosen_settings`). A method without ``score_func`` has one score, which reads every
+    argument it takes.
     """
     passed = [
         (p.name, p.concept) for p in spec.params if p.concept in SCORE_ONLY and p.name in arguments
     ]
-    if not passed:
+    if not passed or not any(p.concept == "score_func" for p in spec.params):
         return
     score = chosen_settings(spec, arguments).get("score_func")
     for name, concept in passed:
@@ -246,9 +270,9 @@ def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:
 def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return ``kwargs`` with the former names and values of ``spec``'s arguments made current.
 
-    Each former name or value of a parameter warns once at the caller's line, and so does each
-    dropped argument, which is removed. Raises ``ValueError`` when a call passes a parameter under
-    both its former and its current name.
+    The arguments are the data inputs and the parameters. Each former name or value warns once at
+    the caller's line, and so does each dropped argument, which is removed. Raises ``ValueError``
+    when a call passes an argument under both its former and its current name.
     """
     kwargs = dict(kwargs)
     for old in spec.dropped_args:
@@ -259,17 +283,18 @@ def current_names(spec: MethodSpec, kwargs: dict[str, Any]) -> dict[str, Any]:
                 "release; drop it",
                 DeprecatedArgumentWarning,
             )
-    for param in spec.params:
-        for old in param.aliases:
+    for argument in (*spec.data.inputs, *spec.params):
+        for old in argument.aliases:
             if old not in kwargs:
                 continue
-            if param.name in kwargs:
+            if argument.name in kwargs:
                 raise ValueError(
-                    f"{spec.name}: {old} is the former name of {param.name}; pass only {param.name}"
+                    f"{spec.name}: {old} is the former name of {argument.name}; pass only "
+                    f"{argument.name}"
                 )
-            kwargs[param.name] = kwargs.pop(old)
+            kwargs[argument.name] = kwargs.pop(old)
             warn_once(
-                f"andrey.{spec.name}: {old} is now {param.name}; the former name stops working "
+                f"andrey.{spec.name}: {old} is now {argument.name}; the former name stops working "
                 "in the next release",
                 DeprecatedArgumentWarning,
             )

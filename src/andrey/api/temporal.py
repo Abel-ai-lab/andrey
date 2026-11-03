@@ -145,6 +145,20 @@ def varma_lingam(
 
     Notes
     -----
+    **When to use.** VARMA-LiNGAM suits one continuous, observational multivariate time series in
+    which each variable is a linear function of the other variables at the same step, the past
+    values of every variable, and past noise terms, with weights that do not change over time; the
+    noise terms are independent and non-Gaussian, the same-step effects form no cycle, and no
+    unmeasured variable causes two measured ones [1]_ [2]_. Its likelihood fit estimates a weight
+    for every pair of variables at every lag, so it suits a modest number of variables over a long
+    series. It returns a temporal structure of autoregressive weights at lags ``0`` (the same step)
+    to ``p``, with the moving-average weights alongside and the same-step causal order; with
+    ``prune=False`` every lag graph links every pair of variables. For Gaussian noise, use
+    :func:`~andrey.pcmciplus`; when unmeasured common causes are plausible,
+    :func:`~andrey.lpcmci`; for many units measured at a few time points,
+    :func:`~andrey.longitudinal_lingam`; and for i.i.d. rows rather than a series,
+    :func:`~andrey.direct_lingam`.
+
     The likelihood fit runs on the series with each column centered and divided by its standard
     deviation, as the structural VAR model that VARMA-LiNGAM extends takes zero-mean series [2]_,
     and its matrices and residuals are mapped back to the data's units, so shifting or rescaling a
@@ -314,6 +328,19 @@ def longitudinal_lingam(
 
     Notes
     -----
+    **When to use.** Longitudinal LiNGAM suits continuous, observational panel data: the same units
+    measured at several time points, given as one dataset per time point [1]_. At each time point,
+    each variable is a linear function of the other variables at that time point and of every
+    variable at the past ``tau_max`` time points, plus independent non-Gaussian noise; the
+    same-time effects form no cycle, no unmeasured variable causes two measured ones, and the
+    effects may change from one time point to the next [1]_. Each time point's fit treats the units
+    as its samples, so it is designed for many units, while the time points can be few. It returns
+    a temporal structure with weights at lags ``0`` to ``tau_max`` for each time point after the
+    first, in which every lagged graph links every pair of variables, and one same-time causal
+    order per time point. For one long series rather than many units, use
+    :func:`~andrey.varma_lingam`, or :func:`~andrey.pcmciplus` when the noise is Gaussian; for the
+    i.i.d. rows of a single time point, use :func:`~andrey.direct_lingam`.
+
     At each time point DirectLiNGAM orders the residuals of the lag regressions. Each pairwise
     regression in its ordering takes the least-squares slope, so every residual it scores is
     uncorrelated with its regressor in the sample, and listing every unit twice leaves the causal
@@ -512,6 +539,18 @@ def pcmci(
 
     Notes
     -----
+    **When to use.** PCMCI suits one observational multivariate time series that is stationary (its
+    causal links and noise do not change over time), with no unmeasured variable that causes two
+    measured ones, in which every independence follows from the graph (faithfulness), and in which
+    every effect takes at least one time step [1]_. With a partial-correlation test, the default for
+    continuous data, it assumes linear effects; ``"cmiknn"``, ``"gpdc"``, ``"kci"``, and ``"rcot"``
+    detect nonlinear effects at a far higher cost per test, and the categorical and mixed-data tests
+    take other data. It is designed for many variables, each strongly dependent on its own past
+    (autocorrelated) and with few lagged parents [1]_, and returns a temporal structure of lagged
+    links only: a directed graph at each lag ``1`` to ``tau_max``. When effects can act within one
+    time step, use :func:`~andrey.pcmciplus`; when unmeasured common causes are plausible, use
+    :func:`~andrey.lpcmci`.
+
     Every test reads the lagged values as the columns of one design. ``"fisherz"`` and
     ``"student_t"`` report the partial correlation, ``"chisq"`` and ``"gsq"`` their chi-square
     statistic, ``"degen_gauss"`` and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its
@@ -831,6 +870,18 @@ def pcmciplus(
 
     Notes
     -----
+    **When to use.** PCMCI+ suits one observational multivariate time series that is stationary (its
+    causal links and noise do not change over time), with no unmeasured variable that causes two
+    measured ones, and in which every independence follows from the graph (faithfulness); its
+    effects can act within one time step as well as across steps, and the same-step effects form no
+    cycle [1]_. Its tests, and the data each suits, are those of :func:`~andrey.pcmci`. It is
+    designed for many variables, each strongly dependent on its own past (autocorrelated) [1]_; its
+    tests grow exponentially with the same-step neighbors of one variable, so it suits sparse
+    same-step links. It returns a temporal structure over lags ``0`` to ``tau_max``: a CPDAG of the
+    same-step links and a directed graph of the lagged links at each lag ``1`` to ``tau_max``. When
+    unmeasured common causes are plausible, use :func:`~andrey.lpcmci`; when the noise is
+    non-Gaussian and every same-step link should be oriented, use :func:`~andrey.varma_lingam`.
+
     The method runs in four phases. The lagged phase selects the lagged parents of each variable
     as PCMCI's PC1 step does, with equal strengths ordered by each variable's rank. The skeleton
     phase starts from those lagged links and from a link between every two variables at the same
@@ -1111,6 +1162,19 @@ def lpcmci(
 
     Notes
     -----
+    **When to use.** LPCMCI suits one observational multivariate time series that is stationary (its
+    causal links and noise do not change over time), in which every independence follows from the
+    graph (faithfulness), and in which unmeasured variables may cause several measured ones; it
+    assumes no selection bias, that is, no time step is kept or dropped by the values of the
+    variables [1]_. Its effects can act within one time step as well as across steps. Its tests, and
+    the data each suits, are those of :func:`~andrey.pcmci`. It is designed for series in which each
+    variable strongly depends on its own past (autocorrelated) [1]_, and suits few links at each
+    variable, since its tests grow exponentially with them; it returns a temporal structure over
+    lags ``0`` to ``tau_max``: a PAG of the same-step links, a directed graph of the definite lagged
+    causes at each lag ``1`` to ``tau_max``, and the marks of every link in ``metadata["links"]``.
+    When every common cause is measured, use :func:`~andrey.pcmciplus`, or :func:`~andrey.pcmci`
+    when every effect also takes at least one time step.
+
     The graph starts complete, with every lagged link ``o->`` (time order rules out the later end
     as a cause of the earlier one) and every same-step link ``o-o``. A round removes links in
     steps ``p = 0, 1, ...``: it tests a link given ``p`` of the neighbors of its later end that are
@@ -1331,9 +1395,20 @@ def granger(
 
     Notes
     -----
+    **When to use.** Granger causality suits one continuous, observational multivariate time series
+    that is stationary (its links and noise do not change over time), in which each variable is a
+    linear function of the past ``tau_max`` steps of every variable plus noise [1]_ [2]_. Its edges
+    read as causes only when every effect takes at least one time step and every common cause is a
+    column of ``data`` [1]_. Each regression takes every lagged variable at once, so it suits a
+    moderate number of variables over a series many times longer than ``n_variables * tau_max``
+    steps. It returns a temporal structure of lagged links only: a directed graph at each lag ``1``
+    to ``tau_max``, weighted by the regression coefficients. When effects can act within one time
+    step, use :func:`~andrey.pcmciplus`; when unmeasured common causes are plausible,
+    :func:`~andrey.lpcmci`; and for nonlinear lagged effects, :func:`~andrey.pcmci` with a
+    nonlinear test.
+
     An edge says that the past of one variable helps predict another beyond the past of every
-    variable in ``data``. Granger causality misses effects within one time step, and a common
-    cause left out of ``data`` can produce edges.
+    variable in ``data``.
 
     The test of each coefficient is the F-test of one regressor in Granger's regression [1]_, the
     test a vector autoregression reports for a coefficient [2]_. Its p-value takes the coefficient's
@@ -1563,25 +1638,23 @@ def dynotears(
     rows' ``p`` earlier steps side by side, and ``A`` stacks the ``A_k``. Every column of ``X`` and
     of ``Y`` is centered on its own mean first, which is the same as fitting an intercept, so a
     series with a nonzero mean adds no weight, to the solver's precision. The paper's loss fits no
-    intercept, as its model takes noise of mean zero [1]_. On the Gaussian series that Limitations
-    describes, whose mean is zero, fitting without an intercept made 3.3 fewer errors of about 140
-    at 50 time steps and 100 variables, with the paper's settings for 50 steps (``lambda1=0.2`` and
-    ``lag_threshold=0.2``), and no fewer at 500 steps. On the same design at 500 steps with
-    exponential noise of mean 1, not centered, so that every series has a nonzero mean, it made 7.3
-    and 5.8 more errors at 10 and 20 variables. The paper's experiments give ``W`` and ``A`` the
-    same penalty, and ``lambda1`` is that one value. A lagged edge points forward in time and
-    closes no cycle, so the constraint reads ``W`` alone; a lagged self-loop, a variable's effect on
-    its own future, is an edge like any other. As in NOTEARS, the weights are written as
-    ``W = W+ - W-`` with both
-    parts non-negative and the diagonal of ``W`` held at zero, and the augmented Lagrangian
-    ``f + 0.5 * rho * h**2 + alpha * h`` is minimized by L-BFGS-B from the zero matrix. After each
-    solve ``rho`` grows tenfold while ``h`` has not fallen to a quarter of its previous value, and
-    then ``alpha += rho * h``, until ``h <= h_tol`` or ``rho >= rho_max``. Same-step weights below
-    ``w_threshold`` and lagged ones below ``lag_threshold`` are then removed, and then the weakest
-    remaining same-step edges until no cycle is left. The defaults of ``lambda1``, ``w_threshold``,
-    ``lag_threshold``, and ``tau_max`` are the paper's values for its simulations with 500 time
-    steps; ``max_iter``, ``h_tol``, and ``rho_max`` are those of NOTEARS [2]_, whose method the
-    paper follows.
+    intercept, as its model takes noise of mean zero [1]_. On the series that Limitations describes,
+    whose mean is zero, fitting without an intercept made 3 to 4 fewer errors of about 150 with
+    exponential noise at 50 time steps and 100 variables, and no fewer, once replicated, in any
+    other setting there. With exponential noise of mean 1, not centered, so that every series has a
+    nonzero mean, it made 4.4 to 9.5 more errors at 500 steps and 5 to 20 variables. The paper's
+    experiments give ``W`` and ``A`` the same penalty, and ``lambda1`` is that one value. A lagged
+    edge points forward in time and closes no cycle, so the constraint reads ``W`` alone; a lagged
+    self-loop, a variable's effect on its own future, is an edge like any other. As in NOTEARS, the
+    weights are written as ``W = W+ - W-`` with both parts non-negative and the diagonal of ``W``
+    held at zero, and the augmented Lagrangian ``f + 0.5 * rho * h**2 + alpha * h`` is minimized by
+    L-BFGS-B from the zero matrix. After each solve ``rho`` grows tenfold while ``h`` has not fallen
+    to a quarter of its previous value, and then ``alpha += rho * h``, until ``h <= h_tol`` or
+    ``rho >= rho_max``. Same-step weights below ``w_threshold`` and lagged ones below
+    ``lag_threshold`` are then removed, and then the weakest remaining same-step edges until no
+    cycle is left. The defaults of ``lambda1``, ``w_threshold``, ``lag_threshold``, and ``tau_max``
+    are the paper's values for its simulations with 500 time steps; ``max_iter``, ``h_tol``, and
+    ``rho_max`` are those of NOTEARS [2]_, whose method the paper follows.
 
     [1]_ shows the model identifiable when the noise is non-Gaussian, or Gaussian with unit
     variance. The likelihood path that :func:`~andrey.notears` follows with ``robust=True`` [3]_
@@ -1592,8 +1665,8 @@ def dynotears(
     and changes nothing else, unless two columns are identical. The
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
     column order, and how ``andrey.config(tie_break="position")`` sorts the columns by position
-    instead. The fit draws no random numbers and runs on one BLAS thread,
-    so the host's thread count does not change it.
+    instead. The fit draws no random numbers and runs on one BLAS thread, so the host's thread count
+    does not change it.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every step on
     the steps before it, so a step with a missing value has no place in it. Fill in the missing
@@ -1601,39 +1674,30 @@ def dynotears(
     :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test.
 
     **Limitations.** The least-squares score with an ``l1`` penalty and the weight thresholds read
-    the data's units, as in NOTEARS [4]_ [5]_: rescaling a column changes the fit, and [1]_
-    standardizes its stock returns so that the penalty does not favor the series of low variance. On
-    series whose variance grows along the causal order the fit gains from that order; in the
-    Gaussian series below, 87 to 96% of the same-step causal paths ran from lower to higher
-    variance, on average by size. Measured on linear structural vector autoregressions of the
-    paper's design [1]_: one lag; Erdos-Renyi same-step graphs of mean degree 2 with weights of
-    magnitude 0.5 to 2; lagged graphs of mean in-degree 2, self-lags included, with weights of
-    magnitude 0.3 to 0.5; Gaussian or centered exponential noise of unit scale; 500 time steps; ten
-    series for each of 5, 10, 20, 50, and 100 variables; in the data's units at the default
-    settings. Errors are SHD over the same-step and lagged edges together, means over the ten
-    series. With Gaussian noise they were 0.7 to 2.5 at every size, against the empty graph's 12.8
-    to 294, with F1 at least 0.96; :func:`~andrey.pcmciplus` with ``fisherz`` had 7.7 to 153, and
-    :func:`~andrey.varma_lingam` with ``order=(1, 0)`` and ``prune=True`` had 8.2 to 234 through 50
-    variables, above the empty graph's from 20, and the one fit tried at 100 did not finish within 1
-    h. With exponential noise they were 0.6 to 3, and :func:`~andrey.varma_lingam`, which
-    non-Gaussian noise suits, had 0.8 and 1.5 at 5 and 10 variables and 4.7 and 18.4 at 20 and 50.
-    With 50 time steps, the paper's settings for them, ``lambda1=0.2`` and ``lag_threshold=0.2``,
-    gave 5.1 to 145 errors at 5 to 100 variables, against the empty graph's 12.8 to 294; the
-    defaults gave 22.4 at 10 variables and more than the empty graph from 20 on (78.1 against 56.9),
-    so set those two arguments for a short series. On the same Gaussian series of 500 steps with
-    standardized columns the errors rose to 7.7, 19.5, 31.4, and 63.9 at 5 to 50 variables, about
-    those of :func:`~andrey.pcmciplus`, which reads no units. On a nonlinear vector autoregression,
-    the sine of each same-step parent and the hyperbolic tangent of each lagged one in place of the
-    linear terms, the errors were 4.5, 10, and 13.3 at 5, 10, and 20 variables, against the empty
-    graph's 13.8, 30.8, and 59; :func:`~andrey.pcmciplus` had 9.3 to 26.7 with ``fisherz`` and 9.1
-    to 30.8 with ``rcot``. With 500 time steps on one core, four fits at a time on four cores, the
-    median fit took 0.3 s at 5 variables, 29 s at 50, and 278 s at 100. One fit each took 218 s at
-    75 variables, 944 s at 150, and 3,492 s at 200, with errors of 0, 5, and 12 against the empty
-    graph's 259, 409, and 550, and one at 250 was stopped after 1 h: a fit passes 1 min between 50
-    and 75 variables, 10 min between 100 and 150, and 1 h at about 200. The time grows faster than
-    the cube of the number of variables, from the matrix exponential of every evaluation and the
-    ``(tau_max + 1) * d * d`` weights. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    the data's units, as in NOTEARS [4]_ [5]_: rescaling a column changes the fit, and on series
+    whose variance grows along the causal order the fit gains from that order. Measured against the
+    reference implementation on linear structural vector autoregressions of the paper's design [1]_:
+    one lag; Erdos-Renyi same-step graphs of mean degree 2 with weights of magnitude 0.5 to 2;
+    lagged graphs of mean in-degree 2, self-lags included, with weights of magnitude 0.3 to 0.5;
+    Gaussian or centered exponential noise; 20 series for each of 5, 10, 20, 50, and 100 variables;
+    in the data's units. Errors are SHD over the same-step and lagged edges together, means over the
+    series. At 500 time steps and the default settings the errors were 0.15 to 6.25, against the
+    empty graph's 13.5 to 283.2, with F1 at least 0.968, and no setting differed from the reference
+    implementation; Barabasi-Albert same-step graphs with block-model lagged graphs, up to 50
+    variables, gave the same result. At 50 time steps with the paper's settings for them,
+    ``lambda1=0.2`` and ``lag_threshold=0.2``, the errors were 5 to 149, against the same empty
+    graph's, and only one setting differed: with exponential noise at 100 variables the centering
+    above made 3.2 more errors than the reference implementation, and 4.15 on 20 further series;
+    against the reference implementation fitted on centered columns the difference on those 20 was
+    0.55, with a 95% interval that includes 0. The defaults at 50 time steps made more errors than
+    the empty graph from 20 variables on (88.4 against 59.4 at 20), so set those two arguments for a
+    short series. With the columns z-scored at 500 steps the errors rose to 8.3, 19.7, 39.2, and
+    82.6 at 5 to 50 variables, against the empty graph's 14.6 to 147.2, over ten series each. With
+    500 time steps on one core, four fits at a time on four cores, the median fit took 0.3 s at 5
+    variables, 29 s at 50, and 299 s at 100. The time grows faster than the cube of the number of
+    variables, from the matrix exponential of every evaluation and the ``(tau_max + 1) * d * d``
+    weights. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------

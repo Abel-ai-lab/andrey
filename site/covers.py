@@ -21,6 +21,7 @@ COVERS = {
     "ceiling": "a rocket reaching the curved edge of the sky, the edge amber and cracking",
     "shelf": "a pantry shelf of mixed jars, cartons, and sacks, one jar amber",
     "plumb": "a plumb bob hanging beside an engraved measuring column, the bob amber",
+    "gears": "three engraved spoked gears meshing on a cast-iron base, the output gear amber",
     "ground": "the stipple ground",
 }
 

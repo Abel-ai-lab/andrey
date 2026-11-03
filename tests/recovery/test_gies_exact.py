@@ -70,7 +70,7 @@ def _interventional_sem(
 def test_gies_orients_the_edges_the_interventions_identify():
     """Intervening on 1 and 6 orients 0 -> 1, 5 -> 6, and 6 -> 7; 0 -- 2 stays open."""
     X, mask = _interventional_sem([[1], [6]], n=3000, seed=0)
-    found = andrey.gies(X, mask, penalty_discount=_BASELINE_LAMBDA).structure
+    found = andrey.gies(X, targets=mask, penalty_discount=_BASELINE_LAMBDA).structure
     assert sorted(found.oriented_edges(index=True)) == [
         (0, 1, "directed"),
         (0, 2, "undirected"),
@@ -123,7 +123,7 @@ def _random_interventional(
 def test_gies_finds_no_edges_between_independent_columns_with_interventions():
     X, mask = _random_interventional(0, 4, 0.0, 2, n=600)
     assert mask.any()
-    assert andrey.gies(X, mask).structure.oriented_edges() == []
+    assert andrey.gies(X, targets=mask).structure.oriented_edges() == []
 
 
 # The cases with targets run the search with interventions. On the observational (5, 15, 0.3)
@@ -277,7 +277,7 @@ def test_gies_orients_a_categorical_or_mixed_chain_by_its_interventions(score_fu
     data leave the chain undirected."""
     X, mask, categorical = _intervened_chain(_KINDS[score_func], n=4000, seed=3)
     columns = np.flatnonzero(categorical).tolist() if _KINDS[score_func] == "mixed" else None
-    found = andrey.gies(X, mask, score_func=score_func, categorical=columns)
+    found = andrey.gies(X, targets=mask, score_func=score_func, categorical=columns)
     assert sorted(found.structure.oriented_edges()) == [
         (0, 1, "directed"),
         (1, 2, "directed"),
@@ -308,12 +308,12 @@ def test_a_category_seen_only_under_an_intervention_stays_one(score_func):
         expected = -2.0 * float(np.sum(counts * np.log(counts / kept))) + np.log(n) * 2
     score = gies_search.InterventionalScore(X, mask, score_func=score_func)
     assert score.score(1, []) == pytest.approx(expected, rel=1e-12)
-    assert np.isfinite(andrey.gies(X, mask, score_func=score_func).metadata["score"])
+    assert np.isfinite(andrey.gies(X, targets=mask, score_func=score_func).metadata["score"])
 
 
 def test_gies_is_deterministic():
     X, mask = _interventional_sem([[2], [7]], n=600, seed=2)
-    first, second = andrey.gies(X, mask), andrey.gies(X, mask)
+    first, second = andrey.gies(X, targets=mask), andrey.gies(X, targets=mask)
     assert np.array_equal(first.structure.to_numpy(), second.structure.to_numpy())
     assert first.metadata["score"] == second.metadata["score"]
 

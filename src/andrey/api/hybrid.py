@@ -222,6 +222,16 @@ def mmhc(
 
     Notes
     -----
+    **When to use.** MMHC suits i.i.d. observational data with no unmeasured common causes, in
+    which every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test
+    and BIC score assume continuous data with linear effects and Gaussian noise; with categorical
+    or mixed columns, the defaults follow the declared column types, as for :func:`~andrey.pc` and
+    :func:`~andrey.ges`. It is a hybrid, a constraint-based skeleton from conditional-independence
+    tests followed by a score-based search over only the skeleton's pairs, designed for many
+    variables with few parents and children each [1]_. It returns the CPDAG of the DAG the search
+    stops at. When unmeasured common causes are plausible, use :func:`~andrey.gfci`; when the noise
+    is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
+
     **How it works.** The MMPC phase estimates each variable's parents and children: a forward
     phase adds, one at a time, the candidate whose weakest association with the variable, over
     every conditioning set drawn from the members so far, is the strongest, and a backward phase
@@ -445,6 +455,17 @@ def rsmax2(
 
     Notes
     -----
+    **When to use.** The restrict-then-maximize search suits i.i.d. observational data with no
+    unmeasured common causes, in which every independence follows from the graph (faithfulness)
+    [2]_. Its default Fisher-Z test and BIC score assume continuous data with linear effects and
+    Gaussian noise; with categorical or mixed columns, the defaults follow the declared column
+    types, as for :func:`~andrey.pc` and :func:`~andrey.ges`. It is a hybrid, a constraint-based
+    skeleton from the tests ``restrict`` names followed by the score search ``maximize`` names over
+    only the skeleton's pairs, designed for many variables with few candidate neighbors each [1]_.
+    It returns the CPDAG of the DAG the maximize phase ends with. When unmeasured common causes are
+    plausible, use :func:`~andrey.gfci`; when the noise is non-Gaussian and every edge should be
+    oriented, use :func:`~andrey.direct_lingam`.
+
     **How it works.** The restrict phase follows the sparse candidate idea of [1]_: tests narrow
     the pairs a score search must consider. Each choice finds every true adjacency when its tests
     are exact. The skeletons of MMPC, IAMB, Inter-IAMB, and PC then hold only the true

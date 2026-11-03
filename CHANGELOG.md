@@ -10,6 +10,59 @@ names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- These arguments have new names, so that one name, `env`, gives each row's environment in both
+  methods; the former ones still work in this release, in Python and on the command line, but give
+  an `andrey.DeprecatedArgumentWarning` that names the replacement, and they stop working in the
+  next release. The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the
+  calls before and after. ([#663])
+
+  | Method | Former name | Name now |
+  | --- | --- | --- |
+  | `cdnod` | `domain_index`, `--domain-index` | `env`, `--env` |
+  | `gies` | `interventions`, `--interventions`, or the 0/1 matrix as the second argument | `targets`, with `env` and `--env` on the command line |
+
+### Added
+
+- `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
+  interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
+  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
+  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
+  columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
+- `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
+  or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
+  environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
+  0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
+  for `gies` or text labels keep the same share of every environment's rows. ([#663])
+- `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
+  environments that differ in the noise variances of variables it is not told: it returns those
+  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
+  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  authors' package, on simulated data in the paper's settings and the settings it claims, 10
+  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
+  the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
+  rows per environment and on the targets in 1 of them, on fresh datasets too; at the standard BIC
+  the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
+  on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
+  graph's 135 in a median 176 s. ([#665])
+
+### Changed
+
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
+  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
+- `andrey --help --json` lists a data input's former names under `aliases` again, such as
+  `cdnod`'s `domain_index`. ([#663])
+
+### Fixed
+
+- Copies of one column in other units, such as `x` and `2 * x + 1`, and categorical columns that
+  group the rows alike under other labels break ties by column position, as identical columns do,
+  so adding a constant to a copy or relabeling its categories no longer changes which column a tie
+  goes to. ([#660])
+
+## [0.13.0] - 2026-11-03
+
 ### Highlights
 
 - `iamb` is supported and joins the quality gate. Against bnlearn 5.2.1 on simulated linear-Gaussian
@@ -94,9 +147,11 @@ names its pull request.
   fall back to their values in row order. Results that a tie decides change in `hc`, `tabu`,
   `mmhc`, `rsmax2`, `boss`, `grasp`, `fci`, `gfci`, `ica_lingam`, and `varma_lingam`: the graph
   changed on 41 of the identity check's 233 draws, all in these methods, and their errors against
-  the true graph on fresh draws were indistinguishable from those of a random ranking. No setting
-  restores the former rank; `tie_break="position"` orders ties by column position, a different
-  rule. ([#612])
+  the true graph on fresh draws were indistinguishable from those of a random ranking. Without
+  changing a graph, the rank also moves `exact_search`'s `metadata["dag"]`, the member of the class
+  it orients, and the last bits of the weights of `bottom_up_parce_lingam` and
+  `longitudinal_lingam`, which order their regressions by it. No setting restores the former rank;
+  `tie_break="position"` orders ties by column position, a different rule. ([#612])
 - `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` return the same graphs and
   p-values in less time, because the candidates of a grow step share one conditioning set, and the
   test now numbers that set's configurations once and counts the tables of all its candidates
@@ -122,6 +177,9 @@ names its pull request.
 - The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
   outside the method's claim, with its numbers and does not fail it; a row without the field is
   judged as before. ([#631])
+- Every method's docstring opens its Notes with a **When to use.** paragraph: the data, model,
+  and scale the method is designed for, what it returns, and the method to use outside that
+  setting. ([#633])
 
 ### Fixed
 
@@ -1431,7 +1489,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
@@ -1619,5 +1678,11 @@ First alpha release.
 [#629]: https://github.com/Abel-ai-lab/andrey/pull/629
 [#630]: https://github.com/Abel-ai-lab/andrey/pull/630
 [#631]: https://github.com/Abel-ai-lab/andrey/pull/631
+[#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
+[#659]: https://github.com/Abel-ai-lab/andrey/pull/659
+[#660]: https://github.com/Abel-ai-lab/andrey/pull/660
+[#662]: https://github.com/Abel-ai-lab/andrey/pull/662
+[#663]: https://github.com/Abel-ai-lab/andrey/pull/663
+[#665]: https://github.com/Abel-ai-lab/andrey/pull/665
