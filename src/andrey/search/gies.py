@@ -27,6 +27,7 @@ import heapq
 import math
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -56,6 +57,22 @@ from andrey.search.hc import tie_ranks
 # The moves a scan skips, as ``(u, v, C)``: under background knowledge, those whose class holds no
 # DAG that satisfies it on the current graph.
 Excluded = set[tuple[int, int, frozenset[int]]]
+
+
+class FamilyScore(Protocol):
+    """What the search reads from a score: a family's local score and the change of each addition.
+
+    :class:`InterventionalScore` is one; any decomposable score whose Markov equivalent graphs of
+    an interventional class get one total can drive :func:`search_class`.
+    """
+
+    def score(self, node: int, parents: Iterable[int]) -> float:
+        """The local score of ``node`` given ``parents``; lower is better."""
+        ...
+
+    def add_deltas(self, node: int, parents: Iterable[int]) -> np.ndarray:
+        """``score(node, parents + u) - score(node, parents)`` for every variable ``u``."""
+        ...
 
 
 def intervention_mask(targets: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
@@ -401,7 +418,7 @@ class _Objective:
     it never revisits a graph and stops.
     """
 
-    def __init__(self, score: InterventionalScore, n: int) -> None:
+    def __init__(self, score: FamilyScore, n: int) -> None:
         self.score = score
         self.terms = [score.score(v, ()) for v in range(n)]
         self.total = math.fsum(self.terms)
@@ -432,7 +449,7 @@ class _Objective:
 def _forward_candidates(
     v: int,
     adj: np.ndarray,
-    score: InterventionalScore,
+    score: FamilyScore,
     n: int,
     ranks: Sequence[int],
     forbidden: np.ndarray | None = None,
@@ -490,7 +507,7 @@ def _forward_candidates(
 def _backward_candidate(
     v: int,
     adj: np.ndarray,
-    score: InterventionalScore,
+    score: FamilyScore,
     n: int,
     ranks: Sequence[int],
     constraints: Constraints | None = None,
@@ -568,7 +585,7 @@ def _separated(
 
 def _turning_best(
     adj: np.ndarray,
-    score: InterventionalScore,
+    score: FamilyScore,
     n: int,
     ranks: Sequence[int],
     constraints: Constraints | None = None,
@@ -677,7 +694,7 @@ class _Search:
 
     def __init__(
         self,
-        score: InterventionalScore,
+        score: FamilyScore,
         n: int,
         ranks: Sequence[int],
         constraints: Constraints | None = None,
@@ -873,6 +890,54 @@ def gies(
     if score_func in MIXED_SCORES:
         columns = column_mask(categorical, n)
     ranks = tie_ranks(X, columns).tolist()
+    adj, total = search_class(score, cut, ranks, constraints, max_parents)
+    if constraints is not None:
+        adj = mpdag(adj, constraints)
+    return to_structure(adj, kind="cpdag"), total
+
+
+def search_class(
+    score: FamilyScore,
+    cut: np.ndarray,
+    ranks: Sequence[int],
+    constraints: Constraints | None = None,
+    max_parents: int | None = None,
+) -> tuple[np.ndarray, float]:
+    """Run the GIES phases over the interventional classes that ``cut`` defines.
+
+    Starts from the empty graph, or under ``constraints`` from the class of the required edges, and
+    repeats the forward, backward, and turning phases, each until it finds no improving step, until
+    a round of backward and turning phases changes nothing. Ties between moves go to the lower
+    ``ranks`` (:func:`~andrey.search.hc.tie_ranks`), as :func:`gies` describes.
+
+    Parameters
+    ----------
+    score : FamilyScore
+        The local score. Every DAG of one class must get the same total from it.
+    cut : ndarray of bool, shape (d, d)
+        ``cut[a, b]`` is True when an edge between ``a`` and ``b`` has one orientation in every DAG
+        of its class, as :func:`cut_pairs` returns.
+    ranks : sequence of int
+        Each variable's tie rank.
+    constraints : Constraints or None
+        Background knowledge, as for :func:`gies`; the returned graph does not yet direct the edges
+        it decides.
+    max_parents : int or None
+        The cap on any DAG's parents, as for :func:`gies`.
+
+    Returns
+    -------
+    tuple[ndarray, float]
+        The interventional essential graph as a mark matrix, and its total score (lower is better).
+
+    Raises
+    ------
+    ValueError
+        If the required edges give a node more than ``max_parents`` parents.
+    RuntimeError
+        If a step does not lower the score, which a correct search never does.
+    """
+    n = len(ranks)
     start = None
     if constraints is not None and constraints.required.any():
         start = replace_unprotected(required_dag(constraints), cut)
@@ -894,5 +959,4 @@ def gies(
             if not changed:
                 break
         total = _recompute_objective(search.adj, score, n)
-    adj = search.adj if constraints is None else mpdag(search.adj, constraints)
-    return to_structure(adj, kind="cpdag"), total
+    return search.adj, total
