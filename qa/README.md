@@ -12,6 +12,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `profiler.py` | Time one method's fit and show where it spends its time. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
+| `gnies_order.py` | Count how often a column or row order changes GnIES's result, and why. |
 | `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
 
@@ -89,6 +90,25 @@ measurement with no passing threshold.
 
 ```shell
 uv run python -m qa.column_order
+```
+
+## GnIES order
+
+`gnies_order.py` measures how often reordering the columns or shuffling the rows changes GnIES's
+graph or learned targets. It draws the GnIES lane's A design (`benchmarks/gnies_cpu.py`) at 6, 8,
+10, and 12 variables, 100 and 1000 rows per environment, seeds 0-9 (80 models), fits each at the
+defaults, refits it on three seeded column orders and three seeded row shuffles that keep each
+row's environment, and maps the answers back. A tie the tie ranks decide is logged at DEBUG level
+(`andrey.search.gies` for a step of the inner search, `andrey.search.gnies` for an outer step); the
+summary counts the changes, those with such a record in one of the two fits, and those without. A
+change without one points at an order dependence the tie ranks do not cover. With `--reference`,
+gnies 0.3.3 is refitted on the same column orders, which shows whether its result depends on the
+column order.
+
+```shell
+uv run python -m qa.gnies_order -o order.json
+ANDREY_BENCH_GNIES_PYTHON=... uv run python -m qa.gnies_order --reference -o order.json
+uv run python -m qa.gnies_order --summarize order-*.json
 ```
 
 ## CI test calibration
@@ -291,6 +311,13 @@ A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fai
 A row where either side has no result is skipped. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where
 a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+
+An entry's `metric` names the error its rows pair: `"shd"`, the default, or `"target_error"`, the
+number of intervention targets a method learned wrongly or missed (the size of the symmetric
+difference of its targets and the true ones), for a method that learns its targets. The row's
+`andrey_shd_mean` and `comparator_shd_mean` then hold that error's means. Such a method has one
+entry per metric, each judged by the rules above, and a row's key names its `metric`; any other
+value of `metric` is an error.
 
 A row of a reference whose result depends on the column order (`reference_order_dependent`) may
 also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,

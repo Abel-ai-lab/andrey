@@ -33,6 +33,8 @@ Packages:
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md), and
   [Tetrad on continuous data](comparisons/tetrad-continuous.md)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
+- [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
+  [GnIES](comparisons/gnies.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
 
@@ -92,6 +94,14 @@ lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
 ```shell
 benchmarks/start_lingam.sh
 export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
+```
+
+gnies 0.3.3, the reference for GnIES, fits in an environment of its own on Python 3.12, so its pins
+stay exact and the module `ges` it imports stays out of bench-env:
+
+```shell
+benchmarks/start_gnies.sh
+export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
 An adapter selects another environment by setting `python_env` to the name of the variable that
