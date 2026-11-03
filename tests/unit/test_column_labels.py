@@ -29,10 +29,13 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix."""
+    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix,
+    and the environments of a method in ``CONTEXT``."""
     args = []
     for inp in spec.data.inputs:
         if not inp.required:
+            if spec.name in CONTEXT and inp.kind == "context":
+                args.append(np.arange(N) * 3 // N)
             continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"
@@ -58,6 +61,9 @@ TABLE_SPECS = [
 
 #: Settings that shorten a slow fit; the labels come from the same facade path.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: The targets of a method that reads three environments: observational, one with the known
+#: target z, and one whose targets are unknown.
+CONTEXT = {"ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}}}
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
@@ -66,7 +72,8 @@ def test_dataframe_columns_become_labels_as_text(spec):
         pytest.importorskip("torch")
     # Integer names that are also positions, beside a string: every label is the name as text.
     frames = [frame(seed).set_axis([1, 0, "z"], axis=1) for seed in range(3)]
-    out = getattr(andrey, spec.name)(*inputs(spec, frames), **SHORT.get(spec.name, {}))
+    settings = {**SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {})}
+    out = getattr(andrey, spec.name)(*inputs(spec, frames), **settings)
     for result in out if isinstance(out, list) else [out]:
         for graph in graphs(result.structure):
             # GIN appends its latents after the observed columns; a pairwise test takes two.
@@ -111,7 +118,7 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
     def fit(columns: list[str], **given):
         frames = [frame(seed)[columns] for seed in range(3)]
         return getattr(andrey, spec.name)(
-            *inputs(spec, frames), **SHORT.get(spec.name, {}), **given
+            *inputs(spec, frames), **SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {}), **given
         )
 
     want = named_marks(fit(COLUMNS))

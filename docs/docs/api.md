@@ -108,7 +108,7 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
 `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
 `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
 for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
@@ -122,12 +122,12 @@ first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
-`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and
-`camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs
-allowed to be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors
-them. Every required edge is in the result, whatever its weight, test, or score says. For the
+`mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`,
+`resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
+parameter says how it honors them. Every required edge is in the result, whatever its weight, test, or score says. For the
 time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
 `effect` at time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows
 them in use.
@@ -206,22 +206,25 @@ can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole
-number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured
-seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. The
-methods that test independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or
-`"gpdc"`, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take
+`seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is
+the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
+exactly. The methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with
+`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
 other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs: the first
-from the start the method describes, each later one from a start drawn from `seed` and the
-search's index. `boss` and `grasp` start it from a random order, and `hc` and `tabu` from the best
-DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring search; a
-later one replaces an earlier one only when it scores better by more than `1e-6`. Each search
+`boss`, `grasp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs:
+the first from the start the method describes, each later one from a start drawn from `seed` and
+the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` from a
+minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
+after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
+replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
+count of edges and targets). `ut_igsp` runs 5 by default, the number its authors' implementation
+runs. Each search
 builds its own caches and drops the previous one's, so more starts take more time but little more
-memory. `1`, the default, runs one search.
+memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -384,6 +387,7 @@ its first call in a process.
    dagma
    camuv
    dynotears
+   ut_igsp
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -405,6 +409,13 @@ time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-ste
 on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
 temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
 lag 0.
+
+UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
+whose intervention targets are known in part or not at all: it searches variable orders for the
+DAG with the fewest edges plus targets, where a setting's targets are its known ones and every
+variable whose distribution given its parents differs from the observational one. It keeps the
+paper's level, `alpha=1e-5`, for the conditional-independence and invariance tests, and returns
+the interventional essential graph with each setting's targets in `metadata["targets"]`.
 
 A method becomes supported once it has:
 

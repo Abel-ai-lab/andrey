@@ -358,6 +358,17 @@ kind of result; `cdnod` also takes `env`, each row's environment, `gies` also ta
 `longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
 {doc}`graph-types` explains which graph each one returns.
 
+`ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. Map an
+observational environment to `[]`, a setting to the targets you know, and a setting whose targets
+you do not know to `None`:
+
+```python
+from andrey import ut_igsp
+
+result = ut_igsp(data, "condition", targets={"control": [], "drug": ["dose"], "knockout": None})
+result.metadata["targets"]  # each environment's targets, known and learned
+```
+
 ## Background knowledge
 
 What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,

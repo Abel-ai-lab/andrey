@@ -35,6 +35,12 @@ names its pull request.
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
+- `ut_igsp`, experimental, learns from an observational environment and settings whose
+  intervention targets are known in part or not at all (UT-IGSP, Squires, Wang, and Uhler 2020):
+  it returns the interventional essential graph and, in `metadata["targets"]`, each setting's
+  targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
+  mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
+  `"indicator"`, the test of whether a variable's distribution given others changes. ([#PR])
 
 ### Changed
 
