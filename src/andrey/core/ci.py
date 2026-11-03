@@ -967,12 +967,18 @@ class ChiSquare:
                     statistics[i], p_values[i] = self._statistic_pvalue(a[i], b[i], cond)
                 continue
             step = max(1, _BATCH_CELLS // max(n, m * cells))
+            # Each row's first cell in its configuration. A block's tables hold at most
+            # max(_BATCH_CELLS, _DENSE_CELLS) cells, so its indices are built in place in the
+            # rows' dtype.
+            dtype = self._rows.dtype
+            first = (layer * cells).astype(dtype)
             for at in range(0, len(members), step):
                 part = members[at : at + step]
-                index = self._rows[a[part]] * ky + self._rows[b[part]]  # each row's (x, y) cell
-                index = (
-                    index + (layer * cells)[None, :] + (np.arange(len(part)) * (m * cells))[:, None]
-                )
+                index = self._rows[a[part]]
+                index *= dtype.type(ky)
+                index += self._rows[b[part]]  # each row's (x, y) cell
+                index += first
+                index += (np.arange(len(part), dtype=dtype) * dtype.type(m * cells))[:, None]
                 tables = np.bincount(index.ravel(), minlength=len(part) * m * cells)
                 bounds = np.arange(len(part) + 1) * m
                 counted.append(
