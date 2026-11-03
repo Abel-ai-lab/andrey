@@ -353,10 +353,10 @@ independences were tested, and `andrey markov-check` runs the same from the shel
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
 per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes a domain index, `gies` also takes which variables were
-intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lingam` take a list of
-datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
-returns.
+kind of result; `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
+`targets`, the variables intervened on in each environment, and `multi_group_direct_lingam` and
+`longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
+{doc}`graph-types` explains which graph each one returns.
 
 ## Background knowledge
 
@@ -523,7 +523,7 @@ with `|S|` the size of its conditioning set, and 2 for the other tests. A test w
 `ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
 with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A column with no
 observed value, or with one value throughout, raises before the fit, and so does infinity, which is
-not a missing value. CD-NOD needs a complete domain index.
+not a missing value. CD-NOD needs a complete `env`.
 
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with

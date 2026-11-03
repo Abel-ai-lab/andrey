@@ -50,6 +50,19 @@ names its pull request.
   a random one on datasets not used before. Location-scale and linear-Gaussian data lie outside the
   model and are reported, not judged. ([#634])
 
+### Breaking
+
+- These arguments have new names, so that one name, `env`, gives each row's environment in both
+  methods; the former ones still work in this release, in Python and on the command line, but give
+  an `andrey.DeprecatedArgumentWarning` that names the replacement, and they stop working in the
+  next release. The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the
+  calls before and after.
+
+  | Method | Former name | Name now |
+  | --- | --- | --- |
+  | `cdnod` | `domain_index`, `--domain-index` | `env`, `--env` |
+  | `gies` | `interventions`, `--interventions`, or the 0/1 matrix as the second argument | `targets`, with `env` and `--env` on the command line |
+
 ### Added
 
 - `andrey.data.sample_scm(functional="location_scale")` and
@@ -81,6 +94,10 @@ names its pull request.
   squares with an l1 penalty under the NOTEARS acyclicity constraint on the same-step weights, with
   the paper's settings: `lambda1=0.05`, `w_threshold=0.3`, and `lag_threshold=0.1` for 500 time
   steps, and `tau_max=1`; it is experimental. ([#639])
+- `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
+  or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
+  environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
+  0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`.
 
 ### Changed
 

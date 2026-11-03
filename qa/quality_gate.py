@@ -464,6 +464,12 @@ def _series(regime: str) -> tuple[str, ...]:
     return tuple(f"{regime}_d{d}_n{n}" for d, n in SERIES_SIZES[regime])
 
 
+def gies_fit(x: np.ndarray) -> Any:
+    """``andrey.gies`` on the samples of a GIES draw, its intervention matrix as ``targets``."""
+    samples, mask = unstack(x)
+    return andrey.gies(samples, targets=mask)
+
+
 def _adapted(adapter: Any) -> Callable[[Any], Any]:
     """The benchmark adapter's fit with the published settings, as the harness scores it."""
     return lambda x: adapter.to_structure(adapter.fit(x, adapter.params()))
@@ -490,7 +496,7 @@ SUPPORTED: dict[str, Method] = {
     "IAMB": Method(lambda x: andrey.iamb(x), "cpdag", CPDAG_DATA),
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
-    "GIES": Method(lambda x: andrey.gies(*unstack(x)), "essential", INTERVENTION_DATA),
+    "GIES": Method(gies_fit, "essential", INTERVENTION_DATA),
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
