@@ -138,6 +138,21 @@ def test_bad_environments_raise(env, targets, message):
         andrey.igsp(frame, rows[env], targets=targets)
 
 
+@pytest.mark.parametrize("method", ["igsp", "ut_igsp"])
+def test_without_env_the_messages_name_each_environment_by_its_targets(method):
+    frame, _, _, _ = sample(n=50)
+    n = len(frame)
+    mask = np.zeros(frame.shape, dtype=int)
+    mask[: n // 2, 0] = mask[n // 2 :, 1] = 1
+    with pytest.raises(ValueError, match="needs an observational environment") as raised:
+        getattr(andrey, method)(frame, targets=mask)
+    assert "['x0']" in str(raised.value) and "['x1']" in str(raised.value)
+    assert "label of env" not in str(raised.value)
+    with pytest.raises(ValueError, match="at least one interventional environment") as raised:
+        getattr(andrey, method)(frame)
+    assert "['']" not in str(raised.value)
+
+
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [

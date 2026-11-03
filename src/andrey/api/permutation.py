@@ -720,11 +720,13 @@ def igsp(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. If ``env`` or
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. If ``env`` or
         ``targets`` is malformed, or leaves an environment's targets unknown, as
         :func:`~andrey.gies` lists; if no environment is observational, or every one is, as with
         ``env`` and ``targets`` both ``None``; if an environment has fewer than 3 rows; if
@@ -827,7 +829,9 @@ def igsp(
     nonlinear effects with ``"fisherz"`` are outside its model; the kernel and categorical tests are
     not benchmarked with it. One level serves both tests unless ``invariance_alpha`` is given. The
     numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    method's settings, and the machine. In :func:`~andrey.bootstrap`, the averaged graph is made a
+    CPDAG without the targets, so an edge that only the settings orient comes back undirected
+    there; each fit and the edge frequencies keep its direction.
 
     References
     ----------
@@ -868,7 +872,7 @@ def igsp(
     )
     labels = column_labels(data)
     named = [_env_name(env_labels[c], env is None, labels) for c in sorted(by_code)]
-    _check_environments("igsp", X, labels, codes, by_code, named)
+    _check_environments("igsp", X, labels, codes, by_code, named, env is None)
     constraints = resolve(knowledge, X.shape[1], labels, method="igsp")
     with copies_named(labels):
         graph, (edges, contradicting) = _igsp(
@@ -1018,11 +1022,13 @@ def ut_igsp(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. If ``env`` or
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. If ``env`` or
         ``targets`` is malformed, as :func:`~andrey.gies` lists; if no environment is
         observational, or every one is; if an environment has fewer than 3 rows; if, without
         ``env``, two environments' known targets join to one key, as when a column label holds a
@@ -1170,7 +1176,7 @@ def ut_igsp(
             f"None, and {shared} names more than one, as a column label holds a comma or is "
             "empty; pass env"
         )
-    _check_environments("ut_igsp", X, labels, codes, by_code, named)
+    _check_environments("ut_igsp", X, labels, codes, by_code, named, env is None)
     constraints = resolve(knowledge, X.shape[1], labels, method="ut_igsp")
     with copies_named(labels):
         graph, found, score = _ut_igsp(
@@ -1245,28 +1251,45 @@ def _check_environments(
     codes: np.ndarray,
     by_code: Mapping[int, frozenset[int] | None],
     named: list[object],
+    from_targets: bool,
 ) -> None:
     """Raise ``ValueError`` unless the environments of ``igsp`` or ``ut_igsp`` can be compared.
 
     Some environment must be observational (targets ``[]``) and some not, every one needs 3 rows,
     and no column may be constant on the observational rows, where the conditional-independence
-    tests run. ``named`` gives each environment's name for the messages, by code.
+    tests run. ``named`` gives each environment's label of ``env`` for the messages, by code; when
+    ``from_targets``, the environments come from the targets, and the messages name each one by
+    its list of targets instead.
     """
+    if from_targets:
+        variable = (lambda j: labels[j]) if labels else int
+        named = [sorted(variable(j) for j in by_code[c] or ()) for c in sorted(by_code)]
     observational = [code for code, t in by_code.items() if t == frozenset()]
+    if not observational and from_targets:
+        raise ValueError(
+            f"{method} needs an observational environment, rows with no targets, but every row "
+            f"has some: the rows' targets are {named}; give some rows no targets, an empty cell "
+            "of the targets column or an all-zero row of the targets array"
+        )
     if not observational:
         raise ValueError(
             f"{method} needs an observational environment, but none of {named} has targets []; "
-            "map at least one label of env to [] in targets"
+            "give one no targets: map its label of env to [] in a targets mapping, or give its "
+            "rows an empty cell of a targets column or an all-zero row of a targets array"
         )
     if len(observational) == len(by_code):
+        rest = "no row has targets" if from_targets else f"every one of {named} has targets []"
         raise ValueError(
             f"{method} needs at least one interventional environment besides the observational "
-            f"ones, {named}; for observational data use grasp or boss"
+            f"ones, but {rest}; for observational data use grasp or boss"
         )
     sizes = np.bincount(codes, minlength=len(by_code))
     small = [named[c] for c in np.flatnonzero(sizes < 3)]
     if small:
-        raise ValueError(f"{method} needs at least 3 rows in every environment; {small} have fewer")
+        which = "the rows with targets" if from_targets else "the environments"
+        raise ValueError(
+            f"{method} needs at least 3 rows in every environment; {which} {small} have fewer"
+        )
     rows = np.isin(codes, observational)
     constant = np.flatnonzero(np.ptp(X[rows], axis=0) == 0)
     if constant.size:

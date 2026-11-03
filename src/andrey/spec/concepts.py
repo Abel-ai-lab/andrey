@@ -726,8 +726,10 @@ _CONCEPTS = (
                 name="n_starts",
                 default=5,
                 fixed_in=None,
-                reason="The reference's default number of runs; restarts are part of the "
-                "method's search (Yang, Katcoff and Uhler 2018).",
+                reason="Further searches from minimum-degree orders whose ties are drawn from "
+                "seed guard against a poor first order; each one runs the paper's Algorithm 1, "
+                "which restarts its depth-first search within one run from a single starting "
+                "order (Yang, Katcoff and Uhler 2018).",
             ),
             Deviation(
                 method="ut_igsp",
