@@ -89,8 +89,8 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
     return args
 
 
-#: Settings that shorten a slow fit.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Settings that shorten a slow fit, and the target ICP needs.
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 
 TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}

@@ -142,10 +142,10 @@ _LINGAM = (
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
 _STARTS = ("boss", "grasp", "hc", "tabu")
-#: The methods with no edge to name in knowledge.
-_NO_KNOWLEDGE = ("gin", "anm", "pnl")
+#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
+_NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
-    *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc"),
+    *("pc", "fci", "gfci", "cdnod", "icp", "iamb", "inter_iamb", "mmpc"),
     *_PURE_SCORE,
     "calm",
     *_CONTINUOUS,
@@ -177,7 +177,16 @@ _CONCEPTS = (
             exclusive_maximum=True,
         ),
         fragment="significance level",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "granger", *_RESIDUAL, "cam", "resit", "camuv"),
+        suitable=(
+            *CI_SEARCHES,
+            *PCMCI_FAMILY,
+            "granger",
+            *_RESIDUAL,
+            "cam",
+            "resit",
+            "camuv",
+            "icp",
+        ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
             *_exempt(
@@ -264,6 +273,10 @@ _CONCEPTS = (
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
             *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
+            *_exempt(
+                "It tests the invariance of regressions across environments, invariance_test.",
+                "icp",
+            ),
         ),
     ),
     Concept(
@@ -437,6 +450,9 @@ _CONCEPTS = (
                 "anm",
                 "pnl",
             ),
+            *_exempt(
+                "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
+            ),
         ),
         deviations=(
             Deviation(
@@ -507,7 +523,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=(*SCORE_SEARCHES, "cam"),
+        suitable=(*SCORE_SEARCHES, "cam", "icp"),
         exempt=(
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -634,6 +650,7 @@ _CONCEPTS = (
                 "dynotears",
                 *_RESIDUAL,
                 "camuv",
+                "icp",
             ),
         ),
     ),
@@ -781,6 +798,11 @@ _CONCEPTS = (
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
+            *_exempt(
+                "Its tests read each set of the target's predictors as the data give it; no "
+                "knowledge of edges enters an invariance test.",
+                "icp",
+            ),
         ),
     ),
     Concept(
@@ -789,8 +811,12 @@ _CONCEPTS = (
         "result, or its score: a required edge whose least-squares weight is 0, or whose "
         "variables look independent, is in the graph all the same.",
         suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
-        exempt=_exempt(
-            "Has no edge for knowledge to name (the knowledge concept).", *_NO_KNOWLEDGE
+        exempt=(
+            *_exempt(
+                "Has no edge for knowledge to name (the knowledge concept).",
+                *(m for m in _NO_KNOWLEDGE if m != "icp"),
+            ),
+            *_exempt("Takes no knowledge (the knowledge concept).", "icp"),
         ),
     ),
     Concept(
@@ -857,6 +883,7 @@ _CONCEPTS = (
                 "rcd",
                 "bottom_up_parce_lingam",
                 "camuv",
+                "icp",
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
         ),

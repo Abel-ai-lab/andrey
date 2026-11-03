@@ -56,8 +56,9 @@ TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
-#: Settings that shorten a slow fit; the labels come from the same facade path.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Settings that shorten a slow fit, and the target ICP needs; the labels come from the same
+#: facade path.
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)

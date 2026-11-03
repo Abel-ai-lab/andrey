@@ -30,6 +30,13 @@ names its pull request.
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
+- `icp`, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal
+  parents of one `target` from continuous data pooled from several environments that leave the
+  target's mechanism alone: it tests every set of the other variables, or of at most
+  `max_parents`, for a regression on the target that is the same in every environment, with the
+  paper's approximate or exact test, and returns the variables in every accepted set, which are
+  parents with probability at least `1 - alpha`, with each variable's p-value and confidence
+  interval; it is experimental.
 
 ### Changed
 

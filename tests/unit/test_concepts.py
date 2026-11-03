@@ -222,6 +222,8 @@ def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: The arguments a method needs beyond its inputs: ICP's target, by position.
+REQUIRED = {"icp": {"target": 2}}
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
@@ -231,7 +233,9 @@ def fit(method: str, *, codes: bool, gaps: bool = False, **kwargs):
     warning_policy._warned.clear()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        out = getattr(andrey, method)(*inputs(method, codes=codes, gaps=gaps), **kwargs)
+        out = getattr(andrey, method)(
+            *inputs(method, codes=codes, gaps=gaps), **REQUIRED.get(method, {}), **kwargs
+        )
     return (out[0] if isinstance(out, list) else out), [w.category for w in caught]
 
 
@@ -290,6 +294,7 @@ UNIT_CASES = {
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "camuv": "nonmonotone_4v",
+    "icp": "gauss_5v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
@@ -336,7 +341,9 @@ def unit_free(method: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
-            out = getattr(andrey, method)(*unit_inputs(method, exponents))
+            out = getattr(andrey, method)(
+                *unit_inputs(method, exponents), **REQUIRED.get(method, {})
+            )
             fits.append(graphs_and_orders(out))
     return all(fit == fits[0] for fit in fits[1:])
 
