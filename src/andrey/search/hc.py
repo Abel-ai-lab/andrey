@@ -252,13 +252,20 @@ def _categorical_relations(
 def _centered_ranks(x: np.ndarray) -> np.ndarray:
     """Each column's doubled average ranks minus ``m + 1``, ``m`` its count of values that are not
     NaN: integers summing to zero, which a sign flip negates. A NaN takes 0, the middle."""
-    out = np.zeros(x.shape)
-    for j, col in enumerate(x.T):
+    n, d = x.shape
+    out = np.zeros((d, n))
+    for col, ranks in zip(np.ascontiguousarray(x.T), out, strict=True):
         present = ~np.isnan(col)
+        if n > 1 and present.all():  # without NaN or ties, a value's rank is its sorted place
+            order = np.argsort(col)
+            ordered = col[order]
+            if (ordered[1:] != ordered[:-1]).all():
+                ranks[order] = 2 * np.arange(1, n + 1) - (n + 1)
+                continue
         _, inverse, counts = np.unique(col[present], return_inverse=True, return_counts=True)
         doubled = 2 * np.cumsum(counts) - counts + 1  # a value's first plus last place, from 1
-        out[present, j] = doubled[inverse.reshape(-1)] - (counts.sum() + 1)
-    return out
+        ranks[present] = doubled[inverse.reshape(-1)] - (counts.sum() + 1)
+    return np.ascontiguousarray(out.T)
 
 
 def _abs_products(ranks: np.ndarray) -> np.ndarray:

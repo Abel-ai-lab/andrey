@@ -112,6 +112,9 @@ def make_invariance_test(
 def _two_groups(groups: np.ndarray, name: str) -> None:
     """Raise ``ValueError`` unless ``groups`` holds both groups ``0`` and ``1`` and only ``-1``
     besides."""
+    if groups.dtype.kind == "i" and groups.size and groups.min() >= -1 and groups.max() <= 1:
+        if np.bincount(groups + 1, minlength=3)[1:].all():
+            return
     if set(np.unique(groups).tolist()) - {-1} != {0, 1}:
         raise ValueError(f"invariance_test {name!r} compares two groups, 0 and 1")
 

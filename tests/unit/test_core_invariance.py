@@ -56,12 +56,13 @@ def test_the_registry_holds_the_two_group_tests():
     assert default_invariance_test("gsq") == "indicator"
 
 
-def test_an_unknown_test_or_more_than_two_groups_raise():
+def test_an_unknown_test_or_other_than_two_groups_raise():
     X, groups = two_groups(np.random.default_rng(0))
     with pytest.raises(ValueError, match="unknown invariance_test 'chow'"):
         make_invariance_test("chow", X, groups, indep_test="fisherz")
-    with pytest.raises(ValueError, match="compares two groups"):
-        make_invariance_test("gaussian", X, np.where(groups == 1, 2, 0), indep_test="fisherz")
+    for other in (np.where(groups == 1, 2, 0), np.where(groups == 1, -1, 0)):
+        with pytest.raises(ValueError, match="compares two groups"):
+            make_invariance_test("gaussian", X, other, indep_test="fisherz")
 
 
 @pytest.mark.parametrize(("y", "S"), [(2, [0]), (2, [0, 1]), (2, []), (3, [0, 1, 2]), (1, [3])])
