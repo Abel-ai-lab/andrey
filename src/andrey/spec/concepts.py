@@ -258,8 +258,9 @@ _CONCEPTS = (
                 reason="None is one over the number of observational rows, for both tests. On "
                 "simulated data in the paper's setting, against the paper's reference "
                 "implementation at its level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), it "
-                "had fewer errors in 20 of 112 comparisons and more in none, where 0.001 had fewer "
-                "in 15.",
+                "was better in 18 of 112 comparisons and worse in none. In the run that chose it, "
+                "on datasets of its own, it had fewer errors in 20 and more in none, where 0.001 "
+                "had fewer in 15 and more in 3, none of which repeated on a rerun.",
             ),
         ),
     ),
@@ -724,8 +725,9 @@ _CONCEPTS = (
                 default=10,
                 fixed_in=None,
                 reason="Restarts are part of the method's search (Squires, Wang and Uhler 2020); "
-                "on simulated data in the paper's setting, 10 searches were better than 5 in 4 of "
-                "15 groups of datasets and worse in none.",
+                "on 15 groups of simulated datasets, 12 in the paper's setting, 10 searches had "
+                "fewer SHD errors than 5 in 4 groups, by 0.17 to 0.42, 2 of them in that setting, "
+                "and more in none, and fewer target errors in 2 and more in none.",
             ),
         ),
     ),

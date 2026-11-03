@@ -9,7 +9,8 @@ drawn from the seed. An observational environment and ``K`` settings of ``n`` ro
 ``k`` intervenes on one designed target, which the fit is told, and on ``l`` off-targets, which it
 is not. The designed targets come from ``default_rng([seed, 654])`` and the off-targets of setting
 ``k`` from ``default_rng([seed, 654, l, k])`` among the other variables, so the cells of one block
-share their DAGs and designed targets. :data:`KINDS` names the interventions.
+share their DAGs, and their designed targets too except the ``weight`` cells, which draw theirs
+among the variables with parents. :data:`KINDS` names the interventions.
 
 :func:`grid` lists every cell: block A (seeds 1000-1019, Andrey alone, to choose its defaults), the
 in-claim arms G1-G6 and the out-of-claim arms O1-O9 (seeds 0-19), each with its ``claim``. Per

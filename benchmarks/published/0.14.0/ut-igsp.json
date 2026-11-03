@@ -34,8 +34,8 @@
  "data": "andrey.data: an Erdos-Renyi DAG on 20 variables with exactly 15 edges (mean degree 1.5), weights uniform on [0.25, 1] in absolute value with a random sign, standard normal noise (scale='raw'), columns in an order drawn from the seed; an observational environment and 5 settings of n rows each, each setting with one designed target, which the fit is told, and l off-targets, which it is not; out-of-claim cells change one of these as their fields say",
  "fit_protocol": "every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw (3,600 s at 100 variables and with kernel tests), a timeout never scored",
  "parity_rule": "paired bootstrap",
- "verdict_rule": "per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a fresh set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'",
- "residue_note": "a side is read after rounding the interval's ends to 10 decimals: three ends are floating-point residue of an exact 0 (5e-18 and -6e-18 in the final rows J2 G1_shift_l3_n3000 shd and J1 G6_weight_l0_n1000 target_error, 2e-17 in the confirmation's a1e-05_lexicographic_s10 G2_perfect_l1_n1000 shd), so those intervals touch 0 and the rows tie; the run's own scripts read them as above or below 0, which changed no decision",
+ "verdict_rule": "per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019",
+ "residue_note": "a side is read after rounding the interval's ends to 10 decimals: three ends are floating-point residue of an exact 0 (5e-18 and -6e-18 in the final rows J2 G1_shift_l3_n3000 shd and J1 G6_weight_l0_n1000 target_error, 2e-17 in the confirmation's a1e-05_lexicographic_s10 G2_perfect_l1_n1000 shd), so those intervals touch 0 and the rows tie; the run's own scripts read them as above or below 0, which changed no decision. The same reading moves the first of them from above 0 to contains 0 in default_selection.trace.inv_n_sum_counts. Counts of single runs name sides (below 0, contains 0, above 0); better and worse name only comparisons that repeated",
  "error_metric": "shd: pairs whose endpoint marks differ between the returned interventional essential graph, under the targets returned, and the true one; target_error: false plus missed targets over the settings",
  "reuse": {
   "datasets": 1800,
@@ -18474,428 +18474,428 @@
   },
   "escalation": {
    "cells": 30,
-   "better_than_neither_on_shd": 0,
+   "below_0_against_neither_on_shd": 0,
    "advantage_on_shd_alone": [],
    "raise": false,
    "verdicts": {
     "G1_shift_l1_n1000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l1_n2000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l1_n3000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l1_n4000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l1_n5000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l2_n1000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l2_n2000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l2_n3000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l2_n4000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l2_n5000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ]
     },
     "G1_shift_l3_n1000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l3_n2000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l3_n3000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l3_n4000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G1_shift_l3_n5000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l1_n1000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l1_n2000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l1_n3000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l1_n4000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l1_n5000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l2_n1000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ]
     },
     "G2_perfect_l2_n2000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ]
     },
     "G2_perfect_l2_n3000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ]
     },
     "G2_perfect_l2_n4000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l2_n5000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l3_n1000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l3_n2000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ]
     },
     "G2_perfect_l3_n3000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l3_n4000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "tie"
+      "below 0",
+      "contains 0"
      ]
     },
     "G2_perfect_l3_n5000": {
      "shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "shd_true_targets": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ],
      "skeleton_shd": [
-      "better",
-      "better"
+      "below 0",
+      "below 0"
      ]
     }
    }
@@ -18941,16 +18941,14 @@
     "a0.001_lexicographic_s5": {
      "counts": {
       "shd": {
-       "better": 6,
-       "worse": 2,
-       "tie": 7,
-       "unpaired": 0
+       "below 0": 6,
+       "contains 0": 7,
+       "above 0": 2
       },
       "target_error": {
-       "better": 1,
-       "worse": 0,
-       "tie": 14,
-       "unpaired": 0
+       "below 0": 1,
+       "contains 0": 14,
+       "above 0": 0
       }
      },
      "eligible": true
@@ -18958,16 +18956,14 @@
     "a0.001_sum_s5": {
      "counts": {
       "shd": {
-       "better": 7,
-       "worse": 2,
-       "tie": 6,
-       "unpaired": 0
+       "below 0": 7,
+       "contains 0": 6,
+       "above 0": 2
       },
       "target_error": {
-       "better": 3,
-       "worse": 0,
-       "tie": 12,
-       "unpaired": 0
+       "below 0": 3,
+       "contains 0": 12,
+       "above 0": 0
       }
      },
      "eligible": true
@@ -18975,16 +18971,14 @@
     "a0.01_lexicographic_s5": {
      "counts": {
       "shd": {
-       "better": 2,
-       "worse": 9,
-       "tie": 4,
-       "unpaired": 0
+       "below 0": 2,
+       "contains 0": 4,
+       "above 0": 9
       },
       "target_error": {
-       "better": 0,
-       "worse": 11,
-       "tie": 4,
-       "unpaired": 0
+       "below 0": 0,
+       "contains 0": 4,
+       "above 0": 11
       }
      },
      "eligible": false
@@ -18992,16 +18986,14 @@
     "a0.01_sum_s5": {
      "counts": {
       "shd": {
-       "better": 2,
-       "worse": 10,
-       "tie": 3,
-       "unpaired": 0
+       "below 0": 2,
+       "contains 0": 3,
+       "above 0": 10
       },
       "target_error": {
-       "better": 0,
-       "worse": 11,
-       "tie": 4,
-       "unpaired": 0
+       "below 0": 0,
+       "contains 0": 4,
+       "above 0": 11
       }
      },
      "eligible": false
@@ -19009,16 +19001,14 @@
     "a1e-05_lexicographic_s5": {
      "counts": {
       "shd": {
-       "better": 0,
-       "worse": 1,
-       "tie": 14,
-       "unpaired": 0
+       "below 0": 0,
+       "contains 0": 14,
+       "above 0": 1
       },
       "target_error": {
-       "better": 0,
-       "worse": 2,
-       "tie": 13,
-       "unpaired": 0
+       "below 0": 0,
+       "contains 0": 13,
+       "above 0": 2
       }
      },
      "eligible": false
@@ -19050,16 +19040,14 @@
     "a0.001_sum_s1": {
      "counts": {
       "shd": {
-       "better": 0,
-       "worse": 10,
-       "tie": 5,
-       "unpaired": 0
+       "below 0": 0,
+       "contains 0": 5,
+       "above 0": 10
       },
       "target_error": {
-       "better": 0,
-       "worse": 7,
-       "tie": 8,
-       "unpaired": 0
+       "below 0": 0,
+       "contains 0": 8,
+       "above 0": 7
       }
      },
      "eligible": false
@@ -19067,16 +19055,14 @@
     "a0.001_sum_s10": {
      "counts": {
       "shd": {
-       "better": 4,
-       "worse": 0,
-       "tie": 11,
-       "unpaired": 0
+       "below 0": 4,
+       "contains 0": 11,
+       "above 0": 0
       },
       "target_error": {
-       "better": 2,
-       "worse": 0,
-       "tie": 13,
-       "unpaired": 0
+       "below 0": 2,
+       "contains 0": 13,
+       "above 0": 0
       }
      },
      "eligible": true
@@ -19180,11 +19166,14 @@
      "G2_perfect_l1_n1000:shd:+0.39[0.01, 0.93]"
     ],
     "lexicographic_J1_counts": {
-     "tie": 110,
-     "better": 2
+     "below 0": 2,
+     "contains 0": 110,
+     "above 0": 0
     },
     "andrey_sum_vs_lexicographic_counts": {
-     "tie": 112
+     "below 0": 0,
+     "contains 0": 112,
+     "above 0": 0
     }
    },
    "level": {
@@ -19203,9 +19192,9 @@
     "J2_vs_reference_at_0.001_above_0": 0,
     "J2_vs_reference_at_0.001_rows": 10,
     "reference_at_0.001_vs_reference_at_1e-5_counts": {
-     "better": 28,
-     "tie": 54,
-     "worse": 30
+     "below 0": 28,
+     "contains 0": 54,
+     "above 0": 30
     }
    },
    "inert": {
@@ -19228,13 +19217,14 @@
     "known_targets_testing_invariant_on_final_dags": 0
    },
    "inv_n_sum_counts": {
-    "better": 33,
-    "tie": 77,
-    "worse": 2
+    "below 0": 33,
+    "contains 0": 78,
+    "above 0": 1
    },
    "inv_n_lexicographic_counts": {
-    "better": 30,
-    "tie": 82
+    "below 0": 30,
+    "contains 0": 82,
+    "above 0": 0
    }
   },
   "confirmation": {

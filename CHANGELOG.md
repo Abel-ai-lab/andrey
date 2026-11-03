@@ -45,8 +45,9 @@ names its pull request.
   with every kind of intervention it claims (20 variables, 5 settings, 1,000 to 5,000 rows per
   setting, up to 3 unknown targets per setting), `ut_igsp` at its defaults, alpha one over the
   observational rows and 10 starts, is worse in none of the 112 comparisons, on the graph or the
-  targets, and better in 18, on fresh datasets too; at the paper's alpha `1e-5` it is worse in none
-  and better in none. A median fit on 20 variables takes 0.24 s, about 1.7 times the library's time
+  targets, and better in 18, its errors lower on two sets of datasets (for 17 of the 18 the second
+  set is the one its default was chosen on); at the paper's alpha `1e-5` it is worse in none and
+  better in none. A median fit on 20 variables takes 0.24 s, about 1.7 times the library's time
   on one core. ([#PR])
 - `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
   environments that differ in the noise variances of variables it is not told: it returns those

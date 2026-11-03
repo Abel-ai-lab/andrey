@@ -227,10 +227,10 @@ the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` f
 minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
 after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
 replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
-count of edges and targets). `ut_igsp` runs 10 by default: on simulated data in its paper's
-setting, 10 searches had fewer errors than 5 in 4 of 15 groups of datasets and more in none. Each
-search builds its own caches and drops the previous one's, so more starts take more time but little
-more memory. `1`, the default for the others, runs one search.
+count of edges and targets). `ut_igsp` runs 10 by default: on 15 groups of simulated datasets, 12
+of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
+that setting, and more in none. Each search builds its own caches and drops the previous one's, so
+more starts take more time but little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -423,9 +423,9 @@ whose intervention targets are known in part or not at all: it searches variable
 DAG with the fewest edges plus targets, where a setting's targets are its known ones and every
 variable whose distribution given its parents differs from the observational one. Its default
 level for the conditional-independence and invariance tests, `alpha=None`, is one over the number
-of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it made
-fewer errors than the paper's reference implementation at the paper's `1e-5` in 20 of 112
-comparisons and more in none. It returns the interventional essential graph with each setting's
+of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was
+better than the paper's reference implementation at the paper's `1e-5` in 18 of 112 comparisons
+and worse in none. It returns the interventional essential graph with each setting's
 targets in `metadata["targets"]` and the level used in `metadata["alpha"]`.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments

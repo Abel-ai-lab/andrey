@@ -14,8 +14,9 @@ generator draws each pair with probability 1.5/19), weights uniform on `[0.25, 1
 value with a random sign, standard normal noise in the generator's own units (`scale="raw"`), and
 its columns in an order drawn from the seed. An observational environment and 5 settings have `n`
 rows each. Each setting intervenes on one designed target, which the fit is told, and on `l`
-off-targets, which it is not. The designed targets and the DAG depend on the seed alone, so the
-cells of a seed range share them, and the cells at one seed and `n` share their observational rows.
+off-targets, which it is not. The DAG depends on the seed alone, so the cells of a seed range
+share it, and their designed targets too except in G6, which draws its designed targets among the
+variables with parents; the cells at one seed and `n` share their observational rows.
 
 | Kind | Intervention on each target | Source |
 |---|---|---|
@@ -99,12 +100,18 @@ of the generating DAG under the true targets.
 | `wall_s` | the timed fit: the tests' construction and the search |
 
 A dataset's error per package is the mean over its draws, and D is Andrey's error minus the
-library's, per dataset. A comparison is worse when the 95% percentile bootstrap interval of the
-mean of D over the 20 datasets lies above 0 and its rerun on 20 fresh datasets lies above 0 too,
-and better when both lie below 0. An interval that contains 0 is a tie. In claim, a cell also
-fails when Andrey timed out on a dataset the library finished, when Andrey's `shd` is not below
-the empty graph's, or when Andrey's targets are not better than the given targets alone where
-those miss some. `qa/reference_parity.py` applies the rule to a summary in this format.
+library's, per dataset. A comparison is worse when the 95% percentile bootstrap interval of the mean
+of D over the 20 datasets lies above 0 and its rerun on 20 fresh datasets lies above 0 too, and
+better when it lies below 0 and so does a rerun. At Andrey's defaults a comparison can have two
+reruns, on seeds 2000 to 2019 and on seeds 4000 to 4019 (see [Replication](#replication)); one below
+0 is enough. An interval that contains 0 is a tie. Its ends are rounded to 10 decimals before its
+side is read, so an end that is floating-point residue of an exact 0, such as 5e-18, counts as 0.
+The run's own scripts read 3 such intervals as above or below 0; here they tie, which changes no
+decision, and at `1e-5` with the lexicographic objective the confirmation has 2 comparisons above 0
+where the run recorded 3. In claim, a cell also fails when Andrey timed out on a dataset the library
+finished, when Andrey's `shd` is not below the empty graph's, or when Andrey's targets are not
+better than the given targets alone where those miss some. `qa/reference_parity.py` applies the rule
+to a summary in this format.
 
 ## Run
 
@@ -137,15 +144,17 @@ the context arms, the coverage, and the floors of every cell.
 ### In the claim
 
 At its defaults, Andrey is worse than the library in none of the 112 comparisons (56 cells, SHD
-and target error) and better in 18: its errors were lower on seeds 0 to 19 and again on fresh
-seeds. Another 15 were lower on seeds 0 to 19 and tied on the fresh seeds, 1 was higher on seeds 0
-to 19 and tied on the rerun, and the other 78 tie. At the paper's level, Andrey is worse in none
-and better in none: 5 comparisons were higher on seeds 0 to 19 and tied on the rerun, 3 were lower
-and had no rerun, and the other 104 tie.
+and target error) and better in 18: its errors were lower on seeds 0 to 19 and again on a rerun,
+on seeds 4000 to 4019 for 17 of them and on seeds 2000 to 2019 for 1. Seeds 4000 to 4019 are those
+of the run that chose the default, as the setting with the most comparisons below 0 there, so they
+favor below 0 for it (see [Replication](#replication)). Another 15 were lower on seeds 0 to 19 and
+tied on the rerun, 1 was higher on seeds 0 to 19 and tied on the rerun, and the other 78 tie. At
+the paper's level, Andrey is worse in none and better in none: 5 comparisons were higher on seeds 0
+to 19 and tied on the rerun, 3 were lower and had no rerun, and the other 104 tie.
 
 The 18 come mostly from the level. Run at Andrey's defaults, alpha one over the observational
 rows and 10 runs, the library ties Andrey in 107 of the 112 comparisons; in the other 5, all with
-weight changes (G6), Andrey's errors stayed lower, on seeds 0 to 19 only.
+weight changes (G6), Andrey's errors were lower on seeds 0 to 19, with no rerun.
 
 At Andrey's defaults, means over the 20 datasets of each cell, seeds 0 to 19. D is Andrey's error
 minus the library's, with its 95% interval. The empty graph's SHD is 15 in every cell.
@@ -275,12 +284,13 @@ At the paper's level, alpha `1e-5` and 5 starts, against the same library fits:
 Every comparison whose interval lay above or below 0 on seeds 0 to 19, with its interval on fresh
 seeds. The 11 cells with a comparison above 0 in the first comparison (see [Choosing the
 defaults](#choosing-the-defaults)) reran on seeds 2000 to 2019; they hold every comparison above 0
-here. At Andrey's defaults every comparison also has seeds 4000 to 4019, where the same settings
-ran on an earlier build of the same search in the run that chose the default; a comparison with
-both shows both. One of the 18 better comparisons, G2 `perfect` l 1 SHD, was lower on seeds 2000
-to 2019 and tied on 4000 to 4019. The 3 comparisons at the paper's level that were lower on seeds
-0 to 19 (G3 `perfect_code` l 3 SHD, and G6 `weight` l 3 target error at 1,000 and 5,000 rows) are
-in cells that did not rerun.
+here. At Andrey's defaults every comparison also has seeds 4000 to 4019, where the same settings ran
+on an earlier build of the same search in the run that chose the default; a comparison with both
+shows both. That run chose the setting with the most comparisons below 0 on seeds 4000 to 4019, so
+those seeds favor below 0 for the default: 17 of the 18 better comparisons repeated there, and one,
+G2 `perfect` l 1 SHD, was lower on seeds 2000 to 2019 and tied on 4000 to 4019. The 3 comparisons at
+the paper's level that were lower on seeds 0 to 19 (G3 `perfect_code` l 3 SHD, and G6 `weight` l 3
+target error at 1,000 and 5,000 rows) are in cells that did not rerun.
 
 | Settings | Cell | Error | D, seeds 0-19 | D, fresh seeds | Fresh seeds | Result |
 |---|---|---|---|---|---|---|
