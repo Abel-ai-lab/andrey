@@ -115,7 +115,9 @@ $ANDREY_BENCH_PYTHON benchmarks/ut_igsp_cpu.py summarize --runs outputs/utigsp-G
 target families. `run` takes one arm, optionally some of its cells and seeds, and fits each
 dataset's packages back to back, one child process per package, each pinned to one core with one
 BLAS thread; `--resume` continues a run. A draw over its cap, 1,800 s (3,600 s at 100 variables
-and in O6), is a timeout, never scored. `select --runs ...` applies block A's rule.
+and in O6), is a timeout, never scored. `run --block C` reruns a cell on block C's seeds, and
+`summarize --replications` adds those reruns to their rows. `select --runs ...` applies block A's
+rule.
 
 ## Results
 

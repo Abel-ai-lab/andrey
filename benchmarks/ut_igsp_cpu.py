@@ -56,7 +56,7 @@ import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -591,6 +591,7 @@ def run_dataset(cell: Cell, seed: int, packages: list[str], args, cpu: int | Non
                 line = found.get((fit["algorithm"], fit["config"], draw))
                 record = {
                     "cell": cell.name,
+                    "block": cell.block,
                     "arm": cell.arm,
                     "claim": cell.claim,
                     "seed": seed,
@@ -630,6 +631,8 @@ def parse_seeds(text: str) -> list[int]:
 
 def run(args) -> int:
     cells = [c for c in grid() if c.arm == args.arm]
+    if args.block:
+        cells = [replace(c, block=args.block) for c in cells]
     if args.cells:
         wanted = set(args.cells.split(","))
         cells = [c for c in cells if c.name in wanted]
@@ -927,9 +930,37 @@ COMPARATORS = {
 }
 
 
-def summarize(records: list[dict]) -> dict:
+def _arms(records: list[dict]) -> dict[tuple, dict[int, dict]]:
+    """:func:`per_dataset` keyed by (cell, package, algorithm, config), then by seed."""
+    arms: dict[tuple, dict[int, dict]] = {}
+    for (cell, seed, package, algorithm, config), entry in per_dataset(records).items():
+        arms.setdefault((cell, package, algorithm, config), {})[seed] = entry
+    return arms
+
+
+def replication(mine: dict[int, dict], theirs: dict[int, dict], metric: str, datasets: int):
+    """A judged row's rerun on fresh seeds, in the fields the parity check reads; ``None`` when
+    no dataset pairs."""
+    row = compare(mine, theirs, metric, datasets)
+    if not row["paired"]:
+        return None
+    seeds = sorted(set(mine) | set(theirs))
+    return {
+        "seeds": f"{seeds[0]}-{seeds[-1]}",
+        "paired": row["paired"],
+        "coverage": row["coverage"],
+        **{k: v for k, v in row["multi_draw"].items() if k not in ("paired",)},
+    }
+
+
+def summarize(records: list[dict], replications: list[dict] | None = None) -> dict:
     """The summary entries of finished runs (design 4.2), one per (cell group, judged row or
-    context comparator, metric), with one row per cell size, and the escalation check (4.1)."""
+    context comparator, metric), with one row per cell size, and the escalation check (4.1).
+
+    ``replications`` are the records of block C's reruns: a judged row whose cell they hold gets
+    its ``replication``.
+    """
+    reruns = _arms(replications or [])
     by = per_dataset(records)
     cells = {c.name: c for c in grid()}
     arms: dict[tuple, dict[int, dict]] = {}
@@ -968,6 +999,12 @@ def summarize(records: list[dict]) -> dict:
                 )
                 row = {"mean_degree": cell.degree, "d": cell.p, "n": cell.n}
                 row.update(compare(mine, theirs, metric, cell.datasets))
+                rerun_mine = reruns.get((name, "andrey", "ut_igsp", row_name))
+                rerun_theirs = reruns.get((name, package, algorithm, config))
+                if judged and rerun_mine and rerun_theirs:
+                    rerun = replication(rerun_mine, rerun_theirs, metric, cell.datasets)
+                    if rerun is not None:
+                        row["replication"] = rerun
                 floor = "empty_shd" if metric == "shd" else "target_floor"
                 interval = floor_interval(mine, metric, floor)
                 if interval is not None:
@@ -1113,6 +1150,7 @@ def main(argv: list[str] | None = None) -> int:
         "--seeds", type=parse_seeds, default=None, help='only these seeds, e.g. "1000-1009"'
     )
     p.add_argument("--packages", default="andrey,reference", help="andrey, reference, or both")
+    p.add_argument("--block", choices=sorted(BLOCKS), default=None, help="seeds of this block")
     p.add_argument("--step", type=int, default=1, choices=(1, 2), help="block A's step")
     p.add_argument(
         "--winner", default=None, help="block A step 2: the step-1 winner, a<alpha>_<objective>"
@@ -1137,6 +1175,7 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--pairs", type=int, default=100)
     s = sub.add_parser("summarize", help="summary entries of finished runs")
     s.add_argument("--runs", nargs="+", required=True)
+    s.add_argument("--replications", nargs="+", default=[], help="block C's runs")
     s.add_argument("--out", required=True)
     c = sub.add_parser("select", help="block A's default selection")
     c.add_argument("--runs", nargs="+", required=True)
@@ -1148,7 +1187,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check-truth":
         return check_truth(args)
     if args.command == "summarize":
-        summary = summarize(_records(args.runs))
+        summary = summarize(_records(args.runs), _records(args.replications))
         Path(args.out).write_text(json.dumps(summary, indent=2))
         _log(
             f"{len(summary['methods'])} entries -> {args.out}; escalation {summary['escalation']['raise']}"

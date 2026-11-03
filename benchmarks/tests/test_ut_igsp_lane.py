@@ -172,6 +172,24 @@ def test_the_summary_entries_are_read_and_judged_by_the_parity_check():
     assert "regime=G1_shift_l3_J1 " in failure and "on target_error" not in failure
 
 
+def test_a_worse_cell_counts_only_when_its_rerun_on_fresh_seeds_is_worse():
+    cell = "G2_perfect_l3_n1000"
+    records = _records(cell, "andrey", "ut_igsp", "J1", lambda s: 2, lambda s: 3)
+    records += _records(cell, "reference", "ut_igsp", "J1", lambda s: 1, lambda s: 3)
+    fresh = range(2000, 2020)
+    reruns = _records(cell, "andrey", "ut_igsp", "J1", lambda s: s % 2, lambda s: 3, seeds=fresh)
+    reruns += _records(cell, "reference", "ut_igsp", "J1", lambda s: 1, lambda s: 3, seeds=fresh)
+    summary = lane.summarize(records, reruns)
+    [entry] = [e for e in summary["methods"] if e["regime"] == "G2_perfect_l3_J1"]
+    assert entry["rows"][0]["replication"]["seeds"] == "2000-2019"
+    rows = reference_parity.paired_rows("lane", summary)
+    [row] = [r for r in rows if r.key["regime"] == "G2_perfect_l3_J1"]
+    assert row.replicated and not row.failed
+    assert reference_parity.check(
+        reference_parity.paired_rows("lane", lane.summarize(records)), []
+    )[0]
+
+
 def test_a_timeout_on_a_dataset_the_reference_finished_fails_the_cell():
     cell = "G1_shift_l0_n1000"
     records = _records(cell, "andrey", "ut_igsp", "J1", lambda s: 0, lambda s: 0)
