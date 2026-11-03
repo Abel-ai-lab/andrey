@@ -29,10 +29,10 @@ variables, by name or position, with `[]` for an observational environment; as t
 whose cells give each row's variables, from whose distinct values `env` follows when you leave it
 out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
 `ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
-environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads such an
-environment as a setting whose targets it learns. `andrey run` takes a mapping as `targets=`, a JSON
-object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the number
-label `0` of `--env`.
+environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
+the mapping leaves out or gives `None` as a setting whose targets it learns, and still needs an
+observational one. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or
+as `targets` in `--config`; a key such as `"0"` names the number label `0` of `--env`.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
