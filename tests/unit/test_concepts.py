@@ -901,10 +901,10 @@ def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
 
 
 ALIASED = [
-    pytest.param(m, p.name, old, id=f"{m}-{old}")
+    pytest.param(m, a.name, old, id=f"{m}-{old}")
     for m, spec in REGISTRY.items()
-    for p in spec.params
-    for old in p.aliases
+    for a in (*spec.data.inputs, *spec.params)
+    for old in a.aliases
 ]
 
 
@@ -913,10 +913,14 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
     method, name, old
 ):
     spec = REGISTRY[method]
-    argument = next(p for p in spec.params if p.name == name)
+    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
     data = inputs(method, codes=False)
     settings = dict(SHORT.get(method, {}))
-    value = settings.pop(name, argument.default)
+    if argument in spec.data.inputs:  # the inputs before it stay positional
+        position = spec.data.inputs.index(argument)
+        value, data = data[position], data[:position]
+    else:
+        value = settings.pop(name, argument.default)
 
     def call(**named):
         out = getattr(andrey, method)(*data, **settings, **named)
@@ -937,10 +941,10 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
 #: each argument it drops.
 FORMER = [
     *(
-        pytest.param(m, {old}, {p.name}, id=f"{m}-{old}")
+        pytest.param(m, {old}, {a.name}, id=f"{m}-{old}")
         for m, spec in REGISTRY.items()
-        for p in spec.params
-        for old in p.aliases
+        for a in (*spec.data.inputs, *spec.params)
+        for old in a.aliases
     ),
     *(
         pytest.param(m, {p.name, old}, {p.name, new}, id=f"{m}-{old}")
