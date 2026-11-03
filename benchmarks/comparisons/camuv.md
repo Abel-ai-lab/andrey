@@ -184,7 +184,7 @@ every setting once replicated. Andrey ran 1.9 to 3.2 times faster than lingam at
 |---|---|---|---|---|---|---|---|---|---|
 | one in five hidden | 4 + 1 | 2,000 | 0 to 19 | 19 | 1.75 | 1.95 | +0.20 [-0.25, +0.70] | tie | 1.9 |
 | one in five hidden | 8 + 2 | 2,000 | 0 to 19 | 19 | 5.40 | 5.05 | -0.35 [-1.15, +0.35] | tie | 2.6 |
-| one in five hidden | 8 + 2 | 2,000 | 20 to 40 | 19 | 5.15 | 5.15 | +0.00 [-0.90, +0.90] | tie | 2.4 |
+| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | 19 | 5.15 | 5.15 | +0.00 [-0.90, +0.90] | tie | 2.4 |
 | one in five hidden | 12 + 3 | 2,000 | 0 to 19 | 19 | 7.85 | 7.35 | -0.50 [-2.00, +0.90] | tie | 2.9 |
 | one in ten hidden | 10 + 1 | 1,000 | 0 to 19 | 18 | 6.70 | 6.60 | -0.10 [-1.40, +1.15] | tie | 2.7 |
 | one in ten hidden | 20 + 2 | 1,000 | 0 to 19 | 19 | 12.00 | 10.40 | -1.60 [-3.50, +0.20] | tie | 3.2 |
@@ -210,8 +210,8 @@ D here is each package's errors minus the empty graph's.
 | one in five hidden | 4 + 1 | 2,000 | 0 to 19 | the paper's | 3.00 | -0.85 [-1.70, +0.15] | -0.95 [-1.65, -0.15] | -1.00 [-1.65, -0.30] | -0.85 [-1.55, -0.05] |
 | one in five hidden | 8 + 2 | 2,000 | 0 to 19 | CAM-UV's | 3.55 | +1.50 [+0.30, +2.75] | +1.90 [+0.70, +3.00] | +1.85 [+0.75, +2.90] | +1.85 [+0.65, +3.00] |
 | one in five hidden | 8 + 2 | 2,000 | 0 to 19 | the paper's | 5.45 | +0.20 [-1.20, +1.50] | +0.40 [-0.90, +1.65] | +0.45 [-0.70, +1.55] | +0.45 [-0.80, +1.65] |
-| one in five hidden | 8 + 2 | 2,000 | 20 to 40 | CAM-UV's | 3.95 | +1.20 [-0.20, +2.60] | +1.25 [-0.25, +2.80] | +1.30 [-0.20, +2.80] | +1.20 [-0.30, +2.75] |
-| one in five hidden | 8 + 2 | 2,000 | 20 to 40 | the paper's | 5.90 | -0.30 [-1.90, +1.30] | +0.05 [-1.45, +1.60] | +0.00 [-1.50, +1.55] | +0.10 [-1.40, +1.65] |
+| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | CAM-UV's | 3.95 | +1.20 [-0.20, +2.60] | +1.25 [-0.25, +2.80] | +1.30 [-0.20, +2.80] | +1.20 [-0.30, +2.75] |
+| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | the paper's | 5.90 | -0.30 [-1.90, +1.30] | +0.05 [-1.45, +1.60] | +0.00 [-1.50, +1.55] | +0.10 [-1.40, +1.65] |
 | one in five hidden | 12 + 3 | 2,000 | 0 to 19 | CAM-UV's | 6.05 | +1.30 [-0.60, +3.25] | +1.65 [-0.50, +3.90] | +1.90 [-0.20, +4.10] | +1.80 [-0.30, +4.00] |
 | one in five hidden | 12 + 3 | 2,000 | 0 to 19 | the paper's | 8.10 | -0.50 [-2.00, +1.00] | -0.15 [-2.05, +1.90] | +0.00 [-1.80, +1.90] | +0.00 [-1.90, +2.00] |
 | one in ten hidden | 10 + 1 | 1,000 | 0 to 19 | CAM-UV's | 7.00 | -0.40 [-2.60, +1.90] | -0.25 [-2.05, +1.75] | +0.05 [-1.65, +1.95] | -0.30 [-2.05, +1.65] |
@@ -241,7 +241,7 @@ claim was worse, so none needed a replication for that. The setting with one nod
 | setting | observed + hidden | rows | seeds | same graph, lingam / causal-learn | errors Andrey | errors lingam | errors causal-learn | errors empty | D vs lingam [95% CI] | D vs causal-learn [95% CI] | verdict, lingam / causal-learn |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | one in five hidden | 8 + 2 | 2,000 | 0 to 19 | 4 / 4 | 5.05 | 5.45 | 5.40 | 3.55 | -0.40 [-1.15, +0.25] | -0.35 [-1.15, +0.35] | tie / tie |
-| one in five hidden | 8 + 2 | 2,000 | 20 to 40 | 4 / 5 | 5.15 | 5.20 | 5.25 | 3.95 | -0.05 [-0.95, +0.85] | -0.10 [-1.00, +0.80] | tie / tie |
+| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | 4 / 5 | 5.15 | 5.20 | 5.25 | 3.95 | -0.05 [-0.95, +0.85] | -0.10 [-1.00, +0.80] | tie / tie |
 | the paper's simulation | 10 + 4 | 500 | 0 to 19 | 6 / 6 | 6.90 | 7.95 | 8.10 | 9.35 | -1.05 [-2.00, -0.25] | -1.20 [-2.10, -0.40] | better / better |
 | the paper's simulation | 10 + 4 | 500 | 20 to 39 | 2 / 2 | 8.65 | 8.20 | 8.15 | 11.00 | +0.45 [-0.90, +1.85] | +0.50 [-0.80, +1.85] | tie / tie |
 | the paper's simulation | 10 + 4 | 1,000 | 0 to 19 | 3 / 2 | 5.55 | 7.55 | 7.00 | 9.35 | -2.00 [-3.35, -0.80] | -1.45 [-2.65, -0.45] | better / better |
@@ -251,15 +251,15 @@ claim was worse, so none needed a replication for that. The setting with one nod
 
 Two graphs are the same here when they have the same directed edges and the same marked pairs,
 whatever the mark; with the marks as returned, `o-o` against `<->`, two graphs are equal only where
-neither marks a pair. Each dataset where Andrey's graph differs from a reference's was refitted
-along one path of switches from lingam's CAM-UV to Andrey's, each switch changing one part of the
-table in [Settings](#settings): lingam run on the columns in Andrey's rank order; then with
-Andrey's HSIC test; then with Andrey's regressions; then Andrey's engine with lingam's algorithm,
-which removes a variable's non-parents together and drops no edge on a directed cycle; then
-Andrey's phase 2, one candidate at a time; then the cycle drop, which is `andrey.camuv`. At 50
-observed variables 5 of the 20 datasets were traced, and the fresh seeds at 8 + 2 variables and
-seeds 10 to 19 with nothing hidden none; at every other size, every dataset where a graph differed.
-Three facts close the question:
+neither marks a pair. Each dataset where Andrey's graph differs from a reference's was refitted,
+except those named at the end of this paragraph, along one path of switches from lingam's CAM-UV
+to Andrey's, each switch changing one part of the table in [Settings](#settings): lingam run on
+the columns in Andrey's rank order; then with Andrey's HSIC test; then with Andrey's regressions;
+then Andrey's engine with lingam's algorithm, which removes a variable's non-parents together and
+drops no edge on a directed cycle; then Andrey's phase 2, one candidate at a time; then the cycle
+drop, which is `andrey.camuv`. At 50 observed variables 5 of the 20 datasets were traced, and the
+fresh seeds at 8 + 2 variables and seeds 10 to 19 with nothing hidden none; at every other size,
+every dataset where a graph differed. Three facts close the question:
 
 - lingam's own code run with Andrey's test and regressions returns the graph of Andrey's engine
   run with lingam's algorithm on every traced dataset, so each difference is made of the five
@@ -272,7 +272,8 @@ Three facts close the question:
   graph on every traced dataset.
 
 The traces start from lingam with sets of up to 3; lingam at its default returns that graph on most
-datasets, as the section above counts.
+datasets, as the section above counts, and on the rest the set size is the first difference,
+untraced.
 
 The table counts, per setting, the switch after which the graph is Andrey's. On the additive-noise
 data with up to 12 observed variables the visiting order alone, lingam run in Andrey's rank order,
@@ -285,7 +286,7 @@ drop.
 | one in five hidden | 4 + 1 | 2,000 | 0 to 19 | 9 | 9 | 7 / 0 / 1 / 1 / 0 | 3 of 3 |
 | one in five hidden | 8 + 2 | 2,000 | 0 to 19 | 16 | 16 | 6 / 1 / 4 / 4 / 1 | 3 of 3 |
 | one in five hidden | 12 + 3 | 2,000 | 0 to 19 | 19 | 19 | 7 / 2 / 6 / 2 / 2 | 9 of 9 |
-| one in five hidden | 8 + 2 | 2,000 | 20 to 40 | 16 | 0 | 0 / 0 / 0 / 0 / 0 | 0 of 0 |
+| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | 16 | 0 | 0 / 0 / 0 / 0 / 0 | 0 of 0 |
 | one in ten hidden | 10 + 1 | 1,000 | 0 to 19 | 19 | 19 | 8 / 1 / 7 / 2 / 1 | 2 of 2 |
 | one in ten hidden | 20 + 2 | 1,000 | 0 to 19 | 20 | 20 | 3 / 3 / 9 / 2 / 3 | 9 of 9 |
 | one in ten hidden | 50 + 5 | 1,000 | 0 to 19 | 20 | 5 | 0 / 0 / 0 / 3 / 2 | 5 of 5 |
