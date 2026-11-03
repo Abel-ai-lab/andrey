@@ -111,7 +111,7 @@ Both tests run on every dataset. Each fit is scored against the target's parents
 selection is an estimate that is not a subset of them, and its share is the FWER; a success is an
 estimate equal to them, the paper's measure; the share of the parents found averages over the fits
 whose target has parents. A fit with no accepted set is an empty estimate, counted apart as
-rejected. With 1000 datasets, a scenario's FWER near `alpha` has a standard error of about 0.007.
+rejected. With 1,000 datasets, a scenario's FWER near `alpha` has a standard error of about 0.007.
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/icp_cpu.py --out outputs/icp-cpu --workers 4
@@ -125,3 +125,81 @@ the scenarios whose FWER is above `alpha` with a one-sided binomial p-value belo
 number of scenarios, the success and found shares, the rejected share, the median fit time, and,
 for the paired fits, how many accepted the same sets and returned the same parents, and the median
 ratio of R's fit time to Andrey's.
+
+## Results
+
+One run of every cell, with Andrey's development build for 0.14.0 and InvariantCausalPrediction
+0.8 on R 4.6.1, at `alpha=0.05`, on an 8-core Intel Core i7-7820X with 4 worker processes, each
+fit on one thread. The numbers come from the run's `summary.json` and, for the traced differences,
+`trace.json`.
+
+### Agreement with R
+
+With two environments, the approximate test accepted the same sets as R on every paired fit, 5,220
+of 5,220: 5,000 in cell A, 200 in cell D, and 20 in the speed cells. `--trace` traced every other
+difference, 2,112 fits, to one of the two causes in
+[Where the two differ by design](#where-the-two-differ-by-design), and found none it could not
+explain: rebuilt from the rows, R's rules give R's accepted sets and Andrey's give Andrey's on
+every one. The settings keep `stopIfEmpty` and the exact test's
+subsample out of every fit.
+
+| Cell | Test | Environments | Paired fits | Same accepted sets | Same parents | Cause of the differences | Median time ratio, R / Andrey |
+|---|---|---|---|---|---|---|---|
+| A | approximate | 2 | 5,000 | 5,000 | 5,000 | | 50 |
+| A | exact | 2 | 5,000 | 3,568 | 4,964 | residual variance | 169 |
+| C | approximate | 3 or 4 | 1,000 | 584 | 975 | correction | 41 |
+| C | exact | 3 or 4 | 1,000 | 813 | 991 | residual variance | 96 |
+| D | approximate | 2 | 200 | 200 | 200 | | 464 |
+| D | exact | 2 | 200 | 131 | 200 | residual variance | 760 |
+
+R's exact p-values are the larger ones, so on every fit where the exact test differs, R accepts
+every set Andrey accepts and more. With three or four environments, R's approximate p-values are
+the smaller ones, so there Andrey accepts every set R accepts and more.
+
+### The claim
+
+In every cell within the method's claim, the pooled share of fits whose estimate holds a variable
+outside the true parents, the FWER, stays well below `alpha=0.05`, and no scenario's FWER is above
+`alpha` beyond sampling error: none has a one-sided binomial p-value below `0.05` over the number
+of scenarios.
+
+| Cell | Test | Fits | FWER | 95% interval | Largest scenario FWER | Success | Parents found |
+|---|---|---|---|---|---|---|---|
+| A | approximate | 100,000 | 0.0070 | 0.0065-0.0075 | 0.049 | 0.477 | 0.118 |
+| A | exact | 100,000 | 0.0063 | 0.0058-0.0068 | 0.053 | 0.494 | 0.172 |
+| C | approximate | 4,000 | 0.0095 | 0.0067-0.0130 | 0.025 | 0.498 | 0.294 |
+| C | exact | 4,000 | 0.0123 | 0.0091-0.0162 | 0.055 | 0.422 | 0.133 |
+| D | approximate | 4,000 | 0.0075 | 0.0051-0.0107 | 0.030 | 0.494 | 0.150 |
+| D | exact | 4,000 | 0.0065 | 0.0043-0.0095 | 0.020 | 0.544 | 0.261 |
+| D40 | approximate | 1,000 | 0.0030 | 0.0006-0.0087 | 0.040 | 0.497 | 0.000 |
+| D40 | exact | 1,000 | 0.0010 | 0.0000-0.0056 | 0.020 | 0.500 | 0.002 |
+
+A scenario's FWER is over its 1,000 datasets in cell A, 200 in C and D, and 50 in D40. Success
+counts an empty estimate for a target without parents, which most of D40's successes are: with
+`max_parents=3` on 40 variables, it found almost none of the parents.
+
+### Out of the claim
+
+When Appendix G's interventions could hit the target (cell B), the FWER rose to 0.1843 under the
+approximate test and 0.1146 under the exact one over the 55 scenarios that hit it, and 0.0079 and
+0.0077 over the 45 that did not. In 88% and 87% of those false selections, the estimate held a
+child of the target, and no set was accepted in 58% and 73% of the fits that hit it. A hidden
+common cause of the target and one other variable (E-hidden) gave 0.0118 and 0.0182, and 0.145 in
+one scenario of 20 under the exact test; a `tanh` effect of one parent on the target
+(E-nonlinear) gave 0.0030 and 0.0100, with success in 0.4% and 0.2% of the fits.
+
+### Speed
+
+| Variables | Rows | Test | Andrey, median s | R, median s | Median ratio |
+|---|---|---|---|---|---|
+| 9 | 1,000 | approximate | 0.010 | 0.72 | 72 |
+| 9 | 1,000 | exact | 0.009 | 4.2 | 458 |
+| 12 | 1,000 | approximate | 0.035 | 6.1 | 170 |
+| 12 | 1,000 | exact | 0.030 | 34 | 1,159 |
+| 15 | 1,000 | approximate | 0.24 | 58 | 241 |
+| 15 | 1,000 | exact | 0.17 | 273 | 1,554 |
+| 12 | 10,000 | approximate | 0.049 | 32 | 656 |
+
+Each row is 5 scenarios, one fit each, Andrey's the median of 3 timed fits after one untimed one.
+Andrey's exact test reads the same Gram matrices as its approximate one, so it costs no more; R's
+solves an `n_e x n_e` system per environment and set.

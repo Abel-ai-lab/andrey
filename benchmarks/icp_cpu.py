@@ -584,9 +584,35 @@ def summarize(out: Path) -> dict:
             if row:
                 cell[f"R {test}"] = row
                 cell[f"agreement {test}"] = _agreement(records, test)
+            # A cell whose interventions can hit the target splits Andrey's fits by whether they do.
+            if any(r["target_intervened"] for r in records):
+                for hit in (True, False):
+                    part = [r for r in records if r["target_intervened"] is hit]
+                    key = "target intervened" if hit else "target not intervened"
+                    cell[f"andrey {test}, {key}"] = _accuracy(part, "andrey", test)
+                hit = [r for r in records if r["target_intervened"]]
+                cell[f"andrey {test}, target intervened"]["false_selections_with_a_child"] = (
+                    _child_share(folder.name, hit, test)
+                )
         summary[folder.name] = cell
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
     return summary
+
+
+def _child_share(name: str, records: list[dict], test: str) -> float | None:
+    """The share of Andrey's false selections that hold a child of the target."""
+    wrong = child = 0
+    for record in records:
+        sem = scenario(name, record["scenario"])
+        children = {int(j) for j in np.flatnonzero(sem.B[:, sem.target])}
+        truth = set(record["truth"])
+        for fit in record["fits"]:
+            if fit["solution"] != "andrey" or fit["test"] != test:
+                continue
+            if not set(fit["parents"]) <= truth:
+                wrong += 1
+                child += bool(set(fit["parents"]) & children)
+    return child / wrong if wrong else None
 
 
 def _accuracy(records: list[dict], solution: str, test: str) -> dict:
