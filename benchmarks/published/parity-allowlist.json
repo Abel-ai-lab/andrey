@@ -202,6 +202,17 @@
       "cause": "correct-by-paper",
       "reason": "The two packages run different discrete tests. Andrey's chi-square test takes the exact permutation mean of the statistic as its degrees of freedom, so a sparse table keeps its level. bnlearn's x2-adf adjusts the degrees of freedom by a rule for sparse tables. On 3,840 random triples from child, insurance, alarm, and hepar2 the two decisions at alpha 0.05 agree in 97.7%, falling to 92% with 3 conditioning variables, and the graphs are not equal on any of the 3,183 datasets of those four networks (595 of 790 on asia). hepar2 has the largest conditioning sets, where the disagreement is widest.",
       "citation": "Tsamardinos, I., and Borboudakis, G. (2010). Permutation testing improves Bayesian network learning. ECML PKDD, 322-337: the statistic's degrees of freedom are its exact permutation mean. bnlearn 5.2.1: ci.test with test x2-adf."
+    },
+    {
+      "summary": "0.14.0",
+      "method": "ICP, approximate test",
+      "comparator": "InvariantCausalPrediction 0.8",
+      "row": {"regime": "icp_do", "d": 6},
+      "andrey_errors": 1.606,
+      "comparator_errors": 1.582,
+      "cause": "correct-by-paper",
+      "reason": "With three or more environments, the approximate test compares each environment's residuals with the other rows' and takes the smallest of the K p-values times K, the paper's Bonferroni correction; InvariantCausalPrediction multiplies by K - 1, below the Bonferroni factor at K >= 3 (with two environments both use 1, as the two comparisons are one). Andrey therefore accepts a superset of the reference's sets and names fewer variables: on all 21 of this row's 500 paired fits that differ, Andrey's parents are a subset of the reference's. At 6 nodes that costs 0.024 errors per fit, all from parents not named (missed 1.592 against 1.556 per fit), while the share of fits naming a non-parent is 0.010 against 0.018; at 10 nodes the same correction gives Andrey fewer errors, 0.406 against 0.420 per fit.",
+      "citation": "Peters, J., Buhlmann, P., and Meinshausen, N. (2016). Causal inference by using invariant prediction: identification and confidence intervals. JRSS-B 78(5), 947-1012, Section 3.1 (Method II, Bonferroni over the K environments). InvariantCausalPrediction 0.8 (GPL): R/getpval.R, pval <- min(pvalvec) * (length(IN) - 1)."
     }
   ]
 }
