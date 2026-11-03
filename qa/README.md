@@ -282,6 +282,18 @@ row or on its entry: the gate prints it with its numbers and does not fail it, w
 interval. A row with `"claim": "in"` or no `claim` is in claim and is judged as above, and a row's
 own `claim` overrides its entry's. Any other value of `claim` is an error.
 
+An entry may name the error its rows compare with `metric` (default `"shd"`): its rows hold
+`andrey_<metric>_mean` and `comparator_<metric>_mean`, and the check names the metric in the row's
+label, so a method judged on its graph and on its intervention targets has one entry for each. An
+entry with `"role": "context"` pairs Andrey with a comparator it is reported against and never
+judged by: its rows are printed with their numbers and not gated. Two more fields gate an in-claim
+row whatever its interval. Its `coverage` holds `andrey_short`, the datasets the reference finished
+and Andrey did not under the time cap: above 0, the row fails at any number of paired datasets,
+since a timeout never becomes a smaller mean, and so does a replication's. Its `floor_95` or
+`target_floor_95` is the bootstrap 95% interval of the mean of Andrey's error minus a floor's, the
+empty graph's SHD or the target errors of the targets the method was given alone: the row fails
+when the interval's upper end is not below 0.
+
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer
