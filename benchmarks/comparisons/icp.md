@@ -120,7 +120,10 @@ $ANDREY_BENCH_PYTHON benchmarks/icp_cpu.py --out outputs/icp-cpu --summary
 ```
 
 Each scenario writes `tasks/<cell>/<scenario>.json` when it finishes, so `--resume` continues a
-run where it stopped. `summary.json` gives each cell's FWER with its 95% Clopper-Pearson interval,
+run where it stopped. `--scenarios`, `--datasets`, and `--r-datasets` rerun chosen scenarios of a
+cell with R fitting the first datasets of each, as for cell B below, and `--r-defaults` runs R at
+its package defaults but for the level and the test. `--trace` checks each paired fit whose
+accepted sets differ. `summary.json` gives each cell's FWER with its 95% Clopper-Pearson interval,
 the scenarios whose FWER is above `alpha` with a one-sided binomial p-value below `0.05` over the
 number of scenarios, the success and found shares, the rejected share, the median fit time, and,
 for the paired fits, how many accepted the same sets and returned the same parents, and the median
@@ -182,11 +185,22 @@ counts an empty estimate for a target without parents, which most of D40's succe
 
 When Appendix G's interventions could hit the target (cell B), the FWER rose to 0.1843 under the
 approximate test and 0.1146 under the exact one over the 55 scenarios that hit it, and 0.0079 and
-0.0077 over the 45 that did not. In 88% and 87% of those false selections, the estimate held a
-child of the target, and no set was accepted in 58% and 73% of the fits that hit it. A hidden
-common cause of the target and one other variable (E-hidden) gave 0.0118 and 0.0182, and 0.145 in
-one scenario of 20 under the exact test; a `tanh` effect of one parent on the target
-(E-nonlinear) gave 0.0030 and 0.0100, with success in 0.4% and 0.2% of the fits.
+0.0077 over the 45 that did not. The method causes it, not the implementation: on the first 20
+datasets of each of the 55 scenarios, R at the like-for-like settings gives the same FWER as Andrey,
+0.1936 under the approximate test and 0.1227 under the exact one, with the same parents on 1,100 and
+1,094 of the 1,100 fits; `--trace` traces the 104 fits whose accepted sets differ to the exact
+test's residual variance. An intervention that changes the target's noise makes the regression on
+its parents differ across the environments, so their set is rejected, while a set that holds a child
+of the target, whose own equation does not change, stays close to invariant and is accepted; 88% and
+87% of the false selections hold a child. The paper reports control of the FWER in its simulation,
+which allows the same interventions. On the same 1,100 datasets, R at its package defaults, with the
+exact test's 200-row subsamples and the boosting screen above 8 variables, gives 0.0573 under the
+exact test, the paper's Method I, near the paper's report, and 0.1836 under the approximate one; the
+like-for-like settings test every set on every row. Where the targets are known, `targets` leaves
+the environments that hit the target out. A hidden common cause of the target and one other variable
+(E-hidden) gave 0.0118 and 0.0182, and 0.145 in one scenario of 20 under the exact test; a `tanh`
+effect of one parent on the target (E-nonlinear) gave 0.0030 and 0.0100, with success in 0.4% and
+0.2% of the fits.
 
 ### Speed
 

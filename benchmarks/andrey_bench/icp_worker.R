@@ -1,12 +1,14 @@
 # Fit InvariantCausalPrediction::ICP on every draw of a directory, the R reference for andrey.icp.
 #
-#   Rscript icp_worker.R <draws dir> <alpha> <largest set or "all"> <tests> <fixed>
+#   Rscript icp_worker.R <draws dir> <alpha> <largest set, "all", or "defaults"> <tests> <fixed>
 #
 # <draws dir> holds d0.csv, d1.csv, ... with the predictors' columns, then `y`, then `env`; <tests>
 # is "normal", "exact", or "normal,exact". Every fit runs at the like-for-like settings of
 # benchmarks/comparisons/icp.md: no screening (selection = "all", or "lasso" with every variable
 # kept and maxNoVariablesSimult = <largest set> for a size cap), no subsampling of the exact test
 # (maxNoObs above every environment's rows), and the full search (stopIfEmpty = FALSE).
+# "defaults" runs ICP() at the package's own defaults instead, but for alpha and test: screening by
+# boosting above 8 variables, sets of at most 8, and subsamples of 200 rows in the exact test.
 #
 # <draws dir>/fits.tsv gets one row per draw and test: the seconds of the ICP() call alone, the
 # p-value of the empty set (ICP() leaves the empty set out of acceptedSets under "lasso"), and
@@ -56,13 +58,18 @@ for (i in seq_along(files) - 1L) {
     E <- data[, p + 2L]
     IN <- lapply(sort(unique(E)), function(k) which(E == k))
     selection <- if (largest == "all") "all" else "lasso"
-    simult <- if (largest == "all") p else as.integer(largest)
+    simult <- if (largest %in% c("all", "defaults")) p else as.integer(largest)
     for (test in tests) {
         start <- proc.time()[["elapsed"]]
-        f <- ICP(X, Y, E, alpha = alpha, test = test, selection = selection,
-                 maxNoVariables = p, maxNoVariablesSimult = simult,
-                 maxNoObs = .Machine$integer.max, stopIfEmpty = FALSE,
-                 showAcceptedSets = FALSE, showCompletion = FALSE)
+        f <- if (largest == "defaults") {
+            ICP(X, Y, E, alpha = alpha, test = test, showAcceptedSets = FALSE,
+                showCompletion = FALSE)
+        } else {
+            ICP(X, Y, E, alpha = alpha, test = test, selection = selection,
+                maxNoVariables = p, maxNoVariablesSimult = simult,
+                maxNoObs = .Machine$integer.max, stopIfEmpty = FALSE,
+                showAcceptedSets = FALSE, showCompletion = FALSE)
+        }
         seconds <- proc.time()[["elapsed"]] - start
         empty <- InvariantCausalPrediction:::getpval(Y, matrix(1, nrow(X), 1), IN, test = test,
                                                      maxNoObs = .Machine$integer.max)$pval

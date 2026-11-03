@@ -280,6 +280,7 @@ class Cell:
     max_parents: int | None = None
     rows: tuple[int, int] = (500, 500)
     r_tests: tuple[str, ...] = ("approximate", "exact")
+    r_defaults: bool = False  # R at its package defaults, not the like-for-like settings
 
 
 CELLS = {
@@ -361,30 +362,32 @@ def r_fits(
     alpha: float = ALPHA,
     fixed: bool = False,
     keep: Path | None = None,
+    defaults: bool = False,
 ) -> list[dict]:
     """R's fits of ``datasets``, one per dataset and test, by 0-based column position.
 
     The empty set is accepted when its own p-value exceeds the level, which ``ICP()`` leaves out
-    of its accepted sets under a size cap. With ``fixed``, each fit also holds the tested sets'
-    p-values and each accepted set's coefficients and standard errors; ``keep`` keeps the draws
-    and R's files there, which are otherwise removed, whether R succeeds or not.
+    of its accepted sets under a size cap or a screen. With ``fixed``, each fit also holds the
+    tested sets' p-values and each accepted set's coefficients and standard errors; ``keep`` keeps
+    the draws and R's files there, which are otherwise removed, whether R succeeds or not.
+    ``defaults`` runs ``ICP()`` at the package's defaults but for the level and the test.
     """
     work = Path(tempfile.mkdtemp(prefix="icp-r-")) if keep is None else keep
     work.mkdir(parents=True, exist_ok=True)
     try:
-        return _r_fits(work, datasets, target, tests, max_parents, alpha, fixed)
+        return _r_fits(work, datasets, target, tests, max_parents, alpha, fixed, defaults)
     finally:
         if keep is None:
             shutil.rmtree(work)
 
 
-def _r_fits(work, datasets, target, tests, max_parents, alpha, fixed) -> list[dict]:
+def _r_fits(work, datasets, target, tests, max_parents, alpha, fixed, defaults) -> list[dict]:
     others = [j for j in range(datasets[0][0].shape[1]) if j != target]
     for i, (X, env) in enumerate(datasets):
         header = [f"x{j}" for j in others] + ["y", "env"]
         table = np.column_stack([X[:, others], X[:, target], env])
         np.savetxt(work / f"d{i}.csv", table, delimiter=",", header=",".join(header), comments="")
-    largest = "all" if max_parents is None else str(max_parents)
+    largest = "defaults" if defaults else "all" if max_parents is None else str(max_parents)
     names = ",".join(TESTS[t] for t in tests)
     environment = {**os.environ, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
     command = ["Rscript", "--vanilla", str(WORKER), str(work), str(alpha), largest, names]
@@ -398,7 +401,7 @@ def _r_fits(work, datasets, target, tests, max_parents, alpha, fixed) -> list[di
             listed = work / f"accepted_{row['draw']}_{row['test']}.txt"
             accepted = [_set(line, others) for line in listed.read_text().splitlines() if line]
             empty_p = float(row["empty_p"])
-            if max_parents is not None and empty_p > alpha:
+            if [] not in accepted and empty_p > alpha:
                 accepted = [[], *accepted]
             p_values = [None] * (len(others) + 1)
             for k, v in zip(others, _floats(row["pvalues"]), strict=True):
@@ -486,7 +489,9 @@ def run_scenario(task: tuple[str, int, str, Cell]) -> str:
                 fit = {k: fit[k] for k in ("parents", "best", "model_rejected", "seconds")}
             record["fits"].append({"solution": "andrey", "dataset": i, "test": test, **fit})
     if r_data:
-        for fit in r_fits(r_data, sem.target, cell.r_tests, cell.max_parents):
+        for fit in r_fits(
+            r_data, sem.target, cell.r_tests, cell.max_parents, defaults=cell.r_defaults
+        ):
             fit = {k: v for k, v in fit.items() if k not in ("upper", "lower")}
             record["fits"].append({"solution": "R", "dataset": fit.pop("draw"), **fit})
     path = Path(out) / "tasks" / name / f"{index:03d}.json"
@@ -498,9 +503,15 @@ def run_scenario(task: tuple[str, int, str, Cell]) -> str:
 
 
 def campaign(
-    out: Path, cells: list[str], workers: int, resume: bool, smoke: bool, only: list[int] | None
+    out: Path,
+    cells: list[str],
+    workers: int,
+    resume: bool,
+    smoke: bool,
+    only: list[int] | None,
+    overrides: dict | None = None,
 ) -> None:
-    specs = {name: CELLS[name] for name in cells}
+    specs = {name: replace(CELLS[name], **(overrides or {})) for name in cells}
     if smoke:  # one scenario of each cell, with a few datasets
         specs = {
             name: replace(
@@ -1018,6 +1029,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--scenarios", default=None, help="comma-separated scenario numbers to fit (default: all)"
     )
+    p.add_argument("--datasets", type=int, default=None, help="datasets per scenario, for Andrey")
+    p.add_argument(
+        "--r-datasets", type=int, default=None, help="R fits the first N datasets of every scenario"
+    )
+    p.add_argument(
+        "--r-defaults", action="store_true", help="R at its package defaults, but alpha and test"
+    )
     args = p.parse_args(argv)
     out = Path(args.out)
     if args.fixed:
@@ -1048,7 +1066,19 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         p.error(f"unknown cells {sorted(unknown)}; the cells are {list(CELLS)}")
     only = None if args.scenarios is None else [int(k) for k in args.scenarios.split(",")]
-    campaign(out, cells, args.workers, args.resume, args.smoke, only)
+    overrides = {
+        **({} if args.datasets is None else {"datasets": args.datasets}),
+        **(
+            {}
+            if args.r_datasets is None
+            else {
+                "r_datasets": args.r_datasets,
+                "r_scenarios": max(CELLS[c].scenarios for c in cells),
+            }
+        ),
+        **({"r_defaults": True} if args.r_defaults else {}),
+    }
+    campaign(out, cells, args.workers, args.resume, args.smoke, only, overrides)
     stamp = datetime.now(timezone.utc).isoformat()
     _log(f"finished {stamp}")
     return 0

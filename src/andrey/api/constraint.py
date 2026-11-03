@@ -1574,21 +1574,23 @@ def icp(
     with probability at least ``1 - 2 alpha`` [1]_.
 
     **Limitations.** Measured on simulated linear Gaussian data drawn as in the paper's simulation
-    study [1]_: two environments of 100 to 500 rows each, 5 to 12 variables, and noise
-    interventions on one or more of them, with 200 datasets per scenario. When those interventions
-    could also hit the target and ``targets`` did not name them, the estimate held a variable
-    outside the true parents in 18% of the fits under ``"approximate"`` and 11% under ``"exact"``,
-    over the 55 scenarios that hit it, most often a child of the target (88% and 87% of those
-    fits), against under 1% in the scenarios that left it alone; ``targets`` leaves such
-    environments out. A hidden common cause of the target and one other variable raised the share
-    to 1.2% and 1.8% over 20 scenarios, and to 14.5% in one of them under ``"exact"``. A ``tanh``
-    effect of one parent on the target kept it at 1.0% at most, but the estimate equaled the true
-    parents in under 0.5% of the fits. With ``max_parents=3`` on 40 variables, it found 0.2% of
-    the true parents under ``"exact"``. Without ``max_parents`` it tests ``2^(n_variables - 1)``
-    sets: the median fit of the approximate test took 0.24 s on one core at 15 variables and 1,000
-    rows. The guarantee does not cover noise that is not Gaussian under ``"exact"``. The numbers
-    are a reference, not a hard limit: they change with the data generator, the settings, and the
-    machine.
+    study [1]_: two environments of 100 to 500 rows each, 5 to 12 variables, and noise interventions
+    on one or more of them, with 200 datasets per scenario. When those interventions could also hit
+    the target and ``targets`` did not name them, the estimate held a variable outside the true
+    parents in 18% of the fits under ``"approximate"`` and 11% under ``"exact"``, over the 55
+    scenarios that hit it, against under 1% in the scenarios that left it alone. An intervention
+    that changes the target's noise makes the regression on its parents differ across environments,
+    so their set is rejected, while a set with a child of the target, whose own equation does not
+    change, stays close to invariant and is accepted: 88% and 87% of those fits held a child.
+    ``targets`` leaves such environments out. A hidden common cause of the target and one other
+    variable raised the share to 1.2% and 1.8% over 20 scenarios, and to 14.5% in one of them under
+    ``"exact"``. A ``tanh`` effect of one parent on the target kept it at 1.0% at most, but the
+    estimate equaled the true parents in under 0.5% of the fits. With ``max_parents=3`` on 40
+    variables, it found 0.2% of the true parents under ``"exact"``. Without ``max_parents`` it tests
+    ``2^(n_variables - 1)`` sets: the median fit of the approximate test took 0.24 s on one core at
+    15 variables and 1,000 rows. The guarantee does not cover noise that is not Gaussian under
+    ``"exact"``. The numbers are a reference, not a hard limit: they change with the data generator,
+    the settings, and the machine.
 
     References
     ----------
