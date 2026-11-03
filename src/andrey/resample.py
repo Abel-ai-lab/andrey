@@ -773,7 +773,7 @@ class _Job:
 
     name: str  # the facade, by name
     data: Any  # the first input: an array or table, or a list of them for a panel
-    aligned: dict[str, Any]  # row-aligned inputs by keyword (cdnod's domain_index)
+    aligned: dict[str, Any]  # row-aligned arguments by keyword (env, a targets matrix)
     kwargs: dict[str, Any]
     seed: int
     unit: str  # "rows", "blocks", "units" (one draw for every array), or "groups" (one each)
@@ -912,9 +912,9 @@ def bootstrap(
     ``method`` is fitted on it. The result counts, for every pair of variables, the fits that give
     each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds the averaged
     graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
-    with a row-aligned input
-    (``cdnod``'s ``domain_index``, ``gies``'s ``interventions``) resamples that input with the
-    rows. A time-series method on one series subsamples one stretch of consecutive rows (and
+    with a row-aligned input (``env``, or ``gies``'s ``targets`` as a 0/1 matrix) resamples that
+    input with the rows, and a column that ``env`` or ``targets`` names travels with the rows of
+    ``data``. A time-series method on one series subsamples one stretch of consecutive rows (and
     bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
     ``multi_group_direct_lingam`` resamples each dataset on its own.
 
@@ -963,7 +963,7 @@ def bootstrap(
         Keep every fit in the ``fits`` property.
     **method_kwargs
         The method's other arguments: its keyword parameters, and a row-aligned input such as
-        ``domain_index=``.
+        ``env=``.
 
     Returns
     -------
@@ -1295,15 +1295,18 @@ def _job(
     elif block_length is not None:
         raise ValueError("block_length is for resampling='bootstrap', not resampling='subsample'")
     aligned = {}
-    for entry in spec.data.inputs[1:]:
-        value = kwargs.pop(entry.name, None)
+    for entry in (*spec.data.inputs[1:], *(p for p in spec.params if p.type == "targets")):
+        key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
+        value = kwargs.get(key)
         if value is None:
-            if entry.required:
+            if getattr(entry, "required", False):
                 raise ValueError(f"{spec.name} needs {entry.name}")
             continue
+        if isinstance(value, (str, Mapping)):  # a column of data, or one entry per environment
+            continue
         if len(value) != sizes[0]:
-            raise ValueError(f"{entry.name} has {len(value)} rows but data has {sizes[0]}")
-        aligned[entry.name] = value
+            raise ValueError(f"{key} has {len(value)} rows but data has {sizes[0]}")
+        aligned[key] = kwargs.pop(key)
     return _Job(
         name=spec.name,
         data=data,

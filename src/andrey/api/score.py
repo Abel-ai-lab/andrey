@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
@@ -28,9 +30,10 @@ from andrey.api._adapt import (
 from andrey.api._method import method_spec
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
+from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy.typing as npt
 
@@ -340,8 +343,9 @@ def ges(
 @method_spec("gies")
 def gies(
     data: npt.ArrayLike,
-    interventions: npt.ArrayLike | None = None,
+    env: npt.ArrayLike | str | None = None,
     *,
+    targets: Mapping | npt.ArrayLike | str | None = None,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
@@ -353,20 +357,36 @@ def gies(
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
 
     GIES learns from data that mixes observation with interventions [1]_: in a row where a variable
-    was intervened on, its value was set from outside rather than by its causes. Each variable is
-    scored only on the rows where it was not intervened on, and an edge with exactly one end
-    intervened on in some rows gets its direction from the data. So the result can orient edges
-    that a CPDAG learned from observational data leaves undirected.
+    was intervened on, its value was set from outside rather than by its causes. The rows come from
+    environments, each with its own set of intervened variables, its targets; an observational
+    environment has none. Each variable is scored only on the rows where it was not intervened on,
+    and an edge with exactly one end intervened on in some environment gets its direction from the
+    data. So the result can orient edges that a CPDAG learned from observational data leaves
+    undirected.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    interventions : array-like of shape (n_samples, n_variables), default=None
-        ``True`` (or 1) where the row's value of the variable was set by an intervention, ``False``
-        (or 0) where its causes set it. ``None`` means no interventions: observational data. Every
-        variable needs at least two rows without an intervention, with different values.
+        become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
+        variable: it leaves the data before the fit, and ``categorical``, ``knowledge``,
+        ``targets``, and the result's positions count the other columns.
+    env : array-like of shape (n_samples,), str, or None, default=None
+        The environment each row comes from: one label per row, strings or numbers, not both, or
+        the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
+        environments from ``targets``: its distinct values, or none, for observational data.
+    targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
+        The variables intervened on in each environment, named by column label or 0-based position.
+        A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
+        ``[]`` marks an observational environment, and every label of ``env`` needs a list:
+        ``None``, or a label the mapping leaves out, raises ``ValueError``, as a key that is not a
+        label of ``env`` does. A string names a column of the DataFrame ``data`` whose cells give
+        each row's targets: a label or a position, a list of them, or an empty cell (``None``,
+        ``NaN``, ``""``, ``[]``) for an observational row. An array is ``True`` (or 1) where the
+        row's value of the variable was set by an intervention and ``False`` (or 0) where its
+        causes set it. With a column or an array, every row of one environment of ``env`` must
+        give the same targets. ``None``, without ``env``, means observational data. Every variable
+        needs at least two rows without an intervention on it, with different values.
     score_func : str or None, default=None
         Local score objective, as for :func:`~andrey.ges`: ``"bic"``, the linear-Gaussian BIC, for
         continuous data. ``"bdeu"`` is the BDeu score and ``"discrete_bic"`` the multinomial BIC,
@@ -447,7 +467,12 @@ def gies(
         function of other columns. One message names every group of copies and says to keep one
         column per group. Also if a given ``max_parents`` is below the parents some graph of the
         required edges of ``knowledge`` gives a node, or if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists. Also if ``env`` comes
+        without ``targets``; if ``env`` does not hold one label per row, misses a label, or mixes
+        strings and numbers; if a ``targets`` mapping comes without ``env``, names a label
+        ``env`` lacks, or leaves an environment's targets unknown; if a column or an array of
+        ``targets`` gives two rows of one environment different targets; if ``targets`` names a
+        variable ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks.
 
     Warns
     -----
@@ -459,6 +484,7 @@ def gies(
     See Also
     --------
     andrey.ges : Searches the same way on observational data, without the turning phase.
+    andrey.cdnod : Learns from data pooled from several environments whose targets are unknown.
 
     Notes
     -----
@@ -467,7 +493,9 @@ def gies(
     noise. When every column is categorical, the default is ``"bdeu"``, and on mixed data
     ``"cond_gauss"``; ``"discrete_bic"`` and ``"degen_gauss"`` also score those data, as
     :func:`~andrey.ges` describes. An intervention replaces the intervened variable's mechanism and
-    leaves every other variable's unchanged.
+    leaves every other variable's unchanged. GIES needs the targets of every environment: when
+    they are unknown, :func:`~andrey.cdnod` learns from ``env`` alone, as a variable that can only
+    be a cause.
 
     **Scores under interventions.** Each score reads a variable only on the rows where it was not
     intervened on, as the likelihood of interventional data does [1]_, and every BIC charges
@@ -535,8 +563,9 @@ def gies(
     child exactly under the BIC, so the search never selects one, nor any parent set that leaves its
     child a residual variance of at most ``1e-12`` times its variance. The categorical and
     mixed-data scores are not benchmarked with GIES yet: its tests run them on small fixed
-    networks, with and without interventions. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    networks, with and without interventions. Every environment's targets must be known: GIES
+    reads no environment whose targets are unknown. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -557,9 +586,15 @@ def gies(
     >>> x = rng.standard_normal(600)
     >>> y = x + 0.5 * rng.standard_normal(600)
     >>> y[400:] = rng.standard_normal(200)  # the last 200 rows set y from outside
-    >>> intervened = np.zeros((600, 2), dtype=bool)
-    >>> intervened[400:, 1] = True
-    >>> gies(pd.DataFrame({"x": x, "y": y}), intervened).structure.oriented_edges()
+    >>> env = np.repeat(["observed", "set y"], [400, 200])
+    >>> data = pd.DataFrame({"x": x, "y": y})
+    >>> gies(data, env, targets={"observed": [], "set y": ["y"]}).structure.oriented_edges()
+    [('x', 'y', 'directed')]
+
+    The same data with a column that names each row's targets, from which ``env`` follows:
+
+    >>> data["target"] = np.where(env == "set y", "y", "")
+    >>> gies(data, targets="target").structure.oriented_edges()
     [('x', 'y', 'directed')]
 
     On categorical data, declared by a pandas ``category`` type, the default score is BDeu:
@@ -567,20 +602,31 @@ def gies(
     >>> a = rng.integers(0, 3, 2000)
     >>> b = np.where(rng.random(2000) < 0.8, a, rng.integers(0, 3, 2000))
     >>> b[1000:] = rng.integers(0, 3, 1000)  # the last 1000 rows set b from outside
-    >>> intervened = np.zeros((2000, 2), dtype=bool)
-    >>> intervened[1000:, 1] = True
+    >>> env = np.repeat([0, 1], 1000)
     >>> data = pd.DataFrame({"a": pd.Categorical(a), "b": pd.Categorical(b)})
-    >>> gies(data, intervened).structure.oriented_edges()
+    >>> gies(data, env, targets={0: [], 1: ["b"]}).structure.oriented_edges()
     [('a', 'b', 'directed')]
     """
+    from andrey.api._env import intervened_rows
     from andrey.search.gies import gies as _gies
-    from andrey.search.gies import intervention_mask
 
+    if env is not None and np.ndim(env) == 2 and np.shape(env)[1] > 1:
+        if targets is not None:
+            raise ValueError(
+                "gies: the second argument is env, one label per row; pass the 0/1 matrix as "
+                "targets alone"
+            )
+        warn_once(
+            "andrey.gies: a 0/1 matrix as the second argument is now targets=; the former form "
+            "stops working in the next release",
+            DeprecatedArgumentWarning,
+        )
+        env, targets = None, env
     score_func, categorical = default_score(data, score_func, categorical=categorical)
     X, mask = checked_data(data, categorical, "score_func", score_func, method="gies")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
-    intervened = None if interventions is None else intervention_mask(interventions, X)
+    intervened = intervened_rows(env, targets, X, labels)
     with copies_named(labels):
         graph, score = _gies(
             X,

@@ -265,14 +265,17 @@ _add(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="domain_index",
+                    name="env",
                     kind="context",
-                    doc="Domain / context index, (n_samples,) or (n_samples, 1), aligned to the "
-                    "data rows.",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
+                    "1, ... in order of first appearance.",
+                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
-            notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
+            notes="env becomes a trailing pseudo-node, then projected out of the result.",
             missing=True,
         ),
         output=OutputSpec(
@@ -453,11 +456,11 @@ _add(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="interventions",
+                    name="env",
                     kind="context",
-                    doc="(n_samples, n_variables) 0/1 matrix aligned to the data: 1 where the "
-                    "row's value of the variable was set by an intervention. Omit it for "
-                    "observational data.",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets. Omit both for observational data.",
                     required=False,
                 ),
             ),
@@ -475,6 +478,18 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"]}; [] marks an '
+                "observational environment. Every environment needs an entry. null, with no env, "
+                "is observational data.",
+                nullable=True,
+                aliases=("interventions",),
+            ),
             concept_param(
                 "score_func",
                 doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "

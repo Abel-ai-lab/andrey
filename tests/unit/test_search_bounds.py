@@ -288,10 +288,10 @@ def test_max_parents_caps_the_interventional_essential_graph():
     data[400:, 2] = np.random.default_rng(4).standard_normal(200)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        uncapped = andrey.gies(data, interventions).structure.to_numpy()
+        uncapped = andrey.gies(data, targets=interventions).structure.to_numpy()
         assert max_parents_in_class(uncapped).max() > max(CAPS)
         for cap in CAPS:
-            marks = andrey.gies(data, interventions, max_parents=cap).structure.to_numpy()
+            marks = andrey.gies(data, targets=interventions, max_parents=cap).structure.to_numpy()
             assert max_parents_in_class(marks).max() <= cap, cap
 
 
