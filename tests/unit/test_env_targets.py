@@ -183,20 +183,32 @@ def test_gies_refuses_targets_it_cannot_read(case):
         GIES_ERRORS[case]()
 
 
-def test_bootstrap_resamples_env_and_a_targets_matrix_with_the_rows():
-    fits = {
-        "mapping": andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=TARGETS),
-        "matrix": andrey.bootstrap("gies", DATA, n_resamples=2, targets=MASK),
-        "column": andrey.bootstrap(
-            "gies", DATA.assign(e=ENV), n_resamples=2, env="e", targets=TARGETS
-        ),
-    }
-    first = fits["matrix"].frequency("->")
-    assert all(np.array_equal(f.frequency("->"), first) for f in fits.values())
+def test_bootstrap_draws_within_the_environments_of_env_in_every_form():
+    """A resample takes the same share of each environment's rows, whatever form names them."""
+    fits = [
+        andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=TARGETS),
+        andrey.bootstrap("gies", DATA.assign(e=ENV), n_resamples=2, env="e", targets=TARGETS),
+        andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=MASK),
+    ]
+    assert all(np.array_equal(f.frequency("->"), fits[0].frequency("->")) for f in fits)
+
+
+def test_a_bootstrap_resample_keeps_every_environment():
+    """An environment of one row is in every subsample, so its key in targets always has rows."""
+    env = ENV.copy()
+    env[0] = "one row"
+    out = andrey.bootstrap(
+        "gies", DATA, n_resamples=20, env=env, targets={**TARGETS, "one row": []}
+    )
+    assert out.n_resamples == 20
+
+
+def test_bootstrap_resamples_a_targets_matrix_without_env_with_the_rows():
+    matrix = andrey.bootstrap("gies", DATA, n_resamples=2, targets=MASK)
     warning_policy._warned.clear()
     with pytest.warns(andrey.DeprecatedArgumentWarning):
         former = andrey.bootstrap("gies", DATA, n_resamples=2, interventions=MASK)
-    assert np.array_equal(former.frequency("->"), first)
+    assert np.array_equal(former.frequency("->"), matrix.frequency("->"))
 
 
 # --- cdnod: env as numbers, labels, and a column -----------------------------------------------
@@ -297,6 +309,20 @@ def test_bootstrap_carries_a_column_of_env_with_its_rows():
     by_values = andrey.bootstrap("cdnod", frame, n_resamples=2, env=DOMAIN)
     assert by_column.structure.labels == ("x", "y")
     assert np.array_equal(by_column.frequency("->"), by_values.frequency("->"))
+
+
+def test_bootstrap_draws_cdnod_rows_whole_for_numbers_and_within_domains_for_text():
+    """A numeric index, which cdnod reads as numbers, draws rows as a whole, as under its former
+    name; text labels draw within each domain."""
+    frame = pd.DataFrame(X, columns=["x", "y"])
+    numbers = andrey.bootstrap("cdnod", frame, n_resamples=4, env=DOMAIN)
+    warning_policy._warned.clear()
+    with pytest.warns(andrey.DeprecatedArgumentWarning):
+        former = andrey.bootstrap("cdnod", frame, n_resamples=4, domain_index=DOMAIN)
+    assert np.array_equal(numbers.frequency("->"), former.frequency("->"))
+    one_row = np.array(["a", "b", "c"])[DOMAIN.astype(int)]
+    one_row[0] = "d"  # a domain of one row stays in every subsample
+    assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
 
 
 # --- the command line ---------------------------------------------------------------------------

@@ -529,7 +529,9 @@ draws as many rows as `data` has, with replacement, instead. The generator depen
 resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run
 begins with the shorter run's fits. A method that takes a row-aligned input (`env`, or `gies`'s
 `targets` as a 0/1 matrix) resamples it with the rows, and a column that `env` or `targets` names
-travels with its rows; `multi_group_direct_lingam`
+travels with its rows. When `env` holds text labels, or for `gies`, each resample takes the same
+share of every environment's rows, at least one, so no resample drops an environment; `cdnod`'s
+numeric index, such as a time step, resamples the rows as a whole. `multi_group_direct_lingam`
 resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
 resamples the units, the same rows of every dataset. A time-series method on one series subsamples
 one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`

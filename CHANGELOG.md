@@ -97,7 +97,8 @@ names its pull request.
 - `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
-  0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`.
+  0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
+  for `gies` or text labels keep the same share of every environment's rows.
 
 ### Changed
 

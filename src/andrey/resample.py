@@ -24,7 +24,7 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range
-from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput
+from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
 from andrey.core.knowledge import mpdag
@@ -783,6 +783,7 @@ class _Job:
     tie_break: str
     resampling: str  # "subsample" or "bootstrap", resolved
     sample_fraction: float  # a subsample's share of the rows
+    strata: tuple[np.ndarray, ...] | None = None  # each environment's rows, drawn on their own
 
 
 def _take(x: Any, idx: np.ndarray) -> Any:
@@ -800,6 +801,19 @@ def _kept(n: int, sample_fraction: float) -> int:
 def _draw(job: _Job, b: int) -> list[np.ndarray]:
     """Draw resample ``b``'s row indices, one array per data array."""
     rng = np.random.default_rng(np.random.SeedSequence(job.seed, spawn_key=(b, 0)))
+    if job.strata is not None:  # the same share of each environment's rows, at least one
+        if job.resampling == "subsample":
+            picks = [
+                rows[
+                    rng.choice(
+                        len(rows), size=max(1, _kept(len(rows), job.sample_fraction)), replace=False
+                    )
+                ]
+                for rows in job.strata
+            ]
+        else:
+            picks = [rows[rng.integers(0, len(rows), size=len(rows))] for rows in job.strata]
+        return [np.sort(np.concatenate(picks))]
     sizes = [len(x) for x in job.data] if job.unit in ("units", "groups") else [len(job.data)]
     if job.resampling == "subsample":
         kept = [_kept(n, job.sample_fraction) for n in sizes]
@@ -914,7 +928,12 @@ def bootstrap(
     graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
     with a row-aligned input (``env``, or ``gies``'s ``targets`` as a 0/1 matrix) resamples that
     input with the rows, and a column that ``env`` or ``targets`` names travels with the rows of
-    ``data``. A time-series method on one series subsamples one stretch of consecutive rows (and
+    ``data``. When ``env`` holds text labels, or the method takes ``targets`` as ``gies`` does, a
+    resample is drawn within each environment of ``env``: of an environment's ``m`` rows, a
+    subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample draws
+    ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
+    ``cdnod``, which reads it as numbers, such as a domain number or a time step, resamples the rows
+    as a whole. A time-series method on one series subsamples one stretch of consecutive rows (and
     bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
     ``multi_group_direct_lingam`` resamples each dataset on its own.
 
@@ -950,8 +969,8 @@ def bootstrap(
     sample_fraction : float, default=0.5
         The share of the rows in a subsample, in ``(0, 1]``, so that ``round(sample_fraction *
         n_samples)`` is at least 2; for ``longitudinal_lingam``, the share of the units, and for
-        ``multi_group_direct_lingam``, the share of each dataset's rows. Not used by
-        ``"bootstrap"``.
+        ``multi_group_direct_lingam``, the share of each dataset's rows, and for a resample drawn
+        within environments, the share of each environment's rows. Not used by ``"bootstrap"``.
     block_length : int or None, default=None
         For ``resampling="bootstrap"`` of a time-series method on one series, the number of
         consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
@@ -1307,6 +1326,7 @@ def _job(
         if len(value) != sizes[0]:
             raise ValueError(f"{key} has {len(value)} rows but data has {sizes[0]}")
         aligned[key] = kwargs.pop(key)
+    strata = _strata(spec, data, aligned, kwargs) if unit == "rows" else None
     return _Job(
         name=spec.name,
         data=data,
@@ -1320,4 +1340,39 @@ def _job(
         tie_break=_backend.config.tie_break,
         resampling=resampling,
         sample_fraction=sample_fraction,
+        strata=strata,
     )
+
+
+def _strata(
+    spec: MethodSpec, data: Any, aligned: dict[str, Any], kwargs: dict[str, Any]
+) -> tuple[np.ndarray, ...] | None:
+    """Return the rows of each environment when a resample is drawn within environments.
+
+    ``None`` when it is not. A resample is drawn within environments when the call gives ``env`` (or
+    its former name) as one label per row or as a column of ``data``, and ``env`` holds text labels
+    or the method takes ``targets``. A numeric ``env`` of a method without ``targets``, such as
+    ``cdnod``'s domain or time index, which the method reads as numbers, leaves the rows drawn as a
+    whole. The environments are in the order of their codes
+    (:func:`~andrey.core.environments.env_codes`); labels the method cannot read leave the rows
+    drawn as a whole, and the fit raises on them.
+    """
+    entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
+    if entry is None:
+        return None
+    key = next((k for k in (entry.name, *entry.aliases) if k in aligned or k in kwargs), None)
+    value = aligned.get(key, kwargs.get(key)) if key is not None else None
+    if isinstance(value, str):
+        value = data[value].to_numpy() if value in list(getattr(data, "columns", ())) else None
+    if value is None:
+        return None
+    values = np.asarray(value, dtype=object)
+    values = values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
+    text = values.ndim == 1 and any(isinstance(v, str) for v in values)
+    if values.ndim != 1 or not (text or any(p.type == "targets" for p in spec.params)):
+        return None
+    try:
+        codes, labels = environments.env_codes(values, len(values))
+    except ValueError:
+        return None
+    return tuple(np.flatnonzero(codes == k) for k in range(len(labels)))
