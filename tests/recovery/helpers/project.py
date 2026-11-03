@@ -72,6 +72,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm in _SCORE_GRAPH:
             candidate["score"] = out.metadata["score"]
         return candidate
+    if algorithm == "GnIES":  # the graph, its score, and the learned targets
+        return {
+            "graph": out.structure.to_numpy(),
+            "score": out.metadata["score"],
+            "targets": [variable for variable, _ in out.metadata["index_edges"]],
+        }
     if algorithm in _LINGAM:
         return {
             "causal_order": np.asarray(out.ordering),

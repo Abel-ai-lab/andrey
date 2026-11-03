@@ -48,6 +48,13 @@ def _run_cdnod(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.cdnod(X, datagen.domain_index("gauss_5v")), algorithm)
 
 
+def _run_gnies(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    env = datagen.environment_index("gauss_5v_noise_shift")
+    return project_output(andrey.gnies(X, env), algorithm)
+
+
 def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
     from andrey.api._temporal import _adapt_var_lingam
     from andrey.lingam.var import var_lingam
@@ -97,6 +104,7 @@ ALGORITHMS = {
     "CDNOD": (_run_cdnod, "gauss_5v"),
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
+    "GnIES": (_run_gnies, "gauss_5v_noise_shift"),
     "XGES": (_facade("xges"), "gauss_5v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
