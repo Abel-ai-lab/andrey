@@ -791,6 +791,21 @@ _TABLE_MIN = 1 << 16
 _BATCH_CELLS = 1 << 22
 
 
+def _segment_sums(values: np.ndarray, cuts: np.ndarray) -> np.ndarray:
+    """``np.sum(values[cuts[i]:cuts[i + 1]])`` for each ``i``.
+
+    When every segment has one length, as each query's tables in a scan do, the segments are summed
+    as the rows of one array with ``np.sum(axis=1)``, which adds each row's values in the order
+    ``np.sum`` adds a segment's, so every sum is the one a call per segment returns, bit for bit;
+    otherwise each segment is summed alone.
+    """
+    bounds = cuts.tolist()
+    if len(bounds) > 2 and all(b - a == bounds[1] - bounds[0] for a, b in zip(bounds, bounds[1:])):
+        rows = values[bounds[0] : bounds[-1]].reshape(len(bounds) - 1, bounds[1] - bounds[0])
+        return np.sum(rows, axis=1)
+    return np.array([np.sum(values[a:b]) for a, b in zip(bounds[:-1], bounds[1:])])
+
+
 class ChiSquare:
     """Pearson chi-square or G-square test of conditional independence on category codes.
 
@@ -1258,8 +1273,7 @@ class ChiSquare:
             values = observed * np.log(observed / expected)
         else:
             values = observed * (observed / expected)
-        cuts = np.searchsorted(occupied, bounds * (kx * ky)).tolist()
-        sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
+        sums = _segment_sums(values, np.searchsorted(occupied, bounds * (kx * ky)))
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
         return statistic, (n_sx, n_sy, n_s)
 
@@ -1269,8 +1283,7 @@ class ChiSquare:
     ) -> np.ndarray:
         """The p-values of tests with ``statistic`` and the null means ``per_table`` of their
         tables, test ``i`` owning ``per_table[bounds[i]:bounds[i + 1]]``."""
-        cuts = bounds.tolist()
-        dof = np.array([np.sum(per_table[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
+        dof = _segment_sums(per_table, bounds)
         out = np.ones(len(dof))
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
