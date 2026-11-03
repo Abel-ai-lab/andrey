@@ -134,7 +134,8 @@ ratio of R's fit time to Andrey's.
 One run of every cell, with Andrey's development build for 0.14.0 and InvariantCausalPrediction
 0.8 on R 4.6.1, at `alpha=0.05`, on an 8-core Intel Core i7-7820X with 4 worker processes, each
 fit on one thread. The numbers come from the run's `summary.json` and, for the traced differences,
-`trace.json`.
+`trace.json`; [`published/0.14.0/icp.json`](../published/0.14.0/icp.json) holds them with the
+paired errors of each cell.
 
 ### Agreement with R
 
