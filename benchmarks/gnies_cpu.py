@@ -195,14 +195,19 @@ def _scm(cell: Cell):
     )
 
 
-def draw(cell: Cell, seed: int) -> Draw:
-    """Sample one dataset of ``cell``; the same ``(cell, seed)`` gives the same bytes."""
+def draw(cell: Cell, seed: int, cell_id: int | None = None) -> Draw:
+    """Sample one dataset of ``cell``; the same ``(cell, seed)`` gives the same bytes.
+
+    ``cell_id`` keys the target draws; it defaults to the cell's position in :data:`CELLS`, so a
+    cell outside that list (as ``qa/gnies_order.py`` builds) passes its own.
+    """
     from andrey.data.interventions import hard, soft
 
     scm = _scm(cell)
     # The noise scales are the first draw of the noise stream, so they do not depend on n.
     sigma = scm.sample(n=10, seed=seed, scale="raw").params.noise_scales
-    rng = np.random.default_rng([cell.d, CELLS.index(cell), seed])
+    cell_id = CELLS.index(cell) if cell_id is None else cell_id
+    rng = np.random.default_rng([cell.d, cell_id, seed])
     k = len(cell.sizes) - cell.observational
     chosen = rng.choice(cell.d, size=(k, cell.per_env), replace=False)
     envs: list[dict] = [{}] if cell.observational else []

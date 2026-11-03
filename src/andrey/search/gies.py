@@ -12,6 +12,12 @@ rebuilds the essential graph by turning every arrow that is not strongly protect
 undirected edge. The algorithm, its settings, and its reference are described on
 :func:`andrey.gies`.
 
+Diagnostics go to the ``andrey.search.gies`` logger at DEBUG level: a step whose two best moves
+share the rounded score change (the first part of
+:func:`~andrey.search._parallel_ges.move_key`) and lead to different graphs, so the tie ranks
+decided it. The records are built only when that level is enabled, so the result does not depend
+on it.
+
 References
 ----------
 Hauser and Buhlmann (2012). Characterization and greedy learning of interventional Markov
@@ -24,9 +30,11 @@ Proceedings of the Fifteenth Conference on Uncertainty in Artificial Intelligenc
 from __future__ import annotations
 
 import heapq
+import itertools
+import logging
 import math
 from collections import deque
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Protocol
 
 import numpy as np
@@ -53,6 +61,8 @@ from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search._parallel_ges import move_key
 from andrey.search.ges import _reachable, _recompute_objective, required_dag
 from andrey.search.hc import tie_ranks
+
+logger = logging.getLogger(__name__)
 
 # The moves a scan skips, as ``(u, v, C)``: under background knowledge, those whose class holds no
 # DAG that satisfies it on the current graph.
@@ -512,13 +522,15 @@ def _backward_candidate(
     ranks: Sequence[int],
     constraints: Constraints | None = None,
     excluded: Excluded | None = None,
+    found: list[tuple[tuple, tuple[int, int, set[int]]]] | None = None,
 ) -> tuple[tuple, int, set[int]] | None:
     """The best-improving deletion of an edge at ``v`` as ``(key, u, C)``, or None.
 
     ``C`` is ``v``'s neighbors kept as its parents (Prop. 28); ``key`` is
     :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``. With ``constraints``, a
     required pair is never deleted, and a neighbor ``h`` whose orientation ``v -> h`` or ``u -> h``
-    is forbidden is never dropped. A move in ``excluded`` is never returned.
+    is forbidden is never dropped. A move in ``excluded`` is never returned. With ``found``, every
+    improving deletion not in ``excluded`` is appended to it as ``(key, (u, v, C))``.
     """
     row = adj[v]
     pa = set(np.flatnonzero(row == ARROW).tolist())
@@ -541,6 +553,8 @@ def _backward_candidate(
             delta = score.score(v, kept - {u}) - score.score(v, kept | {u})
             if delta < -_EPS_IMPROVE:
                 key = move_key(delta, n, u, v, C, ranks)
+                if found is not None and not (excluded and (u, v, frozenset(C)) in excluded):
+                    found.append((key, (u, v, C)))
                 if best is None or key < best[0]:
                     if excluded and (u, v, frozenset(C)) in excluded:
                         continue
@@ -591,6 +605,7 @@ def _turning_best(
     constraints: Constraints | None = None,
     excluded: Excluded | None = None,
     cap: int | None = None,
+    found: list[tuple[tuple, tuple[int, int, set[int], bool]]] | None = None,
 ) -> tuple[int, int, set[int], bool] | None:
     """The best-improving turn as ``(u, v, C, essential)``: ``v -> u`` (or ``v -- u``) becomes
     ``u -> v`` with ``C`` the parents of ``v`` in its component.
@@ -600,7 +615,8 @@ def _turning_best(
     ``constraints``, a turn never makes a forbidden ``u -> v`` (the reverse of a required edge
     included) or a forbidden ``c -> v`` for a ``c`` of ``C`` not adjacent to ``u``, which the
     v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned. With ``cap``,
-    a turn that gives ``v`` more than ``cap`` parents is left out before scoring.
+    a turn that gives ``v`` more than ``cap`` parents is left out before scoring. With ``found``,
+    every improving turn not in ``excluded`` is appended to it as ``(key, move)``.
     """
     pa, nbr, adj_sets = _neighborhoods(adj)
     succ = ops.tail_successor_lists(adj)
@@ -610,6 +626,9 @@ def _turning_best(
 
     def offer(delta: float, key: tuple, move: tuple[int, int, set[int], bool]) -> None:
         nonlocal best_key, best
+        if found is not None and delta < -_EPS_IMPROVE:
+            if not (excluded and (move[0], move[1], frozenset(move[2])) in excluded):
+                found.append((key, move))
         if delta < -_EPS_IMPROVE and (best_key is None or key < best_key):
             if excluded and (move[0], move[1], frozenset(move[2])) in excluded:
                 return
@@ -685,11 +704,21 @@ def _turn(
     return replace_unprotected(adj, cut)
 
 
+#: Each move's phase, as the tie records name it.
+_PHASES: dict[Callable[..., np.ndarray], str] = {
+    _insert: "forward",
+    _delete: "backward",
+    _turn: "turning",
+}
+
+
 class _Search:
     """The GIES search state: the essential graph, the cached candidates, and the objective.
 
     ``constraints`` and ``cap``, the most parents a step may give a vertex, filter the candidates,
     and ``start``, an essential graph, replaces the empty graph the search otherwise starts from.
+    When the logger is enabled for DEBUG, each selection also keeps its two best moves as ``(key,
+    move)`` in ``lowest``, and the backward candidates keep every improving deletion per target.
     """
 
     def __init__(
@@ -713,9 +742,16 @@ class _Search:
             self.objective.update(start, np.ones(n, dtype=bool))
         self.forward: dict[int, list[tuple[tuple, int, set[int]]]] = {}
         self.backward: dict[int, tuple[tuple, int, set[int]] | None] = {}
+        self.debug = logger.isEnabledFor(logging.DEBUG)
+        self.steps = 0
+        self.lowest: list[tuple[tuple, tuple]] = []
+        self.deletions: dict[int, list[tuple[tuple, tuple[int, int, set[int]]]]] = {}
 
-    def forward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
-        """The best-improving insertion not in ``excluded`` as ``(u, v, C)`` (Prop. 25)."""
+    def insertions(
+        self, excluded: Excluded | None
+    ) -> Iterator[tuple[tuple, tuple[int, int, set[int]]]]:
+        """The insertions not in ``excluded`` that Prop. 25 allows, as ``(key, (u, v, C))``, by
+        increasing key."""
         adj, n = self.adj, self.n
         for v in range(n):
             if v not in self.forward:
@@ -724,19 +760,27 @@ class _Search:
                 )
         heap = [(moves[0][0], v, 0) for v, moves in self.forward.items() if moves]
         if not heap:
-            return None
+            return
         heapq.heapify(heap)
         reachable = _reachable(adj)
         while heap:
             _key, v, i = heapq.heappop(heap)
             moves = self.forward[v]
-            _key, u, C = moves[i]
-            if not reachable(v, u, C):  # Prop. 25(iii): every path from v to u meets C
-                if not (excluded and (u, v, frozenset(C)) in excluded):
-                    return u, v, C
+            key, u, C = moves[i]
             if i + 1 < len(moves):
                 heapq.heappush(heap, (moves[i + 1][0], v, i + 1))
-        return None
+            if not reachable(v, u, C):  # Prop. 25(iii): every path from v to u meets C
+                if not (excluded and (u, v, frozenset(C)) in excluded):
+                    yield key, (u, v, C)
+
+    def forward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
+        """The best-improving insertion not in ``excluded`` as ``(u, v, C)`` (Prop. 25)."""
+        moves = self.insertions(excluded)
+        if self.debug:
+            self.lowest = list(itertools.islice(moves, 2))
+            return self.lowest[0][1] if self.lowest else None
+        best = next(moves, None)
+        return None if best is None else best[1]
 
     def backward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
         """The best-improving deletion not in ``excluded`` as ``(u, v, C)`` (Prop. 28).
@@ -747,9 +791,23 @@ class _Search:
         adj, n = self.adj, self.n
         for v in range(n):
             if v not in self.backward:
+                found = [] if self.debug else None
                 self.backward[v] = _backward_candidate(
-                    v, adj, self.score, n, self.ranks, self.constraints
+                    v, adj, self.score, n, self.ranks, self.constraints, found=found
                 )
+                if found is not None:
+                    self.deletions[v] = found
+        if self.debug:
+            self.lowest = heapq.nsmallest(
+                2,
+                (
+                    (key, (u, v, C))
+                    for deletions in self.deletions.values()
+                    for key, (u, v, C) in deletions
+                    if not (excluded and (u, v, frozenset(C)) in excluded)
+                ),
+                key=lambda found: found[0],
+            )
         moves = []
         for v, move in self.backward.items():
             if move is not None and excluded and (move[1], v, frozenset(move[2])) in excluded:
@@ -768,9 +826,13 @@ class _Search:
         self, excluded: Excluded | None = None
     ) -> tuple[int, int, set[int], bool] | None:
         """The best-improving turn not in ``excluded`` (:func:`_turning_best`)."""
-        return _turning_best(
-            self.adj, self.score, self.n, self.ranks, self.constraints, excluded, self.cap
+        found = [] if self.debug else None
+        best = _turning_best(
+            self.adj, self.score, self.n, self.ranks, self.constraints, excluded, self.cap, found
         )
+        if found is not None:
+            self.lowest = heapq.nsmallest(2, found, key=lambda turn: turn[0])
+        return best
 
     def step(self, best: Callable, move: Callable[..., np.ndarray], cut: np.ndarray) -> bool:
         """Apply the move ``best`` selects, built by ``move``; False when it selects none.
@@ -782,10 +844,22 @@ class _Search:
         while (found := best(excluded)) is not None:
             adj = move(self.adj.copy(), *found, cut)
             if self.constraints is None or admits(adj, self.constraints, cut):
+                if self.debug:
+                    self.log_tie(move, adj, cut)
                 self.apply(adj)
                 return True
             excluded.add((found[0], found[1], frozenset(found[2])))
         return False
+
+    def log_tie(self, move: Callable[..., np.ndarray], adj: np.ndarray, cut: np.ndarray) -> None:
+        """Log the step to ``adj`` when the second-best move in ``lowest`` has the same rounded
+        score change and leads to a different graph."""
+        if len(self.lowest) < 2:
+            return
+        (key, _chosen), (other_key, other) = self.lowest
+        if key[0] == other_key[0] and not np.array_equal(move(self.adj.copy(), *other, cut), adj):
+            phase = _PHASES[move]
+            logger.debug("%s step %d: two moves tie at key %r", phase, self.steps + 1, key[0])
 
     def apply(self, adj: np.ndarray) -> None:
         """Move to ``adj``, the graph after one step; raise unless it lowers the score."""
@@ -800,7 +874,9 @@ class _Search:
         for v in _touched_targets(adj, changed):
             self.forward.pop(v, None)
             self.backward.pop(v, None)
+            self.deletions.pop(v, None)
         self.adj = adj
+        self.steps += 1
 
 
 def gies(

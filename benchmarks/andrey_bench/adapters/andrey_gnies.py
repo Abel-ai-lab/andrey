@@ -5,8 +5,8 @@ arms pass the full true mapping, the observational environment included with no 
 targets are fixed and one inner search runs. During the call a counting handler sits on the
 ``andrey.search.gnies`` and ``andrey.search.gies`` loggers at DEBUG, so the record says how often
 the score's guards made a family unavailable, how often the alternating fit reached its step cap,
-how many target families kept one residual degree of freedom, how many inner searches ran, and how
-many outer steps were ties.
+how many target families kept one residual degree of freedom, how many inner searches ran, how
+many outer steps were ties, and how many inner steps the tie ranks decided.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ RECORDS = {
     "one_dof": "one residual degree of freedom",
     "inner_searches": "inner search with targets",
     "outer_ties": "outer step tie",
+    "inner_ties": "two moves tie",
 }
 
 #: Andrey's version, for the record.

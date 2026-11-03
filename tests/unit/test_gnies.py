@@ -363,6 +363,23 @@ def test_standardizing_each_environment_changes_the_result(case, fitted):
     assert _targets(_fit(each, env)) != _targets(fitted)
 
 
+def test_a_step_the_tie_ranks_decide_is_logged_and_logging_changes_nothing(caplog):
+    # The rows again with columns 0 and 1 swapped: a move at 0 and its mirror at 1 change the score
+    # alike and lead to different graphs, so a step between them is decided by the tie ranks.
+    X, env = _sem(_chain_weights(), [300, 200], [{}, {4: 2.0}], seed=4)
+    X, env = np.vstack([X, X[:, [1, 0, 2, 3, 4]]]), np.concatenate([env, env])
+    plain = _fit(X, env)
+    gies = andrey.gies(X, env, targets={0: [], 1: [4]})
+    with caplog.at_level(logging.DEBUG, logger="andrey.search.gies"):
+        logged = _fit(X, env)
+        gies_logged = andrey.gies(X, env, targets={0: [], 1: [4]})
+    assert any("two moves tie" in r.getMessage() for r in caplog.records)
+    assert np.array_equal(_marks(logged), _marks(plain)) and _targets(logged) == _targets(plain)
+    assert logged.metadata["score"] == plain.metadata["score"]
+    assert np.array_equal(_marks(gies_logged), _marks(gies))
+    assert gies_logged.metadata["score"] == gies.metadata["score"]
+
+
 # ---- the facade -------------------------------------------------------------------------------
 
 
