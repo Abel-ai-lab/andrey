@@ -153,10 +153,11 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, XGES, HC, Tabu, MMHC,
-RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD,
-BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and
-Granger on the datasets whose assumptions each method needs, and PC with each supported nonlinear
-conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
+RSMAX2, exact search, CALM, BOSS, GRaSP, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM,
+RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM,
+and Granger on the datasets whose assumptions each method needs, PC with each supported nonlinear
+conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
+UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -165,6 +166,7 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
+| `unknown_target_shift_gauss_er`, `unknown_target_variance_gauss_er` at `d = 20`, six environments of `n = 1000` | 10 seeds each | UT-IGSP, its graph and its targets |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
@@ -209,6 +211,12 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
   their benchmark adapters, which build the domain index and split the groups. GIN's number of
   tests grows combinatorially with the indicator count, so it runs at the two smaller sizes. A test
   keeps the domain, group, and measurement draws in step with the harness.
+- **Unknown targets.** UT-IGSP's published regime, drawn by its benchmark driver
+  (`benchmarks/ut_igsp_cpu.py`) as two of its comparison's cells: 20 variables at mean degree 1.5,
+  an observational environment and five settings of 1,000 rows, each setting with one target it is
+  given and more it is not, a mean shift with one more per setting (`unknown_target_shift_gauss_er`)
+  and a doubled noise standard deviation with three (`unknown_target_variance_gauss_er`). Each row's
+  environment and the targets its setting is given sit beside the samples.
 - **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
@@ -235,16 +243,19 @@ SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, 
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
 ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by
 endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
-essential graph of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the
-domain index orients the edges it reaches. GIN's errors are the latents it misses: the true latents
-whose indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by
-endpoint SHD against the latent projection, the edges and pairs their benchmark scores: `i -> j` for
-a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden
-node reaches through hidden nodes only. The time-series methods are scored in their summaries'
-units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by
-endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the
-missing and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a
-method passes when its median SHD over the draws is:
+essential graph of the true DAG under the rows' targets, UT-IGSP against the one under the true
+targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
+UT-IGSP's targets are scored apart, as `UT-IGSP targets`, by the target error: the false plus the
+missed targets over the settings, against the given targets alone in place of the empty graph. GIN's
+errors are the latents it misses: the true latents whose indicators it does not return as one
+cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection, the
+edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
+nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
+time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
+endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of the observed
+series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, and Granger by the
+missing and extra lagged edges. On each dataset, a method passes when its median SHD over the draws
+is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
@@ -255,7 +266,8 @@ intended change is recorded by a recapture. Every fit runs on the numpy backend 
 one BLAS thread, so the host's accelerators and core count do not enter the result; the tolerances
 absorb rounding differences between CPUs. On every pull request,
 `tests/recovery/test_quality_gate.py` feeds each method the empty graph and a column-shifted true
-graph, and the gate rejects both.
+graph, and UT-IGSP's targets check the given targets alone and the true targets moved one variable,
+and the gate rejects both.
 
 ```shell
 uv run python -m qa.quality_gate PC FCI
