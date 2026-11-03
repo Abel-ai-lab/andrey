@@ -18,6 +18,11 @@ names its pull request.
   comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
   columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
 
+### Changed
+
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
+  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
+
 ### Fixed
 
 - Copies of one column in other units, such as `x` and `2 * x + 1`, and categorical columns that
@@ -1647,3 +1652,4 @@ First alpha release.
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
 [#659]: https://github.com/Abel-ai-lab/andrey/pull/659
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
+[#662]: https://github.com/Abel-ai-lab/andrey/pull/662
