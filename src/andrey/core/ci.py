@@ -502,6 +502,10 @@ class StudentT(PartialCorrelationTest):
         return 2.0 * stdtr(df, -np.abs(t))
 
 
+# The margins of a batch of tables: ``n_sx`` and ``n_sy`` per configuration, and its total ``n_s``.
+_Margins = tuple[np.ndarray, np.ndarray, np.ndarray]
+
+
 def _null_means(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray, g_square: bool) -> np.ndarray:
     """The null mean of each configuration's statistic, the degrees of freedom of its reference.
 
@@ -513,20 +517,98 @@ def _null_means(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray, g_square: b
     ``2 * T * log(T * n_s / (n_sx * n_sy))`` with ``T`` hypergeometric (:func:`_cell_g_means`).
     A configuration with one value of ``x`` or of ``y`` has mean ``0``.
     """
+    return _null_means_batch([(n_sx, n_sy, n_s)], g_square)[0]
+
+
+def _null_means_batch(margins: Sequence[_Margins], g_square: bool) -> list[np.ndarray]:
+    """:func:`_null_means` of each ``(n_sx, n_sy, n_s)`` in ``margins``.
+
+    G-square gathers the cells of all the tables and evaluates their means in one pass
+    (:func:`_g_means`), which costs far less than a pass per entry of ``margins``. A table's cells
+    keep their order and are summed on their own, so each mean equals the one a separate call
+    returns, bit for bit.
+    """
+    if not margins:
+        return []
+    if not g_square:
+        return [_pearson_means(*entry) for entry in margins]
+    found = [_g_cells(*entry) for entry in margins]
+    start = np.concatenate(([0], np.cumsum([len(entry[2]) for entry in margins])))
+    table = np.concatenate([cells[0] + at for cells, at in zip(found, start[:-1], strict=True)])
+    n, r, c = (np.concatenate([cells[part] for cells in found]) for part in (1, 2, 3))
+    total = np.bincount(table, weights=_g_means(n, r, c), minlength=int(start[-1]))
+    return [total[a:b] for a, b in zip(start[:-1], start[1:], strict=True)]
+
+
+def _informative(n_sx: np.ndarray, n_sy: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The values of ``x`` and of ``y`` present in each configuration, and whether both vary."""
     present_x = np.einsum("sx->s", (n_sx > 0).view(np.int8), dtype=np.int64)
     present_y = np.einsum("sy->s", (n_sy > 0).view(np.int8), dtype=np.int64)
-    informative = (present_x > 1) & (present_y > 1)
-    if not g_square:
-        out = np.zeros(len(n_s))
-        n = n_s[informative].astype(np.float64)
-        out[informative] = n * ((present_x - 1) * (present_y - 1))[informative] / (n - 1.0)
-        return out
+    return present_x, present_y, (present_x > 1) & (present_y > 1)
+
+
+def _pearson_means(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray) -> np.ndarray:
+    """:func:`_null_means` for Pearson's statistic."""
+    present_x, present_y, informative = _informative(n_sx, n_sy)
+    out = np.zeros(len(n_s))
+    n = n_s[informative].astype(np.float64)
+    out[informative] = n * ((present_x - 1) * (present_y - 1))[informative] / (n - 1.0)
+    return out
+
+
+def _g_cells(
+    n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """The cells :func:`_null_means` sums for G-square, as ``(table, n, r, c)`` with ``r <= c``.
+
+    A cell is a pair of values present in an informative configuration; ``table`` is the
+    configuration's row, ``n`` its total, and ``r`` and ``c`` the margins of the pair.
+    """
+    informative = _informative(n_sx, n_sy)[2]
     table, x, y = np.nonzero(
         informative[:, None, None] & (n_sx[:, :, None] > 0) & (n_sy[:, None, :] > 0)
     )
     r, c = n_sx[table, x], n_sy[table, y]
-    cells = _cell_g_means(n_s[table], np.minimum(r, c), np.maximum(r, c))
-    return np.bincount(table, weights=cells, minlength=len(n_s))
+    return table, n_s[table], np.minimum(r, c), np.maximum(r, c)
+
+
+def _g_means(n: np.ndarray, r: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """:func:`_cell_g_means`, read from a table where ``n <= _MEANS_N``.
+
+    The table holds the mean of every ``(n, r, c)`` with ``1 <= r <= c <= n <= _MEANS_N``, at most
+    ``_MEANS_N * (_MEANS_N + 1) * (_MEANS_N + 2) / 6`` floats: 357,760 (2.9 MB) for ``128``. Its
+    rows, one per ``(n, c)``, are filled by one call of :func:`_cell_g_means` when a lookup first
+    needs them, and filling all of it takes under half a second. A value is the one
+    :func:`_cell_g_means` returns for its triple, so the table changes no bits.
+    """
+    out = np.empty(len(n))
+    small = n <= _MEANS_N
+    if small.any():
+        out[small] = _table_means(n[small], r[small], c[small])
+    if not small.all():
+        large = ~small
+        out[large] = _cell_g_means(n[large], r[large], c[large])
+    return out
+
+
+def _table_means(n: np.ndarray, r: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """The entries of the table of :func:`_g_means` at ``(n, r, c)``, filling the rows they need."""
+    side = _MEANS_N + 1
+    missing = ~_MEANS_FILLED[n, c]
+    if missing.any():
+        rows = np.unique(n[missing] * side + c[missing])
+        row_n, row_c = np.divmod(rows, side)
+        fill_n, fill_c = np.repeat(row_n, row_c), np.repeat(row_c, row_c)
+        fill_r = np.arange(len(fill_n)) - np.repeat(np.cumsum(row_c) - row_c, row_c) + 1
+        _MEANS_TABLE[_table_slot(fill_n, fill_r, fill_c)] = _cell_g_means(fill_n, fill_r, fill_c)
+        _MEANS_FILLED[row_n, row_c] = True
+    return _MEANS_TABLE[_table_slot(n, r, c)]
+
+
+def _table_slot(n: np.ndarray, r: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """The position of ``(n, r, c)``, ``1 <= r <= c <= n``, in the table: the pairs ``(r, c)`` of
+    one ``n`` are stored together, by ``c`` and then ``r``."""
+    return (n - 1) * n * (n + 1) // 6 + c * (c - 1) // 2 + r - 1
 
 
 def _cell_g_means(n: np.ndarray, r: np.ndarray, c: np.ndarray) -> np.ndarray:
@@ -693,6 +775,14 @@ _DENSE_CELLS = 1 << 20
 # and the cell mean from which the sum gives way to an expansion.
 _MEAN_TERMS = 1 << 21
 _SERIES_MEAN = 10.0
+# The G-square cell means for a configuration of at most this many rows come from a table
+# (:func:`_g_means`); a larger one is evaluated.
+_MEANS_N = 128
+_MEANS_TABLE = np.empty(_MEANS_N * (_MEANS_N + 1) * (_MEANS_N + 2) // 6)
+_MEANS_FILLED = np.zeros((_MEANS_N + 1, _MEANS_N + 1), dtype=bool)  # by n and c
+# A block of tests counted by :meth:`ChiSquare._given`: the positions of its tests in the scan,
+# their table bounds, their statistics, and the margins of their tables.
+_Counted = tuple[np.ndarray, np.ndarray, np.ndarray, _Margins]
 # The batched chi-square path takes a test whose conditioning set's configurations times its table
 # cells are at most max(_TABLE_ROWS * n, _TABLE_MIN), and the scalar path above.
 _TABLE_ROWS = 4
@@ -741,7 +831,11 @@ class ChiSquare:
     rows and counting the statistics above the observed one (a permutation test [4]_) rejected 4.6%
     to 5.0% in the same tables, at about a hundred times the cost; Andrey does not offer it.
 
-    Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
+    Queries are canonicalized as :class:`FisherZ`'s are, and no query's result is memoized. The
+    mean of a G-square cell is a function of its configuration's rows and the two margins alone, so
+    the means of configurations of at most 128 rows are read from a table that every test in the
+    process shares: at most 358 thousand floats (2.9 MB), filled by rows when a lookup first needs
+    them, in under half a second for all of them.
 
     :meth:`batched_call`, :meth:`first_order_pvalues`, :meth:`marginal_pvalues`, and
     :meth:`pvalues_given` answer many queries at once and return the p-values of :meth:`__call__`
@@ -750,7 +844,8 @@ class ChiSquare:
     category-indicator matrix with itself, whose integer counts are exact in float64.
     :meth:`pvalues_given` numbers the configurations of one conditioning set once and counts the
     tables of all its candidates of one shape in one ``bincount``, and :meth:`statistic_pvalues`
-    answers its queries that share a conditioning set the same way. Every step after the counting is
+    answers its queries that share a conditioning set the same way. For G-square, the cell means of
+    every table of such a scan are evaluated in one call. Every step after the counting is
     elementwise on the tables, except the sum of a query's statistic over its cells, which is
     ``np.sum`` over that query's cells in the order :meth:`__call__` sums them, so the sum, and a
     decision on the p-value, does not depend on how the queries are batched.
@@ -843,7 +938,9 @@ class ChiSquare:
         Each pair is ordered as :meth:`__call__` orders it. The pairs whose tables over the
         configurations of ``cond`` have at most ``_DENSE_CELLS`` cells are counted together, in
         blocks of at most ``_BATCH_CELLS`` row indices and table cells, a block per table shape;
-        the others, and a single pair, take the scalar path.
+        the others, and a single pair, take the scalar path. The blocks of a scan are counted
+        first, and their degrees of freedom are evaluated together (:func:`_null_means_batch`),
+        for as many blocks as hold ``_BATCH_CELLS`` table cells at once.
         """
         a, b = np.minimum(xs, ys), np.maximum(xs, ys)
         assert not np.isin(np.concatenate([a, b]), cond).any(), "x, y cannot be in condition_set."
@@ -853,6 +950,8 @@ class ChiSquare:
         scan = len(a) > 1 and n > 0
         layer, m = categorical.configurations(self._codes, cards, cond) if scan else (a, 0)
         shapes = cards[a] * (int(cards.max(initial=0)) + 1) + cards[b]
+        counted: list[_Counted] = []
+        held = 0
         for shape in np.unique(shapes):
             members = np.flatnonzero(shapes == shape)
             kx, ky = int(cards[a[members[0]]]), int(cards[b[members[0]]])
@@ -869,10 +968,31 @@ class ChiSquare:
                     index + (layer * cells)[None, :] + (np.arange(len(part)) * (m * cells))[:, None]
                 )
                 tables = np.bincount(index.ravel(), minlength=len(part) * m * cells)
-                statistics[part], p_values[part] = self._table_statistics(
-                    tables.reshape(-1, kx, ky), np.arange(len(part) + 1) * m
+                bounds = np.arange(len(part) + 1) * m
+                counted.append(
+                    (part, bounds, *self._table_sums(tables.reshape(-1, kx, ky), bounds))
                 )
+                held += tables.size
+                if held >= _BATCH_CELLS:
+                    self._refer(counted, statistics, p_values)
+                    counted, held = [], 0
+        self._refer(counted, statistics, p_values)
         return statistics, p_values
+
+    def _refer(
+        self,
+        counted: list[_Counted],
+        statistics: np.ndarray,
+        p_values: np.ndarray,
+    ) -> None:
+        """Store the statistics and p-values of the counted blocks of :meth:`_given` at their
+        ``part``, the degrees of freedom of all the blocks evaluated together."""
+        means = _null_means_batch([block[3] for block in counted], self._g_square)
+        for (part, bounds, statistic, _), per_table in zip(counted, means, strict=True):
+            statistics[part], p_values[part] = (
+                statistic,
+                self._table_pvalue(statistic, bounds, per_table),
+            )
 
     def _statistic_pvalue(
         self, x: int, y: int, condition_set: Iterable[int]
@@ -1101,6 +1221,13 @@ class ChiSquare:
         same integer counts, and each test's statistic is ``np.sum`` over its own cells in the order
         :meth:`__call__` visits them, so every p-value equals :meth:`__call__`'s.
         """
+        statistic, margins = self._table_sums(tables, bounds)
+        per_table = _null_means(*margins, self._g_square)
+        return statistic, self._table_pvalue(statistic, bounds, per_table)
+
+    def _table_sums(self, tables: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, _Margins]:
+        """The statistics of the tests of :meth:`_table_statistics`, and the margins of their
+        tables, from which :func:`_null_means` gives the degrees of freedom."""
         m, kx, ky = tables.shape
         n_sx = np.einsum("sxy->sx", tables)
         n_sy = np.einsum("sxy->sy", tables)
@@ -1118,13 +1245,20 @@ class ChiSquare:
         cuts = np.searchsorted(occupied, bounds * (kx * ky)).tolist()
         sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
-        per_table = _null_means(n_sx, n_sy, n_s, self._g_square)
+        return statistic, (n_sx, n_sy, n_s)
+
+    @staticmethod
+    def _table_pvalue(
+        statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
+    ) -> np.ndarray:
+        """The p-values of tests with ``statistic`` and the null means ``per_table`` of their
+        tables, test ``i`` owning ``per_table[bounds[i]:bounds[i + 1]]``."""
         cuts = bounds.tolist()
         dof = np.array([np.sum(per_table[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
         out = np.ones(len(dof))
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
-        return statistic, out
+        return out
 
 
 # A conditional covariance's eigenvalue, on the scale of unit-variance columns, at or below this

@@ -180,7 +180,11 @@ def test_bic_is_the_score_andrey_xges_reports_for_its_graph(tiny_run: Path) -> N
     table = _table(tiny_run)
     for row in table[table["name"] == "andrey.xges.numpy"].itertuples():
         data, _ = datasets.load(datasets.store_dir(tiny_run), KEYS[row.dataset_id])
-        assert row.bic == pytest.approx(andrey.xges(data).metadata["score"], rel=1e-12)
+        params = json.loads(row.params)
+        fit = andrey.xges(
+            data, penalty_discount=params["lambda_value"], ebic_gamma=params["ebic_gamma"]
+        )
+        assert row.bic == pytest.approx(fit.metadata["score"], rel=1e-12)
 
 
 def test_every_arm_is_measured_against_one_true_graph(tiny_run: Path) -> None:

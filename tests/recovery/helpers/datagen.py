@@ -379,6 +379,27 @@ CASES: dict[str, dict] = {
             [0.1, 0.0, 0.0, 0.3],
         ],
     },
+    # Stable structural VAR(1), Gaussian noise of unit variance - DYNOTEARS. Same step: x0 -> x1,
+    # x1 -> x2, x3 -> x2; lag 1: every series on its own past and x1 -> x3.
+    "svar_4v_gauss": {
+        "model": "var",
+        "noise": "gaussian",
+        "seed": 20261031,
+        "n_samples": 500,
+        "burn_in": 200,
+        "B0": [
+            [0.0, 0.0, 0.0, 0.0],
+            [0.9, 0.0, 0.0, 0.0],
+            [0.0, -0.8, 0.0, 0.7],
+            [0.0, 0.0, 0.0, 0.0],
+        ],
+        "A1": [
+            [0.4, 0.0, 0.0, 0.0],
+            [0.0, 0.3, 0.0, 0.0],
+            [0.0, 0.0, 0.4, 0.0],
+            [0.0, 0.5, 0.0, 0.3],
+        ],
+    },
     # Stable VAR(2) with lagged effects only - Granger. Lag 1: x0 -> x0, x0 -> x1, x2 -> x2; lag 2:
     # x1 -> x2.
     "var_3v_lag2": {

@@ -5,7 +5,7 @@ Andrey's orientation: ``W[i, j]`` weights ``i -> j``, the transpose of the coeff
 as in :func:`andrey.api.lingam._canonical_weights`. Each lag's :class:`GraphStructure` is derived
 from that block by :mod:`andrey.api._marks`. A lagged window allows 2-cycles and self-loops, so it
 is a ``digraph``, whose ``ARROW``/``ARROW`` pair means both directions, not a latent confounder; the
-contemporaneous lag 0 (VAR and VARMA) is a ``dag``. Nothing here is re-exported from
+contemporaneous lag 0 (VAR, VARMA, and DYNOTEARS) is a ``dag``. Nothing here is re-exported from
 ``andrey.api``.
 """
 
@@ -15,13 +15,14 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from andrey.api._adapt import structure_output
+from andrey.api._adapt import json_safe, structure_output
 from andrey.api._marks import directed_marks
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from andrey.temporal.dynotears import DynotearsResult
     from andrey.temporal.lpcmci import LPCMCIResult
     from andrey.temporal.pcmci import PCMCIResult
     from andrey.temporal.pcmciplus import PCMCIPlusResult
@@ -123,6 +124,22 @@ def _adapt_longitudinal_lingam(model: Any, required: np.ndarray | None = None) -
     orders = getattr(model, "causal_orders_", None)
     if orders is not None:
         metadata["causal_orders"] = orders
+    return structure_output(temporal, metadata=metadata)
+
+
+def _adapt_dynotears(result: DynotearsResult) -> StructureOutput:
+    """DYNOTEARS fit -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
+
+    ``result.support[k, i, j]`` marks the edge ``i -> j`` at lag ``k`` (row = cause), transposed
+    for :func:`_lag_graphs`: lag 0 is a ``dag`` and every later lag a ``digraph``. The weights are
+    stored as ``lag_weights`` in the same orientation; a required edge is in its graph even where
+    its weight is ``0``.
+    """
+    support = result.support.transpose(0, 2, 1).astype(np.float64)
+    temporal = TemporalStructure.from_lag_graphs(
+        _lag_graphs(support, instantaneous=True), lag_weights=result.weights
+    )
+    metadata = {"h_final": json_safe(result.h_final), "edges_removed": result.edges_removed}
     return structure_output(temporal, metadata=metadata)
 
 

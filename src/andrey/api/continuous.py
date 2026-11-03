@@ -81,7 +81,7 @@ def notears(
         The fit stops when the acyclicity function falls to this value, above ``0``.
     rho_max : float, default=1e16
         The fit stops when the penalty weight on the acyclicity function reaches this value, above
-        ``0``.
+        ``1``, the weight the fit starts from.
     robust : bool, default=False
         ``True`` follows the first fit with the likelihood path of [2]_ (see Notes).
     mcp_lambda : float, default=0.4

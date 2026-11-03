@@ -47,19 +47,43 @@ def execute(path: Path) -> nbformat.NotebookNode:
     return notebook
 
 
+def joined(cell_outputs: list) -> list:
+    """Return a cell's outputs with each run of consecutive same-name streams joined into one.
+
+    The kernel splits one stream into messages at different places from run to run, so "errors:"
+    followed by " 11" is the same text as "errors: 11".
+    """
+    result = []
+    for output in cell_outputs:
+        last = result[-1] if result else None
+        if (
+            output["output_type"] == "stream"
+            and last is not None
+            and last["output_type"] == "stream"
+            and last["name"] == output["name"]
+        ):
+            result[-1] = {**last, "text": last["text"] + output["text"]}
+        else:
+            result.append(output)
+    return result
+
+
 def outputs(notebook: nbformat.NotebookNode) -> list[str]:
     """Return each code cell's outputs as text lines, for comparing two runs.
 
     An object's memory address changes from run to run, so it reads ``0x...``. A cell tagged
-    ``output-varies-by-cpu`` has no lines.
+    ``output-varies-by-cpu`` has no lines. A stream is its joined text without trailing newlines,
+    so a stream of only empty lines has no lines.
     """
     lines = []
     for index, cell in enumerate(notebook.cells):
         if cell.cell_type != "code" or CPU_TAG in cell.metadata.get("tags", []):
             continue
-        for output in cell.get("outputs", []):
+        for output in joined(cell.get("outputs", [])):
             kind = output.get("name") or output["output_type"]
-            parts = {kind: output["text"]} if "text" in output else output.get("data", {})
+            parts = (
+                {kind: output["text"].rstrip("\n")} if "text" in output else output.get("data", {})
+            )
             for mime, text in sorted(parts.items()):
                 text = text if isinstance(text, str) else json.dumps(text, sort_keys=True)
                 for line in ADDRESS.sub("0x...", text).splitlines():

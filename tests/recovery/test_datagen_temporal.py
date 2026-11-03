@@ -13,6 +13,7 @@ from tests.recovery.helpers.tolerances import SPEC
 # Temporal / irregular cases, with their expected (n_samples, d) shape.
 NEW_CASES = {
     "var_4v_stable": (500, 4),
+    "svar_4v_gauss": (500, 4),
     "varma_3v": (500, 3),
     "var_3v_lag2": (1000, 3),
     "anm_pair_cubic": (200, 2),
@@ -30,7 +31,7 @@ def test_new_case_shape(case_id, shape):
 
 def test_var_processes_are_stationary():
     """The VAR/VARMA reduced-form spectral radius is < 1 (bounded, stationary)."""
-    for case_id in ("var_4v_stable", "varma_3v"):
+    for case_id in ("var_4v_stable", "svar_4v_gauss", "varma_3v"):
         spec = datagen.CASES[case_id]
         B0 = np.asarray(spec["B0"], dtype=np.float64)
         A1 = np.asarray(spec["A1"], dtype=np.float64)

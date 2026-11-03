@@ -45,11 +45,13 @@ driver stops when another version is installed). bnlearn is the R
 library of [The R lane](../README.md#the-r-lane); its version is in `run_meta.json`.
 
 bnlearn names Pearson's chi-square test `x2` and the G-square test `mi`, the mutual information
-times `2 n`, which is the G statistic. Each has an `-adf` form that takes the empty rows and
-columns of a table out of the degrees of freedom, as Andrey's tests do, so the `-adf` forms are the
-ones paired with Andrey's: the plain `x2` and `mi` differ from Andrey's p-values on tables with an
-empty row or column. The `-adf` p-values are Andrey's to rounding, with one exception: when a table
-has fewer than 5 observations per cell on average (`n < 5 * r * c * q`, for `r` and `c` categories
+times `2 n`, which is the G statistic; both statistics are Andrey's to rounding. Each has an `-adf`
+form that takes the empty rows and columns of a table out of the degrees of freedom, as the
+statistic's mean does when `y` is shuffled within each configuration of the conditioning set,
+which is what Andrey's tests refer the statistic to, so the `-adf` forms are the ones paired with
+Andrey's; the plain `x2` and `mi` keep the empty rows and columns. The two degrees of freedom are
+not equal, so the p-values can differ. When a table has fewer than 5 observations per cell on
+average (`n < 5 * r * c * q`, for `r` and `c` categories
 in the two variables and `q` configurations of the conditioning set), bnlearn returns `p = 1` and
 Andrey's tests have no such rule. At 2000 rows and three-category variables that starts at four
 conditioning variables, where bnlearn's PC removes the edge and Andrey's PC tests it.
@@ -81,12 +83,14 @@ ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/disc
     pgmpy.hc.BDeu pgmpy.hc.BIC_categorical
 ```
 
-The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
-is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
-the two packages' PC and GES return the same graph, with Andrey's PC on the column-order collider
-rule that causal-learn's PC runs; PC's default p-value order can orient conflicting colliders
-differently. BOSS and GRaSP run on search seed 0 in both packages, but each package draws its orders
-from its own random streams, so their graphs can differ at equal settings.
+The chi-square and G-square statistics and the BDeu scores of Andrey and causal-learn follow the
+same definitions (Andrey's BDeu is `-2` times causal-learn's), and on the datasets of
+`benchmarks/tests/test_adapters_discrete.py` the two packages' GES return the same graph. Their
+p-values differ on sparse tables: Andrey refers the statistic to its mean when `y` is shuffled
+within each configuration of the conditioning set, and causal-learn to `(r - 1) * (c - 1)` degrees
+of freedom per configuration, so the two packages' PC can return different graphs. BOSS and GRaSP
+run on search seed 0 in both packages, but each package draws its orders from its own random
+streams, so their graphs can differ at equal settings.
 Each comparator's objective is checked against Andrey's in
 `benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
 agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets, and

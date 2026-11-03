@@ -581,6 +581,39 @@ def test_a_cell_mean_matches_the_hypergeometric_sum_on_both_sides_of_the_expansi
         assert got == pytest.approx(exact, abs=2e-3)
 
 
+def test_the_cell_mean_table_returns_the_evaluated_means(monkeypatch):
+    """Each mean the table returns is the one evaluated for its triple, bit for bit: for every
+    cell of the smallest ``n``, and for random triples on both sides of the table's limit,
+    looked up in any order and in batches that fill the table a few rows at a time."""
+    monkeypatch.setattr(ci, "_MEANS_TABLE", np.empty_like(ci._MEANS_TABLE))
+    monkeypatch.setattr(ci, "_MEANS_FILLED", np.zeros_like(ci._MEANS_FILLED))
+    limit = ci._MEANS_N
+    every = np.array(
+        [(n, r, c) for n in range(2, 13) for c in range(1, n) for r in range(1, c + 1)]
+    )
+    rng = np.random.default_rng(0)
+    n = rng.integers(2, 2 * limit, 3000)
+    r = rng.integers(1, n // 2 + 1)
+    c = rng.integers(r, n)
+    assert (n <= limit).any() and (n > limit).any()
+    triples = np.concatenate([every, np.column_stack([n, r, c])])
+    triples = triples[rng.permutation(len(triples))]
+    for batch in np.array_split(triples, 40):
+        got = ci._g_means(*batch.T)
+        want = ci._cell_g_means(*batch.T)
+        assert np.array_equal(got.view(np.int64), want.view(np.int64))
+    assert ci._MEANS_FILLED.any() and not ci._MEANS_FILLED.all()
+
+
+def test_the_cell_mean_table_is_bounded():
+    """The table holds one float per ``(n, r, c)`` with ``r <= c <= n <= _MEANS_N``, a few
+    megabytes, and no lookup writes outside it."""
+    limit = ci._MEANS_N
+    last = ci._table_slot(np.array([limit]), np.array([limit]), np.array([limit]))[0]
+    assert last == ci._MEANS_TABLE.size - 1
+    assert ci._MEANS_TABLE.nbytes < 4 * 2**20
+
+
 @pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
 @pytest.mark.parametrize("categories", [3, 4, 5])
 def test_a_true_independence_is_rejected_at_the_level_it_is_tested_at(g_square, categories):
@@ -614,7 +647,9 @@ def test_a_true_independence_is_rejected_at_the_level_it_is_tested_at(g_square, 
 def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square, batch, table):
     """``pvalues_given`` and the queries of ``statistic_pvalues`` that share a conditioning set
     return the statistic and p-value of each candidate's own call, bit for bit, on random discrete
-    data with few rows, one-category columns, and any order of candidates and conditioners."""
+    data with few rows, one-category columns, and any order of candidates and conditioners. A
+    candidate's own call evaluates every cell mean; the scan reads the small ones from the table
+    and evaluates the blocks of a scan together or, with a small batch, one at a time."""
     from andrey.core import ci
 
     monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
@@ -629,7 +664,9 @@ def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square,
         rest = rng.permutation([v for v in range(d) if v != target])
         cond = rest[: int(rng.integers(0, 4))].tolist()
         xs = rest[len(cond) :].tolist()
-        alone = [test._statistic_pvalue(target, v, cond) for v in xs]
+        with monkeypatch.context() as direct:
+            direct.setattr(ci, "_MEANS_N", 0)  # no cell mean comes from the table
+            alone = [test._statistic_pvalue(target, v, cond) for v in xs]
         p = test.pvalues_given(target, xs, cond)
         assert p.view(np.int64).tolist() == np.array([a[1] for a in alone]).view(np.int64).tolist()
         shuffled = [int(i) for i in rng.permutation(len(xs))]

@@ -101,14 +101,14 @@ fits several datasets, and GIN finds latent variables.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Nonlinear additive-noise models: CAM
+:::{grid-item-card} Nonlinear additive-noise models: CAM and RESIT
 :link: functional
 :link-type: doc
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM learns a DAG, with every edge oriented, when each variable is a nonlinear function of its
-parents plus independent noise.
+CAM and RESIT learn a DAG, with every edge oriented, when each variable is a nonlinear function of
+its parents plus independent noise.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

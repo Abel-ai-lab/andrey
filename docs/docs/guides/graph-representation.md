@@ -105,7 +105,8 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
 `TemporalStructure` is a stack of `GraphStructure` objects, one per lag. `lags` lists the lag
 values, `lag(k)` selects a graph by lag value, and `lag_weights` holds the `(n_lags, n, n)`
 coefficients (`lag_weights_ma` adds the moving-average stack for VARMA); a `pcmci` result has lags 1
-to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`. An `lpcmci` result
+to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`. A `dynotears` result
+has lags 0 to `tau_max`, lag 0 a `dag`, with the coefficients as `lag_weights`. An `lpcmci` result
 has lag 0 as a `pag` and holds only the lagged links whose earlier end is a tail; a lagged link
 with a circle or an arrowhead at its earlier end is in `metadata["links"]`. An autoregressive
 edge `X(t-k) -> X(t)` is a self-loop in its lag graph. A panel result from `longitudinal_lingam`

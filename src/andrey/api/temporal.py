@@ -1,9 +1,10 @@
-"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, LPCMCI, and Granger.
+"""Temporal-family facades: the LiNGAM, PCMCI, Granger, and DYNOTEARS time-series methods.
 
-Each callable runs the native engine and returns one uniform ``StructureOutput`` wrapping a
+VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, LPCMCI, Granger, and DYNOTEARS each run the
+native engine and return one uniform ``StructureOutput`` wrapping a
 :class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs, plus the lossless coefficient
-weights for the LiNGAM and Granger methods). The mapping onto the public core contract lives in
-the private ``_temporal`` adapters.
+weights for the LiNGAM, Granger, and DYNOTEARS methods). The mapping onto the public core contract
+lives in the private ``_temporal`` adapters.
 """
 
 from __future__ import annotations
@@ -14,8 +15,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._method import method_spec
+from andrey.core.backend import one_blas_thread
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve_lagged
+from andrey.core.score import copies_error, copy_groups
 
 from ._adapt import (
     DROP_UNITS,
@@ -32,6 +35,7 @@ from ._adapt import (
     with_labels,
 )
 from ._temporal import (
+    _adapt_dynotears,
     _adapt_granger,
     _adapt_longitudinal_lingam,
     _adapt_lpcmci,
@@ -1509,3 +1513,244 @@ def granger(
         ratio = scale[:, None] / np.tile(scale, tau_max)[None, :]
         coeff = np.where(coeff == 0, 0.0, coeff * ratio)
     return with_labels(_adapt_granger(coeff, X.shape[1], tau_max, required, p_values), labels)
+
+
+@method_spec("dynotears")
+def dynotears(
+    data: npt.ArrayLike,
+    *,
+    tau_max: int = 1,
+    lambda1: float = 0.05,
+    w_threshold: float = 0.3,
+    lag_threshold: float = 0.1,
+    max_iter: int = 100,
+    h_tol: float = 1e-8,
+    rho_max: float = 1e16,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a weighted temporal causal structure from one multivariate time series with DYNOTEARS.
+
+    DYNOTEARS [1]_ fits a linear structural vector autoregression, same-step and lagged effects
+    together, by continuous optimization: the least-squares loss with an ``l1`` penalty, under the
+    smooth acyclicity constraint of NOTEARS [2]_ on the same-step weights. Use it for one
+    multivariate series in which effects act both within a time step and from earlier steps.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
+        column names become the structure's ``labels``.
+    tau_max : int, default=1
+        The largest lag, at least ``1`` (``p`` in [1]_): each step is fit on the same step and the
+        ``tau_max`` steps before it. ``1`` is the order of the paper's experiments.
+    lambda1 : float, default=0.05
+        Weight of the ``l1`` penalty on every same-step and lagged weight, at least ``0``. Larger
+        values give sparser graphs. ``0.05`` is the paper's value for 500 time steps; it used
+        ``0.2`` for 50.
+    w_threshold : float, default=0.3
+        A same-step edge is kept when its weight magnitude reaches this value, at least ``0``.
+    lag_threshold : float, default=0.1
+        A lagged edge is kept when its weight is not ``0`` and its magnitude reaches this value,
+        at least ``0``. The paper used ``0.1`` for 500 time steps and ``0.2`` for 50.
+    max_iter : int, default=100
+        Most dual steps of the augmented Lagrangian, at least ``1``. Stopping on it rather than on
+        ``h_tol`` or ``rho_max`` warns with :class:`~andrey.SearchLimitWarning`.
+    h_tol : float, default=1e-8
+        The fit stops when the acyclicity function of the same-step weights falls to this value,
+        above ``0``.
+    rho_max : float, default=1e16
+        The fit stops when the penalty weight on the acyclicity function reaches this value, above
+        ``1``, the weight the fit starts from.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over lags ``0`` to ``tau_max``: required and forbidden links, the pairs allowed
+        to be linked, and temporal tiers, all honored. A link ``(cause, effect, lag)`` is the link
+        from ``cause`` at time ``t - lag`` to ``effect`` at time ``t``, lag ``0`` being the same
+        step; a forbidden ``(cause, effect)`` pair forbids it at every lag, and a required link
+        names its lag. A forbidden link is held at zero in the fit; a required link is left out of
+        the penalty and the threshold, is in the graph even where its weight is ``0``, and at lag
+        ``0`` is never removed by the cycle repair. Tiers forbid every link from a later tier into
+        an earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's
+        links to its own past stay allowed.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
+        ``tau_max``. ``structure.lag(0)`` is a ``dag`` of the same-step edges and
+        ``structure.lag(k)``, ``k >= 1``, a ``digraph`` with the edge ``i -> j`` from ``x_i(t - k)``
+        to ``x_j(t)``, self-loops included. ``structure.lag_weights[k][i, j]`` is the coefficient
+        of that edge in the data's units, and ``0`` where there is no edge. ``ordering`` is
+        ``None``. ``metadata`` holds ``"algorithm"`` (``"dynotears"``), ``"h_final"`` (the
+        acyclicity function of the same-step weights before the threshold), and
+        ``"edges_removed"`` (same-step edges the threshold kept that the cycle repair dropped), and
+        ``"tie_break"`` (the rule ties followed).
+
+    Raises
+    ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a finite numeric matrix without a constant column, or has fewer than ``tau_max + 2``
+        rows, so that fewer than 2 steps have ``tau_max`` steps before them. Also if a column
+        repeats another up to scale and shift, as the direction between copies cannot be told
+        apart; one message names every group of copies and says to keep one column per group.
+        Also if ``knowledge``
+        names a column ``data`` lacks, contradicts itself, or requires a link without a lag or
+        beyond ``tau_max``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+
+    Notes
+    -----
+    **When to use.** DYNOTEARS suits one continuous, observational, stationary multivariate time
+    series from a linear structural vector autoregression: each variable is a weighted sum of the
+    other variables at the same step and of every variable at the past ``tau_max`` steps, plus
+    noise, with weights that do not change over time, same-step effects that form no cycle, and no
+    unmeasured variable that causes two measured ones [1]_. Its ``l1`` penalty and both thresholds
+    act on the weights in the data's units, so the columns should be in comparable units [4]_ [5]_:
+    a cause recorded in thousandths multiplies its weight by 1,000, and the penalty can then remove
+    a true edge, or every edge, without a warning; convert such columns to comparable units first,
+    as standardizing them falls outside the setting the paper's simulations measure (see
+    Limitations). It fits ``(tau_max + 1) * d * d`` weights under an acyclicity function that takes
+    a matrix exponential, so it suits a moderate number of variables, a few lags, and a long
+    series. It returns a temporal structure with a DAG at lag ``0`` and the graphs at lags
+    ``1`` to ``tau_max``, self-lags included, with the weight of each edge. For nonlinear effects,
+    use :func:`~andrey.pcmciplus` with a nonlinear test such as ``"gpdc"`` or ``"rcot"``, and for
+    many lags, :func:`~andrey.pcmciplus` with its default test; when unmeasured common causes are
+    plausible, use :func:`~andrey.lpcmci`; and for i.i.d. rows rather than a series,
+    :func:`~andrey.notears`.
+
+    The model is ``x_t = x_t W + x_{t-1} A_1 + ... + x_{t-p} A_p + z_t`` for the row vector
+    ``x_t`` of the variables at step ``t`` and ``p = tau_max``, where ``W`` is acyclic and the
+    noise ``z_t`` is independent within and across steps [1]_. The fit minimizes
+
+    ``0.5 / n * ||X - X W - Y A||**2 + lambda1 * (|W|_1 + |A|_1)`` subject to
+    ``tr(exp(W * W)) - d = 0``,
+
+    where the ``n`` rows of ``X`` are the steps with ``p`` steps before them, ``Y`` holds the same
+    rows' ``p`` earlier steps side by side, and ``A`` stacks the ``A_k``. Every column of ``X`` and
+    of ``Y`` is centered on its own mean first, which is the same as fitting an intercept, so a
+    series with a nonzero mean adds no weight, to the solver's precision. The paper's loss fits no
+    intercept, as its model takes noise of mean zero [1]_. On the series that Limitations describes,
+    whose mean is zero, fitting without an intercept made 3 to 4 fewer errors of about 150 with
+    exponential noise at 50 time steps and 100 variables, and no fewer, once replicated, in any
+    other setting there. With exponential noise of mean 1, not centered, so that every series has a
+    nonzero mean, it made 4.4 to 9.5 more errors at 500 steps and 5 to 20 variables. The paper's
+    experiments give ``W`` and ``A`` the same penalty, and ``lambda1`` is that one value. A lagged
+    edge points forward in time and closes no cycle, so the constraint reads ``W`` alone; a lagged
+    self-loop, a variable's effect on its own future, is an edge like any other. As in NOTEARS, the
+    weights are written as ``W = W+ - W-`` with both parts non-negative and the diagonal of ``W``
+    held at zero, and the augmented Lagrangian ``f + 0.5 * rho * h**2 + alpha * h`` is minimized by
+    L-BFGS-B from the zero matrix. After each solve ``rho`` grows tenfold while ``h`` has not fallen
+    to a quarter of its previous value, and then ``alpha += rho * h``, until ``h <= h_tol`` or
+    ``rho >= rho_max``. Same-step weights below ``w_threshold`` and lagged ones below
+    ``lag_threshold`` are then removed, and then the weakest remaining same-step edges until no
+    cycle is left. The defaults of ``lambda1``, ``w_threshold``, ``lag_threshold``, and ``tau_max``
+    are the paper's values for its simulations with 500 time steps; ``max_iter``, ``h_tol``, and
+    ``rho_max`` are those of NOTEARS [2]_, whose method the paper follows.
+
+    [1]_ shows the model identifiable when the noise is non-Gaussian, or Gaussian with unit
+    variance. The likelihood path that :func:`~andrey.notears` follows with ``robust=True`` [3]_
+    is shown for independent samples only, so this method has no such option.
+
+    The fit runs on the columns sorted by a rank computed from the data, as for
+    :func:`~andrey.hc`, so under the default tie-break reordering the columns relabels the result
+    and changes nothing else, unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order, and how ``andrey.config(tie_break="position")`` sorts the columns by position
+    instead. The fit draws no random numbers and runs on one BLAS thread, so the host's thread count
+    does not change it.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every step on
+    the steps before it, so a step with a missing value has no place in it. Fill in the missing
+    steps first, as dropping one would join the steps around it, or use :func:`~andrey.pcmci`,
+    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test.
+
+    **Limitations.** The least-squares score with an ``l1`` penalty and the weight thresholds read
+    the data's units, as in NOTEARS [4]_ [5]_: rescaling a column changes the fit, and on series
+    whose variance grows along the causal order the fit gains from that order. Measured against the
+    reference implementation on linear structural vector autoregressions of the paper's design [1]_:
+    one lag; Erdos-Renyi same-step graphs of mean degree 2 with weights of magnitude 0.5 to 2;
+    lagged graphs of mean in-degree 2, self-lags included, with weights of magnitude 0.3 to 0.5;
+    Gaussian or centered exponential noise; 20 series for each of 5, 10, 20, 50, and 100 variables;
+    in the data's units. Errors are SHD over the same-step and lagged edges together, means over the
+    series. At 500 time steps and the default settings the errors were 0.15 to 6.25, against the
+    empty graph's 13.5 to 283.2, with F1 at least 0.968, and no setting differed from the reference
+    implementation; Barabasi-Albert same-step graphs with block-model lagged graphs, up to 50
+    variables, gave the same result. At 50 time steps with the paper's settings for them,
+    ``lambda1=0.2`` and ``lag_threshold=0.2``, the errors were 5 to 149, against the same empty
+    graph's, and only one setting differed: with exponential noise at 100 variables the centering
+    above made 3.2 more errors than the reference implementation, and 4.15 on 20 further series;
+    against the reference implementation fitted on centered columns the difference on those 20 was
+    0.55, with a 95% interval that includes 0. The defaults at 50 time steps made more errors than
+    the empty graph from 20 variables on (88.4 against 59.4 at 20), so set those two arguments for a
+    short series. With the columns z-scored at 500 steps the errors rose to 8.3, 19.7, 39.2, and
+    82.6 at 5 to 50 variables, against the empty graph's 14.6 to 147.2, over ten series each. With
+    500 time steps on one core, four fits at a time on four cores, the median fit took 0.3 s at 5
+    variables, 29 s at 50, and 299 s at 100. The time grows faster than the cube of the number of
+    variables, from the matrix exponential of every evaluation and the ``(tau_max + 1) * d * d``
+    weights. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Pamfil, R., Sriwattanaworachai, N., Desai, S., Pilgerstorfer, P., Beaumont, P.,
+       Georgatzis, K., and Aragam, B. (2020). DYNOTEARS: Structure learning from time-series
+       data. AISTATS, PMLR 108, 1595-1605.
+    .. [2] Zheng, X., Aragam, B., Ravikumar, P., and Xing, E. P. (2018). DAGs with NO TEARS:
+       Continuous optimization for structure learning. NeurIPS 31, 9472-9483.
+    .. [3] Deng, C., Bello, K., Ravikumar, P., and Aragam, B. (2024). Markov equivalence and
+       consistency in differentiable structure learning. NeurIPS 37.
+    .. [4] Reisach, A. G., Seiler, C., and Weichwald, S. (2021). Beware of the simulated DAG!
+       Causal discovery benchmarks may be easy to game. NeurIPS 34.
+    .. [5] Kaiser, M. and Sipos, M. (2022). Unsuitability of NOTEARS for causal graph discovery
+       when dealing with dimensional quantities. Neural Processing Letters 54(3), 1587-1595.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import dynotears
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = dynotears(np.column_stack([x, y]))
+    >>> out.structure.lag(1).oriented_edges()
+    [(0, 1, 'directed')]
+    """
+    from andrey.temporal.dynotears import dynotears as _native
+
+    X = data_matrix(data, method="dynotears", fix=FILL_STEPS)
+    if X.shape[0] < tau_max + 2:
+        raise ValueError(
+            f"dynotears: data needs at least tau_max + 2 = {tau_max + 2} rows (time steps), so "
+            f"that 2 steps have tau_max={tau_max} steps before them, got {X.shape[0]}"
+        )
+    labels = column_labels(data)
+    if X.shape[1] > 1:
+        groups = copy_groups(np.corrcoef(X, rowvar=False), X.shape[0])
+        if groups:
+            raise copies_error(groups, column_namer(labels))
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="dynotears")
+    with one_blas_thread():
+        result = _native(
+            X,
+            tau_max=tau_max,
+            lambda1=lambda1,
+            w_threshold=w_threshold,
+            lag_threshold=lag_threshold,
+            max_iter=max_iter,
+            h_tol=h_tol,
+            rho_max=rho_max,
+            constraints=constraints,
+        )
+    return with_labels(_adapt_dynotears(result), labels)

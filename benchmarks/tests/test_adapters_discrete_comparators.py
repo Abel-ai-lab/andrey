@@ -1,11 +1,12 @@
 """pgmpy's and bnlearn's categorical adapters: the harness contract and one objective per pair.
 
-Each comparator must score or test exactly what Andrey's setting of the same name does: pgmpy's
-and bnlearn's multinomial BIC are ``-1/2`` times Andrey's ``local_score_BIC_categorical``,
-bnlearn's BDeu with the ``vsp`` prior is ``-1/2`` times Andrey's ``local_score_BDeu`` up to a
-constant per node, pgmpy's BDeu with the adapter's structure prior is exactly ``-1/2`` times it, and
-bnlearn's ``x2-adf`` and ``mi-adf`` p-values are Andrey's ``chisq`` and ``gsq`` except for the
-sparse-table rule the adapter documents. Each search setting the adapters declare must take effect.
+Each comparator must score or test exactly what Andrey's setting of the same name does: pgmpy's and
+bnlearn's multinomial BIC are ``-1/2`` times Andrey's ``local_score_BIC_categorical``, bnlearn's
+BDeu with the ``vsp`` prior is ``-1/2`` times Andrey's ``local_score_BDeu`` up to a constant per
+node, pgmpy's BDeu with the adapter's structure prior is exactly ``-1/2`` times it, and bnlearn's
+``x2-adf`` and ``mi-adf`` statistics are Andrey's ``chisq`` and ``gsq`` and give their p-value on
+bnlearn's degrees of freedom, except for the sparse-table rule the adapter documents. Each search
+setting the adapters declare must take effect.
 The pgmpy checks run where pgmpy is installed and the bnlearn checks where R is loaded; these tests
 live apart from the discrete lane's, which may not skip.
 """
@@ -22,6 +23,7 @@ from itertools import combinations
 import numpy as np
 import pytest
 from conftest import needs_r
+from scipy.stats import chi2
 
 from andrey.core.ci import ChiSquare
 from andrey.core.score import BDeuScore, CategoricalBICScore
@@ -269,9 +271,12 @@ andrey_bnlearn_score_categorical <- function(X, A, score) {
 andrey_bnlearn_ci_categorical <- function(X, x, y, z, test) {
     df <- andrey_bnlearn_factors(X)
     z <- as.integer(strsplit(z, ",")[[1]])
-    if (length(z) == 0) return(bnlearn::ci.test(names(df)[x], names(df)[y], data = df,
-                                                test = test)$p.value)
-    bnlearn::ci.test(names(df)[x], names(df)[y], names(df)[z], data = df, test = test)$p.value
+    r <- if (length(z) == 0) {
+        bnlearn::ci.test(names(df)[x], names(df)[y], data = df, test = test)
+    } else {
+        bnlearn::ci.test(names(df)[x], names(df)[y], names(df)[z], data = df, test = test)
+    }
+    c(r$p.value, r$statistic, r$parameter)
 }
 """
 
@@ -305,32 +310,47 @@ def test_bnlearn_scores_a_dag_as_andrey_does(score_func: str) -> None:
     assert -2 * theirs == pytest.approx(mine, rel=1e-9)
 
 
+def _ci(session, x: np.ndarray, a: int, b: int, s: tuple[int, ...], test: str):
+    """bnlearn's ``(p, statistic, dof)`` for ``a`` and ``b`` given ``s``."""
+    call = session.function("andrey_bnlearn_ci_categorical")
+    z = ",".join(str(c + 1) for c in s)
+    p, statistic, dof = (float(v) for v in call(session.matrix(x), a + 1, b + 1, z, test))
+    return p, statistic, dof
+
+
+def _assert_andreys_statistic(mine: ChiSquare, a, b, s, theirs) -> None:
+    """bnlearn's statistic is Andrey's, and Andrey's statistic on bnlearn's degrees of freedom
+    gives bnlearn's p-value."""
+    p, statistic, dof = theirs
+    (own,), _ = mine.statistic_pvalues(
+        np.array([a]), np.array([b]), np.array([s], dtype=np.intp).reshape(1, -1)
+    )
+    assert own == pytest.approx(statistic, rel=1e-9, abs=1e-9)
+    assert (chi2.sf(own, dof) if dof else 1.0) == pytest.approx(p, rel=1e-9, abs=1e-12)
+
+
 @needs_r()
 @pytest.mark.parametrize("indep_test", list(TESTS))
-def test_bnlearn_p_values_are_andreys(indep_test: str) -> None:
+def test_bnlearn_statistic_is_andreys(indep_test: str) -> None:
     session = _r_session()
     x = _sample(4, d=5, n=600)
     mine = ChiSquare(x, g_square=indep_test == "gsq")
-    call = session.function("andrey_bnlearn_ci_categorical")
     for a, b in combinations(range(5), 2):
         rest = [c for c in range(5) if c not in (a, b)]
         for size in range(3):
             for s in combinations(rest, size):
-                z = ",".join(str(c + 1) for c in s)
-                theirs = float(call(session.matrix(x), a + 1, b + 1, z, TESTS[indep_test])[0])
-                assert mine(a, b, s) == pytest.approx(theirs, rel=1e-6, abs=1e-12)
+                theirs = _ci(session, x, a, b, s, TESTS[indep_test])
+                _assert_andreys_statistic(mine, a, b, s, theirs)
 
 
 def _tests(session, x: np.ndarray, test: str, size: int, count: int = 60):
-    """``count`` conditional tests of up to ``size`` variables on `x`: ``(a, b, s, p)``, with p
-    from bnlearn."""
-    call = session.function("andrey_bnlearn_ci_categorical")
+    """``count`` conditional tests of up to ``size`` variables on `x`: ``(a, b, s, theirs)``,
+    with ``theirs`` bnlearn's ``(p, statistic, dof)``."""
     d = x.shape[1]
     rng = np.random.default_rng(0)
     for _ in range(count):
         a, b, *s = (int(c) for c in rng.permutation(d)[: 2 + int(rng.integers(0, size + 1))])
-        z = ",".join(str(c + 1) for c in s)
-        yield a, b, tuple(s), float(call(session.matrix(x), a + 1, b + 1, z, test)[0])
+        yield a, b, tuple(s), _ci(session, x, a, b, tuple(s), test)
 
 
 @needs_r()
@@ -339,7 +359,7 @@ def test_bnlearn_declares_a_sparse_table_independent_and_otherwise_agrees_with_a
     indep_test: str,
 ) -> None:
     """The ``-adf`` tests return ``p = 1`` when ``n < 5 * r * c * q``, as the adapter documents;
-    every other table's p-value is Andrey's."""
+    on every other table bnlearn's statistic is Andrey's."""
     session = _r_session()
     x = _sample(4, d=9, n=600)
     mine = ChiSquare(x, g_square=indep_test == "gsq")
@@ -349,10 +369,10 @@ def test_bnlearn_declares_a_sparse_table_independent_and_otherwise_agrees_with_a
         cells = categories[a] * categories[b] * int(np.prod([categories[c] for c in s]))
         if len(x) < 5 * cells:
             sparse += 1
-            assert theirs == 1.0 and mine(a, b, s) < 1.0
+            assert theirs[0] == 1.0 and mine(a, b, s) < 1.0
         else:
             dense += 1
-            assert mine(a, b, s) == pytest.approx(theirs, rel=1e-6, abs=1e-12)
+            _assert_andreys_statistic(mine, a, b, s, theirs)
     assert sparse and dense
 
 
@@ -361,14 +381,15 @@ def test_bnlearn_declares_a_sparse_table_independent_and_otherwise_agrees_with_a
 def test_bnlearn_without_the_degrees_of_freedom_adjustment_is_not_andreys_test(
     indep_test: str,
 ) -> None:
-    """The reason the adapter runs ``x2-adf`` and ``mi-adf``, not ``x2`` and ``mi``."""
+    """The plain forms keep a table's empty rows and columns in the degrees of freedom, which the
+    adapter's ``x2-adf`` and ``mi-adf`` and Andrey's tests take out."""
     session = _r_session()
     x = _sample(4, d=9, n=600)
     mine = ChiSquare(x, g_square=indep_test == "gsq")
     plain = {"chisq": "x2", "gsq": "mi"}[indep_test]
     differs = [
         s
-        for a, b, s, theirs in _tests(session, x, plain, size=2)
+        for a, b, s, (theirs, _, _) in _tests(session, x, plain, size=2)
         if mine(a, b, s) != pytest.approx(theirs, rel=1e-6, abs=1e-12)
     ]
     assert differs

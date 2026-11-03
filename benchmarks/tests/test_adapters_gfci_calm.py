@@ -154,9 +154,9 @@ def test_a_tetrad_fit_gives_the_causal_cmd_pag() -> None:
 
 
 def test_the_default_schedule_is_andreys() -> None:
-    from andrey.search.calm import calm
+    import andrey
 
-    signature = inspect.signature(calm).parameters
+    signature = inspect.signature(andrey.calm).parameters
     defaults = {k: v for k, v in DEFAULTS.items() if k != "seed"}
     assert {k: signature[k].default for k in defaults} == defaults
 
