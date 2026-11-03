@@ -270,7 +270,7 @@ _add(
                     doc="The environment (domain) of each row: one label per row, (n_samples,) or "
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
-                    "1, ... in order of first appearance.",
+                    "1, ... in sorted order.",
                     aliases=("domain_index",),
                 ),
             ),

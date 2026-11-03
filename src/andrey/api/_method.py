@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from andrey.api._adapt import default_score, default_test
 from andrey.api._experimental import warn_experimental
+from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
 from andrey.core.removed import removal_hint
@@ -128,28 +129,15 @@ def take_columns(spec: MethodSpec, arguments: dict[str, Any]) -> None:
     as a string names a column of the DataFrame ``data``: the data lose that column, and the
     argument becomes the column's values, so the method, its default test or score, and its
     metadata read only the variables. Raises ``ValueError`` when the data have no such column or
-    two arguments name the same one.
+    two arguments name the same one (:func:`~andrey.core.environments.take_columns`).
     """
     keys = [i.name for i in spec.data.inputs[1:]] + [
         p.name for p in spec.params if p.type == "targets"
     ]
     named = {key: arguments[key] for key in keys if isinstance(arguments.get(key), str)}
-    if not named:
-        return
     data_key = spec.data.inputs[0].name
-    data = arguments[data_key]
-    columns = list(getattr(data, "columns", ()))
-    for key, column in named.items():
-        if column not in columns:
-            raise ValueError(
-                f"{spec.name}: {key}={column!r} names a column, but data has no column {column!r}; "
-                f"pass a DataFrame with that column, or {key}'s values"
-            )
-    if len(set(named.values())) < len(named):
-        raise ValueError(f"{spec.name}: {' and '.join(named)} name one column; name two columns")
-    arguments[data_key] = data.drop(columns=list(named.values()))
-    for key, column in named.items():
-        arguments[key] = data[column].to_numpy()
+    arguments[data_key], values = environments.take_columns(arguments[data_key], named, spec.name)
+    arguments.update(values)
 
 
 def check_argument(param: ParamSpec, value: Any, method: str) -> object:

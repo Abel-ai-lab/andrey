@@ -1098,9 +1098,9 @@ def cdnod(
         or the time step for data that drift over time, or the name of a column of the DataFrame
         ``data`` that holds them. Numbers are coerced to ``float64`` and read as numbers; whole
         numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels
-        are coded ``0, 1, ...`` in order of first appearance; a label is a string or a number,
-        not both. See Notes for more than two domains. When every row has the same value, the
-        data come from one domain, and the result equals :func:`~andrey.pc`'s.
+        are coded ``0, 1, ...`` in sorted order, whatever the row order; a label is a string or a
+        number, not both. See Notes for more than two domains. When every row has the same value,
+        the data come from one domain, and the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
@@ -1222,8 +1222,7 @@ def cdnod(
     ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
     find a change in a variable's mean that follows the index's values. With two domains the coding
     does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result; string labels take their codes
-    from the row order, so with them reordering the rows can too. A change in a variable's noise
+    undetected, and recoding the domains can change the result. A change in a variable's noise
     variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
     unchanged, so the index keeps no edge to that variable. The paper uses a kernel
     conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
@@ -1331,10 +1330,13 @@ def cdnod(
     >>> cdnod(data, "site").structure.oriented_edges()
     [('x', 'y', 'directed')]
     """
-    from andrey.api._env import cdnod_index
     from andrey.constraint.cdnod import cdnod as _cdnod
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
+    from andrey.core.environments import normalize_env_targets
 
+    data, codes, env_labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method="cdnod"
+    )
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -1348,7 +1350,9 @@ def cdnod(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
-    c = np.asarray(cdnod_index(env, X.shape[0]), dtype=np.float64)
+    # Numbers reach the search as given, such as a time step; text labels as their codes.
+    text = any(isinstance(label, str) for label in env_labels)
+    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     if dependence_threshold is not None and np.isnan(X).any():

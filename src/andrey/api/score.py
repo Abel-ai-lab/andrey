@@ -607,8 +607,9 @@ def gies(
     >>> gies(data, env, targets={0: [], 1: ["b"]}).structure.oriented_edges()
     [('a', 'b', 'directed')]
     """
-    from andrey.api._env import intervened_rows
+    from andrey.core.environments import normalize_env_targets
     from andrey.search.gies import gies as _gies
+    from andrey.search.gies import intervention_mask
 
     if env is not None and np.ndim(env) == 2 and np.shape(env)[1] > 1:
         if targets is not None:
@@ -622,11 +623,19 @@ def gies(
             DeprecatedArgumentWarning,
         )
         env, targets = None, env
+    data, codes, _, by_code = normalize_env_targets(
+        data, env, targets, require_known_targets=True, method="gies"
+    )
     score_func, categorical = default_score(data, score_func, categorical=categorical)
     X, mask = checked_data(data, categorical, "score_func", score_func, method="gies")
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gies")
-    intervened = intervened_rows(env, targets, X, labels)
+    intervened = None
+    if targets is not None:  # mask[i] = targets_by_code[env_codes[i]]
+        rows = np.zeros((len(by_code), X.shape[1]), dtype=bool)
+        for code, variables in by_code.items():
+            rows[code, sorted(variables or ())] = True
+        intervened = intervention_mask(rows[codes], X)
     with copies_named(labels):
         graph, score = _gies(
             X,

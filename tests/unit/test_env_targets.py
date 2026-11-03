@@ -221,11 +221,28 @@ def test_cdnod_reads_numbers_as_numbers():
         assert np.array_equal(out.structure.to_numpy(), engine.to_numpy())
 
 
-def test_cdnod_codes_text_labels_by_first_appearance():
+def test_cdnod_codes_text_labels_in_sorted_order():
     labels = np.array(["b", "c", "a"])[DOMAIN.astype(int)]
-    assert _same(andrey.cdnod(X, labels), andrey.cdnod(X, DOMAIN))
-    reordered = np.array(["c", "a", "b"])[DOMAIN.astype(int)]
-    assert _same(andrey.cdnod(X, reordered), andrey.cdnod(X, DOMAIN))
+    codes = np.array([1.0, 2.0, 0.0])[DOMAIN.astype(int)]
+    assert _same(andrey.cdnod(X, labels), andrey.cdnod(X, codes))
+
+
+def test_reordering_the_rows_leaves_cdnod_on_text_labels_unchanged():
+    """With three domains and fisherz, a shift in the middle domain alone keeps the index apart
+    from x under the sorted codes; codes in order of first appearance would put that domain first
+    whenever its rows came first, and orient x -> y."""
+    rng = np.random.default_rng(2)
+    labels = np.repeat(["a", "b", "c"], 300)
+    x = np.where(labels == "b", 2.0, 0.0) + rng.standard_normal(900)
+    data = np.column_stack([x, x + 0.5 * rng.standard_normal(900)])
+    found = andrey.cdnod(data, labels, indep_test="fisherz").structure.to_numpy()
+    for seed in range(3):
+        order = np.random.default_rng(seed).permutation(900)
+        order = np.r_[order[labels[order] == "b"], order[labels[order] != "b"]]  # "b" rows first
+        reordered = andrey.cdnod(data[order], labels[order], indep_test="fisherz")
+        assert np.array_equal(reordered.structure.to_numpy(), found)
+    shifted_first = np.where(labels == "b", 0.0, np.where(labels == "a", 1.0, 2.0))
+    assert not np.array_equal(andrey.cdnod(data, shifted_first).structure.to_numpy(), found)
 
 
 CDNOD_FORMS = {
