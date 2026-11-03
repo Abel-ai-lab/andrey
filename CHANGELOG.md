@@ -12,7 +12,7 @@ names its pull request.
 
 ### Changed
 
-- `iamb`, `inter_iamb` and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 
 ### Fixed
