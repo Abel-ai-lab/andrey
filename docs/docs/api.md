@@ -739,6 +739,8 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    sample_mixed
    interventions.hard
    interventions.soft
+   interventions.Hard
+   interventions.Soft
 ```
 
 #### Scale

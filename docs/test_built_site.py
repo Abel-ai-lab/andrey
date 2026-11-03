@@ -28,6 +28,7 @@ import andrey.core.ci_gpdc
 import andrey.core.ci_kernel
 import andrey.core.ci_missing
 import andrey.data.discrete
+import andrey.data.interventions
 import andrey.data.mixed
 import andrey.data.real
 import andrey.data.scm
@@ -62,6 +63,7 @@ PUBLIC_MODULES = (
     (andrey.data.discrete, "data."),
     (andrey.data.mixed, "data."),
     (andrey.data.scm, "data."),
+    (andrey.data.interventions, "data.interventions."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),
     (andrey.viz.mpl, "viz.mpl."),
