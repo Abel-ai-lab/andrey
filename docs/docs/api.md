@@ -108,22 +108,22 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
-`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
-`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
-for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
-from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
-`lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
-the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
-likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance
-correlation. A test you register that reports only p-values is ordered by its p-value, smallest
-first.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`,
+`pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`,
+and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
+`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
+`"cmiknn"`, and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
+`None`, the default, picks from the declared column types, `"fisherz"` for continuous data. `pcmci`,
+`pcmciplus`, and `lpcmci` run each test on the lagged values of the series, and order the candidate
+conditions by the test's statistic, as tigramite does: the partial correlation, the chi-square
+statistic, the likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's
+distance correlation. A test you register that reports only p-values is ordered by its p-value,
+smallest first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`,
-`resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`,
+`cam`, `resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
 `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
@@ -206,25 +206,26 @@ can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take
-`seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is
-the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
-exactly. The methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with
-`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
-that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
-seed.
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and
+`ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`,
+the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one,
+so a call repeats exactly. The methods that test independence draw random numbers only under
+`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and `ut_igsp` also with `n_starts` above 1,
+and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
+other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs:
-the first from the start the method describes, each later one from a start drawn from `seed` and
-the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` from a
-minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
-after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
-replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
-count of edges and targets). `ut_igsp` runs 5 by default, the default number of runs of its
-authors' library. Each search builds its own caches and drops the previous one's, so more starts
-take more time but little more memory. `1`, the default for the others, runs one search.
+`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a
+fit runs: the first from the start the method describes, each later one from a start drawn from
+`seed` and the search's index. `boss` and `grasp` start it from a random order, `igsp` and
+`ut_igsp` from a minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the
+best DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring
+search; a later one replaces an earlier one only when it scores better by more than `1e-6` (for
+`igsp`, fewer edges, then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and
+targets). `igsp` and `ut_igsp` run 5 by default, the default number of runs of their authors'
+library. Each search builds its own caches and drops the previous one's, so more starts take more
+time but little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -387,6 +388,7 @@ its first call in a process.
    dagma
    camuv
    dynotears
+   igsp
    ut_igsp
 ```
 
@@ -409,6 +411,13 @@ time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-ste
 on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
 temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
 lag 0.
+
+IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
+and settings whose intervention targets are all known, as GIES does: it searches variable orders
+for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
+the settings' invariance tests contradict. It runs at `alpha=1e-3` for both tests, where `0.05`
+gave a few times the distance to the true graph on data simulated as in its papers, and returns
+the interventional essential graph.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the

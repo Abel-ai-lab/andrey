@@ -1213,6 +1213,90 @@ _add(
 )
 _add(
     MethodSpec(
+        name="igsp",
+        family="permutation",
+        summary="Interventional greedy sparsest permutation: a permutation search over minimal "
+        "I-MAPs for data from an observational environment and settings whose intervention "
+        "targets are known, minimizing the edges, then the edges the settings contradict. Fisher "
+        "z and Gaussian invariance tests by default. Returns the interventional essential graph.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets that map every label, at least one to [], the observational "
+                    "rows.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['score'] is the edges of the DAG found; metadata['n_contradicting'] its "
+            "I-contradicting edges; metadata['invariance_test'] names the invariance test",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        seeded=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"]}; [] marks an observational '
+                "environment. Every environment needs an entry.",
+                nullable=True,
+            ),
+            concept_param("alpha", default=1e-3),
+            ParamSpec(
+                name="invariance_alpha",
+                type="float",
+                default=None,
+                doc="Significance level of the invariance tests: a variable's distribution "
+                "differs between a setting and the observational rows when the test rejects at "
+                "it. null uses alpha.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                nullable=True,
+            ),
+            _INDEP_TEST,
+            concept_param("invariance_test"),
+            concept_param(
+                "n_starts",
+                default=5,
+                doc="Number of searches, at least 1, each from a minimum-degree order: the first "
+                "breaks ties by column rank, each later one draws them from seed and its index; "
+                "returns the best-scoring search.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the searches after the first and the "
+                "randomized tests.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=(
+            "Wang, Solus, Yang & Uhler 2017",
+            "Yang, Katcoff & Uhler 2018",
+            "Hauser & Buhlmann 2012",
+        ),
+    )
+)
+_add(
+    MethodSpec(
         name="ut_igsp",
         family="permutation",
         summary="Unknown-target interventional greedy sparsest permutation: a permutation search "
@@ -2289,9 +2373,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
-    "ut_igsp": "Every DAG the search visits keeps the required edges and holds no forbidden one. "
-    + _ORDER_RULE
-    + _CLASS_RULE,
+    **dict.fromkeys(
+        ("igsp", "ut_igsp"),
+        "Every DAG the search visits keeps the required edges and holds no forbidden one. "
+        + _ORDER_RULE
+        + _CLASS_RULE,
+    ),
     "exact_search": _PARENT_RULE,
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
@@ -2393,9 +2480,9 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 
 
 # Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type. ut_igsp came later and never took it.
+# values no longer declare a column's type. igsp and ut_igsp came later and never took it.
 for _name in CONCEPTS["categorical"].suitable:
-    if _name == "ut_igsp":
+    if _name in ("igsp", "ut_igsp"):
         continue
     _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
     REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
@@ -2412,6 +2499,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
         ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
     ),
     "exact_search": ("dag",),
+    "igsp": ("score", "n_contradicting", "invariance_test"),
     "ut_igsp": ("targets", "score", "invariance_test"),
     "calm": ("h_final", "objective"),
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),

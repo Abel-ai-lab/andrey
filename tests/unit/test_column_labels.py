@@ -62,8 +62,11 @@ TABLE_SPECS = [
 #: Settings that shorten a slow fit; the labels come from the same facade path.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 #: The targets of a method that reads three environments: observational, one with the known
-#: target z, and one whose targets are unknown.
-CONTEXT = {"ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}}}
+#: target z, and one whose targets are unknown (ut_igsp) or z again (igsp).
+CONTEXT = {
+    "igsp": {"targets": {0: [], 1: ["z"], 2: ["z"]}},
+    "ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}},
+}
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)

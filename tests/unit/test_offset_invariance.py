@@ -94,8 +94,11 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
 #: Settings that shorten a slow fit.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 #: The targets of a method that reads three environments: observational, one with the known
-#: target 2, and one whose targets are unknown.
-CONTEXT = {"ut_igsp": {"targets": {0: [], 1: [2], 2: None}}}
+#: target 2, and one whose targets are unknown (ut_igsp) or 0 (igsp).
+CONTEXT = {
+    "igsp": {"targets": {0: [], 1: [2], 2: [0]}},
+    "ut_igsp": {"targets": {0: [], 1: [2], 2: None}},
+}
 
 TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}

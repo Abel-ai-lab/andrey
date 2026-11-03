@@ -142,7 +142,7 @@ _LINGAM = (
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
-_STARTS = ("boss", "grasp", "hc", "tabu", "ut_igsp")
+_STARTS = ("boss", "grasp", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl")
 ALL_METHODS = (
@@ -154,6 +154,7 @@ ALL_METHODS = (
     "resit",
     "mmhc",
     "rsmax2",
+    "igsp",
     "ut_igsp",
     *_LINGAM,
     *PCMCI_FAMILY,
@@ -187,6 +188,7 @@ _CONCEPTS = (
             "cam",
             "resit",
             "camuv",
+            "igsp",
             "ut_igsp",
         ),
         exempt=(
@@ -250,6 +252,17 @@ _CONCEPTS = (
                 "2021 set every level to 0.01).",
             ),
             Deviation(
+                method="igsp",
+                name="alpha",
+                default=1e-3,
+                fixed_in=None,
+                reason="Measured: on linear-Gaussian data with 10 variables and four "
+                "single-variable or one five-variable perfect intervention, and with 20 variables "
+                "and eight single-variable ones, 1,000 or 10,000 rows per environment, 1e-3 had "
+                "20 to 40 percent of the SHD of 0.05; its authors swept 1e-4 to 5e-2 (Wang et al. "
+                "2017).",
+            ),
+            Deviation(
                 method="ut_igsp",
                 name="alpha",
                 default=1e-5,
@@ -271,7 +284,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="conditional-independence test",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "ut_igsp"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp"),
         exempt=(
             *_exempt(
                 "It tests the independence of residuals as part of its own model.",
@@ -301,7 +314,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="invariance test",
-        suitable=("ut_igsp",),
+        suitable=("igsp", "ut_igsp"),
         others_exempt="Takes no invariance test: its data come from one environment, or its "
         "environments enter its own tests or score.",
     ),
@@ -479,6 +492,7 @@ _CONCEPTS = (
             *_exempt(
                 "The minimal I-MAP conditions each pair on every earlier variable; no "
                 "conditioning-set cap.",
+                "igsp",
                 "ut_igsp",
             ),
         ),
@@ -578,6 +592,7 @@ _CONCEPTS = (
             *_exempt(
                 "Parents are those the tests keep in the minimal I-MAP of an order; the paper "
                 "sets no cap.",
+                "igsp",
                 "ut_igsp",
             ),
         ),
@@ -690,8 +705,8 @@ _CONCEPTS = (
         key="n_starts",
         summary="The number of searches a fit runs, each later one from a start drawn from seed: "
         "a random order (boss, grasp), a minimum-degree order with ties drawn from seed "
-        "(ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, tabu); "
-        "the best-scoring one is returned, and 1, the default, runs one search.",
+        "(igsp, ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, "
+        "tabu); the best-scoring one is returned, and 1, the default, runs one search.",
         param=_template(
             "n_starts",
             "int",
@@ -706,6 +721,14 @@ _CONCEPTS = (
         suitable=_STARTS,
         others_exempt="Runs one search per fit.",
         deviations=(
+            Deviation(
+                method="igsp",
+                name="n_starts",
+                default=5,
+                fixed_in=None,
+                reason="The reference's default number of runs; restarts are part of the "
+                "method's search (Yang, Katcoff and Uhler 2018).",
+            ),
             Deviation(
                 method="ut_igsp",
                 name="n_starts",
@@ -881,6 +904,7 @@ _CONCEPTS = (
             "gies",
             "xges",
             *PCMCI_FAMILY,
+            "igsp",
             "ut_igsp",
         ),
         others_exempt="A continuous model.",
@@ -918,6 +942,7 @@ _CONCEPTS = (
                 "rcd",
                 "bottom_up_parce_lingam",
                 "camuv",
+                "igsp",
                 "ut_igsp",
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),

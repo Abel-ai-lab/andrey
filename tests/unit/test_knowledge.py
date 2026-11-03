@@ -112,6 +112,9 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
         if name == "ut_igsp":  # an observational environment and a setting of unknown targets
             env = np.repeat([0, 1], len(data) // 2)
             return andrey.ut_igsp(data, env, targets={0: []}, **kwargs)
+        if name == "igsp":  # an observational environment and a setting that targets column 0
+            env = np.repeat([0, 1], len(data) // 2)
+            return andrey.igsp(data, env, targets={0: [], 1: [0]}, **kwargs)
         if name == "exact_search":
             return andrey.exact_search(data, **kwargs)
         if REGISTRY[name].output.multi:  # the first of two groups, the halves of the rows

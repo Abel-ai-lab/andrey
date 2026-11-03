@@ -41,6 +41,11 @@ names its pull request.
   targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
   mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
   `"indicator"`, the test of whether a variable's distribution given others changes. ([#PR])
+- `igsp`, experimental, learns the interventional essential graph from an observational
+  environment and settings whose targets are all known (IGSP, Wang et al. 2017; Yang, Katcoff, and
+  Uhler 2018), the same inputs as `gies`: it searches variable orders for the DAG with the fewest
+  edges, then the fewest edges that the settings' invariance tests contradict. It takes the
+  arguments of `ut_igsp`, with `alpha=1e-3`. ([#PR])
 
 ### Changed
 
