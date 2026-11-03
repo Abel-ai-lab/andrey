@@ -156,19 +156,17 @@ def test_run_writes_output_file(capsys, tmp_path, csv_path):
     assert json.loads(dest.read_text())["method"] == "pc"
 
 
-def test_run_gies_with_and_without_interventions(capsys, tmp_path):
-    """The optional input orients x -> y; omitted, the facade's default leaves the edge open."""
+def test_run_gies_with_and_without_targets(capsys, tmp_path):
+    """The environments and their targets orient x -> y; omitted, the edge stays open."""
     rng = np.random.default_rng(0)
     x = rng.standard_normal(600)
     y = x + 0.5 * rng.standard_normal(600)
     y[400:] = rng.standard_normal(200)
-    mask = np.zeros((600, 2))
-    mask[400:, 1] = 1
-    data_path, mask_path = tmp_path / "xy.csv", tmp_path / "mask.csv"
+    data_path, env_path = tmp_path / "xy.csv", tmp_path / "env.csv"
     np.savetxt(data_path, np.column_stack([x, y]), delimiter=",")
-    np.savetxt(mask_path, mask, delimiter=",")
+    np.savetxt(env_path, np.repeat([0, 1], [400, 200]), delimiter=",")
     types = {}
-    for argv in (["--interventions", str(mask_path)], []):
+    for argv in (["--env", str(env_path), 'targets={"0": [], "1": [1]}'], []):
         code, out, _ = _run(["run", "gies", "--data", str(data_path), *argv], capsys)
         assert code == 0
         types[bool(argv)] = [e["type"] for e in json.loads(out)["structure"]["edges"]]
@@ -390,7 +388,7 @@ def test_missing_input_error(capsys):
 
 
 def test_unexpected_input_error(capsys, csv_path):
-    argv = ["run", "pc", "--data", str(csv_path), "--domain-index", str(csv_path)]
+    argv = ["run", "pc", "--data", str(csv_path), "--env", str(csv_path)]
     code, _out, err = _run(argv, capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
 

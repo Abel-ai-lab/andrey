@@ -10,6 +10,19 @@ names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- These arguments have new names, so that one name, `env`, gives each row's environment in both
+  methods; the former ones still work in this release, in Python and on the command line, but give
+  an `andrey.DeprecatedArgumentWarning` that names the replacement, and they stop working in the
+  next release. The [upgrade guide](https://andrey.abel.ai/docs/guides/upgrading.html) shows the
+  calls before and after. ([#663])
+
+  | Method | Former name | Name now |
+  | --- | --- | --- |
+  | `cdnod` | `domain_index`, `--domain-index` | `env`, `--env` |
+  | `gies` | `interventions`, `--interventions`, or the 0/1 matrix as the second argument | `targets`, with `env` and `--env` on the command line |
+
 ### Added
 
 - `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
@@ -17,11 +30,18 @@ names its pull request.
   outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
   comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
   columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
+- `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
+  or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
+  environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
+  0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
+  for `gies` or text labels keep the same share of every environment's rows. ([#663])
 
 ### Changed
 
 - `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
+- `andrey --help --json` lists a data input's former names under `aliases` again, such as
+  `cdnod`'s `domain_index`. ([#663])
 
 ### Fixed
 
@@ -1653,3 +1673,4 @@ First alpha release.
 [#659]: https://github.com/Abel-ai-lab/andrey/pull/659
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
 [#662]: https://github.com/Abel-ai-lab/andrey/pull/662
+[#663]: https://github.com/Abel-ai-lab/andrey/pull/663

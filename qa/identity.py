@@ -117,7 +117,7 @@ FITS: dict[str, Fit] = {
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
     "GES": Fit(andrey.ges),
-    "GIES": Fit(lambda x: andrey.gies(*qg.unstack(x)), blocks=2),
+    "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
     "HC": Fit(andrey.hc),
     "Tabu": Fit(andrey.tabu),

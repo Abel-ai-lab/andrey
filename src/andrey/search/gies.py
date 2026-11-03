@@ -58,22 +58,22 @@ from andrey.search.hc import tie_ranks
 Excluded = set[tuple[int, int, frozenset[int]]]
 
 
-def intervention_mask(interventions: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
-    """Return ``interventions`` as a boolean ``(n_samples, n_variables)`` matrix, checked.
+def intervention_mask(targets: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
+    """Return the 0/1 matrix ``targets`` as a boolean ``(n_samples, n_variables)`` matrix, checked.
 
     Raises ``ValueError`` when the shape differs from ``data``'s, a value is neither 0 nor 1, or a
     variable has fewer than two rows without an intervention, or the same value in all of them.
     """
     try:
-        values = np.asarray(interventions, dtype=np.float64)
+        values = np.asarray(targets, dtype=np.float64)
     except (TypeError, ValueError) as error:
-        raise ValueError(f"interventions must hold 0/1 or booleans: {error}") from error
+        raise ValueError(f"gies: a targets matrix must hold 0/1 or booleans: {error}") from error
     if values.shape != data.shape:
         raise ValueError(
-            f"interventions must have the shape of data, {data.shape}, got {values.shape}"
+            f"gies: a targets matrix must have the shape of data, {data.shape}, got {values.shape}"
         )
     if not np.isin(values, (0.0, 1.0)).all():
-        raise ValueError("interventions must hold 0/1 or booleans")
+        raise ValueError("gies: a targets matrix must hold 0/1 or booleans")
     mask = values.astype(bool)
     for v in range(data.shape[1]):
         kept = data[~mask[:, v], v]

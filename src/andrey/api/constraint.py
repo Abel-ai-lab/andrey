@@ -1082,7 +1082,7 @@ def gfci(
 @method_spec("cdnod")
 def cdnod(
     data: npt.ArrayLike,
-    domain_index: npt.ArrayLike,
+    env: npt.ArrayLike | str,
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -1096,22 +1096,26 @@ def cdnod(
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
-    CDNOD [1]_ adds a domain/context index as an extra causal parent, so distribution shifts
-    across regimes are modeled, then runs PC-style discovery. It applies to samples pooled across
-    domains, regimes, or time blocks. The index is appended as a trailing pseudo-node and removed
-    from the result.
+    CDNOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
+    distribution shifts across environments are modeled, then runs PC-style discovery. It applies
+    to samples pooled across domains, regimes, or time blocks. The environment index is appended as
+    a trailing pseudo-node and removed from the result.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    domain_index : array-like of shape (n_samples,) or (n_samples, 1)
-        Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
-        the time step for data that drift over time. Coerced to ``float64``; whole numbers with
-        ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. See Notes for more than two
-        domains. When every row has the same value, the data come from one domain, and the result
-        equals :func:`~andrey.pc`'s.
+        become the structure's ``labels``. A column that ``env`` names is not a variable: it leaves
+        the data before the fit, and ``categorical``, ``knowledge``, and the result's positions
+        count the other columns.
+    env : array-like of shape (n_samples,) or (n_samples, 1), or str
+        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
+        or the time step for data that drift over time, or the name of a column of the DataFrame
+        ``data`` that holds them. Numbers are coerced to ``float64`` and read as numbers; whole
+        numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels
+        are coded ``0, 1, ...`` in sorted order, whatever the row order; a label is a string or a
+        number, not both. See Notes for more than two domains. When every row has the same value,
+        the data come from one domain, and the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
@@ -1174,7 +1178,7 @@ def cdnod(
         reads its unshielded triples as colliders or non-colliders. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
-        a directed cycle raises ``ValueError``. The domain index is unconstrained.
+        a directed cycle raises ``ValueError``. The environment index is unconstrained.
 
     Returns
     -------
@@ -1204,15 +1208,16 @@ def cdnod(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
-        ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
-        ``data`` has too few rows for a test, if ``data`` or ``categorical`` does not suit the test,
-        as for :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index``
-        holds a value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a
-        column of ``data``, or ``domain_index`` with more than one domain, repeats another up to
-        scale and shift, before any test runs; one message names every group of copies and says to
-        keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        message names the method, the argument, what it accepts, and the value. Also if ``env``
+        does not hold one value per row of ``data``, holds ``NaN`` / ``inf`` or a missing label,
+        mixes strings and numbers, or names a column ``data`` lacks; if ``data`` has too few rows
+        for a test, if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`, or, with a categorical or mixed-data test, if a numeric ``env`` holds a
+        value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a column of
+        ``data``, or ``env`` with more than one domain, repeats another up to scale and shift,
+        before any test runs; one message names every group of copies and says to keep one column
+        per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1224,8 +1229,8 @@ def cdnod(
     Notes
     -----
     **When to use.** CD-NOD suits data pooled from several domains or regimes, or data whose
-    distribution drifts over time, in which the causal mechanisms may change with
-    ``domain_index``, any unmeasured common cause is a function of that index, and every
+    distribution drifts over time, in which the causal mechanisms may change with ``env``, any
+    unmeasured common cause is a function of that index, and every
     independence follows from the graph with the index added (faithfulness) [1]_. Its default
     Fisher-Z test assumes continuous data with linear effects and Gaussian noise and detects only a
     change in a variable's mean that follows the index's values; ``"chisq"``, ``"gsq"``,
@@ -1238,7 +1243,9 @@ def cdnod(
 
     The index is added as a variable that can only be a cause. When a variable's distribution
     changes with the index, the edge from the index into it is directed, and Meek's rules can then
-    orient edges that PC leaves undirected on the same data.
+    orient edges that PC leaves undirected on the same data. CD-NOD needs only each row's
+    environment, not which variables changed in it; when every environment's intervened variables
+    are known, :func:`~andrey.gies` uses them.
 
     ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
     find a change in a variable's mean that follows the index's values. With two domains the coding
@@ -1278,7 +1285,7 @@ def cdnod(
     on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
     where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows. ``domain_index`` must be
+    other tests, or when a continuous column is constant on its rows. ``env`` must be
     complete, and ``dependence_threshold``, whose kernel measures read every row, raises
     ``ValueError`` on data with missing values. With missing values, the skeleton search runs in one
     process.
@@ -1338,15 +1345,26 @@ def cdnod(
     >>> import numpy as np
     >>> from andrey import cdnod
     >>> rng = np.random.default_rng(0)
-    >>> domain_index = np.repeat([0.0, 1.0], 300)
-    >>> x = 2.0 * domain_index + rng.standard_normal(600)
+    >>> env = np.repeat([0.0, 1.0], 300)
+    >>> x = 2.0 * env + rng.standard_normal(600)
     >>> y = x + 0.5 * rng.standard_normal(600)
-    >>> cdnod(np.column_stack([x, y]), domain_index).structure.oriented_edges()
+    >>> cdnod(np.column_stack([x, y]), env).structure.oriented_edges()
     [(0, 1, 'directed')]
+
+    The environments can be a column of a DataFrame, with labels of any kind:
+
+    >>> import pandas as pd
+    >>> data = pd.DataFrame({"x": x, "y": y, "site": np.repeat(["north", "south"], 300)})
+    >>> cdnod(data, "site").structure.oriented_edges()
+    [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
+    from andrey.core.environments import normalize_env_targets
 
+    data, codes, env_labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method="cdnod"
+    )
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -1360,9 +1378,11 @@ def cdnod(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
-    c = np.asarray(domain_index, dtype=np.float64)
+    # Numbers reach the search as given, such as a time step; text labels as their codes.
+    text = any(isinstance(label, str) for label in env_labels)
+    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
-        check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
+        check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     if dependence_threshold is not None and np.isnan(X).any():
         raise ValueError(
             "cdnod's dependence_threshold step compares kernel measures over every row, so it "
@@ -1374,7 +1394,7 @@ def cdnod(
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
     with (
-        copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
+        copies_named(labels, lambda j: "env" if j == d else column(j)),
         rows_tested() as rows,
     ):
         cpdag = _cdnod(

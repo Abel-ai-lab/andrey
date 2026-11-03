@@ -15,12 +15,28 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 ## Structure-learning methods
 
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
-exceptions: `cdnod` also takes a domain index, `gies` also takes which variables were intervened on
-in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes
-a list of datasets and returns one result per dataset. The first argument of every method is
-`data`; `andrey run` reads it from `--data`, which a method that takes a list of datasets needs
-once per dataset. Each method is either supported or experimental; `andrey list` prints the
-status.
+exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
+`targets`, the variables intervened on in each environment, `longitudinal_lingam` takes a list of
+datasets, and `multi_group_direct_lingam` takes a list of datasets and returns one result per
+dataset. The first argument of every method is `data`; `andrey run` reads it from `--data`, which a
+method that takes a list of datasets needs once per dataset. Each method is either supported or
+experimental; `andrey list` prints the status.
+
+`env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
+then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`
+takes `targets` as a mapping from each label of `env` to a list of its variables, by name or
+position, with `[]` for an observational environment; as the name of a column whose cells give
+each row's variables, from whose distinct values `env` follows when you leave it out; or as a 0/1
+matrix shaped like `data`. Every environment needs its targets, so `env` without `targets`, an
+environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
+`ValueError`. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
+`targets` in `--config`; a key such as `"0"` names the number label `0` of `--env`.
+
+```python
+out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
+out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
+out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
+```
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
 outside its range or not one of its choices raises `ValueError`, each with a message that names the
@@ -87,7 +103,7 @@ observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows
 column with no observed value, or a constant one over its observed values, raises a `ValueError`
 before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
 `"student_t"` and 2 for the other tests, raises one during it. `cdnod` needs a complete
-`domain_index`. Every other method raises a `ValueError` that names it and says what to do instead,
+`env`. Every other method raises a `ValueError` that names it and says what to do instead,
 as [Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say
 why.
 
@@ -511,8 +527,11 @@ as `"pc"`, or the method itself, and the method's own arguments. Each resample i
 default: `sample_fraction` (0.5) of the rows, drawn without replacement. `resampling="bootstrap"`
 draws as many rows as `data` has, with replacement, instead. The generator depends on `seed` and the
 resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run
-begins with the shorter run's fits. A method that takes a row-aligned input (`cdnod`'s
-`domain_index`, `gies`'s `interventions`) resamples it with the rows; `multi_group_direct_lingam`
+begins with the shorter run's fits. A method that takes a row-aligned input (`env`, or `gies`'s
+`targets` as a 0/1 matrix) resamples it with the rows, and a column that `env` or `targets` names
+travels with its rows. When `env` holds text labels, or for `gies`, each resample takes the same
+share of every environment's rows, at least one, so no resample drops an environment; `cdnod`'s
+numeric index, such as a time step, resamples the rows as a whole. `multi_group_direct_lingam`
 resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
 resamples the units, the same rows of every dataset. A time-series method on one series subsamples
 one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
