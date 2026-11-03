@@ -848,10 +848,11 @@ def ut_igsp(
     variables and on categorical data), one core per fit, against the paper's reference
     implementation at its defaults, ``alpha=1e-5`` [1]_. In the authors' setting every fit finished,
     and in all 56 groups its SHD was below the empty graph's 15 and, where the given targets missed
-    some, its target errors were below those of the given targets alone. Its lead there comes from
-    the default level: run at the same level with 10 starts, the reference implementation tied it in
-    107 of the 112 comparisons, and at ``alpha=1e-5`` with 5 starts it was worse in none and better
-    in none. Outside the authors' setting, at the default level: with 100 rows per setting its SHD
+    some, its target errors were below those of the given targets alone. Its lead there comes mostly
+    from the default level: run at the same level with 10 starts, the reference implementation tied
+    it in 107 of the 112 comparisons, and in the other 5, all with weight changes, its errors stayed
+    lower on one set of datasets; at ``alpha=1e-5`` with 5 starts it was worse in none and better in
+    none. Outside the authors' setting, at the default level: with 100 rows per setting its SHD
     was 8.35 against the reference implementation's 12.95 and the empty graph's 15, but with no
     unknown targets it named more false targets, 1.50 per dataset against 0.25; on a denser graph,
     50 variables at mean degree 5 with 3 settings, neither beat the empty graph, its SHD 130.2 and

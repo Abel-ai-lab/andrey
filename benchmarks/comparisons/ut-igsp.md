@@ -143,9 +143,9 @@ to 19 and tied on the rerun, and the other 78 tie. At the paper's level, Andrey 
 and better in none: 5 comparisons were higher on seeds 0 to 19 and tied on the rerun, 3 were lower
 and had no rerun, and the other 104 tie.
 
-The 18 come from the level, not from the search. Run at Andrey's defaults, alpha one over the
-observational rows and 10 runs, the library ties Andrey in 107 of the 112 comparisons; Andrey's
-errors were lower in the other 5, all with weight changes (G6), on seeds 0 to 19 only.
+The 18 come mostly from the level. Run at Andrey's defaults, alpha one over the observational
+rows and 10 runs, the library ties Andrey in 107 of the 112 comparisons; in the other 5, all with
+weight changes (G6), Andrey's errors stayed lower, on seeds 0 to 19 only.
 
 At Andrey's defaults, means over the 20 datasets of each cell, seeds 0 to 19. D is Andrey's error
 minus the library's, with its 95% interval. The empty graph's SHD is 15 in every cell.
@@ -275,11 +275,12 @@ At the paper's level, alpha `1e-5` and 5 starts, against the same library fits:
 Every comparison whose interval lay above or below 0 on seeds 0 to 19, with its interval on fresh
 seeds. The 11 cells with a comparison above 0 in the first comparison (see [Choosing the
 defaults](#choosing-the-defaults)) reran on seeds 2000 to 2019; they hold every comparison above 0
-here. At Andrey's defaults the fresh seeds are otherwise 4000 to 4019, where the same settings ran
-on an earlier build of the same search in the run that chose the default (see [Choosing the
-defaults](#choosing-the-defaults)). The 3 comparisons at the paper's level that were lower on
-seeds 0 to 19 (G3 `perfect_code` l 3 SHD, G6 `weight` l 3 target error at 1,000 and 5,000 rows)
-are in cells that did not rerun.
+here. At Andrey's defaults every comparison also has seeds 4000 to 4019, where the same settings
+ran on an earlier build of the same search in the run that chose the default; a comparison with
+both shows both. One of the 18 better comparisons, G2 `perfect` l 1 SHD, was lower on seeds 2000
+to 2019 and tied on 4000 to 4019. The 3 comparisons at the paper's level that were lower on seeds
+0 to 19 (G3 `perfect_code` l 3 SHD, and G6 `weight` l 3 target error at 1,000 and 5,000 rows) are
+in cells that did not rerun.
 
 | Settings | Cell | Error | D, seeds 0-19 | D, fresh seeds | Fresh seeds | Result |
 |---|---|---|---|---|---|---|
@@ -290,9 +291,9 @@ are in cells that did not rerun.
 | defaults | G1 `shift`, l 2, n 1,000 | target error | -0.87 [-1.80, -0.15] | -0.13 [-0.53, +0.24] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G1 `shift`, l 3, n 1,000 | SHD | -1.04 [-1.79, -0.40] | -0.27 [-0.68, +0.13] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G1 `shift`, l 3, n 1,000 | target error | -0.94 [-1.65, -0.35] | +0.04 [-0.56, +0.66] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G1 `shift`, l 3, n 3,000 | target error | +0.21 [+0.01, +0.45] | -0.15 [-0.53, +0.15] | 2000-2019 | higher on seeds 0-19 only |
+| defaults | G1 `shift`, l 3, n 3,000 | target error | +0.21 [+0.01, +0.45] | -0.15 [-0.53, +0.15]; +0.16 [0.00, +0.40] | 2000-2019; 4000-4019 | higher on seeds 0-19 only |
 | defaults | G2 `perfect`, l 0, n 1,000 | SHD | -0.94 [-1.57, -0.37] | -0.27 [-0.78, +0.23] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G2 `perfect`, l 1, n 1,000 | SHD | -0.79 [-1.35, -0.30] | -0.90 [-1.71, -0.10] | 2000-2019 | better |
+| defaults | G2 `perfect`, l 1, n 1,000 | SHD | -0.79 [-1.35, -0.30] | -0.90 [-1.71, -0.10]; -0.40 [-0.90, +0.07] | 2000-2019; 4000-4019 | better |
 | defaults | G2 `perfect`, l 2, n 1,000 | SHD | -0.98 [-1.71, -0.39] | -0.66 [-1.21, -0.18] | 4000-4019 | better |
 | defaults | G2 `perfect`, l 2, n 1,000 | target error | -0.82 [-1.65, -0.16] | +0.04 [-0.26, +0.36] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G2 `perfect`, l 3, n 1,000 | SHD | -0.70 [-1.16, -0.33] | -0.40 [-0.76, -0.08] | 4000-4019 | better |
