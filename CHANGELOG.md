@@ -139,6 +139,8 @@ names its pull request.
 - The reference-parity gate reports a published row marked `claim: "out"`, a setting measured
   outside the method's claim, with its numbers and does not fail it; a row without the field is
   judged as before. ([#631])
+- `andrey --help --json` lists a data input's former names under `aliases` again, such as
+  `cdnod`'s `domain_index`.
 
 ### Fixed
 
