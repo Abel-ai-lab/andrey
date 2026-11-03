@@ -33,13 +33,23 @@ import numpy as np
 from andrey.constraint._skeleton import _CHUNK, adjacent_pairs, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.ci import CITest
+from andrey.core.ci_missing import TestwiseDeletion
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.search._parallel import _KEY_DP
 
+# The sets of one size a collider test asks first; each later chunk is twice as large.
+_FIRST_CHUNK = 32
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
 # stronger dependence.
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
+
+
+def _tests_every_set(test: CITest) -> bool:
+    """Whether the searches test every set they reach without stopping early: a test that deletes
+    rows per test, on data with missing values, counts each test's rows, which the fit's
+    ``metadata["rows_tested"]`` summarizes."""
+    return isinstance(test, TestwiseDeletion)
 
 
 def _dependence(test: CITest) -> _Dependence:
@@ -254,11 +264,14 @@ def parents_children(
     add the candidate whose weakest association is the strongest, until every candidate has a
     conditioning set with a p-value above ``alpha``; such a candidate is dropped for good, since
     adding members only weakens an association. Each addition tests every remaining candidate
-    against the conditioning sets that hold the new member. Backward: visit the members in the
+    against the conditioning sets that hold the new member, by increasing size, and stops testing
+    a candidate after the first size at which a set separates it. Backward: visit the members in the
     order they joined and drop each one some subset of the other current members separates; the
     subsets of the members that joined before it were tested in the forward phase. With
     ``max_depth``, both phases test only the conditioning sets of at most ``max_depth`` variables;
-    the set itself may grow larger. Returns the members in the order they joined.
+    the set itself may grow larger. A test that deletes rows per test keeps testing a separated
+    candidate at every size (:func:`_tests_every_set`). Returns the members in the order they
+    joined.
 
     With ``constraints``, each variable a required edge joins to ``target`` is a member from the
     start, in rank order, and neither phase tests it; a pair they make non-adjacent is never a
@@ -268,6 +281,7 @@ def parents_children(
     only when ``target`` is in ``x``'s.
     """
     required = _required(constraints, target, ranks)
+    every = _tests_every_set(test)
     allowed = None if constraints is None else constraints.support()[target]
     others = [
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
@@ -276,18 +290,17 @@ def parents_children(
     members: list[int] = []
 
     def admit(new: int, pool: dict[int, tuple[float, float]]) -> None:
-        """Weaken each association in ``pool`` by the conditioning sets that hold ``new``, then
-        add ``new`` to the members."""
+        """Weaken each association in ``pool`` by the conditioning sets that hold ``new``, size by
+        size, then add ``new`` to the members. A candidate separated at one size is not tested at
+        the next: it leaves the pool, and only the candidates that stay are ranked."""
         top = len(members) if max_depth is None else min(len(members), max_depth - 1)
-        conds = [
-            tuple(sorted((*rest, new)))
-            for size in range(top + 1)
-            for rest in combinations(members, size)
-        ]
         xs = list(pool)
-        if conds:  # none when max_depth is 0
+        for size in range(top + 1):  # none when max_depth is 0
+            conds = [tuple(sorted((*rest, new))) for rest in combinations(members, size)]
             for x, (p, strength) in zip(xs, _weakest(test, target, xs, conds), strict=True):
                 pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
+            if not every:
+                xs = [x for x in xs if pool[x][0] <= alpha]
         members.append(new)
 
     for new in required:
@@ -437,18 +450,24 @@ def blanket_colliders(
     such set separates them. Every conditioning set holds ``b``, so with ``max_depth`` the subsets
     hold at most ``max_depth - 1`` members, and with ``max_depth=0`` no set can be tested and the
     triple is ambiguous. The sets are tested by increasing size, and a non-collider stops at the
-    first size that separates. The sets of one size are generated and tested in chunks, so the
-    memory a triple takes does not grow with the number of its subsets.
+    chunk that holds its first separating set: the sets of one size are generated and tested in
+    chunks of ``_FIRST_CHUNK`` sets, then twice as many each time, at most ``_CHUNK``. A size of
+    at most ``_FIRST_CHUNK`` sets takes one call, a larger one skips the chunks after the one that
+    holds the first separating set, and the memory a triple takes does not grow with the number of
+    its subsets. A test that deletes rows per test tests every set of each size, in chunks of
+    ``_CHUNK`` (:func:`_tests_every_set`).
 
     Returns the separating sets :func:`~andrey.constraint.pc._orient_colliders` reads, keyed
     ``(a, c)`` and holding the pair's non-collider middle nodes; each decided triple's rank, the
     weakest association over its tests (:func:`_weakest`: the smallest absolute partial correlation
     for a test that reports one, else the negated largest p-value), so the most clearly dependent
-    collider comes first; and the ambiguous triples, keyed ``(a, b, c)``.
+    collider comes first; and the ambiguous triples, keyed ``(a, b, c)``. A collider's rank covers
+    every set; a non-collider's covers the sets it tested, and orients nothing.
     """
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     strengths: dict[tuple[int, int, int], float] = {}
     ambiguous: set[tuple[int, int, int]] = set()
+    every = _tests_every_set(test)
     for b in range(skeleton.shape[0]):
         for a, c in combinations(np.flatnonzero(skeleton[b]).tolist(), 2):
             if skeleton[a, c]:
@@ -464,9 +483,11 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 conds = _collider_sets(sides, size, b)
-                while chunk := list(islice(conds, _CHUNK)):
+                width = _CHUNK if every else min(_FIRST_CHUNK, _CHUNK)
+                while (every or p <= alpha) and (chunk := list(islice(conds, width))):
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
                     p, strength = max(p, p_chunk), min(strength, strength_chunk)
+                    width = min(2 * width, _CHUNK)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break

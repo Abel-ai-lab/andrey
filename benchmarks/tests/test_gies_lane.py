@@ -34,7 +34,7 @@ def _xy_with_y_intervened() -> np.ndarray:
 
 
 def test_the_generating_dags_point_to_earlier_and_later_columns():
-    """The causal order is drawn, not the column order, so the lane takes no shuffle step."""
+    """The columns come in an order drawn from the seed, not in the causal order."""
     forward = backward = 0
     for seed in range(3):
         _, _, dag = gies_cpu.sample(10, seed, rows_per_variable=10, target_share=0.2)

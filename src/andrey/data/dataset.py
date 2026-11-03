@@ -97,6 +97,13 @@ class CausalDataset:
         Regeneration record: root entropy, per-component seed layout, SCM config, package versions.
     params : SCMParams
         The drawn structural coefficients and noise scales.
+    env : np.ndarray of shape (n,) or None, default=None
+        The environment of each row, ``0`` to ``K - 1``, its rows together in that order, when the
+        data were drawn under interventions; ``None`` otherwise.
+    targets : dict of int to list of int, or None, default=None
+        Each environment's intervened columns, after the column shuffle: ``{0: [], 1: [3]}`` when
+        environment 0 has no intervention and environment 1 intervenes on column 3. ``None`` when
+        ``env`` is ``None``.
 
     Notes
     -----
@@ -109,6 +116,8 @@ class CausalDataset:
     report: QAReport
     provenance: dict
     params: SCMParams
+    env: np.ndarray | None = None
+    targets: dict[int, list[int]] | None = None
 
     @property
     def observed_graph(self) -> GraphStructure:

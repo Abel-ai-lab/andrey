@@ -37,8 +37,9 @@ def report(data: np.ndarray, edges: np.ndarray, d: int, *, scale: str = "raw") -
     Returns
     -------
     QAReport
-        ``varsortability`` (edge-only, scalable), ``r2sortability`` (or ``nan`` when ``n <= d`` or
-        ``d`` is large), and the ``scale`` label.
+        ``varsortability`` (edge-only, scalable), ``r2sortability`` (or ``nan`` when ``n <= d``,
+        ``d`` is large, or a column is constant, as one set by an intervention), and the ``scale``
+        label.
     """
     x = np.asarray(data, dtype=np.float64)
     n = x.shape[0]
@@ -47,7 +48,7 @@ def report(data: np.ndarray, edges: np.ndarray, d: int, *, scale: str = "raw") -
     # by factors, far above this.
     vs = varsortability_edges(x, edges, tol=1e-5)
     r2 = float("nan")
-    if d <= _R2_D_MAX and n > d:
+    if d <= _R2_D_MAX and n > d and np.all(x.std(axis=0) > 0):
         r2 = r2sortability(x, directed_adjacency(edges, d))
     return QAReport(varsortability=vs, r2sortability=r2, scale=scale)
 

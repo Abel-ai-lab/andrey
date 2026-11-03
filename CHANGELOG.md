@@ -25,6 +25,11 @@ names its pull request.
 
 ### Added
 
+- `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
+  interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
+  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
+  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
+  columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
 - `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
@@ -40,8 +45,17 @@ names its pull request.
 
 ### Changed
 
+- `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
+  data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
+
+### Fixed
+
+- Copies of one column in other units, such as `x` and `2 * x + 1`, and categorical columns that
+  group the rows alike under other labels break ties by column position, as identical columns do,
+  so adding a constant to a copy or relabeling its categories no longer changes which column a tie
+  goes to. ([#660])
 
 ## [0.13.0] - 2026-11-03
 
@@ -1663,4 +1677,7 @@ First alpha release.
 [#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
+[#659]: https://github.com/Abel-ai-lab/andrey/pull/659
+[#660]: https://github.com/Abel-ai-lab/andrey/pull/660
+[#662]: https://github.com/Abel-ai-lab/andrey/pull/662
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
