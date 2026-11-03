@@ -30,9 +30,9 @@ its column, so reordering the columns relabels the result and changes nothing el
 arbitrary with respect to the causal structure.
 
 Some columns are ones the data cannot tell apart in any row order, unit, or sign: a copy of another
-column in other units or the other sign, or two columns whose rows also appear with the two
-swapped. These rank by their values in row order instead, so for them a row shuffle can change
-which ranks first, while reordering the columns still relabels the result.
+column in the other sign, or two columns whose rows also appear with the two swapped. These rank by
+their values in row order instead, so for them a row shuffle can change which ranks first, while
+reordering the columns still relabels the result.
 
 Scores are compared at a fixed precision, so candidates whose scores differ only in their last
 bits count as tied and go to the rank.
@@ -61,11 +61,12 @@ when the fits split evenly between the two directions of an edge, the columns' r
 their positions under `tie_break="position"`. A CPDAG or a PAG needs no rank, as every order of the
 tie gives the same graph.
 
-Identical columns are the exception for every method: they rank the same, so position decides which
-comes first, and the graph is the same up to swapping them. The score-based searches with the BIC
-score, and `pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy
-another up to scale and shift, with a `ValueError` that names each group of copies; the LiNGAM
-causal-order search keeps one column per group and places the other copies right after it.
+Identical columns, copies of a column in other units, and categorical columns that group the rows
+alike are the exception for every method: they rank the same, so position decides which comes first,
+and the graph is the same up to swapping them. The score-based searches with the BIC score, and
+`pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy another up to
+scale and shift, with a `ValueError` that names each group of copies; the LiNGAM causal-order search
+keeps one column per group and places the other copies right after it.
 
 ## Across machines
 

@@ -6,17 +6,25 @@ bit for bit, the blankets of the Fisher-Z IAMB that CALM's moral graph is built 
 
 from __future__ import annotations
 
+from itertools import combinations
+
 import numpy as np
 import pytest
 
 from andrey import GraphStructure, data
+from andrey.constraint import blanket
+from andrey.constraint._skeleton import scan_conditioning_sets
 from andrey.constraint.blanket import (
+    blanket_colliders,
     blanket_graph,
     markov_blanket,
+    mmpc_sets,
     mmpc_skeleton,
     parents_children,
+    reach,
 )
-from andrey.core.ci import FisherZ
+from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
+from andrey.core.ci_missing import rows_tested
 from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.hc import tie_ranks
@@ -114,3 +122,118 @@ def test_independent_columns_have_empty_sets():
     ranks = tie_ranks(x).tolist()
     assert not blanket_graph(test, 6, 0.01, ranks).any()
     assert not mmpc_skeleton(test, 6, 0.01, ranks).any()
+
+
+def _colliders_on_every_set(test, skeleton, blankets, alpha):
+    """Each unshielded triple tested on every set of each size, by increasing size, up to the first
+    size with a separating set: the separating sets and the collider ranks."""
+    sepsets, ranks = {}, {}
+    for b in range(skeleton.shape[0]):
+        for a, c in combinations(np.flatnonzero(skeleton[b]).tolist(), 2):
+            if skeleton[a, c]:
+                continue
+            sepsets.setdefault((a, c), ())
+            sides = blanket._smaller(blankets, a, c, (b,))
+            p, strength = -np.inf, np.inf
+            for size in range(max(len(side) for side in sides) + 1):
+                sets = list(blanket._collider_sets(sides, size, b))
+                [(p_size, strength_size)] = blanket._weakest(test, a, [c], sets)
+                p, strength = max(p, p_size), min(strength, strength_size)
+                if p > alpha:
+                    sepsets[a, c] = (*sepsets[a, c], b)
+                    break
+            else:
+                ranks[a, b, c] = strength
+    return sepsets, ranks
+
+
+def _search_data(kind):
+    """Data and a test of 15 variables: Gaussian with Fisher-z, discrete with the chi-square
+    test, and discrete with a twentieth of the values missing, whose test deletes rows per test."""
+    if kind == "fisherz":
+        x = data.sample_scm(graph="erdos_renyi", d=15, n=1000, seed=2, density=4.0).data
+        return x, FisherZ(x)
+    x = data.sample_discrete(d=15, n=3000, seed=2, density=4.0).data
+    if kind == "chisq":
+        return x, ChiSquare(x)
+    x = x.copy()
+    x[np.random.default_rng(0).random(x.shape) < 0.05] = np.nan
+    return x, make_indep_test("chisq", x)
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq", "missing"])
+@pytest.mark.parametrize(("first", "chunk"), [(1, 4096), (1, 2), (4, 8)])
+def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, first, chunk):
+    """Every triple is decided, and every collider ranked, as testing every set of each size up to
+    the first size that separates decides and ranks it, with fewer sets tested; a test that
+    deletes rows per test tests the same sets, so the rows it reports are the same."""
+    monkeypatch.setattr(blanket, "_FIRST_CHUNK", first)
+    monkeypatch.setattr(blanket, "_CHUNK", chunk)
+    x, test = _search_data(kind)
+    sets = mmpc_sets(test, 15, 0.05, tie_ranks(x).tolist())
+    skeleton, blankets = sets & sets.T, reach(sets)
+    tested = []
+    weakest = blanket._weakest
+
+    def counted(test, target, xs, conds):
+        tested.append(len(conds))
+        return weakest(test, target, xs, conds)
+
+    monkeypatch.setattr(blanket, "_weakest", counted)
+    with rows_tested() as rows:
+        sepsets, ranks, ambiguous = blanket_colliders(test, skeleton, blankets, 0.05)
+    found = sum(tested)
+    tested.clear()
+    with rows_tested() as want_rows:
+        want_sepsets, want_ranks = _colliders_on_every_set(test, skeleton, blankets, 0.05)
+    assert sepsets == want_sepsets
+    assert {t: ranks[t] for t in want_ranks} == want_ranks
+    assert not ambiguous
+    assert rows == want_rows
+    assert found == sum(tested) if kind == "missing" else found < sum(tested)
+
+
+def _mmpc_on_every_set(test, target, d, alpha, ranks):
+    """MMPC with every remaining candidate tested against every set at each addition, then the
+    backward phase of :func:`parents_children`."""
+    weakest = {x: blanket._weakest(test, target, [x], [()])[0] for x in range(d) if x != target}
+    members: list[int] = []
+    while open_ := {x: w for x, w in weakest.items() if w[0] <= alpha}:
+        best = min(
+            open_,
+            key=lambda x: (round(open_[x][0], _KEY_DP), -round(open_[x][1], _KEY_DP), ranks[x]),
+        )
+        del open_[best]
+        conds = [
+            tuple(sorted((*rest, best)))
+            for size in range(len(members) + 1)
+            for rest in combinations(members, size)
+        ]
+        for x, (p, strength) in open_.items():
+            [(p_x, strength_x)] = blanket._weakest(test, target, [x], conds)
+            open_[x] = (max(p, p_x), min(strength, strength_x))
+        members.append(best)
+        weakest = open_
+    for x in list(members):
+        before = set(members[: members.index(x)])
+        rest = sorted(z for z in members if z != x)
+        for size in range(1, len(rest) + 1):
+            if scan_conditioning_sets(test, target, x, rest, size, alpha, set(), before):
+                members.remove(x)
+                break
+    return members
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq", "missing"])
+def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
+    """Each variable's MMPC set, in joining order, is the one found by testing every remaining
+    candidate against every set at each addition; a test that deletes rows per test tests the
+    same sets, so the rows it reports are the same."""
+    x, test = _search_data(kind)
+    ranks = tie_ranks(x).tolist()
+    for target in range(15):
+        with rows_tested() as want_rows:
+            want = _mmpc_on_every_set(test, target, 15, 0.05, ranks)
+        with rows_tested() as rows:
+            assert parents_children(test, target, 15, 0.05, ranks) == want, target
+        assert rows == want_rows, target

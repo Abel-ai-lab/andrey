@@ -174,10 +174,10 @@ def _fast_path_data(case: str) -> np.ndarray:
 def test_every_fast_path_returns_the_scalar_p_values(
     monkeypatch, g_square, case, batch, rows, table
 ):
-    """The batched, first-order, and all-pairs marginal paths equal the scalar call bit for bit:
-    whatever the argument order, with every table in one count or one count per set and the
-    marginal tables in one Gram block or several, and with tables over the size limit on the
-    scalar path."""
+    """The batched, first-order, and all-pairs marginal paths equal the scalar call bit for bit,
+    and so do the statistics of one pair's queries over many sets: whatever the argument order,
+    with every table in one count or one count per set and the marginal tables in one Gram block
+    or several, and with tables over the size limit on the scalar path."""
     from andrey.core import ci
 
     monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
@@ -193,6 +193,12 @@ def test_every_fast_path_returns_the_scalar_p_values(
         sets = [s[::-1] for size in range(4) for s in combinations(others, size)][::-1]
         assert test.batched_call(b, a, sets) == [test(a, b, s) for s in sets]
         assert test.first_order_pvalues(b, a, others).tolist() == [test(a, b, (c,)) for c in others]
+        for size in range(4):
+            same = np.array([s for s in sets if len(s) == size], dtype=np.intp)
+            same = same.reshape(len(same), size)
+            got = test.statistic_pvalues(np.full(len(same), b), np.full(len(same), a), same)
+            want = np.array([test._statistic_pvalue(a, b, s) for s in same.tolist()]).T
+            assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))
 
 
 def _dense_tables(data: np.ndarray, x: int, y: int, conds: list[tuple[int, ...]], g_square: bool):
@@ -425,16 +431,18 @@ def test_make_score_builds_bdeu_with_the_equivalent_sample_size():
 
 def test_configurations_number_the_observed_rows_in_code_order():
     """Many high-cardinality columns overflow a plain mixed-radix code; the configurations that
-    occur are still numbered 0..m-1 in lexicographic order, at most one per row."""
+    occur are still numbered 0..m-1 in lexicographic order, at most one per row, whether the codes
+    are read row-major or from a column-contiguous int32 copy."""
     rng = np.random.default_rng(0)
     x = rng.integers(0, 50, (1000, 12)).astype(np.float64)
     x[:500, :6] = 0.0  # repeated rows, so some configurations occur more than once
     codes, cards = categorical.encode(x)
     columns = list(range(12))
-    index, m = categorical.configurations(codes, cards, columns)
     _, expected = np.unique(codes[:, columns], axis=0, return_inverse=True)
-    assert m == expected.max() + 1 <= len(x)
-    assert np.array_equal(index, expected.reshape(-1))
+    for view in (codes, codes.T.astype(np.int32, order="C").T):
+        index, m = categorical.configurations(view, cards, columns)
+        assert m == expected.max() + 1 <= len(x)
+        assert index.dtype == np.int64 and np.array_equal(index, expected.reshape(-1))
 
 
 def test_no_columns_is_one_configuration():
@@ -647,9 +655,10 @@ def test_a_true_independence_is_rejected_at_the_level_it_is_tested_at(g_square, 
 def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square, batch, table):
     """``pvalues_given`` and the queries of ``statistic_pvalues`` that share a conditioning set
     return the statistic and p-value of each candidate's own call, bit for bit, on random discrete
-    data with few rows, one-category columns, and any order of candidates and conditioners. A
-    candidate's own call evaluates every cell mean; the scan reads the small ones from the table
-    and evaluates the blocks of a scan together or, with a small batch, one at a time."""
+    data with few rows, one-category columns, and any order of candidates and conditioners, and
+    so do the same queries asked again of the same test. A candidate's own call evaluates every
+    cell mean; the scan reads the small ones from the table and evaluates the blocks of a scan
+    together or, with a small batch, one at a time."""
     from andrey.core import ci
 
     monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
@@ -666,14 +675,17 @@ def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square,
         xs = rest[len(cond) :].tolist()
         with monkeypatch.context() as direct:
             direct.setattr(ci, "_MEANS_N", 0)  # no cell mean comes from the table
-            alone = [test._statistic_pvalue(target, v, cond) for v in xs]
+            alone_test = ChiSquare(x, g_square=g_square)
+            alone = [alone_test._statistic_pvalue(target, v, cond) for v in xs]
         p = test.pvalues_given(target, xs, cond)
         assert p.view(np.int64).tolist() == np.array([a[1] for a in alone]).view(np.int64).tolist()
         shuffled = [int(i) for i in rng.permutation(len(xs))]
-        got = test.statistic_pvalues(
+        queries = (
             np.array([target] * len(xs))[shuffled],
             np.array(xs)[shuffled],
             np.array([cond] * len(xs)).reshape(len(xs), -1)[shuffled],
         )
         want = np.array(alone)[shuffled].T
-        assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))
+        for asked in (ChiSquare(x, g_square=g_square), test):
+            got = asked.statistic_pvalues(*queries)
+            assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))
