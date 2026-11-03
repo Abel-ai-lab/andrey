@@ -174,10 +174,10 @@ def _fast_path_data(case: str) -> np.ndarray:
 def test_every_fast_path_returns_the_scalar_p_values(
     monkeypatch, g_square, case, batch, rows, table
 ):
-    """The batched, first-order, and all-pairs marginal paths equal the scalar call bit for bit:
-    whatever the argument order, with every table in one count or one count per set and the
-    marginal tables in one Gram block or several, and with tables over the size limit on the
-    scalar path."""
+    """The batched, first-order, and all-pairs marginal paths equal the scalar call bit for bit,
+    and so do the statistics of one pair's queries over many sets: whatever the argument order,
+    with every table in one count or one count per set and the marginal tables in one Gram block
+    or several, and with tables over the size limit on the scalar path."""
     from andrey.core import ci
 
     monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
@@ -193,6 +193,12 @@ def test_every_fast_path_returns_the_scalar_p_values(
         sets = [s[::-1] for size in range(4) for s in combinations(others, size)][::-1]
         assert test.batched_call(b, a, sets) == [test(a, b, s) for s in sets]
         assert test.first_order_pvalues(b, a, others).tolist() == [test(a, b, (c,)) for c in others]
+        for size in range(4):
+            same = np.array([s for s in sets if len(s) == size], dtype=np.intp)
+            same = same.reshape(len(same), size)
+            got = test.statistic_pvalues(np.full(len(same), b), np.full(len(same), a), same)
+            want = np.array([test._statistic_pvalue(a, b, s) for s in same.tolist()]).T
+            assert np.array_equal(np.array(got).view(np.int64), want.view(np.int64))
 
 
 def _dense_tables(data: np.ndarray, x: int, y: int, conds: list[tuple[int, ...]], g_square: bool):
