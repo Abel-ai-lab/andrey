@@ -771,11 +771,11 @@ def ut_igsp(
     environment, or with environments that differ in ways that are not interventions, use
     :func:`~andrey.cdnod`.
 
-    **Choosing alpha and n_starts.** The defaults come from simulated data in the authors'
-    setting, with 20 variables at mean degree 1.5, linear effects, Gaussian noise, and 5 settings
-    that shift each target's mean or intervene perfectly on it, with 0 or 3 unknown targets each:
-    15 groups of 20 datasets at 300 to 5,000 rows per setting, one at 50 variables, 5 seeds per
-    dataset. A group counts as better or worse when the 95% bootstrap interval of the mean
+    **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' setting,
+    with 20 variables at mean degree 1.5, linear effects, Gaussian noise, and 5 settings that shift
+    each target's mean or intervene perfectly on it, with 0 or 3 unknown targets each: 15 groups of
+    datasets at 300 to 5,000 rows per setting, 20 datasets each and 10 in the one at 50 variables, 5
+    seeds per dataset. A group counts as better or worse when the 95% bootstrap interval of the mean
     difference in SHD, paired by dataset, lies wholly below or above 0. Against the authors' level,
     ``alpha=1e-5`` [1]_, ``alpha=0.001`` was better in 7 groups and worse in 2, by about 0.3 edges
     at 3,000 rows per setting without unknown targets, and ``alpha=0.01`` was worse in 10; at 1,000
