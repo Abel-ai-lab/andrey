@@ -144,6 +144,12 @@ names its pull request.
   zero-mean series (Hyvarinen et al. 2010). On the identity check's 239 draws only the 6 of
   `varma_lingam` changed: 2 in their graph, with 1 and 2 fewer errors against the true graph, and 4
   in their weights; every other method is bit-identical. ([#629])
+- Copies of one column in other units, such as `x` and `2 * x + 1`, and categorical columns that
+  group the rows alike under other labels break ties by column position, as identical columns do.
+  Their tie-break rank came from their raw values, so adding a constant to a copy or relabeling its
+  categories could change which of them a tie went to. Columns that differ only in their values
+  rank by their standardized values in row order. Every output of the identity check is
+  bit-identical.
 
 ## [0.12.0] - 2026-10-30
 
