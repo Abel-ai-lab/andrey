@@ -33,6 +33,7 @@ import numpy as np
 from andrey.constraint._skeleton import _CHUNK, adjacent_pairs, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.ci import CITest
+from andrey.core.ci_missing import TestwiseDeletion
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.search._parallel import _KEY_DP
@@ -42,6 +43,13 @@ _FIRST_CHUNK = 32
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
 # stronger dependence.
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
+
+
+def _tests_every_set(test: CITest) -> bool:
+    """Whether the searches test every set they reach without stopping early: a test that deletes
+    rows per test, on data with missing values, counts each test's rows, which the fit's
+    ``metadata["rows_tested"]`` summarizes."""
+    return isinstance(test, TestwiseDeletion)
 
 
 def _dependence(test: CITest) -> _Dependence:
@@ -261,7 +269,9 @@ def parents_children(
     order they joined and drop each one some subset of the other current members separates; the
     subsets of the members that joined before it were tested in the forward phase. With
     ``max_depth``, both phases test only the conditioning sets of at most ``max_depth`` variables;
-    the set itself may grow larger. Returns the members in the order they joined.
+    the set itself may grow larger. A test that deletes rows per test keeps testing a separated
+    candidate at every size (:func:`_tests_every_set`). Returns the members in the order they
+    joined.
 
     With ``constraints``, each variable a required edge joins to ``target`` is a member from the
     start, in rank order, and neither phase tests it; a pair they make non-adjacent is never a
@@ -271,6 +281,7 @@ def parents_children(
     only when ``target`` is in ``x``'s.
     """
     required = _required(constraints, target, ranks)
+    every = _tests_every_set(test)
     allowed = None if constraints is None else constraints.support()[target]
     others = [
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
@@ -288,7 +299,8 @@ def parents_children(
             conds = [tuple(sorted((*rest, new))) for rest in combinations(members, size)]
             for x, (p, strength) in zip(xs, _weakest(test, target, xs, conds), strict=True):
                 pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
-            xs = [x for x in xs if pool[x][0] <= alpha]
+            if not every:
+                xs = [x for x in xs if pool[x][0] <= alpha]
         members.append(new)
 
     for new in required:
@@ -442,7 +454,8 @@ def blanket_colliders(
     chunks of ``_FIRST_CHUNK`` sets, then twice as many each time, at most ``_CHUNK``. A size of
     at most ``_FIRST_CHUNK`` sets takes one call, a larger one skips the chunks after the one that
     holds the first separating set, and the memory a triple takes does not grow with the number of
-    its subsets.
+    its subsets. A test that deletes rows per test tests every set of each size, in chunks of
+    ``_CHUNK`` (:func:`_tests_every_set`).
 
     Returns the separating sets :func:`~andrey.constraint.pc._orient_colliders` reads, keyed
     ``(a, c)`` and holding the pair's non-collider middle nodes; each decided triple's rank, the
@@ -454,6 +467,7 @@ def blanket_colliders(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     strengths: dict[tuple[int, int, int], float] = {}
     ambiguous: set[tuple[int, int, int]] = set()
+    every = _tests_every_set(test)
     for b in range(skeleton.shape[0]):
         for a, c in combinations(np.flatnonzero(skeleton[b]).tolist(), 2):
             if skeleton[a, c]:
@@ -469,8 +483,8 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 conds = _collider_sets(sides, size, b)
-                width = min(_FIRST_CHUNK, _CHUNK)
-                while p <= alpha and (chunk := list(islice(conds, width))):
+                width = _CHUNK if every else min(_FIRST_CHUNK, _CHUNK)
+                while (every or p <= alpha) and (chunk := list(islice(conds, width))):
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
                     p, strength = max(p, p_chunk), min(strength, strength_chunk)
                     width = min(2 * width, _CHUNK)

@@ -23,7 +23,8 @@ from andrey.constraint.blanket import (
     parents_children,
     reach,
 )
-from andrey.core.ci import ChiSquare, FisherZ
+from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
+from andrey.core.ci_missing import rows_tested
 from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.hc import tie_ranks
@@ -146,19 +147,29 @@ def _colliders_on_every_set(test, skeleton, blankets, alpha):
     return sepsets, ranks
 
 
-@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+def _search_data(kind):
+    """Data and a test of 15 variables: Gaussian with Fisher-z, discrete with the chi-square
+    test, and discrete with a twentieth of the values missing, whose test deletes rows per test."""
+    if kind == "fisherz":
+        x = data.sample_scm(graph="erdos_renyi", d=15, n=1000, seed=2, density=4.0).data
+        return x, FisherZ(x)
+    x = data.sample_discrete(d=15, n=3000, seed=2, density=4.0).data
+    if kind == "chisq":
+        return x, ChiSquare(x)
+    x = x.copy()
+    x[np.random.default_rng(0).random(x.shape) < 0.05] = np.nan
+    return x, make_indep_test("chisq", x)
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq", "missing"])
 @pytest.mark.parametrize(("first", "chunk"), [(1, 4096), (1, 2), (4, 8)])
 def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, first, chunk):
     """Every triple is decided, and every collider ranked, as testing every set of each size up to
-    the first size that separates decides and ranks it, with fewer sets tested."""
+    the first size that separates decides and ranks it, with fewer sets tested; a test that
+    deletes rows per test tests the same sets, so the rows it reports are the same."""
     monkeypatch.setattr(blanket, "_FIRST_CHUNK", first)
     monkeypatch.setattr(blanket, "_CHUNK", chunk)
-    if kind == "fisherz":
-        x = data.sample_scm(graph="erdos_renyi", d=15, n=1000, seed=2, density=4.0).data
-        test = FisherZ(x)
-    else:
-        x = data.sample_discrete(d=15, n=3000, seed=2, density=4.0).data
-        test = ChiSquare(x)
+    x, test = _search_data(kind)
     sets = mmpc_sets(test, 15, 0.05, tie_ranks(x).tolist())
     skeleton, blankets = sets & sets.T, reach(sets)
     tested = []
@@ -169,14 +180,17 @@ def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, f
         return weakest(test, target, xs, conds)
 
     monkeypatch.setattr(blanket, "_weakest", counted)
-    sepsets, ranks, ambiguous = blanket_colliders(test, skeleton, blankets, 0.05)
+    with rows_tested() as rows:
+        sepsets, ranks, ambiguous = blanket_colliders(test, skeleton, blankets, 0.05)
     found = sum(tested)
     tested.clear()
-    want_sepsets, want_ranks = _colliders_on_every_set(test, skeleton, blankets, 0.05)
+    with rows_tested() as want_rows:
+        want_sepsets, want_ranks = _colliders_on_every_set(test, skeleton, blankets, 0.05)
     assert sepsets == want_sepsets
     assert {t: ranks[t] for t in want_ranks} == want_ranks
     assert not ambiguous
-    assert found < sum(tested)
+    assert rows == want_rows
+    assert found == sum(tested) if kind == "missing" else found < sum(tested)
 
 
 def _mmpc_on_every_set(test, target, d, alpha, ranks):
@@ -210,17 +224,16 @@ def _mmpc_on_every_set(test, target, d, alpha, ranks):
     return members
 
 
-@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+@pytest.mark.parametrize("kind", ["fisherz", "chisq", "missing"])
 def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
     """Each variable's MMPC set, in joining order, is the one found by testing every remaining
-    candidate against every set at each addition."""
-    if kind == "fisherz":
-        x = data.sample_scm(graph="erdos_renyi", d=15, n=1000, seed=2, density=4.0).data
-        test = FisherZ(x)
-    else:
-        x = data.sample_discrete(d=15, n=3000, seed=2, density=4.0).data
-        test = ChiSquare(x)
+    candidate against every set at each addition; a test that deletes rows per test tests the
+    same sets, so the rows it reports are the same."""
+    x, test = _search_data(kind)
     ranks = tie_ranks(x).tolist()
     for target in range(15):
-        want = _mmpc_on_every_set(test, target, 15, 0.05, ranks)
-        assert parents_children(test, target, 15, 0.05, ranks) == want, target
+        with rows_tested() as want_rows:
+            want = _mmpc_on_every_set(test, target, 15, 0.05, ranks)
+        with rows_tested() as rows:
+            assert parents_children(test, target, 15, 0.05, ranks) == want, target
+        assert rows == want_rows, target
