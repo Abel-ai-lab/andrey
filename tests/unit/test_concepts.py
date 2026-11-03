@@ -220,9 +220,9 @@ def facade(method: str):
 
 
 def needed(method: str, inp) -> bool:
-    """Whether a fit of ``method`` here takes the input ``inp``: a required one, or gnies's
-    ``env``, which every fit on data alone needs."""
-    return inp.required or (method, inp.name) == ("gnies", "env")
+    """Whether a fit of ``method`` here takes the input ``inp``: a required one, or the ``env`` of
+    cdnod or gnies, which every fit on one table needs."""
+    return inp.required or (method, inp.name) in {("cdnod", "env"), ("gnies", "env")}
 
 
 def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:

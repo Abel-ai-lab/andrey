@@ -73,7 +73,7 @@ SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 def test_supported_methods_do_not_warn_experimental(name, chain):
     """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status. A
     pairwise direction test takes the pair ``x -> y``, a panel method three time points or groups,
-    and a required context, such as CD-NOD's domain index, two domains of equal size."""
+    and a required context, or CD-NOD's domain index, two domains of equal size."""
     spec = REGISTRY[name]
     if spec.accel == "torch":
         pytest.importorskip("torch")
@@ -83,7 +83,7 @@ def test_supported_methods_do_not_warn_experimental(name, chain):
     contexts = [
         np.repeat([0.0, 1.0], len(chain) // 2)
         for i in spec.data.inputs[1:]
-        if i.kind == "context" and i.required
+        if i.kind == "context" and (i.required or (name, i.name) == ("cdnod", "env"))
     ]
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)

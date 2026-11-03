@@ -2,7 +2,9 @@
 
 Every accepted form of ``env`` and ``targets`` gives the same fit as the 0/1 intervention matrix
 it describes, each former form warns once and gives the same fit as its replacement, and every
-form that cannot say which variables an environment intervened on raises.
+form that cannot say which variables an environment intervened on raises. Data given as each
+environment's rows apart fit, in every method that takes ``env``, what the table they stack into
+fits.
 """
 
 from __future__ import annotations
@@ -323,6 +325,115 @@ def test_bootstrap_draws_cdnod_rows_whole_for_numbers_and_within_domains_for_tex
     one_row = np.array(["a", "b", "c"])[DOMAIN.astype(int)]
     one_row[0] = "d"  # a domain of one row stays in every subsample
     assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
+
+
+# --- data as each environment's rows apart -------------------------------------------------------
+
+#: The rows of ``DATA`` by environment; ``ENV`` holds its labels in this order, so the tables stack
+#: back into ``DATA``.
+APART = {label: DATA[ENV == label] for label in TARGETS}
+#: Each row's position in the list of ``APART``'s tables, the label a list gives it.
+POSITIONS = np.repeat([0, 1, 2], [500, 200, 200])
+#: ``ut_igsp``'s targets: ``set x2``'s unknown.
+UT_TARGETS = {"observed": [], "set x1": ["x1"], "set x2": None}
+#: The domains of ``X`` apart, in the order of ``DOMAIN``'s rows.
+DOMAINS = [X[DOMAIN == k] for k in (0.0, 1.0, 2.0)]
+
+#: Each call with the environments apart, and the call with the table they stack into.
+APART_FITS = {
+    "gies, a mapping of DataFrames": (
+        lambda: andrey.gies(APART, targets=TARGETS),
+        lambda: andrey.gies(DATA, ENV, targets=TARGETS),
+    ),
+    "gies, a list of arrays": (
+        lambda: andrey.gies([t.to_numpy() for t in APART.values()], targets={0: [], 1: [1], 2: 2}),
+        lambda: andrey.gies(DATA.to_numpy(), POSITIONS, targets={0: [], 1: [1], 2: 2}),
+    ),
+    "gies, DataFrames with their columns in another order": (
+        lambda: andrey.gies(
+            [t[["x2", "x0", "x1"]] if i else t for i, t in enumerate(APART.values())],
+            targets={0: [], 1: ["x1"], 2: ["x2"]},
+        ),
+        lambda: andrey.gies(DATA, POSITIONS, targets={0: [], 1: ["x1"], 2: ["x2"]}),
+    ),
+    "gnies, a list of DataFrames": (
+        lambda: andrey.gnies(list(APART.values())),
+        lambda: andrey.gnies(DATA, POSITIONS),
+    ),
+    "gnies, a mapping with known targets": (
+        lambda: andrey.gnies(APART, targets={"observed": []}),
+        lambda: andrey.gnies(DATA, ENV, targets={"observed": []}),
+    ),
+    "ut_igsp, a mapping of DataFrames": (
+        lambda: andrey.ut_igsp(APART, targets=UT_TARGETS),
+        lambda: andrey.ut_igsp(DATA, ENV, targets=UT_TARGETS),
+    ),
+    "ut_igsp, a list of DataFrames": (
+        lambda: andrey.ut_igsp(list(APART.values()), targets={0: [], 1: ["x1"], 2: None}),
+        lambda: andrey.ut_igsp(DATA, POSITIONS, targets={0: [], 1: ["x1"], 2: None}),
+    ),
+    "cdnod, a list of arrays": (
+        lambda: andrey.cdnod(DOMAINS),
+        lambda: andrey.cdnod(X, DOMAIN),
+    ),
+    "cdnod, a mapping of DataFrames": (
+        lambda: andrey.cdnod(
+            {k: pd.DataFrame(t, columns=["x", "y"]) for k, t in zip("abc", DOMAINS)}
+        ),
+        lambda: andrey.cdnod(
+            pd.DataFrame(X, columns=["x", "y"]), np.array(["a", "b", "c"])[DOMAIN.astype(int)]
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(APART_FITS))
+def test_environments_apart_fit_what_their_stacked_rows_fit(case):
+    apart, pooled = APART_FITS[case]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        assert _same(apart(), pooled())
+
+
+APART_ERRORS = {
+    "env with the environments apart": lambda: andrey.gies(APART, ENV, targets=TARGETS),
+    "a targets matrix with the environments apart": lambda: andrey.gies(APART, targets=MASK),
+    "a targets column with the environments apart": lambda: andrey.gies(
+        {k: t.assign(t="") for k, t in APART.items()}, targets="t"
+    ),
+    "no environment": lambda: andrey.gies({}, targets={}),
+    "an environment without rows": lambda: andrey.gies(
+        {**APART, "set x2": DATA.iloc[:0]}, targets=TARGETS
+    ),
+    "DataFrames and arrays": lambda: andrey.gies(
+        {**APART, "set x2": APART["set x2"].to_numpy()}, targets=TARGETS
+    ),
+    "DataFrames with other columns": lambda: andrey.gies(
+        {**APART, "set x2": APART["set x2"].rename(columns={"x2": "x3"})}, targets=TARGETS
+    ),
+    "arrays with other numbers of columns": lambda: andrey.cdnod([DOMAINS[0], DOMAINS[1][:, :1]]),
+    "keys that mix strings and numbers": lambda: andrey.cdnod({0: DOMAINS[0], "b": DOMAINS[1]}),
+    "an environment that is not a table": lambda: andrey.cdnod({"a": DOMAINS[0], "b": [1.0, 2.0]}),
+    "cdnod with one table and no env": lambda: andrey.cdnod(X),
+}
+
+
+@pytest.mark.parametrize("case", list(APART_ERRORS))
+def test_environments_apart_that_cannot_be_read_raise(case):
+    with pytest.raises(ValueError):
+        APART_ERRORS[case]()
+
+
+def test_bootstrap_resamples_environments_apart_as_their_stacked_rows():
+    apart = andrey.bootstrap("gies", APART, n_resamples=2, targets=TARGETS)
+    pooled = andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=TARGETS)
+    assert apart.structure.labels == ("x0", "x1", "x2")
+    assert np.array_equal(apart.frequency("->"), pooled.frequency("->"))
+    domains = andrey.bootstrap("cdnod", DOMAINS, n_resamples=2)
+    assert np.array_equal(
+        domains.frequency("->"),
+        andrey.bootstrap("cdnod", X, n_resamples=2, env=DOMAIN).frequency("->"),
+    )
 
 
 # --- the command line ---------------------------------------------------------------------------

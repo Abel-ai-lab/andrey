@@ -24,6 +24,8 @@ from andrey.spec import list_specs
 from tests.recovery.helpers import datagen
 
 N = 400
+#: The ``env`` inputs a fit on one table needs, though a list of environments leaves them out.
+NEEDS_ENV = {("cdnod", "env"), ("gnies", "env")}
 #: The grid spacing, ``2**-23``: the spacing of the floats in ``[2**29, 2**30)``, so a column on it
 #: plus any offset below ``2**29`` stays exactly the same values.
 GRID = 2.0**-23
@@ -79,7 +81,7 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
 
     args = []
     for inp in spec.data.inputs:
-        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
+        if not inp.required and (spec.name, inp.name) not in NEEDS_ENV:
             if spec.name in CONTEXT and inp.kind == "context":
                 args.append(np.arange(N) * 3 // N)
             continue

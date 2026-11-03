@@ -943,7 +943,9 @@ def bootstrap(
         A method's name, such as ``"pc"``, or the callable itself, such as ``andrey.pc``.
     data : array-like of shape (n_samples, n_variables), or a sequence of them
         The data, as the method takes it. ``multi_group_direct_lingam`` and
-        ``longitudinal_lingam`` take a sequence of arrays.
+        ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
+        each environment's rows apart, as a list or a mapping, resampled as the one table and
+        ``env`` they pool into.
     n_resamples : int, default=100
         The number of resamples and fits. ``n_boot``, the former name, works with a
         ``DeprecatedArgumentWarning`` for one more release.
@@ -1285,8 +1287,20 @@ def _job(
     resampling: str,
     sample_fraction: float,
 ) -> _Job:
-    """Check the call against ``spec`` and bundle it for the workers."""
+    """Check the call against ``spec`` and bundle it for the workers.
+
+    Data given as each environment's rows apart become one table and ``env`` first
+    (:func:`~andrey.core.environments.pool_environments`), so the resamples draw from its rows.
+    """
     kwargs = dict(kwargs)
+    entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
+    if entry is not None:
+        key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
+        data, env = environments.pool_environments(
+            data, kwargs.get(key), kwargs.get("targets"), spec.name
+        )
+        if env is not None:
+            kwargs[key] = env
     panel = spec.data.inputs[0].kind == "panel"
     temporal = spec.family == "temporal"
     if panel:

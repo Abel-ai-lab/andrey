@@ -52,8 +52,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     or a choice that an earlier release removed raises as an unknown one does, and the message
     gives its current name (:mod:`andrey.core.removed`); every argument the call passes is checked
     and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
-    ``ValueError``; a row-aligned argument that names a column of the data is taken out of it
-    (:func:`take_columns`); a
+    ``ValueError``; for a method that takes ``env``, data given as each environment's rows apart
+    become one table and ``env`` (:func:`pool_environments`); a row-aligned argument that names a
+    column of the data is taken out of it (:func:`take_columns`); a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
     an int; a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with a score that does
     not use it raises ``ValueError`` (:func:`check_penalties`); an experimental method warns
@@ -83,6 +84,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             for key, value in bound.arguments.items():
                 if key in params:
                     bound.arguments[key] = check_argument(params[key], value, name)
+            pool_environments(spec, bound.arguments)
             take_columns(spec, bound.arguments)
             stamp: dict[str, object] = {"algorithm": name}
             if spec.seeded:
@@ -120,6 +122,24 @@ def removed_name_error(
         if hint is not None:
             return TypeError(f"{method}() got an unexpected keyword argument {key!r}; {hint}")
     return None
+
+
+def pool_environments(spec: MethodSpec, arguments: dict[str, Any]) -> None:
+    """Pool data given as each environment's rows apart into one table and ``env``, in place.
+
+    Only for a method that takes ``env``: a list of tables labels each environment by its
+    position, and a mapping by its key, so the method, its checks, and its metadata read one table
+    and the label of each row (:func:`~andrey.core.environments.pool_environments`, which raises
+    ``ValueError`` when the call also passes ``env``).
+    """
+    if not any(i.name == "env" for i in spec.data.inputs[1:]):
+        return
+    data_key = spec.data.inputs[0].name
+    arguments[data_key], env = environments.pool_environments(
+        arguments[data_key], arguments.get("env"), arguments.get("targets"), spec.name
+    )
+    if env is not None:
+        arguments["env"] = env
 
 
 def take_columns(spec: MethodSpec, arguments: dict[str, Any]) -> None:

@@ -18,6 +18,8 @@ from andrey.spec import list_specs
 
 COLUMNS = ["x", "y", "z"]
 N = 400
+#: The ``env`` inputs a fit on one table needs, though a list of environments leaves them out.
+NEEDS_ENV = {("cdnod", "env"), ("gnies", "env")}
 
 
 def frame(seed: int = 0) -> pd.DataFrame:
@@ -29,11 +31,11 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's required positional inputs, gnies's env, and the environments of a method in
-    ``CONTEXT``, with a DataFrame wherever it takes a data matrix."""
+    """The method's required positional inputs, the env of cdnod and gnies, and the environments
+    of a method in ``CONTEXT``, with a DataFrame wherever it takes a data matrix."""
     args = []
     for inp in spec.data.inputs:
-        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
+        if not inp.required and (spec.name, inp.name) not in NEEDS_ENV:
             if spec.name in CONTEXT and inp.kind == "context":
                 args.append(np.arange(N) * 3 // N)
             continue
