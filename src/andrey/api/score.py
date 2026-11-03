@@ -3,7 +3,9 @@
 ``ges``, ``gies``, ``xges``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC
 scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. Each also scores
 categorical data with BDeu and the multinomial BIC, and mixed data with the degenerate and
-conditional Gaussian BICs. Reported objectives are stored in ``metadata``.
+conditional Gaussian BICs. ``gnies`` scores environments that differ in noise variances
+(:mod:`andrey.search.gnies`) and searches with the GIES engine. Reported objectives are stored in
+``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -20,8 +22,10 @@ from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
+    column_namer,
     copies_named,
     data_matrix,
+    declared_columns,
     default_score,
     int_in_range,
     json_safe,
@@ -658,6 +662,263 @@ def gies(
             constraints=constraints,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    return structure_output(graph, labels=labels, metadata=metadata)
+
+
+@method_spec("gnies")
+def gnies(
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None,
+    *,
+    targets: Mapping | npt.ArrayLike | str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
+    max_parents: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn an interventional essential graph and its unknown targets with greedy search (GnIES).
+
+    GnIES learns from data pooled from several environments that share one linear model with
+    Gaussian noise and differ in the noise variances of some variables, the targets, which it need
+    not be told [1]_. It learns the targets together with the graph's interventional equivalence
+    class, so every edge at a target gets its direction from the data.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
+        variable: it leaves the data before the fit, and ``knowledge``, ``targets``, and the
+        result's positions count the other columns.
+    env : array-like of shape (n_samples,), str, or None
+        The environment of each row: one label per row, strings or numbers, not both, or the name
+        of a column of the DataFrame ``data`` that holds them. GnIES needs two or more
+        environments, each with at least two rows; one of them may be observational, but none has
+        to be. ``None`` takes the environments from ``targets``, as a column or a 0/1 matrix.
+    targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
+        The variables known to be intervened on, by column label or 0-based position. ``None``,
+        the setting GnIES is built for, leaves every environment's targets unknown, and the search
+        learns them. A mapping ``{label: [variables]}`` lists the known targets of each label of
+        ``env``; ``None``, or a label the mapping leaves out, marks an environment whose targets
+        are unknown, and ``[]`` adds none. GnIES fits one set of targets for all environments: the
+        variables the mapping lists stay targets, and while some environment's targets are
+        unknown the search may add more. When every environment's targets are known (a mapping
+        that gives each a list, a string naming a column of the DataFrame ``data`` whose cells
+        give each row's targets, or a 0/1 array that is ``True`` where the row's value of the
+        variable was intervened on), the targets are fixed and only the graph is searched.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent, and per extra
+        noise variance of a target, ``n_environments - 1`` each. ``n_samples`` counts every row.
+        Larger values give sparser graphs and fewer targets; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC. Must be finite and non-negative.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term: each variable's score adds ``2 * ebic_gamma * log
+        C(n_variables - 1, n_parents)``, which grows with the number of parent sets a variable can
+        choose from. Larger values give sparser graphs; ``0.0`` is the standard BIC. The term
+        charges parents only, not targets. Must be finite and non-negative. See Notes.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: no DAG the returned graph represents gives a
+        node more than ``max_parents`` parents. Each search over graphs skips a step that would
+        give a node more for the next best step, so a cap can stop it short of the lowest-scoring
+        graph. ``None`` sets no cap.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored in each search over graphs. No
+        move adds a forbidden edge or removes a required one, and each search starts from the
+        required edges. The result directs every edge the knowledge decides, then Meek's rules
+        direct the edges that follow, as :class:`~andrey.Knowledge` describes.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
+        graph of the learned targets: directed marks (``->``) are edges every graph in the class
+        orients alike, among them every edge at a target, and undirected (``--``) the ones it
+        leaves open. ``metadata["algorithm"]`` is ``"gnies"``; ``metadata["score"]`` the score of
+        the result, lower is better (see Notes); ``metadata["index_edges"]`` lists each learned
+        target as ``[variable, "directed"]``, by label or 0-based position, in column order: the
+        variables whose noise variance changes between environments. ``metadata["environments"]``
+        holds the labels of ``env`` in sorted order or, without ``env``, the list of each
+        environment's targets.
+
+    Raises
+    ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
+        column; if a column is declared categorical by a DataFrame's ``category``, ``bool``, or
+        text type; if the rows come from fewer than two environments, an environment has fewer
+        than two rows, or a column is constant within one environment; if a column repeats another
+        up to scale and shift or is a linear function of other columns, within the environments
+        (one message names every group of copies and says to keep one column per group). Also if
+        ``env`` does not hold one label per row, misses a label, or mixes strings and numbers; if
+        a ``targets`` mapping comes without ``env`` or names a label ``env`` lacks; if a column or
+        an array of ``targets`` gives two rows of one environment different targets, or an array
+        does not have ``data``'s shape or holds a value other than 0 or 1; if ``targets`` names a
+        variable ``data`` lacks; or if ``env`` or ``targets`` names a column ``data`` lacks. Also
+        if a given ``max_parents`` is below the parents some graph of the required edges of
+        ``knowledge`` gives a node, or if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes,
+        which the fit reads as numbers. Each message warns once per process.
+
+    See Also
+    --------
+    andrey.gies : Learns from environments whose targets are known and replaced by interventions.
+    andrey.cdnod : Learns from environments without a model of how they differ.
+
+    Notes
+    -----
+    **When to use.** GnIES suits independent rows from two or more environments, with or without
+    an observational one, of one linear structural equation model with Gaussian noise, in which
+    every environment keeps the same weights and differs only in the noise variances of some
+    variables, its targets, which need not be known [1]_. It assumes no unmeasured common causes
+    and a faithful distribution. Its authors simulate graphs of 10 variables and present it as most
+    useful with many environments of few rows each. It returns the learned targets and the
+    interventional essential graph, which directs every edge at a target, so the environments can
+    orient edges that a CPDAG leaves undirected. When an intervention replaces a variable's
+    mechanism and the targets are known, use :func:`~andrey.gies`; when how the environments
+    differ is not linear and Gaussian, :func:`~andrey.cdnod`; and on observational data alone,
+    :func:`~andrey.ges`.
+
+    **How it works.** Each environment's columns are centered by their own means. For a set of
+    targets, a variable outside it is scored by the Gaussian likelihood of its regression on its
+    parents with one noise variance over every environment, and a target with one set of
+    coefficients and a noise variance per environment, fitted by alternating weighted least
+    squares from the regression over every environment. The search keeps one set of targets for
+    all environments [1]_. For each set it visits, a greedy search over interventional
+    equivalence classes [2]_ adds, removes, and turns edges from the empty graph while the score
+    improves; under these classes, Markov equivalent graphs that orient every edge at a target
+    alike get the same score [4]_. The outer search starts from the known targets, adds the
+    variable whose set scores best while that improves the score, then removes added variables
+    the same way. Steps whose score changes are equal after rounding are chosen by each column's
+    rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>`
+    says what the rank keeps. With every environment's targets known, one search over graphs
+    runs, with the union of the targets.
+
+    **The score.** ``metadata["score"]`` is the sum of each variable's term. Outside the targets
+    it is ``n_samples * log(residual variance) + penalty_discount * log(n_samples) * n_parents``;
+    at a target, ``sum_e n_e * log(residual variance in e) + penalty_discount * log(n_samples) *
+    (n_parents + n_environments - 1)``, with ``n_e`` the rows of environment ``e``. Each term also
+    adds ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``. Variances are divided by the row
+    count.
+
+    **Choosing the penalty.** The paper's score is the standard BIC, ``penalty_discount=1.0`` with
+    ``ebic_gamma=0.0`` [1]_. The default adds the extended-BIC term [5]_, as :func:`~andrey.ges`
+    and :func:`~andrey.gies` do, which describe the choice; with 10 variables it adds ``2 * log 9
+    = 4.4`` to the first parent's penalty, against ``log(n_samples)``, 8.3 with 4,000 rows. Which
+    default makes fewer errors with GnIES is not measured yet.
+
+    **Data scaling.** Rescaling or shifting a column alike in every row does not change the
+    result, nor does shifting one environment's rows. Do not standardize each environment on its
+    own: that rescales the noise variances the method reads, and changes the result.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on 10 variables with an observational
+    environment and three environments that each change one variable's noise variance, with
+    1,000 or 10,000 rows each. There, at the default penalty, it returned the true targets and the
+    true class on 13 of 20 simulated datasets with 1,000 rows per environment and on 19 of 20 with
+    10,000; the others had one false or missing target or a few wrong edges, where the greedy
+    search stopped at a graph that scores worse than the true one. Each set of targets it visits
+    costs one search over graphs from the empty graph, about ``n_variables * (n_targets + 1)``
+    searches per fit, so the cost grows fast with the number of variables. A target's
+    coefficients are shared across environments and its variances are not, so a target with
+    ``k`` parents needs at least ``k + 2`` rows in every environment: no parent set larger than
+    the smallest environment's row count minus 2 is selected for a target. Hard interventions,
+    shifted means alone, changed weights, non-Gaussian noise, and nonlinear relations fall outside
+    its model.
+
+    References
+    ----------
+    .. [1] Gamella, J. L., Taeb, A., Heinze-Deml, C., and Buhlmann, P. (2022). Characterization
+       and greedy learning of Gaussian structural causal models under unknown interventions.
+       arXiv:2211.14897.
+    .. [2] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
+       interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+    .. [3] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
+       507-554.
+    .. [4] Tian, J., and Pearl, J. (2001). Causal discovery from changes. Proceedings of the
+       Seventeenth Conference on Uncertainty in Artificial Intelligence, 512-521.
+    .. [5] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import gnies
+    >>> rng = np.random.default_rng(0)
+    >>> env = np.repeat(["observed", "noisy y"], 500)
+    >>> x = rng.standard_normal(1000)
+    >>> y = 0.8 * x + rng.standard_normal(1000) * np.where(env == "noisy y", 3.0, 1.0)
+    >>> out = gnies(pd.DataFrame({"x": x, "y": y}), env)
+    >>> out.structure.oriented_edges()
+    [('x', 'y', 'directed')]
+    >>> out.metadata["index_edges"]
+    [['y', 'directed']]
+    """
+    from andrey.core.environments import normalize_env_targets
+    from andrey.search.gnies import gnies as _gnies
+
+    data, codes, envs, by_code = normalize_env_targets(
+        data, env, targets, require_known_targets=False, method="gnies"
+    )
+    declared = declared_columns(data, None)
+    if declared is not None:
+        columns = ", ".join(str(c) for c, hit in zip(data.columns, declared, strict=True) if hit)
+        raise ValueError(
+            f"gnies reads continuous data, but data columns {columns} are declared categorical by "
+            "a category, bool, or text type; pass them as numbers or leave them out"
+        )
+    X = data_matrix(data, method="gnies")
+    labels = column_labels(data)
+    name = column_namer(labels)
+    sizes = np.bincount(codes, minlength=len(envs))
+    if len(envs) < 2:
+        raise ValueError(
+            "gnies needs rows from two or more environments; pass env, each row's environment"
+        )
+    small = [envs[k] for k in np.flatnonzero(sizes < 2)]
+    if small:
+        raise ValueError(f"gnies needs at least 2 rows in each environment; {small} have fewer")
+    for k, label in enumerate(envs):
+        flat = np.flatnonzero(np.ptp(X[codes == k], axis=0) == 0)
+        if flat.size:
+            raise ValueError(
+                f"gnies: column {name(int(flat[0]))} is constant in environment {label!r}; the "
+                "model needs a positive noise variance in every environment"
+            )
+    constraints = resolve(knowledge, X.shape[1], labels, method="gnies")
+    known = frozenset().union(*(s for s in by_code.values() if s is not None))
+    fixed = all(s is not None for s in by_code.values())
+    with copies_named(labels):
+        graph, score, learned = _gnies(
+            X,
+            codes,
+            known=known,
+            fixed=fixed,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            max_parents=max_parents,
+            constraints=constraints,
+        )
+    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
+    metadata = {
+        "score": json_safe(score),
+        "index_edges": [[variable(j), "directed"] for j in learned],
+        "environments": [
+            [variable(j) for j in sorted(e)] if isinstance(e, frozenset) else e for e in envs
+        ],
+    }
     return structure_output(graph, labels=labels, metadata=metadata)
 
 

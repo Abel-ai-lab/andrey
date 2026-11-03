@@ -14,13 +14,13 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
+Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with five
 exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
-`targets`, the variables intervened on in each environment, `longitudinal_lingam` takes a list of
-datasets, and `multi_group_direct_lingam` takes a list of datasets and returns one result per
-dataset. The first argument of every method is `data`; `andrey run` reads it from `--data`, which a
-method that takes a list of datasets needs once per dataset. Each method is either supported or
-experimental; `andrey list` prints the status.
+`targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
+targets, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a
+list of datasets and returns one result per dataset. The first argument of every method is `data`;
+`andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
+dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
 `env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
 then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`
@@ -29,13 +29,17 @@ position, with `[]` for an observational environment; as the name of a column wh
 each row's variables, from whose distinct values `env` follows when you leave it out; or as a 0/1
 matrix shaped like `data`. Every environment needs its targets, so `env` without `targets`, an
 environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
-`ValueError`. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
-`targets` in `--config`; a key such as `"0"` names the number label `0` of `--env`.
+`ValueError`. `gnies` takes the same forms of `targets`, but for the targets it knows: an
+environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
+`targets=None`, the default, learns them all. `andrey run` takes a mapping as `targets=`, a JSON
+object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the number
+label `0` of `--env`.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["index_edges"]
 ```
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
@@ -121,16 +125,16 @@ correlation. A test you register that reports only p-values is ordered by its p-
 first.
 
 % concept: knowledge
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
-`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and
-`camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs
-allowed to be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors
-them. Every required edge is in the result, whatever its weight, test, or score says. For the
-time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
-`effect` at time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows
-them in use.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`,
+`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`,
+`resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of
+required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`knowledge` parameter says how it honors them. Every required edge is in the result, whatever its
+weight, test, or score says. For the time-series methods, an edge `(cause, effect, lag)` is the
+link from `cause` at time `t - lag` to `effect` at time `t`.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
 `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take `tau_max`,
@@ -196,10 +200,11 @@ takes the same three rules for its same-step colliders, with `"majority"` as its
 tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
-`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, `gfci`,
-and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph represents
-gives a node more than that many parents. `None`, the default, sets no cap. `ges`, `gies`, `xges`,
-`hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss` and
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
+`gfci`, and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph
+represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
+`gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
+the cap, `boss` and
 `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it, and
 `cam`'s order search adds no edge past it. `gfci` caps its GES phase; the PAG its tests then orient
 can put more arrowheads at a node.
@@ -236,21 +241,22 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of Ramsey et al.
-(2017): larger values give sparser graphs, and `1.0`, the default, with `ebic_gamma=0.0` is the
-standard BIC. Every score but `"bdeu"` has this penalty, and `metadata["penalty_discount"]` records
-the value the score used.
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+`rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of
+Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the default, with
+`ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
+`metadata["penalty_discount"]` records the value the score used.
 
 % concept: ebic_gamma
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+`rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
 linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's
 score, a penalty that grows with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the
 standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice and
 {py:func}`~andrey.gfci` says why its default differs. Only `score_func="bic"` adds the term, so
 passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
-`metadata["ebic_gamma"]` records the value a `"bic"` fit used.
+`metadata["ebic_gamma"]` records the value a `"bic"` fit used. `gnies`, which has one score, always
+adds it.
 
 % concept: equivalent_sample_size
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
@@ -384,6 +390,7 @@ its first call in a process.
    dagma
    camuv
    dynotears
+   gnies
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -405,6 +412,14 @@ time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-ste
 on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
 temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
 lag 0.
+
+GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
+that share one set of weights and differ in the noise variances of some variables, its targets,
+without being told which. It returns the interventional essential graph of the targets it learns,
+which directs every edge at a target, and lists the targets in `metadata["index_edges"]`. For each
+set of targets it tries, it runs the search of `gies` from the empty graph, with the paper's
+likelihood: one noise variance per environment for a target and one in all for the others. Known
+targets in `targets` stay in the set; with every environment's targets known, one search runs.
 
 A method becomes supported once it has:
 

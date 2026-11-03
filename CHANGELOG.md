@@ -35,6 +35,10 @@ names its pull request.
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
+- `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
+  environments that differ in the noise variances of variables it is not told: it returns those
+  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
+  they orient (Gamella et al. 2022). Known targets go in `targets`. ([#PR])
 
 ### Changed
 

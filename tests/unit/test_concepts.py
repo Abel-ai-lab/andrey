@@ -270,7 +270,7 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
-            *("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+            *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
         ),
         "gauss_5v",
     ),
@@ -506,9 +506,10 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
 
 def keeps_the_required_edge(method: str) -> bool:
     """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
-    a constant column and CAM, RESIT, and CAM-UV, which need three distinct values per column, on
-    data where its weight is exactly 0."""
-    flat = () if method in (*PCMCI_FAMILY, "cam", "resit", "camuv") else ("flat",)
+    a constant column, CAM, RESIT, and CAM-UV, which need three distinct values per column, and
+    GnIES, which needs every column to vary within each environment, on data where its weight is
+    exactly 0."""
+    flat = () if method in (*PCMCI_FAMILY, "cam", "resit", "camuv", "gnies") else ("flat",)
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 
 
