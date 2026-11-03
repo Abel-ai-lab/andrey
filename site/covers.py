@@ -22,6 +22,7 @@ COVERS = {
     "shelf": "a pantry shelf of mixed jars, cartons, and sacks, one jar amber",
     "plumb": "a plumb bob hanging beside an engraved measuring column, the bob amber",
     "gears": "three engraved spoked gears meshing on a cast-iron base, the output gear amber",
+    "dominoes": "engraved dominoes, those before the amber one standing, those after it falling",
     "ground": "the stipple ground",
 }
 

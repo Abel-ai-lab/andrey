@@ -154,10 +154,9 @@ html[data-theme="dark"] .release-cover {
     var(--andrey-ground-navy);
 }
 
-/* TODO(freeze): release-cards/0.14.0.jpg once the cover is picked. */
 .bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-14-0 {
   background:
-    url("release-cards/0.13.0.jpg") center 62% / cover no-repeat,
+    url("release-cards/0.14.0.jpg") center 62% / cover no-repeat,
     var(--andrey-ground-navy);
 }
 
