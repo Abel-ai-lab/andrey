@@ -16,7 +16,7 @@ names its pull request.
   interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
   outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
   comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
-  columns, for the linear, nonlinear, location-scale, and discrete models. ([#PR])
+  columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
 
 ## [0.13.0] - 2026-11-03
 
@@ -1638,3 +1638,4 @@ First alpha release.
 [#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
+[#659]: https://github.com/Abel-ai-lab/andrey/pull/659
