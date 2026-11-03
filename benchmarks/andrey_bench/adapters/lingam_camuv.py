@@ -8,6 +8,9 @@ Calls ``lingam.CAMUV(alpha=0.01, num_explanatory_vals=3).fit(X)``, the settings 
 | ``alpha=0.01`` | ``alpha=0.01`` |
 | ``max_depth=2``, sets of up to 3 variables | ``num_explanatory_vals=3``, the largest set, the variable itself included |
 
+lingam's own default is ``num_explanatory_vals=2``, sets of up to 2 variables, which is
+``max_depth=1``; :data:`LINGAM_DEFAULT` builds that solution under a name of its own.
+
 ``adjacency_matrix_`` has ``B[i, j] = 1`` for each parent ``j`` of ``i`` and ``NaN`` in both cells of
 a pair joined through a hidden variable. ``fit`` reads the parents and the pairs back and builds the
 marks of :func:`camuv_marks`, which draws a pair ``<->``, where Andrey draws ``o-o``.
@@ -29,6 +32,10 @@ from andrey_bench.adapters.lingam_env import PYTHON_ENV_VAR, env_version
 
 #: The settings in Andrey's names; ``fit`` passes ``max_depth + 1`` as ``num_explanatory_vals``.
 DEFAULTS = {"alpha": 0.01, "max_depth": 2}
+
+#: lingam's default ``num_explanatory_vals=2`` in Andrey's names, and the solution name it runs under:
+#: ``params`` are not part of a ``run_id``, so each setting needs a name of its own.
+LINGAM_DEFAULT = {"name": "lingam.camuv.default", "max_depth": 1}
 
 # Andrey's endpoint marks: the mark at node i on the edge i-j is marks[i, j].
 _TAIL, _ARROW = 1, 2
@@ -61,6 +68,7 @@ class LingamCAMUV:
     """
 
     name: str = "lingam.camuv"
+    max_depth: int = DEFAULTS["max_depth"]
     package: str = "lingam"
     package_version: str = ""
     backend: str = "native"
@@ -77,7 +85,7 @@ class LingamCAMUV:
 
     def params(self) -> dict[str, Any]:
         """Return the settings in Andrey's names."""
-        return dict(DEFAULTS)
+        return {**DEFAULTS, "max_depth": self.max_depth}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run lingam CAM-UV; return the PAG's endpoint-mark array. The only timed region.
@@ -103,6 +111,6 @@ class LingamCAMUV:
         return GraphStructure.from_numpy(native, kind=self.output_type)
 
 
-def lingam_camuv_adapter() -> LingamCAMUV:
-    """A :class:`LingamCAMUV` carrying its environment's lingam version."""
-    return LingamCAMUV(package_version=env_version("lingam"))
+def lingam_camuv_adapter(**fields: Any) -> LingamCAMUV:
+    """A :class:`LingamCAMUV` carrying its environment's lingam version; `fields` set the rest."""
+    return LingamCAMUV(**fields, package_version=env_version("lingam"))

@@ -150,6 +150,8 @@ def test_a_hidden_cause_or_intermediate_leaves_its_pairs_unresolved() -> None:
     is a backdoor path entering both 1 and 3 from hidden parents. Only 0 -> 2 has no such path."""
     assert scoring.unobserved_path_pairs(HAND) == {(0, 1), (0, 3), (1, 3), (2, 3)}
     assert scoring.direct_edges(HAND) == {(0, 2)}
+    # The paper's truth keeps every edge with no observed node on its path, 2 -> 5 -> 3 included.
+    assert scoring.projected_directed(HAND) == {(0, 2), (2, 3), (1, 3)}
     assert scoring.true_confounded_pairs(HAND, "hidden_cause") == {(0, 1)}
 
 
@@ -166,6 +168,7 @@ def test_the_direct_target_scores_edges_and_marks_apart() -> None:
     directed = scoring.directed_edge_scores(estimate, HAND)
     assert directed["directed_direct_n_true"] == 1
     assert directed["directed_direct_errors"] == 1  # 1 -> 3 lies on an unobserved path
+    assert directed["directed_latent_projection_errors"] == 1  # 2 -> 3, through 5, is missed
     pairs = scoring.confounded_pair_scores(estimate, HAND, "circle")
     assert pairs["confounded_unobserved_path_precision"] == 1.0
     assert pairs["confounded_unobserved_path_recall"] == 0.25
@@ -224,15 +227,29 @@ def test_the_references_take_the_largest_set_as_max_depth_plus_one(monkeypatch) 
     monkeypatch.setitem(sys.modules, "causallearn.search.FCMBased.lingam", module)
 
     X = np.zeros((10, 3))
-    marks = [a.fit(X, a.params()) for a in (LingamCAMUV(), CausalLearnCAMUV())]
-    assert calls == [{"alpha": 0.01, "num_explanatory_vals": 3}, (0.01, 3)]
+    field = (LingamCAMUV(), CausalLearnCAMUV(), LingamCAMUV(max_depth=1))
+    marks = [a.fit(X, a.params()) for a in field]
+    assert calls == [
+        {"alpha": 0.01, "num_explanatory_vals": 3},
+        (0.01, 3),
+        {"alpha": 0.01, "num_explanatory_vals": 2},
+    ]
     expected = _pag([(0, 1)], [(0, 2)], _ARROW, 3).to_numpy()
     for m in marks:
         np.testing.assert_array_equal(m, expected)
 
 
 def test_the_regimes_of_camuvs_model_class_are_in_claim() -> None:
-    assert [camuv_cpu.claim(r) for r in camuv_cpu.REGIMES] == ["in", "in", "in", "out", "out"]
+    """Nonlinear additive effects with any number of hidden variables, none included."""
+    assert [camuv_cpu.claim(r) for r in camuv_cpu.REGIMES] == ["in", "in", "in", "in", "out"]
+
+
+def test_lingam_at_its_default_searches_sets_of_two_under_a_name_of_its_own() -> None:
+    default = camuv_cpu.SOLUTIONS["lingam.camuv.default"]
+    paper = camuv_cpu.SOLUTIONS["lingam.camuv"]
+    assert default.params() == {**paper.params(), "max_depth": 1}
+    assert [a.name for a in camuv_cpu.solutions()] == camuv_cpu.DEFAULT_SOLUTIONS
+    assert "lingam.camuv.default" not in camuv_cpu.DEFAULT_SOLUTIONS
 
 
 def test_the_scoring_pass_adds_every_column(monkeypatch, tmp_path: Path) -> None:

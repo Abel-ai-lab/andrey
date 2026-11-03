@@ -548,8 +548,11 @@ def confounded_pair_scores(
 #: (:func:`projected_directed`) whose endpoints share no hidden cause, what RCD and
 #: BottomUpParceLiNGAM estimate; a pair with a hidden cause is marked, not oriented. ``direct``: the
 #: edges between two observed nodes with no unobserved path between them (:func:`direct_edges`),
-#: what CAM-UV estimates; it marks a pair with such a path instead.
-DIRECTED_TARGETS = ("projection", "direct")
+#: what CAM-UV estimates; it marks a pair with such a path instead. ``latent_projection``: every
+#: edge of the latent projection, ``i -> j`` wherever a directed path runs from ``i`` to ``j`` with
+#: no observed node between them, the truth the CAM-UV paper scores against (Maeda and Shimizu,
+#: 2021, Sect. 5), which also holds the pairs CAM-UV marks.
+DIRECTED_TARGETS = ("projection", "direct", "latent_projection")
 
 #: The columns :func:`directed_edge_scores` returns, in order.
 DIRECTED_COLUMNS = (
@@ -575,7 +578,11 @@ def directed_edge_scores(estimate: GraphStructure, truth: GraphStructure) -> dic
     scores: dict[str, float] = {"directed_n_est": len(claimed)}
     confounded = _hidden_cause_pairs(truth)
     projection = {e for e in projected_directed(truth) if tuple(sorted(e)) not in confounded}
-    for target, true in (("projection", projection), ("direct", direct_edges(truth))):
+    for target, true in (
+        ("projection", projection),
+        ("direct", direct_edges(truth)),
+        ("latent_projection", projected_directed(truth)),
+    ):
         hits = len(claimed & true)
         both = len(claimed) + len(true)
         scores[f"directed_{target}_n_true"] = len(true)

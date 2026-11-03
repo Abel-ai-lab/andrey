@@ -2,18 +2,21 @@
 """Benchmark Andrey's CAM-UV against lingam's and causal-learn's on data with hidden variables.
 
 Every solution runs on the same datasets in the same job: Andrey's CAM-UV, lingam's, causal-learn's,
-and the empty graph, the floor. The regimes (:data:`REGIMES`), ``d`` counting the hidden nodes:
+and the empty graph, the floor (:data:`SOLUTIONS`; ``--solutions`` picks some of them, as for lingam
+at its own default set size, ``lingam.camuv.default``). The regimes (:data:`REGIMES`), ``d``
+counting the hidden nodes:
 
     latent_anm_er         additive noise, one node in five hidden, d = 5 10 15, 2,000 rows   (in)
     latent_anm_er_tenth   additive noise, one node in ten hidden, d = 11 22 55, 1,000 rows   (in)
     camuv_paper           the CAM-UV paper's simulation, 10 observed + 4 hidden, 1,000 rows  (in)
-    anm_er                additive noise, nothing hidden, d = 20, 1,000 rows                 (out)
+    anm_er                additive noise, nothing hidden, d = 20, 1,000 rows                 (in)
     latent_gauss_er       linear Gaussian, one node in ten hidden, d = 22, 1,000 rows        (out)
 
-The first three lie in CAM-UV's model class, nonlinear additive effects with hidden variables, and
-are in claim (:func:`claim`); the last two lie outside it. Every package runs the paper's settings,
-Andrey's defaults (:mod:`~andrey_bench.adapters.andrey_camuv`). A seed whose graph has too few nodes
-with two children to hide is skipped, and the next one taken, so a cell has ``--seeds`` datasets.
+The first four lie in CAM-UV's model class, nonlinear additive effects with independent noise, which
+allows any number of hidden variables, none included, and are in claim (:func:`claim`); the last
+lies outside it. Every package runs the paper's settings, Andrey's defaults
+(:mod:`~andrey_bench.adapters.andrey_camuv`). A seed whose graph has too few nodes with two
+children to hide is skipped, and the next one taken, so a cell has ``--seeds`` datasets.
 
 Every estimate is a PAG, scored against the PAG of the observed nodes (``shd_endpoint``). After
 each rung the driver adds, from the estimates stored in ``structures/``: the directed edges against
@@ -54,18 +57,18 @@ from andrey_bench import datasets, memcap, rundir, scoring
 from andrey_bench.adapters.andrey_camuv import AndreyCAMUV
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.causal_learn_camuv import causal_learn_camuv_adapter
-from andrey_bench.adapters.lingam_camuv import lingam_camuv_adapter
+from andrey_bench.adapters.lingam_camuv import LINGAM_DEFAULT, lingam_camuv_adapter
 from andrey_bench.adapters.lingam_env import PYTHON_ENV_VAR, lingam_venv
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores, check_interpreters
 
-#: The regimes, in ``datasets.REGIMES``: the three in CAM-UV's model class first.
+#: The regimes, in ``datasets.REGIMES``: the four in CAM-UV's model class first.
 REGIMES = ["latent_anm_er", "latent_anm_er_tenth", "camuv_paper", "anm_er", "latent_gauss_er"]
 
 #: The regimes of CAM-UV's model class, Maeda and Shimizu (2021), Sect. 2: nonlinear additive
-#: effects with independent noise, some variables hidden.
-CLAIMED = frozenset(REGIMES[:3])
+#: effects with independent noise, any number of variables hidden.
+CLAIMED = frozenset(REGIMES[:4])
 
 #: Each regime's rows and default ladder; ``d`` counts the hidden nodes.
 SETTINGS: dict[str, dict] = {
@@ -83,11 +86,26 @@ PAPER_DENSITY = 2.7
 #: Smallest run that touches every solution: one small dataset.
 SMOKE = {"regimes": ["latent_anm_er"], "ladder": [5], "seeds": 1, "n": 500, "cap_wall_s": 600.0}
 
+#: Every solution, by name: Andrey's CAM-UV, lingam's and causal-learn's at the paper's set size,
+#: the empty graph, and lingam at its own default set size.
+SOLUTIONS = {
+    a.name: a
+    for a in (
+        AndreyCAMUV(),
+        lingam_camuv_adapter(),
+        causal_learn_camuv_adapter(),
+        BaselineEmpty(),
+        lingam_camuv_adapter(**LINGAM_DEFAULT),
+    )
+}
+
+#: The solutions of a run unless ``--solutions`` names others.
+DEFAULT_SOLUTIONS = list(SOLUTIONS)[:4]
+
 #: Each solution's endpoint mark on a pair it attributes to a hidden variable. The empty graph has
 #: no such edges, so either mark stands for it.
 CONFOUNDED_MARK = {
-    a.name: getattr(a, "confounded_mark", "bidirected")
-    for a in (AndreyCAMUV(), lingam_camuv_adapter(), causal_learn_camuv_adapter(), BaselineEmpty())
+    name: getattr(a, "confounded_mark", "bidirected") for name, a in SOLUTIONS.items()
 }
 
 #: The columns :func:`add_scores` adds to each record.
@@ -104,9 +122,10 @@ def claim(regime: str) -> str:
     return "in" if regime in CLAIMED else "out"
 
 
-def solutions() -> list:
-    """Andrey's CAM-UV, lingam's, causal-learn's, and the empty graph."""
-    return [AndreyCAMUV(), lingam_camuv_adapter(), causal_learn_camuv_adapter(), BaselineEmpty()]
+def solutions(names: list[str] | None = None) -> list:
+    """The solutions named, by default Andrey's CAM-UV, lingam's, causal-learn's, and the empty
+    graph."""
+    return [SOLUTIONS[name] for name in names or DEFAULT_SOLUTIONS]
 
 
 def regime_keys(regime: str, d: int, n: int, seeds: int, seed_start: int = 0) -> list[DatasetKey]:
@@ -236,8 +255,16 @@ def main(argv: list[str] | None = None) -> int:
         "--regimes",
         nargs="+",
         choices=REGIMES,
-        default=REGIMES[:3],
-        help="regimes to run, in order (default: the three in claim)",
+        default=REGIMES[:4],
+        help="regimes to run, in order (default: the four in claim)",
+    )
+    p.add_argument(
+        "--solutions",
+        nargs="+",
+        choices=list(SOLUTIONS),
+        default=DEFAULT_SOLUTIONS,
+        help="solutions to run (default: Andrey, lingam and causal-learn at the paper's set size, "
+        "the empty graph)",
     )
     p.add_argument(
         "--ladder",
@@ -289,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    field = solutions()
+    field = solutions(args.solutions)
     run_meta = {
         "driver": Path(__file__).name,
         "solution list": [a.name for a in field],
