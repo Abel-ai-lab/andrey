@@ -901,8 +901,9 @@ class ChiSquare:
             raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
-        # Each column's codes as one contiguous row, for the batched counts; int32 halves the
-        # memory those counts stream through.
+        # Each column's codes as one contiguous row, for the batched counts and for numbering
+        # configurations, which read a column at a time; int32 halves the memory those counts
+        # stream through.
         self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
         # The marginal queries' statistics and p-values, by pair, and which pairs are known.
@@ -998,7 +999,7 @@ class ChiSquare:
         p_values = np.empty(len(a), dtype=np.float64)
         n, cards = self._n, self._cardinalities
         scan = len(a) > 1 and n > 0
-        layer, m = categorical.configurations(self._codes, cards, cond) if scan else (a, 0)
+        layer, m = categorical.configurations(self._rows.T, cards, cond) if scan else (a, 0)
         shapes = cards[a] * (int(cards.max(initial=0)) + 1) + cards[b]
         counted: list[_Counted] = []
         held = 0
@@ -1070,16 +1071,16 @@ class ChiSquare:
     ) -> tuple[float, float]:
         """:meth:`_statistic_pvalue` of the canonical query ``x_int < y_int`` given ``cond``,
         counted."""
-        codes = self._codes
+        rows = self._rows
         kx = int(self._cardinalities[x_int])
         ky = int(self._cardinalities[y_int])
-        layer, m = categorical.configurations(codes, self._cardinalities, cond)
-        xs = layer * kx + codes[:, x_int]  # (configuration, x) cell of each row
-        ys = layer * ky + codes[:, y_int]
+        layer, m = categorical.configurations(rows.T, self._cardinalities, cond)
+        xs = layer * kx + rows[x_int]  # (configuration, x) cell of each row
+        ys = layer * ky + rows[y_int]
         n_sx = np.bincount(xs, minlength=m * kx).reshape(m, kx)
         n_sy = np.bincount(ys, minlength=m * ky).reshape(m, ky)
         n_s = n_sx.sum(axis=1)
-        cells = xs * ky + codes[:, y_int]
+        cells = xs * ky + rows[y_int]
         if m * kx * ky <= _DENSE_CELLS:
             table = np.bincount(cells, minlength=m * kx * ky)
             occupied = np.flatnonzero(table)

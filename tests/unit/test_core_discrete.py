@@ -431,16 +431,18 @@ def test_make_score_builds_bdeu_with_the_equivalent_sample_size():
 
 def test_configurations_number_the_observed_rows_in_code_order():
     """Many high-cardinality columns overflow a plain mixed-radix code; the configurations that
-    occur are still numbered 0..m-1 in lexicographic order, at most one per row."""
+    occur are still numbered 0..m-1 in lexicographic order, at most one per row, whether the codes
+    are read row-major or from a column-contiguous int32 copy."""
     rng = np.random.default_rng(0)
     x = rng.integers(0, 50, (1000, 12)).astype(np.float64)
     x[:500, :6] = 0.0  # repeated rows, so some configurations occur more than once
     codes, cards = categorical.encode(x)
     columns = list(range(12))
-    index, m = categorical.configurations(codes, cards, columns)
     _, expected = np.unique(codes[:, columns], axis=0, return_inverse=True)
-    assert m == expected.max() + 1 <= len(x)
-    assert np.array_equal(index, expected.reshape(-1))
+    for view in (codes, codes.T.astype(np.int32, order="C").T):
+        index, m = categorical.configurations(view, cards, columns)
+        assert m == expected.max() + 1 <= len(x)
+        assert index.dtype == np.int64 and np.array_equal(index, expected.reshape(-1))
 
 
 def test_no_columns_is_one_configuration():

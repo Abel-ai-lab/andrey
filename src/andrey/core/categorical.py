@@ -49,8 +49,10 @@ def configurations(
 
     Parameters
     ----------
-    codes : ndarray of int64, shape (n_samples, n_features)
-        Category codes from :func:`encode`.
+    codes : ndarray of int, shape (n_samples, n_features)
+        Category codes from :func:`encode`, or a view of them in which each column is contiguous,
+        such as the transpose of a ``(n_features, n_samples)`` copy: the columns are read one at a
+        time, so a contiguous column reads faster on many rows.
     cardinalities : ndarray of int64, shape (n_features,)
         Categories per column, from :func:`encode`.
     columns : sequence of int
