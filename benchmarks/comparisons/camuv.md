@@ -200,9 +200,12 @@ every setting once replicated. Andrey ran 1.9 to 3.2 times faster than lingam at
 With one node in five hidden at 8 + 2 variables, every CAM-UV made more errors than the empty
 graph on seeds 0 to 19, each interval above 0. On fresh seeds, 20 to 40 with seed 31 skipped as one
 that cannot hide its nodes, every mean stays above the empty graph's but every interval includes 0,
-so by the replication rule the floor failure does not repeat. Scored against the paper's truth,
-which also holds the edges CAM-UV marks, every interval at 8 + 2 includes 0 on both sets of seeds.
-D here is each package's errors minus the empty graph's.
+so by the replication rule the floor failure does not repeat. Pooled over the 40 graphs, which the
+rule does not read, every package lies above the floor with an interval above 0, Andrey by 1.35
+[+0.40, +2.30] and the references by 1.53 to 1.58: the method class, not the implementation, misses
+the floor here. Scored against the paper's truth, which also holds the edges CAM-UV marks, every
+interval at 8 + 2 includes 0 on both sets of seeds. D here is each package's errors minus the empty
+graph's.
 
 | setting | observed + hidden | rows | seeds | truth | errors empty | D Andrey [95% CI] | D lingam [95% CI] | D causal-learn [95% CI] | D lingam at its default [95% CI] |
 |---|---|---|---|---|---|---|---|---|---|

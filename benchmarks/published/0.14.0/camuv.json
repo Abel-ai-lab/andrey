@@ -782,6 +782,41 @@
       },
       "same_parts_same_graph": 16,
       "lingam_two_cycles": 0
+     },
+     "pooled_with_replication_vs_empty": {
+      "datasets": 40,
+      "andrey": {
+       "paired": 40,
+       "mean_D_direct_errors": 1.35,
+       "bootstrap_95_direct_errors": [
+        0.4,
+        2.3
+       ]
+      },
+      "lingam": {
+       "paired": 40,
+       "mean_D_direct_errors": 1.575,
+       "bootstrap_95_direct_errors": [
+        0.625,
+        2.5
+       ]
+      },
+      "lingam_default": {
+       "paired": 40,
+       "mean_D_direct_errors": 1.525,
+       "bootstrap_95_direct_errors": [
+        0.55,
+        2.475
+       ]
+      },
+      "causal_learn": {
+       "paired": 40,
+       "mean_D_direct_errors": 1.575,
+       "bootstrap_95_direct_errors": [
+        0.65,
+        2.475
+       ]
+      }
      }
     },
     {
@@ -2980,6 +3015,41 @@
       },
       "same_parts_same_graph": 14,
       "lingam_two_cycles": 0
+     },
+     "pooled_with_replication_vs_empty": {
+      "datasets": 40,
+      "andrey": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.4,
+       "bootstrap_95_direct_errors": [
+        -3.3,
+        -1.425
+       ]
+      },
+      "lingam": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.1,
+       "bootstrap_95_direct_errors": [
+        -3.225,
+        -0.9
+       ]
+      },
+      "lingam_default": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.1,
+       "bootstrap_95_direct_errors": [
+        -3.225,
+        -0.9
+       ]
+      },
+      "causal_learn": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.05,
+       "bootstrap_95_direct_errors": [
+        -3.15,
+        -0.9
+       ]
+      }
      }
     },
     {
@@ -3343,6 +3413,41 @@
       },
       "same_parts_same_graph": 17,
       "lingam_two_cycles": 0
+     },
+     "pooled_with_replication_vs_empty": {
+      "datasets": 40,
+      "andrey": {
+       "paired": 40,
+       "mean_D_direct_errors": -3.5,
+       "bootstrap_95_direct_errors": [
+        -4.325,
+        -2.675
+       ]
+      },
+      "lingam": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.475,
+       "bootstrap_95_direct_errors": [
+        -3.475,
+        -1.45
+       ]
+      },
+      "lingam_default": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.5,
+       "bootstrap_95_direct_errors": [
+        -3.45,
+        -1.549
+       ]
+      },
+      "causal_learn": {
+       "paired": 40,
+       "mean_D_direct_errors": -2.7,
+       "bootstrap_95_direct_errors": [
+        -3.7,
+        -1.724
+       ]
+      }
      }
     },
     {
