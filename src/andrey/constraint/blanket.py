@@ -37,6 +37,8 @@ from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.search._parallel import _KEY_DP
 
+# The sets of one size a collider test asks first; each later chunk is twice as large.
+_FIRST_CHUNK = 32
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
 # stronger dependence.
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
@@ -437,14 +439,18 @@ def blanket_colliders(
     such set separates them. Every conditioning set holds ``b``, so with ``max_depth`` the subsets
     hold at most ``max_depth - 1`` members, and with ``max_depth=0`` no set can be tested and the
     triple is ambiguous. The sets are tested by increasing size, and a non-collider stops at the
-    first size that separates. The sets of one size are generated and tested in chunks, so the
-    memory a triple takes does not grow with the number of its subsets.
+    chunk that holds its first separating set: the sets of one size are generated and tested in
+    chunks of ``_FIRST_CHUNK`` sets, then twice as many each time, at most ``_CHUNK``. A size of
+    at most ``_FIRST_CHUNK`` sets takes one call, a larger one skips the chunks after the one that
+    holds the first separating set, and the memory a triple takes does not grow with the number of
+    its subsets.
 
     Returns the separating sets :func:`~andrey.constraint.pc._orient_colliders` reads, keyed
     ``(a, c)`` and holding the pair's non-collider middle nodes; each decided triple's rank, the
     weakest association over its tests (:func:`_weakest`: the smallest absolute partial correlation
     for a test that reports one, else the negated largest p-value), so the most clearly dependent
-    collider comes first; and the ambiguous triples, keyed ``(a, b, c)``.
+    collider comes first; and the ambiguous triples, keyed ``(a, b, c)``. A collider's rank covers
+    every set; a non-collider's covers the sets it tested, and orients nothing.
     """
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     strengths: dict[tuple[int, int, int], float] = {}
@@ -464,9 +470,11 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 conds = _collider_sets(sides, size, b)
-                while chunk := list(islice(conds, _CHUNK)):
+                width = min(_FIRST_CHUNK, _CHUNK)
+                while p <= alpha and (chunk := list(islice(conds, width))):
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
                     p, strength = max(p, p_chunk), min(strength, strength_chunk)
+                    width = min(2 * width, _CHUNK)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break
