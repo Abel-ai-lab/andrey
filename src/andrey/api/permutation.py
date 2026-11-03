@@ -775,9 +775,9 @@ def ut_igsp(
     of pairs dependent given all other variables, and moves by reversing I-covered edges: ``i ->
     j`` where ``j``'s parents are ``i`` and ``i``'s parents, and, in each setting with ``i`` among
     its known targets, ``j``'s distribution given its parents is not invariant. A depth-first
-    search over reversals that do not raise the objective moves to the first DAG that lowers it,
-    up to 5 reversals away, and repeats until none does [2]_. The result is the best of
-    ``n_starts`` such searches.
+    search over reversals that do not raise the objective moves to a DAG that lowers it, up to 5
+    reversals away, and repeats until none does [1]_. The result is the best of ``n_starts`` such
+    searches, returned as its interventional essential graph under the targets found [2]_.
 
     **Invariance tests.** Under ``"gaussian"``, a variable given a set of others is invariant when
     the linear regressions with an intercept agree in the two groups of rows: the Chow test of
