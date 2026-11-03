@@ -1,11 +1,13 @@
 """The categorical-data adapters, their regime, and agreement with causal-learn.
 
-Andrey's chi-square and G-square p-values and BDeu scores follow causal-learn's definitions, so
-they must agree with causal-learn's to rounding; on the same data both packages' PC and GES must
-return the same graph. Each adapter must also meet the harness contract the shared contract test
-checks for the others, bnlearn's and pgmpy's included: they construct without R or pgmpy, so this
-file never skips. What each of those packages computes is checked in
-``test_adapters_discrete_comparators.py``, where R or pgmpy is installed.
+Andrey's chi-square and G-square statistics and BDeu scores follow causal-learn's definitions, so
+they must agree with causal-learn's to rounding, and on the same data both packages' GES must
+return the same graph. Andrey refers the statistic to its mean when ``y`` is shuffled within each
+configuration, and causal-learn to ``(r_x - 1) * (r_y - 1)`` degrees of freedom per configuration,
+so their p-values, and the graphs of their PC, can differ on sparse tables. Each adapter must also
+meet the harness contract the shared contract test checks for the others, bnlearn's and pgmpy's
+included: they construct without R or pgmpy, so this file never skips. What each of those packages
+computes is checked in ``test_adapters_discrete_comparators.py``, where R or pgmpy is installed.
 """
 
 from __future__ import annotations
@@ -29,7 +31,6 @@ from andrey.data import sample_discrete
 from andrey.search.hc import hc
 from andrey_bench import datasets, rsession
 from andrey_bench.adapters import andrey_hc
-from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.bic_penalty import andrey_score
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.datasets import DatasetKey
@@ -146,9 +147,19 @@ def _codes(seed: int) -> np.ndarray:
     return x
 
 
+def _present_dof(x: np.ndarray, a: int, b: int, s: tuple[int, ...]) -> int:
+    """``(r_a - 1) * (r_b - 1)`` summed over the configurations of ``s``, with ``r_a`` and ``r_b``
+    the values of ``a`` and ``b`` present in each: causal-learn's degrees of freedom."""
+    config = np.unique(x[:, list(s)], axis=0, return_inverse=True)[1].ravel() if s else None
+    groups = [x] if config is None else [x[config == k] for k in np.unique(config)]
+    return sum((len(np.unique(g[:, a])) - 1) * (len(np.unique(g[:, b])) - 1) for g in groups)
+
+
 @pytest.mark.parametrize("method", ["chisq", "gsq"])
-def test_p_values_agree_with_causal_learn(method: str) -> None:
+def test_the_statistic_is_causal_learns(method: str) -> None:
+    """Andrey's statistic on causal-learn's degrees of freedom gives causal-learn's p-value."""
     from causallearn.utils.cit import CIT
+    from scipy.stats import chi2
 
     for seed in range(3):
         x = _codes(seed)
@@ -157,9 +168,12 @@ def test_p_values_agree_with_causal_learn(method: str) -> None:
             rest = [c for c in range(x.shape[1]) if c not in (a, b)]
             for size in range(3):
                 for s in combinations(rest, size):
-                    assert mine(a, b, s) == pytest.approx(
-                        theirs(a, b, list(s)), rel=1e-9, abs=1e-12
+                    (statistic,), _ = mine.statistic_pvalues(
+                        np.array([a]), np.array([b]), np.array([s], dtype=np.intp).reshape(1, -1)
                     )
+                    dof = _present_dof(x, a, b, s)
+                    expected = chi2.sf(statistic, dof) if dof else 1.0
+                    assert expected == pytest.approx(theirs(a, b, list(s)), rel=1e-9, abs=1e-12)
 
 
 def test_bdeu_is_minus_twice_causal_learns_score() -> None:
@@ -178,17 +192,11 @@ def test_bdeu_is_minus_twice_causal_learns_score() -> None:
 @pytest.mark.parametrize("seed", [0, 1, 2])
 @pytest.mark.parametrize("method", discrete_cpu.SAME_GRAPH_PAIRS)
 def test_both_packages_return_the_same_graph(method: str, seed: int) -> None:
-    """causal-learn's PC orients conflicting colliders in column order, so Andrey's PC runs that
-    rule here; its default p-value order can orient them differently. The campaign runs the
-    default, which this check does not cover."""
     data = sample_discrete(d=8, n=2000, seed=seed).data
     hashes = []
     for adapter in discrete_cpu.PAIRS[method]:
         adapter.setup()
-        params = adapter.params()
-        if isinstance(adapter, AndreyPC):
-            params["collider_order"] = "column"
-        native = adapter.fit(data, params)
+        native = adapter.fit(data, adapter.params())
         hashes.append(structure_hash(adapter.to_structure(np.asarray(native))))
     assert hashes[0] == hashes[1]
 
