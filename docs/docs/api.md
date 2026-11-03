@@ -225,9 +225,10 @@ fit runs: the first from the start the method describes, each later one from a s
 best DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring
 search; a later one replaces an earlier one only when it scores better by more than `1e-6` (for
 `igsp`, fewer edges, then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and
-targets). `igsp` runs 5 by default, the default number of runs of its authors' library. `ut_igsp`
-runs 10 by default: on simulated data in its paper's setting, 10 searches had fewer errors than 5
-in 4 of 15 groups of datasets and more in none. Each search builds its own caches and drops the
+targets). `igsp` and `ut_igsp` run 10 by default. On simulated data in `igsp`'s papers' settings,
+10 searches and 5 had fewer errors than one in 21 and 19 of 87 groups of datasets and more in none,
+and tied with each other in every group; in `ut_igsp`'s paper's setting, 10 searches had fewer
+errors than 5 in 4 of 15 groups and more in none. Each search builds its own caches and drops the
 previous one's, so more starts take more time but little more memory. `1`, the default for the
 others, runs one search.
 
@@ -419,9 +420,10 @@ lag 0.
 IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
 and settings whose intervention targets are all known, as GIES does: it searches variable orders
 for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
-the settings' invariance tests contradict. It runs at `alpha=1e-3` for both tests, where `0.05`
-gave a few times the distance to the true graph on data simulated as in its papers, and returns
-the interventional essential graph.
+the settings' invariance tests contradict. Its default level for both tests, `alpha=1e-3`, was
+the best of the levels its authors swept, from `1e-4` to `0.05`, on data simulated as in its
+papers: fewer errors than each of the others in some groups of datasets, except `5e-4`, which tied
+it, and more in none. It returns the interventional essential graph.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the

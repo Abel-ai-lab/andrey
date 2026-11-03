@@ -79,6 +79,7 @@ from ut_igsp_cpu import (
     parse_seeds,
     replication,
     run_child,
+    same_run,
     skeleton_differ,
 )
 
@@ -484,6 +485,12 @@ def gate_alphas() -> list[float]:
     return sorted({*ALPHAS, andrey_defaults()["alpha"]})
 
 
+def judged_starts() -> list[int]:
+    """Andrey's numbers of starts in the judged rows: the reference's number of runs (J1, matched)
+    and ``igsp``'s shipped ``n_starts`` (J2) when it differs."""
+    return sorted({NRUNS, andrey_defaults()["n_starts"]})
+
+
 def _igsp_fit(alpha: float, starts: int, draws: list[int], **kwargs) -> dict:
     return {
         "algorithm": "igsp",
@@ -497,9 +504,9 @@ def andrey_fits(cell: Cell, step: int = 1, winner: str | None = None) -> list[di
     """Andrey's fits on one dataset of ``cell``.
 
     Blocks A and Q (Andrey's defaults, draw 0): step 1 runs every candidate alpha at 5 starts,
-    step 2 the winner's alpha at 1 and 10 starts. Elsewhere ``igsp`` at its shipped ``n_starts``
-    and every gate level (in claim) or its shipped ``alpha`` (out of claim), and the context arms
-    the design lists for the cell.
+    step 2 the winner's alpha at 1 and 10 starts. Elsewhere ``igsp`` at each of
+    :func:`judged_starts` and every gate level (in claim) or its shipped ``alpha`` (out of claim),
+    and the context arms the design lists for the cell.
     """
     if cell.block == "A" or cell.arm == "Q":
         if step == 1:
@@ -512,7 +519,7 @@ def andrey_fits(cell: Cell, step: int = 1, winner: str | None = None) -> list[di
     draws = list(range(cell.draws))
     extra = {"K": {"indep_test": "kci"}, "O7": {"indep_test": "gsq"}}.get(cell.arm, {})
     alphas = gate_alphas() if cell.claim == "in" else [defaults["alpha"]]
-    fits = [_igsp_fit(a, defaults["n_starts"], draws, **extra) for a in alphas]
+    fits = [_igsp_fit(a, s, draws, **extra) for a in alphas for s in judged_starts()]
     one = {"config": "default", "kwargs": {}, "draws": [0]}
     if cell.claim == "in" or cell.arm in ("O1", "O2", "O3", "O4", "O7", "O8", "O9"):
         fits.append({"algorithm": "gies", **one})
@@ -528,8 +535,9 @@ def reference_fits(cell: Cell, package: str) -> list[dict]:
 
     The reference's ``igsp`` at Andrey's levels with 5 runs, in every cell but blocks A and Q,
     O4, O5, O7, and O1 past 100 variables; ``def42``, the patched copy, in the in-claim cells with
-    a multi-target setting. In claim, the reference also runs ``unknown_target_igsp`` with every
-    target known, at the UT-IGSP lane's level.
+    a multi-target setting. In claim, both also run at Andrey's shipped ``alpha`` with its shipped
+    ``n_starts`` as the number of runs when that is not 5 (context), and the reference runs
+    ``unknown_target_igsp`` with every target known, at the UT-IGSP lane's level.
     """
     if cell.block == "A" or cell.arm in ("Q", "O4", "O5", "O7") or cell.p > 100:
         return []
@@ -537,17 +545,21 @@ def reference_fits(cell: Cell, package: str) -> list[dict]:
         return []
     draws = list(range(cell.draws))
     tester = "kci" if cell.arm == "K" else "gauss"
-    alphas = gate_alphas() if cell.claim == "in" else [andrey_defaults()["alpha"]]
+    defaults = andrey_defaults()
+    alphas = gate_alphas() if cell.claim == "in" else [defaults["alpha"]]
+    runs = [(a, NRUNS) for a in alphas]
+    if cell.claim == "in" and defaults["n_starts"] != NRUNS:
+        runs.append((defaults["alpha"], defaults["n_starts"]))
     fits = [
         {
             "algorithm": "igsp",
-            "config": config_name(a, NRUNS).replace("_s", "_r"),
+            "config": config_name(a, r).replace("_s", "_r"),
             "alpha": a,
-            "nruns": NRUNS,
+            "nruns": r,
             "tester": tester,
             "draws": draws,
         }
-        for a in alphas
+        for a, r in runs
     ]
     if package == "reference" and cell.claim == "in":
         fits.append(
@@ -706,7 +718,11 @@ def run(args) -> int:
         "extra": extra,
     }
     meta_path = out / "run_meta.json"
-    if args.resume and meta_path.exists() and json.loads(meta_path.read_text()) != run_meta:
+    if (
+        args.resume
+        and meta_path.exists()
+        and not same_run(json.loads(meta_path.read_text()), run_meta)
+    ):
         raise SystemExit(f"--resume: {meta_path} differs from these flags; pass the first run's")
     meta_path.write_text(json.dumps(run_meta, indent=2))
     from andrey_bench import rundir
@@ -881,14 +897,17 @@ def _row(cell: Cell, mine: dict, theirs: dict) -> dict:
 def summarize(records: list[dict], replications: list[dict] | None = None) -> dict:
     """The summary entries of finished runs (design 4a-4c).
 
-    One entry per (regime, comparator): a gated comparator (the reference, and its copy with
-    Definition 4.2 in the cells with a multi-target setting) at each level, and each context arm
-    at Andrey's default level; one row per (``mean_degree``, ``d``, ``n``). A gated row whose
-    reference does not beat the empty graph (the paired interval of the reference's ``shd`` minus
-    the empty graph's not wholly below 0) is marked ``claim: "out"`` with that reason. A gated row
-    that passes this filter carries ``floor_95``, Andrey against the empty graph, except the
-    unpatched reference's rows in multi-target cells, whose floor is the patched copy's row.
-    ``replications`` are the records of block C's reruns.
+    One entry per (regime, comparator): a gated comparator (the reference with 5 runs, and its
+    copy with Definition 4.2 in the cells with a multi-target setting) at each level against
+    Andrey at each of :func:`judged_starts` (J1 at 5 starts, J2 at the shipped ``n_starts``; the
+    regime ends in ``n_starts=<starts>``), the reference at Andrey's shipped number of runs
+    against Andrey's J2 (context), and each other context arm against Andrey's shipped defaults;
+    one row per (``mean_degree``, ``d``, ``n``). A gated row whose reference does not beat the
+    empty graph (the interval of the reference's ``shd`` minus the empty graph's not wholly below
+    0) is marked ``claim: "out"`` with that reason. A gated row that passes this filter carries
+    ``floor_95``, Andrey against the empty graph, except the unpatched reference's rows in
+    multi-target cells, whose floor is the patched copy's row. ``replications`` are the records
+    of block C's reruns.
     """
     reruns = _arms(replications or [])
     arms = _arms(records)
@@ -916,27 +935,38 @@ def summarize(records: list[dict], replications: list[dict] | None = None) -> di
         if cell is None or (package == "andrey" and algorithm == "igsp"):
             continue
         if algorithm == "igsp":
-            alpha = float(config[1:].split("_")[0])
-            mine = arms.get((name, "andrey", "igsp", config_name(alpha, defaults["n_starts"])))
-            if mine is None:
+            level, runs = config[1:].split("_r")
+            alpha, runs = float(level), int(runs)
+            if runs != NRUNS:
+                mine = arms.get((name, "andrey", "igsp", config_name(alpha, runs)))
+                if mine is not None:
+                    regime = f"{cell.group}|alpha={alpha_text(alpha)}|n_starts={runs}"
+                    comparator = f"{GATED[package]}@nruns={runs}"
+                    entry(regime, comparator, cell, context=True)["rows"].append(
+                        _row(cell, mine, theirs)
+                    )
                 continue
-            row = _row(cell, mine, theirs)
-            reference_floor = floor_interval(theirs, "shd", "empty_shd")
-            row["reference_floor_95"] = reference_floor
-            if reference_floor is None or reference_floor[1] >= 0:
-                row.update(claim="out", reason="reference not better than the empty graph")
-            elif package == "def42" or not cell.multi_target:
-                row["floor_95"] = floor_interval(mine, "shd", "empty_shd")
-            rerun_mine = reruns.get(
-                (name, "andrey", "igsp", config_name(alpha, defaults["n_starts"]))
-            )
-            rerun_theirs = reruns.get((name, package, algorithm, config))
-            if rerun_mine and rerun_theirs:
-                rerun = replication(rerun_mine, rerun_theirs, "shd", cell.datasets)
-                if rerun is not None:
-                    row["replication"] = rerun
-            regime = f"{cell.group}|alpha={alpha_text(alpha)}"
-            entry(regime, GATED[package], cell, context=False)["rows"].append(row)
+            for starts in judged_starts():
+                mine = arms.get((name, "andrey", "igsp", config_name(alpha, starts)))
+                if mine is None:
+                    continue
+                row = _row(cell, mine, theirs)
+                reference_floor = floor_interval(theirs, "shd", "empty_shd")
+                row["reference_floor_95"] = reference_floor
+                if not any(e["complete"] for e in theirs.values()):
+                    row.update(claim="out", reason="reference finished no dataset")
+                elif reference_floor is None or reference_floor[1] >= 0:
+                    row.update(claim="out", reason="reference not better than the empty graph")
+                elif package == "def42" or not cell.multi_target:
+                    row["floor_95"] = floor_interval(mine, "shd", "empty_shd")
+                rerun_mine = reruns.get((name, "andrey", "igsp", config_name(alpha, starts)))
+                rerun_theirs = reruns.get((name, package, algorithm, config))
+                if rerun_mine and rerun_theirs:
+                    rerun = replication(rerun_mine, rerun_theirs, "shd", cell.datasets)
+                    if rerun is not None:
+                        row["replication"] = rerun
+                regime = f"{cell.group}|alpha={alpha_text(alpha)}|n_starts={starts}"
+                entry(regime, GATED[package], cell, context=False)["rows"].append(row)
         elif (package, algorithm, config) in CONTEXT:
             mine = arms.get((name, "andrey", "igsp", mine_default))
             if mine is None:

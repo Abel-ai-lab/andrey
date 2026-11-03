@@ -21,9 +21,9 @@ list. Each fit names an ``algorithm``, a ``config``, its ``alpha``, ``nruns``, `
   children of each setting's context node.
 
 ``tester`` is ``gauss`` (the partial-correlation CI test and the Gaussian invariance test),
-``kci`` (``kci_test`` and ``kci_invariance_test`` at the library defaults, which regress on the
-conditioning set with a GAM and test the residuals with HSIC), or ``kci_conditional`` (the same
-with ``regress=False``). Both tests run at ``alpha``.
+``kci`` (``kci_test`` and ``kci_invariance_test`` at the library defaults, passed as
+:data:`KCI_SETTINGS`, which regress on the conditioning set with a GAM and test the residuals with
+HSIC), or ``kci_conditional`` (the same with ``regress=False``). Both tests run at ``alpha``.
 
 Each draw seeds Python's ``random`` and NumPy's global generator with the draw number, and the
 clock covers the testers' construction and the search. Before the first draw of each fit, one
@@ -143,6 +143,20 @@ def jci_gsp_fixed(setting_list, nodes, combined_ci_tester, depth=4, nruns=5):
     return dag, learned
 
 
+#: The KCI settings of both testers, pinned at conditional-independence 0.1a6's defaults: the
+#: kernel width from the row count (``width=0``), the gamma approximation of the null, and the
+#: regularization and eigenvalue settings.
+KCI_SETTINGS = {
+    "width": 0.0,
+    "unbiased": False,
+    "gamma_approx": True,
+    "n_draws": 500,
+    "lam": 1e-3,
+    "thresh": 1e-5,
+    "num_eig": 0,
+}
+
+
 def testers(fit: dict, obs: np.ndarray, ivs: list[np.ndarray]):
     """The CI tester and the invariance tester of ``fit``, built on the stored rows."""
     from conditional_independence import (
@@ -167,11 +181,11 @@ def testers(fit: dict, obs: np.ndarray, ivs: list[np.ndarray]):
         return ci, inv
     if tester not in ("kci", "kci_conditional"):
         raise ValueError(f"unknown tester {tester!r}")
-    regress = tester == "kci"
+    kci = {**KCI_SETTINGS, "alpha": alpha, "regress": tester == "kci"}
     # kci_test indexes its suffstat by column, so it takes the array itself.
-    ci = MemoizedCI_Tester(kci_test, obs, alpha=alpha, regress=regress)
+    ci = MemoizedCI_Tester(kci_test, obs, **kci)
     contexts = {"obs_samples": obs, **dict(enumerate(ivs))}
-    inv = MemoizedInvarianceTester(kci_invariance_test, contexts, alpha=alpha, regress=regress)
+    inv = MemoizedInvarianceTester(kci_invariance_test, contexts, **kci)
     return ci, inv
 
 

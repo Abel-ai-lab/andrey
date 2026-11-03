@@ -102,7 +102,7 @@ def test_environments_with_one_target_set_are_two_settings_with_env_and_one_with
     for i, variables in enumerate(cells):
         mask[i, [int(v[1:]) for v in variables]] = 1
     settings = {"alpha": 1e-3, "invariance_alpha": 1e-3, "indep_test": "fisherz"}
-    settings |= {"invariance_test": "gaussian", "categorical": None, "n_starts": 5, "seed": 0}
+    settings |= {"invariance_test": "gaussian", "categorical": None, "n_starts": 10, "seed": 0}
     for given, n_settings in (((env, targets), 3), ((None, mask), 2)):
         X, codes, _, by_code = normalize_env_targets(
             frame, *given, require_known_targets=True, method="igsp"

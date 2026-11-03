@@ -256,11 +256,11 @@ _CONCEPTS = (
                 name="alpha",
                 default=1e-3,
                 fixed_in=None,
-                reason="Measured: on linear-Gaussian data with 10 variables and four "
-                "single-variable or one five-variable perfect intervention, and with 20 variables "
-                "and eight single-variable ones, 1,000 or 10,000 rows per environment, 1e-3 had "
-                "20 to 40 percent of the SHD of 0.05; its authors swept 1e-4 to 5e-2 (Wang et al. "
-                "2017).",
+                reason="Of the levels its authors swept, 1e-4 to 0.05 (Wang et al. 2017), 1e-3 "
+                "had the fewest errors on simulated data in the settings of Wang et al. (2017) and "
+                "Yang, Katcoff and Uhler (2018): better in 123 of its 435 comparisons with another "
+                "level over 87 groups of datasets and worse in none, and no level was better on 20 "
+                "variables at mean degree 3 outside those groups.",
             ),
             Deviation(
                 method="ut_igsp",
@@ -725,12 +725,14 @@ _CONCEPTS = (
             Deviation(
                 method="igsp",
                 name="n_starts",
-                default=5,
+                default=10,
                 fixed_in=None,
                 reason="Further searches from minimum-degree orders whose ties are drawn from "
                 "seed guard against a poor first order; each one runs the paper's Algorithm 1, "
                 "which restarts its depth-first search within one run from a single starting "
-                "order (Yang, Katcoff and Uhler 2018).",
+                "order (Yang, Katcoff and Uhler 2018). On simulated data in its papers' settings, "
+                "10 searches were better than one in 21 of 87 groups of datasets, 5 in 19, and "
+                "neither was worse than the other anywhere.",
             ),
             Deviation(
                 method="ut_igsp",

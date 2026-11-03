@@ -171,18 +171,69 @@ def test_the_summary_filters_rows_whose_reference_loses_to_the_empty_graph():
     records += _records(single, "andrey", "default", lambda s: 9, algorithm="gies", draws=1)
     summary = lane.summarize(records)
     entries = {(e["regime"], e["comparator"]): e for e in summary["methods"]}
-    level = lane.alpha_text(lane.andrey_defaults()["alpha"])
-    [worse] = entries[(f"Y6|perfect|k=4|alpha={level}", "graphical-model-learning")]["rows"]
+    level = f"alpha={lane.alpha_text(lane.andrey_defaults()['alpha'])}"
+    level += f"|n_starts={lane.andrey_defaults()['n_starts']}"
+    [worse] = entries[(f"Y6|perfect|k=4|{level}", "graphical-model-learning")]["rows"]
     assert worse["verdict"] == "worse" and worse["floor_95"][1] < 0 and "claim" not in worse
-    [out] = entries[(f"W|K=2|alpha={level}", "graphical-model-learning")]["rows"]
+    [out] = entries[(f"W|K=2|{level}", "graphical-model-learning")]["rows"]
     assert out["claim"] == "out" and "floor_95" not in out
-    [patched] = entries[(f"W|K=2|alpha={level}", "graphical-model-learning+def42")]["rows"]
+    assert out["reason"] == "reference not better than the empty graph"
+    [patched] = entries[(f"W|K=2|{level}", "graphical-model-learning+def42")]["rows"]
     assert patched["verdict"] == "tie" and patched["floor_95"][1] < 0
     assert entries[("Y6|perfect|k=4", "andrey.gies")]["role"] == "context"
     assert summary["counts"] == {"better": 0, "tie": 1, "worse": 1} and summary["filtered"] == 1
     failures, _ = reference_parity.check(reference_parity.paired_rows("lane", summary), [])
     [failure] = failures
     assert "Y6|perfect|k=4" in failure
+
+
+def test_each_gate_level_is_judged_at_five_starts_and_at_the_shipped_number():
+    cell = lane.cell_named("Y6_perfect_k4_p10_n1000")
+    starts = lane.judged_starts()
+    assert starts == sorted({5, lane.andrey_defaults()["n_starts"]})
+    configs = {f["config"] for f in lane.andrey_fits(cell) if f["algorithm"] == "igsp"}
+    assert configs == {lane.config_name(a, s) for a in lane.gate_alphas() for s in starts}
+    alpha = lane.alpha_text(lane.ALPHAS[0])
+    level = lane.ALPHAS[0]
+    records = _records(cell.name, "reference", f"a{level:g}_r5", lambda s: 2)
+    for s in starts:
+        records += _records(cell.name, "andrey", lane.config_name(level, s), lambda s: 1)
+    regimes = {e["regime"] for e in lane.summarize(records)["methods"] if "role" not in e}
+    assert regimes == {f"Y6|perfect|k=4|alpha={alpha}|n_starts={s}" for s in starts}
+
+
+def test_the_reference_at_the_shipped_number_of_runs_is_context():
+    defaults = lane.andrey_defaults()
+    cell = lane.cell_named("W_K2_p10_n1000")
+    shipped = lane.config_name(defaults["alpha"], defaults["n_starts"]).replace("_s", "_r")
+    for package in ("reference", "def42"):
+        configs = {f["config"] for f in lane.reference_fits(cell, package)}
+        assert (shipped in configs) == (defaults["n_starts"] != lane.NRUNS)
+    records = _records(cell.name, "reference", shipped, lambda s: 2)
+    records += _records(cell.name, "andrey", shipped.replace("_r", "_s"), lambda s: 1)
+    [entry] = lane.summarize(records)["methods"]
+    assert entry["role"] == "context" and entry["comparator"].endswith(
+        f"@nruns={defaults['n_starts']}"
+    )
+
+
+def test_a_row_whose_reference_finished_no_dataset_says_so():
+    mine = lane.config_name(lane.andrey_defaults()["alpha"], lane.andrey_defaults()["n_starts"])
+    cell = "Y5_perfect_p20_n1000"
+    records = _records(cell, "andrey", mine, lambda s: 2)
+    records += [
+        {**r, "status": "timeout"}
+        for r in _records(cell, "reference", mine.split("_")[0] + "_r5", lambda s: 1)
+    ]
+    [entry] = lane.summarize(records)["methods"]
+    [row] = entry["rows"]
+    assert row["claim"] == "out" and row["reason"] == "reference finished no dataset"
+
+
+def test_a_resumed_run_may_change_host_and_workers_but_not_its_fits():
+    meta = {"arm": "W", "andrey_fits": {"c": [{"config": "a0.001_s5"}]}, "machine_id": "a"}
+    assert lane.same_run({**meta, "workers": 4}, {**meta, "machine_id": "b", "workers": 2})
+    assert not lane.same_run(meta, {**meta, "andrey_fits": {"c": [{"config": "a0.01_s5"}]}})
 
 
 def test_a_worse_row_counts_only_when_its_rerun_on_fresh_seeds_is_worse():

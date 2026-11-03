@@ -612,7 +612,7 @@ def igsp(
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
     invariance_test: str | None = None,
-    n_starts: int = 5,
+    n_starts: int = 10,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
@@ -654,7 +654,8 @@ def igsp(
     alpha : float, default=1e-3
         Significance level of the conditional-independence tests, in ``(0, 1)``: two variables
         are independent when a test's p-value exceeds it. Smaller values keep more edges out.
-        Also the level of the invariance tests when ``invariance_alpha`` is ``None``.
+        Also the level of the invariance tests when ``invariance_alpha`` is ``None``. See Notes
+        for the choice of the default.
     invariance_alpha : float or None, default=None
         Significance level of the invariance tests, in ``(0, 1)``: a variable's distribution
         given a set of others differs between a setting and the observational rows when the test
@@ -678,12 +679,13 @@ def igsp(
         ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
         so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
         ``metadata["invariance_test"]`` names the test the fit used. See Notes.
-    n_starts : int, default=5
+    n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
         in which it visits moves, from ``seed`` and its own index. Returns the best-scoring search,
         the one that found the fewest edges, then the fewest contradicted ones; a later one
-        replaces an earlier one only when it is strictly better.
+        replaces an earlier one only when it is strictly better. See Notes for the choice of the
+        default.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
@@ -766,6 +768,20 @@ def igsp(
     targets are unknown, use :func:`~andrey.ut_igsp`; with no observational environment, use
     :func:`~andrey.gies`.
 
+    **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' settings
+    [1]_ [2]_: linear effects and Gaussian noise on 7 to 20 variables, with one or two settings of
+    up to 10 targets or up to 45 settings of one or two targets, perfect, inhibiting, or imperfect,
+    and 1,000 to 100,000 rows per setting: 87 groups of 20 datasets, one fit each. A candidate
+    counts as better or worse than another in a group when the 95% bootstrap interval of the mean
+    difference in SHD, paired by dataset, lies wholly below or above 0. Among the levels the authors
+    swept, ``alpha=1e-3`` was worse than none in any group and better than ``1e-4`` in 4 groups,
+    ``5e-3`` in 16, ``1e-2`` in 20, and ``0.05`` in 83, by 0.2 to 10.7 edges; ``5e-4`` tied with it
+    in every group. On 20 variables at mean degree 3 with 8 perfect single-variable settings and
+    1,000 or 10,000 rows per setting, outside these groups, no level was better than ``1e-3``. At
+    ``alpha=1e-3``, 10 starts and 5 were each worse than none in any group and tied with each other
+    in every group; against one start, 10 were better in 21 groups and 5 in 19, by 0.4 to 1.7 edges,
+    at a median of 0.10 s per fit against 0.07 s for 5.
+
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other
     variable before ``j``, on the observational rows (all environments whose targets are ``[]``,
@@ -817,21 +833,20 @@ def igsp(
 
     **Limitations.** Not benchmarked yet. Its tests run it on 10 variables with 4 single-variable
     settings or one setting of 5 targets and 10,000 rows per setting, and on fixed cases of up to 7
-    variables. The default ``alpha=1e-3`` was chosen on such data and on 20 variables with 8
-    settings, where ``0.05`` gave 2.5 to 5 times its distance to the true graph. A perfect
-    intervention that leaves its target's distribution unchanged, such as cutting the causes of a
-    variable that has none while keeping its noise, orients nothing, and the search then reverses
-    some edges out of that target: 26 of 74 such edges on 40 datasets of 10 variables with 4
-    single-variable settings. With settings of more than one target, each edge's test runs over the
-    subsets of a neighborhood, so dense graphs are slow. The search's cost grows with the number of
-    I-covered edges to the power of its depth, and each start tests every pair given all other
-    variables, so time grows fast with the number of variables. Unmeasured common causes and
-    nonlinear effects with ``"fisherz"`` are outside its model; the kernel and categorical tests are
-    not benchmarked with it. One level serves both tests unless ``invariance_alpha`` is given. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine. In :func:`~andrey.bootstrap`, the averaged graph is made a
-    CPDAG without the targets, so an edge that only the settings orient comes back undirected
-    there; each fit and the edge frequencies keep its direction.
+    variables. A perfect intervention that leaves its target's distribution unchanged, such as
+    cutting the causes of a variable that has none while keeping its noise, orients nothing, and the
+    search then reverses some edges out of that target: 26 of 74 such edges on 40 datasets of 10
+    variables with 4 single-variable settings. With settings of more than one target, each edge's
+    test runs over the subsets of a neighborhood, so dense graphs are slow. The search's cost grows
+    with the number of I-covered edges to the power of its depth, and each start tests every pair
+    given all other variables, so time grows fast with the number of variables. Unmeasured common
+    causes and nonlinear effects with ``"fisherz"`` are outside its model; the kernel and
+    categorical tests are not benchmarked with it. One level serves both tests unless
+    ``invariance_alpha`` is given. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine. In
+    :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG without the targets, so an edge
+    that only the settings orient comes back undirected there; each fit and the edge frequencies
+    keep its direction.
 
     References
     ----------

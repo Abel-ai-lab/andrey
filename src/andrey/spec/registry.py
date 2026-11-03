@@ -1275,7 +1275,7 @@ _add(
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
-                default=5,
+                default=10,
                 doc="Number of searches, at least 1, each from a minimum-degree order: the first "
                 "breaks ties by column rank, each later one draws them from seed and its index; "
                 "returns the best-scoring search.",
