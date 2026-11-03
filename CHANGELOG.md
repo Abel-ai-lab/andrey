@@ -53,6 +53,14 @@ names its pull request.
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
+- `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
+  implementation, on structural vector autoregressions of the paper's design: one lag, 5 to 100
+  variables, 500 and 50 time steps, Gaussian and centered exponential noise. It makes no more
+  errors in 23 of the 24 judged settings and more in one, exponential noise with 100 variables and
+  50 time steps, on two sets of 20 series (3.20 and 4.15 more of about 150), of which CausalNex
+  fitted on centered columns, as `dynotears` centers them, makes 2.45 and 3.60. The median fit at
+  100 variables and 500 time steps takes 299 to 385 s on one core. `dynotears` stays experimental.
+  ([#PR])
 
 ### Fixed
 

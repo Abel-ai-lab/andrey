@@ -50,7 +50,7 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores, check_interpreters
 
-#: The regimes, in ``datasets.REGIMES``: the paper's design first, then the three outside it.
+#: The regimes, in ``datasets.REGIMES``: the three the lane judges first, then three it reports.
 REGIMES = [
     "dynotears_paper",
     "dynotears_paper_exponential",
@@ -60,7 +60,8 @@ REGIMES = [
     "dynotears_sin_tanh",
 ]
 
-#: The regimes of the paper's design, Pamfil et al. (2020), Appendix B.4.
+#: The regimes the lane judges: the paper's design, Pamfil et al. (2020), Appendix B.4, with the
+#: noise centered as its Sect. 2.1 takes it.
 PAPER_REGIMES = frozenset(REGIMES[:3])
 
 #: The paper's settings, Appendix B.3, in Andrey's names: for 500 steps (Andrey's defaults) and 50.

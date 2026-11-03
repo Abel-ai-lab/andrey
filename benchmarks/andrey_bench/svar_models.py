@@ -16,8 +16,10 @@ lags beyond the first only, so it does not enter.
   included, so the mean in-degree is ``k``; or a stochastic block model with two equal blocks,
   ``p_out / p_in = 0.3``, and the same mean in-degree. Weights uniform in magnitude on [0.3, 0.5]
   with a random sign.
-- Noise: standard Gaussian, or exponential of scale 1 (:data:`NOISES`). Sect. 2.1 takes noise of
-  mean zero, so ``"exponential"`` subtracts the mean 1 and ``"exponential_uncentered"`` keeps it.
+- Noise: standard Gaussian, or exponential of scale 1 (:data:`NOISES`). Sect. 2.1 takes centered
+  noise, so ``"exponential"`` subtracts the mean 1. Appendix B.4 draws exponential noise of scale 1
+  as NOTEARS does, and CausalNex's generator adds it without subtracting the mean, which
+  ``"exponential_uncentered"`` keeps.
 
 The nodes are then relabeled by one permutation drawn from the seed, so the column order carries no
 information about either graph. The paper assumes a stationary series and states no check; a draw

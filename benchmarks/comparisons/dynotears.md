@@ -24,12 +24,15 @@ Figure 3:
 
 Same-step weights are uniform in magnitude on [0.5, 2] and lagged ones on [0.3, 0.5], each with a
 random sign; the lagged graph includes self-lags. The nodes are relabeled by a permutation drawn
-from the seed. Section 2.1 takes noise of mean zero, so the exponential noise of the paper's design
-has its mean 1 subtracted. A draw whose reduced-form lag matrix `A (I - W)^-1` has spectral radius 1
-or more is drawn again, as the paper assumes a stationary series; the Barabasi-Albert graphs need
-more than 1,000 draws for some seeds at 100 variables, so that regime runs to 50. A series has
-`n + 1` steps, so every fit regresses `n` steps on the step before each, the paper's `n`. The truth
-is the window over lags 0 and 1: the same-step DAG and the lagged links.
+from the seed. Section 2.1 takes centered noise, so `dynotears_paper_exponential` subtracts the
+exponential noise's mean 1. The simulations of Appendix B.4 draw exponential noise of scale 1 as
+NOTEARS does, and CausalNex's generator adds it without subtracting the mean: that noise is
+`dynotears_paper_uncentered`, outside Section 2.1's model, reported and not judged. A draw whose
+reduced-form lag matrix `A (I - W)^-1` has spectral radius 1 or more is drawn again, as the paper
+assumes a stationary series; the Barabasi-Albert graphs need more than 1,000 draws for some seeds at
+100 variables, so that regime runs to 50. A series has `n + 1` steps, so every fit regresses `n`
+steps on the step before each, the paper's `n`. The truth is the window over lags 0 and 1: the
+same-step DAG and the lagged links.
 
 ## Settings
 
@@ -76,7 +79,7 @@ coverage and never scored.
 
 ## Results
 
-The numbers come from [`published/0.13.0/dynotears.json`](../published/0.13.0/dynotears.json): an
+The numbers come from [`published/0.14.0/dynotears.json`](../published/0.14.0/dynotears.json): an
 Andrey pre-release build of the 0.13.0 branch (31 October 2026) against CausalNex 0.12.2, on one
 Intel Core i7-7820X, one core and one BLAS thread per fit, four fits at a time. Every setting in
 claim has 20 series (seeds 0 to 19), every one out of claim 10 (seeds 0 to 9), each fitted once with
@@ -151,24 +154,26 @@ In claim, 23 of the 24 settings count as a tie and one as worse:
 | exponential | 100 | 0-19 | 0 | 148.95 | 145.75 | +3.20 [+0.10, +6.00] | 148.20 | +0.75 [+0.20, +1.40] | 8 |
 | exponential | 100 | 20-39 | 0 | 154.45 | 150.30 | +4.15 [+1.30, +7.10] | 153.90 | +0.55 [-0.20, +1.45] | 4 |
 
-The worse setting is explained by centering, Andrey's fit of every column on its own mean. With 50
-steps for 100 variables the least-squares problem has more weights than steps, and whether the
-sample means are fitted moves the solution: on CausalNex's side, centering the columns brings the
-mean gap from 3.20 errors per series down to 0.75 on seeds 0 to 19, and from 4.15 to 0.55 on seeds
-20 to 39. The gap left lies above 0 on seeds 0 to 19 alone, and it is the optimizer's path. On four
-of those series Andrey stops on `h_tol` with no edge removed by the cycle repair, and refitting it
-with CausalNex's cap on the penalty weight, `1e20`, returns CausalNex's graph on none of them; the
-data multiplied by `1 + 1e-12` noise changes Andrey's graph on three of the four, one of them to
-CausalNex's graph exactly. The same centering keeps Andrey's fit from reading a series' mean: with
-exponential noise of mean 1 (out of claim) CausalNex as given makes several times Andrey's errors,
-and CausalNex on centered columns exactly as many as Andrey.
+Most of the worse setting's gap comes from centering, Andrey's fit of every column on its own mean.
+With 50 steps for 100 variables the least-squares problem has more weights than steps, and whether
+the sample means are fitted moves the solution: on CausalNex's side, centering the columns adds 2.45
+errors per series [-0.65, +5.35] on seeds 0 to 19 and 3.60 [+0.45, +6.85] on seeds 20 to 39, of the
+gaps of 3.20 and 4.15. The gap left, Andrey against CausalNex on centered columns, is 0.75
+[+0.20, +1.40] and 0.55 [-0.20, +1.45]: above 0 on seeds 0 to 19 alone. On four of the series where
+Andrey's graph differs from that of CausalNex on centered columns, Andrey stops on `h_tol` with no
+edge removed by the cycle repair, and refitting it with CausalNex's cap on the penalty weight,
+`1e20`, returns CausalNex's graph on none of them; the data multiplied by `1 + 1e-12` noise changes
+Andrey's graph on three of the four, one of them to CausalNex's graph exactly. The same centering
+keeps Andrey's fit from reading a series' mean: with exponential noise of mean 1, on one run of ten
+series per setting, CausalNex as given makes several times Andrey's errors, and CausalNex on
+centered columns exactly as many as Andrey.
 
 ## Out of claim
 
 Out of claim, at ten series per setting: the defaults at 50 steps, z-scored columns, exponential
-noise of mean 1, and a nonlinear vector autoregression. Both packages read the data's units, so
-z-scored columns raise both packages' errors alike, and the defaults at 50 steps pass the empty
-window's errors from 20 variables on.
+noise of mean 1 (the noise of the paper's simulations, outside Section 2.1's model), and a nonlinear
+vector autoregression. Both packages read the data's units, so z-scored columns raise both packages'
+errors alike, and the defaults at 50 steps pass the empty window's errors from 20 variables on.
 
 | regime | T | d | same graph | SHD Andrey | SHD CausalNex | SHD empty | D [95% CI] | F1 Andrey | F1 CausalNex | SHD CausalNex centered |
 |---|---|---|---|---|---|---|---|---|---|---|

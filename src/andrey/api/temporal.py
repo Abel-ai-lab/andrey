@@ -1638,23 +1638,26 @@ def dynotears(
     rows' ``p`` earlier steps side by side, and ``A`` stacks the ``A_k``. Every column of ``X`` and
     of ``Y`` is centered on its own mean first, which is the same as fitting an intercept, so a
     series with a nonzero mean adds no weight, to the solver's precision. The paper's loss fits no
-    intercept, as its model takes noise of mean zero [1]_. On the series that Limitations describes,
-    whose mean is zero, fitting without an intercept made 3 to 4 fewer errors of about 150 with
-    exponential noise at 50 time steps and 100 variables, and no fewer, once replicated, in any
-    other setting there. With exponential noise of mean 1, not centered, so that every series has a
-    nonzero mean, it made 4.4 to 9.5 more errors at 500 steps and 5 to 20 variables. The paper's
-    experiments give ``W`` and ``A`` the same penalty, and ``lambda1`` is that one value. A lagged
-    edge points forward in time and closes no cycle, so the constraint reads ``W`` alone; a lagged
-    self-loop, a variable's effect on its own future, is an edge like any other. As in NOTEARS, the
-    weights are written as ``W = W+ - W-`` with both parts non-negative and the diagonal of ``W``
-    held at zero, and the augmented Lagrangian ``f + 0.5 * rho * h**2 + alpha * h`` is minimized by
-    L-BFGS-B from the zero matrix. After each solve ``rho`` grows tenfold while ``h`` has not fallen
-    to a quarter of its previous value, and then ``alpha += rho * h``, until ``h <= h_tol`` or
-    ``rho >= rho_max``. Same-step weights below ``w_threshold`` and lagged ones below
-    ``lag_threshold`` are then removed, and then the weakest remaining same-step edges until no
-    cycle is left. The defaults of ``lambda1``, ``w_threshold``, ``lag_threshold``, and ``tau_max``
-    are the paper's values for its simulations with 500 time steps; ``max_iter``, ``h_tol``, and
-    ``rho_max`` are those of NOTEARS [2]_, whose method the paper follows.
+    intercept, as its model takes noise of mean zero [1]_, while its simulations draw exponential
+    noise of scale 1, whose mean is 1. On the series that Limitations describes, whose noise has
+    mean zero, fitting without an intercept made fewer errors of about 150 at 50 time steps and 100
+    variables on two sets of 20 series, 2.45 and 3.60 with exponential noise and 6.25 and 1.75 with
+    Gaussian noise, each pair with one 95% interval that includes 0; no other setting at 50 time
+    steps had an interval above 0. With exponential noise of mean 1, so that every series has a
+    nonzero mean, it made 4.4 to 9.5 more errors at 500 steps and 5 to 20 variables, on one run of
+    10 series per setting. The paper's experiments give ``W`` and ``A`` the same penalty, and
+    ``lambda1`` is that one value. A lagged edge points forward in time and closes no cycle, so the
+    constraint reads ``W`` alone; a lagged self-loop, a variable's effect on its own future, is an
+    edge like any other. As in NOTEARS, the weights are written as ``W = W+ - W-`` with both parts
+    non-negative and the diagonal of ``W`` held at zero, and the augmented Lagrangian
+    ``f + 0.5 * rho * h**2 + alpha * h`` is minimized by L-BFGS-B from the zero matrix. After each
+    solve ``rho`` grows tenfold while ``h`` has not fallen to a quarter of its previous value, and
+    then ``alpha += rho * h``, until ``h <= h_tol`` or ``rho >= rho_max``. Same-step weights below
+    ``w_threshold`` and lagged ones below ``lag_threshold`` are then removed, and then the weakest
+    remaining same-step edges until no cycle is left. The defaults of ``lambda1``, ``w_threshold``,
+    ``lag_threshold``, and ``tau_max`` are the paper's values for its simulations with 500 time
+    steps; ``max_iter``, ``h_tol``, and ``rho_max`` are those of NOTEARS [2]_, whose method the
+    paper follows.
 
     [1]_ shows the model identifiable when the noise is non-Gaussian, or Gaussian with unit
     variance. The likelihood path that :func:`~andrey.notears` follows with ``robust=True`` [3]_
@@ -1683,21 +1686,23 @@ def dynotears(
     in the data's units. Errors are SHD over the same-step and lagged edges together, means over the
     series. At 500 time steps and the default settings the errors were 0.15 to 6.25, against the
     empty graph's 13.5 to 283.2, with F1 at least 0.968, and no setting differed from the reference
-    implementation; Barabasi-Albert same-step graphs with block-model lagged graphs, up to 50
-    variables, gave the same result. At 50 time steps with the paper's settings for them,
-    ``lambda1=0.2`` and ``lag_threshold=0.2``, the errors were 5 to 149, against the same empty
-    graph's, and only one setting differed: with exponential noise at 100 variables the centering
-    above made 3.2 more errors than the reference implementation, and 4.15 on 20 further series;
-    against the reference implementation fitted on centered columns the difference on those 20 was
-    0.55, with a 95% interval that includes 0. The defaults at 50 time steps made more errors than
-    the empty graph from 20 variables on (88.4 against 59.4 at 20), so set those two arguments for a
-    short series. With the columns z-scored at 500 steps the errors rose to 8.3, 19.7, 39.2, and
-    82.6 at 5 to 50 variables, against the empty graph's 14.6 to 147.2, over ten series each. With
-    500 time steps on one core, four fits at a time on four cores, the median fit took 0.3 s at 5
-    variables, 29 s at 50, and 299 s at 100. The time grows faster than the cube of the number of
-    variables, from the matrix exponential of every evaluation and the ``(tau_max + 1) * d * d``
-    weights. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    implementation; Barabasi-Albert same-step graphs with block-model lagged graphs, with Gaussian
+    noise and up to 50 variables, gave the same result. At 50 time steps with the paper's settings
+    for them, ``lambda1=0.2`` and ``lag_threshold=0.2``, the errors were 5 to 149, against the same
+    empty graph's, and only one setting differed: with exponential noise at 100 variables this
+    method made 3.20 more errors than the reference implementation (95% interval 0.10 to 6.00), and
+    4.15 (1.30 to 7.10) on 20 further series. Fitted on columns centered as above, the reference
+    implementation made 2.45 (-0.65 to 5.35) and 3.60 (0.45 to 6.85) more errors than on the columns
+    as given, and this method 0.75 (0.20 to 1.40) and 0.55 (-0.20 to 1.45) more than that fit. The
+    defaults at 50 time steps made more errors than the empty graph from 20 variables on (88.4
+    against 59.4 at 20), so set those two arguments for a short series. With the columns z-scored at
+    500 steps the errors rose to 8.3, 19.7, 39.2, and 82.6 at 5 to 50 variables, against the empty
+    graph's 14.6 to 147.2, over ten series each. With 500 time steps on one core, four fits at a
+    time on four cores, the median fit took 0.3 s at 5 variables, 29 to 30 s at 50, and 299 to 385 s
+    at 100, the lower with Gaussian noise. From 50 to 100 variables the time grew faster than the
+    cube of the number of variables, from the matrix exponential of every evaluation and the
+    ``(tau_max + 1) * d * d`` weights. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
