@@ -194,6 +194,68 @@ def sample(sem: SEM, seed: list[int]) -> tuple[np.ndarray, np.ndarray]:
     return X, env
 
 
+def _pinned_specs():
+    """The linear functional and the Gaussian noise of ``andrey.data``, with given weights and noise
+    scales: a seed of ``SCM.sample`` redraws both, and a scenario fixes them."""
+    from dataclasses import field
+
+    from andrey.data.functional import Linear
+    from andrey.data.noise import Gaussian
+
+    @dataclass(frozen=True, kw_only=True)
+    class PinnedLinear(Linear):
+        pinned: tuple[float, ...] = field(default=())
+
+        def draw_weights(self, draw, rng):
+            return np.array(self.pinned)
+
+    @dataclass(frozen=True, kw_only=True)
+    class PinnedGaussian(Gaussian):
+        pinned: tuple[float, ...] = field(default=())
+
+        def draw_scales(self, d, rng):
+            return np.array(self.pinned)
+
+    return PinnedLinear, PinnedGaussian
+
+
+def sample_envs(sem: SEM, seed: list[int]) -> tuple[np.ndarray, np.ndarray, dict]:
+    """One dataset of a SEM whose environments ``andrey.data``'s ``envs=`` expresses: do-
+    interventions, as ``hard(mean, sd=sd)``. The scenario's DAG, weights, and noise scales stay
+    fixed, the noise is drawn from ``seed``, and the data keep their units and column order.
+    Returns the data, ``env``, and ``targets``."""
+    from andrey.data import SCM
+    from andrey.data.graphs import FixedDAG
+    from andrey.data.interventions import hard
+
+    linear, gaussian = _pinned_specs()
+    children, parents = np.nonzero(sem.B)
+    nodes = tuple(str(j) for j in range(sem.B.shape[0]))
+    model = SCM(
+        graph=FixedDAG(nodes=nodes, arcs=tuple(zip(map(str, parents), map(str, children)))),
+        functional=linear(pinned=tuple(sem.B[children, parents])),
+        noise=gaussian(pinned=tuple(np.sqrt(sem.variances))),
+    )
+    envs = []
+    for changes in sem.changes:
+        if any(kind != "do" for kind, *_ in changes.values()):
+            raise ValueError("sample_envs takes do-interventions only")
+        envs.append({j: hard(mean, sd=sd) for j, (_, mean, sd) in changes.items()})
+    root = int(np.random.SeedSequence(seed).generate_state(1, dtype=np.uint64)[0] >> 1)
+    ds = model.sample(n=list(sem.rows), seed=root, envs=envs, scale="raw", shuffle=False)
+    return ds.data, ds.env, ds.targets
+
+
+def dataset(name: str, sem: SEM, index: int, i: int) -> tuple[np.ndarray, np.ndarray, dict | None]:
+    """Dataset ``i`` of a scenario: from ``andrey.data`` for cell C, else from :func:`sample`,
+    whose noise interventions and SEMs ``envs=`` cannot express (``comparisons/icp.md``)."""
+    seed = [658, CELL_IDS[name], index, i]
+    if CELLS[name].kind == "do":
+        return sample_envs(sem, seed)
+    X, env = sample(sem, seed)
+    return X, env, None
+
+
 def true_parents(sem: SEM) -> list[int]:
     """The target's observed parents."""
     p = len(sem.variances) - (sem.hidden is not None)
@@ -249,15 +311,22 @@ def r_scenario(cell: Cell, index: int) -> bool:
 # --- fits -----------------------------------------------------------------------------------------
 
 
-def andrey_fit(X, env, target, test, max_parents, alpha: float = ALPHA) -> dict:
-    """One Andrey fit, timed, by 0-based column position."""
+def andrey_fit(X, env, target, test, max_parents, alpha: float = ALPHA, targets=None) -> dict:
+    """One Andrey fit, timed, by 0-based column position; ``targets`` as ``andrey.data`` gives
+    them."""
     import andrey
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         start = time.perf_counter()
         out = andrey.icp(
-            X, env, target=target, alpha=alpha, invariance_test=test, max_parents=max_parents
+            X,
+            env,
+            target=target,
+            targets=targets,
+            alpha=alpha,
+            invariance_test=test,
+            max_parents=max_parents,
         )
         seconds = time.perf_counter() - start
     meta = out.metadata
@@ -277,14 +346,10 @@ def _floats(text: str) -> list[float]:
     return [float("nan") if v == "NA" else float(v) for v in text.split(";")] if text else []
 
 
-def _sets(text: str, others: list[int]) -> list[list[int]]:
-    """R's sets, 1-based predictor positions, as sorted column positions."""
-    if not text:
-        return []
-    return [
-        [] if s == "{}" else sorted(others[int(k) - 1] for k in s.split(","))
-        for s in text.split("|")
-    ]
+def _set(text: str, others: list[int]) -> list[int]:
+    """One of R's sets, 1-based predictor positions joined by ``,`` or ``{}``, as sorted column
+    positions."""
+    return [] if text == "{}" else sorted(others[int(k) - 1] for k in text.split(","))
 
 
 def r_fits(
@@ -302,10 +367,18 @@ def r_fits(
     The empty set is accepted when its own p-value exceeds the level, which ``ICP()`` leaves out
     of its accepted sets under a size cap. With ``fixed``, each fit also holds the tested sets'
     p-values and each accepted set's coefficients and standard errors; ``keep`` keeps the draws
-    and R's files there.
+    and R's files there, which are otherwise removed, whether R succeeds or not.
     """
     work = Path(tempfile.mkdtemp(prefix="icp-r-")) if keep is None else keep
     work.mkdir(parents=True, exist_ok=True)
+    try:
+        return _r_fits(work, datasets, target, tests, max_parents, alpha, fixed)
+    finally:
+        if keep is None:
+            shutil.rmtree(work)
+
+
+def _r_fits(work, datasets, target, tests, max_parents, alpha, fixed) -> list[dict]:
     others = [j for j in range(datasets[0][0].shape[1]) if j != target]
     for i, (X, env) in enumerate(datasets):
         header = [f"x{j}" for j in others] + ["y", "env"]
@@ -322,7 +395,8 @@ def r_fits(
     with (work / "fits.tsv").open() as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
             test = next(t for t, r in TESTS.items() if r == row["test"])
-            accepted = _sets(row["accepted"], others)
+            listed = work / f"accepted_{row['draw']}_{row['test']}.txt"
+            accepted = [_set(line, others) for line in listed.read_text().splitlines() if line]
             empty_p = float(row["empty_p"])
             if max_parents is not None and empty_p > alpha:
                 accepted = [[], *accepted]
@@ -346,8 +420,6 @@ def r_fits(
                 fit["sets"] = _set_table(work / f"sets_{row['draw']}.tsv", others)
                 fit["coef"] = _coef_table(work / f"coef_{row['draw']}_{row['test']}.tsv", others)
             fits.append(fit)
-    if keep is None:
-        shutil.rmtree(work)
     return fits
 
 
@@ -355,7 +427,7 @@ def _set_table(path: Path, others: list[int]) -> list[dict]:
     with path.open() as handle:
         return [
             {
-                "set": _sets(row["set"], others)[0],
+                "set": _set(row["set"], others),
                 **{k: float(row[k]) for k in ("normal", "exact", "chow_package", "chow_paper")},
             }
             for row in csv.DictReader(handle, delimiter="\t")
@@ -401,13 +473,14 @@ def run_scenario(task: tuple[str, int, str, Cell]) -> str:
     repeats = 3 if cell.kind == "speed" else 1
     r_data = []
     for i in range(cell.datasets):
-        X, env = sample(sem, [658, CELL_IDS[name], index, i])
+        X, env, targets = dataset(name, sem, index, i)
         if paired and i < cell.r_datasets:
             r_data.append((X, env))
         for test in ("approximate", "exact"):
+            args = (X, env, sem.target, test, cell.max_parents, ALPHA, targets)
             if repeats > 1:
-                andrey_fit(X, env, sem.target, test, cell.max_parents)  # warm-up
-            fits = [andrey_fit(X, env, sem.target, test, cell.max_parents) for _ in range(repeats)]
+                andrey_fit(*args)  # warm-up
+            fits = [andrey_fit(*args) for _ in range(repeats)]
             fit = fits[0] | {"seconds": statistics.median(f["seconds"] for f in fits)}
             if not (paired and i < cell.r_datasets):
                 fit = {k: fit[k] for k in ("parents", "best", "model_rejected", "seconds")}
@@ -424,7 +497,9 @@ def run_scenario(task: tuple[str, int, str, Cell]) -> str:
     return f"{name}/{index:03d}"
 
 
-def campaign(out: Path, cells: list[str], workers: int, resume: bool, smoke: bool) -> None:
+def campaign(
+    out: Path, cells: list[str], workers: int, resume: bool, smoke: bool, only: list[int] | None
+) -> None:
     specs = {name: CELLS[name] for name in cells}
     if smoke:  # one scenario of each cell, with a few datasets
         specs = {
@@ -461,6 +536,7 @@ def campaign(out: Path, cells: list[str], workers: int, resume: bool, smoke: boo
         for name, spec in ordered
         for index in range(spec.scenarios)
         if not (out / "tasks" / name / f"{index:03d}.json").exists()
+        and (only is None or index in only)
     ]
     _log(f"=== ICP, Andrey and R -> {out}: {len(tasks)} scenarios to fit ===")
     start = time.perf_counter()
@@ -627,10 +703,10 @@ def set_p_values(X, env, target, test, max_parents, rules) -> dict[tuple[int, ..
 
 def trace_fit(task: tuple) -> dict:
     """Whether R's rules give R's accepted sets and Andrey's rules Andrey's, for one paired fit."""
-    name, index, dataset, test, mine, theirs = task
+    name, index, number, test, mine, theirs = task
     cell = CELLS[name]
     sem = scenario(name, index)
-    X, env = sample(sem, [658, CELL_IDS[name], index, dataset])
+    X, env, _ = dataset(name, sem, index, number)
     found = {}
     for rules, accepted in (("package", theirs), ("paper", mine)):
         p = set_p_values(X, env, sem.target, test, cell.max_parents, rules)
@@ -645,7 +721,7 @@ def trace_fit(task: tuple) -> dict:
     return {
         "cell": name,
         "scenario": index,
-        "dataset": dataset,
+        "dataset": number,
         "test": test,
         "environments": len(sem.rows),
         "explained": explained,
@@ -913,6 +989,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--workers", type=int, default=4, help="worker processes (default: 4)")
     p.add_argument("--resume", action="store_true", help="skip the scenarios already on disk")
     p.add_argument("--smoke", action="store_true", help="one scenario of each cell, few datasets")
+    p.add_argument(
+        "--scenarios", default=None, help="comma-separated scenario numbers to fit (default: all)"
+    )
     args = p.parse_args(argv)
     out = Path(args.out)
     if args.fixed:
@@ -942,7 +1021,8 @@ def main(argv: list[str] | None = None) -> int:
     unknown = set(cells) - set(CELLS)
     if unknown:
         p.error(f"unknown cells {sorted(unknown)}; the cells are {list(CELLS)}")
-    campaign(out, cells, args.workers, args.resume, args.smoke)
+    only = None if args.scenarios is None else [int(k) for k in args.scenarios.split(",")]
+    campaign(out, cells, args.workers, args.resume, args.smoke, only)
     stamp = datetime.now(timezone.utc).isoformat()
     _log(f"finished {stamp}")
     return 0

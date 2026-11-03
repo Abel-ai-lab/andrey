@@ -10,8 +10,9 @@
 #
 # <draws dir>/fits.tsv gets one row per draw and test: the seconds of the ICP() call alone, the
 # p-value of the empty set (ICP() leaves the empty set out of acceptedSets under "lasso"), and
-# ICP()'s modelReject, bestModel, per-variable pvalues, ConfInt, and acceptedSets. A set is its
-# 1-based predictor positions joined by ",", "{}" for the empty set, and sets are joined by "|".
+# ICP()'s modelReject, bestModel, per-variable pvalues, and ConfInt. Its acceptedSets, up to every
+# subset of the variables, go to <draws dir>/accepted_<draw>_<test>.txt, one set per line: its
+# 1-based predictor positions joined by ",", "{}" for the empty set.
 # With <fixed> = 1, <draws dir>/sets_<draw>.tsv also gets every tested set's p-value from the
 # package's own getpval under both tests, with Chow's p-value computed here from the package's
 # residual variance and from the OLS residual variance, and <draws dir>/coef_<draw>_<test>.tsv
@@ -69,9 +70,10 @@ for (i in seq_along(files) - 1L) {
         rows[[length(rows) + 1L]] <- data.frame(
             draw = i, test = test, seconds = seconds, empty_p = format(empty, digits = 17),
             model_reject = f$modelReject, best = format(f$bestModel, digits = 17),
-            pvalues = join(f$pvalues), upper = join(conf[1, ]), lower = join(conf[2, ]),
-            accepted = paste(vapply(f$acceptedSets, set_text, ""), collapse = "|")
+            pvalues = join(f$pvalues), upper = join(conf[1, ]), lower = join(conf[2, ])
         )
+        writeLines(vapply(f$acceptedSets, set_text, ""),
+                   file.path(dir, sprintf("accepted_%d_%s.txt", i, test)))
         if (fixed) {
             used <- rep(0L, p)
             sets <- character(0); coef <- character(0); se <- character(0)
