@@ -607,11 +607,11 @@ def ut_igsp(
     env: npt.ArrayLike | str | None = None,
     *,
     targets: Mapping | npt.ArrayLike | str | None = None,
-    alpha: float = 1e-5,
+    alpha: float = 0.001,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
     invariance_test: str | None = None,
-    n_starts: int = 5,
+    n_starts: int = 10,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
@@ -653,10 +653,11 @@ def ut_igsp(
         targets are one environment. ``None`` with ``env`` makes every environment a setting with
         unknown targets, which leaves none observational and raises. Every environment needs at
         least 3 rows. See Notes.
-    alpha : float, default=1e-5
+    alpha : float, default=0.001
         Significance level of the conditional-independence tests, in ``(0, 1)``: two variables
         are independent when a test's p-value exceeds it. Smaller values keep more edges out.
-        Also the level of the invariance tests when ``invariance_alpha`` is ``None``.
+        Also the level of the invariance tests when ``invariance_alpha`` is ``None``. See Notes
+        for the choice of the default.
     invariance_alpha : float or None, default=None
         Significance level of the invariance tests, in ``(0, 1)``: a variable is a target of a
         setting when the test of its distribution given its parents, there against the
@@ -680,12 +681,12 @@ def ut_igsp(
         ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
         so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
         ``metadata["invariance_test"]`` names the test the fit used. See Notes.
-    n_starts : int, default=5
+    n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
         in which it visits moves, from ``seed`` and its own index. Returns the best-scoring search,
         the one that found the lowest objective; a later one replaces an earlier one only when it
-        is strictly lower.
+        is strictly lower. See Notes for the choice of the default.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
@@ -769,6 +770,19 @@ def ut_igsp(
     targets. When every target is known, use :func:`~andrey.gies`; with no observational
     environment, or with environments that differ in ways that are not interventions, use
     :func:`~andrey.cdnod`.
+
+    **Choosing alpha and n_starts.** The defaults come from simulated data in the authors'
+    setting, with 20 variables at mean degree 1.5, linear effects, Gaussian noise, and 5 settings
+    that shift each target's mean or intervene perfectly on it, with 0 or 3 unknown targets each:
+    15 groups of 20 datasets at 300 to 5,000 rows per setting, one at 50 variables, 5 seeds per
+    dataset. A group counts as better or worse when the 95% bootstrap interval of the mean
+    difference in SHD, paired by dataset, lies wholly below or above 0. Against the authors' level,
+    ``alpha=1e-5`` [1]_, ``alpha=0.001`` was better in 7 groups and worse in 2, by about 0.3 edges
+    at 3,000 rows per setting without unknown targets, and ``alpha=0.01`` was worse in 10; at 1,000
+    rows or fewer and at 50 variables ``0.001`` lowered the mean SHD by 0.8 to 2.5. At
+    ``alpha=0.001``, 10 starts were better than 5 in 4 groups, by 0.2 to 0.4 edges, and worse in
+    none, at a median of 0.24 s per fit on 20 variables against 0.21 s. Neither change made the
+    target errors worse in any group.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other

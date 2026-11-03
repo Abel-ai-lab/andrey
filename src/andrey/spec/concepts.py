@@ -252,10 +252,11 @@ _CONCEPTS = (
             Deviation(
                 method="ut_igsp",
                 name="alpha",
-                default=1e-5,
+                default=0.001,
                 fixed_in=None,
-                reason="1e-5 is the paper's level for the conditional-independence and invariance "
-                "tests (Squires, Wang and Uhler 2020, Section 5.1).",
+                reason="0.001 had fewer errors than the paper's 1e-5 (Squires, Wang and Uhler "
+                "2020, Section 5.1) on simulated data in the paper's setting: better in 7 of 15 "
+                "groups of datasets, worse in 2.",
             ),
         ),
     ),
@@ -709,10 +710,11 @@ _CONCEPTS = (
             Deviation(
                 method="ut_igsp",
                 name="n_starts",
-                default=5,
+                default=10,
                 fixed_in=None,
-                reason="The reference's default number of runs; restarts are part of the "
-                "method's search (Squires, Wang and Uhler 2020).",
+                reason="Restarts are part of the method's search (Squires, Wang and Uhler 2020); "
+                "on simulated data in the paper's setting, 10 searches were better than 5 in 4 of "
+                "15 groups of datasets and worse in none.",
             ),
         ),
     ),
