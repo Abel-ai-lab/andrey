@@ -14,23 +14,25 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
-exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
-`targets`, the variables intervened on in each environment, `longitudinal_lingam` takes a list of
-datasets, and `multi_group_direct_lingam` takes a list of datasets and returns one result per
-dataset. The first argument of every method is `data`; `andrey run` reads it from `--data`, which a
-method that takes a list of datasets needs once per dataset. Each method is either supported or
-experimental; `andrey list` prints the status.
+Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with these
+exceptions: `cdnod` also takes `env`, each row's environment, `gies`, `igsp`, and `ut_igsp` also
+take `env` with `targets`, the variables intervened on in each environment, `longitudinal_lingam`
+takes a list of datasets, and `multi_group_direct_lingam` takes a list of datasets and returns one
+result per dataset. The first argument of every method is `data`; `andrey run` reads it from
+`--data`, which a method that takes a list of datasets needs once per dataset. Each method is either
+supported or experimental; `andrey list` prints the status.
 
 `env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
-then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`
-takes `targets` as a mapping from each label of `env` to a list of its variables, by name or
-position, with `[]` for an observational environment; as the name of a column whose cells give
-each row's variables, from whose distinct values `env` follows when you leave it out; or as a 0/1
-matrix shaped like `data`. Every environment needs its targets, so `env` without `targets`, an
-environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
-`ValueError`. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
-`targets` in `--config`; a key such as `"0"` names the number label `0` of `--env`.
+then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`,
+`igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
+variables, by name or position, with `[]` for an observational environment; as the name of a column
+whose cells give each row's variables, from whose distinct values `env` follows when you leave it
+out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
+`ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
+environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads such an
+environment as a setting whose targets it learns. `andrey run` takes a mapping as `targets=`, a JSON
+object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the number
+label `0` of `--env`.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
@@ -542,21 +544,23 @@ DoWhy for effect estimation.
 ## Bootstrap
 
 `andrey.bootstrap` refits a method on resamples of the rows and reports how often each edge appears,
-and the averaged graph, a valid graph of the method's kind. It takes a method's name, such
-as `"pc"`, or the method itself, and the method's own arguments. Each resample is a subsample by
+and the averaged graph, a valid graph of the method's kind. It takes a method's name, such as
+`"pc"`, or the method itself, and the method's own arguments. Each resample is a subsample by
 default: `sample_fraction` (0.5) of the rows, drawn without replacement. `resampling="bootstrap"`
 draws as many rows as `data` has, with replacement, instead. The generator depends on `seed` and the
-resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run
-begins with the shorter run's fits. A method that takes a row-aligned input (`env`, or `gies`'s
-`targets` as a 0/1 matrix) resamples it with the rows, and a column that `env` or `targets` names
-travels with its rows. When `env` holds text labels, or for `gies`, each resample takes the same
-share of every environment's rows, at least one, so no resample drops an environment; `cdnod`'s
-numeric index, such as a time step, resamples the rows as a whole. `multi_group_direct_lingam`
-resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
-resamples the units, the same rows of every dataset. A time-series method on one series subsamples
-one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
-consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
-take, since its number of latent nodes differs from fit to fit.
+resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run begins
+with the shorter run's fits. A method that takes a row-aligned input (`env`, or `targets` as a 0/1
+matrix) resamples it with the rows, and a column that `env` or `targets` names travels with its
+rows. When `env` holds text labels, or for the methods that take `targets` (`gies`, `igsp`, and
+`ut_igsp`), each resample takes the same share of every environment's rows, at least one, so no
+resample drops an environment; `cdnod`'s numeric index, such as a time step, resamples the rows as a
+whole. For the methods that take `targets`, the averaged graph is made a CPDAG without the targets,
+so an edge that only the interventions orient is undirected there; the edge frequencies keep its
+direction. `multi_group_direct_lingam` resamples each dataset on its own and returns one result per
+dataset; `longitudinal_lingam` resamples the units, the same rows of every dataset. A time-series
+method on one series subsamples one stretch of consecutive rows; with `resampling="bootstrap"` it
+resamples blocks of `block_length` consecutive rows, by default at least ten times its `tau_max`.
+`gin` is the one method it does not take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
