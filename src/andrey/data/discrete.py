@@ -12,14 +12,27 @@ stream of the seed, so a change to one leaves the others' draws unchanged.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import numpy as np
 
 import andrey
 
 from .dataset import CausalDataset, QAReport, SCMParams
 from .graphs import DAGDraw, dag_truth
+from .interventions import (
+    Hard,
+    Intervention,
+    Soft,
+    check_columns,
+    env_labels,
+    env_targets,
+    environments,
+    record,
+)
 from .scm import (
     _GRAPH,
+    _INTERVENTION,
     _NOISE,
     _SEED_SCHEME,
     _WEIGHTS,
@@ -35,12 +48,13 @@ def sample_discrete(
     *,
     graph: str = "erdos_renyi",
     d: int,
-    n: int,
+    n: int | Sequence[int],
     seed: int,
     density: float = 2.0,
     categories: tuple[int, int] = (2, 3),
     concentration: float = 1.0,
     shuffle: bool = True,
+    envs: Sequence[Mapping[int, Intervention | float]] | None = None,
 ) -> CausalDataset:
     """Sample a discrete Bayesian network with random conditional probability tables.
 
@@ -50,8 +64,9 @@ def sample_discrete(
         The random graph the DAG is drawn from, as for :func:`~andrey.data.sample_scm`.
     d : int
         Node count.
-    n : int
-        Sample count.
+    n : int or sequence of int
+        Sample count. With ``envs``, the rows of each environment: ``n`` each, or ``n[k]`` for
+        environment ``k``.
     seed : int
         Root seed.
     density : float, default=2.0
@@ -67,6 +82,16 @@ def sample_discrete(
         Shuffle the columns with a permutation from the seed's own column stream, and relabel the
         true graph and the categories to match, as for :func:`~andrey.data.sample_scm`.
         ``provenance["column_order"][j]`` is the index column ``j`` has with ``shuffle=False``.
+    envs : sequence of mappings of int to Hard, Soft, or int, or None, default=None
+        One mapping per environment, ``{column: intervention}``, as for
+        :meth:`SCM.sample <andrey.data.SCM.sample>`; ``{}`` is an environment without
+        interventions. ``hard(category)`` sets a column to one category, ``hard(probs=...)``
+        draws it from one distribution for every configuration of its parents, and ``hard()``
+        from the uniform one; a whole number stands for ``hard(number)``. ``soft()`` draws every
+        row of the column's table anew, from the same Dirichlet. Every environment shares the
+        graph and the tables, and draws its own samples; environment 0 draws those a sample
+        without ``envs`` draws. The rows come pooled, environment 0 first, with ``env`` and
+        ``targets`` set.
 
     Returns
     -------
@@ -79,7 +104,10 @@ def sample_discrete(
     ------
     ValueError
         If ``categories`` is not a pair with ``2 <= least <= most``, ``concentration`` is not
-        positive, or ``graph`` names no graph.
+        positive, or ``graph`` names no graph; or, with ``envs``, if ``n`` does not give each
+        environment at least one row, a target is not a column, a category is not one of the
+        column's, ``probs`` does not have one entry per category, or an intervention takes the
+        arguments of a continuous variable.
 
     Examples
     --------
@@ -98,6 +126,14 @@ def sample_discrete(
         )
     if not (np.isfinite(concentration) and concentration > 0):
         raise ValueError(f"concentration must be finite and positive, got {concentration}")
+    pooled = None
+    if envs is None:
+        if not isinstance(n, int | np.integer):
+            raise TypeError(f"n is one row count without envs, got {n!r}")
+        rows = int(n)
+    else:
+        pooled = environments(envs, n)
+        rows = sum(size for _, size in pooled)
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
     _, draw = spec.materialize(_component_rng(root, _GRAPH))
@@ -111,10 +147,33 @@ def sample_discrete(
         )
         for c in range(draw.d)
     ]
-    values = _forward_sample(
-        draw.topo_order.tolist(), parents, cards, tables, n, _component_rng(root, _NOISE)
-    )
     order = _column_order(root, draw.d, shuffle)  # the drawn node of each column
+    if pooled is None:
+        values = _forward_sample(
+            draw.topo_order.tolist(), parents, cards, tables, rows, _component_rng(root, _NOISE)
+        )
+    else:
+        check_columns(pooled, draw.d)
+        values = np.concatenate(
+            [
+                _forward_sample(
+                    draw.topo_order.tolist(),
+                    parents,
+                    cards,
+                    intervened_tables(
+                        tables,
+                        interventions,
+                        order,
+                        cards,
+                        concentration,
+                        _component_rng(root, _INTERVENTION, k),
+                    ),
+                    size,
+                    _component_rng(root, _NOISE) if k == 0 else _component_rng(root, _NOISE, k),
+                )
+                for k, (interventions, size) in enumerate(pooled)
+            ]
+        )
     edges = np.argsort(order)[np.stack([draw.parents, draw.children], axis=1)]
     params = SCMParams(
         edges=edges,
@@ -138,8 +197,9 @@ def sample_discrete(
             "functional": "categorical",
             "categories": cards[order].tolist(),
             "concentration": float(concentration),
-            "n": int(n),
+            "n": rows,
             "shuffle": bool(shuffle),
+            **({} if pooled is None else {"envs": record(pooled)}),
         },
         "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
     }
@@ -149,7 +209,57 @@ def sample_discrete(
         report=QAReport(scale="raw"),
         provenance=provenance,
         params=params,
+        env=None if pooled is None else env_labels(pooled),
+        targets=None if pooled is None else env_targets(pooled),
     )
+
+
+def intervened_tables(
+    tables: list[np.ndarray],
+    spec: Mapping[int, Intervention],
+    order: np.ndarray,
+    cards: np.ndarray,
+    concentration: float,
+    rng: np.random.Generator,
+) -> list[np.ndarray]:
+    """Each node's conditional probability table under one environment's interventions.
+
+    ``spec`` names columns; ``order[j]`` is the node of column ``j``. A ``hard`` intervention gives
+    every configuration of the parents one row; ``soft()`` draws every row anew from ``rng``.
+    """
+    tables = list(tables)
+    for column, intervention in spec.items():
+        c = int(order[column])
+        k, rows = int(cards[c]), tables[c].shape[0]
+        if isinstance(intervention, Soft):
+            if intervention != Soft():
+                raise ValueError(
+                    f"column {column}: soft() on a discrete variable takes no arguments; it draws "
+                    "the variable's table anew"
+                )
+            tables[c] = rng.dirichlet(np.full(k, float(concentration)), size=rows)
+            continue
+        tables[c] = np.tile(categorical_probs(intervention, column, k), (rows, 1))
+    return tables
+
+
+def categorical_probs(intervention: Hard, column: int, k: int) -> np.ndarray:
+    """Return the distribution a ``hard`` intervention sets a column of ``k`` categories to."""
+    if intervention.sd:
+        raise ValueError(f"column {column}: hard() on a discrete variable takes no sd")
+    if intervention.probs is not None:
+        if len(intervention.probs) != k:
+            raise ValueError(
+                f"column {column} has {k} categories; probs has {len(intervention.probs)} entries"
+            )
+        return np.asarray(intervention.probs)
+    if intervention.value is None:
+        return np.full(k, 1.0 / k)
+    if not (float(intervention.value).is_integer() and 0 <= intervention.value < k):
+        raise ValueError(
+            f"column {column} has the categories 0..{k - 1}; hard() got {intervention.value}"
+        )
+    return np.eye(k)[int(intervention.value)]
 
 
 def _parents_of(draw: DAGDraw) -> list[np.ndarray]:

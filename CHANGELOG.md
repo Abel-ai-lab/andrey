@@ -10,6 +10,14 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
+  interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
+  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
+  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
+  columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
+
 ### Changed
 
 - `iamb`, `inter_iamb`, and `mmpc` with `indep_test="chisq"` or `"gsq"` run faster on categorical
@@ -1642,5 +1650,6 @@ First alpha release.
 [#633]: https://github.com/Abel-ai-lab/andrey/pull/633
 [#634]: https://github.com/Abel-ai-lab/andrey/pull/634
 [#639]: https://github.com/Abel-ai-lab/andrey/pull/639
+[#659]: https://github.com/Abel-ai-lab/andrey/pull/659
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
 [#662]: https://github.com/Abel-ai-lab/andrey/pull/662

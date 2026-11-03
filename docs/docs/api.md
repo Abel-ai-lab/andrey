@@ -737,6 +737,10 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    SCM
    sample_discrete
    sample_mixed
+   interventions.hard
+   interventions.soft
+   interventions.Hard
+   interventions.Soft
 ```
 
 #### Scale
@@ -764,6 +768,39 @@ $R^2$-sortability, and `andrey.data.sortability.varsortability` and `r2sortabili
 for any data and graph. On 30 random graphs of 20 variables at mean degree 2, with 1,000 rows,
 $R^2$-sortability averages 0.74 raw or standardized, 0.52 with `"rescale"`, and 0.51 with
 `"unitless"`.
+
+#### Interventions
+
+`SCM.do` returns the model under interventions, and its `sample` draws from it.
+`andrey.data.interventions.hard` cuts a variable from its parents and sets it to a value, or draws
+it from a Gaussian; `soft` keeps the parents and changes the mechanism: it shifts or rescales the
+variable's noise, or rescales its parents' weights. You name a variable by its column in the data
+`sample` returns, after the column shuffle, and give values and shifts in the units of those data,
+whatever the `scale`. The sample under `do` draws the noise the sample without interventions draws,
+so every column the interventions do not reach is the same in the two.
+
+`envs=` on `SCM.sample` and `sample_discrete` draws several environments into one dataset: one
+mapping of interventions per environment, `{}` for none. Each environment draws its own noise, and
+the rows come pooled, environment 0 first, with `env`, each row's environment, and `targets`, each
+environment's intervened columns:
+
+```python
+import andrey.data as data
+from andrey.data.interventions import hard, soft
+
+scm = data.SCM(graph=data.graphs.erdos_renyi(d=20, avg_degree=2),
+               functional=data.functional.linear(), noise=data.noise.gaussian())
+ds = scm.sample(n=[2000, 400, 400], seed=0,
+                envs=[{}, {3: hard(2.0, sd=0.2)}, {5: soft(shift=1.0), 8: soft(shift=1.0)}])
+ds.env      # 2,000 zeros, then 400 ones and 400 twos
+ds.targets  # {0: [], 1: [3], 2: [5, 8]}
+```
+
+`"standardize"` and `"rescale"` take their means, standard deviations, and divisors from the model
+without interventions on the same noise and apply them to every environment, so a shift in one
+environment stays a shift in the data. On discrete data, `hard(category)` or `hard(probs=...)`
+gives a variable one distribution whatever its parents, and `soft()` draws its table anew. The true
+graph is the graph without interventions.
 
 ## Metrics
 

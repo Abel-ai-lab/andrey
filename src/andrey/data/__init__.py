@@ -17,12 +17,23 @@ true graph:
 :func:`sample_discrete` samples category codes from a discrete Bayesian network with random
 conditional probability tables, the data for the discrete tests and scores. :func:`sample_mixed`
 samples categorical and continuous variables from a conditional linear Gaussian network, the data
-for the mixed-data tests and scores.
+for the mixed-data tests and scores. :meth:`SCM.do` and ``envs=`` on :meth:`SCM.sample` and
+:func:`sample_discrete` draw data under the hard and soft interventions of :mod:`interventions`.
 """
 
 from __future__ import annotations
 
-from . import benchmarks, functional, graphs, latent, noise, qa, sortability, temporal
+from . import (
+    benchmarks,
+    functional,
+    graphs,
+    interventions,
+    latent,
+    noise,
+    qa,
+    sortability,
+    temporal,
+)
 from .dataset import CausalDataset, QAReport, SCMParams
 from .discrete import sample_discrete
 from .generate import Ensemble, generate
@@ -48,6 +59,7 @@ __all__ = [
     "graphs",
     "functional",
     "noise",
+    "interventions",
     "latent",
     "sortability",
     "qa",
