@@ -44,7 +44,7 @@ names its pull request.
   in all 21 settings, on the graph and on the targets, and fewer in 2 with 10 rows per environment,
   on fresh datasets too; at the standard BIC the two return the same graph and targets on 412 of
   420 datasets. It fits about 34 times faster on one core (median) and reaches 100 variables, with
-  a median SHD of 2.5 against the empty graph's 135 in a median 176 s. ([#PR])
+  a median SHD of 2.5 against the empty graph's 135 in a median 176 s. ([#665])
 
 ### Changed
 
@@ -1684,3 +1684,4 @@ First alpha release.
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
 [#662]: https://github.com/Abel-ai-lab/andrey/pull/662
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
+[#665]: https://github.com/Abel-ai-lab/andrey/pull/665
