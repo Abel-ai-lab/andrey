@@ -225,9 +225,11 @@ fit runs: the first from the start the method describes, each later one from a s
 best DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring
 search; a later one replaces an earlier one only when it scores better by more than `1e-6` (for
 `igsp`, fewer edges, then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and
-targets). `igsp` and `ut_igsp` run 5 by default, the default number of runs of their authors'
-library. Each search builds its own caches and drops the previous one's, so more starts take more
-time but little more memory. `1`, the default for the others, runs one search.
+targets). `igsp` runs 5 by default, the default number of runs of its authors' library. `ut_igsp`
+runs 10 by default: on simulated data in its paper's setting, 10 searches had fewer errors than 5
+in 4 of 15 groups of datasets and more in none. Each search builds its own caches and drops the
+previous one's, so more starts take more time but little more memory. `1`, the default for the
+others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -424,9 +426,11 @@ the interventional essential graph.
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the
 DAG with the fewest edges plus targets, where a setting's targets are its known ones and every
-variable whose distribution given its parents differs from the observational one. It keeps the
-paper's level, `alpha=1e-5`, for the conditional-independence and invariance tests, and returns
-the interventional essential graph with each setting's targets in `metadata["targets"]`.
+variable whose distribution given its parents differs from the observational one. Its default
+level for the conditional-independence and invariance tests, `alpha=0.001`, had fewer errors than
+the paper's `1e-5` on simulated data in the paper's setting, mostly at 1,000 rows per setting or
+fewer. It returns the interventional essential graph with each setting's targets in
+`metadata["targets"]`.
 
 A method becomes supported once it has:
 

@@ -79,6 +79,8 @@ BLOCKS = {"A": 1000, "B": 0, "C": 2000}
 CAP_DRAW_S, CAP_DRAW_LONG_S = 1800.0, 3600.0
 #: Bootstrap resamples of the paired interval.
 RESAMPLES = 10_000
+#: ``run_meta.json`` fields a resumed run may change: the host and the worker count of its job.
+PER_JOB = ("machine_id", "workers")
 
 #: Each kind's intervention: ``(constructor, arguments)`` from ``andrey.data.interventions``.
 KINDS: dict[str, tuple[str, dict]] = {
@@ -620,6 +622,15 @@ def run_dataset(cell: Cell, seed: int, packages: list[str], args, cpu: int | Non
     return truth_line, records
 
 
+def same_run(first: dict, again: dict) -> bool:
+    """Whether two ``run_meta`` objects describe the same fits: equal but for :data:`PER_JOB`."""
+
+    def fits(meta: dict) -> dict:
+        return {k: v for k, v in json.loads(json.dumps(meta)).items() if k not in PER_JOB}
+
+    return fits(first) == fits(again)
+
+
 def parse_seeds(text: str) -> list[int]:
     """``"1000-1004"`` or ``"3,7"``: the seeds a run takes from its cells."""
     seeds: list[int] = []
@@ -678,7 +689,11 @@ def run(args) -> int:
         "extra": extra,
     }
     meta_path = out / "run_meta.json"
-    if args.resume and meta_path.exists() and json.loads(meta_path.read_text()) != run_meta:
+    if (
+        args.resume
+        and meta_path.exists()
+        and not same_run(json.loads(meta_path.read_text()), run_meta)
+    ):
         raise SystemExit(f"--resume: {meta_path} differs from these flags; pass the first run's")
     meta_path.write_text(json.dumps(run_meta, indent=2))
     from andrey_bench import rundir
