@@ -147,6 +147,7 @@ _NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
     *("pc", "fci", "gfci", "cdnod", "icp", "iamb", "inter_iamb", "mmpc"),
     *_PURE_SCORE,
+    "gnies",
     "calm",
     *_CONTINUOUS,
     "cam",
@@ -188,7 +189,7 @@ _CONCEPTS = (
             "icp",
         ),
         exempt=(
-            *_exempt("A score search: no test decides an edge.", *_PURE_SCORE),
+            *_exempt("A score search: no test decides an edge.", *_PURE_SCORE, "gnies"),
             *_exempt(
                 "Continuous optimization: no test decides an edge.", *_CONTINUOUS, "dynotears"
             ),
@@ -269,7 +270,9 @@ _CONCEPTS = (
                 "resit",
                 "camuv",
             ),
-            *_exempt("No conditional-independence test.", *_PURE_SCORE, *_CONTINUOUS, *_LINGAM),
+            *_exempt(
+                "No conditional-independence test.", *_PURE_SCORE, "gnies", *_CONTINUOUS, *_LINGAM
+            ),
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
             *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
@@ -292,6 +295,10 @@ _CONCEPTS = (
         ),
         fragment="score",
         suitable=SCORE_SEARCHES,
+        exempt=_exempt(
+            "Its score is the method: the noise-intervention likelihood has no other local score.",
+            "gnies",
+        ),
         others_exempt="Not a search over parent sets scored by a decomposable score.",
     ),
     Concept(
@@ -306,7 +313,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="BIC penalty",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "gnies"),
         others_exempt="Does not score with BIC.",
     ),
     Concept(
@@ -325,7 +332,7 @@ _CONCEPTS = (
             maximum=1,
         ),
         fragment="extended-BIC term",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "gnies"),
         others_exempt="Does not score with BIC.",
         deviations=(
             Deviation(
@@ -438,6 +445,7 @@ _CONCEPTS = (
             *_exempt(
                 "No conditional-independence tests over growing conditioning sets.",
                 *_PURE_SCORE,
+                "gnies",
                 "calm",
                 "cam",
                 "resit",
@@ -523,7 +531,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=(*SCORE_SEARCHES, "cam", "icp"),
+        suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
         exempt=(
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -639,6 +647,7 @@ _CONCEPTS = (
             *_exempt(
                 "Deterministic.",
                 *(m for m in _PURE_SCORE if m not in _STARTS),
+                "gnies",
                 *_CONTINUOUS,
                 "cam",
                 "resit",
@@ -874,6 +883,7 @@ _CONCEPTS = (
             *_exempt(
                 "A score or a regression reads every column.",
                 *_PURE_SCORE,
+                "gnies",
                 "calm",
                 *_CONTINUOUS,
                 "cam",

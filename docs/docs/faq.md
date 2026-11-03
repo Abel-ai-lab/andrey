@@ -221,7 +221,8 @@ graphs over time lags; `lpcmci` also allows hidden common causes. The [release c
 benchmark them against tigramite, lingam, and causal-learn. `multi_group_direct_lingam` fits
 several datasets that share one causal order, `cdnod` takes data from several domains, and `gies`
 takes data that mixes observation with interventions. All are supported. `dynotears`, which fits a
-linear structural vector autoregression by continuous optimization, is experimental.
+linear structural vector autoregression by continuous optimization, is experimental, and so is
+`gnies`, which learns from several environments the variables whose noise variance changed.
 
 ## Command line and agents
 

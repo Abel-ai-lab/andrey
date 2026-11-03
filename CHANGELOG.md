@@ -35,13 +35,24 @@ names its pull request.
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
-- `icp`, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal
-  parents of one `target` from continuous data pooled from several environments that leave the
-  target's mechanism alone: it tests every set of the other variables, or of at most
-  `max_parents`, for a regression on the target that is the same in every environment, with the
-  paper's approximate or exact test, and returns the variables in every accepted set, which are
-  parents with probability at least `1 - alpha`, with each variable's p-value and confidence
-  interval; it is experimental.
+- `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
+  environments that differ in the noise variances of variables it is not told: it returns those
+  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
+  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  authors' package, on simulated data in the paper's settings and the settings it claims, 10
+  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
+  the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
+  rows per environment and on the targets in 1 of them, on fresh datasets too; at the standard BIC
+  the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
+  on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
+  graph's 135 in a median 176 s. ([#665])
+- `andrey.icp`, experimental, finds the causal parents of one `target` from continuous data pooled
+  from several environments that leave the target's mechanism alone (Peters, Buhlmann and
+  Meinshausen 2016), by the paper's approximate or exact test, with each variable's p-value and
+  confidence interval. Against InvariantCausalPrediction 0.8, the authors' package, on simulated
+  data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
+  environments, and it names a variable outside the true parents in at most 1.23% of fits at
+  `alpha=0.05` in the settings it claims. ([#ICP])
 
 ### Changed
 
@@ -1681,3 +1692,4 @@ First alpha release.
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
 [#662]: https://github.com/Abel-ai-lab/andrey/pull/662
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
+[#665]: https://github.com/Abel-ai-lab/andrey/pull/665

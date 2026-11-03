@@ -889,3 +889,27 @@ def test_parity_keys_a_row_by_regime_when_a_method_has_one_entry_per_regime():
         del method["regime"]
     with pytest.raises(ValueError):
         reference_parity.paired_rows("s", summary)
+
+
+def test_parity_judges_each_metric_of_a_method_on_its_own_key():
+    from qa import reference_parity
+
+    worse, tied = _paired_row([0.2, 0.8]), _paired_row([-0.3, 0.6])
+    summary = {
+        "parity_rule": reference_parity.PAIRED_BOOTSTRAP,
+        "methods": [
+            {"method": "M", "comparator": "ref", "metric": metric, "regime": "A", "rows": [row]}
+            for metric, row in (("shd", tied), ("target_error", worse))
+        ],
+    }
+    rows = reference_parity.paired_rows("s", summary)
+    assert [r.key for r in rows] == [
+        {"metric": "shd", "d": 10},
+        {"metric": "target_error", "d": 10},
+    ]
+    failures = reference_parity.check(rows, [])[0]
+    assert len(failures) == 1
+    assert "metric=target_error" in failures[0] and "mean target error Andrey" in failures[0]
+    summary["methods"][1]["metric"] = "f1"
+    with pytest.raises(ValueError):
+        reference_parity.paired_rows("s", summary)
