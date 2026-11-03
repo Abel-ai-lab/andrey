@@ -459,8 +459,9 @@ def andrey_fits(cell: Cell, configs: list[dict] | None = None) -> list[dict]:
 def reference_fits(cell: Cell, kci_conditional: bool = False) -> list[dict]:
     """The reference's fits on one dataset of ``cell``; none in block A and O7.
 
-    UT-IGSP at J1 (alpha 1e-5, 5 runs) and, as context, at Andrey's shipped alpha (and 10 runs if
-    Andrey ships 10 starts); IGSP in G1 and G2; JCI-GSP in G1, G2, and G5.
+    UT-IGSP at J1 (alpha 1e-5, 5 runs) and, as context, at Andrey's shipped alpha, one over the
+    cell's observational rows when that is ``None`` (and 10 runs if Andrey ships 10 starts); IGSP
+    in G1 and G2; JCI-GSP in G1, G2, and G5.
     """
     if cell.arm in ("A", "O7"):
         return []
@@ -473,7 +474,8 @@ def reference_fits(cell: Cell, kci_conditional: bool = False) -> list[dict]:
             {**base, "config": "J1_conditional", "tester": "kci_conditional", **J1_REFERENCE}
         )
     defaults = andrey_defaults()
-    level = {"alpha": defaults["alpha"], "nruns": 10 if defaults["n_starts"] == 10 else NRUNS}
+    alpha = 1.0 / (cell.n_obs or cell.n) if defaults["alpha"] is None else defaults["alpha"]
+    level = {"alpha": alpha, "nruns": 10 if defaults["n_starts"] == 10 else NRUNS}
     if level != J1_REFERENCE:
         fits.append({**base, "config": "andrey_level", **level})
     if cell.arm in ("G1", "G2"):
