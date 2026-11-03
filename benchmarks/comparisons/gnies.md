@@ -52,8 +52,8 @@ The two packages differ in ways a larger comparison can show:
   runs GES's operators on CPDAGs, then completes each graph by orienting every edge at a target
   (the paper's Algorithm 3). Neither search is proven consistent, so on a dataset where either
   stops short of the true graph, the two can stop at different graphs.
-- The fit of a target's coefficients. Andrey runs the alternating fit to its floating-point fixed
-  point; the reference runs 10 iterations.
+- The fit of a target's coefficients. Andrey runs the alternating fit to its fixed point, within
+  1,000 steps; the reference runs 10 iterations.
 - Small environments. Andrey makes a target's parent set unavailable when it has more than the
   smallest environment's row count minus 2 members, where the likelihood has no maximum, and when
   the fit leaves an environment a residual variance of zero up to rounding; the reference scores
@@ -148,7 +148,8 @@ Each fit writes one line to `records.jsonl` in the output directory, with its ma
 ## Results
 
 Andrey's pre-release build of 3 November 2026 against gnies 0.3.3, one fit at a time on one core
-of an AMD EPYC 7713 processor with one BLAS thread. Every number below is in
+of an AMD EPYC 7713 processor with one BLAS thread; the processor model of the order check was not
+recorded. Every number below is in
 [`published/0.14.0/gnies.json`](../published/0.14.0/gnies.json), with the context arms, the
 coverage, and the score gaps of every cell. Every Andrey fit finished within its cap, and every
 in-claim SCM passed the model check.
@@ -270,7 +271,8 @@ single-target environments, seeds 0 to 9, a 3,600 s cap per fit; medians:
 | 100 | 2.5 | 0 | 176 | 54.5 | not run | | 135 |
 
 At 30 variables the reference ran seeds 0 to 2, and its fit on seed 1 passed the cap. Every Andrey
-fit finished; the slowest took 415 s at 100 variables.
+fit finished; the slowest took 478 s, at 100 variables and the standard BIC, and 415 s at its
+defaults.
 
 ### Order check
 

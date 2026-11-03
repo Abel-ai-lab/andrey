@@ -40,11 +40,12 @@ names its pull request.
   variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
   they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
   authors' package, on simulated data in the paper's settings and the settings it claims, 10
-  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` makes no more errors
-  in all 21 settings, on the graph and on the targets, and fewer in 2 with 10 rows per environment,
-  on fresh datasets too; at the standard BIC the two return the same graph and targets on 412 of
-  420 datasets. It fits about 34 times faster on one core (median) and reaches 100 variables, with
-  a median SHD of 2.5 against the empty graph's 135 in a median 176 s. ([#665])
+  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
+  the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
+  rows per environment and on the targets in 1 of them, on fresh datasets too; at the standard BIC
+  the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
+  on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
+  graph's 135 in a median 176 s. ([#665])
 
 ### Changed
 
