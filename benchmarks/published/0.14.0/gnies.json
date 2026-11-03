@@ -202,6 +202,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 16,
+      "same_graph_and_targets": 16
      }
     },
     "known_bic_vs_ceiling": {
@@ -228,6 +233,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -418,7 +428,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 1,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 19
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 2
    },
    "replication": {
     "cell": "A10",
@@ -554,6 +574,10 @@
      "ratio_q25": 0.0258,
      "ratio_q75": 0.0392,
      "paired": 19
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 0
     },
     "failed_fits": [
      {
@@ -738,6 +762,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -764,6 +793,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -945,7 +979,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 14,
+     "same_graph_and_targets": 14,
+     "learned_scores_lower_where_graphs_differ": 6
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -1121,6 +1165,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -1147,6 +1196,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -1328,7 +1382,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 15,
+     "same_graph_and_targets": 15,
+     "learned_scores_lower_where_graphs_differ": 5
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -1504,6 +1568,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 19,
+      "same_graph_and_targets": 19
      }
     },
     "known_bic_vs_ceiling": {
@@ -1530,6 +1599,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -1717,7 +1791,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 1,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 19
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "replication": {
     "cell": "B10",
@@ -1853,6 +1937,10 @@
      "ratio_q25": 0.0262,
      "ratio_q75": 0.0374,
      "paired": 20
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 0
     }
    }
   },
@@ -2029,6 +2117,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -2055,6 +2148,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -2236,7 +2334,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 9,
+     "same_graph_and_targets": 7,
+     "learned_scores_lower_where_graphs_differ": 10
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -2412,6 +2520,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -2438,6 +2551,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -2619,7 +2737,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 7,
+     "same_graph_and_targets": 7,
+     "learned_scores_lower_where_graphs_differ": 13
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -2795,6 +2923,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 18,
+      "same_graph_and_targets": 18
      }
     },
     "known_bic_vs_ceiling": {
@@ -2821,6 +2954,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 19,
+      "same_graph_and_targets": 19
      }
     },
     "ebic_default_minus_bic": {
@@ -3017,7 +3155,17 @@
        "target_saturated": 1
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 2,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 17
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "gies_true_targets_shd_own_class_mean": 6.75,
    "replication": {
@@ -3154,6 +3302,10 @@
      "ratio_q25": 0.0218,
      "ratio_q75": 0.0256,
      "paired": 19
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 2
     },
     "gies_true_targets_shd_own_class_mean": 7.5,
     "failed_fits": [
@@ -3339,6 +3491,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -3365,6 +3522,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -3546,7 +3708,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 15,
+     "same_graph_and_targets": 13,
+     "learned_scores_lower_where_graphs_differ": 5
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "gies_true_targets_shd_own_class_mean": 2.4,
    "replication": {
@@ -3683,6 +3855,10 @@
      "ratio_q25": 0.0215,
      "ratio_q75": 0.025,
      "paired": 20
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 0
     },
     "gies_true_targets_shd_own_class_mean": 1.9
    }
@@ -3860,6 +4036,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -3886,6 +4067,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -4067,7 +4253,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 16,
+     "same_graph_and_targets": 15,
+     "learned_scores_lower_where_graphs_differ": 3
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "gies_true_targets_shd_own_class_mean": 1.25
   },
@@ -4244,6 +4440,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 19,
+      "same_graph_and_targets": 19
      }
     },
     "known_bic_vs_ceiling": {
@@ -4270,6 +4471,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -4461,7 +4667,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 0,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 20
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 1
    },
    "replication": {
     "cell": "D10",
@@ -4597,6 +4813,10 @@
      "ratio_q25": 0.0218,
      "ratio_q75": 0.0443,
      "paired": 19
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 0
     },
     "failed_fits": [
      {
@@ -4781,6 +5001,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -4807,6 +5032,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -4988,7 +5218,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 8,
+     "same_graph_and_targets": 5,
+     "learned_scores_lower_where_graphs_differ": 12
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "replication": {
     "cell": "D100",
@@ -5124,6 +5364,10 @@
      "ratio_q25": 0.0281,
      "ratio_q75": 0.0323,
      "paired": 20
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 0
     }
    }
   },
@@ -5300,6 +5544,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -5326,6 +5575,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -5507,7 +5761,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 14,
+     "same_graph_and_targets": 13,
+     "learned_scores_lower_where_graphs_differ": 6
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -5683,6 +5947,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -5709,6 +5978,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -5890,7 +6164,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 12,
+     "same_graph_and_targets": 12,
+     "learned_scores_lower_where_graphs_differ": 8
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -6066,6 +6350,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -6092,6 +6381,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -6273,7 +6567,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 15,
+     "same_graph_and_targets": 14,
+     "learned_scores_lower_where_graphs_differ": 5
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -6455,6 +6759,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -6481,6 +6790,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 19,
+      "same_graph_and_targets": 19
      }
     },
     "ebic_default_minus_bic": {
@@ -6671,7 +6985,17 @@
        "target_saturated": 1
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 0,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 20
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -6853,6 +7177,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -6879,6 +7208,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -7060,7 +7394,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 15,
+     "same_graph_and_targets": 12,
+     "learned_scores_lower_where_graphs_differ": 4
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "replication": {
     "cell": "F100",
@@ -7196,6 +7540,10 @@
      "ratio_q25": 0.0213,
      "ratio_q75": 0.0239,
      "paired": 20
+    },
+    "targets_past_parent_limit": {
+     "andrey.gnies": 0,
+     "gnies.fit": 0
     }
    }
   },
@@ -7372,6 +7720,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -7398,6 +7751,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -7579,7 +7937,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 13,
+     "same_graph_and_targets": 13,
+     "learned_scores_lower_where_graphs_differ": 7
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -7753,6 +8121,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -7779,6 +8152,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -7960,7 +8338,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 15,
+     "same_graph_and_targets": 14,
+     "learned_scores_lower_where_graphs_differ": 5
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -8135,6 +8523,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -8161,6 +8554,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -8342,7 +8740,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 15,
+     "same_graph_and_targets": 14,
+     "learned_scores_lower_where_graphs_differ": 5
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -8518,6 +8926,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -8544,6 +8957,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -8725,7 +9143,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 14,
+     "same_graph_and_targets": 14,
+     "learned_scores_lower_where_graphs_differ": 6
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -8901,6 +9329,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -8927,6 +9360,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -9108,7 +9546,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 18,
+     "same_graph_and_targets": 16,
+     "learned_scores_lower_where_graphs_differ": 2
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -9284,6 +9732,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -9310,6 +9763,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -9491,7 +9949,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 18,
+     "same_graph_and_targets": 17,
+     "learned_scores_lower_where_graphs_differ": 2
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -9667,6 +10135,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -9693,6 +10166,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -9874,7 +10352,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 13,
+     "same_graph_and_targets": 13,
+     "learned_scores_lower_where_graphs_differ": 7
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -10050,6 +10538,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -10076,6 +10569,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -10257,7 +10755,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 1,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 19
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    },
    "shd_against_observational_cpdag": {
     "andrey.gnies": 2.55,
@@ -10439,6 +10947,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -10465,6 +10978,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -10646,7 +11164,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 1,
+     "same_graph_and_targets": 0,
+     "learned_scores_lower_where_graphs_differ": 19
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -10822,6 +11350,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -10848,6 +11381,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -11029,7 +11567,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 16,
+     "same_graph_and_targets": 15,
+     "learned_scores_lower_where_graphs_differ": 4
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   },
   {
@@ -11205,6 +11753,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "known_bic_vs_ceiling": {
@@ -11231,6 +11784,11 @@
       ],
       "above_zero": false,
       "verdict": "tie"
+     },
+     "datasets": {
+      "paired": 20,
+      "same_graph": 20,
+      "same_graph_and_targets": 20
      }
     },
     "ebic_default_minus_bic": {
@@ -11412,7 +11970,17 @@
        "target_saturated": 0
       }
      }
+    },
+    "bic_learned_vs_known_targets": {
+     "paired": 20,
+     "same_graph": 13,
+     "same_graph_and_targets": 8,
+     "learned_scores_lower_where_graphs_differ": 7
     }
+   },
+   "targets_past_parent_limit": {
+    "andrey.gnies": 0,
+    "gnies.fit": 0
    }
   }
  ],
