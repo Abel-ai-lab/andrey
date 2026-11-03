@@ -1302,7 +1302,8 @@ _add(
             graph_kind="cpdag",
             doc="metadata['targets'] maps each environment to its targets, known and learned; "
             "metadata['score'] is the edges plus the targets of the DAG found; "
-            "metadata['invariance_test'] names the invariance test",
+            "metadata['invariance_test'] names the invariance test; metadata['alpha'] is the "
+            "level of the conditional-independence tests",
         ),
         determinism="stochastic",
         accel="numpy",
@@ -1322,7 +1323,14 @@ _add(
                 "targets are all unknown.",
                 nullable=True,
             ),
-            concept_param("alpha", default=0.001),
+            concept_param(
+                "alpha",
+                default=None,
+                nullable=True,
+                doc="Significance level of the conditional-independence tests, and of the "
+                "invariance tests when invariance_alpha is null; null uses one over the number "
+                "of observational rows.",
+            ),
             ParamSpec(
                 name="invariance_alpha",
                 type="float",
@@ -2477,7 +2485,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "gnies": ("score", "index_edges", "environments"),
     "exact_search": ("dag",),
-    "ut_igsp": ("targets", "score", "invariance_test"),
+    "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
     "calm": ("h_final", "objective"),
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),
     "multi_group_direct_lingam": ("group_index",),

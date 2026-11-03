@@ -422,10 +422,11 @@ UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment
 whose intervention targets are known in part or not at all: it searches variable orders for the
 DAG with the fewest edges plus targets, where a setting's targets are its known ones and every
 variable whose distribution given its parents differs from the observational one. Its default
-level for the conditional-independence and invariance tests, `alpha=0.001`, had fewer errors than
-the paper's `1e-5` on simulated data in the paper's setting, mostly at 1,000 rows per setting or
-fewer. It returns the interventional essential graph with each setting's targets in
-`metadata["targets"]`.
+level for the conditional-independence and invariance tests, `alpha=None`, is one over the number
+of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it made
+fewer errors than the paper's reference implementation at the paper's `1e-5` in 20 of 112
+comparisons and more in none. It returns the interventional essential graph with each setting's
+targets in `metadata["targets"]` and the level used in `metadata["alpha"]`.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,

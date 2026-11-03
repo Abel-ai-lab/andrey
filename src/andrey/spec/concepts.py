@@ -253,11 +253,13 @@ _CONCEPTS = (
             Deviation(
                 method="ut_igsp",
                 name="alpha",
-                default=0.001,
+                default=None,
                 fixed_in=None,
-                reason="0.001 had fewer errors than the paper's 1e-5 (Squires, Wang and Uhler "
-                "2020, Section 5.1) on simulated data in the paper's setting: better in 7 of 15 "
-                "groups of datasets, worse in 2.",
+                reason="None is one over the number of observational rows, for both tests. On "
+                "simulated data in the paper's setting, against the paper's reference "
+                "implementation at its level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), it "
+                "had fewer errors in 20 of 112 comparisons and more in none, where 0.001 had fewer "
+                "in 15.",
             ),
         ),
     ),
