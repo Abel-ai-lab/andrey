@@ -9,7 +9,8 @@
 # the environment it was measured in. Some of them (pgmpy, xgboost, the NCCL wheel) are
 # dependencies the reference never imports; they stay here, outside Andrey's environment. A child
 # in this environment imports NumPy and the reference packages and nothing more; andrey stays in
-# bench-env, where the parent scores the results.
+# bench-env, where the parent scores the results. The check fits UT-IGSP, IGSP, the lane's JCI-GSP
+# copy (andrey_bench/adapters/gml_interventional.py), and UT-IGSP with the kernel tests.
 
 set -euo pipefail
 
@@ -22,9 +23,10 @@ uv venv "$VENV" --python 3.11 --clear
 uv pip install --python "$VENV/bin/python" -r "$LOCK"
 sha256sum "$LOCK"
 
-"$VENV/bin/python" - <<'PY'
+"$VENV/bin/python" - "$REPO/benchmarks/andrey_bench/adapters" <<'PY'
 import importlib.metadata as m
 import random
+import sys
 
 import graphical_model_learning as gml
 import graphical_models as gm
@@ -51,11 +53,24 @@ found, targets = gml.unknown_target_igsp(
     [{"known_interventions": [0]}, {"known_interventions": []}], set(range(5)), ci, inv
 )
 igsp = gml.igsp([{"interventions": [0]}, {"interventions": [2]}], set(range(5)), ci, inv)
+
+sys.path.insert(0, sys.argv[1])
+from gml_interventional import run_fit  # noqa: E402
+
+X = np.vstack([obs, *ivs])
+env = np.repeat([0, 1, 2], 2000)
+known = [[0], []]
+fit = {"alpha": 1e-5, "nruns": 5, "tester": "gauss"}
+jci = run_fit({**fit, "algorithm": "jci_gsp"}, X, env, known)
+rows = np.concatenate([np.flatnonzero(env == k)[:200] for k in range(3)])
+kci = run_fit({**fit, "algorithm": "ut_igsp", "tester": "kci"}, X[rows], env[rows], known)
 print(
     f"utigsp-env OK graphical-model-learning {m.version('graphical-model-learning')} "
     f"conditional-independence {m.version('conditional-independence')} graphical-models "
     f"{m.version('graphical-models')} numpy {np.__version__} | UT-IGSP {len(found.arcs)} arcs, "
-    f"targets {[sorted(int(v) for v in t) for t in targets]}; IGSP {len(igsp.arcs)} arcs"
+    f"targets {[sorted(int(v) for v in t) for t in targets]}; IGSP {len(igsp.arcs)} arcs; "
+    f"JCI-GSP {len(jci['arcs'])} arcs, targets {jci['targets']}; UT-IGSP with kernel tests "
+    f"{len(kci['arcs'])} arcs"
 )
 PY
 

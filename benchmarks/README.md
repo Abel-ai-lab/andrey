@@ -94,6 +94,17 @@ benchmarks/start_lingam.sh
 export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
 ```
 
+The authors' UT-IGSP library, graphical-model-learning 0.1a8 with its pinned dependencies, has an
+environment of its own as well, built from the lock file `requirements-utigsp.txt`:
+
+```shell
+benchmarks/start_utigsp.sh
+export ANDREY_BENCH_UTIGSP_PYTHON=$PWD/benchmarks/.venv-utigsp/bin/python
+```
+
+Its lane, `ut_igsp_cpu.py`, starts one child process per package and dataset rather than one per
+fit, since each child fits several draws; [its page](comparisons/ut-igsp.md) describes it.
+
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
