@@ -759,13 +759,23 @@ class NormalScores(FisherZ):
     """
 
     def __init__(self, data: np.ndarray) -> None:
-        from scipy.stats import rankdata
-
         arr = np.asarray(data, dtype=np.float64)
         scores = arr
         if arr.ndim == 2 and np.isfinite(arr).all():
-            scores = ndtri(rankdata(arr, axis=0) / (arr.shape[0] + 1.0))
+            scores = normal_scores(arr)
         super().__init__(scores)
+
+
+def normal_scores(data: np.ndarray) -> np.ndarray:
+    """Each column of the finite ``(n_samples, n_features)`` ``data`` as its normal scores.
+
+    The scores are ``Phi^-1(rank / (n + 1))`` (van der Waerden), with tied values sharing their
+    average rank: a column's scores depend on it only through its ranks.
+    """
+    from scipy.stats import rankdata
+
+    arr = np.asarray(data, dtype=np.float64)
+    return ndtri(rankdata(arr, axis=0) / (arr.shape[0] + 1.0))
 
 
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
