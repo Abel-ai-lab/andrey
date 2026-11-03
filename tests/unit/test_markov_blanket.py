@@ -13,6 +13,7 @@ import pytest
 
 from andrey import GraphStructure, data
 from andrey.constraint import blanket
+from andrey.constraint._skeleton import scan_conditioning_sets
 from andrey.constraint.blanket import (
     blanket_colliders,
     blanket_graph,
@@ -176,3 +177,50 @@ def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, f
     assert {t: ranks[t] for t in want_ranks} == want_ranks
     assert not ambiguous
     assert found < sum(tested)
+
+
+def _mmpc_on_every_set(test, target, d, alpha, ranks):
+    """MMPC with every remaining candidate tested against every set at each addition, then the
+    backward phase of :func:`parents_children`."""
+    weakest = {x: blanket._weakest(test, target, [x], [()])[0] for x in range(d) if x != target}
+    members: list[int] = []
+    while open_ := {x: w for x, w in weakest.items() if w[0] <= alpha}:
+        best = min(
+            open_,
+            key=lambda x: (round(open_[x][0], _KEY_DP), -round(open_[x][1], _KEY_DP), ranks[x]),
+        )
+        del open_[best]
+        conds = [
+            tuple(sorted((*rest, best)))
+            for size in range(len(members) + 1)
+            for rest in combinations(members, size)
+        ]
+        for x, (p, strength) in open_.items():
+            [(p_x, strength_x)] = blanket._weakest(test, target, [x], conds)
+            open_[x] = (max(p, p_x), min(strength, strength_x))
+        members.append(best)
+        weakest = open_
+    for x in list(members):
+        before = set(members[: members.index(x)])
+        rest = sorted(z for z in members if z != x)
+        for size in range(1, len(rest) + 1):
+            if scan_conditioning_sets(test, target, x, rest, size, alpha, set(), before):
+                members.remove(x)
+                break
+    return members
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+def test_mmpc_stops_testing_a_candidate_once_a_set_separates_it(kind):
+    """Each variable's MMPC set, in joining order, is the one found by testing every remaining
+    candidate against every set at each addition."""
+    if kind == "fisherz":
+        x = data.sample_scm(graph="erdos_renyi", d=15, n=1000, seed=2, density=4.0).data
+        test = FisherZ(x)
+    else:
+        x = data.sample_discrete(d=15, n=3000, seed=2, density=4.0).data
+        test = ChiSquare(x)
+    ranks = tie_ranks(x).tolist()
+    for target in range(15):
+        want = _mmpc_on_every_set(test, target, 15, 0.05, ranks)
+        assert parents_children(test, target, 15, 0.05, ranks) == want, target

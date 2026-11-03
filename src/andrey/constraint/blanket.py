@@ -256,7 +256,8 @@ def parents_children(
     add the candidate whose weakest association is the strongest, until every candidate has a
     conditioning set with a p-value above ``alpha``; such a candidate is dropped for good, since
     adding members only weakens an association. Each addition tests every remaining candidate
-    against the conditioning sets that hold the new member. Backward: visit the members in the
+    against the conditioning sets that hold the new member, by increasing size, and stops testing
+    a candidate after the first size at which a set separates it. Backward: visit the members in the
     order they joined and drop each one some subset of the other current members separates; the
     subsets of the members that joined before it were tested in the forward phase. With
     ``max_depth``, both phases test only the conditioning sets of at most ``max_depth`` variables;
@@ -278,18 +279,16 @@ def parents_children(
     members: list[int] = []
 
     def admit(new: int, pool: dict[int, tuple[float, float]]) -> None:
-        """Weaken each association in ``pool`` by the conditioning sets that hold ``new``, then
-        add ``new`` to the members."""
+        """Weaken each association in ``pool`` by the conditioning sets that hold ``new``, size by
+        size, then add ``new`` to the members. A candidate separated at one size is not tested at
+        the next: it leaves the pool, and only the candidates that stay are ranked."""
         top = len(members) if max_depth is None else min(len(members), max_depth - 1)
-        conds = [
-            tuple(sorted((*rest, new)))
-            for size in range(top + 1)
-            for rest in combinations(members, size)
-        ]
         xs = list(pool)
-        if conds:  # none when max_depth is 0
+        for size in range(top + 1):  # none when max_depth is 0
+            conds = [tuple(sorted((*rest, new))) for rest in combinations(members, size)]
             for x, (p, strength) in zip(xs, _weakest(test, target, xs, conds), strict=True):
                 pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
+            xs = [x for x in xs if pool[x][0] <= alpha]
         members.append(new)
 
     for new in required:
