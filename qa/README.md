@@ -152,11 +152,11 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, XGES, HC, Tabu, MMHC,
-RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD,
-BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and
-Granger on the datasets whose assumptions each method needs, and PC with each supported nonlinear
-conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
+The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, XGES, HC, Tabu,
+MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM,
+RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM,
+and Granger on the datasets whose assumptions each method needs, and PC with each supported
+nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -165,6 +165,7 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
+| `noise_interventional_gauss_er` at `d = 10, 20`, four environments of `n = 1000` | 10 seeds each | GnIES |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
@@ -198,17 +199,21 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
-- **Interventions, domains, groups, and indicators.** The published regimes of GIES, CD-NOD,
-  MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and
-  GIES's benchmark driver): `interventional_gauss_er` at `n = 50d`, with intervention targets on
-  four variables in ten and the rows split evenly between no intervention and each target;
-  `domain_shift_er`, 2,000 rows from four domains, in which one variable in three shifts its mean;
-  `multi_group_er`, three groups of 1,000 rows over one graph with weights drawn for each group;
-  and `latent_measurement`, latents that each cause every later one, with three indicators each,
-  where `d` counts the latents and the indicators. CD-NOD and MultiGroupDirectLiNGAM run through
-  their benchmark adapters, which build the domain index and split the groups. GIN's number of
-  tests grows combinatorially with the indicator count, so it runs at the two smaller sizes. A test
-  keeps the domain, group, and measurement draws in step with the harness.
+- **Interventions, domains, groups, and indicators.** The published regimes of GIES, GnIES, CD-NOD,
+  MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and the
+  benchmark drivers of GIES and GnIES): `interventional_gauss_er` at `n = 50d`, with intervention
+  targets on four variables in ten and the rows split evenly between no intervention and each
+  target; `noise_interventional_gauss_er`, the comparison's cell A1000 at 10 variables and its first
+  ladder rung at 20, an observational environment and three that each multiply the noise variance of
+  one variable, 1,000 rows each, with each row's environment beside the samples and the targets left
+  for GnIES to learn; `domain_shift_er`, 2,000 rows from four domains, in which one variable in
+  three shifts its mean; `multi_group_er`, three groups of 1,000 rows over one graph with weights
+  drawn for each group; and `latent_measurement`, latents that each cause every later one, with
+  three indicators each, where `d` counts the latents and the indicators. CD-NOD and
+  MultiGroupDirectLiNGAM run through their benchmark adapters, which build the domain index and
+  split the groups. GIN's number of tests grows combinatorially with the indicator count, so it runs
+  at the two smaller sizes. A test keeps the domain, group, and measurement draws in step with the
+  harness.
 - **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
@@ -235,16 +240,17 @@ SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, 
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
 ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by
 endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
-essential graph of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the
-domain index orients the edges it reaches. GIN's errors are the latents it misses: the true latents
-whose indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by
-endpoint SHD against the latent projection, the edges and pairs their benchmark scores: `i -> j` for
-a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden
-node reaches through hidden nodes only. The time-series methods are scored in their summaries'
-units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by
-endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the
-missing and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a
-method passes when its median SHD over the draws is:
+essential graph of the true DAG under the rows' targets, GnIES against the one under the true
+targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches. GIN's
+errors are the latents it misses: the true latents whose indicators it does not return as one
+cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection, the
+edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
+nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
+time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
+endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of the observed
+series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, and Granger by the
+missing and extra lagged edges. On each dataset, a method passes when its median SHD over the draws
+is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
