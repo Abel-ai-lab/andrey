@@ -19,6 +19,7 @@ whose Reproduce table lists the driver.
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
+| [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
 | BOSS and GRaSP | `boss_grasp_cpu.py`, `boss_grasp_reach.py` | BOSS, GRaSP | causal-learn | 0.1.0, 0.9.0 |
@@ -44,8 +45,8 @@ whose Reproduce table lists the driver.
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
-`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, and `start_lingam_ts.sh` build the
-separate environments some comparisons need ([setup](README.md#setup)).
+`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, and
+`start_utigsp.sh` build the separate environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
@@ -53,7 +54,9 @@ Each release card publishes its numbers from a summary in `published/<release>/`
 hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
 fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
 fix. [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json) holds the comparison of the
-experimental GnIES with gnies, which its [comparison page](comparisons/gnies.md) presents.
+experimental GnIES with gnies, and [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
+that of the experimental UT-IGSP with graphical-model-learning; their comparison pages,
+[GnIES](comparisons/gnies.md) and [UT-IGSP](comparisons/ut-igsp.md), present them.
 
 | Release | Release card | Summary |
 |---|---|---|

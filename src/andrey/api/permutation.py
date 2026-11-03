@@ -12,12 +12,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
     copies_named,
     default_score,
+    default_test,
     json_safe,
     structure_output,
 )
@@ -25,7 +28,7 @@ from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy.typing as npt
 
@@ -596,3 +599,397 @@ def grasp(
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+@method_spec("ut_igsp")
+def ut_igsp(
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
+    *,
+    targets: Mapping | npt.ArrayLike | str | None = None,
+    alpha: float | None = None,
+    invariance_alpha: float | None = None,
+    indep_test: str | None = None,
+    invariance_test: str | None = None,
+    n_starts: int = 10,
+    seed: int | None = None,
+    categorical: Sequence[str | int] | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn an interventional essential graph and unknown intervention targets with UT-IGSP.
+
+    UT-IGSP (unknown-target interventional greedy sparsest permutation) learns from data pooled
+    from an observational environment and interventional ones, the settings, whose targets, the
+    variables each one intervened on, may be known in part or not at all [1]_. It searches
+    variable orders for the DAG with the fewest edges and targets: each order gives the DAG of the
+    edges its conditional-independence tests keep on the observational rows, and a setting's
+    targets are its known ones plus every variable whose distribution given its parents differs
+    from the observational one. It returns the DAG's interventional essential graph under the
+    targets it found, with the targets.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample, from every environment. Coerced to ``float64``. A
+        DataFrame's column names become the structure's ``labels``. A column that ``env`` or
+        ``targets`` names is not a variable: it leaves the data before the fit, and
+        ``categorical``, ``knowledge``, ``targets``, and the result's positions count the other
+        columns.
+    env : array-like of shape (n_samples,), str, or None, default=None
+        The environment each row comes from: one label per row, strings or numbers, not both, or
+        the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
+        environments from ``targets``: its distinct values.
+    targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
+        The known targets of each environment, named by column label or 0-based position. A
+        mapping ``{label: [variables]}`` takes a label of ``env`` to its known targets: ``[]``
+        marks an observational environment, a list a setting with those known targets, and
+        ``None``, or a label the mapping leaves out, a setting whose targets are all unknown; a key
+        that is not a label of ``env`` raises ``ValueError``. A string names a column of the
+        DataFrame ``data`` whose cells give each row's targets: a label or a position, a list of
+        them, or an empty cell (``None``, ``NaN``, ``""``, ``[]``) for an observational row. An
+        array is ``True`` (or 1) where the row's value of the variable was set by an
+        intervention. With a column or an array an empty row is observational, so only the
+        mapping can name a setting with no known targets; without ``env``, rows with the same
+        targets are one environment. ``None`` with ``env`` makes every environment a setting with
+        unknown targets, which leaves none observational and raises. Every environment needs at
+        least 3 rows. See Notes.
+    alpha : float or None, default=None
+        Significance level of the conditional-independence tests, in ``(0, 1)``: two variables
+        are independent when a test's p-value exceeds it. Smaller values keep more edges out.
+        ``None`` uses one over the number of observational rows, 0.001 at 1,000 rows, so the level
+        falls as the rows grow. Also the level of the invariance tests when ``invariance_alpha``
+        is ``None``. ``metadata["alpha"]`` gives the level used. See Notes for the choice of the
+        default.
+    invariance_alpha : float or None, default=None
+        Significance level of the invariance tests, in ``(0, 1)``: a variable is a target of a
+        setting when the test of its distribution given its parents, there against the
+        observational rows, gives a p-value at most this level. ``None`` uses the level of the
+        conditional-independence tests, ``metadata["alpha"]``.
+    indep_test : str or None, default=None
+        The conditional-independence test, on the observational rows. For continuous data, on the
+        partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
+        categorical data coded by whole numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with
+        the categorical columns named by ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``;
+        for nonlinear effects in continuous data, each far slower: ``"kci"``, ``"rcot"``,
+        ``"cmiknn"``, and ``"gpdc"``, as for :func:`~andrey.pc`. ``None`` picks from the declared
+        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
+        else ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+    invariance_test : {"gaussian", "indicator"} or None, default=None
+        The invariance test, which asks whether a variable's distribution given a set of others is
+        the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
+        regressions of the two groups of rows: their coefficients and intercept by the Chow test
+        and their residual variances by an F-test, each at half the level. ``"indicator"`` runs
+        ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
+        others. ``None`` picks ``"gaussian"`` under ``"fisherz"``, ``"student_t"``, and
+        ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
+        so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
+        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+    n_starts : int, default=10
+        Number of searches, at least ``1``, each from a minimum-degree order of the variables:
+        the first breaks ties by each column's rank, and each later one draws them, and the order
+        in which it visits moves, from ``seed`` and its own index. Returns the best-scoring search,
+        the one that found the lowest objective; a later one replaces an earlier one only when it
+        is strictly lower. See Notes for the choice of the default.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
+        the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
+        another test, the result does not depend on it.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical test reads every column as
+        categorical, and a continuous test raises ``ValueError`` on a declared column, named here
+        or by its type.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Every DAG the search visits has
+        the required edges and none of the forbidden ones, and every order it visits puts the
+        cause of each required edge, and each earlier tier, first. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential graph
+        of the DAG found under the observational environment and each setting's targets in
+        ``metadata["targets"]``: directed marks (``->``) are the edges that every DAG of the class
+        orients alike, undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is
+        ``"ut_igsp"``; ``metadata["targets"]`` maps each environment to its targets, known and
+        learned, by column label or 0-based position, ``[]`` for an observational one. Its keys are
+        text, as every metadata key is: an environment's label of ``env`` as ``str(label)``, so
+        the label ``1`` is the key ``"1"``, to be converted back before it is passed as
+        ``targets``; without ``env``, its known targets joined by commas, labels sorted as text or
+        positions sorted, ``""`` for the observational one. ``metadata["score"]`` is the objective
+        of the DAG found, its number of edges plus its number of targets over the settings, lower
+        is better; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests
+        used, and ``metadata["alpha"]`` is the level of the conditional-independence tests;
+        ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a
+        mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read.
+
+    Raises
+    ------
+    TypeError
+        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. If ``env`` or
+        ``targets`` is malformed, as :func:`~andrey.gies` lists; if no environment is
+        observational, or every one is; if an environment has fewer than 3 rows; if, without
+        ``env``, two environments' known targets join to one key, as when a column label holds a
+        comma; if ``invariance_test="gaussian"`` comes with a categorical or mixed-data
+        ``indep_test``; if ``data`` holds a missing or infinite value, a column constant on every
+        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`.
+        With a partial-correlation test, also if a column repeats another up to scale and shift on
+        the observational rows; one message names every group of copies. Also if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes,
+        which a continuous test reads as numbers. Each message warns once per process.
+
+    See Also
+    --------
+    andrey.gies : Learns the same kind of graph when every environment's targets are known.
+    andrey.cdnod : Learns from data pooled over environments without targets, as a changing
+        context.
+    andrey.grasp : Searches variable orders on observational data.
+
+    Notes
+    -----
+    **When to use.** UT-IGSP suits continuous data from an observational environment and several
+    settings, with linear effects, Gaussian noise, and no unmeasured common causes, where the
+    settings' targets are known in part or not at all [1]_. Its authors claim it for perfect
+    interventions, which cut a variable from its causes, and imperfect ones, which change its
+    mechanism, such as a shift of its mean, a change of its noise variance, or a change of the
+    weights of its causes; their simulations use about 20 variables, 5 settings, and 1,000 or more
+    rows per setting. It returns the interventional essential graph and each setting's targets.
+    Measured in that setting against the paper's reference implementation, with every kind of
+    intervention above and up to 3 unknown targets per setting, it was worse in none of 112
+    comparisons and better in 18, its errors lower on two sets of datasets; for 17 of the 18 the
+    second set is the one its default was chosen on (see Limitations). When every target is known,
+    use :func:`~andrey.gies`; with no observational environment, or with environments that differ in
+    ways that are not interventions, use :func:`~andrey.cdnod`.
+
+    **Choosing alpha and n_starts.** The defaults come from simulated data with linear effects,
+    Gaussian noise, and 5 settings, 5 seeds per dataset, mostly in the authors' setting of 20
+    variables at mean degree 1.5. A comparison's errors count as lower or higher when the 95%
+    bootstrap interval of the mean difference in errors, paired by dataset, lies wholly below or
+    above 0. On 15 groups of datasets with mean shifts and perfect interventions at 300 to 5,000
+    rows per setting, 20 datasets each and 10 in the one at 50 variables, 10 starts made fewer SHD
+    errors than 5 in 4 groups, by 0.17 to 0.42 edges, 2 of them outside the authors' setting at 300
+    rows per setting or 50 variables, and more in none, at a median of 0.24 s per fit on 20
+    variables against 0.21 s; the target errors were higher in no group. The level was then chosen
+    on 56 further groups at 1,000 to 5,000 rows per setting, 20 datasets each, with mean shifts,
+    perfect interventions, and changes of the noise variance or of the weights, 0 to 3 unknown
+    targets per setting, and in 4 groups no known ones: each candidate against the paper's reference
+    implementation at the authors' level, ``alpha=1e-5`` [1]_, in SHD and in target errors, 112
+    comparisons, each one above 0 rerun on 20 more datasets per group. With one over the number of
+    observational rows the errors were higher in none and lower in 20, by 0.13 to 2.63 errors per
+    dataset, 11 of them in SHD at 1,000 rows per setting; ``alpha=0.001`` was lower in 15 and higher
+    in 3, in SHD at 5,000 rows, none of which repeated on the rerun; ``alpha=1e-5`` was lower in 7
+    and higher in none. Against ``alpha=0.001`` itself the default made fewer SHD errors in 4
+    comparisons, all at 5,000 rows, by 0.2 to 0.65 edges, and more in none.
+
+    **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
+    ``j`` unless the conditional-independence test finds them independent given every other
+    variable before ``j``, on the observational rows (all environments whose targets are ``[]``,
+    pooled). A setting's targets in that DAG are its known ones plus every variable whose
+    distribution given its parents in the DAG is not invariant between the setting and the
+    observational rows. The objective is the number of edges plus the number of targets over the
+    settings [1]_. The search starts from the order of a minimum-degree elimination of the graph
+    of pairs dependent given all other variables, and moves by reversing I-covered edges: ``i ->
+    j`` where ``j``'s parents are ``i`` and ``i``'s parents, and, in each setting with ``i`` among
+    its known targets, ``j``'s distribution given its parents is not invariant. A depth-first
+    search over reversals that do not raise the objective moves to a DAG that lowers it, up to 5
+    reversals away, and repeats until none does [1]_. The result is the best of ``n_starts`` such
+    searches, returned as its interventional essential graph under the targets found [2]_.
+
+    **Invariance tests.** Under ``"gaussian"``, a variable given a set of others is invariant when
+    the linear regressions with an intercept agree in the two groups of rows: the Chow test of
+    equal coefficients and intercept and the F-test of equal residual variances [3]_, exact under
+    Gaussian noise, each at half the level, so a variable is a target when either rejects. A
+    regressor constant within a group, as under a hard intervention without noise, costs that
+    group one degree of freedom. A group with no more rows than the regression has parameters, as
+    a setting of 3 rows given 2 other variables, leaves nothing to compare, and the variable reads
+    as invariant: such a setting learns no target from that query and blocks the reversal of an
+    edge from one of its known targets into that variable. Under ``"normal_scores"`` the
+    regressions read every column's normal scores over all rows. Under ``"indicator"``, a variable
+    is invariant when ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows
+    given the others, on the rows of the setting and the observational ones [4]_; under
+    ``"fisherz"`` and ``"student_t"`` this sees a change of the mean alone, which is why
+    ``"gaussian"`` is their default.
+
+    **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
+    their rows are pooled. Every other environment is a setting, compared with the observational
+    rows alone, never with another setting. A setting's known targets count as targets whatever
+    their tests say. Only the mapping form of ``targets`` gives a setting with no known targets:
+    in the column and array forms an empty row is observational, so with ``env`` such a setting
+    would be pooled with the observational rows, and without ``env`` settings with the same known
+    targets merge into one.
+
+    **Column order.** Each column gets a tie rank computed from the data on every row, as for
+    :func:`~andrey.hc`, and the search runs on the columns sorted by it: the first search breaks
+    ties between orders and between moves by the rank, and the later ones shuffle them. Reordering
+    the columns relabels the result, and the labels of the environments and the order of the rows
+    change nothing for the tests that draw no random numbers. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test
+    regresses or tests a variable on all of its conditioning variables in each environment. Drop
+    the incomplete rows first.
+
+    **Limitations.** Measured on simulated data, 20 datasets per setting (10 at 50 and 100 variables
+    and on categorical data), one core per fit, against the paper's reference implementation at its
+    defaults, ``alpha=1e-5`` [1]_. In the authors' setting every fit finished, and in all 56 groups
+    its SHD was below the empty graph's 15 and, where the given targets missed some, its target
+    errors were below those of the given targets alone. Its lead there comes mostly from the default
+    level: run at the same level with 10 starts, the reference implementation tied it in 107 of the
+    112 comparisons, and in the other 5, all with weight changes, this method's errors were lower,
+    on one set of datasets with no rerun; at ``alpha=1e-5`` with 5 starts it was worse in none and
+    better in none. Outside the authors' setting, at the default level: with 100 rows per setting
+    its SHD was 8.35 against the reference implementation's 12.95 and the empty graph's 15, but with
+    no unknown targets it named more false targets, 1.50 per dataset against 0.25; on a denser
+    graph, 50 variables at mean degree 5 with 3 settings, neither beat the empty graph, its SHD
+    130.2 and 123.9 against 125 at 500 and 2,000 rows per setting; with additive nonlinear effects
+    and the Gaussian tests its SHD was 1.55 and 1.4, close to the reference implementation's, but
+    its target errors were higher, 1.85 against 0.75 with no unknown targets and 4.85 against 2.90
+    with 3 per setting. Its authors state a nonparametric version but run none; with
+    ``indep_test="kci"`` on 10 variables with additive nonlinear effects its SHD was 5.3 and 5.5 at
+    200 rows per setting and 2.4 and 2.35 at 400, against the empty graph's 8, a fit taking 8 to
+    30 s. On categorical data with ``indep_test="gsq"``, 10 variables, its SHD was 5.4 at 1,000 rows
+    per setting and 1.6 at 5,000, against 10. With 2,000 rows per setting and 3 unknown targets per
+    setting, its SHD was 1.5 at 50 variables and 4.8 at 100, against 38 and 75, a median fit taking
+    1.7 s and 15.2 s. A median fit on 20 variables took 0.24 s, about 1.7 times the reference
+    implementation's time on one core of the same processor model. The search's cost grows with the
+    number of I-covered edges to the power of its depth, and each start tests every pair given all
+    other variables, so time grows fast with the number of variables. The objective counts targets,
+    so a setting whose intervention leaves its target's distribution unchanged orients nothing
+    through that target. Unmeasured common causes are outside its model and not measured. One level
+    serves both tests unless ``invariance_alpha`` is given. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Squires, C., Wang, Y., and Uhler, C. (2020). Permutation-based causal structure learning
+       with unknown intervention targets. UAI, PMLR 124, 1039-1048.
+       https://proceedings.mlr.press/v124/squires20a.html
+    .. [2] Yang, K. D., Katcoff, A., and Uhler, C. (2018). Characterizing and learning equivalence
+       classes of causal DAGs under interventions. ICML, PMLR 80, 5537-5546.
+       https://proceedings.mlr.press/v80/yang18a.html
+    .. [3] Chow, G. C. (1960). Tests of equality between sets of coefficients in two linear
+       regressions. Econometrica 28(3), 591-605.
+    .. [4] Heinze-Deml, C., Peters, J., and Meinshausen, N. (2018). Invariant causal prediction for
+       nonlinear models. Journal of Causal Inference 6(2).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import ut_igsp
+    >>> rng = np.random.default_rng(0)
+    >>> env = np.repeat(["observed", "shift x", "unknown"], 1000)
+    >>> x = rng.standard_normal(3000) + 2.0 * (env == "shift x")
+    >>> y = x + rng.standard_normal(3000) + 2.0 * (env == "unknown")
+    >>> data = pd.DataFrame({"x": x, "y": y})
+    >>> out = ut_igsp(data, env, targets={"observed": [], "shift x": ["x"], "unknown": None})
+    >>> out.structure.oriented_edges()
+    [('x', 'y', 'directed')]
+    >>> out.metadata["targets"]
+    {'observed': [], 'shift x': ['x'], 'unknown': ['y']}
+    """
+    from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
+    from andrey.core.environments import normalize_env_targets
+    from andrey.core.invariance import default_invariance_test
+    from andrey.search.igsp import ut_igsp as _ut_igsp
+
+    data, codes, env_labels, by_code = normalize_env_targets(
+        data, env, targets, require_known_targets=False, method="ut_igsp"
+    )
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    invariance_test = invariance_test or default_invariance_test(indep_test)
+    if invariance_test == "gaussian" and indep_test in DISCRETE_INDEP_TESTS + MIXED_INDEP_TESTS:
+        raise ValueError(
+            "ut_igsp: invariance_test='gaussian' regresses on the columns' values and so cannot "
+            f"read categorical columns, which indep_test={indep_test!r} reads; use 'indicator' "
+            "or None"
+        )
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method="ut_igsp")
+    labels = column_labels(data)
+    observational = [code for code, t in by_code.items() if t == frozenset()]
+    named = [_env_name(env_labels[c], env is None, labels) for c in sorted(by_code)]
+    shared = [name for name in dict.fromkeys(named) if named.count(name) > 1]
+    if shared:
+        raise ValueError(
+            "ut_igsp names each environment by its known targets joined by commas when env is "
+            f"None, and {shared} names more than one, as a column label holds a comma or is "
+            "empty; pass env"
+        )
+    if not observational:
+        raise ValueError(
+            f"ut_igsp needs an observational environment, but none of {named} has targets []; "
+            "map at least one label of env to [] in targets"
+        )
+    if len(observational) == len(by_code):
+        raise ValueError(
+            "ut_igsp needs at least one interventional environment besides the observational "
+            f"ones, {named}; for observational data use grasp or boss"
+        )
+    sizes = np.bincount(codes, minlength=len(by_code))
+    small = [named[c] for c in np.flatnonzero(sizes < 3)]
+    if small:
+        raise ValueError(f"ut_igsp needs at least 3 rows in every environment; {small} have fewer")
+    rows = np.isin(codes, observational)
+    constant = np.flatnonzero(np.ptp(X[rows], axis=0) == 0)
+    if constant.size:
+        columns = [labels[j] if labels else int(j) for j in constant]
+        raise ValueError(
+            f"ut_igsp: columns {columns} are constant on the observational rows, where the "
+            "conditional-independence tests run; drop them"
+        )
+    constraints = resolve(knowledge, X.shape[1], labels, method="ut_igsp")
+    level = 1.0 / int(rows.sum()) if alpha is None else alpha
+    with copies_named(labels):
+        graph, found, score = _ut_igsp(
+            X,
+            codes,
+            by_code,
+            alpha=level,
+            invariance_alpha=level if invariance_alpha is None else invariance_alpha,
+            indep_test=indep_test,
+            invariance_test=invariance_test,
+            categorical=mask,
+            n_starts=n_starts,
+            seed=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            constraints=constraints,
+        )
+    variables = (lambda j: labels[j]) if labels else int
+    metadata = {
+        "targets": {
+            named[c]: [variables(j) for j in sorted(found.get(c, ()))] for c in sorted(by_code)
+        },
+        "score": score[0] if len(score) == 1 else list(score),
+        "invariance_test": invariance_test,
+        "alpha": level,
+        **categorical_metadata(mask, data),
+    }
+    return structure_output(graph, labels=labels, metadata=metadata)
+
+
+def _env_name(label: object, from_targets: bool, labels: tuple[str, ...] | None) -> object:
+    """Return an environment's key in ``metadata["targets"]``.
+
+    The key is its label of ``env``, or, when the environments come from the targets, its known
+    targets joined by commas: their labels sorted as text, or their positions sorted.
+    """
+    if not from_targets:
+        return label.item() if isinstance(label, np.generic) else label
+    positions = sorted(label)  # ty: ignore[invalid-argument-type]
+    return ",".join(sorted(labels[j] for j in positions) if labels else map(str, positions))

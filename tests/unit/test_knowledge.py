@@ -109,6 +109,9 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
         warnings.simplefilter("ignore")
         if name in ("cdnod", "gnies"):
             return getattr(andrey, name)(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
+        if name == "ut_igsp":  # an observational environment and a setting of unknown targets
+            env = np.repeat([0, 1], len(data) // 2)
+            return andrey.ut_igsp(data, env, targets={0: []}, **kwargs)
         if name == "exact_search":
             return andrey.exact_search(data, **kwargs)
         if REGISTRY[name].output.multi:  # the first of two groups, the halves of the rows
