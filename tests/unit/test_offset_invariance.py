@@ -70,7 +70,8 @@ def marks(out) -> list[np.ndarray]:
 
 
 def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
-    """The method's required inputs built from ``data`` shifted to ``data * scale + offset``."""
+    """The method's required inputs, gnies's env, and the environments of a method in ``CONTEXT``,
+    built from ``data`` shifted to ``data * scale + offset``."""
     scale, offset = shift
 
     def moved(x: np.ndarray) -> np.ndarray:
@@ -78,7 +79,7 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
 
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
             if spec.name in CONTEXT and inp.kind == "context":
                 args.append(np.arange(N) * 3 // N)
             continue

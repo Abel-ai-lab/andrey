@@ -1967,8 +1967,8 @@ _EnvOption = Annotated[
     typer.Option(
         "--env",
         metavar="COLUMN|PATH",
-        help="cdnod, gies, igsp, ut_igsp only: the environment of each row, a column of --data's "
-        "header (then not a variable) or a file with one value per row of --data.",
+        help="cdnod, gies, gnies, igsp, ut_igsp only: the environment of each row, a column of "
+        "--data's header (then not a variable) or a file with one value per row of --data.",
     ),
 ]
 _DomainIndexOption = Annotated[

@@ -40,12 +40,31 @@ names its pull request.
   it returns the interventional essential graph and, in `metadata["targets"]`, each setting's
   targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
   mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
-  `"indicator"`, the test of whether a variable's distribution given others changes. ([#PR])
+  `"indicator"`, the test of whether a variable's distribution given others changes. Against
+  graphical-model-learning 0.1a8, the authors' library, on simulated data in the paper's setting
+  with every kind of intervention it claims (20 variables, 5 settings, 1,000 to 5,000 rows per
+  setting, up to 3 unknown targets per setting), `ut_igsp` at its defaults, alpha one over the
+  observational rows and 10 starts, is worse in none of the 112 comparisons, on the graph or the
+  targets, and better in 18, its errors lower on two sets of datasets (for 17 of the 18 the second
+  set is the one its default was chosen on); at the paper's alpha `1e-5` it is worse in none and
+  better in none. A median fit on 20 variables takes 0.24 s, about 1.7 times the library's time
+  on one core. ([#668])
 - `igsp`, experimental, learns the interventional essential graph from an observational
   environment and settings whose targets are all known (IGSP, Wang et al. 2017; Yang, Katcoff, and
   Uhler 2018), the same inputs as `gies`: it searches variable orders for the DAG with the fewest
   edges, then the fewest edges that the settings' invariance tests contradict. It takes the
   arguments of `ut_igsp`, with `alpha=1e-3`. ([#PR])
+- `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
+  environments that differ in the noise variances of variables it is not told: it returns those
+  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
+  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  authors' package, on simulated data in the paper's settings and the settings it claims, 10
+  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
+  the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
+  rows per environment and on the targets in 1 of them, on fresh datasets too; at the standard BIC
+  the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
+  on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
+  graph's 135 in a median 176 s. ([#665])
 
 ### Changed
 
@@ -1685,3 +1704,5 @@ First alpha release.
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
 [#662]: https://github.com/Abel-ai-lab/andrey/pull/662
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
+[#665]: https://github.com/Abel-ai-lab/andrey/pull/665
+[#668]: https://github.com/Abel-ai-lab/andrey/pull/668

@@ -33,6 +33,10 @@ Packages:
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md), and
   [Tetrad on continuous data](comparisons/tetrad-continuous.md)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
+- [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
+  [GnIES](comparisons/gnies.md)
+- [graphical-model-learning](https://github.com/uhlerlab/graphical_model_learning) - uses a
+  separate environment; see below and [UT-IGSP](comparisons/ut-igsp.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
 
@@ -108,6 +112,14 @@ rather than one per fit, since each child fits several draws;
 [UT-IGSP's page](comparisons/ut-igsp.md) and [IGSP's](comparisons/igsp.md) describe them. The
 second interpreter is the same environment with `patches/gml-igsp-def42.patch` applied, the IGSP
 lane's second reference.
+
+gnies 0.3.3, the reference for GnIES, fits in an environment of its own on Python 3.12, so its pins
+stay exact and the module `ges` it imports stays out of bench-env:
+
+```shell
+benchmarks/start_gnies.sh
+export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
+```
 
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and

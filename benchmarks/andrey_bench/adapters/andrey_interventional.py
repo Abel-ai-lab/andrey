@@ -10,7 +10,7 @@ of each row's known targets, and ``fits``, a JSON list. Each fit names an ``algo
 - ``ut_igsp``: ``andrey.ut_igsp(X, env, targets={0: [], k: known_k}, seed=draw, **kwargs)``, the
   settings with no known targets left out of the mapping, which reads them as unknown. A fit's
   ``objective`` sets ``andrey.search.igsp.UT_IGSP_OBJECTIVE`` for its calls. Its targets are
-  ``metadata["targets"]`` per setting.
+  ``metadata["targets"]`` per setting, and its line keeps the level used, ``metadata["alpha"]``.
 - ``igsp``: ``andrey.igsp(X, env, targets={0: [], k: known_k}, seed=draw, **kwargs)``.
 - ``gies``: ``andrey.gies(X, env, targets={0: [], k: known_k})``, at its defaults.
 - ``grasp``: ``andrey.grasp(X[env == 0], **kwargs)``, the observational rows alone.
@@ -52,6 +52,7 @@ def run_fit(fit: dict, X: np.ndarray, env: np.ndarray, known: dict[int, list[int
             "marks": out.structure.to_numpy().astype(int).tolist(),
             "targets": targets,
             "score": out.metadata.get("score"),
+            "alpha": out.metadata.get("alpha"),
         }
     if algorithm == "igsp":
         out = andrey.igsp(X, env, targets={0: [], **known}, seed=seed, **kwargs)

@@ -918,7 +918,7 @@ def ut_igsp(
     env: npt.ArrayLike | str | None = None,
     *,
     targets: Mapping | npt.ArrayLike | str | None = None,
-    alpha: float = 0.001,
+    alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
     invariance_test: str | None = None,
@@ -964,15 +964,18 @@ def ut_igsp(
         targets are one environment. ``None`` with ``env`` makes every environment a setting with
         unknown targets, which leaves none observational and raises. Every environment needs at
         least 3 rows. See Notes.
-    alpha : float, default=0.001
+    alpha : float or None, default=None
         Significance level of the conditional-independence tests, in ``(0, 1)``: two variables
         are independent when a test's p-value exceeds it. Smaller values keep more edges out.
-        Also the level of the invariance tests when ``invariance_alpha`` is ``None``. See Notes
-        for the choice of the default.
+        ``None`` uses one over the number of observational rows, 0.001 at 1,000 rows, so the level
+        falls as the rows grow. Also the level of the invariance tests when ``invariance_alpha``
+        is ``None``. ``metadata["alpha"]`` gives the level used. See Notes for the choice of the
+        default.
     invariance_alpha : float or None, default=None
         Significance level of the invariance tests, in ``(0, 1)``: a variable is a target of a
         setting when the test of its distribution given its parents, there against the
-        observational rows, gives a p-value at most this level. ``None`` uses ``alpha``.
+        observational rows, gives a p-value at most this level. ``None`` uses the level of the
+        conditional-independence tests, ``metadata["alpha"]``.
     indep_test : str or None, default=None
         The conditional-independence test, on the observational rows. For continuous data, on the
         partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
@@ -1032,7 +1035,8 @@ def ut_igsp(
         positions sorted, ``""`` for the observational one. ``metadata["score"]`` is the objective
         of the DAG found, its number of edges plus its number of targets over the settings, lower
         is better; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests
-        used; ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a
+        used, and ``metadata["alpha"]`` is the level of the conditional-independence tests;
+        ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a
         mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read.
 
     Raises
@@ -1078,24 +1082,34 @@ def ut_igsp(
     settings' targets are known in part or not at all [1]_. Its authors claim it for perfect
     interventions, which cut a variable from its causes, and imperfect ones, which change its
     mechanism, such as a shift of its mean, a change of its noise variance, or a change of the
-    weights of its causes; their simulations use about 20 variables, 5 settings, and 1,000 or
-    more rows per setting. It returns the interventional essential graph and each setting's
-    targets. When every target is known, use :func:`~andrey.gies`; with no observational
-    environment, or with environments that differ in ways that are not interventions, use
-    :func:`~andrey.cdnod`.
+    weights of its causes; their simulations use about 20 variables, 5 settings, and 1,000 or more
+    rows per setting. It returns the interventional essential graph and each setting's targets.
+    Measured in that setting against the paper's reference implementation, with every kind of
+    intervention above and up to 3 unknown targets per setting, it was worse in none of 112
+    comparisons and better in 18, its errors lower on two sets of datasets; for 17 of the 18 the
+    second set is the one its default was chosen on (see Limitations). When every target is known,
+    use :func:`~andrey.gies`; with no observational environment, or with environments that differ in
+    ways that are not interventions, use :func:`~andrey.cdnod`.
 
-    **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' setting,
-    with 20 variables at mean degree 1.5, linear effects, Gaussian noise, and 5 settings that shift
-    each target's mean or intervene perfectly on it, with 0 or 3 unknown targets each: 15 groups of
-    datasets at 300 to 5,000 rows per setting, 20 datasets each and 10 in the one at 50 variables, 5
-    seeds per dataset. A group counts as better or worse when the 95% bootstrap interval of the mean
-    difference in SHD, paired by dataset, lies wholly below or above 0. Against the authors' level,
-    ``alpha=1e-5`` [1]_, ``alpha=0.001`` was better in 7 groups and worse in 2, by about 0.3 edges
-    at 3,000 rows per setting without unknown targets, and ``alpha=0.01`` was worse in 10; at 1,000
-    rows or fewer and at 50 variables ``0.001`` lowered the mean SHD by 0.8 to 2.5. At
-    ``alpha=0.001``, 10 starts were better than 5 in 4 groups, by 0.2 to 0.4 edges, and worse in
-    none, at a median of 0.24 s per fit on 20 variables against 0.21 s. Neither change made the
-    target errors worse in any group.
+    **Choosing alpha and n_starts.** The defaults come from simulated data with linear effects,
+    Gaussian noise, and 5 settings, 5 seeds per dataset, mostly in the authors' setting of 20
+    variables at mean degree 1.5. A comparison's errors count as lower or higher when the 95%
+    bootstrap interval of the mean difference in errors, paired by dataset, lies wholly below or
+    above 0. On 15 groups of datasets with mean shifts and perfect interventions at 300 to 5,000
+    rows per setting, 20 datasets each and 10 in the one at 50 variables, 10 starts made fewer SHD
+    errors than 5 in 4 groups, by 0.17 to 0.42 edges, 2 of them outside the authors' setting at 300
+    rows per setting or 50 variables, and more in none, at a median of 0.24 s per fit on 20
+    variables against 0.21 s; the target errors were higher in no group. The level was then chosen
+    on 56 further groups at 1,000 to 5,000 rows per setting, 20 datasets each, with mean shifts,
+    perfect interventions, and changes of the noise variance or of the weights, 0 to 3 unknown
+    targets per setting, and in 4 groups no known ones: each candidate against the paper's reference
+    implementation at the authors' level, ``alpha=1e-5`` [1]_, in SHD and in target errors, 112
+    comparisons, each one above 0 rerun on 20 more datasets per group. With one over the number of
+    observational rows the errors were higher in none and lower in 20, by 0.13 to 2.63 errors per
+    dataset, 11 of them in SHD at 1,000 rows per setting; ``alpha=0.001`` was lower in 15 and higher
+    in 3, in SHD at 5,000 rows, none of which repeated on the rerun; ``alpha=1e-5`` was lower in 7
+    and higher in none. Against ``alpha=0.001`` itself the default made fewer SHD errors in 4
+    comparisons, all at 5,000 rows, by 0.2 to 0.65 edges, and more in none.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other
@@ -1145,18 +1159,35 @@ def ut_igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5 settings
-    and 5,000 rows per setting, the authors' simulated setting, and on smaller fixed cases with the
-    kernel and categorical tests. The search's cost grows with the number of I-covered edges to
-    the power of its depth, and each start tests every pair given all other variables, so time
-    grows fast with the number of variables. The objective counts targets, so a setting whose
-    intervention leaves its target's distribution unchanged, such as a shift of a variable's mean
-    by an amount the test cannot tell apart, orients nothing through that target. Unmeasured common
-    causes and nonlinear effects with ``"fisherz"`` are outside its model. Its authors state a
-    nonparametric version but run none; the kernel tests are not benchmarked with it. One level
-    serves both tests unless ``invariance_alpha`` is given. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Measured on simulated data, 20 datasets per setting (10 at 50 and 100 variables
+    and on categorical data), one core per fit, against the paper's reference implementation at its
+    defaults, ``alpha=1e-5`` [1]_. In the authors' setting every fit finished, and in all 56 groups
+    its SHD was below the empty graph's 15 and, where the given targets missed some, its target
+    errors were below those of the given targets alone. Its lead there comes mostly from the default
+    level: run at the same level with 10 starts, the reference implementation tied it in 107 of the
+    112 comparisons, and in the other 5, all with weight changes, this method's errors were lower,
+    on one set of datasets with no rerun; at ``alpha=1e-5`` with 5 starts it was worse in none and
+    better in none. Outside the authors' setting, at the default level: with 100 rows per setting
+    its SHD was 8.35 against the reference implementation's 12.95 and the empty graph's 15, but with
+    no unknown targets it named more false targets, 1.50 per dataset against 0.25; on a denser
+    graph, 50 variables at mean degree 5 with 3 settings, neither beat the empty graph, its SHD
+    130.2 and 123.9 against 125 at 500 and 2,000 rows per setting; with additive nonlinear effects
+    and the Gaussian tests its SHD was 1.55 and 1.4, close to the reference implementation's, but
+    its target errors were higher, 1.85 against 0.75 with no unknown targets and 4.85 against 2.90
+    with 3 per setting. Its authors state a nonparametric version but run none; with
+    ``indep_test="kci"`` on 10 variables with additive nonlinear effects its SHD was 5.3 and 5.5 at
+    200 rows per setting and 2.4 and 2.35 at 400, against the empty graph's 8, a fit taking 8 to
+    30 s. On categorical data with ``indep_test="gsq"``, 10 variables, its SHD was 5.4 at 1,000 rows
+    per setting and 1.6 at 5,000, against 10. With 2,000 rows per setting and 3 unknown targets per
+    setting, its SHD was 1.5 at 50 variables and 4.8 at 100, against 38 and 75, a median fit taking
+    1.7 s and 15.2 s. A median fit on 20 variables took 0.24 s, about 1.7 times the reference
+    implementation's time on one core of the same processor model. The search's cost grows with the
+    number of I-covered edges to the power of its depth, and each start tests every pair given all
+    other variables, so time grows fast with the number of variables. The objective counts targets,
+    so a setting whose intervention leaves its target's distribution unchanged orients nothing
+    through that target. Unmeasured common causes are outside its model and not measured. One level
+    serves both tests unless ``invariance_alpha`` is given. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1207,13 +1238,15 @@ def ut_igsp(
         )
     _check_environments("ut_igsp", X, labels, codes, by_code, named, env is None)
     constraints = resolve(knowledge, X.shape[1], labels, method="ut_igsp")
+    observational = [code for code, t in by_code.items() if t == frozenset()]
+    level = 1.0 / int(np.isin(codes, observational).sum()) if alpha is None else alpha
     with copies_named(labels):
         graph, found, score = _ut_igsp(
             X,
             codes,
             by_code,
-            alpha=alpha,
-            invariance_alpha=alpha if invariance_alpha is None else invariance_alpha,
+            alpha=level,
+            invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
             invariance_test=invariance_test,
             categorical=mask,
@@ -1228,6 +1261,7 @@ def ut_igsp(
         },
         "score": score[0] if len(score) == 1 else list(score),
         "invariance_test": invariance_test,
+        "alpha": level,
         **categorical_metadata(mask, data),
     }
     return structure_output(graph, labels=labels, metadata=metadata)

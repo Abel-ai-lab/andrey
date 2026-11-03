@@ -9,7 +9,8 @@ drawn from the seed. An observational environment and ``K`` settings of ``n`` ro
 ``k`` intervenes on one designed target, which the fit is told, and on ``l`` off-targets, which it
 is not. The designed targets come from ``default_rng([seed, 654])`` and the off-targets of setting
 ``k`` from ``default_rng([seed, 654, l, k])`` among the other variables, so the cells of one block
-share their DAGs and designed targets. :data:`KINDS` names the interventions.
+share their DAGs, and their designed targets too except the ``weight`` cells, which draw theirs
+among the variables with parents. :data:`KINDS` names the interventions.
 
 :func:`grid` lists every cell: block A (seeds 1000-1019, Andrey alone, to choose its defaults), the
 in-claim arms G1-G6 and the out-of-claim arms O1-O9 (seeds 0-19), each with its ``claim``. Per
@@ -459,8 +460,9 @@ def andrey_fits(cell: Cell, configs: list[dict] | None = None) -> list[dict]:
 def reference_fits(cell: Cell, kci_conditional: bool = False) -> list[dict]:
     """The reference's fits on one dataset of ``cell``; none in block A and O7.
 
-    UT-IGSP at J1 (alpha 1e-5, 5 runs) and, as context, at Andrey's shipped alpha (and 10 runs if
-    Andrey ships 10 starts); IGSP in G1 and G2; JCI-GSP in G1, G2, and G5.
+    UT-IGSP at J1 (alpha 1e-5, 5 runs) and, as context, at Andrey's shipped alpha, one over the
+    cell's observational rows when that is ``None`` (and 10 runs if Andrey ships 10 starts); IGSP
+    in G1 and G2; JCI-GSP in G1, G2, and G5.
     """
     if cell.arm in ("A", "O7"):
         return []
@@ -473,7 +475,8 @@ def reference_fits(cell: Cell, kci_conditional: bool = False) -> list[dict]:
             {**base, "config": "J1_conditional", "tester": "kci_conditional", **J1_REFERENCE}
         )
     defaults = andrey_defaults()
-    level = {"alpha": defaults["alpha"], "nruns": 10 if defaults["n_starts"] == 10 else NRUNS}
+    alpha = 1.0 / (cell.n_obs or cell.n) if defaults["alpha"] is None else defaults["alpha"]
+    level = {"alpha": alpha, "nruns": 10 if defaults["n_starts"] == 10 else NRUNS}
     if level != J1_REFERENCE:
         fits.append({**base, "config": "andrey_level", **level})
     if cell.arm in ("G1", "G2"):

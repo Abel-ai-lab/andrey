@@ -103,6 +103,7 @@ def test_without_env_two_environments_with_one_key_raise():
         andrey.ut_igsp(frame.assign(t=[known[label] for label in env]), targets="t")
 
 
+@pytest.mark.parametrize("alpha", [None, 0.05])
 @pytest.mark.parametrize(
     ("env", "targets", "message"),
     [
@@ -114,12 +115,12 @@ def test_without_env_two_environments_with_one_key_raise():
         ("small", {"a": []}, "at least 3 rows in every environment"),
     ],
 )
-def test_bad_environments_raise(env, targets, message):
+def test_bad_environments_raise(env, targets, message, alpha):
     frame, _, _, _ = sample(n=50)
     n = len(frame)
     rows = {"one": np.full(n, "a"), "small": np.array(["a"] * (n - 2) + ["b", "b"]), None: None}
     with pytest.raises(ValueError, match=message):
-        andrey.ut_igsp(frame, rows[env], targets=targets)
+        andrey.ut_igsp(frame, rows[env], targets=targets, alpha=alpha)
 
 
 def test_a_column_constant_on_the_observational_rows_raises():
@@ -153,6 +154,38 @@ def test_invariance_alpha_reaches_the_invariance_test_and_alpha_does_not(monkeyp
         ({"alpha": 0.05, "invariance_alpha": 0.001}, known),
     ):
         assert andrey.ut_igsp(frame, env, targets=targets, **levels).metadata["targets"] == want
+
+
+def test_alpha_none_is_one_over_the_observational_rows_and_a_float_is_kept():
+    frame, env, targets, _ = sample()
+    rows = int((env == "observed").sum())
+    default = andrey.ut_igsp(frame, env, targets=targets)
+    explicit = andrey.ut_igsp(frame, env, targets=targets, alpha=1 / rows)
+    assert default.metadata["alpha"] == explicit.metadata["alpha"] == 1 / rows
+    assert marks(default) == marks(explicit)
+    assert default.metadata["targets"] == explicit.metadata["targets"]
+    assert andrey.ut_igsp(frame, env, targets=targets, alpha=0.01).metadata["alpha"] == 0.01
+    # Every environment mapped to [] is observational: their rows are pooled and all counted.
+    split = np.where((env == "observed") & (np.arange(len(env)) % 2 == 0), "again", env)
+    pooled = andrey.ut_igsp(frame, split, targets={**targets, "again": []})
+    assert pooled.metadata["alpha"] == 1 / rows
+
+
+def test_alpha_none_sets_the_invariance_level_by_the_observational_rows(monkeypatch):
+    """Under an invariance test whose p-value is always 0.01, every variable is a target at 50
+    observational rows, a level of 0.02, and only the known ones at 500, a level of 0.002."""
+    from andrey.search import igsp
+
+    monkeypatch.setattr(igsp, "make_invariance_test", lambda *args, **kwargs: lambda y, S: 0.01)
+    for n, every in ((50, True), (500, False)):
+        frame, env, targets, _ = sample(n=n)
+        out = andrey.ut_igsp(frame, env, targets=targets)
+        assert out.metadata["alpha"] == 1 / n
+        found = out.metadata["targets"]
+        if every:
+            assert all(found[k] == list(frame.columns) for k in ("one", "two", "three"))
+        else:
+            assert found == {"observed": [], "one": ["x1"], "two": ["x3"], "three": []}
 
 
 @pytest.mark.parametrize("indep_test", ["fisherz", "kci"])

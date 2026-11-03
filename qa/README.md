@@ -12,6 +12,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `profiler.py` | Time one method's fit and show where it spends its time. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
+| `gnies_order.py` | Count how often a column or row order changes GnIES's result, and why. |
 | `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
 
@@ -89,6 +90,25 @@ measurement with no passing threshold.
 
 ```shell
 uv run python -m qa.column_order
+```
+
+## GnIES order
+
+`gnies_order.py` measures how often reordering the columns or shuffling the rows changes GnIES's
+graph or learned targets. It draws the GnIES lane's A design (`benchmarks/gnies_cpu.py`) at 6, 8,
+10, and 12 variables, 100 and 1000 rows per environment, seeds 0-9 (80 models), fits each at the
+defaults, refits it on three seeded column orders and three seeded row shuffles that keep each
+row's environment, and maps the answers back. A tie the tie ranks decide is logged at DEBUG level
+(`andrey.search.gies` for a step of the inner search, `andrey.search.gnies` for an outer step); the
+summary counts the changes, those with such a record in one of the two fits, and those without. A
+change without one points at an order dependence the tie ranks do not cover. With `--reference`,
+gnies 0.3.3 is refitted on the same column orders, which shows whether its result depends on the
+column order.
+
+```shell
+uv run python -m qa.gnies_order -o order.json
+ANDREY_BENCH_GNIES_PYTHON=... uv run python -m qa.gnies_order --reference -o order.json
+uv run python -m qa.gnies_order --summarize order-*.json
 ```
 
 ## CI test calibration
@@ -282,10 +302,13 @@ row or on its entry: the gate prints it with its numbers and does not fail it, w
 interval. A row with `"claim": "in"` or no `claim` is in claim and is judged as above, and a row's
 own `claim` overrides its entry's. Any other value of `claim` is an error.
 
-An entry may name the error its rows compare with `metric` (default `"shd"`): its rows hold
-`andrey_<metric>_mean` and `comparator_<metric>_mean`, and the check names the metric in the row's
-label, so a method judged on its graph and on its intervention targets has one entry for each. An
-entry with `"role": "context"` pairs Andrey with a comparator it is reported against and never
+An entry's `metric` names the error its rows pair: `"shd"`, the default, or `"target_error"`, the
+number of intervention targets a method learned wrongly or missed (the size of the symmetric
+difference of its targets and the true ones), for a method that learns its targets. Its rows hold
+`andrey_<metric>_mean` and `comparator_<metric>_mean`, or `andrey_shd_mean` and
+`comparator_shd_mean` holding that error's means. Such a method has one entry per metric, each
+judged by the rules here, and a row's key names its `metric`; any other value of `metric` is an
+error. An entry with `"role": "context"` pairs Andrey with a comparator it is reported against and never
 judged by: its rows are printed with their numbers and not gated. Two more fields gate an in-claim
 row whatever its interval. Its `coverage` holds `andrey_short`, the datasets the reference finished
 and Andrey did not under the time cap: above 0, the row fails at any number of paired datasets,
