@@ -850,11 +850,13 @@ $R^2$-sortability averages 0.74 raw or standardized, 0.52 with `"rescale"`, and 
 it from a Gaussian; `soft` keeps the parents and changes the mechanism: it shifts or rescales the
 variable's noise, or rescales its parents' weights. `soft(noise_scale=(low, high))` multiplies the
 noise of each row by its own draw from `U[low, high]`, the noise interventions of the ICP
-simulations (Peters, Buhlmann and Meinshausen 2016, Appendix G), and `soft(weights="redraw")` draws
-each parent's weight anew, on its own, from the functional's `weight_range`. You name a variable by
-its column in the data `sample` returns, after the column shuffle, and give values and shifts in the
-units of those data, whatever the `scale`. The sample under `do` draws the noise the sample without
-interventions draws, so every column the interventions do not reach is the same in the two.
+simulations (Peters, Buhlmann and Meinshausen 2016, Appendix G). `soft(weights="redraw")` draws each
+parent's weight anew, on its own, from the functional's own `weight_range`; the new weights of
+Appendix G come from a range of their own, which `soft` does not take. A variable without parents
+has no weights to rescale or draw anew. You name a variable by its column in the data `sample`
+returns, after the column shuffle, and give values and shifts in the units of those data, whatever
+the `scale`. The sample under `do` draws the noise the sample without interventions draws, so every
+column the interventions do not reach is the same in the two.
 
 `envs=` on `SCM.sample` and `sample_discrete` draws several environments into one dataset: one
 mapping of interventions per environment, `{}` for none. Each environment draws its own noise, and
@@ -881,9 +883,9 @@ graph is the graph without interventions.
 
 `model_seed=` on `SCM.sample` and `sample_discrete` keeps one model across datasets. The model
 comes from `model_seed`: the graph, the weights or tables, the noise scales, the column order, and
-the weights or tables a `soft` intervention draws anew. `seed` draws only the rows, so samples with
-one `model_seed` and different seeds are datasets of one model, with the same true graph and
-`params`:
+the weights or tables a `soft` intervention draws anew. Each environment draws its own, and `params`
+holds those of the model without interventions. `seed` draws only the rows, so samples with one
+`model_seed` and different seeds are datasets of one model, with the same true graph and `params`:
 
 ```python
 datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(weights="redraw")}])

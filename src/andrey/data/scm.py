@@ -103,6 +103,18 @@ def _column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) 
     return _component_rng(root, _COLUMNS).permutation(n_observed)
 
 
+def _options(functional: Functional, noise: Noise) -> dict:
+    """Return the functional and noise options the provenance names beside the two names.
+
+    Each option appears only when it is set, so a record of a model without them is unchanged.
+    """
+    return {
+        **({"positive": True} if functional.positive else {}),
+        **({"heteroscedastic": True} if noise.heteroscedastic else {}),
+        **({} if noise.variance_range is None else {"variance_range": list(noise.variance_range)}),
+    }
+
+
 @dataclass(frozen=True, kw_only=True)
 class SCM:
     """A structural causal model: a causal graph, functional forms, and exogenous noise.
@@ -199,7 +211,8 @@ class SCM:
             Number of samples (rows). With ``envs``, the rows of each environment: ``n`` each, or
             ``n[k]`` for environment ``k``.
         seed : int
-            Root seed; the graph, weights, and noise streams are derived from it statelessly.
+            Root seed of the rows, and of the model when ``model_seed`` is None; the streams it
+            seeds are derived from it statelessly.
         model_seed : int or None, default=None
             The seed of the model: the graph, the weights, the noise scales, the latent variables,
             the column order, the lag matrices of a temporal functional, and the weights
@@ -462,6 +475,7 @@ class SCM:
                 },
                 "functional": self.functional.name,
                 "noise": self.noise.name,
+                **_options(self.functional, self.noise),
                 "n": int(n),
                 "scale": scale,
                 "dtype": np.dtype(dtype).name,
@@ -633,6 +647,7 @@ class SCM:
                 },
                 "functional": self.functional.name,
                 "noise": self.noise.name,
+                **_options(self.functional, self.noise),
                 "n": int(n),
                 "scale": scale,
                 "dtype": np.dtype(dtype).name,

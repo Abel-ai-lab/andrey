@@ -122,17 +122,22 @@ def soft(
         functional, its weights in the location and in the scale. A variable without parents has
         no weights to change.
     noise_scale : float or (float, float), default=1.0
-        Multiplies the variable's noise, so its noise standard deviation. A pair ``(low, high)``
-        multiplies the noise of each row by its own draw from ``U[low, high]``, so the noise
-        follows a new distribution, a scale mixture of the one it had (Peters et al. 2016,
-        Appendix G).
+        Multiplies the variable's noise, so its noise standard deviation. A pair ``(low, high)``,
+        ``low < high``, multiplies the noise of each row by its own draw from ``U[low, high]``, so
+        the noise follows a new distribution, a scale mixture of the one it had (Peters et al.
+        2016, Appendix G).
     weights : {"keep", "redraw"}, default="keep"
         ``"redraw"`` draws the weight of each of the variable's parents anew, each on its own,
-        from the functional's weight distribution: magnitude ``U[weight_range]``, with a random
-        sign, or positive when the functional draws positive weights. Under the location-scale
-        functional, the weights in the location and in the scale are drawn anew. The new weights
-        are part of the model: samples with the same model seed draw the same ones. ``"redraw"``
-        takes ``weight_scale=1``.
+        from the functional's own weight distribution: magnitude ``U[weight_range]``, with a
+        random sign, or positive when the functional draws positive weights. The new weights
+        come from that ``weight_range``, not from a range of their own as in Peters et al. (2016,
+        Appendix G). Under the location-scale functional, the weights in the location and in the
+        scale are drawn anew. A variable without parents has no weights to draw anew. The new
+        weights are part of the model: samples with the same model seed draw the same ones. Each
+        environment draws its own: the sample under :meth:`~andrey.data.SCM.do` and each
+        environment of ``envs=`` draw different new weights for the same intervention, and the
+        dataset's ``params`` holds the weights without interventions. ``"redraw"`` takes
+        ``weight_scale=1``.
 
     Returns
     -------
@@ -142,7 +147,7 @@ def soft(
     ------
     ValueError
         If an argument is not finite, ``noise_scale`` is negative or a pair not ordered
-        ``0 <= low <= high``, ``weights`` is not ``"keep"`` or ``"redraw"``, or ``"redraw"`` is
+        ``0 <= low < high``, ``weights`` is not ``"keep"`` or ``"redraw"``, or ``"redraw"`` is
         given with a ``weight_scale`` other than 1.
 
     References
@@ -159,17 +164,17 @@ def soft(
     >>> soft(noise_scale=(1.0, 3.0), weights="redraw")
     SoftIntervention(shift=0.0, weight_scale=1.0, noise_scale=(1.0, 3.0), weights='redraw')
     """
-    if isinstance(noise_scale, int | float | np.integer | np.floating):
-        noise = float(noise_scale)
+    values = np.asarray(noise_scale, dtype=float)
+    if values.ndim == 0:
+        noise = float(values)
         if not (np.isfinite(noise) and noise >= 0):
             raise ValueError(f"soft() takes a finite noise_scale >= 0, got {noise_scale}")
     else:
-        noise = tuple(float(v) for v in noise_scale)
-        if len(noise) != 2 or not (np.all(np.isfinite(noise)) and 0 <= noise[0] <= noise[1]):
+        if values.shape != (2,) or not (np.all(np.isfinite(values)) and 0 <= values[0] < values[1]):
             raise ValueError(
-                f"soft() takes noise_scale as a number or a pair 0 <= low <= high, got "
-                f"{noise_scale}"
+                f"soft() takes noise_scale as a number or a pair 0 <= low < high, got {noise_scale}"
             )
+        noise = (float(values[0]), float(values[1]))
     if not all(np.isfinite(v) for v in (shift, weight_scale)):
         raise ValueError(
             f"soft() takes finite arguments, got shift={shift}, weight_scale={weight_scale}"

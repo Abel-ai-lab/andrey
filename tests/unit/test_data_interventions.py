@@ -403,8 +403,10 @@ def test_bad_discrete_interventions_raise(intervention, match):
         (lambda: hard(probs=[0.5, 0.6]), "sum to 1"),
         (lambda: soft(shift=np.nan), "finite"),
         (lambda: soft(noise_scale=-1.0), "noise_scale >= 0"),
-        (lambda: soft(noise_scale=(2.0, 1.0)), "pair 0 <= low <= high"),
-        (lambda: soft(noise_scale=(1.0, 2.0, 3.0)), "pair 0 <= low <= high"),
+        (lambda: soft(noise_scale=(2.0, 1.0)), "pair 0 <= low < high"),
+        (lambda: soft(noise_scale=(1.0, 1.0)), "pair 0 <= low < high"),
+        (lambda: soft(noise_scale=(1.0, 2.0, 3.0)), "pair 0 <= low < high"),
+        (lambda: soft(noise_scale=np.ones((1, 2))), "pair 0 <= low < high"),
         (lambda: soft(weights="new"), "'keep' or 'redraw'"),
         (lambda: soft(weights="redraw", weight_scale=2.0), "not both"),
     ],
@@ -412,3 +414,7 @@ def test_bad_discrete_interventions_raise(intervention, match):
 def test_bad_specs_raise(build, match):
     with pytest.raises(ValueError, match=match):
         build()
+
+
+def test_a_0d_noise_scale_is_a_number():
+    assert soft(noise_scale=np.array(2.0)) == soft(noise_scale=2.0)

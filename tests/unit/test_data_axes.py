@@ -305,3 +305,21 @@ def test_unitless_rejects_the_weights_and_variances_it_draws_itself(functional, 
     )
     with pytest.raises(ValueError, match="unitless"):
         scm.sample(n=10, seed=0, scale="unitless")
+
+
+@pytest.mark.parametrize(
+    ("functional", "noise"),
+    [
+        (data.functional.linear(positive=True), data.noise.gaussian()),
+        (data.functional.linear(), data.noise.gaussian(variance_range=(1.0, 2.0))),
+        (data.functional.linear(), data.noise.gaussian(heteroscedastic=True)),
+    ],
+)
+def test_the_provenance_tells_a_model_option_apart(functional, noise):
+    graph = data.graphs.erdos_renyi(d=6, avg_degree=2.0)
+
+    def config(functional, noise):
+        scm = data.SCM(graph=graph, functional=functional, noise=noise)
+        return scm.sample(n=10, seed=0).provenance["config"]
+
+    assert config(functional, noise) != config(data.functional.linear(), data.noise.gaussian())

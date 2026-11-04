@@ -74,7 +74,8 @@ names its pull request.
   each row by its own draw from `U[low, high]`, `model_seed=` on `SCM.sample` and `sample_discrete`
   keeps one model across datasets while `seed` draws the rows, `functional.linear(positive=True)`
   makes every weight positive, and `variance_range=` on the noise families draws each noise variance
-  from a range. ([#690])
+  from a range. The provenance of a sample names `positive`, `variance_range`, and
+  `heteroscedastic` when they are set. ([#690])
 
 ### Changed
 
