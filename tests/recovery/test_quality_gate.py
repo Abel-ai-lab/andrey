@@ -55,6 +55,8 @@ def shifted_series_truth(truth: object, target: qg.Target) -> object:
     if target == "window":
         n = truth.n_nodes - truth.latents
         return qg.WindowGraph(np.roll(truth.marks[:, :n, :n], 1, axis=(1, 2)), lag0="cpdag")
+    if target == "window_edges":
+        return qg.WindowGraph(np.roll(truth.marks, 1, axis=(1, 2)), lag0="dag")
     if target == "cross_links":
         blocks = truth.stack[[1, 0, 2]] if truth.kind == "varma" else truth.stack[:, ::-1]
         return qg.CoefficientStack(blocks, kind=truth.kind)
