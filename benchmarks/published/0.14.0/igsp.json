@@ -4,7 +4,7 @@
  "lane": "igsp",
  "method": "IGSP",
  "status": "experimental",
- "about": "IGSP's own published measurements, one file per lane; it holds no release-summary entry, and no release card reads it",
+ "about": "IGSP's own published measurements, one file per lane; the release summary's IGSP entries are built from it",
  "build": "Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every in-claim and out-of-claim fit",
  "build_commits": 1,
  "comparator": "graphical-model-learning 0.1a8 (igsp) with conditional-independence 0.1a6 and graphical-models 0.1a21, the authors' library and the method's only implementation; in the 27 cells with a setting of two or more targets also a copy of it patched so that its I-contradicting test follows Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
