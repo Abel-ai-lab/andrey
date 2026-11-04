@@ -1531,9 +1531,6 @@ def icp(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which the fit reads as numbers. Each message warns once per process.

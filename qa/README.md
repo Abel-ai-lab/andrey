@@ -154,10 +154,10 @@ fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, ICP, XGES, HC,
 Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
-MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI,
-VARMA-LiNGAM, LongitudinalLiNGAM, and Granger on the datasets whose assumptions each method needs,
-PC with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on
-nonlinear data, and the targets UT-IGSP learns:
+MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI,
+VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each
+method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn,
+and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -174,6 +174,7 @@ nonlinear data, and the targets UT-IGSP learns:
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
+| `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
@@ -182,6 +183,7 @@ nonlinear data, and the targets UT-IGSP learns:
 | `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
+| `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
 | ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
 | Sachs, measured | 1 | PC, FCI, GFCI, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
@@ -193,6 +195,12 @@ nonlinear data, and the targets UT-IGSP learns:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Hidden variables, nonlinear.** CAM-UV's published regimes, drawn by its benchmark driver
+  (`benchmarks/camuv_cpu.py`) at two cells in its claim where its errors are below the empty
+  graph's: `camuv_paper`, the paper's simulation, 10 observed variables, two hidden common causes,
+  and two hidden intermediates; and `latent_anm_er_tenth`, `anm_er`'s additive noise with one node
+  in ten hidden, 20 observed. Both have 1,000 rows, and `d` counts the hidden nodes. A seed whose
+  graph cannot hide its nodes is skipped and the next one taken, as the driver does.
 - **Nonlinear regimes.** `anm_er` adds to each variable a weighted sum of `z + sin(z)` over its
   parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
   partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
@@ -234,7 +242,7 @@ nonlinear data, and the targets UT-IGSP learns:
   as its fit takes seconds. `longitudinal_lingam_paper` draws `m` units at `n` time points.
   Granger's published median error is above the empty graph's at every published size, so its
   gate draws 5 variables, where it is below. PCMCI and Granger run at their default
-  `fdr_method`, `"fdr_bh"`. A test keeps the Granger draws in step with the benchmark driver and
+  `fdr_method`, `"fdr_bh"`. DYNOTEARS runs at its defaults, the paper's settings for 500 steps. A test keeps the Granger draws in step with the benchmark driver and
   the regime names with the harness.
 - **Environments.** `icp_do` follows ICP's published regime of that name: an observational
   environment and environments of do-interventions `N(2, 0.2^2)`, at 6 or 10 variables and 200
@@ -267,11 +275,13 @@ edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to
 nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
 time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
 endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of the observed
-series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, and Granger by the
-missing and extra lagged edges. A method that estimates a set of variables is scored by the set's
-false members plus its missed ones, where the empty set makes as many errors as the true set has
-members: ICP by the target's parents. On each dataset, a method passes when its median SHD over the
-draws is:
+series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the
+missing and extra lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
+scored by its directed edges against the edges between observed variables that no hidden causal or
+backdoor path joins, the edges it can identify as direct: an edge in one set and not the other
+counts 1, a reversed one 2. A method that estimates a set of variables is scored by the set's false
+members plus its missed ones, where the empty set makes as many errors as the true set has members:
+ICP by the target's parents. On each dataset, a method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.

@@ -57,14 +57,15 @@ whose Reproduce table lists the driver.
 Each release card publishes its numbers from a summary in `published/<release>/`. Two more folders
 hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
 fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
-fix. [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json) holds the comparison of the
-experimental GnIES with gnies, [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
-that of the experimental UT-IGSP with graphical-model-learning,
-[`published/0.14.0/camuv.json`](published/0.14.0/camuv.json) that of the experimental CAM-UV with
-lingam and causal-learn, and [`published/0.14.0/dynotears.json`](published/0.14.0/dynotears.json)
-that of the experimental DYNOTEARS with CausalNex; their comparison pages,
-[GnIES](comparisons/gnies.md), [UT-IGSP](comparisons/ut-igsp.md), [CAM-UV](comparisons/camuv.md),
-and [DYNOTEARS](comparisons/dynotears.md), present them.
+fix. The 0.14.0 summary draws its rows from the lane files
+[`published/0.14.0/gnies.json`](published/0.14.0/gnies.json), GnIES with gnies,
+[`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json), UT-IGSP with
+graphical-model-learning, [`published/0.14.0/icp.json`](published/0.14.0/icp.json), ICP with
+InvariantCausalPrediction, [`published/0.14.0/camuv.json`](published/0.14.0/camuv.json), CAM-UV with
+lingam and causal-learn, and [`published/0.14.0/dynotears.json`](published/0.14.0/dynotears.json),
+DYNOTEARS with CausalNex; their comparison pages, [GnIES](comparisons/gnies.md),
+[UT-IGSP](comparisons/ut-igsp.md), [ICP](comparisons/icp.md), [CAM-UV](comparisons/camuv.md), and
+[DYNOTEARS](comparisons/dynotears.md), present them.
 
 | Release | Release card | Summary |
 |---|---|---|

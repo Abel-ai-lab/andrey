@@ -1601,12 +1601,6 @@ def dynotears(
         names a column ``data`` lacks, contradicts itself, or requires a link without a lag or
         beyond ``tau_max``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
-
     Notes
     -----
     **When to use.** DYNOTEARS suits one continuous, observational, stationary multivariate time
