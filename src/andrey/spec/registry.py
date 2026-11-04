@@ -383,6 +383,7 @@ _add(
                 type="str",
                 default="approximate",
                 choices=("approximate", "exact"),
+                concept="invariance_test",
                 doc="approximate = one regression on every row, each environment's residuals "
                 "against the others' by Welch's t-test and the F-test of their variances; exact = "
                 "the regression on the other rows predicts each environment's rows, by Chow's "
@@ -1351,6 +1352,95 @@ _add(
             _CATEGORICAL,
         ),
         references=("Lam, Andrews & Ramsey 2022",),
+    )
+)
+_add(
+    MethodSpec(
+        name="ut_igsp",
+        family="permutation",
+        summary="Unknown-target interventional greedy sparsest permutation: a permutation search "
+        "over minimal I-MAPs for data from an observational environment and settings whose "
+        "intervention targets are known in part or not at all, minimizing the edges plus the "
+        "targets. Fisher z and Gaussian invariance tests by default. Returns the interventional "
+        "essential graph + each setting's targets.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets that map at least one label to [], the observational rows.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['targets'] maps each environment to its targets, known and learned; "
+            "metadata['score'] is the edges plus the targets of the DAG found; "
+            "metadata['invariance_test'] names the invariance test; metadata['alpha'] is the "
+            "level of the conditional-independence tests",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        seeded=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The known intervention targets of each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"], "2": null}; [] marks an '
+                "observational environment, and null, or a label left out, a setting whose "
+                "targets are all unknown.",
+                nullable=True,
+            ),
+            concept_param(
+                "alpha",
+                default=None,
+                nullable=True,
+                doc="Significance level of the conditional-independence tests, and of the "
+                "invariance tests when invariance_alpha is null; null uses one over the number "
+                "of observational rows.",
+            ),
+            ParamSpec(
+                name="invariance_alpha",
+                type="float",
+                default=None,
+                doc="Significance level of the invariance tests: a variable is a target of a "
+                "setting when the test rejects at it. null uses alpha.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                nullable=True,
+            ),
+            _INDEP_TEST,
+            concept_param("invariance_test"),
+            concept_param(
+                "n_starts",
+                default=10,
+                doc="Number of searches, at least 1, each from a minimum-degree order: the first "
+                "breaks ties by column rank, each later one draws them from seed and its index; "
+                "returns the best-scoring search.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the searches after the first and the "
+                "randomized tests.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Squires, Wang & Uhler 2020", "Yang, Katcoff & Uhler 2018"),
     )
 )
 
@@ -2351,6 +2441,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    "ut_igsp": "Every DAG the search visits keeps the required edges and holds no forbidden one. "
+    + _ORDER_RULE
+    + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
@@ -2452,8 +2545,10 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 
 
 # Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type.
+# values no longer declare a column's type. ut_igsp came later and never took it.
 for _name in CONCEPTS["categorical"].suitable:
+    if _name == "ut_igsp":
+        continue
     _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
     REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
 
@@ -2480,6 +2575,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "gnies": ("score", "index_edges", "environments"),
     "exact_search": ("dag",),
+    "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
     "calm": ("h_final", "objective"),
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),
     "multi_group_direct_lingam": ("group_index",),

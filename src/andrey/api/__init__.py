@@ -20,7 +20,7 @@ from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
-from .permutation import boss, grasp
+from .permutation import boss, grasp, ut_igsp
 from .score import calm, exact_search, ges, gies, gnies, hc, tabu, xges
 from .temporal import (
     dynotears,
@@ -60,6 +60,7 @@ __all__ = [
     # permutation-based
     "boss",
     "grasp",
+    "ut_igsp",
     # functional causal models: LiNGAM, then nonlinear additive noise
     "direct_lingam",
     "ica_lingam",

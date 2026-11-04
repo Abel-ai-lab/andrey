@@ -37,6 +37,8 @@ Packages:
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
   [GnIES](comparisons/gnies.md)
+- [graphical-model-learning](https://github.com/uhlerlab/graphical_model_learning) - uses a
+  separate environment; see below and [UT-IGSP](comparisons/ut-igsp.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
 
@@ -97,6 +99,17 @@ lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
 benchmarks/start_lingam.sh
 export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
 ```
+
+The authors' UT-IGSP library, graphical-model-learning 0.1a8 with its pinned dependencies, has an
+environment of its own as well, built from the lock file `requirements-utigsp.txt`:
+
+```shell
+benchmarks/start_utigsp.sh
+export ANDREY_BENCH_UTIGSP_PYTHON=$PWD/benchmarks/.venv-utigsp/bin/python
+```
+
+Its lane, `ut_igsp_cpu.py`, starts one child process per package and dataset rather than one per
+fit, since each child fits several draws; [its page](comparisons/ut-igsp.md) describes it.
 
 gnies 0.3.3, the reference for GnIES, fits in an environment of its own on Python 3.12, so its pins
 stay exact and the module `ges` it imports stays out of bench-env:

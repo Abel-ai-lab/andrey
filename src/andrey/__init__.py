@@ -55,6 +55,7 @@ from .api import (
     resit,
     rsmax2,
     tabu,
+    ut_igsp,
     varma_lingam,
     xges,
 )
@@ -131,6 +132,7 @@ __all__ = [
     "rsmax2",
     "boss",
     "grasp",
+    "ut_igsp",
     "direct_lingam",
     "ica_lingam",
     "cam",
