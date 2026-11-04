@@ -98,6 +98,11 @@ names its pull request.
   centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
   steps, where the centering costs about one time step of data. `dynotears` stays experimental.
   ([#682])
+- `fci` and `gfci` run their possible-d-separation step faster, with bit-identical outputs. With
+  `n_jobs` above one and `"fisherz"`, `"student_t"`, or `"normal_scores"`, each pair's search sends
+  its larger conditioning-set sizes to the worker processes, and the pairs are still searched one
+  at a time in the serial order. Those tests also take a batch of conditioning sets of one size as
+  one array.
 
 ### Fixed
 

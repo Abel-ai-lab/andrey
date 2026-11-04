@@ -80,9 +80,10 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
-    ``workers`` worker processes share the GES passes and the adjacency search's larger
-    conditioning-size passes, each above its own work threshold; ``None`` reads
-    ``andrey.config.n_jobs``. ``collider_rule`` ``"conservative"`` or ``"majority"`` decides
+    ``workers`` worker processes share the GES passes, the adjacency search's larger
+    conditioning-size passes, and the larger conditioning-set sizes of each possible-d-sep search,
+    each above its own work threshold; ``None`` reads ``andrey.config.n_jobs``. ``collider_rule``
+    ``"conservative"`` or ``"majority"`` decides
     the triples the pattern shields by the vote of :func:`~andrey.constraint.fci._vote_sepsets`
     after the possible-d-sep step. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. The private
@@ -120,11 +121,20 @@ def gfci(
     _knowledge_marks(marks, constraints)
     _orient_colliders_from_pattern(marks, pattern, sepsets)
     if possible_dsep == "fast":
-        _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
+        _remove_by_possible_dsep(
+            marks, test, alpha, sepsets, keep=keep, max_depth=max_depth, workers=workers
+        )
     else:
         by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
         _remove_by_possible_dsep(
-            marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
+            marks,
+            ranked_test,
+            alpha,
+            sepsets,
+            by_rank,
+            keep=keep,
+            max_depth=max_depth,
+            workers=workers,
         )
     marks = _circle_pag(marks != NULL)
     _knowledge_marks(marks, constraints)
