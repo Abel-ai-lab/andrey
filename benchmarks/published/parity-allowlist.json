@@ -202,6 +202,17 @@
       "cause": "correct-by-paper",
       "reason": "The two packages run different discrete tests. Andrey's chi-square test takes the exact permutation mean of the statistic as its degrees of freedom, so a sparse table keeps its level. bnlearn's x2-adf adjusts the degrees of freedom by a rule for sparse tables. On 3,840 random triples from child, insurance, alarm, and hepar2 the two decisions at alpha 0.05 agree in 97.7%, falling to 92% with 3 conditioning variables, and the graphs are not equal on any of the 3,183 datasets of those four networks (595 of 790 on asia). hepar2 has the largest conditioning sets, where the disagreement is widest.",
       "citation": "Tsamardinos, I., and Borboudakis, G. (2010). Permutation testing improves Bayesian network learning. ECML PKDD, 322-337: the statistic's degrees of freedom are its exact permutation mean. bnlearn 5.2.1: ci.test with test x2-adf."
+    },
+    {
+      "summary": "0.14.0",
+      "method": "DYNOTEARS",
+      "comparator": "CausalNex 0.12.2",
+      "row": {"regime": "dynotears_paper_exponential", "d": 100, "n": 50},
+      "andrey_errors": 154.45,
+      "comparator_errors": 150.3,
+      "cause": "correct-by-paper",
+      "reason": "Andrey centers every column before the fit, the same as fitting an intercept, so that it fits the series the paper's simulations draw: exponential noise of scale 1, whose mean of 1 a loss without an intercept cannot absorb. On that noise Andrey makes fewer errors than CausalNex in 6 of 10 settings and no more in the rest. With the noise centered, as this row's is, the means the centering estimates are 0, and estimating them costs about one time step of data, which shows only where the fit has more weights than steps: at 100 variables and 50 steps. On this row's 40 series Andrey's fit without centering makes 3.50 fewer errors (95% interval 1.48 to 5.50) and ties CausalNex (+0.65 [+0.05, +1.35] on seeds 0-19, -0.30 [-1.00, +0.35] on seeds 20-39); a fit not centered on 49 of the 50 steps makes 3.25 more errors [+0.50, +6.30] than on all 50. CausalNex on centered columns makes 0.55 fewer errors than Andrey on seeds 20-39 [-0.20, +1.45], the optimizer's path.",
+      "citation": "Pamfil, R., et al. (2020). DYNOTEARS: Structure learning from time-series data. AISTATS, PMLR 108, Appendix B.4: noise drawn from exponential distributions of scale 1, as in NOTEARS (Zheng et al. 2018). benchmarks/published/0.14.0/dynotears.json: centering."
     }
   ]
 }
