@@ -65,8 +65,11 @@ TABLE_SPECS = [
 #: facade path.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 #: The targets of a method that reads three environments: observational, one with the known
-#: target z, and one whose targets are unknown.
-CONTEXT = {"ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}}}
+#: target z, and one whose targets are unknown (ut_igsp) or z again (igsp).
+CONTEXT = {
+    "igsp": {"targets": {0: [], 1: ["z"], 2: ["z"]}},
+    "ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}},
+}
 
 
 @functools.cache

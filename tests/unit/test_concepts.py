@@ -204,9 +204,13 @@ def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
     return data
 
 
-#: What a method reads besides its data and its parameters: ut_igsp's environments, an
-#: observational one, one with the known target x, and one whose targets are unknown.
-CONTEXT = {"ut_igsp": {"targets": {0: [], 1: [0], 2: None}}}
+#: What a method reads besides its data and its parameters: the environments of igsp and ut_igsp,
+#: an observational one, one with the known target x, and one whose targets are unknown (ut_igsp)
+#: or y (igsp).
+CONTEXT = {
+    "igsp": {"targets": {0: [], 1: [0], 2: [1]}},
+    "ut_igsp": {"targets": {0: [], 1: [0], 2: None}},
+}
 
 
 def environments(n: int) -> np.ndarray:
@@ -297,18 +301,8 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
-            *(
-                "ges",
-                "gies",
-                "gnies",
-                "xges",
-                "hc",
-                "tabu",
-                "exact_search",
-                "boss",
-                "grasp",
-                "ut_igsp",
-            ),
+            *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+            *("igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),

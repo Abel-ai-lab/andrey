@@ -926,16 +926,18 @@ def bootstrap(
     ``method`` is fitted on it. The result counts, for every pair of variables, the fits that give
     each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds the averaged
     graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
-    with a row-aligned input (``env``, or ``gies``'s ``targets`` as a 0/1 matrix) resamples that
-    input with the rows, and a column that ``env`` or ``targets`` names travels with the rows of
-    ``data``. When ``env`` holds text labels, or the method takes ``targets`` as ``gies`` does, a
-    resample is drawn within each environment of ``env``: of an environment's ``m`` rows, a
-    subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample draws
-    ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
+    with a row-aligned input (``env``, or ``targets`` as a 0/1 matrix) resamples that input with the
+    rows, and a column that ``env`` or ``targets`` names travels with the rows of ``data``. When
+    ``env`` holds text labels, or the method takes ``targets`` (``gies``, ``igsp``, and
+    ``ut_igsp``), a resample is drawn within each environment of ``env``: of an environment's ``m``
+    rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample
+    draws ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
     ``cdnod``, which reads it as numbers, such as a domain number or a time step, resamples the rows
-    as a whole. A time-series method on one series subsamples one stretch of consecutive rows (and
-    bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
-    ``multi_group_direct_lingam`` resamples each dataset on its own.
+    as a whole. For a method that takes ``targets``, the averaged graph is made a CPDAG without the
+    targets, so an edge that only the interventions orient is undirected there; the edge frequencies
+    keep its direction. A time-series method on one series subsamples one stretch of consecutive
+    rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units,
+    and ``multi_group_direct_lingam`` resamples each dataset on its own.
 
     Parameters
     ----------

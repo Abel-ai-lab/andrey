@@ -1,0 +1,50 @@
+graphical-model-learning 0.1a8 igsp: the general branch of _is_i_contradicting (gsp.py:624-640) as
+Definition 4.2 of Yang, Katcoff, and Uhler (2018, arXiv 1802.06310): an empty I_{i\j} makes
+condition 1 false, and condition 2 holds when, for every S, some setting of I_{j\i} changes i given
+S. Nothing else changes. Applied by benchmarks/start_utigsp.sh to .venv-gml-def42.
+
+--- a/graphical_model_learning/algorithms/dag/gsp.py
++++ b/graphical_model_learning/algorithms/dag/gsp.py
+@@ -621,23 +621,26 @@
+                 return True
+             return False
+         else:
+-            # === TEST CONDITION 1
+-            neighbors_j = dag.neighbors_of(j) - {i}
+-            for s in powerset(neighbors_j):
+-                for setting_num, setting in enumerate(setting_list):
+-                    if i in setting['interventions'] and j not in setting['interventions']:
+-                        if not invariance_tester.is_invariant(j, context=setting_num, cond_set=s):
+-                            return True
+-
++            # === Def. 4.2 of Yang, Katcoff, and Uhler (2018): the settings that hold one end alone
++            i_not_j = [
++                setting_num for setting_num, setting in enumerate(setting_list)
++                if i in setting['interventions'] and j not in setting['interventions']
++            ]
++            j_not_i = [
++                setting_num for setting_num, setting in enumerate(setting_list)
++                if j in setting['interventions'] and i not in setting['interventions']
++            ]
++            # === TEST CONDITION 1: some S under which j is invariant in every setting of I_{i\j}
++            if i_not_j:
++                for s in powerset(dag.neighbors_of(j) - {i}):
++                    if all(invariance_tester.is_invariant(j, context=k, cond_set=s) for k in i_not_j):
++                        return True
++            # === TEST CONDITION 2: for every S, some setting of I_{j\i} under which i varies
+             neighbors_i = dag.neighbors_of(i) - {j}
+-            for setting_num, setting in enumerate(setting_list):
+-                if j in setting['interventions'] and i not in setting['interventions']:
+-                    i_always_varies = all(
+-                        invariance_tester.is_invariant(i, context=setting_num, cond_set=s) for s in
+-                        powerset(neighbors_i)
+-                    )
+-                    if i_always_varies: return True
+-            return False
++            return bool(j_not_i) and all(
++                any(not invariance_tester.is_invariant(i, context=k, cond_set=s) for k in j_not_i)
++                for s in powerset(neighbors_i)
++            )
+ 
+     def _get_contradicting_arcs(dag):
+         """

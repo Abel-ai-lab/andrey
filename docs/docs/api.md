@@ -14,23 +14,25 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with five
-exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
-`targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
-targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
+Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with these
+exceptions: `cdnod` also takes `env`, each row's environment, `gies`, `igsp`, and `ut_igsp` also
+take `env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
+learns the targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
 `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a list of
 datasets and returns one result per dataset. The first argument of every method is `data`;
 `andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
 dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
 `env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
-then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`
-takes `targets` as a mapping from each label of `env` to a list of its variables, by name or
-position, with `[]` for an observational environment; as the name of a column whose cells give
-each row's variables, from whose distinct values `env` follows when you leave it out; or as a 0/1
-matrix shaped like `data`. Every environment needs its targets, so `env` without `targets`, an
-environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
-`ValueError`. `gnies` takes the same forms of `targets`, but for the targets it knows: an
+then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`,
+`igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
+variables, by name or position, with `[]` for an observational environment; as the name of a column
+whose cells give each row's variables, from whose distinct values `env` follows when you leave it
+out; or as a 0/1 matrix shaped like `data`. A key that is not a label of `env` raises a
+`ValueError`. `gies` and `igsp` need every environment's targets, so `env` without `targets`, and an
+environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` reads an environment
+the mapping leaves out or gives `None` as a setting whose targets it learns, and still needs an
+observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
 environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
 `targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
 names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
@@ -131,22 +133,22 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
-`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
-`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"`
-and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and
-`"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default,
-picks from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
-`lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
-the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
-likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance
-correlation. A test you register that reports only p-values is ordered by its p-value, smallest
-first.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`,
+`pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`,
+and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
+`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
+`"cmiknn"`, and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
+`None`, the default, picks from the declared column types, `"fisherz"` for continuous data. `pcmci`,
+`pcmciplus`, and `lpcmci` run each test on the lagged values of the series, and order the candidate
+conditions by the test's statistic, as tigramite does: the partial correlation, the chi-square
+statistic, the likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's
+distance correlation. A test you register that reports only p-values is ordered by its p-value,
+smallest first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`,
-`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`,
-`cam`, `resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`,
+`dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
 `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of
 required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
@@ -230,23 +232,26 @@ GES phase; the PAG its tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take
-`seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is
-the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
-exactly. The methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with
-`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
-that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
-seed.
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and
+`ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`,
+the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one,
+so a call repeats exactly. The methods that test independence draw random numbers only under
+`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and `ut_igsp` also with `n_starts` above 1,
+and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
+other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs:
-the first from the start the method describes, each later one from a start drawn from `seed` and
-the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` from a
+`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit
+runs: the first from the start the method describes, each later one from a start drawn from `seed`
+and the search's index. `boss` and `grasp` start it from a random order, `igsp` and `ut_igsp` from a
 minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
 after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
-replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
-count of edges and targets). `ut_igsp` runs 10 by default: on 15 groups of simulated datasets, 12
+replaces an earlier one only when it scores better by more than `1e-6` (for `igsp`, fewer edges,
+then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and targets). `igsp` and
+`ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s papers' settings, at
+`alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were worse in
+none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated datasets, 12
 of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
 that setting, and more in none. Each search builds its own caches and drops the previous one's, so
 more starts take more time but little more memory. `1`, the default for the others, runs one search.
@@ -413,6 +418,7 @@ its first call in a process.
    dagma
    camuv
    dynotears
+   igsp
    ut_igsp
    gnies
    icp
@@ -437,6 +443,18 @@ time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-ste
 on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
 temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
 lag 0.
+
+IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
+and settings whose intervention targets are all known, as GIES does: it searches variable orders
+for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
+the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
+over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
+authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
+as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
+and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
+in 17, with interval ends that are floating-point residue of 0 read as 0, and a rule written before
+the run gives a tie to one over the observational rows. It returns the interventional essential
+graph and the level used in `metadata["alpha"]`.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the
@@ -587,21 +605,23 @@ DoWhy for effect estimation.
 ## Bootstrap
 
 `andrey.bootstrap` refits a method on resamples of the rows and reports how often each edge appears,
-and the averaged graph, a valid graph of the method's kind. It takes a method's name, such
-as `"pc"`, or the method itself, and the method's own arguments. Each resample is a subsample by
+and the averaged graph, a valid graph of the method's kind. It takes a method's name, such as
+`"pc"`, or the method itself, and the method's own arguments. Each resample is a subsample by
 default: `sample_fraction` (0.5) of the rows, drawn without replacement. `resampling="bootstrap"`
 draws as many rows as `data` has, with replacement, instead. The generator depends on `seed` and the
-resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run
-begins with the shorter run's fits. A method that takes a row-aligned input (`env`, or `gies`'s
-`targets` as a 0/1 matrix) resamples it with the rows, and a column that `env` or `targets` names
-travels with its rows. When `env` holds text labels, or for `gies`, each resample takes the same
-share of every environment's rows, at least one, so no resample drops an environment; `cdnod`'s
-numeric index, such as a time step, resamples the rows as a whole. `multi_group_direct_lingam`
-resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
-resamples the units, the same rows of every dataset. A time-series method on one series subsamples
-one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
-consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
-take, since its number of latent nodes differs from fit to fit.
+resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run begins
+with the shorter run's fits. A method that takes a row-aligned input (`env`, or `targets` as a 0/1
+matrix) resamples it with the rows, and a column that `env` or `targets` names travels with its
+rows. When `env` holds text labels, or for the methods that take `targets` (`gies`, `igsp`, and
+`ut_igsp`), each resample takes the same share of every environment's rows, at least one, so no
+resample drops an environment; `cdnod`'s numeric index, such as a time step, resamples the rows as a
+whole. For the methods that take `targets`, the averaged graph is made a CPDAG without the targets,
+so an edge that only the interventions orient is undirected there; the edge frequencies keep its
+direction. `multi_group_direct_lingam` resamples each dataset on its own and returns one result per
+dataset; `longitudinal_lingam` resamples the units, the same rows of every dataset. A time-series
+method on one series subsamples one stretch of consecutive rows; with `resampling="bootstrap"` it
+resamples blocks of `block_length` consecutive rows, by default at least ten times its `tau_max`.
+`gin` is the one method it does not take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,

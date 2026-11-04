@@ -21,6 +21,7 @@ whose Reproduce table lists the driver.
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
 | [ICP](comparisons/icp.md) | `icp_cpu.py`, `icp_correction.py` | ICP, both tests | InvariantCausalPrediction (R) | |
 | [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | |
+| [IGSP](comparisons/igsp.md) | `igsp_cpu.py`, `igsp_cases.py` | IGSP; GIES, GRaSP, and UT-IGSP as context | graphical-model-learning (IGSP, and a copy patched to Definition 4.2; UT-IGSP as context) | |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
 | BOSS and GRaSP | `boss_grasp_cpu.py`, `boss_grasp_reach.py` | BOSS, GRaSP | causal-learn | 0.1.0, 0.9.0 |
