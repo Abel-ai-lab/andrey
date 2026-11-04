@@ -66,7 +66,7 @@ names its pull request.
   confidence interval. Against InvariantCausalPrediction 0.8, the authors' package, on simulated
   data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
   environments, and it names a variable outside the true parents in at most 1.23% of fits at
-  `alpha=0.05` in the settings it claims. ([#ICP])
+  `alpha=0.05` in the settings it claims. ([#677])
 
 ### Changed
 
@@ -1708,3 +1708,4 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#677]: https://github.com/Abel-ai-lab/andrey/pull/677
