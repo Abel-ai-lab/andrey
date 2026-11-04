@@ -7,8 +7,12 @@ by the kind of experiment, with the rows per environment beside them. A comparis
 where a rerun on fresh seeds agreed; one lower or higher on the first seeds alone is a tie, with a
 note.
 
-The numbers come from the published lanes ``gnies.json`` and ``ut-igsp.json``. The script runs with
-``uv run python docs/docs/benchmarks/0.14.0/tables.py [gnies.json ut-igsp.json]``.
+``camuv.html``: CAM-UV's table has one error, the directed-edge errors, against two references,
+lingam and causal-learn.
+
+The numbers come from the published lanes ``gnies.json``, ``ut-igsp.json``, and ``camuv.json``. The
+script runs with
+``uv run python docs/docs/benchmarks/0.14.0/tables.py [gnies.json ut-igsp.json camuv.json]``.
 """
 
 from __future__ import annotations
@@ -56,7 +60,7 @@ def verdict(first: str, rerun: str | None) -> str:
         return ""
     if first == rerun:
         return f'<small class="ct-verdict ct-{first}">{first}</small>'
-    return f"<small>{'lower' if first == 'better' else 'higher'} on the first seeds only</small>"
+    return f"<small>{'lower' if first == 'better' else 'higher'}, first seeds only</small>"
 
 
 def table(
@@ -176,6 +180,77 @@ def ut_igsp(lane: dict) -> str:
     )
 
 
+# CAM-UV's regimes, in the comparison page's words.
+CAMUV_GROUPS = {
+    "latent_anm_er": "One in five hidden",
+    "latent_anm_er_tenth": "One in ten hidden",
+    "camuv_paper": "The paper's simulation",
+    "anm_er": "Nothing hidden",
+}
+
+
+def camuv(lane: dict) -> str:
+    """CAM-UV against lingam and causal-learn, in its claim: directed-edge errors."""
+    refs = (("lingam", "lingam"), ("causal_learn", "causal-learn"))
+    head = (
+        '<tr><td rowspan="2"></td>'
+        '<th scope="colgroup" colspan="4" class="ct-start">Directed-edge errors</th>'
+        '<th scope="colgroup" colspan="2" class="ct-start">Andrey minus</th></tr><tr>'
+        '<th scope="col" class="ct-ours ct-start">Andrey</th><th scope="col">lingam</th>'
+        '<th scope="col">causal-learn</th><th scope="col">Empty graph</th>'
+        + "".join(
+            f'<th scope="col" class="ct-ours{" ct-start" if k == 0 else ""}">{escape(name)}</th>'
+            for k, (_, name) in enumerate(refs)
+        )
+        + "</tr>"
+    )
+    body = ""
+    for m in lane["methods"]:
+        if m["claim"] != "in":
+            continue
+        reruns = {(r["observed"], r["latents"], r["n"]): r for r in m["rows"] if r["replication"]}
+        body += (
+            f'<tr class="ct-section"><th scope="rowgroup" colspan="7">'
+            f"{escape(CAMUV_GROUPS[m['regime']])}</th></tr>"
+        )
+        for r in m["rows"]:
+            if r["replication"]:
+                continue
+            hidden = f" + {r['latents']} hidden" if r["latents"] else ""
+            label = f"{r['observed']} observed{hidden}<small>{r['n']:,} rows</small>"
+            rerun = reruns.get((r["observed"], r["latents"], r["n"]))
+            tds = (
+                f'<td class="ct-ours ct-start">{r["andrey_direct_errors_mean"]:.2f}</td>'
+                f"<td>{r['lingam_direct_errors_mean']:.2f}</td>"
+                f"<td>{r['causal_learn_direct_errors_mean']:.2f}</td>"
+                f"<td>{r['empty_direct_errors_mean']:.2f}</td>"
+            )
+            for k, (key, _) in enumerate(refs):
+                v = r[f"vs_{key}"]
+                low, high = v["bootstrap_95_direct_errors"]
+                first = v["verdict"]
+                again = (
+                    (rerun or {}).get(f"vs_{key}", {}).get("verdict") if first != "tie" else first
+                )
+                tds += (
+                    f'<td class="ct-ours{" ct-start" if k == 0 else ""}">'
+                    f"{interval(v['mean_D_direct_errors'], low, high)}{verdict(first, again)}</td>"
+                )
+            body += f'<tr><th scope="row">{label}</th>{tds}</tr>'
+    return (
+        '<figure class="ct"><p class="ct-title">CAM-UV against lingam and causal-learn</p>'
+        '<div class="ct-scroll"><table class="ct-table ct-nested"><thead>'
+        f"{head}</thead><tbody>{body}</tbody></table></div><figcaption>"
+        "Mean directed-edge errors over 20 datasets, seeds 0 to 19: a missing or extra edge costs "
+        "1 and a reversed one 2, against the edges CAM-UV can identify. lingam and causal-learn "
+        "search sets of up to 3 variables, as Andrey does; lingam at its default set size of 2 "
+        "ties Andrey in every setting too. The difference is Andrey's mean errors minus the "
+        "reference's, with its 95% interval, marked better only where seeds 20 to 39 agreed; "
+        "unmarked is a tie."
+        "</figcaption></figure>\n"
+    )
+
+
 if __name__ == "__main__":
     paths = [Path(p) for p in sys.argv[1:]] or [
         PUBLISHED / "gnies.json",
@@ -183,3 +258,4 @@ if __name__ == "__main__":
     ]
     (HERE / "gnies.html").write_text(gnies(json.loads(paths[0].read_text())))
     (HERE / "ut-igsp.html").write_text(ut_igsp(json.loads(paths[1].read_text())))
+    (HERE / "camuv.html").write_text(camuv(json.loads(paths[2].read_text())))

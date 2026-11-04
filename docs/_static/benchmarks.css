@@ -726,6 +726,10 @@ html[data-theme="dark"] .release-tile {
   white-space: normal;
 }
 
+.ct-table.ct-nested tbody th[scope="row"] {
+  min-width: 8.5rem;
+}
+
 .ct-table.ct-nested td small {
-  white-space: nowrap;
+  white-space: normal;
 }
