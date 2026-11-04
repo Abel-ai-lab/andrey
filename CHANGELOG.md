@@ -61,7 +61,7 @@ names its pull request.
   two or more targets, where the library's test departs from the paper; against a copy of the
   library corrected to the paper it is worse in none and better in none. At alpha `1e-4` with 5
   starts it is worse in 1, traced to its fixed first start. A median fit takes 1.8 times the
-  library's time on one core at 1,000 rows per setting and 4.3 times at 10,000. ([#PR])
+  library's time on one core at 1,000 rows per setting and 4.3 times at 10,000. ([#685])
 - `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
   environments that differ in the noise variances of variables it is not told: it returns those
   variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
@@ -1731,3 +1731,4 @@ First alpha release.
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
+[#685]: https://github.com/Abel-ai-lab/andrey/pull/685
