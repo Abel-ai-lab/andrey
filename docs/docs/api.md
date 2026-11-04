@@ -438,8 +438,9 @@ intervention targets are known in part or not at all: it searches variable order
 the fewest edges plus targets, where a setting's targets are its known ones and every variable whose
 distribution given its parents differs from the observational one. Its default level for the
 conditional-independence and invariance tests, `alpha=None`, is one over the number of observational
-rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was better than the paper's
-reference implementation at the paper's `1e-5` in 18 of 112 comparisons and worse in none. It
+rows, `0.001` at 1,000 rows: on simulated data in the paper's setting, against the paper's reference
+implementation at the paper's `1e-5`, it was worse in none of 112 comparisons and better in 1 on
+fresh datasets, and lower in 17 more on the datasets that chose it. It
 returns the interventional essential graph with each setting's targets in `metadata["targets"]`,
 keyed by the labels of `env`, and the level used in `metadata["alpha"]`. The targets pass back as
 `targets`, where they are known: `ut_igsp` may learn more, and `gies` refits the graph under exactly

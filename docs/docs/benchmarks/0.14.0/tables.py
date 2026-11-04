@@ -168,13 +168,18 @@ def ut_igsp(lane: dict) -> str:
             e = c["J2"][error]
             low, high = e["ci95"]
             first = {"below 0": "better", "above 0": "worse"}.get(e["side"], "tie")
+            note = verdict(first, e["verdict"])
+            if first == "better" != e["verdict"] and (e["confirmation"] or {}).get("side") == (
+                "below 0"
+            ):
+                note = "<small>lower, first seeds and the default's seeds</small>"
             cells.append(
                 (
                     e["andrey_mean"],
                     e["comparator_mean"],
                     base,
                     interval(e["D"], low, high),
-                    verdict(first, e["verdict"]),
+                    note,
                 )
             )
         grouped.setdefault((c["arm"], c["kind"]), []).append(((c["l"], c["n"]), row, cells))
@@ -190,8 +195,9 @@ def ut_igsp(lane: dict) -> str:
         "Means over 20 datasets, seeds 0 to 19, 5 draws each, on 20 variables with an "
         "observational environment and 5 experiments. Each experiment intervenes on one target it "
         "names and on off-targets it does not. The difference is Andrey's mean error minus the "
-        "library's, with its 95% interval, marked better only where a rerun agreed; unmarked is "
-        "a tie. "
+        "library's, with its 95% interval, marked better only where the rerun on fresh seeds, "
+        "2000 to 2019, agreed; one lower on the first seeds and on the seeds that chose the "
+        "default, 4000 to 4019, is noted and counts as a tie; unmarked is a tie. "
         "Given targets is the target error of the named targets alone.",
     )
 

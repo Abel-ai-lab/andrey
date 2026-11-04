@@ -275,7 +275,8 @@ _CONCEPTS = (
                 reason="None is one over the number of observational rows, for both tests. On "
                 "simulated data in the paper's setting, against the paper's reference "
                 "implementation at its level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), it "
-                "was better in 18 of 112 comparisons and worse in none. In the run that chose it, "
+                "was worse in none of 112 comparisons and better in 1 on fresh datasets, and lower "
+                "in 17 more on the datasets that chose it. In the run that chose it, "
                 "on datasets of its own, it had fewer errors in 20 and more in none, where 0.001 "
                 "had fewer in 15 and more in 3, none of which repeated on a rerun.",
             ),
