@@ -98,6 +98,13 @@ names its pull request.
   and fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
   core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
   makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
+- `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
+  implementation, on the structural vector autoregressions of the paper's design, with 5 to 100
+  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it makes no
+  more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
+  centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
+  steps, where the centering costs about one time step of data. `dynotears` stays experimental.
+  ([#682])
 
 ### Fixed
 
@@ -1736,4 +1743,5 @@ First alpha release.
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
 [#679]: https://github.com/Abel-ai-lab/andrey/pull/679
+[#682]: https://github.com/Abel-ai-lab/andrey/pull/682
 [#690]: https://github.com/Abel-ai-lab/andrey/pull/690

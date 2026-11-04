@@ -75,7 +75,7 @@ def test_ut_igsp_recovers_the_paper_setting(seed, off, kind):
     ds, known = paper_dataset(seed, 5000, off, kind)
     out = andrey.ut_igsp(ds.data, ds.env, targets=known)
     truth = essential(ds.graph.to_numpy(), {k: t for k, t in ds.targets.items() if k})
-    found = {int(k): v for k, v in out.metadata["targets"].items()}
+    found = out.metadata["targets"]
     target_errors = sum(len(set(found[k]) ^ set(ds.targets[k])) for k in range(1, K + 1))
     errors = shd(out.structure.to_numpy(), truth)
     recorded_shd, recorded_targets = RECORDED[seed, off, kind]
@@ -103,7 +103,7 @@ def test_a_chain_with_an_unknown_and_a_known_target_is_fully_oriented(kind):
     x2 = intervened(env == 2, 0.8 * x1 + noise[:, 2])
     out = andrey.ut_igsp(np.column_stack([x0, x1, x2]), env, targets={0: [], 2: [2]})
     assert out.structure.oriented_edges() == [(0, 1, "directed"), (1, 2, "directed")]
-    assert out.metadata["targets"] == {"0": [], "1": [0], "2": [2]}
+    assert out.metadata["targets"] == {0: [], 1: [0], 2: [2]}
     dag = np.zeros((3, 3), dtype=np.int8)
     dag[0, 1] = dag[1, 2] = TAIL
     dag[1, 0] = dag[2, 1] = ARROW
