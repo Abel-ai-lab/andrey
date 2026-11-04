@@ -1300,14 +1300,15 @@ def _job(
         key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
         targets = next((p for p in spec.params if p.type == "targets"), None)
         names = () if targets is None else (targets.name, *targets.aliases)
+        given = kwargs.get(key)
         data, env = environments.pool_environments(
             data,
-            kwargs.get(key),
+            given,
             next((kwargs[k] for k in names if k in kwargs), None),
             spec.name,
             missing=spec.data.missing,
         )
-        if env is not None:
+        if given is None and env is not None:
             kwargs[key], apart = env, True
     panel = spec.data.inputs[0].kind == "panel"
     temporal = spec.family == "temporal"

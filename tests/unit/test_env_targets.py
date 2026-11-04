@@ -514,6 +514,7 @@ def test_bootstrap_draws_within_each_domain_given_apart(form):
     job = _job(get_spec("cdnod"), data, {}, None, 0, "subsample", 0.5)
     assert job.strata is not None
     assert [len(rows) for rows in job.strata] == [len(t) for t in DOMAINS]
+    assert _job(get_spec("cdnod"), X, {"env": DOMAIN}, None, 0, "subsample", 0.5).strata is None
 
 
 # --- the command line ---------------------------------------------------------------------------
