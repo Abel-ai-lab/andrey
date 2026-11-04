@@ -93,7 +93,9 @@ def _run_igsp(X: np.ndarray, algorithm: str) -> dict:
     case = "gauss_5v_noise_shift"
     column = list(datagen.column_order(case)).index
     targets = {0: [], 1: [column(3)], 2: [column(4)]}
-    return project_output(andrey.igsp(X, datagen.environment_index(case), targets=targets), algorithm)
+    return project_output(
+        andrey.igsp(X, datagen.environment_index(case), targets=targets), algorithm
+    )
 
 
 # algorithm -> (runner, case id). Single-input methods take one matrix.
