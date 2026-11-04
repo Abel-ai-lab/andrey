@@ -353,10 +353,10 @@ independences were tested, and `andrey markov-check` runs the same from the shel
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
 per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
-`targets`, the variables intervened on in each environment, `gnies` takes `env` and learns which
-variables each environment's interventions changed, and `multi_group_direct_lingam` and
-`longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
+kind of result; `cdnod` also takes `env`, each row's environment, `gies` and `igsp` also take
+`env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
+learns which variables each environment's interventions changed, and `multi_group_direct_lingam`
+and `longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
 {doc}`graph-types` explains which graph each one returns.
 
 `ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. Map an

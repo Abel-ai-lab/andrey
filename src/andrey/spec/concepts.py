@@ -142,7 +142,7 @@ _LINGAM = (
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
-_STARTS = ("boss", "grasp", "hc", "tabu", "ut_igsp")
+_STARTS = ("boss", "grasp", "hc", "tabu", "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
@@ -155,6 +155,7 @@ ALL_METHODS = (
     "resit",
     "mmhc",
     "rsmax2",
+    "igsp",
     "ut_igsp",
     *_LINGAM,
     *PCMCI_FAMILY,
@@ -189,6 +190,7 @@ _CONCEPTS = (
             "resit",
             "camuv",
             "icp",
+            "igsp",
             "ut_igsp",
         ),
         exempt=(
@@ -252,6 +254,18 @@ _CONCEPTS = (
                 "2021 set every level to 0.01).",
             ),
             Deviation(
+                method="igsp",
+                name="alpha",
+                default=1e-3,
+                fixed_in=None,
+                reason="Of the levels its authors swept, 1e-4 to 0.05 (Wang et al. 2017), 1e-3 "
+                "had the fewest errors on simulated data in the settings of Wang et al. (2017) and "
+                "Yang, Katcoff and Uhler (2018): on one set of datasets, its SHD was lower in 123 "
+                "of its 435 comparisons with another level over 87 groups of datasets and it was "
+                "worse in none, and no level's was lower on 20 variables at mean degree 3 outside "
+                "those groups.",
+            ),
+            Deviation(
                 method="ut_igsp",
                 name="alpha",
                 default=None,
@@ -277,7 +291,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="conditional-independence test",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "ut_igsp"),
+        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp"),
         exempt=(
             *_exempt(
                 "It tests the independence of residuals as part of its own model.",
@@ -313,7 +327,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="invariance test",
-        suitable=("ut_igsp",),
+        suitable=("igsp", "ut_igsp"),
         others_exempt="Takes no invariance test: its data come from one environment, or its "
         "environments enter its own tests or score.",
         deviations=(
@@ -510,6 +524,7 @@ _CONCEPTS = (
             *_exempt(
                 "The minimal I-MAP conditions each pair on every earlier variable; no "
                 "conditioning-set cap.",
+                "igsp",
                 "ut_igsp",
             ),
         ),
@@ -609,6 +624,7 @@ _CONCEPTS = (
             *_exempt(
                 "Parents are those the tests keep in the minimal I-MAP of an order; the paper "
                 "sets no cap.",
+                "igsp",
                 "ut_igsp",
             ),
         ),
@@ -723,8 +739,8 @@ _CONCEPTS = (
         key="n_starts",
         summary="The number of searches a fit runs, each later one from a start drawn from seed: "
         "a random order (boss, grasp), a minimum-degree order with ties drawn from seed "
-        "(ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, tabu); "
-        "the best-scoring one is returned, and 1, the default, runs one search.",
+        "(igsp, ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, "
+        "tabu); the best-scoring one is returned, and 1, the default, runs one search.",
         param=_template(
             "n_starts",
             "int",
@@ -739,6 +755,18 @@ _CONCEPTS = (
         suitable=_STARTS,
         others_exempt="Runs one search per fit.",
         deviations=(
+            Deviation(
+                method="igsp",
+                name="n_starts",
+                default=10,
+                fixed_in=None,
+                reason="Further searches from minimum-degree orders whose ties are drawn from "
+                "seed guard against a poor first order; each one runs the paper's Algorithm 1, "
+                "which restarts its depth-first search within one run from a single starting "
+                "order (Yang, Katcoff and Uhler 2018). On one set of simulated datasets in its "
+                "papers' settings, the SHD of 10 searches was lower than one search's in 21 of 87 "
+                "groups, that of 5 in 19, and neither was higher than the other's anywhere.",
+            ),
             Deviation(
                 method="ut_igsp",
                 name="n_starts",
@@ -925,6 +953,7 @@ _CONCEPTS = (
             "gies",
             "xges",
             *PCMCI_FAMILY,
+            "igsp",
             "ut_igsp",
         ),
         others_exempt="A continuous model.",
@@ -964,6 +993,7 @@ _CONCEPTS = (
                 "bottom_up_parce_lingam",
                 "camuv",
                 "icp",
+                "igsp",
                 "ut_igsp",
             ),
             *_exempt("A series cannot drop a step.", "granger", "dynotears"),
