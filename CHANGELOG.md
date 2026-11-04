@@ -53,7 +53,14 @@ names its pull request.
   environment and settings whose targets are all known (IGSP, Wang et al. 2017; Yang, Katcoff, and
   Uhler 2018), the same inputs as `gies`: it searches variable orders for the DAG with the fewest
   edges, then the fewest edges that the settings' invariance tests contradict. It takes the
-  arguments of `ut_igsp`, with `alpha=1e-3`. ([#PR])
+  arguments of `ut_igsp`, with `alpha=1e-3`. Against graphical-model-learning 0.1a8, the authors'
+  library, on simulated data in the papers' settings (7 to 20 variables, perfect, inhibiting, and
+  imperfect interventions, 1,000 to 100,000 rows per setting), `igsp` at its defaults, alpha
+  `1e-3` and 10 starts, is worse in none of the 114 comparisons and better in 11, all in settings
+  of two or more targets, where the library's test departs from the paper; against a copy of the
+  library corrected to the paper it is worse in none and better in none. At alpha `1e-4` with 5
+  starts it is worse in 1, traced to its fixed first start. A median fit takes 1.8 times the
+  library's time on one core at 1,000 rows per setting and 4.3 times at 10,000. ([#PR])
 - `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
   environments that differ in the noise variances of variables it is not told: it returns those
   variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph

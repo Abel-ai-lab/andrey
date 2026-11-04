@@ -764,7 +764,12 @@ def igsp(
     with one or two settings of 4 to 10 targets and 1,000 to 100,000 rows per setting [1]_, or up to
     20 single-variable or 45 two-variable settings [2]_. It returns the interventional essential
     graph, the same kind of graph :func:`~andrey.gies` returns from the same inputs; the authors
-    show a 7-variable DAG where the score search of GIES is not consistent and IGSP is. When some
+    show a 7-variable DAG where the score search of GIES is not consistent and IGSP is. Measured in
+    the authors' settings against their reference implementation at the same level, it was worse
+    in none of 114 comparisons and better in 11, all in settings of two or more targets, where that
+    implementation's test departs from the paper; against a copy corrected to the paper it was
+    worse in none and better in none. On the same data, :func:`~andrey.gies` and
+    :func:`~andrey.ut_igsp` told every target often had a lower SHD (see Limitations). When some
     targets are unknown, use :func:`~andrey.ut_igsp`; with no observational environment, use
     :func:`~andrey.gies`.
 
@@ -780,7 +785,9 @@ def igsp(
     1,000 or 10,000 rows per setting, outside these groups, no level was better than ``1e-3``. At
     ``alpha=1e-3``, 10 starts and 5 were each worse than none in any group and tied with each other
     in every group; against one start, 10 were better in 21 groups and 5 in 19, by 0.4 to 1.7 edges,
-    at a median of 0.10 s per fit against 0.07 s for 5.
+    at a median of 0.10 s per fit against 0.07 s for 5. On fresh datasets, 5 fits each, against
+    the reference implementation at ``1e-3``, ``alpha=1e-3`` and one over the observational rows,
+    both with 10 starts, were each worse in none of 114 comparisons, and lower in 18 and 17.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other
@@ -831,22 +838,48 @@ def igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 10 variables with 4 single-variable
-    settings or one setting of 5 targets and 10,000 rows per setting, and on fixed cases of up to 7
-    variables. A perfect intervention that leaves its target's distribution unchanged, such as
-    cutting the causes of a variable that has none while keeping its noise, orients nothing, and the
-    search then reverses some edges out of that target: 26 of 74 such edges on 40 datasets of 10
-    variables with 4 single-variable settings. With settings of more than one target, each edge's
-    test runs over the subsets of a neighborhood, so dense graphs are slow. The search's cost grows
-    with the number of I-covered edges to the power of its depth, and each start tests every pair
-    given all other variables, so time grows fast with the number of variables. Unmeasured common
-    causes and nonlinear effects with ``"fisherz"`` are outside its model; the kernel and
-    categorical tests are not benchmarked with it. One level serves both tests unless
-    ``invariance_alpha`` is given. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine. In
-    :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG without the targets, so an edge
-    that only the settings orient comes back undirected there; each fit and the edge frequencies
-    keep its direction.
+    **Limitations.** Measured on simulated data in the authors' settings, the 87 groups above with 5
+    fits per dataset, one core per fit, against the reference implementation with its 5 runs at
+    ``alpha`` ``1e-4``, ``1e-3``, and ``1e-2``, and in the 27 groups with settings of two or more
+    targets also against a copy of it corrected to the paper's test. In every group its SHD was
+    below the empty graph's and every fit finished. At the default level, the 11 comparisons it was
+    better in were all against the uncorrected implementation; the corrected copy tied it in 25 of
+    the 27 groups, and in the other 2 its SHD was lower on one set of datasets only. With 5 starts
+    it was worse in none at ``1e-3`` and ``1e-2``, and in one at ``alpha=1e-4``: on 10 variables
+    with 2 settings of 4 targets and 1,000 rows per setting, its SHD was 2.51 against the corrected
+    copy's 2.12, and 3.07 against 2.76 on fresh datasets. There the objective often ties the true
+    DAG with a wrong one, and the first start, the minimum-degree order with its ties broken by the
+    column ranks, is the same in every fit, so the five fits repeat one result where the reference
+    implementation's random starts vary; at 10 starts that group ties. On the same data,
+    :func:`~andrey.gies` had a lower SHD in 35 of the 87 groups, by 0.35 to 2.63, and a higher one
+    in 6, and :func:`~andrey.ut_igsp` told every target a lower one in 27, by 0.38 to 1.95, and a
+    higher one in none. A perfect intervention that leaves its target's distribution unchanged, such
+    as cutting the causes of a variable that has none while keeping its noise, orients nothing, and
+    the search then reverses some edges out of that target: 823 of 3,960 such edges over the 87
+    groups, against 838 for the reference implementation and 16 for :func:`~andrey.gies`. Outside
+    the authors' setting, one fit per dataset: with 100 rows per setting on 10 variables its SHD was
+    4.65 against the reference implementation's 4.05 and the empty graph's 8; at mean degree 4 on 20
+    variables it was 11.8 against 12.65 and 40; with one unknown target per setting, 0.85 and 0.95
+    against 0.05 and 0.15 for :func:`~andrey.ut_igsp` and 15 for the empty graph. With additive
+    nonlinear effects on 10 variables its SHD was 2.05 and 2.3 with the Gaussian tests and 5.0 and
+    1.15 with ``indep_test="kci"``, at 200 and 500 rows per setting, against 8, a kernel fit taking
+    1.7 s and 13.8 s; on categorical data with ``indep_test="gsq"``, 6.4 at 1,000 rows per setting
+    and 0.9 at 10,000, against 10. With 10 single-variable settings of 1,000 rows, its SHD was 3.9
+    at 50 variables, 15.3 at 100, and 42.9 at 200, against 38, 75, and 150, a median fit taking 1.6
+    s, 33 s, and 726 s and 0.5 GB of memory at 100; at 400 no fit finished within an hour, while
+    :func:`~andrey.gies` reached 0.2, 0.1, and 0.3 at 50 to 200 variables in under 2 s. Its fits
+    take longer than the reference implementation's on one core of the same processor, a median of
+    1.8 times at 1,000 rows per setting and 4.3 times at 10,000, its time growing with the number of
+    rows; where the search dominates it is faster, 1.6 s against 4.3 s at 50 variables. With
+    settings of more than one target, each edge's test runs over the subsets of a neighborhood, so
+    dense graphs are slow. The search's cost grows with the number of I-covered edges to the power
+    of its depth, and each start tests every pair given all other variables, so time grows fast with
+    the number of variables. Unmeasured common causes are outside its model and not measured. One
+    level serves both tests unless ``invariance_alpha`` is given. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine. In :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG without the targets,
+    so an edge that only the settings orient comes back undirected there; each fit and the edge
+    frequencies keep its direction.
 
     References
     ----------
