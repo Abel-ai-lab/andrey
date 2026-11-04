@@ -1383,7 +1383,8 @@ _add(
             structure_type="graph",
             graph_kind="cpdag",
             doc="metadata['score'] is the edges of the DAG found; metadata['n_contradicting'] its "
-            "I-contradicting edges; metadata['invariance_test'] names the invariance test",
+            "I-contradicting edges; metadata['invariance_test'] names the invariance test; "
+            "metadata['alpha'] is the level of the conditional-independence tests",
         ),
         determinism="stochastic",
         accel="numpy",
@@ -1402,7 +1403,14 @@ _add(
                 "environment. Every environment needs an entry.",
                 nullable=True,
             ),
-            concept_param("alpha", default=1e-3),
+            concept_param(
+                "alpha",
+                default=None,
+                nullable=True,
+                doc="Significance level of the conditional-independence tests, and of the "
+                "invariance tests when invariance_alpha is null; null uses one over the number "
+                "of observational rows.",
+            ),
             ParamSpec(
                 name="invariance_alpha",
                 type="float",
@@ -2665,7 +2673,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "gnies": ("score", "changing_variables", "environments"),
     "exact_search": ("dag",),
-    "igsp": ("score", "n_contradicting", "invariance_test"),
+    "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
     "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
     "calm": ("h_final", "objective"),
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),

@@ -49,7 +49,9 @@ against.
 In claim, where the papers claim the method works (linear Gaussian data, perfect, inhibiting, and
 imperfect interventions with known targets, at their sizes): the 12 cells of W, 27 of S (one per
 family, `c`, and `n`), and 48 of Y, 20 datasets per cell, 5 draws per dataset, at alpha `1e-4`,
-`1e-3`, and `1e-2` (inside the authors' sweep), and at Andrey's default when it is a fourth value.
+`1e-3`, and `1e-2` (inside the authors' sweep). Andrey's default, one over the observational rows,
+is `1e-3` at n 1,000, `1e-4` at 10,000, and `1e-5` at 100,000; the confirmation fits it on seeds of
+its own (see [Choosing the defaults](#choosing-the-defaults)).
 
 Out of claim, measured for the method's limitations, one draw per dataset: kernel tests on
 additive-noise data (K), 50 to 400 variables (O1), 100 and 300 rows per setting (O2), mean degree 3
@@ -57,10 +59,11 @@ and 4 (O3), an unknown off-target in each setting (O4), additive-noise data with
 (O5), categorical data with the G-test (O7), Laplace and uniform noise (O8), and an observational
 environment 3 and 10 times larger than each setting (O9).
 
-Andrey's defaults are chosen before the comparison, on seeds of their own, from alpha `1e-4`,
-`5e-4`, `1e-3`, `5e-3`, `1e-2`, `5e-2` and from 1, 5, and 10 starts, over every in-claim cell, and
-checked on a family outside the grid (perfect interventions on 8 of 20 variables, mean degree 3,
-weights on `[0.5, 2]`).
+Andrey's level and starts were compared before the comparison, on seeds of their own, from alpha
+`1e-4`, `5e-4`, `1e-3`, `5e-3`, `1e-2`, `5e-2` and from 1, 5, and 10 starts, over every in-claim
+cell, and checked on a family outside the grid (perfect interventions on 8 of 20 variables, mean
+degree 3, weights on `[0.5, 2]`). A confirmation on fresh seeds, its rule written before any fit,
+then compared `1e-3` with one over the observational rows, the default.
 
 ## Settings
 
@@ -120,9 +123,11 @@ A dataset's error per package is the mean over its draws. A row is judged only w
 beats the empty graph (the 95% percentile bootstrap interval of its mean paired difference with the
 empty graph lies below 0); the others are reported. A judged row is worse when the interval of the
 mean paired difference, Andrey minus the library, lies above 0, and counts only if a rerun on 20
-fresh datasets is worse too. In claim, a row also fails when Andrey timed out on a dataset the
-library finished, or when Andrey does not beat the empty graph. `qa/reference_parity.py` checks the
-published summary.
+fresh datasets is worse too. An interval end within `1e-12` of 0, floating-point residue of an exact
+0, is read as 0, as on the UT-IGSP page; the run's own scripts read the 6 such ends as computed,
+which changes 4 verdicts, each named below. In claim, a row also fails when Andrey timed out on a
+dataset the library finished, or when Andrey does not beat the empty graph. `qa/reference_parity.py`
+checks the published summary.
 
 IGSP's I-contradicting test marks a true arc out of a null target, so the search is pushed to
 reverse it; GIES drops the target's own term in that setting and orients the arc from the same
@@ -143,7 +148,7 @@ $ANDREY_BENCH_PYTHON benchmarks/igsp_cpu.py summarize --runs outputs/igsp-W \
 `run` takes one arm, optionally some of its cells and seeds, and fits each dataset's packages back
 to back, one child process per package, each pinned to one core with one BLAS thread; `--resume`
 continues a run. A draw over its cap, 1,800 s in claim and 3,600 s out of it, is a timeout, never
-scored. `run --block A` fits the in-claim cells on the seeds that choose Andrey's defaults, and
+scored. `run --block A` fits the in-claim cells on the seeds that compare Andrey's levels, and
 `select` applies the rule; `run --block C` reruns a cell on fresh seeds, and `summarize
 --replications` adds those reruns to their rows.
 
@@ -159,26 +164,120 @@ interval; each dataset's SHD is the mean over its 5 draws.
 
 ### In the claim
 
-At its defaults, alpha `1e-3` and 10 starts, Andrey is worse than the library in none of the 114
-comparisons (87 cells against the library, and the 27 cells with a setting of two or more targets
-against the patched copy) and better in 11: its errors were lower on seeds 0 to 19 and again on a
-rerun on seeds 6000 to 6019. All 11 are against the unpatched library, in cells with settings of
-two or more targets (10 of W's 12 and Y8 `inhibiting` at n 10,000), where the library's test
-inverts Definition 4.2; against the patched copy none of the 11 is better: 9 tie and 2 were lower
-on seeds 0 to 19 only. Seeds 6000 to 6019 are those of the run that confirmed the default (see
-[Choosing the defaults](#choosing-the-defaults)), which chose it as the candidate with the most
-comparisons below 0 there, 18 against 17, so they favor below 0 for it. One of the 11, Y8
-`inhibiting` at n 10,000, is below 0 on seeds 6000 to 6019 only through its upper end, `-2e-17`,
-floating-point residue of 0, read as below 0 as computed; read exactly, that interval contains 0,
-the row is lower on seeds 0 to 19 only, the better comparisons are 10, and the confirmation's
-count is 17 against 17. Another 4 were lower on seeds 0 to 19 and tied on the rerun, and the other
-99 tie. Against the patched copy alone, Andrey is worse in none and better in none of 27.
+At its defaults, alpha one over the observational rows and 10 starts, Andrey is worse than the
+library in none of the 114 comparisons on seeds 6000 to 6019, the confirmation's datasets (87 cells
+against the library at alpha `1e-3`, and the 27 cells with a setting of two or more targets against
+the patched copy), and lower in 17: 15 against the library, 12 of them in cells with settings of two
+or more targets (10 of W's 12, Y8 `inhibiting` and `perfect` at n 10,000), and 2 against the patched
+copy (W, K 1 and K 2, p 20, n 10,000); the other 97 tie. That is one seed set, so they count as
+lower, not better. At n 1,000 the default is alpha `1e-3`, and its fits are the ones below.
+
+The default on seeds 6000 to 6019, against the library and the patched copy at alpha `1e-3`:
+
+| Cell | Default alpha | Andrey | Reference | D [95%] | Side | Patched copy | D [95%] | Side |
+|---|---|---|---|---|---|---|---|---|
+| W, K 1, p 10, n 1,000 | `1e-3` | 2.24 | 3.04 | -0.80 [-1.54, 0.00] | tie | 2.36 | -0.12 [-0.34, +0.08] | tie |
+| W, K 1, p 10, n 10,000 | `1e-4` | 0.90 | 2.00 | -1.10 [-1.83, -0.38] | lower | 0.80 | +0.10 [-0.04, +0.26] | tie |
+| W, K 1, p 10, n 100,000 | `1e-5` | 0.60 | 1.92 | -1.32 [-1.99, -0.64] | lower | 0.38 | +0.22 [0.00, +0.56] | tie |
+| W, K 1, p 20, n 1,000 | `1e-3` | 3.60 | 5.38 | -1.78 [-2.64, -0.86] | lower | 3.41 | +0.19 [-0.21, +0.61] | tie |
+| W, K 1, p 20, n 10,000 | `1e-4` | 0.96 | 4.31 | -3.35 [-4.15, -2.54] | lower | 1.74 | -0.78 [-1.32, -0.33] | lower |
+| W, K 1, p 20, n 100,000 | `1e-5` | 0.35 | 3.59 | -3.24 [-4.11, -2.36] | lower | 0.57 | -0.22 [-0.67, +0.15] | tie |
+| W, K 2, p 10, n 1,000 | `1e-3` | 1.89 | 2.71 | -0.82 [-1.70, +0.08] | tie | 1.95 | -0.06 [-0.23, +0.12] | tie |
+| W, K 2, p 10, n 10,000 | `1e-4` | 0.75 | 2.00 | -1.25 [-2.03, -0.46] | lower | 0.62 | +0.13 [-0.02, +0.31] | tie |
+| W, K 2, p 10, n 100,000 | `1e-5` | 0.30 | 1.68 | -1.38 [-2.09, -0.63] | lower | 0.32 | -0.02 [-0.06, 0.00] | tie |
+| W, K 2, p 20, n 1,000 | `1e-3` | 3.58 | 5.69 | -2.11 [-2.85, -1.37] | lower | 3.28 | +0.30 [-0.15, +0.77] | tie |
+| W, K 2, p 20, n 10,000 | `1e-4` | 0.98 | 4.56 | -3.58 [-4.34, -2.82] | lower | 1.70 | -0.72 [-1.34, -0.23] | lower |
+| W, K 2, p 20, n 100,000 | `1e-5` | 0.25 | 3.52 | -3.27 [-4.21, -2.33] | lower | 0.62 | -0.37 [-0.87, 0.00] | tie |
+| S {4}, c 0.1, n 1,000 | `1e-3` | 1.20 | 1.15 | +0.05 [0.00, +0.15] | tie |  |  |  |
+| S {4}, c 0.1, n 10,000 | `1e-4` | 0.30 | 0.25 | +0.05 [-0.15, +0.30] | tie |  |  |  |
+| S {4}, c 0.1, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {4}, c 0.25, n 1,000 | `1e-3` | 0.20 | 0.26 | -0.06 [-0.16, 0.00] | tie |  |  |  |
+| S {4}, c 0.25, n 10,000 | `1e-4` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {4}, c 0.25, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {4}, c 0.5, n 1,000 | `1e-3` | 0.00 | 0.00 | 0.00 [0.00, 0.00] | tie |  |  |  |
+| S {4}, c 0.5, n 10,000 | `1e-4` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {4}, c 0.5, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {5}, c 0.1, n 1,000 | `1e-3` | 1.00 | 0.85 | +0.15 [0.00, +0.45] | tie |  |  |  |
+| S {5}, c 0.1, n 10,000 | `1e-4` | 0.25 | 0.25 | 0.00 [-0.15, +0.15] | tie |  |  |  |
+| S {5}, c 0.1, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {5}, c 0.25, n 1,000 | `1e-3` | 0.15 | 0.21 | -0.06 [-0.16, 0.00] | tie |  |  |  |
+| S {5}, c 0.25, n 10,000 | `1e-4` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {5}, c 0.25, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {5}, c 0.5, n 1,000 | `1e-3` | 0.00 | 0.00 | 0.00 [0.00, 0.00] | tie |  |  |  |
+| S {5}, c 0.5, n 10,000 | `1e-4` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {5}, c 0.5, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie |  |  |  |
+| S {4, 5}, c 0.1, n 1,000 | `1e-3` | 0.90 | 1.00 | -0.10 [-0.30, +0.10] | tie | 0.85 | +0.05 [0.00, +0.15] | tie |
+| S {4, 5}, c 0.1, n 10,000 | `1e-4` | 0.25 | 0.25 | 0.00 [-0.15, +0.15] | tie | 0.25 | 0.00 [-0.15, +0.15] | tie |
+| S {4, 5}, c 0.1, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie | 0.05 | -0.05 [-0.15, 0.00] | tie |
+| S {4, 5}, c 0.25, n 1,000 | `1e-3` | 0.15 | 0.21 | -0.06 [-0.16, 0.00] | tie | 0.21 | -0.06 [-0.16, 0.00] | tie |
+| S {4, 5}, c 0.25, n 10,000 | `1e-4` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie | 0.05 | -0.05 [-0.15, 0.00] | tie |
+| S {4, 5}, c 0.25, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie | 0.05 | -0.05 [-0.15, 0.00] | tie |
+| S {4, 5}, c 0.5, n 1,000 | `1e-3` | 0.00 | 0.00 | 0.00 [0.00, 0.00] | tie | 0.00 | 0.00 [0.00, 0.00] | tie |
+| S {4, 5}, c 0.5, n 10,000 | `1e-4` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie | 0.05 | -0.05 [-0.15, 0.00] | tie |
+| S {4, 5}, c 0.5, n 100,000 | `1e-5` | 0.00 | 0.05 | -0.05 [-0.15, 0.00] | tie | 0.05 | -0.05 [-0.15, 0.00] | tie |
+| Y6 `perfect`, k 1, n 1,000 | `1e-3` | 1.40 | 1.25 | +0.15 [-0.22, +0.58] | tie |  |  |  |
+| Y6 `perfect`, k 1, n 10,000 | `1e-4` | 0.30 | 0.30 | 0.00 [0.00, 0.00] | tie |  |  |  |
+| Y6 `perfect`, k 2, n 1,000 | `1e-3` | 1.10 | 1.14 | -0.04 [-0.42, +0.34] | tie |  |  |  |
+| Y6 `perfect`, k 2, n 10,000 | `1e-4` | 0.40 | 0.21 | +0.19 [-0.18, +0.75] | tie |  |  |  |
+| Y6 `perfect`, k 4, n 1,000 | `1e-3` | 1.28 | 1.64 | -0.36 [-1.16, +0.35] | tie |  |  |  |
+| Y6 `perfect`, k 4, n 10,000 | `1e-4` | 0.15 | 0.45 | -0.30 [-0.65, -0.06] | lower |  |  |  |
+| Y6 `perfect`, k 6, n 1,000 | `1e-3` | 1.46 | 1.44 | +0.02 [-0.51, +0.51] | tie |  |  |  |
+| Y6 `perfect`, k 6, n 10,000 | `1e-4` | 0.53 | 0.60 | -0.07 [-0.26, +0.11] | tie |  |  |  |
+| Y6 `perfect`, k 8, n 1,000 | `1e-3` | 1.55 | 1.37 | +0.18 [-0.28, +0.67] | tie |  |  |  |
+| Y6 `perfect`, k 8, n 10,000 | `1e-4` | 0.80 | 0.79 | +0.01 [-0.20, +0.26] | tie |  |  |  |
+| Y6 `perfect`, k 10, n 1,000 | `1e-3` | 1.76 | 1.74 | +0.02 [-0.35, +0.34] | tie |  |  |  |
+| Y6 `perfect`, k 10, n 10,000 | `1e-4` | 1.30 | 1.20 | +0.10 [-0.13, +0.37] | tie |  |  |  |
+| Y6 `inhibiting`, k 1, n 1,000 | `1e-3` | 1.23 | 1.25 | -0.02 [-0.36, +0.32] | tie |  |  |  |
+| Y6 `inhibiting`, k 1, n 10,000 | `1e-4` | 0.30 | 0.30 | 0.00 [0.00, 0.00] | tie |  |  |  |
+| Y6 `inhibiting`, k 2, n 1,000 | `1e-3` | 1.05 | 1.14 | -0.09 [-0.76, +0.48] | tie |  |  |  |
+| Y6 `inhibiting`, k 2, n 10,000 | `1e-4` | 0.40 | 0.21 | +0.19 [-0.18, +0.75] | tie |  |  |  |
+| Y6 `inhibiting`, k 4, n 1,000 | `1e-3` | 1.39 | 1.64 | -0.25 [-0.94, +0.38] | tie |  |  |  |
+| Y6 `inhibiting`, k 4, n 10,000 | `1e-4` | 0.45 | 0.37 | +0.08 [-0.10, +0.32] | tie |  |  |  |
+| Y6 `inhibiting`, k 6, n 1,000 | `1e-3` | 1.48 | 1.44 | +0.04 [-0.73, +0.73] | tie |  |  |  |
+| Y6 `inhibiting`, k 6, n 10,000 | `1e-4` | 0.70 | 0.61 | +0.09 [-0.13, +0.32] | tie |  |  |  |
+| Y6 `inhibiting`, k 8, n 1,000 | `1e-3` | 1.65 | 1.41 | +0.24 [-0.08, +0.55] | tie |  |  |  |
+| Y6 `inhibiting`, k 8, n 10,000 | `1e-4` | 0.89 | 0.78 | +0.11 [-0.25, +0.55] | tie |  |  |  |
+| Y6 `inhibiting`, k 10, n 1,000 | `1e-3` | 1.90 | 1.78 | +0.12 [-0.18, +0.45] | tie |  |  |  |
+| Y6 `inhibiting`, k 10, n 10,000 | `1e-4` | 1.16 | 1.22 | -0.06 [-0.32, +0.22] | tie |  |  |  |
+| Y6 `imperfect`, k 1, n 1,000 | `1e-3` | 1.15 | 1.25 | -0.10 [-0.46, +0.24] | tie |  |  |  |
+| Y6 `imperfect`, k 1, n 10,000 | `1e-4` | 0.30 | 0.36 | -0.06 [-0.18, 0.00] | tie |  |  |  |
+| Y6 `imperfect`, k 2, n 1,000 | `1e-3` | 1.55 | 1.42 | +0.13 [-0.20, +0.47] | tie |  |  |  |
+| Y6 `imperfect`, k 2, n 10,000 | `1e-4` | 0.15 | 0.21 | -0.06 [-0.18, 0.00] | tie |  |  |  |
+| Y6 `imperfect`, k 4, n 1,000 | `1e-3` | 1.88 | 1.72 | +0.16 [-0.45, +0.78] | tie |  |  |  |
+| Y6 `imperfect`, k 4, n 10,000 | `1e-4` | 0.90 | 0.55 | +0.35 [-0.25, +0.98] | tie |  |  |  |
+| Y6 `imperfect`, k 6, n 1,000 | `1e-3` | 1.25 | 1.43 | -0.18 [-0.84, +0.39] | tie |  |  |  |
+| Y6 `imperfect`, k 6, n 10,000 | `1e-4` | 0.63 | 0.64 | -0.01 [-0.23, +0.23] | tie |  |  |  |
+| Y6 `imperfect`, k 8, n 1,000 | `1e-3` | 1.44 | 1.44 | 0.00 [-0.25, +0.29] | tie |  |  |  |
+| Y6 `imperfect`, k 8, n 10,000 | `1e-4` | 1.10 | 1.04 | +0.06 [-0.30, +0.47] | tie |  |  |  |
+| Y6 `imperfect`, k 10, n 1,000 | `1e-3` | 1.72 | 1.84 | -0.12 [-0.67, +0.34] | tie |  |  |  |
+| Y6 `imperfect`, k 10, n 10,000 | `1e-4` | 1.25 | 1.31 | -0.06 [-0.47, +0.36] | tie |  |  |  |
+| Y5 `perfect`, n 1,000 | `1e-3` | 3.19 | 3.51 | -0.32 [-1.07, +0.31] | tie |  |  |  |
+| Y5 `perfect`, n 10,000 | `1e-4` | 1.88 | 2.37 | -0.49 [-1.14, +0.11] | tie |  |  |  |
+| Y5 `inhibiting`, n 1,000 | `1e-3` | 3.31 | 3.50 | -0.19 [-1.15, +0.58] | tie |  |  |  |
+| Y5 `inhibiting`, n 10,000 | `1e-4` | 1.70 | 2.45 | -0.75 [-1.32, -0.21] | lower |  |  |  |
+| Y5 `imperfect`, n 1,000 | `1e-3` | 3.23 | 3.53 | -0.30 [-0.79, +0.19] | tie |  |  |  |
+| Y5 `imperfect`, n 10,000 | `1e-4` | 2.06 | 2.61 | -0.55 [-1.13, -0.03] | lower |  |  |  |
+| Y8 `perfect`, n 1,000 | `1e-3` | 1.89 | 1.92 | -0.03 [-0.58, +0.47] | tie | 1.69 | +0.20 [-0.25, +0.71] | tie |
+| Y8 `perfect`, n 10,000 | `1e-4` | 1.20 | 1.60 | -0.40 [-0.80, -0.01] | lower | 1.13 | +0.07 [-0.20, +0.36] | tie |
+| Y8 `inhibiting`, n 1,000 | `1e-3` | 1.62 | 1.92 | -0.30 [-0.84, +0.17] | tie | 1.59 | +0.03 [-0.29, +0.37] | tie |
+| Y8 `inhibiting`, n 10,000 | `1e-4` | 1.05 | 1.53 | -0.48 [-0.92, -0.08] | lower | 1.13 | -0.08 [-0.30, +0.16] | tie |
+| Y8 `imperfect`, n 1,000 | `1e-3` | 1.73 | 1.80 | -0.07 [-0.59, +0.42] | tie | 1.80 | -0.07 [-0.59, +0.42] | tie |
+| Y8 `imperfect`, n 10,000 | `1e-4` | 1.25 | 1.40 | -0.15 [-0.58, +0.24] | tie | 1.22 | +0.03 [-0.23, +0.27] | tie |
+
+At alpha `1e-3`, the former default, with 10 starts, Andrey is worse than the library in none of
+the 114 comparisons and better in 10: its errors were lower on seeds 0 to 19 and again on a rerun on
+seeds 6000 to 6019. All 10 are against the unpatched library, in W's cells with settings of two or
+more targets, where the library's test inverts Definition 4.2; against the patched copy none of the
+10 is better: 8 tie and 2 were lower on seeds 0 to 19 only. Another 5 were lower on seeds 0 to 19
+and tied on the rerun, among them Y8 `inhibiting` at n 10,000, whose upper end on seeds 6000 to 6019
+is `-2e-17`, residue of 0 (read as computed it is below 0 there, and better); the other 99 tie.
+Against the patched copy alone, Andrey is worse in none and better in none of 27.
 
 With 5 starts, the library's number of runs, at the same level, Andrey is worse in none of the 114
 comparisons: 13 were lower on seeds 0 to 19, with no rerun, and the other 101 tie.
 
-At the default, 10 starts, seeds 0 to 19. The patched copy's columns are filled in the cells with
-a setting of two or more targets.
+At alpha `1e-3` with 10 starts, seeds 0 to 19. The patched copy's columns are filled in the cells
+with a setting of two or more targets.
 
 | Cell | Empty graph | Andrey | Reference | D [95%] | Verdict | Patched copy | D [95%] | Verdict |
 |---|---|---|---|---|---|---|---|---|
@@ -266,11 +365,11 @@ a setting of two or more targets.
 | Y8 `perfect`, n 1,000 | 8.00 | 1.53 | 1.55 | -0.02 [-0.34, +0.29] | tie | 1.40 | +0.13 [-0.20, +0.46] | tie |
 | Y8 `perfect`, n 10,000 | 8.00 | 0.90 | 1.37 | -0.47 [-1.04, +0.01] | tie | 0.82 | +0.08 [-0.17, +0.34] | tie |
 | Y8 `inhibiting`, n 1,000 | 8.00 | 1.23 | 1.55 | -0.32 [-0.63, -0.02] | lower on seeds 0-19 only | 1.39 | -0.16 [-0.44, +0.10] | tie |
-| Y8 `inhibiting`, n 10,000 | 8.00 | 0.60 | 1.37 | -0.77 [-1.26, -0.34] | better | 0.82 | -0.22 [-0.45, +0.02] | tie |
+| Y8 `inhibiting`, n 10,000 | 8.00 | 0.60 | 1.37 | -0.77 [-1.26, -0.34] | lower on seeds 0-19 only | 0.82 | -0.22 [-0.45, +0.02] | tie |
 | Y8 `imperfect`, n 1,000 | 8.00 | 1.47 | 1.52 | -0.05 [-0.40, +0.30] | tie | 1.46 | +0.01 [-0.32, +0.34] | tie |
 | Y8 `imperfect`, n 10,000 | 8.00 | 0.90 | 1.29 | -0.39 [-0.92, +0.10] | tie | 0.86 | +0.04 [-0.24, +0.32] | tie |
 
-At the default level with 5 starts, against the same library fits:
+At alpha `1e-3` with 5 starts, against the same library fits:
 
 | Cell | Empty graph | Andrey | Reference | D [95%] | Verdict | Patched copy | D [95%] | Verdict |
 |---|---|---|---|---|---|---|---|---|
@@ -368,31 +467,32 @@ agrees; "no rerun" marks rows lower on seeds 0 to 19 in cells that were not reru
 | Level | Starts | Against | Worse | Higher on seeds 0-19 only | Better | Lower on seeds 0-19 only | Lower, no rerun | Tie |
 |---|---|---|---|---|---|---|---|---|
 | `1e-4` | 5 | reference | 0 | 5 | 0 | 0 | 13 | 69 |
-| `1e-4` | 5 | patched copy | 1 | 1 | 0 | 0 | 0 | 25 |
+| `1e-4` | 5 | patched copy | 0 | 1 | 0 | 0 | 0 | 26 |
 | `1e-4` | 10 | reference | 0 | 2 | 1 | 0 | 14 | 70 |
 | `1e-4` | 10 | patched copy | 0 | 0 | 0 | 0 | 0 | 27 |
 | `1e-3` | 5 | reference | 0 | 0 | 0 | 0 | 13 | 74 |
 | `1e-3` | 5 | patched copy | 0 | 0 | 0 | 0 | 0 | 27 |
-| `1e-3` | 10 | reference | 0 | 0 | 11 | 2 | 0 | 74 |
+| `1e-3` | 10 | reference | 0 | 0 | 10 | 3 | 0 | 74 |
 | `1e-3` | 10 | patched copy | 0 | 0 | 0 | 2 | 0 | 25 |
 | `1e-2` | 5 | reference | 0 | 0 | 1 | 0 | 28 | 58 |
-| `1e-2` | 5 | patched copy | 0 | 0 | 0 | 1 | 13 | 13 |
+| `1e-2` | 5 | patched copy | 0 | 0 | 0 | 1 | 12 | 14 |
 | `1e-2` | 10 | reference | 0 | 0 | 1 | 1 | 34 | 51 |
-| `1e-2` | 10 | patched copy | 0 | 0 | 0 | 1 | 13 | 13 |
+| `1e-2` | 10 | patched copy | 0 | 0 | 0 | 1 | 12 | 14 |
 
-At `1e-2` against the patched copy, one of the 13 rows lower with no rerun at each number of
-starts, Y8 `inhibiting` at n 1,000, has an upper end of `-2e-17` on seeds 0 to 19, floating-point
-residue of 0, read as below 0; read exactly, both tie.
+At `1e-2` against the patched copy, Y8 `inhibiting` at n 1,000 has an upper end of `-2e-17` on seeds
+0 to 19 at each number of starts, residue of 0: both rows tie, so 12 rows are lower with no rerun at
+each number of starts (13 read as computed).
 
 ### Replication
 
-Every comparison whose interval lay above 0 on seeds 0 to 19, with its interval on fresh seeds
-100 to 119, on which every package refit the cell. All nine are at alpha `1e-4` with 1,000 rows
-per setting on 10 variables; none is at the default level or at `1e-2`.
+Every comparison whose interval lay above 0 on seeds 0 to 19, eight, and the W row, whose lower end
+there is `4e-17`, residue of 0 (above 0 as computed, so its cell was rerun too), with the interval
+on fresh seeds 100 to 119, on which every package refit the cell. All nine are at alpha `1e-4` with
+1,000 rows per setting on 10 variables; none is at `1e-3` or `1e-2`.
 
 | Cell | Level | Starts | Against | Seeds 0-19: Andrey, comparator, D [95%] | Seeds 100-119: Andrey, comparator, D [95%] | Verdict |
 |---|---|---|---|---|---|---|
-| W, K 2, p 10, n 1,000 | `1e-4` | 5 | patched copy | 2.51, 2.12, +0.39 [0.00, +0.93] | 3.07, 2.76, +0.31 [+0.01, +0.63] | worse |
+| W, K 2, p 10, n 1,000 | `1e-4` | 5 | patched copy | 2.51, 2.12, +0.39 [0.00, +0.93] | 3.07, 2.76, +0.31 [+0.01, +0.63] | tie |
 | Y6 `inhibiting`, k 1, n 1,000 | `1e-4` | 5 | reference | 1.13, 0.65, +0.48 [+0.08, +0.98] | 1.59, 1.90, -0.31 [-0.86, +0.16] | higher on seeds 0-19 only |
 | Y6 `imperfect`, k 2, n 1,000 | `1e-4` | 5 | reference | 1.02, 0.58, +0.44 [+0.10, +0.88] | 1.80, 1.91, -0.11 [-0.38, +0.16] | higher on seeds 0-19 only |
 | Y6 `imperfect`, k 6, n 1,000 | `1e-4` | 5 | reference | 1.57, 1.19, +0.38 [+0.03, +0.79] | 2.08, 2.16, -0.08 [-0.41, +0.27] | higher on seeds 0-19 only |
@@ -402,20 +502,18 @@ per setting on 10 variables; none is at the default level or at `1e-2`.
 | Y6 `imperfect`, k 10, n 1,000 | `1e-4` | 10 | reference | 1.93, 1.35, +0.58 [+0.22, +0.97] | 2.54, 2.83, -0.29 [-0.86, +0.16] | higher on seeds 0-19 only |
 | Y8 `perfect`, n 1,000 | `1e-4` | 5 | patched copy | 1.68, 1.28, +0.40 [+0.03, +0.77] | 2.18, 2.78, -0.60 [-1.23, -0.08] | higher on seeds 0-19 only |
 
-The W row's lower end on seeds 0 to 19 is `4e-17`, floating-point residue of 0, read as above 0,
-which sent the row to the rerun. On the rerun it was higher again, so it counts as worse: the one
-replicated row of the campaign. The same rerun found 3 comparisons in these cells lower again,
-which count as better at their levels (in the table above). The confirmation's rerun has one such
-end as well: at the default, Y8 `inhibiting` at n 10,000 against the library is below 0 on seeds
-6000 to 6019 through an upper end of `-2e-17` (see [In the claim](#in-the-claim)).
+No comparison is worse: the eight tied or were lower on the rerun, and the W row ties on seeds 0 to
+19, though on the rerun it was higher (read as computed, it would be the one replicated worse row).
+The same rerun found 3 comparisons in these cells lower again, which count as better at their levels
+(in the table above).
 
-### The replicated row
+### The W row
 
 At alpha `1e-4` with 5 starts, on W with 2 settings of 4 targets, 10 variables, and 1,000 rows per
-setting, Andrey's SHD was higher than the patched copy's on both seed sets: 2.51 against 2.12 on
-seeds 0 to 19 and 3.07 against 2.76 on seeds 100 to 119. The trace finds the cause in the first
-start. Andrey's first start is the minimum-degree order with its ties broken by the column ranks,
-the same in every draw, and a later start replaces its result only with a strictly lower
+setting, Andrey's SHD was 2.51 against the patched copy's 2.12 on seeds 0 to 19, a tie with a lower
+end of 0, and 3.07 against 2.76 on seeds 100 to 119, higher. The trace finds the cause of the gap in
+the first start. Andrey's first start is the minimum-degree order with its ties broken by the column
+ranks, the same in every draw, and a later start replaces its result only with a strictly lower
 objective; the library draws all 5 starts at random in every draw. At this level and size the
 objective often fails to single out the truth: the true DAG's objective equals the returned DAG's
 in 42 and 26 of the 100 draws of the two seed sets, and is strictly higher in 45 and 65. Where
@@ -428,8 +526,7 @@ comes from a named difference, the library's one-sided start test, which keeps w
 Andrey's level drops (switching it moves D from +0.39 to +0.29). Both packages count the same
 I-contradicting edges on every DAG traced. The same cell ties at Andrey's default of 10 starts on
 both seed sets (+0.13 [-0.07, +0.34] and +0.19 [-0.08, +0.47]), and against the unpatched library
-the row ties on seeds 0 to 19 and is lower on seeds 100 to 119. The row awaits a decision before
-IGSP can leave experimental status.
+the row ties on seeds 0 to 19 and is lower on seeds 100 to 119.
 
 ### Floors and coverage
 
@@ -440,25 +537,28 @@ row was filtered and no dataset is missing.
 
 ### Choosing the defaults
 
-The defaults were chosen before this comparison, by Andrey alone on seeds 1000 to 1019, one draw,
-over the 87 cells (Notes of `igsp`), with no rerun, so lower and higher below mean the interval
-on these seeds alone. Against the other levels of the authors' sweep, alpha `1e-3` was lower in
-123 comparisons and worse in none: lower than `1e-4` in 4 cells, `5e-3` in 16, `1e-2` in 20, and
-`5e-2` in 83, and tied with `5e-4` in all 87. At `1e-3`, 10 starts and 5 tied each other in every
-cell; against one start, 10 were lower in 21 cells and 5 in 19.
+The levels were first compared before this comparison, by Andrey alone on seeds 1000 to 1019, one
+draw, over the 87 cells (Notes of `igsp`), with no rerun, so lower and higher below mean the
+interval on these seeds alone. Against the other levels of the authors' sweep, alpha `1e-3` was
+lower in 123 comparisons and worse in none: lower than `1e-4` in 4 cells, `5e-3` in 16, `1e-2` in
+20, and `5e-2` in 83, and tied with `5e-4` in all 87. At `1e-3`, 10 starts and 5 tied each other in
+every cell; against one start, 10 were lower in 21 cells and 5 in 19.
 
-A confirmation run, its rule written before any fit, then compared alpha `1e-3` with alpha one
-over the observational rows, both at 10 starts, against the library at `1e-3` (and the patched
-copy in the multi-target cells), on seeds 6000 to 6019 with 5 draws: worse in none of 114 for
-either, below 0 in 18 for `1e-3` and in 17 for one over the observational rows. The rule kept the
-candidate with the most comparisons below 0, `1e-3`. One of its 18 is the Y8 `inhibiting` row at n
-10,000 whose upper end is residue of 0 (see [In the claim](#in-the-claim)); read exactly, the two
-candidates tie at 17, and the rule gives a tie to one over the observational rows.
+A confirmation run, its rule written before any fit, then compared alpha `1e-3` with alpha one over
+the observational rows, both at 10 starts, against the library at `1e-3` (and the patched copy in
+the multi-target cells), on seeds 6000 to 6019 with 5 draws. Both were worse in none of 114 and
+lower in 17, a tie, which the rule gives to one over the observational rows, the default of
+Andrey's `ut_igsp`, so it is `igsp`'s default; the run's own verdict, reading the ends as computed,
+counted 18 for `1e-3`, one of them Y8 `inhibiting` at n 10,000 through an upper end of `-2e-17`, and
+kept `1e-3`. At n 1,000 the two candidates run the same fits. In the 50 cells at n 10,000 and
+100,000, one over the observational rows had a lower SHD than `1e-3` in 1 (W, K 2, p 20, n 10,000,
+-0.28 [-0.56, -0.05]) and a higher one in none, and against the library at its own level, one over
+the observational rows, it was lower in 11 of 67 comparisons and higher in none.
 
 ### Other methods
 
-Andrey's `igsp` at its defaults beside other methods on the same datasets, seeds 0 to 19, one
-seed set and no rerun, never judged:
+Andrey's `igsp` at alpha `1e-3` and 10 starts beside other methods on the same datasets, seeds 0
+to 19, one seed set and no rerun, never judged:
 
 - Andrey's `gies`, from the same inputs: `igsp`'s SHD was higher in 35 of the 87 cells (all 6 of
   Y5 and of Y8, 6 of W's 12, 14 of Y6's 36, and 3 of S's 27), lower in 6 (Y6), and tied in 46.
@@ -478,11 +578,11 @@ target's own term in that setting, 16.
 
 ### Out of the claim
 
-One draw per dataset, 20 datasets per cell (10 at 50 to 400 variables), Andrey at its defaults,
-with a cap of 3,600 s per fit. D, Andrey's SHD minus the library's, is given where the library
-finished every dataset. The library has no run with an unknown off-target, with additive noise and
-the Gaussian tests, or on categorical data, and none above 100 variables; Andrey's `gies` runs
-beside it in every row but those with additive noise.
+One draw per dataset, 20 datasets per cell (10 at 50 to 400 variables), Andrey at alpha `1e-3` and
+10 starts, with a cap of 3,600 s per fit. D, Andrey's SHD minus the library's, is given where the
+library finished every dataset. The library has no run with an unknown off-target, with additive
+noise and the Gaussian tests, or on categorical data, and none above 100 variables; Andrey's `gies`
+runs beside it in every row but those with additive noise.
 
 | Cell | Empty graph | Andrey | Reference | D [95%] | GIES | Andrey, median fit (s) | Reference, median fit (s) |
 |---|---|---|---|---|---|---|---|
@@ -526,13 +626,13 @@ the library's fits peaked at up to 5.4 GB, Andrey's at 0.3 GB.
 
 ### Speed
 
-Andrey was slower than the library in 84 of the 87 cells at the default level, and
-the ratio grows with the rows: its median over cells was 1.83 at 1,000 rows per setting, 4.29 at
-10,000, and 3.48 at 100,000 (W and S only). Andrey's fit time grows with the total number of rows,
-the library's much less. Where the search dominates, Andrey is faster: with the kernel tests 1.72 s
-against 8.69 s at 200 rows and 13.83 s against 21.19 s at 500, and on 50 variables 1.56 s against
-4.28 s. The ratio is per row the median over datasets of Andrey's mean fit time over its draws
-divided by the library's at 5 runs.
+Andrey was slower than the library in 84 of the 87 cells at alpha `1e-3`, and the ratio grows with
+the rows: its median over cells was 1.83 at 1,000 rows per setting, 4.29 at 10,000, and 3.48 at
+100,000 (W and S only). Andrey's fit time grows with the total number of rows, the library's much
+less. Where the search dominates, Andrey is faster: with the kernel tests 1.72 s against 8.69 s at
+200 rows and 13.83 s against 21.19 s at 500, and on 50 variables 1.56 s against 4.28 s. The ratio is
+per row the median over datasets of Andrey's mean fit time over its draws divided by the library's
+at 5 runs.
 
 | Block | n | Rows | Andrey, median fit (s) | Reference, median fit (s) | Ratio, median [range] |
 |---|---|---|---|---|---|
@@ -551,10 +651,10 @@ divided by the library's at 5 runs.
 
 ### Where the differences show
 
-Of the named differences, the multi-target test accounts for the 11 comparisons better than the
-unpatched library, since against the patched copy none of the 11 is better (9 tie and 2 were lower
-on seeds 0 to 19 only), and the first start, with a smaller share from the one-sided start test,
-for the replicated row.
+Of the named differences, the multi-target test accounts for the 10 comparisons at alpha `1e-3`
+better than the unpatched library, since against the patched copy none of the 10 is better (8 tie
+and 2 were lower on seeds 0 to 19 only), and the first start, with a smaller share from the
+one-sided start test, for the W row's gap on its rerun.
 
 ## References
 

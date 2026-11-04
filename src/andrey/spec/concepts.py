@@ -256,14 +256,16 @@ _CONCEPTS = (
             Deviation(
                 method="igsp",
                 name="alpha",
-                default=1e-3,
+                default=None,
                 fixed_in=None,
-                reason="Of the levels its authors swept, 1e-4 to 0.05 (Wang et al. 2017), 1e-3 "
-                "had the fewest errors on simulated data in the settings of Wang et al. (2017) and "
-                "Yang, Katcoff and Uhler (2018): on one set of datasets, its SHD was lower in 123 "
-                "of its 435 comparisons with another level over 87 groups of datasets and it was "
-                "worse in none, and no level's was lower on 20 variables at mean degree 3 outside "
-                "those groups.",
+                reason="None is one over the number of observational rows, for both tests, as for "
+                "ut_igsp. On simulated data in the settings of Wang et al. (2017) and Yang, "
+                "Katcoff and Uhler (2018), 1e-3 had the fewest errors of the levels its authors "
+                "swept, 1e-4 to 0.05; then, on fresh datasets, against the authors' reference "
+                "implementation at 1e-3, one over the observational rows and 1e-3 were each worse "
+                "in none of 114 comparisons and had fewer errors in 17, with interval ends "
+                "that are floating-point residue of 0 read as 0, a tie that a rule written before "
+                "the run gives to one over the observational rows.",
             ),
             Deviation(
                 method="ut_igsp",

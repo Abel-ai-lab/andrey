@@ -208,6 +208,39 @@ def test_invariance_alpha_reaches_the_invariance_test_and_alpha_does_not(monkeyp
         assert answers == [invariant]
 
 
+def test_alpha_none_is_one_over_the_observational_rows_and_a_float_is_kept():
+    frame, env, targets, _ = sample()
+    rows = int((env == "observed").sum())
+    default = andrey.igsp(frame, env, targets=targets)
+    explicit = andrey.igsp(frame, env, targets=targets, alpha=1 / rows)
+    assert default.metadata["alpha"] == explicit.metadata["alpha"] == 1 / rows
+    assert marks(default) == marks(explicit)
+    assert andrey.igsp(frame, env, targets=targets, alpha=0.01).metadata["alpha"] == 0.01
+    # Every environment mapped to [] is observational: their rows are pooled and all counted.
+    split = np.where((env == "observed") & (np.arange(len(env)) % 2 == 0), "again", env)
+    pooled = andrey.igsp(frame, split, targets={**targets, "again": []})
+    assert pooled.metadata["alpha"] == 1 / rows
+
+
+def test_alpha_none_sets_the_invariance_level_by_the_observational_rows(monkeypatch):
+    """Under an invariance test whose p-value is always 0.01, a variable varies at 50
+    observational rows, a level of 0.02, and does not at 500, a level of 0.002."""
+    monkeypatch.setattr(igsp, "make_invariance_test", lambda *args, **kwargs: lambda y, S: 0.01)
+    answers: list[bool] = []
+    rules = igsp.igsp_rules
+
+    def spy(invariant, family):
+        answers.append(invariant(0, (), 0))
+        return rules(invariant, family)
+
+    monkeypatch.setattr(igsp, "igsp_rules", spy)
+    for n, invariant in ((50, False), (500, True)):
+        frame, env, targets, _ = sample(n=n)
+        answers.clear()
+        assert andrey.igsp(frame, env, targets=targets).metadata["alpha"] == 1 / n
+        assert answers == [invariant]
+
+
 @pytest.mark.parametrize("indep_test", ["fisherz", "kci"])
 def test_row_order_environment_labels_and_split_observational_rows_change_nothing(indep_test):
     frame, env, targets, _ = sample(n=150 if indep_test == "kci" else 500)

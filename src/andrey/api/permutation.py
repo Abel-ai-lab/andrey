@@ -608,7 +608,7 @@ def igsp(
     env: npt.ArrayLike | str | None = None,
     *,
     targets: Mapping | npt.ArrayLike | str | None = None,
-    alpha: float = 1e-3,
+    alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
     invariance_test: str | None = None,
@@ -651,15 +651,18 @@ def igsp(
         row of one environment of ``env`` must give the same targets; without ``env``, rows with
         the same targets are one environment. At least one environment must be observational and
         one not, and every environment needs at least 3 rows. See Notes.
-    alpha : float, default=1e-3
+    alpha : float or None, default=None
         Significance level of the conditional-independence tests, in ``(0, 1)``: two variables
         are independent when a test's p-value exceeds it. Smaller values keep more edges out.
-        Also the level of the invariance tests when ``invariance_alpha`` is ``None``. See Notes
-        for the choice of the default.
+        ``None`` uses one over the number of observational rows, 0.001 at 1,000 rows, so the level
+        falls as the rows grow. Also the level of the invariance tests when ``invariance_alpha``
+        is ``None``. ``metadata["alpha"]`` gives the level used. See Notes for the choice of the
+        default.
     invariance_alpha : float or None, default=None
         Significance level of the invariance tests, in ``(0, 1)``: a variable's distribution
         given a set of others differs between a setting and the observational rows when the test
-        gives a p-value at most this level. ``None`` uses ``alpha``.
+        gives a p-value at most this level. ``None`` uses the level of the conditional-independence
+        tests, ``metadata["alpha"]``.
     indep_test : str or None, default=None
         The conditional-independence test, on the observational rows. For continuous data, on the
         partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
@@ -715,7 +718,8 @@ def igsp(
         ``metadata["score"]`` is the DAG's number of edges, lower is better, and
         ``metadata["n_contradicting"]`` its number of I-contradicting edges, the second part of
         the objective; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the
-        tests used; ``metadata["seed"]`` is the seed used when the fit draws random numbers.
+        tests used, and ``metadata["alpha"]`` is the level of the conditional-independence tests;
+        ``metadata["seed"]`` is the seed used when the fit draws random numbers.
         Under a mixed-data test, ``metadata["categorical"]`` lists the categorical columns it
         read.
 
@@ -765,14 +769,15 @@ def igsp(
     20 single-variable or 45 two-variable settings [2]_. It returns the interventional essential
     graph, the same kind of graph :func:`~andrey.gies` returns from the same inputs; the authors
     show a 7-variable DAG where the score search of GIES is not consistent and IGSP is. Measured in
-    the authors' settings against their reference implementation at the same level, it was worse
-    in none of 114 comparisons and better in 11, its errors lower on two sets of datasets, the
-    second the one its default was confirmed on; all 11 are in settings of two or more targets,
+    the authors' settings against their reference implementation, both at ``alpha=1e-3``, the
+    default's level at 1,000 observational rows, it was worse in none of 114 comparisons and better
+    in 10, its errors lower on two sets of datasets; all 10 are in settings of two or more targets,
     where that implementation's test departs from the paper, and against a copy corrected to the
-    paper it was worse in none and better in none. On the same data, :func:`~andrey.gies` and
-    :func:`~andrey.ut_igsp` told every target often had a lower SHD (see Limitations). When some
-    targets are unknown, use :func:`~andrey.ut_igsp`; with no observational environment, use
-    :func:`~andrey.gies`.
+    paper it was worse in none and better in none. At its default, against the same implementation
+    at ``1e-3``, it was worse in none of the 114 and had fewer errors in 17 on the second set (see
+    Choosing alpha and n_starts). On the same data, :func:`~andrey.gies` and :func:`~andrey.ut_igsp`
+    told every target often had a lower SHD (see Limitations). When some targets are unknown, use
+    :func:`~andrey.ut_igsp`; with no observational environment, use :func:`~andrey.gies`.
 
     **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' settings
     [1]_ [2]_: linear effects and Gaussian noise on 7 to 20 variables, with one or two settings of
@@ -788,8 +793,14 @@ def igsp(
     groups and tied with each other in every group; against one start, 10 were lower in 21 groups
     and 5 in 19, by 0.4 to 1.7 edges, at a median of 0.10 s per fit against 0.07 s for 5. On fresh
     datasets, 5 fits each, against the reference implementation at ``1e-3``, ``alpha=1e-3`` and one
-    over the observational rows, both with 10 starts, were each worse in none of 114 comparisons,
-    and lower in 18 and 17.
+    over the observational rows, both with 10 starts, were each worse in none of 114 comparisons and
+    had fewer errors in 17 each when interval ends that are floating-point residue of 0 are read as
+    0, or in 18 and 17 as computed; a rule written before the fits gives such a tie to one over the
+    observational rows, the default of :func:`~andrey.ut_igsp`. It equals ``1e-3`` at 1,000
+    observational rows, and in the 50 groups at 10,000 and 100,000 rows per setting it had fewer SHD
+    errors than ``1e-3`` in 1, by 0.28 edges, and more in none. Of its 17, 15 are against the
+    reference implementation, 12 of them in settings of two or more targets, by 0.3 to 3.58 edges,
+    and 2 against the corrected copy.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other
@@ -844,15 +855,17 @@ def igsp(
     fits per dataset, one core per fit, against the reference implementation with its 5 runs at
     ``alpha`` ``1e-4``, ``1e-3``, and ``1e-2``, and in the 27 groups with settings of two or more
     targets also against a copy of it corrected to the paper's test. In every group its SHD was
-    below the empty graph's and every fit finished. At the default level, the 11 comparisons it was
-    better in were all against the uncorrected implementation; the corrected copy tied it in 25 of
-    the 27 groups, and in the other 2 its SHD was lower on one set of datasets only. With 5 starts
-    it was worse in none at ``1e-3`` and ``1e-2``, and in one at ``alpha=1e-4``: on 10 variables
-    with 2 settings of 4 targets and 1,000 rows per setting, its SHD was 2.51 against the corrected
-    copy's 2.12, and 3.07 against 2.76 on fresh datasets. There the objective often ties the true
-    DAG with a wrong one, and the first start, the minimum-degree order with its ties broken by the
-    column ranks, is the same in every fit, so the five fits repeat one result where the reference
-    implementation's random starts vary; at 10 starts that group ties. On the same data,
+    below the empty graph's and every fit finished. At the three levels, with 10 starts and with 5,
+    it was worse in none. At ``alpha=1e-3`` with 10 starts, the 10 comparisons it was better in were
+    all against the uncorrected implementation; the corrected copy tied it in 25 of the 27 groups,
+    and in the other 2 its SHD was lower on one set of datasets only. At ``alpha=1e-4`` with 5
+    starts, on 10 variables with 2 settings of 4 targets and 1,000 rows per setting, its SHD was
+    2.51 against the corrected copy's 2.12, an interval whose lower end is 0, and 3.07 against 2.76,
+    higher, on fresh datasets. There the objective often ties the true DAG with a wrong one, and the
+    first start, the minimum-degree order with its ties broken by the column ranks, is the same in
+    every fit, so the five fits repeat one result where the reference implementation's random starts
+    vary; at 10 starts that group ties. Unless a level is named, the numbers below are at
+    ``alpha=1e-3``, the default's level at 1,000 observational rows. On the same data,
     :func:`~andrey.gies` had a lower SHD in 35 of the 87 groups, by 0.35 to 2.63, and a higher one
     in 6, and :func:`~andrey.ut_igsp` told every target a lower one in 27, by 0.38 to 1.95, and a
     higher one in none. A perfect intervention that leaves its target's distribution unchanged, such
@@ -924,13 +937,15 @@ def igsp(
     named = [_env_name(env_labels[c], env is None, labels) for c in sorted(by_code)]
     _check_environments("igsp", X, labels, codes, by_code, named, env is None)
     constraints = resolve(knowledge, X.shape[1], labels, method="igsp")
+    observational = [code for code, t in by_code.items() if t == frozenset()]
+    level = 1.0 / int(np.isin(codes, observational).sum()) if alpha is None else alpha
     with copies_named(labels):
         graph, (edges, contradicting) = _igsp(
             X,
             codes,
             by_code,
-            alpha=alpha,
-            invariance_alpha=alpha if invariance_alpha is None else invariance_alpha,
+            alpha=level,
+            invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
             invariance_test=invariance_test,
             categorical=mask,
@@ -942,6 +957,7 @@ def igsp(
         "score": edges,
         "n_contradicting": contradicting,
         "invariance_test": invariance_test,
+        "alpha": level,
         **categorical_metadata(mask, data),
     }
     return structure_output(graph, labels=labels, metadata=metadata)

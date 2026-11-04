@@ -228,20 +228,19 @@ and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothi
 other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a
-fit runs: the first from the start the method describes, each later one from a start drawn from
-`seed` and the search's index. `boss` and `grasp` start it from a random order, `igsp` and
-`ut_igsp` from a minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the
-best DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring
-search; a later one replaces an earlier one only when it scores better by more than `1e-6` (for
-`igsp`, fewer edges, then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and
-targets). `igsp` and `ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s
-papers' settings, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were
-worse in none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated
-datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2
-of them in that setting, and more in none. Each search builds its own caches and drops the previous
-one's, so more starts take more time but little more memory. `1`, the default for the others, runs
-one search.
+`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit
+runs: the first from the start the method describes, each later one from a start drawn from `seed`
+and the search's index. `boss` and `grasp` start it from a random order, `igsp` and `ut_igsp` from a
+minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
+after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
+replaces an earlier one only when it scores better by more than `1e-6` (for `igsp`, fewer edges,
+then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and targets). `igsp` and
+`ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s papers' settings, at
+`alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were worse in
+none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated datasets, 12
+of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
+that setting, and more in none. Each search builds its own caches and drops the previous one's, so
+more starts take more time but little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -434,10 +433,14 @@ lag 0.
 IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
 and settings whose intervention targets are all known, as GIES does: it searches variable orders
 for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
-the settings' invariance tests contradict. Its default level for both tests, `alpha=1e-3`, was
-chosen from the levels its authors swept, from `1e-4` to `0.05`, on one set of datasets simulated
-as in its papers: its SHD was lower than each other level's in some groups of datasets, except
-`5e-4`, which tied it, and it was worse in none. It returns the interventional essential graph.
+the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
+over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
+authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
+as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
+and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
+in 17, with interval ends that are floating-point residue of 0 read as 0, and a rule written before
+the run gives a tie to one over the observational rows. It returns the interventional essential
+graph and the level used in `metadata["alpha"]`.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the

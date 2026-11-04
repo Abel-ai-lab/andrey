@@ -159,7 +159,7 @@ def _records(cell, package, config, shd, algorithm="igsp", draws=5, seeds=range(
 
 
 def test_the_summary_filters_rows_whose_reference_loses_to_the_empty_graph():
-    mine = lane.config_name(lane.andrey_defaults()["alpha"], lane.andrey_defaults()["n_starts"])
+    mine = lane.config_name(lane.LEVEL, lane.andrey_defaults()["n_starts"])
     alpha = mine.split("_")[0]
     single, multi = "Y6_perfect_k4_p10_n1000", "W_K2_p10_n1000"
     records = _records(single, "andrey", mine, lambda s: 3)
@@ -171,7 +171,7 @@ def test_the_summary_filters_rows_whose_reference_loses_to_the_empty_graph():
     records += _records(single, "andrey", "default", lambda s: 9, algorithm="gies", draws=1)
     summary = lane.summarize(records)
     entries = {(e["regime"], e["comparator"]): e for e in summary["methods"]}
-    level = f"alpha={lane.alpha_text(lane.andrey_defaults()['alpha'])}"
+    level = f"alpha={lane.alpha_text(lane.LEVEL)}"
     level += f"|n_starts={lane.andrey_defaults()['n_starts']}"
     [worse] = entries[(f"Y6|perfect|k=4|{level}", "graphical-model-learning")]["rows"]
     assert worse["verdict"] == "worse" and worse["floor_95"][1] < 0 and "claim" not in worse
@@ -205,7 +205,7 @@ def test_each_gate_level_is_judged_at_five_starts_and_at_the_shipped_number():
 def test_the_reference_at_the_shipped_number_of_runs_is_context():
     defaults = lane.andrey_defaults()
     cell = lane.cell_named("W_K2_p10_n1000")
-    shipped = lane.config_name(defaults["alpha"], defaults["n_starts"]).replace("_s", "_r")
+    shipped = lane.config_name(lane.LEVEL, defaults["n_starts"]).replace("_s", "_r")
     for package in ("reference", "def42"):
         configs = {f["config"] for f in lane.reference_fits(cell, package)}
         assert (shipped in configs) == (defaults["n_starts"] != lane.NRUNS)
@@ -218,7 +218,7 @@ def test_the_reference_at_the_shipped_number_of_runs_is_context():
 
 
 def test_a_row_whose_reference_finished_no_dataset_says_so():
-    mine = lane.config_name(lane.andrey_defaults()["alpha"], lane.andrey_defaults()["n_starts"])
+    mine = lane.config_name(lane.LEVEL, lane.andrey_defaults()["n_starts"])
     cell = "Y5_perfect_p20_n1000"
     records = _records(cell, "andrey", mine, lambda s: 2)
     records += [
@@ -237,7 +237,7 @@ def test_a_resumed_run_may_change_host_and_workers_but_not_its_fits():
 
 
 def test_a_worse_row_counts_only_when_its_rerun_on_fresh_seeds_is_worse():
-    mine = lane.config_name(lane.andrey_defaults()["alpha"], lane.andrey_defaults()["n_starts"])
+    mine = lane.config_name(lane.LEVEL, lane.andrey_defaults()["n_starts"])
     theirs = mine.split("_")[0] + "_r5"
     cell = "Y5_perfect_p20_n1000"
     records = _records(cell, "andrey", mine, lambda s: 2) + _records(
