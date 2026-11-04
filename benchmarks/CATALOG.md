@@ -19,6 +19,7 @@ whose Reproduce table lists the driver.
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
+| [ICP](comparisons/icp.md) | `icp_cpu.py`, `icp_correction.py` | ICP, both tests | InvariantCausalPrediction (R) | |
 | [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
