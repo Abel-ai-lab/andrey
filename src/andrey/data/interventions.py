@@ -24,11 +24,11 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-__all__ = ["Hard", "Soft", "hard", "soft"]
+__all__ = ["HardIntervention", "SoftIntervention", "hard", "soft"]
 
 
 @dataclass(frozen=True, kw_only=True)
-class Hard:
+class HardIntervention:
     """A hard intervention: the variable's parents no longer act on it (see :func:`hard`)."""
 
     value: float | None = None
@@ -37,7 +37,7 @@ class Hard:
 
 
 @dataclass(frozen=True, kw_only=True)
-class Soft:
+class SoftIntervention:
     """A soft intervention: the mechanism changes and the parents still act (:func:`soft`)."""
 
     shift: float = 0.0
@@ -45,12 +45,12 @@ class Soft:
     noise_scale: float = 1.0
 
 
-Intervention = Hard | Soft
+Intervention = HardIntervention | SoftIntervention
 
 
 def hard(
     value: float | None = None, *, sd: float = 0.0, probs: Sequence[float] | None = None
-) -> Hard:
+) -> HardIntervention:
     """Build a hard intervention: the variable is set from outside, and its parents no longer act.
 
     Parameters
@@ -68,7 +68,7 @@ def hard(
 
     Returns
     -------
-    Hard
+    HardIntervention
 
     Raises
     ------
@@ -80,23 +80,25 @@ def hard(
     --------
     >>> from andrey.data.interventions import hard
     >>> hard(2.0, sd=0.2)
-    Hard(value=2.0, sd=0.2, probs=None)
+    HardIntervention(value=2.0, sd=0.2, probs=None)
     """
     if value is not None and not np.isfinite(value):
         raise ValueError(f"hard() takes a finite value, got {value}")
     if not (np.isfinite(sd) and sd >= 0):
         raise ValueError(f"hard() takes a finite sd >= 0, got {sd}")
     if probs is None:
-        return Hard(value=None if value is None else float(value), sd=float(sd))
+        return HardIntervention(value=None if value is None else float(value), sd=float(sd))
     if value is not None or sd:
         raise ValueError("hard() takes probs, or a value and an sd, not both")
     p = np.asarray(probs, dtype=np.float64)
     if p.ndim != 1 or p.size < 2 or not np.all(p >= 0) or not np.isclose(p.sum(), 1.0):
         raise ValueError(f"probs must hold two or more probabilities that sum to 1, got {probs}")
-    return Hard(probs=tuple(float(v) for v in p))
+    return HardIntervention(probs=tuple(float(v) for v in p))
 
 
-def soft(*, shift: float = 0.0, weight_scale: float = 1.0, noise_scale: float = 1.0) -> Soft:
+def soft(
+    *, shift: float = 0.0, weight_scale: float = 1.0, noise_scale: float = 1.0
+) -> SoftIntervention:
     """Build a soft intervention: the variable's mechanism changes, and its parents still act.
 
     On a continuous variable, its noise is multiplied by ``noise_scale`` and moved by ``shift``,
@@ -119,7 +121,7 @@ def soft(*, shift: float = 0.0, weight_scale: float = 1.0, noise_scale: float = 
 
     Returns
     -------
-    Soft
+    SoftIntervention
 
     Raises
     ------
@@ -130,7 +132,7 @@ def soft(*, shift: float = 0.0, weight_scale: float = 1.0, noise_scale: float = 
     --------
     >>> from andrey.data.interventions import soft
     >>> soft(shift=1.0)
-    Soft(shift=1.0, weight_scale=1.0, noise_scale=1.0)
+    SoftIntervention(shift=1.0, weight_scale=1.0, noise_scale=1.0)
     """
     if not all(np.isfinite(v) for v in (shift, weight_scale, noise_scale)):
         raise ValueError(
@@ -139,7 +141,7 @@ def soft(*, shift: float = 0.0, weight_scale: float = 1.0, noise_scale: float = 
         )
     if noise_scale < 0:
         raise ValueError(f"soft() takes noise_scale >= 0, got {noise_scale}")
-    return Soft(
+    return SoftIntervention(
         shift=float(shift), weight_scale=float(weight_scale), noise_scale=float(noise_scale)
     )
 
@@ -168,7 +170,7 @@ def as_interventions(spec: Mapping, n_columns: int | None = None) -> dict[int, I
             intervention, bool
         ):
             intervention = hard(float(intervention))
-        if not isinstance(intervention, Hard | Soft):
+        if not isinstance(intervention, HardIntervention | SoftIntervention):
             raise TypeError(
                 f"column {column}: an intervention is hard(...), soft(...), or a number, got "
                 f"{intervention!r}"
