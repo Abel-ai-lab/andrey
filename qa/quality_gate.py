@@ -48,6 +48,7 @@ from qa import reference_parity
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
 import gies_cpu  # noqa: E402
+import igsp_cpu  # noqa: E402
 
 from andrey_bench import lingam_models, regime_models, scoring, temporal_models  # noqa: E402
 from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
@@ -163,6 +164,15 @@ PAIR_N = 1000
 INTERVENTION_SIZES: tuple[tuple[int, int], ...] = ((20, 1000), (50, 2500))
 TARGET_SHARE = 0.4
 
+#: IGSP's published regime, drawn by its benchmark driver (``benchmarks/igsp_cpu.py``) as two of
+#: the comparison's cells, Wang et al. (2017), Figure 2, at 20 variables: an observational
+#: environment and settings of 1,000 rows each, every target cut from its causes and given, one
+#: setting of 10 targets (``K`` 1) or two disjoint settings of 8 (``K`` 2).
+KNOWN_TARGET_CELLS: dict[str, str] = {
+    "known_targets_one_setting_gauss_er_d20": "W_K1_p20_n1000",
+    "known_targets_two_settings_gauss_er_d20": "W_K2_p20_n1000",
+}
+
 #: The published regimes that :mod:`andrey_bench.regime_models` draws, as its model and noise, and
 #: the ``(d, n)`` the gate draws each at: two published sizes, with the published rows. CD-NOD's
 #: rows come from four domains, MultiGroupDirectLiNGAM's from three groups side by side, and in
@@ -244,6 +254,41 @@ def intervention_draws(d: int, n: int) -> tuple[Draw, ...]:
         )
         truth = gies_cpu.essential_graph(dag, interventions)
         out.append(Draw(stack(x, interventions), GraphStructure.from_numpy(truth, kind="cpdag")))
+    return tuple(out)
+
+
+def known_target_stack(x: np.ndarray, env: np.ndarray, targets: list[list[int]]) -> np.ndarray:
+    """The samples, each row's environment, and a 0/1 matrix marking, in each row of a setting, its
+    targets: the benchmark driver's ``known`` matrix."""
+    known = np.zeros(x.shape)
+    for k, setting in enumerate(targets, start=1):
+        known[np.ix_(env == k, setting)] = 1
+    return np.column_stack([x, env, known])
+
+
+def known_target_unstack(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, list[list[int]]]:
+    """The samples, the environments, and each setting's targets of :func:`known_target_stack`."""
+    p = (x.shape[1] - 1) // 2
+    env = x[:, p].astype(int)
+    known = x[:, p + 1 :]
+    targets = [np.flatnonzero(known[env == k][0]).tolist() for k in range(1, env.max() + 1)]
+    return x[:, :p], env, targets
+
+
+def known_target_draws(cell: str) -> tuple[Draw, ...]:
+    """The stacked samples (:func:`known_target_stack`) with the interventional essential graph of
+    the true DAG under the targets."""
+    spec = igsp_cpu.cell_named(cell)
+    out = []
+    for seed in SEEDS:
+        x, env, truth = igsp_cpu.dataset(spec, seed)
+        graph = igsp_cpu.essential(np.asarray(truth["dag"]), truth["effective"])
+        out.append(
+            Draw(
+                known_target_stack(x, env, truth["given"]),
+                GraphStructure.from_numpy(graph, kind="cpdag"),
+            )
+        )
     return tuple(out)
 
 
@@ -376,6 +421,10 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         for d, n in INTERVENTION_SIZES
     },
     **{
+        name: functools.partial(known_target_draws, cell)
+        for name, cell in KNOWN_TARGET_CELLS.items()
+    },
+    **{
         f"{regime}_d{d}": functools.partial(model_draws, regime, d, n)
         for regime, sizes_ in MODEL_SIZES.items()
         for d, n in sizes_
@@ -454,6 +503,7 @@ PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
 INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTION_SIZES)
+KNOWN_TARGET_DATA = tuple(KNOWN_TARGET_CELLS)
 
 
 def _models(regime: str) -> tuple[str, ...]:
@@ -468,6 +518,13 @@ def gies_fit(x: np.ndarray) -> Any:
     """``andrey.gies`` on the samples of a GIES draw, its intervention matrix as ``targets``."""
     samples, mask = unstack(x)
     return andrey.gies(samples, targets=mask)
+
+
+def igsp_fit(x: np.ndarray) -> Any:
+    """``andrey.igsp`` on a stacked draw (:func:`known_target_stack`), as the benchmark driver
+    calls it: the observational environment and each setting with its targets."""
+    samples, env, targets = known_target_unstack(x)
+    return andrey.igsp(samples, env, targets={0: [], **dict(enumerate(targets, start=1))})
 
 
 def _adapted(adapter: Any) -> Callable[[Any], Any]:
@@ -497,6 +554,7 @@ SUPPORTED: dict[str, Method] = {
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
     "GIES": Method(gies_fit, "essential", INTERVENTION_DATA),
+    "IGSP": Method(igsp_fit, "essential", KNOWN_TARGET_DATA),
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
