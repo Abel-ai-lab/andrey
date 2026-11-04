@@ -302,6 +302,21 @@ row or on its entry: the gate prints it with its numbers and does not fail it, w
 interval. A row with `"claim": "in"` or no `claim` is in claim and is judged as above, and a row's
 own `claim` overrides its entry's. Any other value of `claim` is an error.
 
+An entry's `metric` names the error its rows pair: `"shd"`, the default, or `"target_error"`, the
+number of intervention targets a method learned wrongly or missed (the size of the symmetric
+difference of its targets and the true ones), for a method that learns its targets. Its rows hold
+`andrey_<metric>_mean` and `comparator_<metric>_mean`, or `andrey_shd_mean` and
+`comparator_shd_mean` holding that error's means. Such a method has one entry per metric, each
+judged by the rules here, and a row's key names its `metric`; any other value of `metric` is an
+error. An entry with `"role": "context"` pairs Andrey with a comparator it is reported against and never
+judged by: its rows are printed with their numbers and not gated. Two more fields gate an in-claim
+row whatever its interval. Its `coverage` holds `andrey_short`, the datasets the reference finished
+and Andrey did not under the time cap: above 0, the row fails at any number of paired datasets,
+since a timeout never becomes a smaller mean, and so does a replication's. Its `floor_95` or
+`target_floor_95` is the bootstrap 95% interval of the mean of Andrey's error minus a floor's, the
+empty graph's SHD or the target errors of the targets the method was given alone: the row fails
+when the interval's upper end is not below 0.
+
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer
@@ -311,13 +326,6 @@ A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fai
 A row where either side has no result is skipped. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where
 a summary has one entry per regime for a method and reference, a row's key names its `regime`.
-
-An entry's `metric` names the error its rows pair: `"shd"`, the default, or `"target_error"`, the
-number of intervention targets a method learned wrongly or missed (the size of the symmetric
-difference of its targets and the true ones), for a method that learns its targets. The row's
-`andrey_shd_mean` and `comparator_shd_mean` then hold that error's means. Such a method has one
-entry per metric, each judged by the rules above, and a row's key names its `metric`; any other
-value of `metric` is an error.
 
 A row of a reference whose result depends on the column order (`reference_order_dependent`) may
 also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,

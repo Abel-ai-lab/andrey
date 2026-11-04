@@ -24,6 +24,8 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [InvariantCausalPrediction](https://cran.r-project.org/package=InvariantCausalPrediction) (R) -
+  see [ICP](comparisons/icp.md)
 - [CAM](https://cran.r-project.org/src/contrib/Archive/CAM/) 1.0 (R, archived on CRAN) - see
   [CAM and RESIT](comparisons/cam-resit.md)
 - the authors' R code for RESIT, read from disk and never copied - see
@@ -35,6 +37,8 @@ Packages:
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
   [GnIES](comparisons/gnies.md)
+- [graphical-model-learning](https://github.com/uhlerlab/graphical_model_learning) - uses a
+  separate environment; see below and [UT-IGSP](comparisons/ut-igsp.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
 - [CausalNex](https://github.com/mckinsey/causalnex) - uses a separate environment; see below and
@@ -105,6 +109,17 @@ below 2, so its fits run in an environment on Python 3.10:
 benchmarks/start_causalnex.sh
 export ANDREY_BENCH_CAUSALNEX_PYTHON=$PWD/benchmarks/.venv-causalnex/bin/python
 ```
+
+The authors' UT-IGSP library, graphical-model-learning 0.1a8 with its pinned dependencies, has an
+environment of its own as well, built from the lock file `requirements-utigsp.txt`:
+
+```shell
+benchmarks/start_utigsp.sh
+export ANDREY_BENCH_UTIGSP_PYTHON=$PWD/benchmarks/.venv-utigsp/bin/python
+```
+
+Its lane, `ut_igsp_cpu.py`, starts one child process per package and dataset rather than one per
+fit, since each child fits several draws; [its page](comparisons/ut-igsp.md) describes it.
 
 gnies 0.3.3, the reference for GnIES, fits in an environment of its own on Python 3.12, so its pins
 stay exact and the module `ges` it imports stays out of bench-env:

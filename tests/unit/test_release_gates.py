@@ -891,6 +891,94 @@ def test_parity_keys_a_row_by_regime_when_a_method_has_one_entry_per_regime():
         reference_parity.paired_rows("s", summary)
 
 
+def _entry_rows(*rows: dict, **entry) -> list:
+    """The parsed rows of one ``paired bootstrap`` entry with the given entry fields."""
+    from qa import reference_parity
+
+    summary = {**_summary(*rows), "parity_rule": reference_parity.PAIRED_BOOTSTRAP}
+    summary["methods"][0].update(entry)
+    return reference_parity.paired_rows("s", summary)
+
+
+def test_parity_reports_a_context_comparator_without_gating_it():
+    from qa import reference_parity
+
+    worse = _paired_row([0.05, 0.95])
+    [row] = _entry_rows(worse, role="context")
+    assert row.context and row.reported and not row.failed
+    assert "a context comparator: reported, not gated" in row.numbers()
+    assert reference_parity.check([row], [])[0] == []
+    with pytest.raises(ValueError, match="role"):
+        _entry_rows(worse, role="judged")
+
+
+def test_parity_judges_the_metric_an_entry_names():
+    from qa import reference_parity
+
+    multi = {
+        "draws": 5,
+        "paired": 20,
+        "andrey_target_error_mean": 2.0,
+        "comparator_target_error_mean": 1.0,
+        "mean_D": 1.0,
+        "bootstrap_95": [0.4, 1.6],
+        "above_zero": True,
+    }
+    row = {"d": 20, "n": 1000, "paired": 20, "multi_draw": multi}
+    [parsed] = _entry_rows(row, metric="target_error")
+    assert parsed.failed and (parsed.andrey, parsed.reference) == (2.0, 1.0)
+    [failure] = reference_parity.check([parsed], [])[0]
+    assert "metric=target_error" in failure and "mean target error Andrey 2.00" in failure
+    # The entry's metric decides which means the row must hold.
+    with pytest.raises(ValueError, match="andrey_shd_mean"):
+        _entry_rows(row)
+
+
+def test_parity_fails_a_row_where_andrey_timed_out_on_a_dataset_the_reference_finished():
+    from qa import reference_parity
+
+    # Six paired datasets, under ten, would be reported; two datasets finished by the reference
+    # alone fail the row, at any number of pairs.
+    row = {
+        "d": 20,
+        "paired": 6,
+        "andrey_fewer_errors": 3,
+        "comparator_fewer_errors": 0,
+        "coverage": {
+            "datasets": 20,
+            "andrey_complete": 6,
+            "comparator_complete": 8,
+            "andrey_short": 2,
+        },
+    }
+    [parsed] = _entry_rows(row)
+    assert parsed.failed
+    [failure] = reference_parity.check([parsed], [])[0]
+    assert "2 datasets finished by ref and not by Andrey" in failure
+    # With no paired dataset at all the row still fails.
+    [none] = _entry_rows({**row, "paired": 0})
+    assert none.failed and "no paired dataset" in none.numbers()
+    # Out of claim or as context it is reported.
+    assert not _entry_rows(row, claim="out")[0].failed
+    assert not _entry_rows(row, role="context")[0].failed
+    assert not _entry_rows({**row, "coverage": {**row["coverage"], "andrey_short": 0}})[0].failed
+    with pytest.raises(ValueError, match="andrey_short"):
+        _entry_rows({**row, "coverage": {"datasets": 20}})
+
+
+def test_parity_fails_a_row_whose_floor_interval_reaches_zero():
+    from qa import reference_parity
+
+    better = _paired_row([-0.9, -0.1])
+    assert not _entry_rows({**better, "floor_95": [-12.0, -9.5]})[0].failed
+    [parsed] = _entry_rows({**better, "target_floor_95": [-1.5, 0.0]})
+    assert parsed.failed
+    [failure] = reference_parity.check([parsed], [])[0]
+    assert "Andrey minus its floor: bootstrap 95% [-1.50, +0.00], not below 0" in failure
+    with pytest.raises(ValueError, match="floor"):
+        _entry_rows({**better, "floor_95": [-2.0, -1.0], "target_floor_95": [-2.0, -1.0]})
+
+
 def test_parity_judges_each_metric_of_a_method_on_its_own_key():
     from qa import reference_parity
 
