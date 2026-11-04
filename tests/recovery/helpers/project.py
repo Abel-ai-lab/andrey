@@ -70,6 +70,13 @@ def project_output(out: Any, algorithm: str) -> dict:
     """Project a ``StructureOutput`` (or a list for multi-group) to the baseline field layout."""
     if algorithm == "ExactSearch":  # the recorded graph is the DAG the search found
         return {"graph": found_dag(out).to_numpy()}
+    if algorithm == "IGSP":  # the graph and both parts of its objective
+        md = out.metadata
+        return {
+            "graph": out.structure.to_numpy(),
+            "score": md["score"],
+            "n_contradicting": md["n_contradicting"],
+        }
     if algorithm in _GRAPH:
         candidate: dict = {"graph": out.structure.to_numpy()}
         if algorithm in _SCORE_GRAPH:

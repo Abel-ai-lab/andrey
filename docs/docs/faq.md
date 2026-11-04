@@ -221,10 +221,10 @@ Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `gra
 fits a linear structural vector autoregression by continuous optimization. The
 [release cards](benchmarks.md) benchmark them against tigramite, lingam, causal-learn, and
 CausalNex. `multi_group_direct_lingam` fits several datasets that share one causal order, `cdnod`
-takes data from several domains, and `gies`, `gnies`, `ut_igsp`, and `icp` take data from several
-environments: `gies` with known interventions, `gnies` learning the variables whose noise variance
-changed, `ut_igsp` learning the targets it is not given, and `icp` the parents of one target. All
-are supported.
+takes data from several domains, and `gies`, `gnies`, `igsp`, `ut_igsp`, and `icp` take data from
+several environments: `gies` and `igsp` with known interventions, `gnies` learning the variables
+whose noise variance changed, `ut_igsp` learning the targets it is not given, and `icp` the parents
+of one target. All are supported.
 
 ## Command line and agents
 

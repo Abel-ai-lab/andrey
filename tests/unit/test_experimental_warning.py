@@ -68,11 +68,12 @@ def test_is_a_user_warning():
 #: Settings that shorten a slow fit; the facade path stays the same.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
 #: Arguments a method needs beyond its required inputs: each row's environment, two of equal size,
-#: where it is optional, UT-IGSP's targets with the observational environment's known, and the
-#: variable whose parents ICP finds.
+#: where it is optional, IGSP's targets for every environment, UT-IGSP's with the observational
+#: environment's known, and the variable whose parents ICP finds.
 TWO = np.repeat([0, 1], 500)
 NEEDS = {
     "gnies": {"env": TWO},
+    "igsp": {"env": TWO, "targets": {0: [], 1: [1]}},
     "ut_igsp": {"env": TWO, "targets": {0: [], 1: None}},
     "icp": {"target": 2},
 }

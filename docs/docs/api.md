@@ -346,6 +346,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    rsmax2
    boss
    grasp
+   igsp
    ut_igsp
    direct_lingam
    ica_lingam
@@ -419,6 +420,19 @@ one in all for the others. Known targets in `targets` stay in the set; with ever
 targets known, one search runs. The [0.14.0](benchmarks/0.14.0.md#gnies) release card measures it
 against gnies, the authors' package.
 
+IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
+and settings whose intervention targets are all known, as GIES does: it searches variable orders
+for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
+the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
+over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
+authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
+as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
+and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
+in 17, with interval ends that are floating-point residue of 0 read as 0. It returns the
+interventional essential graph and the level used in `metadata["alpha"]`. The
+[0.14.0](benchmarks/0.14.0.md#igsp) release card measures it against graphical-model-learning, the
+authors' library.
+
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings whose
 intervention targets are known in part or not at all: it searches variable orders for the DAG with
 the fewest edges plus targets, where a setting's targets are its known ones and every variable whose
@@ -474,25 +488,12 @@ its first call in a process.
 
    notears
    dagma
-   igsp
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
-and settings whose intervention targets are all known, as GIES does: it searches variable orders
-for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
-the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
-over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
-authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
-as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
-and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
-in 17, with interval ends that are floating-point residue of 0 read as 0, and a rule written before
-the run gives a tie to one over the observational rows. It returns the interventional essential
-graph and the level used in `metadata["alpha"]`.
 
 A method becomes supported once it has:
 

@@ -1388,7 +1388,7 @@ _add(
         ),
         determinism="stochastic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         seeded=True,

@@ -4,7 +4,7 @@
  "lane": "ut-igsp",
  "method": "UT-IGSP",
  "status": "supported",
- "about": "UT-IGSP's own published measurements, one file per lane. The release summary's UT-IGSP entries come from the same runs: its out-of-claim rows at the paper's level also hold Andrey's wall time and floor intervals at that level, which this file keeps at the defaults alone",
+ "about": "UT-IGSP's own published measurements, one file per lane; the release summary's UT-IGSP entries and the release card's UT-IGSP table hold its numbers",
  "build": "Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically",
  "comparator": "graphical-model-learning 0.1a8 (unknown_target_igsp) with conditional-independence 0.1a6 and graphical-models 0.1a21, the authors' library and the method's only implementation",
  "packages": {

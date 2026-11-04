@@ -108,6 +108,17 @@ def _run_multi_group_direct_lingam(groups: list[np.ndarray], algorithm: str) -> 
     return project_output(andrey.multi_group_direct_lingam(groups), algorithm)
 
 
+def _run_igsp(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    case = "gauss_5v_noise_shift"
+    column = list(datagen.column_order(case)).index
+    targets = {0: [], 1: [column(3)], 2: [column(4)]}
+    return project_output(
+        andrey.igsp(X, datagen.environment_index(case), targets=targets), algorithm
+    )
+
+
 # algorithm -> (runner, case id). Single-input methods take one matrix.
 ALGORITHMS = {
     "DirectLiNGAM": (_facade("direct_lingam"), "lingam_5v_uniform"),
@@ -120,6 +131,7 @@ ALGORITHMS = {
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
     "GnIES": (_run_gnies, "gauss_5v_noise_shift"),
+    "IGSP": (_run_igsp, "gauss_5v_noise_shift"),
     "XGES": (_facade("xges"), "gauss_5v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
