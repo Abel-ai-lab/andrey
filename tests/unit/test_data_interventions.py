@@ -14,7 +14,7 @@ import pytest
 from scipy import stats
 
 import andrey.data as data
-from andrey.data.interventions import Hard, hard, soft
+from andrey.data.interventions import HardIntervention, hard, soft
 
 FUNCTIONALS = ["linear", "additive_noise", "post_nonlinear", "nonmonotone", "location_scale"]
 SCALES = ["standardize", "rescale", "raw"]
@@ -89,7 +89,7 @@ def test_descendants_move_by_the_total_effect(scale, intervention):
     plain = scm.sample(n=200, seed=5, scale=scale)
     under = scm.do({target: intervention}).sample(n=200, seed=5, scale=scale)
     change = under.data[:, target] - plain.data[:, target]
-    if isinstance(intervention, Hard):
+    if isinstance(intervention, HardIntervention):
         assert stats.kstest(under.data[:, target], stats.norm(2.0, 0.5).cdf).pvalue > ALPHA
     else:
         assert np.allclose(change, 0.7)
@@ -156,7 +156,7 @@ def test_pooled_env_and_targets_match_the_rows():
     assert pooled.targets == {0: [], 1: [1], 2: [0, 2], 3: []}
     for k, spec in enumerate(envs):
         for column, intervention in spec.items():
-            if isinstance(intervention, Hard):
+            if isinstance(intervention, HardIntervention):
                 values = pooled.data[:, column]
                 assert np.all(values[pooled.env == k] == intervention.value)
                 assert not np.any(values[pooled.env != k] == intervention.value)

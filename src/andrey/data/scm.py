@@ -47,9 +47,9 @@ from .graphs import (
 )
 from .interventions import (
     Environment,
-    Hard,
+    HardIntervention,
     Intervention,
-    Soft,
+    SoftIntervention,
     as_interventions,
     check_columns,
     env_labels,
@@ -113,7 +113,7 @@ class SCM:
         The structural-equation family (for example, ``andrey.data.functional.linear()``).
     noise : Noise
         The exogenous-noise family (for example, ``andrey.data.noise.gaussian()``).
-    interventions : tuple of (int, Hard or Soft) pairs, default=()
+    interventions : tuple of (int, HardIntervention or SoftIntervention) pairs, default=()
         The interventions :meth:`do` applied, by column, in column order.
 
     Examples
@@ -140,7 +140,7 @@ class SCM:
 
         Parameters
         ----------
-        interventions : mapping of int to Hard, Soft, or float
+        interventions : mapping of int to HardIntervention, SoftIntervention, or float
             Each intervened column of the data :meth:`sample` returns, after the column shuffle,
             with its intervention: :func:`~andrey.data.interventions.hard`, which cuts the variable
             from its parents, :func:`~andrey.data.interventions.soft`, which changes its mechanism
@@ -196,7 +196,7 @@ class SCM:
             ``n[k]`` for environment ``k``.
         seed : int
             Root seed; the graph, weights, and noise streams are derived from it statelessly.
-        envs : sequence of mappings of int to Hard, Soft, or float, or None, default=None
+        envs : sequence of mappings of int to intervention or float, or None, default=None
             One mapping per environment, ``{column: intervention}`` as for :meth:`do`; ``{}`` is
             an environment without interventions, and the first environment is the observational
             one by convention. Every environment shares the graph and the weights, and draws its
@@ -501,7 +501,7 @@ class SCM:
             draws = _component_rng(root, _INTERVENTION, k)
             for column, intervention in spec.items():
                 c = int(order[column])
-                if isinstance(intervention, Hard):
+                if isinstance(intervention, HardIntervention):
                     if intervention.value is None:
                         raise ValueError(
                             f"column {column}: hard() on a continuous variable takes a value"
@@ -512,7 +512,7 @@ class SCM:
                     set_values.append((rows, c, target))
                     fixed[c] = loc[c] + unit[c] * target
                     continue
-                if intervention == Soft():
+                if intervention == SoftIntervention():
                     raise ValueError(
                         f"column {column}: soft() changes nothing on a continuous variable; give "
                         "shift, weight_scale, or noise_scale"

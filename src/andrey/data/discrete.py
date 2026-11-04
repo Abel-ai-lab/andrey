@@ -21,9 +21,9 @@ import andrey
 from .dataset import CausalDataset, QAReport, SCMParams
 from .graphs import DAGDraw, dag_truth
 from .interventions import (
-    Hard,
+    HardIntervention,
     Intervention,
-    Soft,
+    SoftIntervention,
     check_columns,
     env_labels,
     env_targets,
@@ -82,7 +82,7 @@ def sample_discrete(
         Shuffle the columns with a permutation from the seed's own column stream, and relabel the
         true graph and the categories to match, as for :func:`~andrey.data.sample_scm`.
         ``provenance["column_order"][j]`` is the index column ``j`` has with ``shuffle=False``.
-    envs : sequence of mappings of int to Hard, Soft, or int, or None, default=None
+    envs : sequence of mappings of int to intervention or int, or None, default=None
         One mapping per environment, ``{column: intervention}``, as for
         :meth:`SCM.sample <andrey.data.SCM.sample>`; ``{}`` is an environment without
         interventions. ``hard(category)`` sets a column to one category, ``hard(probs=...)``
@@ -231,8 +231,8 @@ def intervened_tables(
     for column, intervention in spec.items():
         c = int(order[column])
         k, rows = int(cards[c]), tables[c].shape[0]
-        if isinstance(intervention, Soft):
-            if intervention != Soft():
+        if isinstance(intervention, SoftIntervention):
+            if intervention != SoftIntervention():
                 raise ValueError(
                     f"column {column}: soft() on a discrete variable takes no arguments; it draws "
                     "the variable's table anew"
@@ -243,7 +243,7 @@ def intervened_tables(
     return tables
 
 
-def categorical_probs(intervention: Hard, column: int, k: int) -> np.ndarray:
+def categorical_probs(intervention: HardIntervention, column: int, k: int) -> np.ndarray:
     """Return the distribution a ``hard`` intervention sets a column of ``k`` categories to."""
     if intervention.sd:
         raise ValueError(f"column {column}: hard() on a discrete variable takes no sd")
