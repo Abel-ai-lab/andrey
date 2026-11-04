@@ -330,9 +330,11 @@ row or on its entry: the gate prints it with its numbers and does not fail it, w
 interval. A row with `"claim": "in"` or no `claim` is in claim and is judged as above, and a row's
 own `claim` overrides its entry's. Any other value of `claim` is an error.
 
-An entry's `metric` names the error its rows pair: `"shd"`, the default, or `"target_error"`, the
+An entry's `metric` names the error its rows pair: `"shd"`, the default; `"target_error"`, the
 number of intervention targets a method learned wrongly or missed (the size of the symmetric
-difference of its targets and the true ones), for a method that learns its targets. Its rows hold
+difference of its targets and the true ones), for a method that learns its targets; or
+`"direct_errors"`, the directed edges a method with hidden variables returns, against the edges
+between observed variables that no unobserved causal or backdoor path joins. Its rows hold
 `andrey_<metric>_mean` and `comparator_<metric>_mean`, or `andrey_shd_mean` and
 `comparator_shd_mean` holding that error's means. Such a method has one entry per metric, each
 judged by the rules here, and a row's key names its `metric`; any other value of `metric` is an

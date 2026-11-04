@@ -2,13 +2,13 @@
  "release": "0.14.0",
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-04",
- "theme": "GnIES against gnies 0.3.3, the authors' package; UT-IGSP against graphical-model-learning 0.1a8, the authors' library; ICP against InvariantCausalPrediction, in and out of the claim; DYNOTEARS against CausalNex 0.12.2, the authors' implementation",
- "build": "GnIES: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every fit but the order check, which ran on a build of the same day that adds DEBUG records of the steps a tie decided; with the records off, its GIES and GES outputs equal the first build's | UT-IGSP: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically | ICP: pre-release Andrey 0.14.0 build, 3 November 2026 | DYNOTEARS: Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps; refitted on the 0.14.0 build, every recorded Andrey fit up to 50 variables and 20 at 100 variables return the same graph (identity)",
- "verdict_rule": "GnIES: per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged | UT-IGSP: per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 2000-2019, confirmation the rerun on seeds 4000-4019, and verdict the result; out of claim, verdict is the side | ICP: D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise | DYNOTEARS: D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0. Settings with claim 'out' are reported, not judged",
- "fit_protocol": "GnIES: every arm of a dataset back to back on one pinned core with one BLAS thread; a cap of 1,800 s per fit at 10 variables (300 s for gnies with the true targets fixed) and 3,600 s on the variable ladder; a fit past its cap is a timeout, never an empty graph; a gnies fit whose total is not finite or whose local scores returned NaN is an error and leaves its cell's pairs | UT-IGSP: every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw (3,600 s at 100 variables and with kernel tests), a timeout never scored | ICP: every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone | DYNOTEARS: one timed fit per series, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; andrey_cpu_s and comparator_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired series of CausalNex's CPU time over Andrey's, with its bootstrap 95% interval",
- "error_metric": "GnIES: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets (the _mean fields hold the means) | UT-IGSP: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets of each dataset's mean over its draws (the _mean fields hold the means) | ICP: each entry's own, in its error_metric | DYNOTEARS: each entry's own, in its error_metric: the edge SHD over the window, as the mean over the paired series",
- "complete_definition": "GnIES: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | UT-IGSP: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | ICP: true when every planned fit finished; no fit timed out | DYNOTEARS: true when every setting has at least 10 paired series (both packages finished); no fit reached its cap",
- "seeds_note": "GnIES: seeds is the number of datasets attempted per setting: 20 (seeds 0-19) in every in-claim and out-of-claim setting at 10 variables, with reruns on seeds 20-39 in the replication of the 7 settings that came out better; 10 (seeds 0-9) on the ladder of 20 to 100 variables, where the reference ran 10 seeds at 20 variables, 3 at 30, and none at 50 and 100 | UT-IGSP: seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 2000-2019 in the 11 in-claim cells with a comparison above 0 in the first comparison, and, at the defaults, the confirmation's seeds 4000-4019 in every in-claim cell. Categorical data (Andrey alone) is in the lane file only | ICP: scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target | DYNOTEARS: 20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39",
+ "theme": "GnIES against gnies 0.3.3, the authors' package; UT-IGSP against graphical-model-learning 0.1a8, the authors' library; ICP against InvariantCausalPrediction, in and out of the claim; DYNOTEARS against CausalNex 0.12.2, the authors' implementation; CAM-UV against lingam 1.13.0 and causal-learn 0.1.4.8",
+ "build": "GnIES: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every fit but the order check, which ran on a build of the same day that adds DEBUG records of the steps a tie decided; with the records off, its GIES and GES outputs equal the first build's | UT-IGSP: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically | ICP: pre-release Andrey 0.14.0 build, 3 November 2026 | DYNOTEARS: Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps; refitted on the 0.14.0 build, every recorded Andrey fit up to 50 variables and 20 at 100 variables return the same graph (identity) | CAM-UV: Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+ "verdict_rule": "GnIES: per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged | UT-IGSP: per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 2000-2019, confirmation the rerun on seeds 4000-4019, and verdict the result; out of claim, verdict is the side | ICP: D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise | DYNOTEARS: D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0. Settings with claim 'out' are reported, not judged | CAM-UV: D = direct_errors(Andrey) - direct_errors(reference) per dataset on the datasets both finished, for each of lingam and causal-learn at the paper's set size and lingam at its default; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a cell in claim is worse when the interval lies above 0, better when below, a tie otherwise; a cell worse or better is run again on 20 fresh seeds (20-39, the replication rows) and keeps its verdict only if the replication's interval lies on the same side of 0 (final_verdict). Cells with claim 'out' are reported, not judged",
+ "fit_protocol": "GnIES: every arm of a dataset back to back on one pinned core with one BLAS thread; a cap of 1,800 s per fit at 10 variables (300 s for gnies with the true targets fixed) and 3,600 s on the variable ladder; a fit past its cap is a timeout, never an empty graph; a gnies fit whose total is not finite or whose local scores returned NaN is an error and leaves its cell's pairs | UT-IGSP: every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw (3,600 s at 100 variables and with kernel tests), a timeout never scored | ICP: every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone | DYNOTEARS: one timed fit per series, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; andrey_cpu_s and comparator_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired series of CausalNex's CPU time over Andrey's, with its bootstrap 95% interval | CAM-UV: one timed fit per dataset, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; *_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired datasets of the reference's CPU time over Andrey's, with its bootstrap 95% interval. lingam at its default set size (lingam_default) ran on the same stored datasets in runs of its own, two days after the others, so its cpu_ratio pairs fits from different runs",
+ "error_metric": "GnIES: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets (the _mean fields hold the means) | UT-IGSP: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets of each dataset's mean over its draws (the _mean fields hold the means) | ICP: each entry's own, in its error_metric | DYNOTEARS: each entry's own, in its error_metric: the edge SHD over the window, as the mean over the paired series | CAM-UV: each entry's own, in its error_metric: the direct-edge errors (direct_errors), as the mean over the paired datasets",
+ "complete_definition": "GnIES: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | UT-IGSP: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | ICP: true when every planned fit finished; no fit timed out | DYNOTEARS: true when every setting has at least 10 paired series (both packages finished); no fit reached its cap | CAM-UV: true when every setting has at least 10 paired datasets (every package finished); no fit reached its cap",
+ "seeds_note": "GnIES: seeds is the number of datasets attempted per setting: 20 (seeds 0-19) in every in-claim and out-of-claim setting at 10 variables, with reruns on seeds 20-39 in the replication of the 7 settings that came out better; 10 (seeds 0-9) on the ladder of 20 to 100 variables, where the reference ran 10 seeds at 20 variables, 3 at 30, and none at 50 and 100 | UT-IGSP: seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 2000-2019 in the 11 in-claim cells with a comparison above 0 in the first comparison, and, at the defaults, the confirmation's seeds 4000-4019 in every in-claim cell. Categorical data (Andrey alone) is in the lane file only | ICP: scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target | DYNOTEARS: 20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39 | CAM-UV: 20 datasets per cell in claim (seeds 0-19), 10 per cell out of claim (seeds 0-9), and replications on seeds 20-39: the paper's simulation at both sizes and one node in five hidden at d = 10, and nothing hidden on seeds 0-19; a seed whose graph cannot hide its nodes is skipped and the next one taken: seed 31 at d = 10 with one node in five hidden, so that replication reads seeds 20-30 and 32-40",
  "regimes": {
   "gnies_a": "linear-Gaussian data from 10-variable Erdos-Renyi graphs, observational + 3 environments, mean degree 2.7, 1 target per environment, v ~ U[5, 10]; in claim, figure (Fig. 3)",
   "gnies_b": "linear-Gaussian data from 10-variable Erdos-Renyi graphs, observational + 3 environments, mean degree 4, 1 target per environment, v ~ U[5, 10]; in claim, figure (Fig. 8)",
@@ -75,7 +75,12 @@
   "dynotears_paper_standardized": "dynotears_paper with every column z-scored (out of claim)",
   "dynotears_paper_uncentered": "the same graphs, exponential noise of scale 1 not centered, the noise of the paper's simulations (Appendix B.4), raw scale (in claim)",
   "dynotears_sin_tanh": "sin of each same-step parent and tanh of each lagged parent in place of the linear terms, Gaussian noise (out of claim)",
-  "length 50 at n500": "dynotears_paper at 50 steps with the defaults (out of claim)"
+  "length 50 at n500": "dynotears_paper at 50 steps with the defaults (out of claim)",
+  "latent_anm_er": "additive noise X_c = sum w g(X_p) + e with g(z) = z + sin(z), Gaussian noise, Erdos-Renyi graph of mean degree 2, standardized; one node in five hidden, chosen among nodes with two or more children; 2,000 rows (in claim)",
+  "latent_anm_er_tenth": "the same model with one node in ten hidden, one per ten observed; 1,000 rows (in claim)",
+  "camuv_paper": "the paper's simulation: 10 observed variables, each pair joined with probability 0.3, two hidden common causes into two observed variables each, two hidden intermediates each in place of an observed edge, effects (v + a)^c + b with c in {2, 3}, uniform noise, each variable divided by its standard deviation (in claim)",
+  "anm_er": "additive noise with nothing hidden, 20 variables, 1,000 rows (in claim: the paper's model allows no hidden variable)",
+  "latent_gauss_er": "linear Gaussian, one node in ten hidden, 20 observed variables, 1,000 rows (out of claim: linear effects)"
  },
  "coverage": {
   "gnies_a": {
@@ -555,6 +560,41 @@
    "most_seeds": 10,
    "andrey_timeouts": 0,
    "comparator_timeouts": 0
+  },
+  "latent_anm_er": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "latent_anm_er_tenth": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "camuv_paper": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "anm_er": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "latent_gauss_er": {
+   "planned_seeds": 10,
+   "fewest_seeds": 10,
+   "most_seeds": 10,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
   }
  },
  "packages": {
@@ -580,6 +620,11 @@
   },
   "DYNOTEARS": {
    "CausalNex": "0.12.2 (Python 3.10, NumPy 1.23.5, SciPy 1.15.3)",
+   "Andrey environment": "Python 3.13, NumPy 2.5.4, SciPy 1.16.3"
+  },
+  "CAM-UV": {
+   "lingam": "1.13.0 with pygam 0.12.0 (Python 3.12, NumPy 2.2.6, SciPy 1.13.1)",
+   "causal-learn": "0.1.4.8, in the same environment",
    "Andrey environment": "Python 3.13, NumPy 2.5.4, SciPy 1.16.3"
   }
  },
@@ -616,6 +661,14 @@
     "cores_per_fit": 1
    },
    "DYNOTEARS": {
+    "cpu_models": [
+     "Intel Core i7-7820X"
+    ],
+    "hosts": 1,
+    "cores_per_fit": 1,
+    "fits_at_a_time": 4
+   },
+   "CAM-UV": {
     "cpu_models": [
      "Intel Core i7-7820X"
     ],
@@ -41527,6 +41580,1992 @@
      "differences_traced": {
       "different_graph": 2,
       "centered_comparator_gives_andreys_graph": 2
+     },
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0",
+   "comparator_solution": "lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_anm_er",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "latents": 1,
+     "observed": 4,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 4.0337,
+     "comparator_s": 8.3482,
+     "ratio": 2.131,
+     "ratio_95": [
+      2.016,
+      2.179
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 1.95,
+     "comparator_direct_errors_mean": 1.85,
+     "empty_direct_errors_mean": 1.7,
+     "andrey_shd_endpoint_mean": 6.3,
+     "comparator_shd_endpoint_mean": 6.85,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 3,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      -0.3,
+      0.55
+     ],
+     "above_zero": false,
+     "same_graph": 11,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        -0.75,
+        1.35
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "latents": 2,
+     "observed": 8,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 10.4725,
+     "comparator_s": 25.9855,
+     "ratio": 2.53,
+     "ratio_95": [
+      2.315,
+      2.64
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 5.05,
+     "comparator_direct_errors_mean": 5.45,
+     "empty_direct_errors_mean": 3.55,
+     "andrey_shd_endpoint_mean": 12.85,
+     "comparator_shd_endpoint_mean": 14.25,
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 6,
+     "mean_D": -0.4,
+     "bootstrap_95": [
+      -1.15,
+      0.25
+     ],
+     "above_zero": false,
+     "same_graph": 4,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.5,
+       "bootstrap_95": [
+        0.3,
+        2.75
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 5.15,
+      "comparator_direct_errors_mean": 5.2,
+      "empty_direct_errors_mean": 3.95,
+      "andrey_shd_endpoint_mean": 15.75,
+      "comparator_shd_endpoint_mean": 15.75,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 7,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.95,
+       0.85
+      ],
+      "above_zero": false,
+      "same_graph": 4,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": 1.2,
+        "bootstrap_95": [
+         -0.2,
+         2.6
+        ]
+       }
+      },
+      "seeds": "20-30 and 32-40"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 15,
+     "latents": 3,
+     "observed": 12,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 18.5078,
+     "comparator_s": 48.5485,
+     "ratio": 2.758,
+     "ratio_95": [
+      2.506,
+      2.857
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 7.35,
+     "comparator_direct_errors_mean": 7.7,
+     "empty_direct_errors_mean": 6.05,
+     "andrey_shd_endpoint_mean": 19.4,
+     "comparator_shd_endpoint_mean": 19.4,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 8,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -1.8,
+      1.0
+     ],
+     "above_zero": false,
+     "same_graph": 1,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.3,
+       "bootstrap_95": [
+        -0.601,
+        3.25
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0 at its default set size",
+   "comparator_solution": "lingam.CAMUV (default)",
+   "comparator_setting": "lingam's documented default is num_explanatory_vals=2, sets of up to 2 variables; every package here runs 3, the paper's d (Sect. 5) and Andrey's default, so the lingam fits visit sets of 3 as well; causal-learn's num_explanatory_vals has no default. lingam_default runs lingam at that default, CAMUV(alpha=0.01, num_explanatory_vals=2), on every cell in claim",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_anm_er",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "latents": 1,
+     "observed": 4,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 4.0337,
+     "comparator_s": 7.8523,
+     "ratio": 1.872,
+     "ratio_95": [
+      1.76,
+      1.947
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 1.95,
+     "comparator_direct_errors_mean": 1.75,
+     "empty_direct_errors_mean": 1.7,
+     "andrey_shd_endpoint_mean": 6.3,
+     "comparator_shd_endpoint_mean": 6.85,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 4,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.25,
+      0.7
+     ],
+     "above_zero": false,
+     "same_graph": 10,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        -0.75,
+        1.35
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "latents": 2,
+     "observed": 8,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 10.4725,
+     "comparator_s": 27.7886,
+     "ratio": 2.588,
+     "ratio_95": [
+      2.379,
+      3.006
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 5.05,
+     "comparator_direct_errors_mean": 5.4,
+     "empty_direct_errors_mean": 3.55,
+     "andrey_shd_endpoint_mean": 12.85,
+     "comparator_shd_endpoint_mean": 14.2,
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 6,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -1.15,
+      0.35
+     ],
+     "above_zero": false,
+     "same_graph": 4,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.5,
+       "bootstrap_95": [
+        0.3,
+        2.75
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 5.15,
+      "comparator_direct_errors_mean": 5.15,
+      "empty_direct_errors_mean": 3.95,
+      "andrey_shd_endpoint_mean": 15.75,
+      "comparator_shd_endpoint_mean": 15.75,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 7,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.9,
+       0.9
+      ],
+      "above_zero": false,
+      "same_graph": 4,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": 1.2,
+        "bootstrap_95": [
+         -0.2,
+         2.6
+        ]
+       }
+      },
+      "seeds": "20-30 and 32-40"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 15,
+     "latents": 3,
+     "observed": 12,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 18.5078,
+     "comparator_s": 54.6503,
+     "ratio": 2.913,
+     "ratio_95": [
+      2.568,
+      3.183
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 7.35,
+     "comparator_direct_errors_mean": 7.85,
+     "empty_direct_errors_mean": 6.05,
+     "andrey_shd_endpoint_mean": 19.4,
+     "comparator_shd_endpoint_mean": 19.7,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 8,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -2.0,
+      0.9
+     ],
+     "above_zero": false,
+     "same_graph": 1,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.3,
+       "bootstrap_95": [
+        -0.601,
+        3.25
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "causal-learn 0.1.4.8",
+   "comparator_solution": "causallearn.search.FCMBased.lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_anm_er",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "latents": 1,
+     "observed": 4,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 4.0337,
+     "comparator_s": 40.1246,
+     "ratio": 10.035,
+     "ratio_95": [
+      9.707,
+      10.511
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 1.95,
+     "comparator_direct_errors_mean": 1.8,
+     "empty_direct_errors_mean": 1.7,
+     "andrey_shd_endpoint_mean": 6.3,
+     "comparator_shd_endpoint_mean": 7.05,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 4,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.3,
+      0.6
+     ],
+     "above_zero": false,
+     "same_graph": 12,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        -0.75,
+        1.35
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 10,
+     "latents": 2,
+     "observed": 8,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 10.4725,
+     "comparator_s": 124.7928,
+     "ratio": 12.025,
+     "ratio_95": [
+      11.544,
+      12.663
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 5.05,
+     "comparator_direct_errors_mean": 5.4,
+     "empty_direct_errors_mean": 3.55,
+     "andrey_shd_endpoint_mean": 12.85,
+     "comparator_shd_endpoint_mean": 14.1,
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 7,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -1.15,
+      0.35
+     ],
+     "above_zero": false,
+     "same_graph": 4,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.5,
+       "bootstrap_95": [
+        0.3,
+        2.75
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 5.15,
+      "comparator_direct_errors_mean": 5.25,
+      "empty_direct_errors_mean": 3.95,
+      "andrey_shd_endpoint_mean": 15.75,
+      "comparator_shd_endpoint_mean": 15.65,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 7,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -1.0,
+       0.8
+      ],
+      "above_zero": false,
+      "same_graph": 5,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": 1.2,
+        "bootstrap_95": [
+         -0.2,
+         2.6
+        ]
+       }
+      },
+      "seeds": "20-30 and 32-40"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 15,
+     "latents": 3,
+     "observed": 12,
+     "n": 2000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 18.5078,
+     "comparator_s": 246.5901,
+     "ratio": 13.53,
+     "ratio_95": [
+      12.452,
+      14.676
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 7.35,
+     "comparator_direct_errors_mean": 7.95,
+     "empty_direct_errors_mean": 6.05,
+     "andrey_shd_endpoint_mean": 19.4,
+     "comparator_shd_endpoint_mean": 20.05,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 8,
+     "mean_D": -0.6,
+     "bootstrap_95": [
+      -2.0,
+      0.7
+     ],
+     "above_zero": false,
+     "same_graph": 1,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 1.3,
+       "bootstrap_95": [
+        -0.601,
+        3.25
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0",
+   "comparator_solution": "lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_anm_er_tenth",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 11,
+     "latents": 1,
+     "observed": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 5.1138,
+     "comparator_s": 14.9477,
+     "ratio": 2.616,
+     "ratio_95": [
+      2.527,
+      2.764
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 6.6,
+     "comparator_direct_errors_mean": 6.75,
+     "empty_direct_errors_mean": 7.0,
+     "andrey_shd_endpoint_mean": 19.7,
+     "comparator_shd_endpoint_mean": 19.8,
+     "andrey_fewer_errors": 10,
+     "comparator_fewer_errors": 9,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -1.35,
+      1.05
+     ],
+     "above_zero": false,
+     "same_graph": 1,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -2.6,
+        1.9
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 22,
+     "latents": 2,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 16.0026,
+     "comparator_s": 52.3289,
+     "ratio": 3.088,
+     "ratio_95": [
+      2.906,
+      3.691
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 10.4,
+     "comparator_direct_errors_mean": 12.05,
+     "empty_direct_errors_mean": 15.3,
+     "andrey_shd_endpoint_mean": 38.95,
+     "comparator_shd_endpoint_mean": 40.15,
+     "andrey_fewer_errors": 12,
+     "comparator_fewer_errors": 8,
+     "mean_D": -1.65,
+     "bootstrap_95": [
+      -3.55,
+      0.2
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.9,
+       "bootstrap_95": [
+        -6.75,
+        -2.95
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 55,
+     "latents": 5,
+     "observed": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 90.7292,
+     "comparator_s": 296.4359,
+     "ratio": 3.123,
+     "ratio_95": [
+      3.039,
+      3.573
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 27.9,
+     "comparator_direct_errors_mean": 28.9,
+     "empty_direct_errors_mean": 39.6,
+     "andrey_shd_endpoint_mean": 111.15,
+     "comparator_shd_endpoint_mean": 101.3,
+     "andrey_fewer_errors": 11,
+     "comparator_fewer_errors": 9,
+     "mean_D": -1.0,
+     "bootstrap_95": [
+      -5.7,
+      3.801
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -11.7,
+       "bootstrap_95": [
+        -15.35,
+        -7.55
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0 at its default set size",
+   "comparator_solution": "lingam.CAMUV (default)",
+   "comparator_setting": "lingam's documented default is num_explanatory_vals=2, sets of up to 2 variables; every package here runs 3, the paper's d (Sect. 5) and Andrey's default, so the lingam fits visit sets of 3 as well; causal-learn's num_explanatory_vals has no default. lingam_default runs lingam at that default, CAMUV(alpha=0.01, num_explanatory_vals=2), on every cell in claim",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_anm_er_tenth",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 11,
+     "latents": 1,
+     "observed": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 5.1138,
+     "comparator_s": 15.1071,
+     "ratio": 2.691,
+     "ratio_95": [
+      2.636,
+      3.154
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 6.6,
+     "comparator_direct_errors_mean": 6.7,
+     "empty_direct_errors_mean": 7.0,
+     "andrey_shd_endpoint_mean": 19.7,
+     "comparator_shd_endpoint_mean": 20.0,
+     "andrey_fewer_errors": 10,
+     "comparator_fewer_errors": 10,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -1.4,
+      1.15
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -2.6,
+        1.9
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 22,
+     "latents": 2,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 16.0026,
+     "comparator_s": 50.5103,
+     "ratio": 3.215,
+     "ratio_95": [
+      2.89,
+      3.83
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 10.4,
+     "comparator_direct_errors_mean": 12.0,
+     "empty_direct_errors_mean": 15.3,
+     "andrey_shd_endpoint_mean": 38.95,
+     "comparator_shd_endpoint_mean": 40.25,
+     "andrey_fewer_errors": 12,
+     "comparator_fewer_errors": 8,
+     "mean_D": -1.6,
+     "bootstrap_95": [
+      -3.5,
+      0.2
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.9,
+       "bootstrap_95": [
+        -6.75,
+        -2.95
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 55,
+     "latents": 5,
+     "observed": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 90.7292,
+     "comparator_s": 235.9229,
+     "ratio": 2.515,
+     "ratio_95": [
+      2.273,
+      3.07
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 27.9,
+     "comparator_direct_errors_mean": 28.75,
+     "empty_direct_errors_mean": 39.6,
+     "andrey_shd_endpoint_mean": 111.15,
+     "comparator_shd_endpoint_mean": 101.65,
+     "andrey_fewer_errors": 11,
+     "comparator_fewer_errors": 9,
+     "mean_D": -0.85,
+     "bootstrap_95": [
+      -5.8,
+      4.25
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -11.7,
+       "bootstrap_95": [
+        -15.35,
+        -7.55
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "causal-learn 0.1.4.8",
+   "comparator_solution": "causallearn.search.FCMBased.lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_anm_er_tenth",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 11,
+     "latents": 1,
+     "observed": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 5.1138,
+     "comparator_s": 46.8137,
+     "ratio": 8.6,
+     "ratio_95": [
+      7.918,
+      8.959
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 6.6,
+     "comparator_direct_errors_mean": 7.05,
+     "empty_direct_errors_mean": 7.0,
+     "andrey_shd_endpoint_mean": 19.7,
+     "comparator_shd_endpoint_mean": 20.0,
+     "andrey_fewer_errors": 10,
+     "comparator_fewer_errors": 8,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -1.8,
+      0.85
+     ],
+     "above_zero": false,
+     "same_graph": 2,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -2.6,
+        1.9
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 22,
+     "latents": 2,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 16.0026,
+     "comparator_s": 164.8847,
+     "ratio": 10.552,
+     "ratio_95": [
+      9.667,
+      11.613
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 10.4,
+     "comparator_direct_errors_mean": 10.85,
+     "empty_direct_errors_mean": 15.3,
+     "andrey_shd_endpoint_mean": 38.95,
+     "comparator_shd_endpoint_mean": 37.9,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 11,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -2.3,
+      1.45
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.9,
+       "bootstrap_95": [
+        -6.75,
+        -2.95
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 55,
+     "latents": 5,
+     "observed": 50,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 90.7292,
+     "comparator_s": 964.3845,
+     "ratio": 10.313,
+     "ratio_95": [
+      9.621,
+      11.951
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 27.9,
+     "comparator_direct_errors_mean": 30.05,
+     "empty_direct_errors_mean": 39.6,
+     "andrey_shd_endpoint_mean": 111.15,
+     "comparator_shd_endpoint_mean": 102.8,
+     "andrey_fewer_errors": 13,
+     "comparator_fewer_errors": 7,
+     "mean_D": -2.15,
+     "bootstrap_95": [
+      -6.55,
+      2.4
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -11.7,
+       "bootstrap_95": [
+        -15.35,
+        -7.55
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0",
+   "comparator_solution": "lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "camuv_paper",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 14,
+     "latents": 4,
+     "observed": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.7634,
+     "comparator_s": 4.7742,
+     "ratio": 2.944,
+     "ratio_95": [
+      2.779,
+      3.246
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 6.9,
+     "comparator_direct_errors_mean": 7.95,
+     "empty_direct_errors_mean": 9.35,
+     "andrey_shd_endpoint_mean": 23.25,
+     "comparator_shd_endpoint_mean": 23.7,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 3,
+     "mean_D": -1.05,
+     "bootstrap_95": [
+      -2.0,
+      -0.25
+     ],
+     "above_zero": false,
+     "same_graph": 6,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.45,
+       "bootstrap_95": [
+        -3.8,
+        -0.8
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 8.65,
+      "comparator_direct_errors_mean": 8.2,
+      "empty_direct_errors_mean": 11.0,
+      "andrey_shd_endpoint_mean": 27.05,
+      "comparator_shd_endpoint_mean": 25.85,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 10,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       -0.9,
+       1.85
+      ],
+      "above_zero": false,
+      "same_graph": 2,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -2.35,
+        "bootstrap_95": [
+         -3.5,
+         -1.25
+        ]
+       }
+      },
+      "seeds": "20-39"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 14,
+     "latents": 4,
+     "observed": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 5.1665,
+     "comparator_s": 16.2016,
+     "ratio": 2.884,
+     "ratio_95": [
+      2.833,
+      3.057
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 5.55,
+     "comparator_direct_errors_mean": 7.55,
+     "empty_direct_errors_mean": 9.35,
+     "andrey_shd_endpoint_mean": 21.05,
+     "comparator_shd_endpoint_mean": 22.65,
+     "andrey_fewer_errors": 13,
+     "comparator_fewer_errors": 2,
+     "mean_D": -2.0,
+     "bootstrap_95": [
+      -3.35,
+      -0.8
+     ],
+     "above_zero": false,
+     "same_graph": 3,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.8,
+       "bootstrap_95": [
+        -4.75,
+        -2.85
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 7.8,
+      "comparator_direct_errors_mean": 7.85,
+      "empty_direct_errors_mean": 11.0,
+      "andrey_shd_endpoint_mean": 27.35,
+      "comparator_shd_endpoint_mean": 27.2,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 9,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -1.5,
+       1.351
+      ],
+      "above_zero": false,
+      "same_graph": 3,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -3.2,
+        "bootstrap_95": [
+         -4.5,
+         -1.85
+        ]
+       }
+      },
+      "seeds": "20-39"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0 at its default set size",
+   "comparator_solution": "lingam.CAMUV (default)",
+   "comparator_setting": "lingam's documented default is num_explanatory_vals=2, sets of up to 2 variables; every package here runs 3, the paper's d (Sect. 5) and Andrey's default, so the lingam fits visit sets of 3 as well; causal-learn's num_explanatory_vals has no default. lingam_default runs lingam at that default, CAMUV(alpha=0.01, num_explanatory_vals=2), on every cell in claim",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "camuv_paper",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 14,
+     "latents": 4,
+     "observed": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.7634,
+     "comparator_s": 4.7321,
+     "ratio": 2.727,
+     "ratio_95": [
+      2.447,
+      3.391
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 6.9,
+     "comparator_direct_errors_mean": 7.95,
+     "empty_direct_errors_mean": 9.35,
+     "andrey_shd_endpoint_mean": 23.25,
+     "comparator_shd_endpoint_mean": 23.7,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 3,
+     "mean_D": -1.05,
+     "bootstrap_95": [
+      -2.0,
+      -0.25
+     ],
+     "above_zero": false,
+     "same_graph": 6,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.45,
+       "bootstrap_95": [
+        -3.8,
+        -0.8
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 8.65,
+      "comparator_direct_errors_mean": 8.2,
+      "empty_direct_errors_mean": 11.0,
+      "andrey_shd_endpoint_mean": 27.05,
+      "comparator_shd_endpoint_mean": 26.1,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 10,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       -0.9,
+       1.85
+      ],
+      "above_zero": false,
+      "same_graph": 2,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -2.35,
+        "bootstrap_95": [
+         -3.5,
+         -1.25
+        ]
+       }
+      },
+      "seeds": "20-39"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 14,
+     "latents": 4,
+     "observed": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 5.1665,
+     "comparator_s": 14.107,
+     "ratio": 2.666,
+     "ratio_95": [
+      2.301,
+      2.859
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 5.55,
+     "comparator_direct_errors_mean": 7.65,
+     "empty_direct_errors_mean": 9.35,
+     "andrey_shd_endpoint_mean": 21.05,
+     "comparator_shd_endpoint_mean": 23.05,
+     "andrey_fewer_errors": 13,
+     "comparator_fewer_errors": 1,
+     "mean_D": -2.1,
+     "bootstrap_95": [
+      -3.35,
+      -1.05
+     ],
+     "above_zero": false,
+     "same_graph": 3,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.8,
+       "bootstrap_95": [
+        -4.75,
+        -2.85
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 7.8,
+      "comparator_direct_errors_mean": 7.7,
+      "empty_direct_errors_mean": 11.0,
+      "andrey_shd_endpoint_mean": 27.35,
+      "comparator_shd_endpoint_mean": 27.15,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 9,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       -1.2,
+       1.4
+      ],
+      "above_zero": false,
+      "same_graph": 3,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -3.2,
+        "bootstrap_95": [
+         -4.5,
+         -1.85
+        ]
+       }
+      },
+      "seeds": "20-39"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "causal-learn 0.1.4.8",
+   "comparator_solution": "causallearn.search.FCMBased.lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "camuv_paper",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 14,
+     "latents": 4,
+     "observed": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.7634,
+     "comparator_s": 11.6866,
+     "ratio": 7.366,
+     "ratio_95": [
+      6.842,
+      8.512
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 6.9,
+     "comparator_direct_errors_mean": 8.1,
+     "empty_direct_errors_mean": 9.35,
+     "andrey_shd_endpoint_mean": 23.25,
+     "comparator_shd_endpoint_mean": 24.0,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 2,
+     "mean_D": -1.2,
+     "bootstrap_95": [
+      -2.1,
+      -0.4
+     ],
+     "above_zero": false,
+     "same_graph": 6,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -2.45,
+       "bootstrap_95": [
+        -3.8,
+        -0.8
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 8.65,
+      "comparator_direct_errors_mean": 8.15,
+      "empty_direct_errors_mean": 11.0,
+      "andrey_shd_endpoint_mean": 27.05,
+      "comparator_shd_endpoint_mean": 25.85,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 9,
+      "mean_D": 0.5,
+      "bootstrap_95": [
+       -0.8,
+       1.85
+      ],
+      "above_zero": false,
+      "same_graph": 2,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -2.35,
+        "bootstrap_95": [
+         -3.5,
+         -1.25
+        ]
+       }
+      },
+      "seeds": "20-39"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    },
+    {
+     "d": 14,
+     "latents": 4,
+     "observed": 10,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 5.1665,
+     "comparator_s": 49.1143,
+     "ratio": 8.59,
+     "ratio_95": [
+      8.253,
+      9.374
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 5.55,
+     "comparator_direct_errors_mean": 7.0,
+     "empty_direct_errors_mean": 9.35,
+     "andrey_shd_endpoint_mean": 21.05,
+     "comparator_shd_endpoint_mean": 22.45,
+     "andrey_fewer_errors": 13,
+     "comparator_fewer_errors": 2,
+     "mean_D": -1.45,
+     "bootstrap_95": [
+      -2.65,
+      -0.45
+     ],
+     "above_zero": false,
+     "same_graph": 2,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.8,
+       "bootstrap_95": [
+        -4.75,
+        -2.85
+       ]
+      }
+     },
+     "replication": {
+      "paired": 20,
+      "andrey_direct_errors_mean": 7.8,
+      "comparator_direct_errors_mean": 7.95,
+      "empty_direct_errors_mean": 11.0,
+      "andrey_shd_endpoint_mean": 27.35,
+      "comparator_shd_endpoint_mean": 27.65,
+      "andrey_fewer_errors": 7,
+      "comparator_fewer_errors": 7,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -1.55,
+       1.25
+      ],
+      "above_zero": false,
+      "same_graph": 4,
+      "verdict": "tie",
+      "floor": {
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -3.2,
+        "bootstrap_95": [
+         -4.5,
+         -1.85
+        ]
+       }
+      },
+      "seeds": "20-39"
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0",
+   "comparator_solution": "lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "anm_er",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 20,
+     "latents": 0,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 16.8235,
+     "comparator_s": 48.333,
+     "ratio": 2.959,
+     "ratio_95": [
+      2.866,
+      3.243
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 11.55,
+     "comparator_direct_errors_mean": 10.25,
+     "empty_direct_errors_mean": 20.0,
+     "andrey_shd_endpoint_mean": 37.95,
+     "comparator_shd_endpoint_mean": 36.75,
+     "andrey_fewer_errors": 8,
+     "comparator_fewer_errors": 10,
+     "mean_D": 1.3,
+     "bootstrap_95": [
+      -0.95,
+      3.6
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.45,
+       "bootstrap_95": [
+        -11.05,
+        -5.649
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0 at its default set size",
+   "comparator_solution": "lingam.CAMUV (default)",
+   "comparator_setting": "lingam's documented default is num_explanatory_vals=2, sets of up to 2 variables; every package here runs 3, the paper's d (Sect. 5) and Andrey's default, so the lingam fits visit sets of 3 as well; causal-learn's num_explanatory_vals has no default. lingam_default runs lingam at that default, CAMUV(alpha=0.01, num_explanatory_vals=2), on every cell in claim",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "anm_er",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 20,
+     "latents": 0,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 16.8235,
+     "comparator_s": 47.7953,
+     "ratio": 2.872,
+     "ratio_95": [
+      2.508,
+      3.076
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 11.55,
+     "comparator_direct_errors_mean": 10.25,
+     "empty_direct_errors_mean": 20.0,
+     "andrey_shd_endpoint_mean": 37.95,
+     "comparator_shd_endpoint_mean": 36.75,
+     "andrey_fewer_errors": 8,
+     "comparator_fewer_errors": 10,
+     "mean_D": 1.3,
+     "bootstrap_95": [
+      -0.95,
+      3.6
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.45,
+       "bootstrap_95": [
+        -11.05,
+        -5.649
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "causal-learn 0.1.4.8",
+   "comparator_solution": "causallearn.search.FCMBased.lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "anm_er",
+   "claim": "in",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 20,
+     "latents": 0,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 16.8235,
+     "comparator_s": 154.6442,
+     "ratio": 9.865,
+     "ratio_95": [
+      8.932,
+      10.355
+     ],
+     "paired": 20,
+     "andrey_direct_errors_mean": 11.55,
+     "comparator_direct_errors_mean": 10.85,
+     "empty_direct_errors_mean": 20.0,
+     "andrey_shd_endpoint_mean": 37.95,
+     "comparator_shd_endpoint_mean": 37.8,
+     "andrey_fewer_errors": 8,
+     "comparator_fewer_errors": 10,
+     "mean_D": 0.7,
+     "bootstrap_95": [
+      -1.7,
+      3.1
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.45,
+       "bootstrap_95": [
+        -11.05,
+        -5.649
+       ]
+      }
+     },
+     "final_verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "lingam 1.13.0",
+   "comparator_solution": "lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_gauss_er",
+   "claim": "out",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 22,
+     "latents": 2,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 13.545,
+     "comparator_s": 44.0002,
+     "ratio": 3.092,
+     "ratio_95": [
+      2.943,
+      3.333
+     ],
+     "paired": 10,
+     "andrey_direct_errors_mean": 21.9,
+     "comparator_direct_errors_mean": 24.3,
+     "empty_direct_errors_mean": 14.8,
+     "andrey_shd_endpoint_mean": 51.4,
+     "comparator_shd_endpoint_mean": 50.3,
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 3,
+     "mean_D": -2.4,
+     "bootstrap_95": [
+      -5.3,
+      0.8
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": 7.1,
+       "bootstrap_95": [
+        5.5,
+        9.1
+       ]
+      }
+     },
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "CAM-UV",
+   "family": "functional",
+   "solution": "andrey.camuv.numpy",
+   "setting": "alpha=0.01, max_depth=2 (the defaults: sets of up to 3 variables, the paper's d)",
+   "comparator": "causal-learn 0.1.4.8",
+   "comparator_solution": "causallearn.search.FCMBased.lingam.CAMUV",
+   "comparator_setting": "lingam CAMUV(alpha=alpha, num_explanatory_vals=max_depth + 1); causal-learn CAMUV.execute(X, alpha, max_depth + 1); their pairs drawn <->",
+   "lane": "camuv",
+   "output": "DAG over the observed variables, with o-o on each pair it finds joined by a hidden common cause or a causal path through a hidden variable",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
+   "same_graph_test": "the same directed edges and the same marked pairs",
+   "regime": "latent_gauss_er",
+   "claim": "out",
+   "metric": "direct_errors",
+   "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
+   "complete": true,
+   "rows": [
+    {
+     "d": 22,
+     "latents": 2,
+     "observed": 20,
+     "n": 1000,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 13.545,
+     "comparator_s": 130.9573,
+     "ratio": 9.618,
+     "ratio_95": [
+      8.645,
+      10.903
+     ],
+     "paired": 10,
+     "andrey_direct_errors_mean": 21.9,
+     "comparator_direct_errors_mean": 25.7,
+     "empty_direct_errors_mean": 14.8,
+     "andrey_shd_endpoint_mean": 51.4,
+     "comparator_shd_endpoint_mean": 52.4,
+     "andrey_fewer_errors": 8,
+     "comparator_fewer_errors": 2,
+     "mean_D": -3.8,
+     "bootstrap_95": [
+      -7.0,
+      -0.5
+     ],
+     "above_zero": false,
+     "same_graph": 0,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": 7.1,
+       "bootstrap_95": [
+        5.5,
+        9.1
+       ]
+      }
      },
      "complete": true
     }

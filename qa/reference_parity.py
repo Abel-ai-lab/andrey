@@ -20,10 +20,12 @@ summary's ``parity_rule`` sets how its rows are judged:
   measured for the method's Limitations, so it is reported with its numbers and never gated. A row
   with ``"claim": "in"``, or with no ``claim``, is in claim and is judged as above; the row's own
   field overrides its entry's.
-- ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent) or
+- ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent),
   ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
-  targets). A row's means are ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the
-  ``*_shd_mean`` fields, which then hold that error's means. A method with a gated metric beside
+  targets), or ``"direct_errors"`` (the directed edges against the edges between observed
+  variables that no unobserved causal or backdoor path joins). A row's means are
+  ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
+  then hold that error's means. A method with a gated metric beside
   SHD has one entry per metric, and a row's key names the ``metric``.
 - ``role``: ``"context"`` on an entry marks a comparator the method is reported against and never
   judged by, such as another method on the same data. Its rows are reported with their numbers.
@@ -91,7 +93,11 @@ CONTEXT = "context"
 #: A row's floor intervals: Andrey's error minus the empty graph's, and minus the given targets'.
 FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95")
 #: The ``metric`` values an entry may name, with the text a row prints for each.
-METRICS: dict[str, str] = {"shd": "SHD", "target_error": "target error"}
+METRICS: dict[str, str] = {
+    "shd": "SHD",
+    "target_error": "target error",
+    "direct_errors": "direct-edge errors",
+}
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset(
     {"correct-by-paper", "reference-defect", "tie-break", "trade-off"}
