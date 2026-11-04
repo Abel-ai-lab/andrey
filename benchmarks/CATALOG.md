@@ -67,7 +67,11 @@ InvariantCausalPrediction, [`published/0.14.0/camuv.json`](published/0.14.0/camu
 lingam and causal-learn, and [`published/0.14.0/dynotears.json`](published/0.14.0/dynotears.json),
 DYNOTEARS with CausalNex; their comparison pages, [GnIES](comparisons/gnies.md),
 [UT-IGSP](comparisons/ut-igsp.md), [IGSP](comparisons/igsp.md), [ICP](comparisons/icp.md),
-[CAM-UV](comparisons/camuv.md), and [DYNOTEARS](comparisons/dynotears.md), present them.
+[CAM-UV](comparisons/camuv.md), and [DYNOTEARS](comparisons/dynotears.md), present them. Some
+summary fields come from the runs behind a lane file rather than from the file itself: ICP's rows
+split by size (`icp.json` holds each setting's sizes pooled), GnIES's intervals outside its claim,
+the speed context (ratio quartiles, per-row fit times, median errors), and the regime, coverage,
+and seed notes of GnIES, UT-IGSP, and IGSP.
 
 | Release | Release card | Summary |
 |---|---|---|

@@ -163,7 +163,9 @@ the smaller ones, so there Andrey accepts every set R accepts and more.
 In every cell within the method's claim, the pooled share of fits whose estimate holds a variable
 outside the true parents, the FWER, stays well below `alpha=0.05`, and no scenario's FWER is above
 `alpha` beyond sampling error: none has a one-sided binomial p-value below `0.05` over the number
-of scenarios.
+of scenarios. The claim bounds the variables ICP names as parents. It names none where the
+invariance does not identify them, so no empty-estimate floor applies: the paired errors are judged
+against R's on the same fits alone.
 
 | Cell | Test | Fits | FWER | 95% interval | Largest scenario FWER | Success | Parents found |
 |---|---|---|---|---|---|---|---|
