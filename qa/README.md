@@ -251,8 +251,9 @@ and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   as its fit takes seconds. `longitudinal_lingam_paper` draws `m` units at `n` time points.
   Granger's published median error is above the empty graph's at every published size, so its
   gate draws 5 variables, where it is below. PCMCI and Granger run at their default
-  `fdr_method`, `"fdr_bh"`. DYNOTEARS runs at its defaults, the paper's settings for 500 steps. A test keeps the Granger draws in step with the benchmark driver and
-  the regime names with the harness.
+  `fdr_method`, `"fdr_bh"`. DYNOTEARS runs at its defaults, the paper's settings for 500 steps. A
+  test keeps the Granger draws in step with the benchmark driver and the regime names with the
+  harness.
 - **Environments.** `icp_do` follows ICP's published regime of that name: an observational
   environment and environments of do-interventions `N(2, 0.2^2)`, at 6 or 10 variables and 200
   rows each. The data are `andrey.data`'s linear-Gaussian Erdos-Renyi graphs of mean degree 2,
@@ -396,9 +397,10 @@ with a reason and a citation:
 - `correct-by-paper`: Andrey follows the method's paper and the reference does not.
 - `reference-defect`: the reference has a defect.
 - `tie-break`: the two packages end at different local optima after an exact score tie that Andrey
-  breaks by column order. Its `evidence` holds the row's two error values with the columns in
-  reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
-  row must pass.
+  breaks by column order, or by its tie ranks. Its `evidence` holds the row's two error values with
+  the columns in reversed order (`"column_order": "reversed"`), or, for a method whose result does
+  not depend on the column order, with its tie ranks reversed (`"tie_ranks": "reversed"`), beside
+  `andrey_errors` and `comparator_errors`, where the row must pass.
 - `trade-off`: the row is the cost of a default chosen for what it gains on other rows; the reason
   gives both.
 

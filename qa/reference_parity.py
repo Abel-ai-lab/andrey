@@ -53,14 +53,15 @@ context: its series counts are printed beside the row and never judged.
 ``parity-allowlist.json``, next to the summaries, exempts a failing row only when it names the
 cause: Andrey is correct by the paper the method comes from, the reference has a defect, the two
 packages end at different local optima after an exact score tie that Andrey breaks by column order
-(a tie-break), or the row is the cost of a default chosen for what it gains on other rows (a
-trade-off). Each entry gives the reason and a citation, and pins the row's two error values, so
-a re-run that changes the row voids the entry. A tie-break entry also gives, as its evidence, the
-row's two error values with the columns in reversed order, where the row must pass. An entry that
-matches no failing row also fails. A released summary never changes, so a method re-measured
-against the same reference in a later summary is judged by the later rows only. Where a summary has
-two entries of one method against one reference, one per regime, a row's key also names its
-``regime``.
+or by its tie ranks (a tie-break), or the row is the cost of a default chosen for what it gains on
+other rows (a trade-off). Each entry gives the reason and a citation, and pins the row's two error
+values, so a re-run that changes the row voids the entry. A tie-break entry also gives, as its
+evidence, the row's two error values with the columns in reversed order, or with the tie ranks
+reversed for a method whose result does not depend on the column order, where the row must pass.
+An entry that matches no failing row also fails. A released summary never changes, so a method
+re-measured against the same reference in a later summary is judged by the later rows only. Where a
+summary has two entries of one method against one reference, one per regime, a row's key also names
+its ``regime``.
 
     uv run python -m qa.reference_parity              # exit 1 if any row fails
 """
@@ -530,14 +531,22 @@ def _entry_problem(entry: dict, row: Row) -> str | None:
 
 
 def _tie_break_problem(evidence: object) -> str | None:
-    """Check a tie-break's evidence: the row's error values with the columns reversed, passing."""
-    if not isinstance(evidence, dict) or evidence.get("column_order") != "reversed":
-        return "a tie-break needs evidence with the result on the reversed column order"
+    """Check a tie-break's evidence: the row's error values with its tie order reversed, passing.
+
+    The reversed order is the column order (``"column_order": "reversed"``) or, for a method whose
+    result does not depend on the column order, its tie ranks (``"tie_ranks": "reversed"``).
+    """
+    if not isinstance(evidence, dict) or not any(
+        evidence.get(key) == "reversed" for key in ("column_order", "tie_ranks")
+    ):
+        return (
+            "a tie-break needs evidence with the result on the reversed column order or tie ranks"
+        )
     values = (evidence.get("andrey_errors"), evidence.get("comparator_errors"))
     if not all(isinstance(v, (int, float)) for v in values):
         return "its evidence needs andrey_errors and comparator_errors"
     if values[0] > values[1]:
-        return f"with the columns reversed the row still fails: {values}"
+        return f"with the tie order reversed the row still fails: {values}"
     return None
 
 

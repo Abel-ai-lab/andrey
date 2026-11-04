@@ -587,7 +587,10 @@ def test_parity_allowlist_exempts_a_tie_break_only_when_the_reversed_order_passe
         return _entry(cause="tie-break", andrey_errors=4, comparator_errors=0, evidence=evidence)
 
     assert _failures(row, allowlist=(tie_break(reversed_order),)) == []
+    reversed_ranks = {"tie_ranks": "reversed", "andrey_errors": 1, "comparator_errors": 1}
+    assert _failures(row, allowlist=(tie_break(reversed_ranks),)) == []
     for evidence in (
+        {**reversed_ranks, "tie_ranks": "random"},
         None,
         "pgmpy wins on ties",
         {**reversed_order, "column_order": "random"},
