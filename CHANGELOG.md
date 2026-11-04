@@ -89,6 +89,9 @@ names its pull request.
   group the rows alike under other labels break ties by column position, as identical columns do,
   so adding a constant to a copy or relabeling its categories no longer changes which column a tie
   goes to. ([#660])
+- The Limitations of `cam` and `resit` and the subsampling evidence in `bootstrap` count a setting
+  whose paired interval contains 0 as a tie instead of saying the method made no more errors there.
+  ([#687])
 
 ## [0.13.0] - 2026-11-03
 
@@ -1718,3 +1721,4 @@ First alpha release.
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
+[#687]: https://github.com/Abel-ai-lab/andrey/pull/687
