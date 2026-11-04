@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from andrey.core.environments import env_codes, normalize_env_targets
+from andrey.core.environments import env_codes, normalize_env_targets, pool_environments
 
 N = 6
 #: Each row's environment, in an order that is not sorted.
@@ -105,7 +105,61 @@ def test_unknown_targets_come_back_as_none_unless_they_are_required():
         _normal(targets=None)
 
 
+#: ``DATA``'s rows by environment, in sorted label order, and the table they stack into.
+APART = {label: DATA[ENV == label] for label in LABELS}
+STACKED = pd.concat(APART.values(), ignore_index=True)
+BY_POSITION = {0: [], 1: ["y"], 2: [2]}
+
+#: Each form of the environments apart, and the labels it gives them.
+APART_FORMS = {
+    "a mapping of DataFrames": (lambda: _normal(APART, None), LABELS),
+    "a list of DataFrames": (lambda: _normal(list(APART.values()), None, BY_POSITION), [0, 1, 2]),
+    "DataFrames with their columns in another order": (
+        lambda: _normal(
+            [t[["z", "x", "y"]] if i else t for i, t in enumerate(APART.values())],
+            None,
+            BY_POSITION,
+        ),
+        [0, 1, 2],
+    ),
+    "a tuple of arrays": (
+        lambda: _normal(tuple(t.to_numpy() for t in APART.values()), None, {0: [], 1: 1, 2: [2]}),
+        [0, 1, 2],
+    ),
+}
+
+
+@pytest.mark.parametrize("form", list(APART_FORMS))
+def test_environments_apart_reach_the_normal_form_of_their_stacked_rows(form):
+    call, labels = APART_FORMS[form]
+    X, codes, env_labels, by_code = call()
+    assert np.array_equal(np.asarray(X), STACKED.to_numpy())
+    assert list(getattr(X, "columns", ["x", "y", "z"])) == ["x", "y", "z"]
+    assert codes.tolist() == sorted(CODES) and env_labels == labels and by_code == BY_CODE
+
+
+def test_data_that_is_not_apart_comes_back_unchanged():
+    rows = [[0.0, 1.0], [2.0, 3.0]]  # a list of rows is one table
+    for data in (rows, DATA, DATA.to_numpy()):
+        pooled, env = pool_environments(data, ENV)
+        assert pooled is data and env is ENV
+
+
 ERRORS = {
+    "env with the environments apart": lambda: _normal(APART, ENV),
+    "a targets column with the environments apart": lambda: _normal(APART, None, "t"),
+    "a targets matrix with the environments apart": lambda: _normal(APART, None, MASK),
+    "no environment": lambda: _normal([], None, None),
+    "an environment without rows": lambda: _normal({**APART, "set z": DATA.iloc[:0]}, None),
+    "DataFrames and arrays": lambda: _normal([DATA, DATA.to_numpy()], None, None),
+    "DataFrames with other columns": lambda: _normal([DATA, DATA[["x", "y"]]], None, None),
+    "arrays with other numbers of columns": lambda: _normal(
+        [DATA.to_numpy(), DATA.to_numpy()[:, :2]], None, None
+    ),
+    "keys that mix strings and numbers": lambda: _normal({0: DATA, "a": DATA}, None, None),
+    "a key that is not a string or a number": lambda: _normal({("a",): DATA}, None, None),
+    "a NaN key": lambda: _normal({np.nan: DATA}, None, None),
+    "an environment that is not a table": lambda: _normal({"a": DATA, "b": [0.0]}, None, None),
     "env of another length": lambda: _normal(env=ENV[1:]),
     "env of two columns": lambda: _normal(env=np.column_stack([ENV, ENV])),
     "env with None": lambda: _normal(env=np.r_[[None], ENV[1:]]),

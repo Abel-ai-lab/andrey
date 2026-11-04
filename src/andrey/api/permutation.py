@@ -991,12 +991,15 @@ def ut_igsp(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample, from every environment. Coerced to ``float64``. A
         DataFrame's column names become the structure's ``labels``. A column that ``env`` or
         ``targets`` names is not a variable: it leaves the data before the fit, and
         ``categorical``, ``knowledge``, ``targets``, and the result's positions count the other
         columns.
+        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
+        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
+        order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,), str, or None, default=None
         The environment each row comes from: one label per row, strings or numbers, not both, or
         the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
@@ -1110,9 +1113,10 @@ def ut_igsp(
         of column names and positions, or ``knowledge`` is neither ``None`` nor a
         :class:`~andrey.Knowledge`.
     ValueError
-        If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. If ``env`` or
-        ``targets`` is malformed, as :func:`~andrey.gies` lists; if no environment is
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. If ``env`` or
+        ``targets`` is malformed, or ``data`` holds each environment's rows apart in a form it
+        cannot read, as :func:`~andrey.gies` lists; if no environment is
         observational, or every one is; if an environment has fewer than 3 rows; if, without
         ``env``, two environments' known targets join to one key, as when a column label holds a
         comma; if ``invariance_test="gaussian"`` comes with a categorical or mixed-data

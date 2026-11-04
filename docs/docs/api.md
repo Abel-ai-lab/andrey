@@ -49,6 +49,20 @@ out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["chang
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
 
+In Python, every method that takes `env` also takes each environment's rows apart as `data`, in
+place of one table and `env`: a list of DataFrames or 2-D arrays, each labeled by its position
+`0, 1, ...`, or a dict from each label to its table. `env` is then left out, and `targets` is a
+mapping from those labels, or `None`. DataFrames need the same columns, in any order, which take
+the first one's order, and a column of the `category` type in each keeps it, with every
+DataFrame's categories; arrays need the same number of columns. The rows are stacked in the order
+of the list or dict, so the fit is the one on the stacked table with `env` naming each row's
+label.
+
+```python
+out = andrey.gies([observed, knockout], targets={0: [], 1: ["x"]})
+out = andrey.ut_igsp({"control": control, "drug": drug}, targets={"control": [], "drug": None})
+```
+
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
 outside its range or not one of its choices raises `ValueError`, each with a message that names the
 method, the argument, what it accepts, and the value, such as

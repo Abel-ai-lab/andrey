@@ -370,6 +370,16 @@ result = ut_igsp(data, "condition", targets={"control": [], "drug": ["dose"], "k
 result.metadata["targets"]  # each environment's targets, known and learned, by its label
 ```
 
+When each environment's rows come as their own table, pass them as a dict, or a list labeled by
+position, in place of `env`:
+
+```python
+result = ut_igsp(
+    {"control": control, "drug": drug, "knockout": knockout},
+    targets={"control": [], "drug": ["dose"], "knockout": None},
+)
+```
+
 ## Background knowledge
 
 What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
