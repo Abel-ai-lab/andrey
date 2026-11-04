@@ -16651,6 +16651,17 @@
   "row": "J1 alpha 1e-4 patched",
   "status": "awaits the user's decision before promotion",
   "cause": "Andrey's first start is the minimum-degree order with its ties broken by its column ranks, the same in every draw, and a later start replaces its result only with a strictly lower objective; at alpha 1e-4 and 1,000 rows per setting the objective often ties the true DAG with a wrong one (the true DAG's objective equals the returned one's in 42 and 26 of 100 draws, and is strictly higher in 45 and 65), so where the first start lands on the worse member of a tie or in a worse basin the other four starts miss, all five draws repeat it, while the reference draws five fresh random starts per draw; draw luck adds to it; a smaller share comes from the reference's one-sided start test",
+  "objective_ties": {
+   "draws_per_seed_set": 100,
+   "true_dag_objective_equal_to_returned": {
+    "seeds_0_19": 42,
+    "seeds_100_119": 26
+   },
+   "true_dag_objective_strictly_higher": {
+    "seeds_0_19": 45,
+    "seeds_100_119": 65
+   }
+  },
   "evidence": {
    "ranks_reversed": {
     "seeds_0_19": [

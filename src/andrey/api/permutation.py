@@ -766,9 +766,10 @@ def igsp(
     graph, the same kind of graph :func:`~andrey.gies` returns from the same inputs; the authors
     show a 7-variable DAG where the score search of GIES is not consistent and IGSP is. Measured in
     the authors' settings against their reference implementation at the same level, it was worse
-    in none of 114 comparisons and better in 11, all in settings of two or more targets, where that
-    implementation's test departs from the paper; against a copy corrected to the paper it was
-    worse in none and better in none. On the same data, :func:`~andrey.gies` and
+    in none of 114 comparisons and better in 11, its errors lower on two sets of datasets, the
+    second the one its default was confirmed on; all 11 are in settings of two or more targets,
+    where that implementation's test departs from the paper, and against a copy corrected to the
+    paper it was worse in none and better in none. On the same data, :func:`~andrey.gies` and
     :func:`~andrey.ut_igsp` told every target often had a lower SHD (see Limitations). When some
     targets are unknown, use :func:`~andrey.ut_igsp`; with no observational environment, use
     :func:`~andrey.gies`.

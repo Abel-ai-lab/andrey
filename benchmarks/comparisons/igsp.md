@@ -507,8 +507,9 @@ beside it in every row but those with additive noise.
 On the off-target rows, Andrey's `ut_igsp`, told the targets that are known and learning the
 others, reached SHD 0.15 and 0.05. The rows by number of variables stopped at 400, where no
 Andrey fit finished within the cap. At 100 variables the library finished 1 of 10 datasets within
-the cap, its finished fit peaking at 72 GB of memory against Andrey's 0.5 GB; at 50 variables its
-fits peaked at up to 5.4 GB, Andrey's at 0.3 GB.
+the cap, its finished fit peaking at 72 GB of memory against Andrey's 0.5 GB; these library fits
+ran later than Andrey's, with more memory, after a first attempt ran out of it. At 50 variables
+the library's fits peaked at up to 5.4 GB, Andrey's at 0.3 GB.
 
 ### Speed
 

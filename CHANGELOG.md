@@ -56,8 +56,9 @@ names its pull request.
   arguments of `ut_igsp`, with `alpha=1e-3`. Against graphical-model-learning 0.1a8, the authors'
   library, on simulated data in the papers' settings (7 to 20 variables, perfect, inhibiting, and
   imperfect interventions, 1,000 to 100,000 rows per setting), `igsp` at its defaults, alpha
-  `1e-3` and 10 starts, is worse in none of the 114 comparisons and better in 11, all in settings
-  of two or more targets, where the library's test departs from the paper; against a copy of the
+  `1e-3` and 10 starts, is worse in none of the 114 comparisons and better in 11, its errors lower
+  on two sets of datasets (the second the one its default was confirmed on), all in settings of
+  two or more targets, where the library's test departs from the paper; against a copy of the
   library corrected to the paper it is worse in none and better in none. At alpha `1e-4` with 5
   starts it is worse in 1, traced to its fixed first start. A median fit takes 1.8 times the
   library's time on one core at 1,000 rows per setting and 4.3 times at 10,000. ([#PR])
