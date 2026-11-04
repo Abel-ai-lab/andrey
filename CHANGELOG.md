@@ -27,9 +27,10 @@ names its pull request.
 
 - `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
   interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
-  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
-  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
-  columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
+  outside, and `soft` changes its mechanism and keeps its parents; they return a `HardIntervention`
+  and a `SoftIntervention`. A sample of several environments comes pooled with `env`, each row's
+  environment, and `targets`, each environment's intervened columns, for the linear, nonlinear,
+  location-scale, and discrete models. ([#659], [#674])
 - `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
@@ -74,7 +75,15 @@ names its pull request.
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
+- `gies` and `ut_igsp` prepare their rows faster, with bit-identical outputs. On one core, with 20
+
+  variables, an observational environment, and 5 settings that each intervene on one variable,
+  `gies` fits about 3 times as fast at 10,000 rows per environment and 1.8 to 2.2 times as fast at
+  100,000, and `ut_igsp` about 1.2 times as fast. The ranks that break ties, which most methods
+  compute, take about a quarter less time. ([#679])
+
 - `camuv`'s Limitations report its benchmark against three references: lingam 1.13.0 and
+
   causal-learn 0.1.4.8, each run with sets of up to 3 variables, the paper's setting, and lingam at
   its default of 2, on simulated nonlinear additive data with and without hidden variables, 4 to 50
   observed variables and 500 to 2,000 rows, and on the paper's simulation. `camuv` is worse in none
@@ -82,6 +91,13 @@ names its pull request.
   and fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
   core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
   makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
+- `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
+  implementation, on the structural vector autoregressions of the paper's design, with 5 to 100
+  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it makes no
+  more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
+  centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
+  steps, where the centering costs about one time step of data. `dynotears` stays experimental.
+  ([#682])
 
 ### Fixed
 
@@ -1719,6 +1735,9 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#674]: https://github.com/Abel-ai-lab/andrey/pull/674
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
+[#679]: https://github.com/Abel-ai-lab/andrey/pull/679
+[#682]: https://github.com/Abel-ai-lab/andrey/pull/682
 [#687]: https://github.com/Abel-ai-lab/andrey/pull/687

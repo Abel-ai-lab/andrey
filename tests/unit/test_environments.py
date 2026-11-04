@@ -7,6 +7,8 @@ environment intervened on, raises.
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -134,9 +136,102 @@ def test_each_unreadable_form_raises(case):
         ERRORS[case]()
 
 
+#: Labels of each kind, and a mapping keyed by them: an observational environment and two others.
+KINDS = {
+    "int": ([3, 7, 12], {3: [], 7: ["y"], 12: ["z"]}),
+    "float": ([0.5, 1.0, 2.25], {0.5: [], 1.0: ["y"], 2.25: ["z"]}),
+    "text": (["obs", "1", "b"], {"obs": [], "1": ["y"], "b": ["z"]}),
+    "bool": ([False, True], {False: [], True: ["y"]}),
+}
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_a_mapping_written_to_json_names_the_same_environments(kind):
+    """JSON writes every key as text; ``targets`` reads it back as the label it spells."""
+    import json
+
+    labels, mapping = KINDS[kind]
+    env = np.resize(np.array(labels, dtype=object), N)
+    text = json.loads(json.dumps(mapping))
+    assert all(isinstance(key, str) for key in text)
+    assert _normal(env=env, targets=text)[3] == _normal(env=env, targets=mapping)[3]
+
+
+@pytest.mark.parametrize("key", ["1", "1.0", "01", "+1", "1.", "1e0", " 1"])
+def test_a_text_key_names_the_number_label_it_spells(key):
+    env = np.resize([0, 1], N)
+    assert _normal(env=env, targets={0: [], key: ["y"]})[3] == {0: frozenset(), 1: frozenset({1})}
+
+
+@pytest.mark.parametrize("key", ["nan", "inf", "true", "[1]", "one", "2"])
+def test_a_text_key_that_spells_no_number_label_raises_and_names_it(key):
+    with pytest.raises(ValueError, match=re.escape(f"targets names environments [{key!r}")):
+        _normal(env=np.resize([0, 1], N), targets={0: [], key: ["y"]})
+
+
+def test_boolean_labels_read_only_true_and_false():
+    env = np.resize([False, True], N)
+    assert _normal(env=env, targets={"false": [], "true": ["y"]})[3] == {
+        0: frozenset(),
+        1: frozenset({1}),
+    }
+    with pytest.raises(ValueError, match="that env does not have"):
+        _normal(env=env, targets={"0": [], "1": ["y"]})
+
+
+def test_a_label_beyond_2_to_the_53_matches_its_text_exactly():
+    big = 2**53 + 1
+    env = np.resize(np.array([big, big + 2], dtype=object), N)
+    assert _normal(env=env, targets={str(big): [], str(big + 2): ["y"]})[3] == {
+        0: frozenset(),
+        1: frozenset({1}),
+    }
+
+
+def test_text_labels_are_never_read_as_numbers():
+    env = np.resize(["1", "b"], N)
+    assert _normal(env=env, targets={"1": [], "b": ["y"]})[3] == {
+        0: frozenset(),
+        1: frozenset({1}),
+    }
+    with pytest.raises(ValueError, match="the labels are text, so write the key '1'"):
+        _normal(env=env, targets={1: [], "b": ["y"]})
+
+
+@pytest.mark.parametrize(
+    ("env", "targets", "group"),
+    [
+        ([0, 1], {0: [], 1: ["y"], "1": ["z"]}, r"\[1, '1'\] name 1"),
+        ([0, 1], {0: [], "1": ["y"], "1.0": ["z"]}, r"\['1', '1.0'\] name 1"),
+        ([0.0, 1.0], {0: [], 1: ["y"], "1.0": ["z"]}, r"\[1, '1.0'\] name 1.0"),
+    ],
+)
+def test_two_keys_that_name_one_label_raise_and_name_each_group(env, targets, group):
+    with pytest.raises(ValueError, match=f"more than one key: {group}"):
+        _normal(env=np.resize(env, N), targets=targets)
+
+
 def test_env_codes_follow_the_sorted_labels():
     codes, labels = env_codes(["b", "a", "c", "a"], 4)
     assert codes.tolist() == [1, 0, 2, 0] and labels == ["a", "b", "c"]
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        np.array(["b", "a", "c", "a"]),
+        np.array([3, -1, 7, -1]),
+        np.array([2**63 + 1, 5, 2**64 - 1, 5], dtype=np.uint64),
+    ],
+    ids=["text", "int", "uint"],
+)
+def test_a_typed_array_gives_the_codes_and_labels_of_its_list(env):
+    expected_codes, expected_labels = env_codes(env.tolist(), 4)
+    for shaped in (env, env.reshape(4, 1), np.asmatrix(env).T):
+        codes, labels = env_codes(shaped, 4)
+        assert codes.dtype == np.intp and codes.tolist() == expected_codes.tolist()
+        assert labels == expected_labels
+        assert [type(v) for v in labels] == [type(v) for v in expected_labels]
 
 
 def test_the_docstring_example_runs():

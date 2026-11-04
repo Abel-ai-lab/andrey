@@ -644,7 +644,9 @@ def ut_igsp(
         mapping ``{label: [variables]}`` takes a label of ``env`` to its known targets: ``[]``
         marks an observational environment, a list a setting with those known targets, and
         ``None``, or a label the mapping leaves out, a setting whose targets are all unknown; a key
-        that is not a label of ``env`` raises ``ValueError``. A string names a column of the
+        that is not a label of ``env`` raises ``ValueError``. When the labels of ``env`` are
+        numbers, a text key names the label it spells, ``"1"`` the label ``1``, so
+        ``metadata["targets"]`` read back from JSON passes as it is. A string names a column of the
         DataFrame ``data`` whose cells give each row's targets: a label or a position, a list of
         them, or an empty cell (``None``, ``NaN``, ``""``, ``[]``) for an observational row. An
         array is ``True`` (or 1) where the row's value of the variable was set by an
@@ -717,11 +719,21 @@ def ut_igsp(
         ``metadata["targets"]``: directed marks (``->``) are the edges that every DAG of the class
         orients alike, undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is
         ``"ut_igsp"``; ``metadata["targets"]`` maps each environment to its targets, known and
-        learned, by column label or 0-based position, ``[]`` for an observational one. Its keys are
-        text, as every metadata key is: an environment's label of ``env`` as ``str(label)``, so
-        the label ``1`` is the key ``"1"``, to be converted back before it is passed as
-        ``targets``; without ``env``, its known targets joined by commas, labels sorted as text or
-        positions sorted, ``""`` for the observational one. ``metadata["score"]`` is the objective
+        learned, in column order, ``[]`` for an observational one: positions for an array or a
+        DataFrame whose columns are ``0..d-1``, and column labels as text otherwise. Its keys are
+        the labels of ``env`` in sorted order, as Python scalars, so the label ``1`` is the key
+        ``1``, and the mapping passes back as ``targets=``: as it is, after ``save`` and ``load``,
+        or from ``andrey run --json``, whose keys are the labels' JSON text. Passed back, the
+        targets are known, the least each setting has: UT-IGSP may still learn more, so its refit
+        can differ, while :func:`~andrey.gies` refits the graph under exactly these targets. A
+        setting where no target was found maps to ``[]``, which ``targets=`` reads as
+        observational and pools with the observational rows: a different fit, which raises when
+        every setting maps to ``[]``. Compared with the true targets, such as those of
+        :mod:`andrey.data`, the mapping holds the known targets it was given, and each setting's
+        targets are its differences from the environments marked ``[]``, the true ones only when
+        those environments are observational. Without ``env``, an environment's key is its known
+        targets joined by commas, labels sorted as text or positions sorted, ``""`` for the
+        observational one: a name, not a label of ``env``. ``metadata["score"]`` is the objective
         of the DAG found, its number of edges plus its number of targets over the settings, lower
         is better; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests
         used, and ``metadata["alpha"]`` is the level of the conditional-independence tests;
@@ -904,6 +916,12 @@ def ut_igsp(
     [('x', 'y', 'directed')]
     >>> out.metadata["targets"]
     {'observed': [], 'shift x': ['x'], 'unknown': ['y']}
+
+    Number labels stay numbers, so the result passes back as ``targets``:
+
+    >>> codes = np.repeat([0, 1, 2], 1000)
+    >>> ut_igsp(data, codes, targets={0: [], 1: ["x"], 2: None}).metadata["targets"]
+    {0: [], 1: ['x'], 2: ['y']}
     """
     from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
     from andrey.core.environments import normalize_env_targets
