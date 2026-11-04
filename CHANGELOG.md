@@ -27,9 +27,10 @@ names its pull request.
 
 - `andrey.data.SCM.do`, and `envs=` on `SCM.sample` and `andrey.data.sample_discrete`, simulate
   interventions: `andrey.data.interventions.hard` cuts a variable from its parents and sets it from
-  outside, and `soft` changes its mechanism and keeps its parents. A sample of several environments
-  comes pooled with `env`, each row's environment, and `targets`, each environment's intervened
-  columns, for the linear, nonlinear, location-scale, and discrete models. ([#659])
+  outside, and `soft` changes its mechanism and keeps its parents; they return a `HardIntervention`
+  and a `SoftIntervention`. A sample of several environments comes pooled with `env`, each row's
+  environment, and `targets`, each environment's intervened columns, for the linear, nonlinear,
+  location-scale, and discrete models. ([#659], [#674])
 - `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
@@ -1701,3 +1702,4 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#674]: https://github.com/Abel-ai-lab/andrey/pull/674
