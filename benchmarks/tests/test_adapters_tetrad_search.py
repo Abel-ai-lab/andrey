@@ -35,6 +35,9 @@ from andrey_bench.contracts import SolutionAdapter
 TETRAD = [a for a in tetrad_cpu.SOLUTIONS if a.package == "tetrad"] + [
     a for a in tetrad_fci_latent.SOLUTIONS if a.package == "tetrad"
 ]
+#: The PAG searches no lane driver runs yet; FCI-JCI fits only with context columns.
+PAG_SEARCHES = [tetrad_search.TetradBossFCI(), tetrad_search.TetradGraspFCI()]
+SETTINGS = [*TETRAD, *PAG_SEARCHES, tetrad_search.TetradFCIJCI()]
 DRIVER = tetrad_search.DRIVER.read_text()
 
 
@@ -62,7 +65,7 @@ def _data(d: int = 20, n: int = 200, seed: int = 0, latents: bool = False) -> np
     return datasets.generate_one(datasets.DatasetKey(**coordinates))[0]
 
 
-@pytest.mark.parametrize("adapter", TETRAD, ids=lambda a: a.name)
+@pytest.mark.parametrize("adapter", SETTINGS, ids=lambda a: a.name)
 def test_an_adapter_meets_the_harness_contract(adapter) -> None:
     assert isinstance(adapter, SolutionAdapter)
     json.dumps(adapter.params(), sort_keys=True)
@@ -113,15 +116,18 @@ def _read_by_driver() -> dict[str, set[str]]:
     """The setting names the driver reads for each algorithm, from its source."""
     body = DRIVER.split("static Graph run(", 1)[1].split("static String upper(", 1)[0]
     score = set(re.findall(r's\.\w+\("(\w+)"\)', DRIVER.split("static SemBicScore score(", 1)[1]))
+    star = DRIVER.split("static Graph starFci(", 1)[1].split("static SemBicScore score(", 1)[0]
+    star = set(re.findall(r's\.\w+\("(\w+)"\)', star))
     read = {}
     for case in re.split(r'\n            case "', body)[1:]:
         name = case.split('"', 1)[0]
         names = set(re.findall(r's\.\w+\("(\w+)"\)', case))
-        read[name] = names | score if "score(data, s)" in case else names
+        names |= score if "score(data, s)" in case else set()
+        read[name] = names | star if "starFci(" in case else names
     return read
 
 
-@pytest.mark.parametrize("adapter", TETRAD, ids=lambda a: a.name)
+@pytest.mark.parametrize("adapter", SETTINGS, ids=lambda a: a.name)
 def test_an_adapter_passes_exactly_the_settings_the_driver_reads(adapter, monkeypatch) -> None:
     monkeypatch.setenv("OMP_NUM_THREADS", "1")
     assert set(adapter.settings({})) == _read_by_driver()[adapter.command]
@@ -236,9 +242,9 @@ def _probe(mode: str, data: np.ndarray, first: str | None, queries: list[list[in
 
 
 @needs_tetrad
-@pytest.mark.parametrize("adapter", TETRAD, ids=lambda a: a.name)
+@pytest.mark.parametrize("adapter", [*TETRAD, *PAG_SEARCHES], ids=lambda a: a.name)
 def test_a_tetrad_fit_gives_its_graph_and_the_warm_up_leaves_it_as_it_was(adapter) -> None:
-    data = _data(latents=adapter.command == "fci")
+    data = _data(latents=adapter.output_type == "pag")
     adapter.setup()
     native = adapter.fit(data, adapter.params())
     assert adapter.search_s > 0
