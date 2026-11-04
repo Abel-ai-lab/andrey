@@ -71,7 +71,7 @@ names its pull request.
   variables, an observational environment, and 5 settings that each intervene on one variable,
   `gies` fits about 3 times as fast at 10,000 rows per environment and 1.8 to 2.2 times as fast at
   100,000, and `ut_igsp` about 1.2 times as fast. The ranks that break ties, which most methods
-  compute, take about a quarter less time. ([#PR])
+  compute, take about a quarter less time. ([#679])
 
 ### Fixed
 
@@ -1706,3 +1706,4 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#679]: https://github.com/Abel-ai-lab/andrey/pull/679
