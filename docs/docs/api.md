@@ -34,17 +34,18 @@ environment the mapping leaves out or gives `None`, raise one too; `ut_igsp` rea
 the mapping leaves out or gives `None` as a setting whose targets it learns, and still needs an
 observational one. `gnies` takes the same forms of `targets`, but for the targets it knows: an
 environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
-`targets=None`, the default, learns them all. `icp` takes `targets` in the same forms but reads
-only whether an environment intervened on its `target`: it leaves such an environment's rows out,
-and keeps an environment whose targets are unknown. `andrey run` takes a mapping as `targets=`, a
-JSON object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the
-number label `0` of `--env`.
+`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
+names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
+it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
+its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
+unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
+`targets` in `--config`, and reads an `--env` of whole numbers as integers.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
-out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["index_edges"]
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
 
@@ -227,20 +228,19 @@ and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothi
 other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a
-fit runs: the first from the start the method describes, each later one from a start drawn from
-`seed` and the search's index. `boss` and `grasp` start it from a random order, `igsp` and
-`ut_igsp` from a minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the
-best DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring
-search; a later one replaces an earlier one only when it scores better by more than `1e-6` (for
-`igsp`, fewer edges, then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and
-targets). `igsp` and `ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s
-papers' settings, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were
-worse in none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated
-datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2
-of them in that setting, and more in none. Each search builds its own caches and drops the previous
-one's, so more starts take more time but little more memory. `1`, the default for the others, runs
-one search.
+`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit
+runs: the first from the start the method describes, each later one from a start drawn from `seed`
+and the search's index. `boss` and `grasp` start it from a random order, `igsp` and `ut_igsp` from a
+minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
+after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
+replaces an earlier one only when it scores better by more than `1e-6` (for `igsp`, fewer edges,
+then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and targets). `igsp` and
+`ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s papers' settings, at
+`alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were worse in
+none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated datasets, 12
+of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
+that setting, and more in none. Each search builds its own caches and drops the previous one's, so
+more starts take more time but little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -433,10 +433,14 @@ lag 0.
 IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
 and settings whose intervention targets are all known, as GIES does: it searches variable orders
 for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
-the settings' invariance tests contradict. Its default level for both tests, `alpha=1e-3`, was
-chosen from the levels its authors swept, from `1e-4` to `0.05`, on one set of datasets simulated
-as in its papers: its SHD was lower than each other level's in some groups of datasets, except
-`5e-4`, which tied it, and it was worse in none. It returns the interventional essential graph.
+the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
+over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
+authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
+as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
+and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
+in 17, with interval ends that are floating-point residue of 0 read as 0, and a rule written before
+the run gives a tie to one over the observational rows. It returns the interventional essential
+graph and the level used in `metadata["alpha"]`.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the
@@ -446,15 +450,22 @@ level for the conditional-independence and invariance tests, `alpha=None`, is on
 of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was
 better than the paper's reference implementation at the paper's `1e-5` in 18 of 112 comparisons
 and worse in none. It returns the interventional essential graph with each setting's
-targets in `metadata["targets"]` and the level used in `metadata["alpha"]`.
+targets in `metadata["targets"]`, keyed by the labels of `env`, and the level used in
+`metadata["alpha"]`. The targets pass back as `targets`, where they are known: `ut_igsp` may
+learn more, and `gies` refits the graph under exactly these. A setting where it found no target
+maps to `[]`, which `targets` reads as observational.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
 without being told which. It returns the interventional essential graph of the targets it learns,
-which directs every edge at a target, and lists the targets in `metadata["index_edges"]`. For each
-set of targets it tries, it runs the search of `gies` from the empty graph, with the paper's
-likelihood: one noise variance per environment for a target and one in all for the others. Known
-targets in `targets` stay in the set; with every environment's targets known, one search runs.
+which directs every edge at a target, and lists the targets in `metadata["changing_variables"]`: the
+variables whose noise variance differs between some two environments. With `env`,
+`metadata["environments"]` holds its labels, and
+`targets=dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])` refits the
+graph under the learned targets. For each set of targets it tries, it runs the search of `gies` from
+the empty graph, with the paper's likelihood: one noise variance per environment for a target and
+one in all for the others. Known targets in `targets` stay in the set; with every environment's
+targets known, one search runs.
 
 ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
 of one `target` from continuous data pooled from several environments, such as observation and

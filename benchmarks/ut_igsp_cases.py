@@ -167,7 +167,7 @@ def compare() -> list[dict]:
         reference = np.array(case["marks"])
         upper = np.triu_indices(marks.shape[0], 1)
         differ = (marks[upper] != reference[upper]) | (marks.T[upper] != reference.T[upper])
-        targets = [out.metadata["targets"][str(k)] for k in range(1, N_SETTINGS + 1)]
+        targets = [out.metadata["targets"][k] for k in range(1, N_SETTINGS + 1)]
         rows.append(
             {
                 "seed": case["seed"],

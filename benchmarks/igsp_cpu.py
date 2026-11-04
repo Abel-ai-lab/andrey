@@ -89,6 +89,10 @@ SAMPLER = "andrey.data"
 
 #: The gate's levels, inside Wang et al.'s sweep, and the candidates for Andrey's default.
 ALPHAS = (1e-4, 1e-3, 1e-2)
+#: Andrey's level outside the gate's levels: the out-of-claim fits and the context arms run ``igsp``
+#: at it with the shipped ``n_starts``. ``igsp``'s default, ``alpha=None``, one over the
+#: observational rows, equals it at 1,000 rows; the confirmation compared the two.
+LEVEL = 1e-3
 CANDIDATES = (1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2)
 #: Andrey's candidate numbers of starts; the reference library's number of runs.
 STARTS, NRUNS = (1, 5, 10), 5
@@ -473,7 +477,7 @@ def config_name(alpha: float, starts: int) -> str:
 
 
 def andrey_defaults() -> dict:
-    """``igsp``'s shipped ``alpha`` and ``n_starts``."""
+    """``igsp``'s shipped ``alpha`` (``None``, one over the observational rows) and ``n_starts``."""
     import andrey
 
     params = inspect.signature(andrey.igsp).parameters
@@ -481,8 +485,8 @@ def andrey_defaults() -> dict:
 
 
 def gate_alphas() -> list[float]:
-    """The gate's levels and Andrey's default when it is a fourth."""
-    return sorted({*ALPHAS, andrey_defaults()["alpha"]})
+    """The gate's levels, :data:`LEVEL` among them."""
+    return sorted({*ALPHAS, LEVEL})
 
 
 def judged_starts() -> list[int]:
@@ -505,7 +509,7 @@ def andrey_fits(cell: Cell, step: int = 1, winner: str | None = None) -> list[di
 
     Blocks A and Q (Andrey's defaults, draw 0): step 1 runs every candidate alpha at 5 starts,
     step 2 the winner's alpha at 1 and 10 starts. Elsewhere ``igsp`` at each of
-    :func:`judged_starts` and every gate level (in claim) or its shipped ``alpha`` (out of claim),
+    :func:`judged_starts` and every gate level (in claim) or :data:`LEVEL` (out of claim),
     and the context arms the design lists for the cell.
     """
     if cell.block == "A" or cell.arm == "Q":
@@ -515,10 +519,9 @@ def andrey_fits(cell: Cell, step: int = 1, winner: str | None = None) -> list[di
             raise SystemExit("--step 2 needs --winner, the step-1 winner a<alpha>_s5")
         alpha = float(winner[1:].split("_")[0])
         return [_igsp_fit(alpha, s, [0]) for s in STARTS if s != 5]
-    defaults = andrey_defaults()
     draws = list(range(cell.draws))
     extra = {"K": {"indep_test": "kci"}, "O7": {"indep_test": "gsq"}}.get(cell.arm, {})
-    alphas = gate_alphas() if cell.claim == "in" else [defaults["alpha"]]
+    alphas = gate_alphas() if cell.claim == "in" else [LEVEL]
     fits = [_igsp_fit(a, s, draws, **extra) for a in alphas for s in judged_starts()]
     one = {"config": "default", "kwargs": {}, "draws": [0]}
     if cell.claim == "in" or cell.arm in ("O1", "O2", "O3", "O4", "O7", "O8", "O9"):
@@ -535,7 +538,7 @@ def reference_fits(cell: Cell, package: str) -> list[dict]:
 
     The reference's ``igsp`` at Andrey's levels with 5 runs, in every cell but blocks A and Q,
     O4, O5, O7, and O1 past 100 variables; ``def42``, the patched copy, in the in-claim cells with
-    a multi-target setting. In claim, both also run at Andrey's shipped ``alpha`` with its shipped
+    a multi-target setting. In claim, both also run at :data:`LEVEL` with Andrey's shipped
     ``n_starts`` as the number of runs when that is not 5 (context), and the reference runs
     ``unknown_target_igsp`` with every target known, at the UT-IGSP lane's level.
     """
@@ -546,10 +549,10 @@ def reference_fits(cell: Cell, package: str) -> list[dict]:
     draws = list(range(cell.draws))
     tester = "kci" if cell.arm == "K" else "gauss"
     defaults = andrey_defaults()
-    alphas = gate_alphas() if cell.claim == "in" else [defaults["alpha"]]
+    alphas = gate_alphas() if cell.claim == "in" else [LEVEL]
     runs = [(a, NRUNS) for a in alphas]
     if cell.claim == "in" and defaults["n_starts"] != NRUNS:
-        runs.append((defaults["alpha"], defaults["n_starts"]))
+        runs.append((LEVEL, defaults["n_starts"]))
     fits = [
         {
             "algorithm": "igsp",
@@ -847,7 +850,7 @@ def _arms(records: list[dict]) -> dict[tuple, dict[int, dict]]:
     return arms
 
 
-#: The gated comparators by package, and the context arms (each at Andrey's default level).
+#: The gated comparators by package, and the context arms (each against Andrey at :data:`LEVEL`).
 GATED = {"reference": "graphical-model-learning", "def42": "graphical-model-learning+def42"}
 CONTEXT = {
     ("andrey", "gies", "default"): "andrey.gies",
@@ -901,7 +904,7 @@ def summarize(records: list[dict], replications: list[dict] | None = None) -> di
     copy with Definition 4.2 in the cells with a multi-target setting) at each level against
     Andrey at each of :func:`judged_starts` (J1 at 5 starts, J2 at the shipped ``n_starts``; the
     regime ends in ``n_starts=<starts>``), the reference at Andrey's shipped number of runs
-    against Andrey's J2 (context), and each other context arm against Andrey's shipped defaults;
+    against Andrey's J2 (context), and each other context arm against Andrey at :data:`LEVEL`;
     one row per (``mean_degree``, ``d``, ``n``). A gated row whose reference does not beat the
     empty graph (the interval of the reference's ``shd`` minus the empty graph's not wholly below
     0) is marked ``claim: "out"`` with that reason. A gated row that passes this filter carries
@@ -913,7 +916,7 @@ def summarize(records: list[dict], replications: list[dict] | None = None) -> di
     arms = _arms(records)
     cells = {c.name: c for c in grid()}
     defaults = andrey_defaults()
-    mine_default = config_name(defaults["alpha"], defaults["n_starts"])
+    mine_default = config_name(LEVEL, defaults["n_starts"])
     entries: dict[tuple, dict] = {}
 
     def entry(regime: str, comparator: str, cell: Cell, context: bool) -> dict:

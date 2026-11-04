@@ -173,6 +173,47 @@ def test_run_gies_with_and_without_targets(capsys, tmp_path):
     assert types == {True: ["directed"], False: ["undirected"]}
 
 
+@pytest.fixture
+def three_environments(tmp_path):
+    """x shifted in environment 1, y in 2: the data file, the env file of whole numbers, and both
+    as arrays."""
+    rng = np.random.default_rng(0)
+    env = np.repeat([0, 1, 2], 600)
+    x = rng.standard_normal(1800) + 2.0 * (env == 1)
+    y = x + rng.standard_normal(1800) * np.where(env == 2, 3.0, 1.0)
+    X = np.column_stack([x, y])
+    data_path, env_path = tmp_path / "xy.csv", tmp_path / "env.csv"
+    np.savetxt(data_path, X, delimiter=",")
+    np.savetxt(env_path, env, delimiter=",")  # written as 0.000000000000000000e+00, ...
+    return data_path, env_path, X, env
+
+
+def test_an_env_of_whole_numbers_gives_integer_keys_that_pass_back(capsys, three_environments):
+    """The labels read 0, not 0.0, so ut_igsp's --json keys are "0", "1", "2", and its targets
+    passed back as targets= give the result Python gives for the same mapping."""
+    data_path, env_path, X, env = three_environments
+    run = ["run", "ut_igsp", "--data", str(data_path), "--env", str(env_path)]
+    code, out, _ = _run([*run, 'targets={"0": [], "1": [0]}'], capsys)
+    targets = json.loads(out)["metadata"]["targets"]
+    assert code == 0 and list(targets) == ["0", "1", "2"]
+    code, again, _ = _run([*run, f"targets={json.dumps(targets)}"], capsys)
+    python = andrey.ut_igsp(X, env, targets={int(k): v for k, v in targets.items()})
+    assert code == 0
+    assert json.loads(again)["metadata"]["targets"] == {
+        str(k): v for k, v in python.metadata["targets"].items()
+    }
+    code, out, _ = _run(["run", "gnies", "--data", str(data_path), "--env", str(env_path)], capsys)
+    assert code == 0 and json.loads(out)["metadata"]["environments"] == [0, 1, 2]
+
+
+def test_an_env_of_whole_numbers_leaves_cdnod_as_float_labels_do(capsys, three_environments):
+    data_path, env_path, X, env = three_environments
+    code, out, _ = _run(["run", "cdnod", "--data", str(data_path), "--env", str(env_path)], capsys)
+    edges = [(e["source"], e["target"], e["type"]) for e in json.loads(out)["structure"]["edges"]]
+    assert code == 0
+    assert edges == andrey.cdnod(X, env.astype(float)).structure.oriented_edges(index=True)
+
+
 def test_run_multi_group(capsys, nongaussian_path):
     code, out, _ = _run(
         [

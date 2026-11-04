@@ -36,7 +36,7 @@
  "complete": true,
  "timeouts": 0,
  "differences": {
-  "method": "each dataset where Andrey's graph differs from a reference's, whatever the mark, is refitted along one path of switches from lingam's CAMUV to Andrey's: lingam on the columns in Andrey's rank order (the order its sets are visited in), then with Andrey's HSIC test, then with Andrey's regressions, then Andrey's engine with lingam's algorithm (a variable's non-parents removed together, no edge on a directed cycle dropped), then Andrey's phase 2 (one candidate at a time), then the cycle drop, which is andrey.camuv. first_switch counts, per cell, the switch after which the graph is Andrey's; switch_changed_graph the datasets where each switch changes the graph. A dataset where the references differ is refitted with causal-learn using lingam's HSIC test. At 50 observed variables 5 of the 20 datasets are traced (seeds 0, 1, 5, 10, 15); the replication at d = 10 with one node in five hidden and seeds 10-19 with nothing hidden are not traced",
+  "method": "each dataset where Andrey's graph differs from a reference's, whatever the mark, is refitted along one path of switches from lingam's CAMUV to Andrey's: lingam on the columns in Andrey's rank order (the order its sets are visited in), then with Andrey's HSIC test, then with Andrey's regressions, then Andrey's engine with lingam's algorithm (a variable's non-parents removed together, no edge on a directed cycle dropped), then Andrey's phase 2 (one candidate at a time), then the cycle drop, which is andrey.camuv. first_switch counts, per cell, the switch after which the graph is Andrey's; switch_changed_graph the datasets where each switch changes the graph. A dataset where the references differ is refitted with causal-learn using lingam's HSIC test. At 50 observed variables 5 of the 20 datasets are traced (seeds 0, 1, 5, 10, 15); at every other size, every dataset where a graph differs",
   "same_parts_same_graph": "lingam's code with Andrey's test and regressions returns the graph of Andrey's engine with lingam's algorithm on every traced dataset, so each difference is made of the five switches and nothing else",
   "references": "causal-learn with lingam's HSIC test returns lingam's graph on every traced dataset where the two differ: their difference is the HSIC test, whose bandwidth reads every row in causal-learn and the first 100 rows in lingam",
   "two_cycles": "no traced lingam fit made two variables each other's parent, which the adapters' marks would hold as one edge",
@@ -1520,14 +1520,31 @@
      },
      "differences_traced": {
       "differing": 16,
-      "traced": 0,
-      "lane_reproduced": 0,
-      "first_switch": {},
-      "references_differ_by": {},
-      "ladder_datasets": 0,
-      "switch_changed_graph": {},
-      "switch_changed_edges_and_pairs": {},
-      "same_parts_same_graph": 0,
+      "traced": 16,
+      "lane_reproduced": 16,
+      "first_switch": {
+       "hsic_test": 1,
+       "order": 9,
+       "phase_2": 3,
+       "regressions": 3
+      },
+      "references_differ_by": {
+       "hsic_test": 4
+      },
+      "ladder_datasets": 16,
+      "switch_changed_graph": {
+       "order": 16,
+       "hsic_test": 3,
+       "regressions": 5,
+       "phase_2": 3
+      },
+      "switch_changed_edges_and_pairs": {
+       "order": 122,
+       "hsic_test": 12,
+       "regressions": 16,
+       "phase_2": 4
+      },
+      "same_parts_same_graph": 16,
       "lingam_two_cycles": 0
      }
     }
@@ -4510,31 +4527,31 @@
      },
      "differences_traced": {
       "differing": 20,
-      "traced": 10,
-      "lane_reproduced": 10,
+      "traced": 20,
+      "lane_reproduced": 20,
       "first_switch": {
-       "phase_2": 4,
-       "regressions": 4,
-       "order": 1,
-       "hsic_test": 1
+       "phase_2": 8,
+       "hsic_test": 2,
+       "regressions": 8,
+       "order": 2
       },
       "references_differ_by": {
-       "hsic_test": 4
+       "hsic_test": 6
       },
-      "ladder_datasets": 10,
+      "ladder_datasets": 20,
       "switch_changed_graph": {
-       "order": 10,
-       "hsic_test": 4,
-       "regressions": 8,
-       "phase_2": 4
+       "order": 20,
+       "regressions": 15,
+       "phase_2": 8,
+       "hsic_test": 10
       },
       "switch_changed_edges_and_pairs": {
-       "order": 131,
-       "hsic_test": 12,
-       "regressions": 49,
-       "phase_2": 16
+       "order": 328,
+       "regressions": 135,
+       "phase_2": 42,
+       "hsic_test": 42
       },
-      "same_parts_same_graph": 10,
+      "same_parts_same_graph": 20,
       "lingam_two_cycles": 0
      }
     }

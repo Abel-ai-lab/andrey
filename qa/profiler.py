@@ -39,7 +39,6 @@ from threadpoolctl import threadpool_limits
 
 import andrey
 from qa import identity
-from qa import quality_gate as qg
 
 #: Calls per calibration loop, and loops per calibration; the fastest loop counts.
 CALIBRATION_CALLS = 200_000
@@ -48,7 +47,7 @@ CALIBRATION_LOOPS = 5
 
 def keys(method: str) -> tuple[str, ...]:
     """Return the dataset keys ``method`` runs on: its gate datasets, then its larger dataset."""
-    return tuple(dict.fromkeys((*qg.SUPPORTED[method].datasets, identity.LARGER[method])))
+    return tuple(dict.fromkeys(identity.datasets(method)))
 
 
 def sample(dataset: str, seed: int) -> np.ndarray:

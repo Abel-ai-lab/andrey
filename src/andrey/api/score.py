@@ -385,7 +385,9 @@ def gies(
         A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
         ``[]`` marks an observational environment, and every label of ``env`` needs a list:
         ``None``, or a label the mapping leaves out, raises ``ValueError``, as a key that is not a
-        label of ``env`` does. A string names a column of the DataFrame ``data`` whose cells give
+        label of ``env`` does. When the labels of ``env`` are numbers, a text key names the label
+        it spells, ``"1"`` the label ``1``, so a mapping read back from JSON passes as it is. A
+        string names a column of the DataFrame ``data`` whose cells give
         each row's targets: a label or a position, a list of them, or an empty cell (``None``,
         ``NaN``, ``""``, ``[]``) for an observational row. An array is ``True`` (or 1) where the
         row's value of the variable was set by an intervention and ``False`` (or 0) where its
@@ -464,7 +466,8 @@ def gies(
         not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
         column; if a ``targets`` matrix does not have ``data``'s shape, holds a value other than 0
         or 1, or leaves a variable fewer than two rows, or one value, without an intervention; if an
-        environment's targets are unknown, or ``targets`` names a label ``env`` lacks; with a
+        environment's targets are unknown, or ``targets`` names a label ``env`` lacks or names one
+        label by two keys, such as ``1`` and ``"1"``; with a
         categorical score, if ``data`` holds a number that is not whole; or, with a mixed-data
         score, if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a
         number that is not whole. Also if a continuous score meets a column declared categorical, by
@@ -702,7 +705,9 @@ def gnies(
         the setting GnIES is built for, leaves every environment's targets unknown, and the search
         learns them. A mapping ``{label: [variables]}`` lists the known targets of each label of
         ``env``; ``None``, or a label the mapping leaves out, marks an environment whose targets
-        are unknown, and ``[]`` adds none. GnIES fits one set of targets for all environments: the
+        are unknown, and ``[]`` adds none. When the labels of ``env`` are numbers, a text key
+        names the label it spells, ``"1"`` the label ``1``. GnIES fits one set of targets for all
+        environments: the
         variables the mapping lists stay targets, and while some environment's targets are
         unknown the search may add more. When every environment's targets are known (a mapping
         that gives each a list, a string naming a column of the DataFrame ``data`` whose cells
@@ -737,11 +742,15 @@ def gnies(
         graph of the learned targets: directed marks (``->``) are edges every graph in the class
         orients alike, among them every edge at a target, and undirected (``--``) the ones it
         leaves open. ``metadata["algorithm"]`` is ``"gnies"``; ``metadata["score"]`` the score of
-        the result, lower is better (see Notes); ``metadata["index_edges"]`` lists each learned
-        target as ``[variable, "directed"]``, by label or 0-based position, in column order: the
-        variables whose noise variance changes between environments. ``metadata["environments"]``
-        holds the labels of ``env`` in sorted order or, without ``env``, the list of each
-        environment's targets.
+        the result, lower is better (see Notes); ``metadata["changing_variables"]`` lists the
+        targets, known and learned, by label or 0-based position, in column order: the variables
+        whose noise variance differs between some two environments. A shift in a variable's mean
+        is not among them, since each environment's mean is taken out, and neither is a change
+        made alike in every environment. With ``env``, ``metadata["environments"]`` holds its
+        labels in sorted order, so ``targets=dict.fromkeys(out.metadata["environments"],
+        out.metadata["changing_variables"])`` gives every environment the learned targets as
+        known: a refit on it searches the graph alone and returns the same graph and score.
+        Without ``env``, ``targets`` gives every environment's targets, which are then known.
 
     Raises
     ------
@@ -758,7 +767,8 @@ def gnies(
         linear function of other columns, within the environments (one message names every group
         of copies and says to keep one column per group). Also if ``env`` does not hold one label
         per row, misses a label, or mixes strings and numbers; if a ``targets`` mapping comes
-        without ``env`` or names a label ``env`` lacks; if a column or an array of ``targets``
+        without ``env``, names a label ``env`` lacks, or names one label by two keys; if a column
+        or an array of ``targets``
         gives two rows of one environment different targets, or an array does not have ``data``'s
         shape or holds a value other than 0 or 1; if ``targets`` names a variable ``data`` lacks;
         or if ``env`` or ``targets`` names a column ``data`` lacks. Also if a given
@@ -898,8 +908,8 @@ def gnies(
     >>> out = gnies(pd.DataFrame({"x": x, "y": y}), env)
     >>> out.structure.oriented_edges()
     [('x', 'y', 'directed')]
-    >>> out.metadata["index_edges"]
-    [['y', 'directed']]
+    >>> out.metadata["changing_variables"]
+    ['y']
     """
     from andrey.core.environments import normalize_env_targets
     from andrey.search.gnies import gnies as _gnies
@@ -969,8 +979,8 @@ def gnies(
         )
     metadata = {
         "score": json_safe(score),
-        "index_edges": [[variable(j), "directed"] for j in learned],
-        "environments": shown,
+        "changing_variables": [variable(j) for j in learned],
+        **({} if env is None else {"environments": envs}),
     }
     return structure_output(graph, labels=labels, metadata=metadata)
 

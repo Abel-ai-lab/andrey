@@ -87,7 +87,7 @@ def _marks(out: andrey.StructureOutput) -> np.ndarray:
 
 
 def _targets(out: andrey.StructureOutput) -> list:
-    return [v for v, _ in out.metadata["index_edges"]]
+    return out.metadata["changing_variables"]
 
 
 # ---- the score ----------------------------------------------------------------------------------
@@ -389,18 +389,33 @@ def test_the_fit_repeats_and_records_its_metadata(case, fitted):
     assert np.array_equal(_marks(again), _marks(fitted))
     assert again.metadata == fitted.metadata
     assert fitted.metadata["algorithm"] == "gnies"
-    assert fitted.metadata["index_edges"] == [[1, "directed"], [4, "directed"]]
+    assert fitted.metadata["changing_variables"] == [1, 4]
+    assert "index_edges" not in fitted.metadata
     assert fitted.metadata["environments"] == [0, 1, 2]
     assert (fitted.metadata["penalty_discount"], fitted.metadata["ebic_gamma"]) == (1.0, 1.0)
 
 
-def test_labels_name_the_targets_and_environments_without_env(case):
+def test_labels_name_the_targets_and_without_env_no_environments_are_listed(case):
     X, env = case
     data = pd.DataFrame(X, columns=list("abcde"))
     data["changed"] = np.array(["", "b", "e"], dtype=object)[env]
     out = _fit(data, targets="changed")
-    assert out.metadata["index_edges"] == [["b", "directed"], ["e", "directed"]]
-    assert out.metadata["environments"] == [[], ["e"], ["b"]]  # numpy.unique's row order
+    assert out.metadata["changing_variables"] == ["b", "e"]
+    assert "environments" not in out.metadata
+
+
+def test_the_learned_targets_given_as_known_refit_the_same_graph_and_score(case):
+    """With ``env`` a column, ``environments`` keys the refit: every environment gets the learned
+    targets, and the one search on them repeats the outer search's final run, bit for bit."""
+    X, env = case
+    data = pd.DataFrame(X, columns=list("abcde")).assign(site=np.array(["p", "q", "r"])[env])
+    out = _fit(data, "site")
+    assert out.metadata["environments"] == ["p", "q", "r"]
+    targets = dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])
+    refit = _fit(data, "site", targets=targets)
+    assert np.array_equal(_marks(refit), _marks(out))
+    assert refit.metadata["score"] == out.metadata["score"]
+    assert refit.metadata["changing_variables"] == out.metadata["changing_variables"] == ["b", "e"]
 
 
 def test_errors_name_an_environment_from_targets_by_its_targets(case):

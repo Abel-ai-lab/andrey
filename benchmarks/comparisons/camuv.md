@@ -260,9 +260,8 @@ to Andrey's, each switch changing one part of the table in [Settings](#settings)
 the columns in Andrey's rank order; then with Andrey's HSIC test; then with Andrey's regressions;
 then Andrey's engine with lingam's algorithm, which removes a variable's non-parents together and
 drops no edge on a directed cycle; then Andrey's phase 2, one candidate at a time; then the cycle
-drop, which is `andrey.camuv`. At 50 observed variables 5 of the 20 datasets were traced, and the
-fresh seeds at 8 + 2 variables and seeds 10 to 19 with nothing hidden none; at every other size,
-every dataset where a graph differed. Three facts close the question:
+drop, which is `andrey.camuv`. At 50 observed variables 5 of the 20 datasets were traced; at
+every other size, every dataset where a graph differed. Three facts close the question:
 
 - lingam's own code run with Andrey's test and regressions returns the graph of Andrey's engine
   run with lingam's algorithm on every traced dataset, so each difference is made of the five
@@ -281,15 +280,15 @@ untraced.
 The table counts, per setting, the switch after which the graph is Andrey's. On the additive-noise
 data with up to 12 observed variables the visiting order alone, lingam run in Andrey's rank order,
 most often gives Andrey's graph. On the paper's simulation, over its four runs, and at 20 observed
-variables, the regressions most often do. At 50 every traced graph needs phase 2 or the cycle
-drop.
+variables, the regressions most often do, with nothing hidden as often as phase 2. At 50 every
+traced graph needs phase 2 or the cycle drop.
 
 | setting | observed + hidden | rows | seeds | graphs differ | traced | first switch that gives Andrey's graph: order / test / regressions / phase 2 / cycle drop | references differ, the HSIC test explains |
 |---|---|---|---|---|---|---|---|
 | one in five hidden | 4 + 1 | 2,000 | 0 to 19 | 9 | 9 | 7 / 0 / 1 / 1 / 0 | 3 of 3 |
 | one in five hidden | 8 + 2 | 2,000 | 0 to 19 | 16 | 16 | 6 / 1 / 4 / 4 / 1 | 3 of 3 |
 | one in five hidden | 12 + 3 | 2,000 | 0 to 19 | 19 | 19 | 7 / 2 / 6 / 2 / 2 | 9 of 9 |
-| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | 16 | 0 | 0 / 0 / 0 / 0 / 0 | 0 of 0 |
+| one in five hidden | 8 + 2 | 2,000 | 20 to 40, 31 skipped | 16 | 16 | 9 / 1 / 3 / 3 / 0 | 4 of 4 |
 | one in ten hidden | 10 + 1 | 1,000 | 0 to 19 | 19 | 19 | 8 / 1 / 7 / 2 / 1 | 2 of 2 |
 | one in ten hidden | 20 + 2 | 1,000 | 0 to 19 | 20 | 20 | 3 / 3 / 9 / 2 / 3 | 9 of 9 |
 | one in ten hidden | 50 + 5 | 1,000 | 0 to 19 | 20 | 5 | 0 / 0 / 0 / 3 / 2 | 5 of 5 |
@@ -297,7 +296,7 @@ drop.
 | the paper's simulation | 10 + 4 | 1,000 | 0 to 19 | 19 | 19 | 6 / 5 / 4 / 2 / 0 | 8 of 8 |
 | the paper's simulation | 10 + 4 | 500 | 20 to 39 | 18 | 18 | 5 / 1 / 8 / 4 / 0 | 8 of 8 |
 | the paper's simulation | 10 + 4 | 1,000 | 20 to 39 | 17 | 17 | 4 / 2 / 9 / 2 / 0 | 5 of 5 |
-| nothing hidden | 20 | 1,000 | 0 to 19 | 20 | 10 | 1 / 1 / 4 / 4 / 0 | 4 of 4 |
+| nothing hidden | 20 | 1,000 | 0 to 19 | 20 | 20 | 2 / 2 / 8 / 8 / 0 | 6 of 6 |
 | linear Gaussian, one in ten hidden | 20 + 2 | 1,000 | 0 to 9 | 10 | 10 | 0 / 0 / 3 / 5 / 2 | 6 of 6 |
 
 On the paper's simulation at 1,000 rows, seeds 0 to 19, 2 of the 19 traced datasets have Andrey's
