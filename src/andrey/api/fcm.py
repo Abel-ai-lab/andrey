@@ -200,8 +200,8 @@ def cam(
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** On additive-noise data with Gaussian or Gumbel noise, 10 to 100 variables, and
-    1,000 rows, standardized and not (the 0.13.0 release card), it made no more errors than the
-    paper's reference implementation in 14 of 16 settings and fewer in 2, returned the same graph on
+    1,000 rows, standardized and not (the 0.13.0 release card), it tied the paper's reference
+    implementation on errors in 14 of 16 settings and made fewer in 2, returned the same graph on
     278 of 320 datasets, and fit 6.5 to 14.7 times faster on one core. The reference implementation
     caps a variable's parents at the smaller of the variables minus one and the rows over 20, 50 at
     1,000 rows, which binds at 100 variables, where ``max_parents`` sets none by default. The
@@ -459,11 +459,11 @@ def resit(
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** On additive-noise data with Gaussian or Gumbel noise, 5 to 20 variables, and
-    1,000 rows, standardized and not (the 0.13.0 release card), it made no more errors than the
-    paper's reference implementation in 12 of 12 settings, one of them after a rerun on fresh
-    datasets, returned the same graph on 87 of 220 datasets, and fit 3.2 to 4.6 times faster on one
-    core; against an implementation that regresses with random forests it made fewer errors in 11 of
-    12 settings and no more in the other, and fit 2.1 to 2.9 times faster. The accuracy claim holds
+    1,000 rows, standardized and not (the 0.13.0 release card), it tied the paper's reference
+    implementation on errors in 12 of 12 settings, one of them after a rerun on fresh datasets,
+    returned the same graph on 87 of 220 datasets, and fit 3.2 to 4.6 times faster on one core;
+    against an implementation that regresses with random forests it made fewer errors in 11 of 12
+    settings and tied in the other, and fit 2.1 to 2.9 times faster. The accuracy claim holds
     up to 10 variables: at 20 variables, on Gaussian additive-noise data, no implementation clearly
     beats the empty graph (mean errors of 19.4 for this fit and 20.2 for the reference
     implementation against 20.0), so 20 variables is a range for speed. The edge removal tries a

@@ -1027,24 +1027,24 @@ def bootstrap(
     does [4]_, and it changes only the draw, so it means the same for every method.
 
     On linear data with 20 and 50 variables and 1,000 and 5,000 rows (``pc``, ``ges``, and
-    ``direct_lingam``; 10 datasets per cell), the averaged graph of half-size subsamples had no more
-    errors (SHD) than the bootstrap's in any of the 10 cells, and fewer in 5; for ``ges`` with 50
-    variables and 1,000 rows, 5.0 fewer on average (95% interval 2.7 to 7.9). For ``ges`` with 20
-    variables and 1,000 rows, the averaged graph had 18 wrong edge types instead of 32, and 9 of
-    the 10 averaged graphs were valid CPDAGs instead of 3. The adjacency frequencies had a lower
+    ``direct_lingam``; 10 datasets per cell), the averaged graph of half-size subsamples had fewer
+    errors (SHD) than the bootstrap's in 5 of the 10 cells and tied in the other 5; for ``ges`` with
+    50 variables and 1,000 rows, 5.0 fewer on average (95% interval 2.7 to 7.9). For ``ges`` with 20
+    variables and 1,000 rows, the averaged graph had 18 wrong edge types instead of 32, and 9 of the
+    10 averaged graphs were valid CPDAGs instead of 3. The adjacency frequencies had a lower
     calibration error in 9 of the 10 cells, and a fit took 0.56 to 0.95 of the time, since it has
     half the rows. The one cell where the point estimate was worse, ``pc`` with 20 variables and
     1,000 rows, was 0.43 errors above the bootstrap's over 30 datasets (interval -0.23 to 1.13). A
-    larger ``sample_fraction`` gives fits closer to the fit on ``data``, so the resamples agree
-    more and the frequencies say less about how much the fit varies.
+    larger ``sample_fraction`` gives fits closer to the fit on ``data``, so the resamples agree more
+    and the frequencies say less about how much the fit varies.
 
     For a time-series method on one series, a subsample is one stretch of consecutive rows, which
     keeps the lags inside it [5]_. With ``pcmci``, ``pcmciplus``, ``lpcmci``, and ``varma_lingam``
     on simulated series with 5 and 10 variables and 500 and 1,000 rows (10 series per cell, 14
-    cells; 30 series per cell, 12 cells, for the first three), a stretch of half of the series had
-    no more errors (SHD) than the block bootstrap in any cell, and fewer, by an interval below 0, in
-    9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter
-    than ten times the longest lag.
+    cells; 30 series per cell, 12 cells, for the first three), a stretch of half of the series was
+    worse than the block bootstrap in none of the cells and had fewer errors (SHD), by an interval
+    below 0, in 9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows,
+    shorter than ten times the longest lag.
 
     **The averaged graph.** Each pair of variables takes its most frequent state in the fits, no
     edge counted as one of the states: the pair gets its most frequent edge when more fits have
