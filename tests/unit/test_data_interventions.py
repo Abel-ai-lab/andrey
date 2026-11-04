@@ -57,7 +57,15 @@ def test_values_and_shifts_are_in_the_units_of_the_returned_data(scale):
 
 @pytest.mark.parametrize("functional", FUNCTIONALS)
 @pytest.mark.parametrize("scale", SCALES)
-@pytest.mark.parametrize("intervention", [hard(1.0, sd=0.5), soft(shift=1.0, noise_scale=2.0)])
+@pytest.mark.parametrize(
+    "intervention",
+    [
+        hard(1.0, sd=0.5),
+        soft(shift=1.0, noise_scale=2.0),
+        soft(noise_scale=(0.5, 3.0)),
+        soft(weights="redraw"),
+    ],
+)
 def test_an_intervention_changes_only_its_column_and_descendants(functional, scale, intervention):
     scm = _scm(functional, latents=2 if functional == "linear" else 0)
     plain = scm.sample(n=400, seed=1, scale=scale)
@@ -145,6 +153,77 @@ def test_soft_keeps_the_parents_and_hard_cuts_them():
     assert np.allclose(coefficients(1), weights, atol=0.1)
     assert np.allclose(coefficients(2), 0.5 * weights, atol=0.1)
     assert np.all(pooled.data[pooled.env == 3, target] == 1.0)
+
+
+def _parent_weights(ds, target):
+    """The parents of ``target`` and the weights of their edges into it."""
+    into = ds.params.edges[:, 1] == target
+    return ds.params.edges[into, 0], ds.params.weights[into]
+
+
+def _coefficients(ds, k, parents, target):
+    """The least-squares coefficients of ``target`` on ``parents`` in environment ``k``."""
+    rows = ds.data[ds.env == k]
+    design = np.column_stack([rows[:, parents], np.ones(len(rows))])
+    return np.linalg.lstsq(design, rows[:, target], rcond=None)[0][:-1]
+
+
+@pytest.mark.parametrize("positive", [False, True])
+def test_redraw_draws_each_parent_weight_on_its_own(positive):
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=12, avg_degree=4.0),
+        functional=data.functional.linear(weight_range=(0.5, 1.0), positive=positive),
+        noise=data.noise.gaussian(),
+    )
+    probe = scm.sample(n=10, seed=2, scale="raw")
+    target = max(range(12), key=lambda j: int(np.sum(probe.params.edges[:, 1] == j)))
+    parents, weights = _parent_weights(probe, target)
+    assert len(parents) >= 3
+    envs = [{}, {target: soft(weights="redraw")}, {target: soft(weights="redraw")}]
+    pooled = scm.sample(n=20000, seed=2, scale="raw", envs=envs)
+    assert np.allclose(_coefficients(pooled, 0, parents, target), weights, atol=0.05)
+    new = [_coefficients(pooled, k, parents, target) for k in (1, 2)]
+    for w in new:
+        assert np.all((np.abs(w) > 0.45) & (np.abs(w) < 1.05))
+        assert np.ptp(w / weights) > 0.2  # not one factor on every weight
+        assert not positive or np.all(w > 0)
+    assert not np.allclose(new[0], new[1], atol=0.1)  # each environment draws its own
+
+
+def test_redrawn_weights_are_part_of_the_model():
+    scm = _scm(d=12, density=4.0)
+    probe = scm.sample(n=10, seed=7, scale="raw")
+    target = _with_parents_and_children(probe)
+    parents, weights = _parent_weights(probe, target)
+    envs = [{}, {target: soft(weights="redraw")}]
+    fits = [
+        _coefficients(
+            scm.sample(n=20000, seed=seed, model_seed=7, scale="raw", envs=envs), 1, parents, target
+        )
+        for seed in (1, 2)
+    ]
+    assert np.allclose(fits[0], fits[1], atol=0.05)
+    assert not np.allclose(fits[0], weights, atol=0.1)
+
+
+def test_a_noise_scale_range_multiplies_each_row_by_its_own_draw():
+    """The target's noise is its Gaussian noise times a ``U[1, 3]`` draw per row: a scale mixture
+    with variance ``13 / 3``, not a Gaussian of that variance."""
+    scm = _scm(d=10)
+    probe = scm.sample(n=10, seed=6, scale="raw")
+    target = _with_parents_and_children(probe)
+    parents, weights = _parent_weights(probe, target)
+    envs = [{}, {target: soft(noise_scale=(1.0, 3.0))}]
+    pooled = scm.sample(n=20000, seed=6, scale="raw", envs=envs)
+    rows = pooled.data[pooled.env == 1]
+    noise = (rows[:, target] - rows[:, parents] @ weights) / probe.params.noise_scales[target]
+    factors = np.linspace(1.0, 3.0, 201)[:-1] + 0.005  # midpoints of U[1, 3]
+
+    def mixture(x):
+        return stats.norm.cdf(np.asarray(x)[:, None] / factors).mean(axis=1)
+
+    assert stats.kstest(noise, mixture).pvalue > ALPHA
+    assert stats.kstest(noise, stats.norm(0.0, np.sqrt(13 / 3)).cdf).pvalue < 1e-6
 
 
 def test_pooled_env_and_targets_match_the_rows():
@@ -294,6 +373,10 @@ def test_bad_sample_arguments_raise():
     )
     with pytest.raises(ValueError, match="temporal"):
         temporal.sample(n=10, seed=0, envs=[{}])
+    with pytest.raises(ValueError, match="model_seed"):
+        scm.sample(n=10, seed=0, model_seed=1, screen=data.FaithfulnessScreen(min_abs_corr=0.1))
+    with pytest.raises(ValueError, match="unitless"):
+        scm.sample(n=10, seed=0, scale="unitless", envs=[{1: soft(weights="redraw")}])
 
 
 @pytest.mark.parametrize(
@@ -320,6 +403,10 @@ def test_bad_discrete_interventions_raise(intervention, match):
         (lambda: hard(probs=[0.5, 0.6]), "sum to 1"),
         (lambda: soft(shift=np.nan), "finite"),
         (lambda: soft(noise_scale=-1.0), "noise_scale >= 0"),
+        (lambda: soft(noise_scale=(2.0, 1.0)), "pair 0 <= low <= high"),
+        (lambda: soft(noise_scale=(1.0, 2.0, 3.0)), "pair 0 <= low <= high"),
+        (lambda: soft(weights="new"), "'keep' or 'redraw'"),
+        (lambda: soft(weights="redraw", weight_scale=2.0), "not both"),
     ],
 )
 def test_bad_specs_raise(build, match):

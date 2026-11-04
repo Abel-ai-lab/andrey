@@ -65,6 +65,53 @@ def test_component_stream_isolation():
     assert not np.array_equal(a.data, b.data)  # but the noise differs -> data differs
 
 
+def _standard_noise(ds):
+    """Each drawn node's noise in units of its noise scale, from raw linear data."""
+    d = ds.data.shape[1]
+    weights = np.zeros((d, d))
+    weights[ds.params.edges[:, 0], ds.params.edges[:, 1]] = ds.params.weights
+    noise = (ds.data - ds.data @ weights) / ds.params.noise_scales
+    by_node = np.empty_like(noise)
+    by_node[:, ds.provenance["column_order"]] = noise
+    return by_node
+
+
+@pytest.mark.parametrize("latents", [0, 2])
+def test_a_model_seed_fixes_the_model_and_the_seed_draws_the_rows(latents):
+    scm = dataclasses.replace(_scm(heteroscedastic=True), latents=latents)
+    a, b = (scm.sample(n=100, seed=seed, model_seed=7, scale="raw") for seed in (1, 2))
+    own = scm.sample(n=100, seed=7, scale="raw")
+    for other in (b, own):
+        assert other.graph == a.graph
+        assert other.provenance["column_order"] == a.provenance["column_order"]
+        for field in ("edges", "weights", "noise_scales"):
+            assert np.array_equal(getattr(other.params, field), getattr(a.params, field))
+    assert not np.array_equal(a.data, b.data)
+    assert "model_entropy" in a.provenance and "model_entropy" not in own.provenance
+    assert np.array_equal(a.data, scm.sample(n=100, seed=1, model_seed=7, scale="raw").data)
+    assert np.array_equal(
+        scm.sample(n=100, seed=1, model_seed=1).data, scm.sample(n=100, seed=1).data
+    )
+    if latents == 0:
+        other_model = scm.sample(n=100, seed=1, model_seed=8, scale="raw")
+        assert not np.array_equal(other_model.params.weights, a.params.weights)
+        assert np.allclose(_standard_noise(other_model), _standard_noise(a))
+
+
+def test_a_model_seed_fixes_a_discrete_network():
+    a, b = (data.sample_discrete(d=8, n=200, seed=seed, model_seed=3) for seed in (1, 2))
+    own = data.sample_discrete(d=8, n=200, seed=3)
+    for other in (b, own):
+        assert other.graph == a.graph
+        assert other.provenance["column_order"] == a.provenance["column_order"]
+        assert other.provenance["config"]["categories"] == a.provenance["config"]["categories"]
+    assert not np.array_equal(a.data, b.data)
+    assert np.array_equal(
+        data.sample_discrete(d=8, n=200, seed=1, model_seed=1).data,
+        data.sample_discrete(d=8, n=200, seed=1).data,
+    )
+
+
 def test_seed_variation_changes_data():
     a = _scm().sample(n=200, seed=0, scale="raw")
     b = _scm().sample(n=200, seed=1, scale="raw")

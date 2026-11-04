@@ -50,6 +50,7 @@ def sample_discrete(
     d: int,
     n: int | Sequence[int],
     seed: int,
+    model_seed: int | None = None,
     density: float = 2.0,
     categories: tuple[int, int] = (2, 3),
     concentration: float = 1.0,
@@ -69,6 +70,11 @@ def sample_discrete(
         environment ``k``.
     seed : int
         Root seed.
+    model_seed : int or None, default=None
+        The seed of the model: the graph, the categories, the tables, the column order, and the
+        tables ``soft()`` draws anew. ``seed`` then draws only the rows. Samples with one
+        ``model_seed`` and different seeds are datasets of one network. ``None`` takes ``seed``,
+        as ``model_seed=seed`` does.
     density : float, default=2.0
         Mean total degree (``2 * |E| / d``) of the graph.
     categories : tuple of int, default=(2, 3)
@@ -136,8 +142,9 @@ def sample_discrete(
         rows = sum(size for _, size in pooled)
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
-    _, draw = spec.materialize(_component_rng(root, _GRAPH))
-    table_rng = _component_rng(root, _WEIGHTS)
+    model = root if model_seed is None else np.random.SeedSequence(model_seed)
+    _, draw = spec.materialize(_component_rng(model, _GRAPH))
+    table_rng = _component_rng(model, _WEIGHTS)
     cards = table_rng.integers(low, high + 1, size=draw.d)
     parents = _parents_of(draw)
     tables = [
@@ -147,7 +154,7 @@ def sample_discrete(
         )
         for c in range(draw.d)
     ]
-    order = _column_order(root, draw.d, shuffle)  # the drawn node of each column
+    order = _column_order(model, draw.d, shuffle)  # the drawn node of each column
     if pooled is None:
         values = _forward_sample(
             draw.topo_order.tolist(), parents, cards, tables, rows, _component_rng(root, _NOISE)
@@ -166,7 +173,7 @@ def sample_discrete(
                         order,
                         cards,
                         concentration,
-                        _component_rng(root, _INTERVENTION, k),
+                        _component_rng(model, _INTERVENTION, k),
                     ),
                     size,
                     _component_rng(root, _NOISE) if k == 0 else _component_rng(root, _NOISE, k),
@@ -185,6 +192,7 @@ def sample_discrete(
     provenance = {
         "root_entropy": str(root.entropy),
         "spawn_key": list(root.spawn_key),
+        **({} if model is root else {"model_entropy": str(model.entropy)}),
         "seed_scheme": _SEED_SCHEME,
         "column_order": order.tolist(),
         "config": {

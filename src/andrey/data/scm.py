@@ -73,7 +73,10 @@ _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 # selection, the temporal lag matrices, the column shuffle, and the intervention draws each get an
 # independent stream, so a change to one component's draws never shifts another's. Environment
 # ``k >= 1`` draws its noise from ``(_NOISE, k)`` and environment ``k`` its intervention values from
-# ``(_INTERVENTION, k)``; environment 0 draws from ``_NOISE``, as data without interventions do.
+# ``(_INTERVENTION, k)`` and its redrawn weights from ``(_WEIGHTS, k)``; environment 0 draws from
+# ``_NOISE``, as data without interventions do. The model's streams (graph, weights, noise scales,
+# latents, lags, columns) come off the model seed's root, the rows' streams off the seed's root;
+# without a model seed the two are one root.
 _GRAPH, _WEIGHTS, _NOISE, _LATENT, _LAG, _COLUMNS, _INTERVENTION = 0, 1, 2, 3, 4, 5, 6
 _SEED_SCHEME = 1  # bump if the seed-derivation layout ever changes (recorded in provenance)
 
@@ -181,6 +184,7 @@ class SCM:
         n: int | Sequence[int],
         seed: int,
         *,
+        model_seed: int | None = None,
         envs: Sequence[Mapping[int, Intervention | float]] | None = None,
         scale: str = "standardize",
         screen: FaithfulnessScreen | None = None,
@@ -196,6 +200,13 @@ class SCM:
             ``n[k]`` for environment ``k``.
         seed : int
             Root seed; the graph, weights, and noise streams are derived from it statelessly.
+        model_seed : int or None, default=None
+            The seed of the model: the graph, the weights, the noise scales, the latent variables,
+            the column order, the lag matrices of a temporal functional, and the weights
+            ``soft(weights="redraw")`` draws. ``seed`` then draws only the rows: the noise and the
+            values interventions draw for each row. Samples with one ``model_seed`` and different
+            seeds are datasets of one model, with the same true graph, ``params``, and column
+            order. ``None`` takes ``seed``, as ``model_seed=seed`` does.
         envs : sequence of mappings of int to intervention or float, or None, default=None
             One mapping per environment, ``{column: intervention}`` as for :meth:`do`; ``{}`` is
             an environment without interventions, and the first environment is the observational
@@ -267,7 +278,9 @@ class SCM:
             functional is temporal, ``screen`` is given, this model is under :meth:`do` and
             ``envs`` is given, ``n`` does not give each environment at least one row, a target is
             not an observed column, ``hard()`` on a variable has no ``value``, or ``soft()``
-            changes nothing.
+            changes nothing. Also if ``"unitless"`` is given a positive-weight functional, noise
+            with a ``variance_range``, or ``soft(weights="redraw")``, or ``screen`` is given with
+            ``model_seed``.
 
         References
         ----------
@@ -294,11 +307,19 @@ class SCM:
             raise ValueError(
                 f"scale='unitless' takes the linear functional, got {self.functional.name!r}"
             )
-        if scale == "unitless" and self.noise.heteroscedastic:
+        if scale == "unitless" and (
+            self.noise.heteroscedastic or self.noise.variance_range is not None
+        ):
             raise ValueError(
                 "scale='unitless' draws the noise scales itself; use noise without "
-                "heteroscedastic=True"
+                "heteroscedastic=True or a variance_range"
             )
+        if scale == "unitless" and self.functional.positive:
+            raise ValueError(
+                "scale='unitless' draws the weights itself; use linear() without positive=True"
+            )
+        if screen is not None and model_seed is not None:
+            raise ValueError("screen redraws the model, which model_seed fixes; give one of them")
         if not isinstance(self.graph, GraphSpec):
             raise NotImplementedError(
                 "SCM.sample currently supports a GraphSpec; concrete-graph input is not supported"
@@ -323,14 +344,17 @@ class SCM:
             rows = sum(size for _, size in pooled)
         root = np.random.SeedSequence(seed)
         if screen is None:
+            model = root if model_seed is None else np.random.SeedSequence(model_seed)
             return self._sample_once(
-                rows, root, scale=scale, dtype=dtype, shuffle=shuffle, envs=pooled
+                rows, root, model, scale=scale, dtype=dtype, shuffle=shuffle, envs=pooled
             )
         for attempt in range(screen.max_attempts):
             attempt_root = np.random.SeedSequence(
                 entropy=root.entropy, spawn_key=(*root.spawn_key, attempt)
             )
-            ds = self._sample_once(rows, attempt_root, scale=scale, dtype=dtype, shuffle=shuffle)
+            ds = self._sample_once(
+                rows, attempt_root, attempt_root, scale=scale, dtype=dtype, shuffle=shuffle
+            )
             edges = ds.params.edges
             n_obs = ds.data.shape[1]
             obs_edges = edges[
@@ -349,29 +373,33 @@ class SCM:
         self,
         n: int,
         root: np.random.SeedSequence,
+        model: np.random.SeedSequence,
         *,
         scale: str,
         dtype: npt.DTypeLike,
         shuffle: bool,
         envs: list[Environment] | None = None,
     ) -> CausalDataset:
-        _, draw = self.graph.materialize(_component_rng(root, _GRAPH))
+        """Draw one dataset: the model from the streams of ``model``, the rows from ``root``'s."""
+        _, draw = self.graph.materialize(_component_rng(model, _GRAPH))
         noise_rng = _component_rng(root, _NOISE)
         scale_weights = np.empty(0)
         if scale == "unitless":
             weights, scales = self.functional.draw_unitless(  # ty: ignore[unresolved-attribute]  # checked in sample: Linear only
-                draw, _component_rng(root, _WEIGHTS)
+                draw, _component_rng(model, _WEIGHTS)
             )
         else:
-            weight_rng = _component_rng(root, _WEIGHTS)
+            weight_rng = _component_rng(model, _WEIGHTS)
             weights = self.functional.draw_weights(draw, weight_rng)
             # The scale weights follow the location weights in their stream, so they leave the
             # location weights and every other stream as they are.
             scale_weights = self.functional.draw_scale_weights(draw, weight_rng)
             scales = self.noise.draw_scales(draw.d, noise_rng)
+            if model is not root:  # the rows' stream moves past its own scales, as without a model
+                scales = self.noise.draw_scales(draw.d, _component_rng(model, _NOISE))
         if self.functional.is_temporal:
             return self._sample_temporal(
-                n, draw, weights, scales, noise_rng, root, scale, dtype, shuffle
+                n, draw, weights, scales, noise_rng, root, model, scale, dtype, shuffle
             )
         # ``order[j]`` is the drawn label of output node ``j``: the observed nodes in column order,
         # then the latents. Edge rows keep their order, so ``weights`` stays aligned with ``edges``.
@@ -380,10 +408,10 @@ class SCM:
         order = np.arange(draw.d)
         node_types = None
         if self.latents > 0:
-            order = latent_order(edges, draw.d, self.latents, _component_rng(root, _LATENT))
+            order = latent_order(edges, draw.d, self.latents, _component_rng(model, _LATENT))
             node_types = np.full(draw.d, OBSERVED, dtype=np.int8)
             node_types[n_obs:] = LATENT
-        columns = _column_order(root, n_obs, shuffle)
+        columns = _column_order(model, n_obs, shuffle)
         order[:n_obs] = order[columns]
         if envs is None:
             innovations = self.noise.draw(n, scales, noise_rng)
@@ -399,7 +427,7 @@ class SCM:
         else:
             check_columns(envs, n_obs)
             values = self._evaluate_envs(
-                draw, weights, scale_weights, scales, noise_rng, root, envs, scale, order
+                draw, weights, scale_weights, scales, noise_rng, root, model, envs, scale, order
             )
         data = values.astype(dtype)
         if not np.all(np.isfinite(data)):  # deep weighted paths can overflow float32
@@ -422,6 +450,7 @@ class SCM:
         provenance = {
             "root_entropy": str(root.entropy),
             "spawn_key": list(root.spawn_key),
+            **({} if model is root else {"model_entropy": str(model.entropy)}),
             "seed_scheme": _SEED_SCHEME,
             "column_order": columns.tolist(),
             "config": {
@@ -463,6 +492,7 @@ class SCM:
         scales: np.ndarray,
         noise_rng: np.random.Generator,
         root: np.random.SeedSequence,
+        model: np.random.SeedSequence,
         envs: list[Environment],
         scale: str,
         order: np.ndarray,
@@ -473,6 +503,8 @@ class SCM:
         and standard deviations (``"standardize"``) and its divisors (``"rescale"``) scale every
         environment, and a ``hard`` value or a ``soft`` shift, given in the units of the returned
         data, is converted to the model's units with them. ``order[j]`` is the node of column ``j``.
+        Redrawn weights come from ``model``'s streams, every other intervention draw from
+        ``root``'s.
         """
         noise = np.concatenate(
             [
@@ -499,6 +531,7 @@ class SCM:
             env_weights, env_scale_weights = weights.copy(), scale_weights.copy()
             env_noise, fixed = noise[rows].copy(), {}
             draws = _component_rng(root, _INTERVENTION, k)
+            redraws = _component_rng(model, _WEIGHTS, k)
             for column, intervention in spec.items():
                 c = int(order[column])
                 if isinstance(intervention, HardIntervention):
@@ -515,15 +548,28 @@ class SCM:
                 if intervention == SoftIntervention():
                     raise ValueError(
                         f"column {column}: soft() changes nothing on a continuous variable; give "
-                        "shift, weight_scale, or noise_scale"
+                        "shift, weight_scale, noise_scale, or weights"
                     )
                 into = draw.children == c
+                if intervention.weights == "redraw":
+                    if scale == "unitless":
+                        raise ValueError(
+                            f"column {column}: soft(weights='redraw') draws from the functional's "
+                            "weight_range, which scale='unitless' does not use"
+                        )
+                    env_weights[into] = self.functional.draw_weights(draw, redraws)[into]
+                    if env_scale_weights.size:
+                        env_scale_weights[into] = self.functional.draw_scale_weights(draw, redraws)[
+                            into
+                        ]
                 env_weights[into] *= intervention.weight_scale
                 if env_scale_weights.size:
                     env_scale_weights[into] *= intervention.weight_scale
+                noise_scale = intervention.noise_scale
+                if isinstance(noise_scale, tuple):  # one factor per row
+                    noise_scale = draws.uniform(*noise_scale, size=size)
                 env_noise[:, c] = (
-                    env_noise[:, c] * intervention.noise_scale
-                    + intervention.shift * unit[c] * divisors[c]
+                    env_noise[:, c] * noise_scale + intervention.shift * unit[c] * divisors[c]
                 )
             values[rows] = self.functional.propagate(
                 draw,
@@ -540,7 +586,9 @@ class SCM:
             values[rows, c] = target
         return values
 
-    def _sample_temporal(self, n, draw, weights, scales, noise_rng, root, scale, dtype, shuffle):
+    def _sample_temporal(
+        self, n, draw, weights, scales, noise_rng, root, model, scale, dtype, shuffle
+    ):
         """Generate a VAR/VARMA series; ``n`` is the number of time steps, truth temporal."""
         if self.latents > 0:
             raise NotImplementedError(
@@ -548,7 +596,7 @@ class SCM:
             )
         innovations = self.noise.draw(n + _TEMPORAL_BURN_IN, scales, noise_rng)
         series, temporal_truth = self.functional.generate_temporal(  # ty: ignore[unresolved-attribute]  # gated by is_temporal (VAR/VARMA only)
-            draw, weights, innovations, _component_rng(root, _LAG), burn_in=_TEMPORAL_BURN_IN
+            draw, weights, innovations, _component_rng(model, _LAG), burn_in=_TEMPORAL_BURN_IN
         )
         if scale == "standardize":
             series = standardize(series)
@@ -559,7 +607,7 @@ class SCM:
                 "reduce lag_density or the weight range"
             )
         # The shuffle relabels the lag-0 DAG and every lag block on both axes.
-        order = _column_order(root, draw.d, shuffle)
+        order = _column_order(model, draw.d, shuffle)
         data = np.take(data, order, axis=1)
         temporal_truth = relabel_truth(temporal_truth, order)
         edges = np.stack([draw.parents, draw.children], axis=1)  # the instantaneous (lag-0) DAG
@@ -573,6 +621,7 @@ class SCM:
         provenance = {
             "root_entropy": str(root.entropy),
             "spawn_key": list(root.spawn_key),
+            **({} if model is root else {"model_entropy": str(model.entropy)}),
             "seed_scheme": _SEED_SCHEME,
             "column_order": order.tolist(),
             "config": {

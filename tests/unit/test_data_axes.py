@@ -240,3 +240,68 @@ def test_non_gaussian_noise_finite_and_centered(noise_name):
     assert np.all(np.isfinite(ds.data))
     # Every noise family is normalized to ~unit variance, so column spreads stay well-scaled.
     assert 0.5 < np.median(ds.data.std(axis=0)) < 20
+
+
+def test_positive_weights_are_the_signed_weights_in_absolute_value():
+    graph, noise = data.graphs.erdos_renyi(d=12, avg_degree=3.0), data.noise.gaussian()
+    signed, positive = (
+        data.SCM(
+            graph=graph,
+            functional=data.functional.linear(weight_range=(0.5, 1.0), positive=flag),
+            noise=noise,
+        ).sample(n=4000, seed=4, scale="raw")
+        for flag in (False, True)
+    )
+    assert np.any(signed.params.weights < 0)
+    assert np.array_equal(positive.params.edges, signed.params.edges)
+    assert np.array_equal(positive.params.weights, np.abs(signed.params.weights))
+    parent, child = positive.params.edges.T
+    corr = np.corrcoef(positive.data, rowvar=False)
+    assert np.all(corr[parent, child] > 0)
+
+
+@pytest.mark.parametrize("noise_name", ["gaussian", "uniform", "laplace", "exponential", "gumbel"])
+def test_variance_range_draws_each_noise_variance_from_it(noise_name):
+    from scipy import stats
+
+    noise = getattr(data.noise, noise_name)(variance_range=(1.0, 2.0))
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=300, avg_degree=1.0),
+        functional=data.functional.linear(),
+        noise=noise,
+    )
+    ds = scm.sample(n=4000, seed=5, scale="raw")
+    variances = ds.params.noise_scales**2
+    assert stats.kstest(variances, stats.uniform(1.0, 1.0).cdf).pvalue > 1e-3
+    roots = np.setdiff1d(np.arange(300), ds.params.edges[:, 1])
+    ratio = ds.data[:, roots].var(axis=0) / variances[roots]
+    assert abs(ratio.mean() - 1.0) < 0.02
+
+
+@pytest.mark.parametrize(
+    ("build", "match"),
+    [
+        (lambda: data.noise.gaussian(variance_range=(0.0, 1.0)), "0 < lo <= hi"),
+        (lambda: data.noise.laplace(variance_range=(2.0, 1.0)), "0 < lo <= hi"),
+        (lambda: data.noise.gaussian(variance_range=(1.0, float("inf"))), "0 < lo <= hi"),
+        (lambda: data.noise.gaussian(heteroscedastic=True, variance_range=(1.0, 2.0)), "not both"),
+    ],
+)
+def test_bad_variance_ranges_raise(build, match):
+    with pytest.raises(ValueError, match=match):
+        build()
+
+
+@pytest.mark.parametrize(
+    ("functional", "noise"),
+    [
+        (data.functional.linear(positive=True), data.noise.gaussian()),
+        (data.functional.linear(), data.noise.gaussian(variance_range=(1.0, 2.0))),
+    ],
+)
+def test_unitless_rejects_the_weights_and_variances_it_draws_itself(functional, noise):
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=6, avg_degree=2.0), functional=functional, noise=noise
+    )
+    with pytest.raises(ValueError, match="unitless"):
+        scm.sample(n=10, seed=0, scale="unitless")

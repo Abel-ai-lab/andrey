@@ -42,7 +42,8 @@ class SoftIntervention:
 
     shift: float = 0.0
     weight_scale: float = 1.0
-    noise_scale: float = 1.0
+    noise_scale: float | tuple[float, float] = 1.0
+    weights: str = "keep"
 
 
 Intervention = HardIntervention | SoftIntervention
@@ -97,14 +98,18 @@ def hard(
 
 
 def soft(
-    *, shift: float = 0.0, weight_scale: float = 1.0, noise_scale: float = 1.0
+    *,
+    shift: float = 0.0,
+    weight_scale: float = 1.0,
+    noise_scale: float | Sequence[float] = 1.0,
+    weights: str = "keep",
 ) -> SoftIntervention:
     """Build a soft intervention: the variable's mechanism changes, and its parents still act.
 
     On a continuous variable, its noise is multiplied by ``noise_scale`` and moved by ``shift``,
-    and the weights of its parents are multiplied by ``weight_scale``. On a discrete variable,
-    ``soft()`` takes no arguments: every row of its conditional probability table is drawn anew,
-    from the Dirichlet the sampler drew it from.
+    and the weights of its parents are multiplied by ``weight_scale`` or drawn anew. On a discrete
+    variable, ``soft()`` takes no arguments: every row of its conditional probability table is
+    drawn anew, from the Dirichlet the sampler drew it from.
 
     Parameters
     ----------
@@ -116,8 +121,18 @@ def soft(
         Multiplies the weight of each of the variable's parents; under the location-scale
         functional, its weights in the location and in the scale. A variable without parents has
         no weights to change.
-    noise_scale : float, default=1.0
-        Multiplies the variable's noise, so its noise standard deviation.
+    noise_scale : float or (float, float), default=1.0
+        Multiplies the variable's noise, so its noise standard deviation. A pair ``(low, high)``
+        multiplies the noise of each row by its own draw from ``U[low, high]``, so the noise
+        follows a new distribution, a scale mixture of the one it had (Peters et al. 2016,
+        Appendix G).
+    weights : {"keep", "redraw"}, default="keep"
+        ``"redraw"`` draws the weight of each of the variable's parents anew, each on its own,
+        from the functional's weight distribution: magnitude ``U[weight_range]``, with a random
+        sign, or positive when the functional draws positive weights. Under the location-scale
+        functional, the weights in the location and in the scale are drawn anew. The new weights
+        are part of the model: samples with the same model seed draw the same ones. ``"redraw"``
+        takes ``weight_scale=1``.
 
     Returns
     -------
@@ -126,23 +141,45 @@ def soft(
     Raises
     ------
     ValueError
-        If an argument is not finite or ``noise_scale`` is negative.
+        If an argument is not finite, ``noise_scale`` is negative or a pair not ordered
+        ``0 <= low <= high``, ``weights`` is not ``"keep"`` or ``"redraw"``, or ``"redraw"`` is
+        given with a ``weight_scale`` other than 1.
+
+    References
+    ----------
+    Peters, J., Buhlmann, P., and Meinshausen, N. (2016). Causal inference by using invariant
+    prediction: identification and confidence intervals. Journal of the Royal Statistical
+    Society, Series B, 78(5), 947-1012.
 
     Examples
     --------
     >>> from andrey.data.interventions import soft
     >>> soft(shift=1.0)
-    SoftIntervention(shift=1.0, weight_scale=1.0, noise_scale=1.0)
+    SoftIntervention(shift=1.0, weight_scale=1.0, noise_scale=1.0, weights='keep')
+    >>> soft(noise_scale=(1.0, 3.0), weights="redraw")
+    SoftIntervention(shift=0.0, weight_scale=1.0, noise_scale=(1.0, 3.0), weights='redraw')
     """
-    if not all(np.isfinite(v) for v in (shift, weight_scale, noise_scale)):
+    if isinstance(noise_scale, int | float | np.integer | np.floating):
+        noise = float(noise_scale)
+        if not (np.isfinite(noise) and noise >= 0):
+            raise ValueError(f"soft() takes a finite noise_scale >= 0, got {noise_scale}")
+    else:
+        noise = tuple(float(v) for v in noise_scale)
+        if len(noise) != 2 or not (np.all(np.isfinite(noise)) and 0 <= noise[0] <= noise[1]):
+            raise ValueError(
+                f"soft() takes noise_scale as a number or a pair 0 <= low <= high, got "
+                f"{noise_scale}"
+            )
+    if not all(np.isfinite(v) for v in (shift, weight_scale)):
         raise ValueError(
-            f"soft() takes finite arguments, got shift={shift}, weight_scale={weight_scale}, "
-            f"noise_scale={noise_scale}"
+            f"soft() takes finite arguments, got shift={shift}, weight_scale={weight_scale}"
         )
-    if noise_scale < 0:
-        raise ValueError(f"soft() takes noise_scale >= 0, got {noise_scale}")
+    if weights not in ("keep", "redraw"):
+        raise ValueError(f"soft() takes weights 'keep' or 'redraw', got {weights!r}")
+    if weights == "redraw" and weight_scale != 1:
+        raise ValueError("soft() takes weights='redraw' or a weight_scale, not both")
     return SoftIntervention(
-        shift=float(shift), weight_scale=float(weight_scale), noise_scale=float(noise_scale)
+        shift=float(shift), weight_scale=float(weight_scale), noise_scale=noise, weights=weights
     )
 
 
