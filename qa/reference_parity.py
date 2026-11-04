@@ -25,8 +25,8 @@ summary's ``parity_rule`` sets how its rows are judged:
   targets), or ``"direct_errors"`` (the directed edges against the edges between observed
   variables that no unobserved causal or backdoor path joins). A row's means are
   ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
-  then hold that error's means. A method with a gated metric beside
-  SHD has one entry per metric, and a row's key names the ``metric``.
+  then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
+  and a row's key names the ``metric``.
 - ``role``: ``"context"`` on an entry marks a comparator the method is reported against and never
   judged by, such as another method on the same data. Its rows are reported with their numbers.
 - ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
