@@ -371,11 +371,14 @@ def gies(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
         variable: it leaves the data before the fit, and ``categorical``, ``knowledge``,
         ``targets``, and the result's positions count the other columns.
+        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
+        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
+        order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
     env : array-like of shape (n_samples,), str, or None, default=None
         The environment each row comes from: one label per row, strings or numbers, not both, or
         the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
@@ -464,7 +467,9 @@ def gies(
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``data`` is
         not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
-        column; if a ``targets`` matrix does not have ``data``'s shape, holds a value other than 0
+        column; if ``data`` holds each environment's rows apart with ``env`` or with ``targets``
+        other than a mapping, or its tables differ in kind or columns, or one has no rows; if a
+        ``targets`` matrix does not have ``data``'s shape, holds a value other than 0
         or 1, or leaves a variable fewer than two rows, or one value, without an intervention; if an
         environment's targets are unknown, or ``targets`` names a label ``env`` lacks or names one
         label by two keys, such as ``1`` and ``"1"``; with a
@@ -688,11 +693,15 @@ def gnies(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
         variable: it leaves the data before the fit, and ``knowledge``, ``targets``, and the
         result's positions count the other columns.
+        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
+        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
+        order, ``env`` stays ``None``, and ``targets``, when given, maps
+        those labels to their known variables.
     env : array-like of shape (n_samples,), str, or None, default=None
         The environment of each row: one label per row, strings or numbers, not both, or the name
         of a column of the DataFrame ``data`` that holds them. GnIES needs two or more
@@ -765,7 +774,9 @@ def gnies(
         than two rows, ``n_samples - n_environments`` is below the variable count, or a column is
         constant within one environment; if a column repeats another up to scale and shift or is a
         linear function of other columns, within the environments (one message names every group
-        of copies and says to keep one column per group). Also if ``env`` does not hold one label
+        of copies and says to keep one column per group). Also if ``data`` holds each
+        environment's rows apart with ``env`` or with ``targets`` other than a mapping, or its
+        tables differ in kind or columns, or one has no rows; if ``env`` does not hold one label
         per row, misses a label, or mixes strings and numbers; if a ``targets`` mapping comes
         without ``env``, names a label ``env`` lacks, or names one label by two keys; if a column
         or an array of ``targets``

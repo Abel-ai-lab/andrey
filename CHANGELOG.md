@@ -68,14 +68,6 @@ names its pull request.
   data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
   environments, and it names a variable outside the true parents in at most 1.23% of fits at
   `alpha=0.05` in the settings it claims. ([#677])
-- `andrey.data` takes options for the simulations of interventional benchmarks, each off by default,
-  so every sample at the defaults is unchanged: `soft(weights="redraw")` draws each parent weight
-  anew from the functional's `weight_range`, `soft(noise_scale=(low, high))` multiplies the noise of
-  each row by its own draw from `U[low, high]`, `model_seed=` on `SCM.sample` and `sample_discrete`
-  keeps one model across datasets while `seed` draws the rows, `functional.linear(positive=True)`
-  makes every weight positive, and `variance_range=` on the noise families draws each noise variance
-  from a range. The provenance of a sample names `positive`, `variance_range`, and
-  `heteroscedastic` when they are set. ([#690])
 
 ### Changed
 
@@ -1745,4 +1737,3 @@ First alpha release.
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
 [#679]: https://github.com/Abel-ai-lab/andrey/pull/679
 [#682]: https://github.com/Abel-ai-lab/andrey/pull/682
-[#690]: https://github.com/Abel-ai-lab/andrey/pull/690
