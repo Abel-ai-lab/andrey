@@ -17,40 +17,73 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.13.0
+:link: benchmarks/0.14.0
 :link-type: doc
-:link-alt: The 0.13.0 release card: functional causal models
-:class-card: release-cover release-art release-art-0-13-0
+:link-alt: The 0.14.0 release card: interventional data
+:class-card: release-cover release-art release-art-0-14-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Functional causal models
+Interventional data
 
-0.13.0
+0.14.0
 :::
 
 ::::{div} release-tldr
 
-0.13.0 is here: functional causal models. The card measures the four methods it makes supported:
-CAM and RESIT against their authors' code, and IAMB and MMPC against bnlearn, on linear-Gaussian
-data and five discrete networks.
+0.14.0 is here: interventional data. The card measures the methods it makes supported against
+their authors' code: GnIES and UT-IGSP, which learn the targets of experiments they are not told,
+IGSP, ICP, CAM-UV, and DYNOTEARS.
+
+% TODO(freeze): the stats follow the promotion PRs that land.
 
 :::{div} release-stats
 
-- **4 methods** newly supported: CAM, RESIT, IAMB, and MMPC
-- **0 of 16** settings where CAM 1.0 makes significantly fewer errors than CAM
-- **9.7x** CAM's median speed over CAM 1.0's, and 3.7x for RESIT over the authors' code
+- **6 methods** newly supported: GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS
+- **0 of 112** comparisons where UT-IGSP's authors' library makes significantly fewer errors
+- **34x** GnIES's median speed over the authors' gnies package
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.13.0.md)
+[Read the release card](benchmarks/0.14.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.13.0
+:link-type: doc
+:link-alt: The 0.13.0 release card: functional causal models
+:class-card: release-tile release-art-0-13-0
+:shadow: none
+:margin: 0
+
+0.13.0
+:::
+
+:::{div} release-body
+<h3>Functional causal models</h3>
+
+CAM and RESIT against their authors' code, and IAMB and MMPC against bnlearn, on linear-Gaussian
+data and five discrete networks.
+
+- **0 of 16** settings where CAM 1.0 makes significantly fewer errors than CAM
+- CAM **9.7x** faster than CAM 1.0 in the median, RESIT 3.7x faster than the authors' code
+:::
+
+:::{div} release-meta
+Released November 3, 2026
+
+- [Release card<span class="visually-hidden"> 0.13.0</span>](benchmarks/0.13.0.md)
+- [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -427,6 +460,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.14.0: interventional data <benchmarks/0.14.0>
 0.13.0: functional causal models <benchmarks/0.13.0>
 0.12.0: calibration <benchmarks/0.12.0>
 0.11.0: ready for real data <benchmarks/0.11.0>
