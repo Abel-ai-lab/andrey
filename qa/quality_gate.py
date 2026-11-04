@@ -688,7 +688,7 @@ def ut_igsp_fit(x: np.ndarray) -> Any:
 def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
     """The targets :func:`ut_igsp_fit` returns for each setting, given and learned."""
     learned = ut_igsp_fit(x).metadata["targets"]
-    return [learned[str(k)] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
+    return [learned[k] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
 
 
 #: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its

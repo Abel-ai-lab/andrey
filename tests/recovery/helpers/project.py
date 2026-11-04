@@ -79,7 +79,7 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {
             "graph": out.structure.to_numpy(),
             "score": out.metadata["score"],
-            "targets": [variable for variable, _ in out.metadata["index_edges"]],
+            "targets": list(out.metadata["changing_variables"]),
         }
     if algorithm in _LINGAM:
         return {
