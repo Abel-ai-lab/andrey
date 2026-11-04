@@ -19,6 +19,7 @@ whose Reproduce table lists the driver.
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
+| [ICP](comparisons/icp.md) | `icp_cpu.py`, `icp_correction.py` | ICP, both tests | InvariantCausalPrediction (R) | |
 | [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
@@ -28,6 +29,7 @@ whose Reproduce table lists the driver.
 | [FCI collider configurations](comparisons/fci-colliders.md) | `fci_latent.py` | FCI, both collider rules | causal-learn | 0.1.0, 0.2.0, 0.9.0 |
 | [GFCI](comparisons/gfci.md) | `gfci_latent.py` | GFCI | Tetrad | 0.7.0, 0.9.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
+| [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
@@ -40,13 +42,15 @@ whose Reproduce table lists the driver.
 | [PCMCI+ and LPCMCI](comparisons/pcmciplus-lpcmci.md) | `pcmci_cpu.py` | PCMCI+, LPCMCI | tigramite | 0.5.0, 0.9.0 |
 | [Granger causality](comparisons/granger.md) | `granger_var.py` | Granger | causal-learn | 0.5.0, 0.9.0 |
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
+| [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | |
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
-`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, and
-`start_utigsp.sh` build the separate environments some comparisons need ([setup](README.md#setup)).
+`start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`,
+`start_causalnex.sh`, and `start_utigsp.sh` build the separate environments some comparisons need
+([setup](README.md#setup)).
 
 ## Release cards
 
@@ -54,9 +58,13 @@ Each release card publishes its numbers from a summary in `published/<release>/`
 hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
 fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
 fix. [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json) holds the comparison of the
-experimental GnIES with gnies, and [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
-that of the experimental UT-IGSP with graphical-model-learning; their comparison pages,
-[GnIES](comparisons/gnies.md) and [UT-IGSP](comparisons/ut-igsp.md), present them.
+experimental GnIES with gnies, [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
+that of the experimental UT-IGSP with graphical-model-learning,
+[`published/0.14.0/camuv.json`](published/0.14.0/camuv.json) that of the experimental CAM-UV with
+lingam and causal-learn, and [`published/0.14.0/dynotears.json`](published/0.14.0/dynotears.json)
+that of the experimental DYNOTEARS with CausalNex; their comparison pages,
+[GnIES](comparisons/gnies.md), [UT-IGSP](comparisons/ut-igsp.md), [CAM-UV](comparisons/camuv.md),
+and [DYNOTEARS](comparisons/dynotears.md), present them.
 
 | Release | Release card | Summary |
 |---|---|---|
