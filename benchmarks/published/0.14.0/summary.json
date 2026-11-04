@@ -4,11 +4,11 @@
  "generated": "2026-11-04",
  "theme": "GnIES against gnies 0.3.3, the authors' package; UT-IGSP against graphical-model-learning 0.1a8, the authors' library; ICP against InvariantCausalPrediction, in and out of the claim; DYNOTEARS against CausalNex 0.12.2, the authors' implementation; CAM-UV against lingam 1.13.0 and causal-learn 0.1.4.8",
  "build": "GnIES: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every fit but the order check, which ran on a build of the same day that adds DEBUG records of the steps a tie decided; with the records off, its GIES and GES outputs equal the first build's | UT-IGSP: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically | ICP: pre-release Andrey 0.14.0 build, 3 November 2026 | DYNOTEARS: Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps; refitted on the 0.14.0 build, every recorded Andrey fit up to 50 variables and 20 at 100 variables return the same graph (identity) | CAM-UV: Andrey pre-release build of the 0.13.0 branch, 1 November 2026; andrey.camuv's source is the same in every commit of that branch from 12e380fc9, which adds CAM-UV, to 7d85ce6d5, the branch's tip that day. The fits on seeds 20-39 with one node in five hidden at d = 10 and on seeds 10-19 with nothing hidden ran on a pre-release build of the 0.14.0 branch, 3 November 2026, whose andrey.camuv code is the same and whose column ranks, the order the sets are visited in, are the same on every dataset of the lane",
- "verdict_rule": "GnIES: per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged | UT-IGSP: per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 2000-2019, confirmation the rerun on seeds 4000-4019, and verdict the result; out of claim, verdict is the side | ICP: D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise | DYNOTEARS: D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0. Settings with claim 'out' are reported, not judged | CAM-UV: D = direct_errors(Andrey) - direct_errors(reference) per dataset on the datasets both finished, for each of lingam and causal-learn at the paper's set size and lingam at its default; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a cell in claim is worse when the interval lies above 0, better when below, a tie otherwise; a cell worse or better is run again on 20 fresh seeds (20-39, the replication rows) and keeps its verdict only if the replication's interval lies on the same side of 0 (final_verdict). Cells with claim 'out' are reported, not judged",
+ "verdict_rule": "GnIES: per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged | UT-IGSP: per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 2000-2019, confirmation the rerun on seeds 4000-4019, and verdict the result; out of claim, verdict is the side | ICP: D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise | DYNOTEARS: D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0; a better setting is run again the same way and counts as better only if its replication's interval also lies below 0. Settings with claim 'out' are reported, not judged | CAM-UV: D = direct_errors(Andrey) - direct_errors(reference) per dataset on the datasets both finished, for each of lingam and causal-learn at the paper's set size and lingam at its default; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a cell in claim is worse when the interval lies above 0, better when below, a tie otherwise; a cell worse or better is run again on 20 fresh seeds (20-39, the replication rows) and keeps its verdict only if the replication's interval lies on the same side of 0 (final_verdict). Cells with claim 'out' are reported, not judged",
  "fit_protocol": "GnIES: every arm of a dataset back to back on one pinned core with one BLAS thread; a cap of 1,800 s per fit at 10 variables (300 s for gnies with the true targets fixed) and 3,600 s on the variable ladder; a fit past its cap is a timeout, never an empty graph; a gnies fit whose total is not finite or whose local scores returned NaN is an error and leaves its cell's pairs | UT-IGSP: every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw (3,600 s at 100 variables and with kernel tests), a timeout never scored | ICP: every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone | DYNOTEARS: one timed fit per series, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; andrey_cpu_s and comparator_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired series of CausalNex's CPU time over Andrey's, with its bootstrap 95% interval | CAM-UV: one timed fit per dataset, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; *_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired datasets of the reference's CPU time over Andrey's, with its bootstrap 95% interval. lingam at its default set size (lingam_default) ran on the same stored datasets in runs of its own, two days after the others, so its cpu_ratio pairs fits from different runs",
  "error_metric": "GnIES: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets (the _mean fields hold the means) | UT-IGSP: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets of each dataset's mean over its draws (the _mean fields hold the means) | ICP: each entry's own, in its error_metric | DYNOTEARS: each entry's own, in its error_metric: the edge SHD over the window, as the mean over the paired series | CAM-UV: each entry's own, in its error_metric: the direct-edge errors (direct_errors), as the mean over the paired datasets",
  "complete_definition": "GnIES: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | UT-IGSP: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | ICP: true when every planned fit finished; no fit timed out | DYNOTEARS: true when every setting has at least 10 paired series (both packages finished); no fit reached its cap | CAM-UV: true when every setting has at least 10 paired datasets (every package finished); no fit reached its cap",
- "seeds_note": "GnIES: seeds is the number of datasets attempted per setting: 20 (seeds 0-19) in every in-claim and out-of-claim setting at 10 variables, with reruns on seeds 20-39 in the replication of the 7 settings that came out better; 10 (seeds 0-9) on the ladder of 20 to 100 variables, where the reference ran 10 seeds at 20 variables, 3 at 30, and none at 50 and 100 | UT-IGSP: seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 2000-2019 in the 11 in-claim cells with a comparison above 0 in the first comparison, and, at the defaults, the confirmation's seeds 4000-4019 in every in-claim cell. Categorical data (Andrey alone) is in the lane file only | ICP: scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target | DYNOTEARS: 20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39 | CAM-UV: 20 datasets per cell in claim (seeds 0-19), 10 per cell out of claim (seeds 0-9), and replications on seeds 20-39: the paper's simulation at both sizes and one node in five hidden at d = 10, and nothing hidden on seeds 0-19; a seed whose graph cannot hide its nodes is skipped and the next one taken: seed 31 at d = 10 with one node in five hidden, so that replication reads seeds 20-30 and 32-40",
+ "seeds_note": "GnIES: seeds is the number of datasets attempted per setting: 20 (seeds 0-19) in every in-claim and out-of-claim setting at 10 variables, with reruns on seeds 20-39 in the replication of the 7 settings that came out better; 10 (seeds 0-9) on the ladder of 20 to 100 variables, where the reference ran 10 seeds at 20 variables, 3 at 30, and none at 50 and 100 | UT-IGSP: seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 2000-2019 in the 11 in-claim cells with a comparison above 0 in the first comparison, and, at the defaults, the confirmation's seeds 4000-4019 in every in-claim cell. Categorical data (Andrey alone) is in the lane file only | ICP: scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target | DYNOTEARS: 20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39 of every setting judged worse or better | CAM-UV: 20 datasets per cell in claim (seeds 0-19), 10 per cell out of claim (seeds 0-9), and replications on seeds 20-39: the paper's simulation at both sizes and one node in five hidden at d = 10, and nothing hidden on seeds 0-19; a seed whose graph cannot hide its nodes is skipped and the next one taken: seed 31 at d = 10 with one node in five hidden, so that replication reads seeds 20-30 and 32-40",
  "regimes": {
   "gnies_a": "linear-Gaussian data from 10-variable Erdos-Renyi graphs, observational + 3 environments, mean degree 2.7, 1 target per environment, v ~ U[5, 10]; in claim, figure (Fig. 3)",
   "gnies_b": "linear-Gaussian data from 10-variable Erdos-Renyi graphs, observational + 3 environments, mean degree 4, 1 target per environment, v ~ U[5, 10]; in claim, figure (Fig. 8)",
@@ -819,7 +819,8 @@
  },
  "differences": {
   "500_steps": "in claim, 34 of the 280 paired series end on a different graph; CausalNex on centered columns (fitted on those 34 alone) returns Andrey's graph on 29. Of the other 5, Andrey's graph changes on 4 when the data are multiplied by 1 + 1e-12 noise or the columns are fitted in their given order. On the fifth (exponential noise, 20 variables, seed 1) neither moves either package's graph; the one edge that differs is a true lagged edge of weight 0.10026 in Andrey's fit and 0.09975 in CausalNex's on centered columns, against the threshold 0.1, the largest weight difference between the two fits being 0.0048",
-  "50_steps": "every run has the centered arm (same_graph in each row's centered block). At 100 variables, on 4 exponential-noise series where Andrey's graph differs from CausalNex's on centered columns: Andrey stops on h_tol (h_final below 1e-8) with no edge removed by the cycle repair, refitting at rho_max 1e20 keeps the graph on 3 and matches CausalNex on none, and multiplying the data by 1 + 1e-12 noise changes the graph on 3 of the 4 (SHD -5, +4, -2; on one series to CausalNex's graph exactly), the columns in their given order on 2"
+  "50_steps": "every run has the centered arm (same_graph in each row's centered block). At 100 variables, on 4 exponential-noise series where Andrey's graph differs from CausalNex's on centered columns: Andrey stops on h_tol (h_final below 1e-8) with no edge removed by the cycle repair, refitting at rho_max 1e20 keeps the graph on 3 and matches CausalNex on none, and multiplying the data by 1 + 1e-12 noise changes the graph on 3 of the 4 (SHD -5, +4, -2; on one series to CausalNex's graph exactly), the columns in their given order on 2",
+  "mean_1": "with exponential noise of mean 1, 36 paired series end on a graph other than CausalNex's on centered columns, 13 of them at 50 steps and 100 variables; 27 were traced (4 of those 13). On 24 the data multiplied by 1 + 1e-12 noise or the columns fitted in their given order changes Andrey's graph; on the other 3 the one edge that differs has a weight within 0.002 of the threshold in both fits (0.19848 and 0.20013 against 0.2; 0.09856 and 0.10018, and 0.09848 and 0.10031, against 0.1)"
  },
  "methods": [
   {
@@ -40322,6 +40323,33 @@
        -3.25
       ]
      },
+     "replication": {
+      "paired": 20,
+      "same_graph": 0,
+      "andrey_shd_mean": 1.05,
+      "comparator_shd_mean": 8.95,
+      "andrey_fewer_errors": 20,
+      "comparator_fewer_errors": 0,
+      "mean_D": -7.9,
+      "bootstrap_95": [
+       -9.4,
+       -6.35
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 13.7,
+      "seeds": "20-39",
+      "verdict": "better",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 20,
+       "comparator_shd_mean": 1.05,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
      "complete": true,
      "final_verdict": "better"
     },
@@ -40388,6 +40416,33 @@
        -16.00125,
        -6.5
       ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 1,
+      "andrey_shd_mean": 1.25,
+      "comparator_shd_mean": 12.9,
+      "andrey_fewer_errors": 19,
+      "comparator_fewer_errors": 0,
+      "mean_D": -11.65,
+      "bootstrap_95": [
+       -14.9,
+       -8.55
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 26.7,
+      "seeds": "20-39",
+      "verdict": "better",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 20,
+       "comparator_shd_mean": 1.25,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
      },
      "complete": true,
      "final_verdict": "better"
@@ -40456,6 +40511,33 @@
        -4.3
       ]
      },
+     "replication": {
+      "paired": 20,
+      "same_graph": 4,
+      "andrey_shd_mean": 1.1,
+      "comparator_shd_mean": 8.0,
+      "andrey_fewer_errors": 15,
+      "comparator_fewer_errors": 1,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -10.8,
+       -3.598750000000018
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 57.65,
+      "seeds": "20-39",
+      "verdict": "better",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 19,
+       "comparator_shd_mean": 1.15,
+       "mean_D": -0.05,
+       "bootstrap_95": [
+        -0.15,
+        0.0
+       ]
+      }
+     },
      "complete": true,
      "final_verdict": "better"
     },
@@ -40522,6 +40604,33 @@
        -8.1,
        -2.2
       ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 1,
+      "andrey_shd_mean": 1.9,
+      "comparator_shd_mean": 4.9,
+      "andrey_fewer_errors": 17,
+      "comparator_fewer_errors": 1,
+      "mean_D": -3.0,
+      "bootstrap_95": [
+       -4.05,
+       -1.9
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 140.2,
+      "seeds": "20-39",
+      "verdict": "better",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 17,
+       "comparator_shd_mean": 2.0,
+       "mean_D": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ]
+      }
      },
      "complete": true,
      "final_verdict": "better"
@@ -40590,8 +40699,35 @@
        -0.4
       ]
      },
+     "replication": {
+      "paired": 20,
+      "same_graph": 1,
+      "andrey_shd_mean": 5.15,
+      "comparator_shd_mean": 6.55,
+      "andrey_fewer_errors": 15,
+      "comparator_fewer_errors": 1,
+      "mean_D": -1.4,
+      "bootstrap_95": [
+       -2.55,
+       0.1
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 284.55,
+      "seeds": "20-39",
+      "verdict": "tie",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 17,
+       "comparator_shd_mean": 5.25,
+       "mean_D": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ]
+      }
+     },
      "complete": true,
-     "final_verdict": "better"
+     "final_verdict": "tie"
     }
    ]
   },
@@ -40678,6 +40814,33 @@
        -2.1,
        -0.2
       ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 0,
+      "andrey_shd_mean": 6.05,
+      "comparator_shd_mean": 7.7,
+      "andrey_fewer_errors": 15,
+      "comparator_fewer_errors": 4,
+      "mean_D": -1.65,
+      "bootstrap_95": [
+       -2.6,
+       -0.7
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 13.7,
+      "seeds": "20-39",
+      "verdict": "better",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 20,
+       "comparator_shd_mean": 6.05,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
      },
      "complete": true,
      "final_verdict": "better"
