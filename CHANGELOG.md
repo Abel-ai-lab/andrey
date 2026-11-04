@@ -68,6 +68,10 @@ names its pull request.
   data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
   environments, and it names a variable outside the true parents in at most 1.23% of fits at
   `alpha=0.05` in the settings it claims. ([#677])
+- `cdnod` reports what the environments change: `metadata["changing_variables"]` lists the
+  variables whose causal module, the distribution given their causes, changes across them, and
+  `metadata["index_edges"]` the environment index's edges into them, as `[variable, "directed"]`
+  pairs. Their descendants change through them and are not listed.
 
 ### Changed
 
