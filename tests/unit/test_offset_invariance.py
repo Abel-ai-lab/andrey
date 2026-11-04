@@ -92,8 +92,8 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
     return args
 
 
-#: Settings that shorten a slow fit.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Settings that shorten a slow fit, and the target ICP needs.
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 #: The targets of a method that reads three environments: observational, one with the known
 #: target 2, and one whose targets are unknown.
 CONTEXT = {"ut_igsp": {"targets": {0: [], 1: [2], 2: None}}}

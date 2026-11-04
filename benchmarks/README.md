@@ -24,6 +24,8 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [InvariantCausalPrediction](https://cran.r-project.org/package=InvariantCausalPrediction) (R) -
+  see [ICP](comparisons/icp.md)
 - [CAM](https://cran.r-project.org/src/contrib/Archive/CAM/) 1.0 (R, archived on CRAN) - see
   [CAM and RESIT](comparisons/cam-resit.md)
 - the authors' R code for RESIT, read from disk and never copied - see
