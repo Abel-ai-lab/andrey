@@ -68,6 +68,10 @@ names its pull request.
   data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
   environments, and it names a variable outside the true parents in at most 1.23% of fits at
   `alpha=0.05` in the settings it claims. ([#677])
+- `load_dataset("sachs", conditions=True)` returns all nine of Sachs's conditions, 7,466 cells,
+  with each cell's condition in `env`, the measured variables each reagent acts on in `targets`
+  (unknown for PMA and b2cAMP), and the conditions' names in `conditions`, for `cdnod`, `gies`,
+  `gnies`, `ut_igsp`, and `icp`.
 
 ### Changed
 

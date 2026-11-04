@@ -744,7 +744,7 @@ name.
 
 | Name | Variables | Edges | Data |
 |---|---|---|---|
-| `sachs` | 11 | 17 | Measured: 853 observational cells (Sachs et al., 2005) |
+| `sachs` | 11 | 17 | Measured: 853 observational cells, or 7,466 in nine conditions (Sachs et al., 2005) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
 | `child` | 20 | 25 | Simulated on the published network (bnlearn) |
 | `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
@@ -763,6 +763,17 @@ its SHA-256, and caches it; later loads need no network. The cache directory is 
 argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andrey` when
 `XDG_CACHE_HOME` is unset). Without network access, the error names the path to put the file at.
 [Getting started](guides/getting-started.md) learns and scores the Sachs data end to end.
+
+`load_dataset("sachs", conditions=True)` loads all nine of Sachs's conditions instead, 7,466 cells:
+the 853 observational cells and eight conditions in which a reagent stimulated or inhibited the
+network. `env` gives each cell's condition as a code and `conditions` their names, and `targets`
+the measured variables each reagent acts on, `None` where they are unknown, for the methods that
+take `env`, such as `cdnod`, `gies`, `gnies`, `ut_igsp`, and `icp`:
+
+```python
+pooled = load_dataset("sachs", conditions=True)
+andrey.cdnod(pooled.data, env=pooled.env)
+```
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
