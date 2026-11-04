@@ -10,9 +10,13 @@ note.
 ``camuv.html``: CAM-UV's table has one error, the directed-edge errors, against two references,
 lingam and causal-learn.
 
-The numbers come from the published lanes ``gnies.json``, ``ut-igsp.json``, and ``camuv.json``. The
-script runs with
-``uv run python docs/docs/benchmarks/0.14.0/tables.py [gnies.json ut-igsp.json camuv.json]``.
+``icp.html``: ICP against R's InvariantCausalPrediction on the same fits, the errors in the target's
+parents, the familywise error rate (FWER), and the fits that accepted the same sets; then ICP's FWER
+over every fit, in its claim and out of it.
+
+The numbers come from the published lanes ``gnies.json``, ``ut-igsp.json``, ``camuv.json``, and
+``icp.json``, from ``benchmarks/published/0.14.0`` or from the paths given, in that order. The
+script runs with ``uv run python docs/docs/benchmarks/0.14.0/tables.py [paths]``.
 """
 
 from __future__ import annotations
@@ -251,6 +255,104 @@ def camuv(lane: dict) -> str:
     )
 
 
+# ICP's cells, in plain words.
+ICP_CELLS = {
+    "A": "5 to 12 variables",
+    "C": "Do-interventions, 6 or 10 variables",
+    "D": "16 or 21 variables, at most 3 parents",
+    "D40": "40 variables, at most 3 parents",
+    "B, target intervened": "Interventions that hit the target",
+    "E-hidden": "A hidden parent of the target",
+    "E-nonlinear": "A nonlinear parent of the target",
+}
+
+
+def icp(lane: dict) -> str:
+    """ICP against R on the same fits, then ICP's FWER over every fit."""
+    lanes = {m["lane"]: m for m in lane["methods"]}
+    head = (
+        '<tr><td rowspan="2"></td>'
+        '<th scope="colgroup" colspan="4" class="ct-start">Errors in the parents</th>'
+        '<th scope="colgroup" colspan="2" class="ct-start">FWER</th>'
+        '<th scope="col" rowspan="2" class="ct-start">Same accepted sets</th></tr><tr>'
+        '<th scope="col" class="ct-ours ct-start">Andrey</th><th scope="col">R</th>'
+        '<th scope="col">Empty set</th><th scope="col" class="ct-ours">Difference</th>'
+        '<th scope="col" class="ct-ours ct-start">Andrey</th><th scope="col">R</th></tr>'
+    )
+    body = ""
+    for key, name in (("icp.approximate", "Approximate test"), ("icp.exact", "Exact test")):
+        body += f'<tr class="ct-section"><th scope="rowgroup" colspan="8">{name}</th></tr>'
+        for r in lanes[key]["rows"]:
+            if r["cell"].startswith("speed"):
+                continue
+            k = r["environments"]
+            envs = f"{k[0]} environments" if len(k) == 1 else f"{k[0]} or {k[-1]} environments"
+            low, high = r["bootstrap_95"]
+            body += (
+                f'<tr><th scope="row">{escape(ICP_CELLS[r["cell"]])}<small>{envs}</small></th>'
+                f'<td class="ct-ours ct-start">{r["andrey_shd_mean"]:.3f}</td>'
+                f"<td>{r['comparator_shd_mean']:.3f}</td><td>{r['empty_shd_mean']:.3f}</td>"
+                f'<td class="ct-ours">{interval(r["mean_D"], low, high)}'
+                f"{verdict(r['verdict'], r['verdict'])}</td>"
+                f'<td class="ct-ours ct-start">{r["andrey_fwer"]:.4f}</td>'
+                f"<td>{r['comparator_fwer']:.4f}</td>"
+                f'<td class="ct-start">{r["same_accepted_sets"]:,} of {r["paired"]:,}</td></tr>'
+            )
+    paired = (
+        '<figure class="ct"><p class="ct-title">ICP against InvariantCausalPrediction 0.8, '
+        'the same fits</p><div class="ct-scroll"><table class="ct-table ct-nested">'
+        f"<thead>{head}</thead><tbody>{body}</tbody></table></div><figcaption>"
+        "Means over the paired fits at alpha 0.05: 50 datasets of each of 100 scenarios with 5 to "
+        "12 variables, 50 of each of 20 with do-interventions, and 20 of each of 10 with 16 or 21 "
+        "variables. The errors count the variables missing from or added to the target's true "
+        "parents; the FWER is the share of fits that name a variable outside them. The difference "
+        "is Andrey's mean errors minus R's, with its 95% interval; unmarked is a tie."
+        "</figcaption></figure>\n"
+    )
+    head = (
+        '<tr><td rowspan="2"></td>'
+        '<th scope="colgroup" colspan="3" class="ct-start">Approximate test</th>'
+        '<th scope="colgroup" colspan="3" class="ct-start">Exact test</th></tr><tr>'
+        + '<th scope="col" class="ct-ours ct-start">FWER</th><th scope="col">95% interval</th>'
+        '<th scope="col">Success</th>' * 2 + "</tr>"
+    )
+    rows = {
+        test: {r["cell"]: r for r in lanes[f"icp.{test}.claim"]["rows"]}
+        for test in ("approximate", "exact")
+    }
+    body = ""
+    for section, cells in (
+        ("In the claim", ("A", "C", "D", "D40")),
+        ("Out of the claim", ("B, target intervened", "E-hidden", "E-nonlinear")),
+    ):
+        body += f'<tr class="ct-section"><th scope="rowgroup" colspan="7">{section}</th></tr>'
+        for cell in cells:
+            tds = ""
+            for test in ("approximate", "exact"):
+                r = rows[test][cell]
+                low, high = r["andrey_fwer_95"]
+                tds += (
+                    f'<td class="ct-ours ct-start">{r["andrey_fwer"]:.4f}</td>'
+                    f"<td>{low:.4f} to {high:.4f}</td><td>{r['andrey_success']:.3f}</td>"
+                )
+            fits = rows["approximate"][cell]["fits"]
+            body += (
+                f'<tr><th scope="row">{escape(ICP_CELLS[cell])}<small>{fits:,} fits</small></th>'
+                f"{tds}</tr>"
+            )
+    rates = (
+        '<figure class="ct"><p class="ct-title">ICP\'s FWER at alpha 0.05, every fit</p>'
+        '<div class="ct-scroll"><table class="ct-table ct-nested">'
+        f"<thead>{head}</thead><tbody>{body}</tbody></table></div><figcaption>"
+        "The FWER is the share of fits that name a variable outside the target's true parents, "
+        "with its 95% Clopper-Pearson interval; success is the share whose estimate equals them. "
+        "In the claim the environments leave the target's own mechanism alone; out of it they do "
+        "not, or a hidden or nonlinear parent breaks the linear model."
+        "</figcaption></figure>\n"
+    )
+    return paired + rates
+
+
 if __name__ == "__main__":
     paths = [Path(p) for p in sys.argv[1:]] or [
         PUBLISHED / "gnies.json",
@@ -259,3 +361,4 @@ if __name__ == "__main__":
     (HERE / "gnies.html").write_text(gnies(json.loads(paths[0].read_text())))
     (HERE / "ut-igsp.html").write_text(ut_igsp(json.loads(paths[1].read_text())))
     (HERE / "camuv.html").write_text(camuv(json.loads(paths[2].read_text())))
+    (HERE / "icp.html").write_text(icp(json.loads(paths[3].read_text())))
