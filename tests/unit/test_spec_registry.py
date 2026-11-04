@@ -42,6 +42,10 @@ _RESERVED_PARAM_NAMES = frozenset(
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
+# The inputs whose facade default, None, stands for data given as each environment's rows apart,
+# which one data file cannot give, so the CLI needs them.
+APART_DEFAULTS = {("cdnod", "env")}
+
 _SPEC_NAMES = sorted(REGISTRY)
 
 
@@ -69,9 +73,10 @@ def test_signature_agreement(name):
     # Array inputs: same names, same order.
     assert [i.name for i in spec.data.inputs] == data_names
     # An input is optional exactly when the facade gives it a default, so the CLI can leave a
-    # missing one to that default.
+    # missing one to that default; an input in APART_DEFAULTS has one too, though the CLI needs it.
     defaults = [p.default is not p.empty for p in params if p.kind is p.POSITIONAL_OR_KEYWORD]
-    assert [not i.required for i in spec.data.inputs] == defaults
+    optional = [not i.required or (name, i.name) in APART_DEFAULTS for i in spec.data.inputs]
+    assert optional == defaults
 
     # Keyword hyperparameters: same set, and each default matches the signature exactly.
     spec_params = {p.name: p for p in spec.params}
