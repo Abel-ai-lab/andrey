@@ -55,8 +55,16 @@ import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
 
-from andrey_bench import lingam_models, regime_models, scoring, temporal_models  # noqa: E402
+from andrey_bench import (  # noqa: E402
+    datasets,
+    lingam_models,
+    regime_models,
+    scoring,
+    svar_models,
+    temporal_models,
+)
 from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
+from andrey_bench.adapters.andrey_dynotears import AndreyDYNOTEARS  # noqa: E402
 from andrey_bench.adapters.andrey_gies import stack, unstack  # noqa: E402
 from andrey_bench.adapters.andrey_lingam_ts import (  # noqa: E402
     AndreyLongitudinalLiNGAM,
@@ -400,16 +408,19 @@ SERIES_MODELS: dict[str, str] = {
     "pcmciplus_paper": "pcmciplus2020",
     "lpcmci_paper": "lpcmci2020",
     "varma_lingam_paper": "varma2010",
+    "dynotears_paper": "dynotears2020",
 }
 #: ``(d, n)``, the variables and time steps, of each time-series regime the gate draws: sizes of the
 #: published summary at which the method's median error is below the empty graph's on most series.
 #: PCMCI's is only at ``d = 10``; from ``d = 20`` its median error is near or above the empty
-#: graph's. VARMA-LiNGAM's fit takes seconds, so it runs at the two smaller sizes.
+#: graph's. VARMA-LiNGAM's fit takes seconds, so it runs at the two smaller sizes. DYNOTEARS runs
+#: at 500 steps, its defaults' length, at 10 and 20 variables, where a fit takes a second or a few.
 SERIES_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "pcmci_paper": ((10, 500), (10, 1000)),
     "pcmciplus_paper": ((10, 500), (20, 1000)),
     "lpcmci_paper": ((5, 500), (10, 1000)),
     "varma_lingam_paper": ((3, 300), (5, 300)),
+    "dynotears_paper": ((10, 500), (20, 500)),
 }
 #: ``(d, n, m)`` of the longitudinal LiNGAM panel: variables, time points, and units.
 PANEL_MODEL = "panel2013"
@@ -429,6 +440,11 @@ def series_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
     model = SERIES_MODELS[regime]
     out = []
     for seed in SEEDS:
+        if model in svar_models.MODELS:
+            _, _, noise, scale = datasets.REGIMES[regime]
+            series, window = svar_models.sample(model, d, n, seed, noise, scale)
+            out.append(Draw(series, WindowGraph(window, lag0="dag")))
+            continue
         if model in lingam_models.MODELS:
             series, stack, _ = lingam_models.sample_varma(model, d, n, seed)
             out.append(Draw(series, CoefficientStack(stack, kind="varma")))
@@ -550,11 +566,12 @@ Target = Literal[
     "parents",
     "lagged",
     "window",
+    "window_edges",
     "cross_links",
     "lagged_edges",
     "targets",
 ]
-SERIES_TARGETS = ("lagged", "window", "cross_links", "lagged_edges")
+SERIES_TARGETS = ("lagged", "window", "window_edges", "cross_links", "lagged_edges")
 
 
 @dataclass(frozen=True)
@@ -705,6 +722,11 @@ SUPPORTED: dict[str, Method] = {
     "Granger": Method(
         _granger, "lagged_edges", tuple(f"var2_lagged_d{d}_n{n}" for d, n in GRANGER_SIZES)
     ),
+    "DYNOTEARS": Method(
+        _adapted(AndreyDYNOTEARS("dynotears", lambda1=0.05, w_threshold=0.3, lag_threshold=0.1)),
+        "window_edges",
+        _series("dynotears_paper"),
+    ),
 }
 
 
@@ -819,13 +841,16 @@ def series_error(estimate: Any, truth: Any, target: Target) -> int:
     """Return the errors of a time-series ``estimate`` in its published summary's unit.
 
     ``lagged``: the lag-resolved SHD over lags 1..L. ``window``: the endpoint SHD over the window,
-    against the true PAG of the observed series when some are unobserved. ``cross_links``: the
+    against the true PAG of the observed series when some are unobserved. ``window_edges``: the
+    edge SHD over the window of an estimate whose lag 0 is a DAG. ``cross_links``: the
     missing and extra cross-links. ``lagged_edges``: the missing and extra lagged edges.
     """
     if target == "lagged":
         return int(scoring.temporal_score_columns(estimate, truth)["temporal_shd"])
     if target == "window":
         return int(scoring.window_scores(estimate, truth)["endpoint_shd"])
+    if target == "window_edges":
+        return int(scoring.window_scores(estimate, truth)["shd"])
     if target == "cross_links":
         s = scoring.cross_link_scores(estimate, truth)
         return int(s["cross_n_est"] + s["cross_n_true"] - 2 * s["cross_tp"])
@@ -849,6 +874,8 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
     if target == "window":
         n = truth.n_nodes - truth.latents
         return WindowGraph(np.zeros((truth.tau_max + 1, n, n), np.int8), lag0="cpdag")
+    if target == "window_edges":
+        return WindowGraph(np.zeros_like(truth.marks), lag0="dag")
     if target == "cross_links":
         return CoefficientStack(np.zeros_like(truth.stack), kind=truth.kind)
     if target == "lagged_edges":

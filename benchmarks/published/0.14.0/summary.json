@@ -1,14 +1,14 @@
 {
  "release": "0.14.0",
  "parity_rule": "paired bootstrap",
- "generated": "2026-11-03",
- "theme": "GnIES against gnies 0.3.3, the authors' package; UT-IGSP against graphical-model-learning 0.1a8, the authors' library; ICP against InvariantCausalPrediction, in and out of the claim",
- "build": "GnIES: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every fit but the order check, which ran on a build of the same day that adds DEBUG records of the steps a tie decided; with the records off, its GIES and GES outputs equal the first build's | UT-IGSP: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically | ICP: pre-release Andrey 0.14.0 build, 3 November 2026",
- "verdict_rule": "GnIES: per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged | UT-IGSP: per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 2000-2019, confirmation the rerun on seeds 4000-4019, and verdict the result; out of claim, verdict is the side | ICP: D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise",
- "fit_protocol": "GnIES: every arm of a dataset back to back on one pinned core with one BLAS thread; a cap of 1,800 s per fit at 10 variables (300 s for gnies with the true targets fixed) and 3,600 s on the variable ladder; a fit past its cap is a timeout, never an empty graph; a gnies fit whose total is not finite or whose local scores returned NaN is an error and leaves its cell's pairs | UT-IGSP: every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw (3,600 s at 100 variables and with kernel tests), a timeout never scored | ICP: every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone",
- "error_metric": "GnIES: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets (the _mean fields hold the means) | UT-IGSP: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets of each dataset's mean over its draws (the _mean fields hold the means) | ICP: each entry's own, in its error_metric",
- "complete_definition": "GnIES: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | UT-IGSP: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | ICP: true when every planned fit finished; no fit timed out",
- "seeds_note": "GnIES: seeds is the number of datasets attempted per setting: 20 (seeds 0-19) in every in-claim and out-of-claim setting at 10 variables, with reruns on seeds 20-39 in the replication of the 7 settings that came out better; 10 (seeds 0-9) on the ladder of 20 to 100 variables, where the reference ran 10 seeds at 20 variables, 3 at 30, and none at 50 and 100 | UT-IGSP: seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 2000-2019 in the 11 in-claim cells with a comparison above 0 in the first comparison, and, at the defaults, the confirmation's seeds 4000-4019 in every in-claim cell. Categorical data (Andrey alone) is in the lane file only | ICP: scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target",
+ "generated": "2026-11-04",
+ "theme": "GnIES against gnies 0.3.3, the authors' package; UT-IGSP against graphical-model-learning 0.1a8, the authors' library; ICP against InvariantCausalPrediction, in and out of the claim; DYNOTEARS against CausalNex 0.12.2, the authors' implementation",
+ "build": "GnIES: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every fit but the order check, which ran on a build of the same day that adds DEBUG records of the steps a tie decided; with the records off, its GIES and GES outputs equal the first build's | UT-IGSP: Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically | ICP: pre-release Andrey 0.14.0 build, 3 November 2026 | DYNOTEARS: Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps; refitted on the 0.14.0 build, every recorded Andrey fit up to 50 variables and 20 at 100 variables return the same graph (identity)",
+ "verdict_rule": "GnIES: per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged | UT-IGSP: per cell, row, and metric (shd, target_error): D = error(Andrey) - error(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D (10,000 resamples) lies; worse = above 0 on seeds 0-19 and on the rerun on seeds 2000-2019; better = below 0 on seeds 0-19 and on a second set (seeds 2000-2019, or for J2 the confirmation's seeds 4000-4019); a row with both is better when either lies below 0 (one row: J2 G2_perfect_l1_n1000 shd, below 0 on 2000-2019, contains 0 on 4000-4019); otherwise the row is named by its side on seeds 0-19 and 'not replicated', or 'tie'. Seeds 4000-4019 are the seeds on which J2's default was chosen, as the setting with the most rows below 0 there, so they favor below 0 for J2: 17 of J2's 18 better rows repeated there, 1 on seeds 2000-2019. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 2000-2019, confirmation the rerun on seeds 4000-4019, and verdict the result; out of claim, verdict is the side | ICP: D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise | DYNOTEARS: D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0. Settings with claim 'out' are reported, not judged",
+ "fit_protocol": "GnIES: every arm of a dataset back to back on one pinned core with one BLAS thread; a cap of 1,800 s per fit at 10 variables (300 s for gnies with the true targets fixed) and 3,600 s on the variable ladder; a fit past its cap is a timeout, never an empty graph; a gnies fit whose total is not finite or whose local scores returned NaN is an error and leaves its cell's pairs | UT-IGSP: every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw (3,600 s at 100 variables and with kernel tests), a timeout never scored | ICP: every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone | DYNOTEARS: one timed fit per series, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; andrey_cpu_s and comparator_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired series of CausalNex's CPU time over Andrey's, with its bootstrap 95% interval",
+ "error_metric": "GnIES: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets (the _mean fields hold the means) | UT-IGSP: each entry's own, in its error_metric and metric: the SHD of the interventional essential graph or the target error, as the median over the paired datasets of each dataset's mean over its draws (the _mean fields hold the means) | ICP: each entry's own, in its error_metric | DYNOTEARS: each entry's own, in its error_metric: the edge SHD over the window, as the mean over the paired series",
+ "complete_definition": "GnIES: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | UT-IGSP: true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored | ICP: true when every planned fit finished; no fit timed out | DYNOTEARS: true when every setting has at least 10 paired series (both packages finished); no fit reached its cap",
+ "seeds_note": "GnIES: seeds is the number of datasets attempted per setting: 20 (seeds 0-19) in every in-claim and out-of-claim setting at 10 variables, with reruns on seeds 20-39 in the replication of the 7 settings that came out better; 10 (seeds 0-9) on the ladder of 20 to 100 variables, where the reference ran 10 seeds at 20 variables, 3 at 30, and none at 50 and 100 | UT-IGSP: seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 2000-2019 in the 11 in-claim cells with a comparison above 0 in the first comparison, and, at the defaults, the confirmation's seeds 4000-4019 in every in-claim cell. Categorical data (Andrey alone) is in the lane file only | ICP: scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them; a row's seeds counts its paired datasets, the datasets of its scenarios that both packages fit, and the cell B rows hold the first 20 datasets of each scenario whose intervened set holds the target | DYNOTEARS: 20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39",
  "regimes": {
   "gnies_a": "linear-Gaussian data from 10-variable Erdos-Renyi graphs, observational + 3 environments, mean degree 2.7, 1 target per environment, v ~ U[5, 10]; in claim, figure (Fig. 3)",
   "gnies_b": "linear-Gaussian data from 10-variable Erdos-Renyi graphs, observational + 3 environments, mean degree 4, 1 target per environment, v ~ U[5, 10]; in claim, figure (Fig. 8)",
@@ -68,7 +68,14 @@
   "icp_appendix_g_capped": "icp_appendix_g at 16, 21, or 40 nodes, targets with at most 3 parents, max_parents=3",
   "icp_hidden": "icp_appendix_g with a hidden parent of the target and of one other variable (out of the claim)",
   "icp_nonlinear": "icp_appendix_g with tanh of one parent in the target's equation (out of the claim)",
-  "icp_speed": "icp_appendix_g weights at 9, 12, and 15 nodes with 500 + 500 rows, and 12 nodes with 5000 + 5000 rows"
+  "icp_speed": "icp_appendix_g weights at 9, 12, and 15 nodes with 500 + 500 rows, and 12 nodes with 5000 + 5000 rows",
+  "dynotears_paper": "Erdos-Renyi same-step graph of mean degree 2, Erdos-Renyi lagged graph of mean in-degree 2 with self-lags, Gaussian noise, raw scale (in claim)",
+  "dynotears_paper_exponential": "the same graphs, exponential noise of scale 1 with its mean subtracted, raw scale (in claim)",
+  "dynotears_paper_ba_sbm": "Barabasi-Albert same-step graph (2 edges per new node), two-block lagged graph of mean in-degree 2, Gaussian noise, raw scale, 500 and 50 steps, up to 50 variables (in claim)",
+  "dynotears_paper_standardized": "dynotears_paper with every column z-scored (out of claim)",
+  "dynotears_paper_uncentered": "the same graphs, exponential noise of scale 1 not centered, the noise of the paper's simulations (Appendix B.4), raw scale (in claim)",
+  "dynotears_sin_tanh": "sin of each same-step parent and tanh of each lagged parent in place of the linear terms, Gaussian noise (out of claim)",
+  "length 50 at n500": "dynotears_paper at 50 steps with the defaults (out of claim)"
  },
  "coverage": {
   "gnies_a": {
@@ -478,6 +485,76 @@
   "speed-15": {
    "scenarios": 5,
    "andrey_fits_per_test": 5
+  },
+  "dynotears_paper_n500": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_n50": {
+   "planned_seeds": 10,
+   "fewest_seeds": 10,
+   "most_seeds": 10,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_exponential_n500": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_exponential_n50": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_ba_sbm_n500": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_ba_sbm_n50": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_uncentered_n500": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_uncentered_n50": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_paper_standardized_n500": {
+   "planned_seeds": 10,
+   "fewest_seeds": 10,
+   "most_seeds": 10,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
+  },
+  "dynotears_sin_tanh_n500": {
+   "planned_seeds": 10,
+   "fewest_seeds": 10,
+   "most_seeds": 10,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0
   }
  },
  "packages": {
@@ -500,11 +577,16 @@
   "ICP": {
    "InvariantCausalPrediction": "0.8",
    "R": "4.6.1"
+  },
+  "DYNOTEARS": {
+   "CausalNex": "0.12.2 (Python 3.10, NumPy 1.23.5, SciPy 1.15.3)",
+   "Andrey environment": "Python 3.13, NumPy 2.5.4, SciPy 1.16.3"
   }
  },
  "hardware": {
   "cpu_models": [
    "AMD EPYC 7713 64-Core Processor",
+   "Intel Core i7-7820X",
    "Intel(R) Core(TM) i7-7820X CPU @ 3.60GHz"
   ],
   "cores_per_fit": 1,
@@ -532,6 +614,14 @@
     ],
     "hosts": 1,
     "cores_per_fit": 1
+   },
+   "DYNOTEARS": {
+    "cpu_models": [
+     "Intel Core i7-7820X"
+    ],
+    "hosts": 1,
+    "cores_per_fit": 1,
+    "fits_at_a_time": 4
    }
   }
  },
@@ -612,6 +702,72 @@
   }
  ],
  "residue_note": "a side is read after rounding the interval's ends to 10 decimals: three ends are floating-point residue of an exact 0 (5e-18 and -6e-18 in the final rows J2 G1_shift_l3_n3000 shd and J1 G6_weight_l0_n1000 target_error, 2e-17 in the confirmation's a1e-05_lexicographic_s10 G2_perfect_l1_n1000 shd), so those intervals touch 0 and the rows tie; the run's own scripts read them as above or below 0, which changed no decision. The same reading moves the first of them from above 0 to contains 0 in default_selection.trace.inv_n_sum_counts. Counts of single runs name sides (below 0, contains 0, above 0); better and worse name only comparisons that repeated",
+ "identity": "the 0.14.0 build's tie ranks keep the column order of all 640 stored series, the fit's code is otherwise unchanged, and refitted on that build 580 of 580 recorded Andrey fits (every one up to 50 variables, and the 20 of exponential noise at 100 variables and 50 steps on seeds 0-19) return the same structure_hash",
+ "centering": {
+  "what": "Andrey's fit with its columns not centered (the second moments in place of the covariance), on the exponential-noise series of mean 0 at 50 steps and 100 variables; D is a paired mean difference of SHD with its bootstrap 95% interval",
+  "centered_minus_not_centered": {
+   "seeds 0-19": [
+    2.55,
+    [
+     -0.3,
+     5.25
+    ]
+   ],
+   "seeds 20-39": [
+    4.45,
+    [
+     1.65,
+     7.45
+    ]
+   ],
+   "seeds 0-39": [
+    3.5,
+    [
+     1.48,
+     5.5
+    ]
+   ]
+  },
+  "not_centered_minus_causalnex": {
+   "seeds 0-19": [
+    0.65,
+    [
+     0.05,
+     1.35
+    ]
+   ],
+   "seeds 20-39": [
+    -0.3,
+    [
+     -1.0,
+     0.35
+    ]
+   ]
+  },
+  "not_centered_one_step_fewer_minus_not_centered": {
+   "seeds 0-19": [
+    3.25,
+    [
+     0.5,
+     6.3
+    ]
+   ]
+  },
+  "centered_minus_not_centered_one_step_fewer": {
+   "seeds 0-19": [
+    -0.7,
+    [
+     -5.25,
+     3.5
+    ]
+   ]
+  },
+  "weights_of_true_edges_seeds_0_19": "mean magnitude centered minus not centered: same-step -0.014, self-lags -0.017, cross-lags -0.002; the share of true edges whose magnitude shrinks: 51%, 54%, 41%"
+ },
+ "differences": {
+  "500_steps": "in claim, 34 of the 280 paired series end on a different graph; CausalNex on centered columns (fitted on those 34 alone) returns Andrey's graph on 29. Of the other 5, Andrey's graph changes on 4 when the data are multiplied by 1 + 1e-12 noise or the columns are fitted in their given order. On the fifth (exponential noise, 20 variables, seed 1) neither moves either package's graph; the one edge that differs is a true lagged edge of weight 0.10026 in Andrey's fit and 0.09975 in CausalNex's on centered columns, against the threshold 0.1, the largest weight difference between the two fits being 0.0048",
+  "50_steps": "every run has the centered arm (same_graph in each row's centered block). At 100 variables, on 4 exponential-noise series where Andrey's graph differs from CausalNex's on centered columns: Andrey stops on h_tol (h_final below 1e-8) with no edge removed by the cycle repair, refitting at rho_max 1e20 keeps the graph on 3 and matches CausalNex on none, and multiplying the data by 1 + 1e-12 noise changes the graph on 3 of the 4 (SHD -5, +4, -2; on one series to CausalNex's graph exactly), the columns in their given order on 2"
+ },
  "methods": [
   {
    "method": "GnIES",
@@ -38077,6 +38233,3301 @@
      ],
      "above_zero": false,
      "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper",
+   "length": 500,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.297829,
+     "comparator_s": 0.3625039999999997,
+     "ratio": 1.2611503541143148,
+     "ratio_95": [
+      1.1453125812214013,
+      1.3962430818689615
+     ],
+     "same_graph": 20,
+     "paired": 20,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 0.15,
+     "empty_shd_mean": 13.5,
+     "andrey_lag0_shd_mean": 0.0,
+     "comparator_lag0_shd_mean": 0.0,
+     "andrey_lagged_shd_mean": 0.15,
+     "comparator_lagged_shd_mean": 0.15,
+     "andrey_f1_mean": 0.9950588235294118,
+     "comparator_f1_mean": 0.9950588235294118,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -13.35,
+       "bootstrap_95": [
+        -14.15,
+        -12.498750000000019
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.7377495000000001,
+     "comparator_s": 1.2149570000000003,
+     "ratio": 1.6468557314671697,
+     "ratio_95": [
+      1.5452758417948464,
+      1.6766142592721174
+     ],
+     "same_graph": 19,
+     "paired": 20,
+     "andrey_shd_mean": 1.75,
+     "comparator_shd_mean": 1.8,
+     "empty_shd_mean": 29.3,
+     "andrey_lag0_shd_mean": 0.25,
+     "comparator_lag0_shd_mean": 0.25,
+     "andrey_lagged_shd_mean": 1.5,
+     "comparator_lagged_shd_mean": 1.55,
+     "andrey_f1_mean": 0.9692352539622492,
+     "comparator_f1_mean": 0.968274801984848,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 0,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -27.55,
+       "bootstrap_95": [
+        -29.85,
+        -25.5
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 1,
+      "centered_comparator_gives_andreys_graph": 1
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 2.7244445,
+     "comparator_s": 4.5099625,
+     "ratio": 1.5988224286139916,
+     "ratio_95": [
+      1.4907267662152306,
+      1.6966870318818863
+     ],
+     "same_graph": 19,
+     "paired": 20,
+     "andrey_shd_mean": 1.35,
+     "comparator_shd_mean": 1.3,
+     "empty_shd_mean": 57.65,
+     "andrey_lag0_shd_mean": 0.15,
+     "comparator_lag0_shd_mean": 0.15,
+     "andrey_lagged_shd_mean": 1.2,
+     "comparator_lagged_shd_mean": 1.15,
+     "andrey_f1_mean": 0.9876415391046134,
+     "comparator_f1_mean": 0.9880291360038381,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 1,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -56.3,
+       "bootstrap_95": [
+        -59.05,
+        -53.45
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 1,
+      "centered_comparator_gives_andreys_graph": 1
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 28.8665375,
+     "comparator_s": 50.048041,
+     "ratio": 1.6148762244752106,
+     "ratio_95": [
+      1.5523144107369264,
+      1.7086911846607005
+     ],
+     "same_graph": 16,
+     "paired": 20,
+     "andrey_shd_mean": 1.2,
+     "comparator_shd_mean": 1.75,
+     "empty_shd_mean": 144.55,
+     "andrey_lag0_shd_mean": 0.0,
+     "comparator_lag0_shd_mean": 0.35,
+     "andrey_lagged_shd_mean": 1.2,
+     "comparator_lagged_shd_mean": 1.4,
+     "andrey_f1_mean": 0.9958809356971885,
+     "comparator_f1_mean": 0.9939881321468185,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 1,
+     "mean_D": -0.55,
+     "bootstrap_95": [
+      -1.6,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -143.35,
+       "bootstrap_95": [
+        -147.25,
+        -139.4
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 4,
+      "centered_comparator_gives_andreys_graph": 4
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 100,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 298.629676,
+     "comparator_s": 393.33037550000006,
+     "ratio": 1.3042362812230317,
+     "ratio_95": [
+      1.2755182674263608,
+      1.3692815819811572
+     ],
+     "same_graph": 16,
+     "paired": 20,
+     "andrey_shd_mean": 3.15,
+     "comparator_shd_mean": 3.35,
+     "empty_shd_mean": 283.25,
+     "andrey_lag0_shd_mean": 0.3,
+     "comparator_lag0_shd_mean": 0.3,
+     "andrey_lagged_shd_mean": 2.85,
+     "comparator_lagged_shd_mean": 3.05,
+     "andrey_f1_mean": 0.9943600523156533,
+     "comparator_f1_mean": 0.993941479913776,
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 2,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.75,
+      0.2
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -280.1,
+       "bootstrap_95": [
+        -286.85,
+        -273.15
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 4,
+      "centered_comparator_gives_andreys_graph": 2
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n50",
+   "setting": "lambda1=0.2, w_threshold=0.3, lag_threshold=0.2, tau_max=1 (the paper's for 50 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n50",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.2, lambda_a=0.2, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.2",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper",
+   "length": 50,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.2982395,
+     "comparator_s": 0.3293820000000003,
+     "ratio": 1.102979032603007,
+     "ratio_95": [
+      1.0680852807008367,
+      1.1426579567251585
+     ],
+     "same_graph": 14,
+     "paired": 20,
+     "andrey_shd_mean": 5.0,
+     "comparator_shd_mean": 5.35,
+     "empty_shd_mean": 13.5,
+     "andrey_lag0_shd_mean": 0.75,
+     "comparator_lag0_shd_mean": 0.9,
+     "andrey_lagged_shd_mean": 4.25,
+     "comparator_lagged_shd_mean": 4.45,
+     "andrey_f1_mean": 0.7795281245053631,
+     "comparator_f1_mean": 0.7602819861831378,
+     "andrey_fewer_errors": 5,
+     "comparator_fewer_errors": 1,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -0.8,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.5,
+       "bootstrap_95": [
+        -9.3,
+        -7.7
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 5.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": -0.35,
+      "centered_minus_as_given_95": [
+       -0.8,
+       0.0
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 10,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.864589,
+     "comparator_s": 1.1525670000000003,
+     "ratio": 1.378295238235038,
+     "ratio_95": [
+      1.288832322524868,
+      1.4359166227419293
+     ],
+     "same_graph": 7,
+     "paired": 20,
+     "andrey_shd_mean": 12.35,
+     "comparator_shd_mean": 12.2,
+     "empty_shd_mean": 29.3,
+     "andrey_lag0_shd_mean": 2.35,
+     "comparator_lag0_shd_mean": 2.25,
+     "andrey_lagged_shd_mean": 10.0,
+     "comparator_lagged_shd_mean": 9.95,
+     "andrey_f1_mean": 0.7476267142258421,
+     "comparator_f1_mean": 0.7523323857758263,
+     "andrey_fewer_errors": 5,
+     "comparator_fewer_errors": 8,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.3,
+      0.55
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.95,
+       "bootstrap_95": [
+        -19.1,
+        -14.8
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 12.35,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": 0.15,
+      "centered_minus_as_given_95": [
+       -0.3,
+       0.55
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 4.4778225,
+     "comparator_s": 6.705764500000001,
+     "ratio": 1.4085602393485368,
+     "ratio_95": [
+      1.327819155158142,
+      1.5874639722492216
+     ],
+     "same_graph": 4,
+     "paired": 20,
+     "andrey_shd_mean": 21.65,
+     "comparator_shd_mean": 20.8,
+     "empty_shd_mean": 57.65,
+     "andrey_lag0_shd_mean": 3.85,
+     "comparator_lag0_shd_mean": 3.8,
+     "andrey_lagged_shd_mean": 17.8,
+     "comparator_lagged_shd_mean": 17.0,
+     "andrey_f1_mean": 0.7717947788787533,
+     "comparator_f1_mean": 0.7841976282116507,
+     "andrey_fewer_errors": 5,
+     "comparator_fewer_errors": 10,
+     "mean_D": 0.85,
+     "bootstrap_95": [
+      0.05,
+      1.65
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -36.0,
+       "bootstrap_95": [
+        -39.90125,
+        -31.95
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 18,
+      "comparator_shd_mean": 21.65,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "centered_minus_as_given": 0.85,
+      "centered_minus_as_given_95": [
+       0.0,
+       1.7
+      ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 3,
+      "andrey_shd_mean": 21.55,
+      "comparator_shd_mean": 20.9,
+      "andrey_fewer_errors": 6,
+      "comparator_fewer_errors": 9,
+      "mean_D": 0.65,
+      "bootstrap_95": [
+       -0.45,
+       1.7
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 57.65,
+      "seeds": "20-39",
+      "verdict": "tie",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 20,
+       "comparator_shd_mean": 21.55,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 62.519307999999995,
+     "comparator_s": 76.017232,
+     "ratio": 1.1785480192570001,
+     "ratio_95": [
+      1.1301324798565104,
+      1.289356607248999
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 59.6,
+     "comparator_shd_mean": 59.0,
+     "empty_shd_mean": 144.55,
+     "andrey_lag0_shd_mean": 9.45,
+     "comparator_lag0_shd_mean": 9.5,
+     "andrey_lagged_shd_mean": 50.15,
+     "comparator_lagged_shd_mean": 49.5,
+     "andrey_f1_mean": 0.7556550230935333,
+     "comparator_f1_mean": 0.7573797867885615,
+     "andrey_fewer_errors": 5,
+     "comparator_fewer_errors": 11,
+     "mean_D": 0.6,
+     "bootstrap_95": [
+      -0.15,
+      1.35
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -84.95,
+       "bootstrap_95": [
+        -89.7,
+        -80.6
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 12,
+      "comparator_shd_mean": 59.65,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.4,
+       0.25
+      ],
+      "centered_minus_as_given": 0.65,
+      "centered_minus_as_given_95": [
+       -0.2,
+       1.45
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 100,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 700.0714664999999,
+     "comparator_s": 849.797858,
+     "ratio": 1.132148159092501,
+     "ratio_95": [
+      1.0784445010926262,
+      1.252285848075263
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 143.95,
+     "comparator_shd_mean": 137.05,
+     "empty_shd_mean": 283.25,
+     "andrey_lag0_shd_mean": 28.9,
+     "comparator_lag0_shd_mean": 26.25,
+     "andrey_lagged_shd_mean": 115.05,
+     "comparator_lagged_shd_mean": 110.8,
+     "andrey_f1_mean": 0.6918637496485075,
+     "comparator_f1_mean": 0.7081586125995611,
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 17,
+     "mean_D": 6.9,
+     "bootstrap_95": [
+      4.3,
+      9.55
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -139.3,
+       "bootstrap_95": [
+        -146.45,
+        -131.89875000000004
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 6,
+      "comparator_shd_mean": 143.3,
+      "mean_D": 0.65,
+      "bootstrap_95": [
+       -0.4,
+       2.45
+      ],
+      "centered_minus_as_given": 6.25,
+      "centered_minus_as_given_95": [
+       3.9,
+       8.8
+      ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 0,
+      "andrey_shd_mean": 144.7,
+      "comparator_shd_mean": 142.9,
+      "andrey_fewer_errors": 5,
+      "comparator_fewer_errors": 11,
+      "mean_D": 1.8,
+      "bootstrap_95": [
+       -1.05,
+       4.7
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 284.55,
+      "seeds": "20-39",
+      "verdict": "tie",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 10,
+       "comparator_shd_mean": 144.65,
+       "mean_D": 0.05,
+       "bootstrap_95": [
+        -0.3,
+        0.35
+       ]
+      }
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_exponential",
+   "length": 500,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.29903,
+     "comparator_s": 0.37421550000000003,
+     "ratio": 1.2710439472857518,
+     "ratio_95": [
+      1.2093999124534358,
+      1.3222716960959624
+     ],
+     "same_graph": 20,
+     "paired": 20,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 0.15,
+     "empty_shd_mean": 13.5,
+     "andrey_lag0_shd_mean": 0.0,
+     "comparator_lag0_shd_mean": 0.0,
+     "andrey_lagged_shd_mean": 0.15,
+     "comparator_lagged_shd_mean": 0.15,
+     "andrey_f1_mean": 0.9952222222222222,
+     "comparator_f1_mean": 0.9952222222222222,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -13.35,
+       "bootstrap_95": [
+        -14.15,
+        -12.5
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.7331934999999999,
+     "comparator_s": 1.2693745,
+     "ratio": 1.5612394092893078,
+     "ratio_95": [
+      1.5392414753282808,
+      1.6843636018708783
+     ],
+     "same_graph": 19,
+     "paired": 20,
+     "andrey_shd_mean": 1.35,
+     "comparator_shd_mean": 1.3,
+     "empty_shd_mean": 29.3,
+     "andrey_lag0_shd_mean": 0.2,
+     "comparator_lag0_shd_mean": 0.2,
+     "andrey_lagged_shd_mean": 1.15,
+     "comparator_lagged_shd_mean": 1.1,
+     "andrey_f1_mean": 0.9765583181187656,
+     "comparator_f1_mean": 0.9773508589113064,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 1,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -27.95,
+       "bootstrap_95": [
+        -30.15,
+        -25.9
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 1,
+      "centered_comparator_gives_andreys_graph": 1
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 2.7889685,
+     "comparator_s": 4.5345925,
+     "ratio": 1.6192818708432868,
+     "ratio_95": [
+      1.510441861947797,
+      1.7169313277404563
+     ],
+     "same_graph": 16,
+     "paired": 20,
+     "andrey_shd_mean": 1.35,
+     "comparator_shd_mean": 1.35,
+     "empty_shd_mean": 57.65,
+     "andrey_lag0_shd_mean": 0.2,
+     "comparator_lag0_shd_mean": 0.2,
+     "andrey_lagged_shd_mean": 1.15,
+     "comparator_lagged_shd_mean": 1.15,
+     "andrey_f1_mean": 0.9874810650741033,
+     "comparator_f1_mean": 0.987476701777017,
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.2,
+      0.2
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -56.3,
+       "bootstrap_95": [
+        -59.0,
+        -53.6
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 4,
+      "centered_comparator_gives_andreys_graph": 3
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 30.493067,
+     "comparator_s": 50.2730025,
+     "ratio": 1.6806058992086559,
+     "ratio_95": [
+      1.6260517276765332,
+      1.7326939725963935
+     ],
+     "same_graph": 15,
+     "paired": 20,
+     "andrey_shd_mean": 2.1,
+     "comparator_shd_mean": 1.95,
+     "empty_shd_mean": 144.55,
+     "andrey_lag0_shd_mean": 0.25,
+     "comparator_lag0_shd_mean": 0.25,
+     "andrey_lagged_shd_mean": 1.85,
+     "comparator_lagged_shd_mean": 1.7,
+     "andrey_f1_mean": 0.9925545838568108,
+     "comparator_f1_mean": 0.9930393057260698,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 4,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.05,
+      0.35
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -142.45,
+       "bootstrap_95": [
+        -146.4,
+        -138.65
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 5,
+      "centered_comparator_gives_andreys_graph": 5
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 100,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 385.09591250000005,
+     "comparator_s": 547.4822365,
+     "ratio": 1.3812146236079492,
+     "ratio_95": [
+      1.28708872048777,
+      1.4771121912652487
+     ],
+     "same_graph": 12,
+     "paired": 20,
+     "andrey_shd_mean": 6.25,
+     "comparator_shd_mean": 6.3,
+     "empty_shd_mean": 283.25,
+     "andrey_lag0_shd_mean": 1.05,
+     "comparator_lag0_shd_mean": 1.05,
+     "andrey_lagged_shd_mean": 5.2,
+     "comparator_lagged_shd_mean": 5.25,
+     "andrey_f1_mean": 0.9880999701846799,
+     "comparator_f1_mean": 0.9881005522666095,
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 4,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.85,
+      0.55
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -277.0,
+       "bootstrap_95": [
+        -285.35,
+        -267.99875000000003
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 8,
+      "centered_comparator_gives_andreys_graph": 6
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n50",
+   "setting": "lambda1=0.2, w_threshold=0.3, lag_threshold=0.2, tau_max=1 (the paper's for 50 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n50",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.2, lambda_a=0.2, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.2",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_exponential",
+   "length": 50,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.2764145,
+     "comparator_s": 0.3383689999999999,
+     "ratio": 1.1514877220658022,
+     "ratio_95": [
+      1.0178483095699526,
+      1.2371216088887769
+     ],
+     "same_graph": 14,
+     "paired": 20,
+     "andrey_shd_mean": 5.4,
+     "comparator_shd_mean": 5.25,
+     "empty_shd_mean": 13.5,
+     "andrey_lag0_shd_mean": 0.8,
+     "comparator_lag0_shd_mean": 0.75,
+     "andrey_lagged_shd_mean": 4.6,
+     "comparator_lagged_shd_mean": 4.5,
+     "andrey_f1_mean": 0.758619184949533,
+     "comparator_f1_mean": 0.7661686486649006,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 4,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.05,
+      0.35
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.1,
+       "bootstrap_95": [
+        -9.0,
+        -7.3
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 5.4,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": 0.15,
+      "centered_minus_as_given_95": [
+       -0.05,
+       0.35
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 10,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.0024110000000002,
+     "comparator_s": 1.3324639999999999,
+     "ratio": 1.3326267519808064,
+     "ratio_95": [
+      1.2636784757627169,
+      1.4057544027853999
+     ],
+     "same_graph": 7,
+     "paired": 20,
+     "andrey_shd_mean": 12.95,
+     "comparator_shd_mean": 12.75,
+     "empty_shd_mean": 29.3,
+     "andrey_lag0_shd_mean": 2.45,
+     "comparator_lag0_shd_mean": 2.25,
+     "andrey_lagged_shd_mean": 10.5,
+     "comparator_lagged_shd_mean": 10.5,
+     "andrey_f1_mean": 0.7391453280941971,
+     "comparator_f1_mean": 0.7436049534058123,
+     "andrey_fewer_errors": 4,
+     "comparator_fewer_errors": 6,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -0.25,
+      0.7
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.35,
+       "bootstrap_95": [
+        -18.7,
+        -14.25
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 17,
+      "comparator_shd_mean": 12.9,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.1,
+       0.2
+      ],
+      "centered_minus_as_given": 0.15,
+      "centered_minus_as_given_95": [
+       -0.25,
+       0.55
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 4.030132,
+     "comparator_s": 5.2477405,
+     "ratio": 1.3841921554152998,
+     "ratio_95": [
+      1.2124585305249171,
+      1.4206029992852436
+     ],
+     "same_graph": 3,
+     "paired": 20,
+     "andrey_shd_mean": 23.55,
+     "comparator_shd_mean": 23.4,
+     "empty_shd_mean": 57.65,
+     "andrey_lag0_shd_mean": 4.5,
+     "comparator_lag0_shd_mean": 4.45,
+     "andrey_lagged_shd_mean": 19.05,
+     "comparator_lagged_shd_mean": 18.95,
+     "andrey_f1_mean": 0.7548196145245394,
+     "comparator_f1_mean": 0.7577688364998557,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 7,
+     "mean_D": 0.15,
+     "bootstrap_95": [
+      -0.5,
+      0.75
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -34.1,
+       "bootstrap_95": [
+        -37.85,
+        -30.5
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 23.55,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": 0.15,
+      "centered_minus_as_given_95": [
+       -0.5,
+       0.75
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 61.7688775,
+     "comparator_s": 75.5235915,
+     "ratio": 1.221980677792903,
+     "ratio_95": [
+      1.1836218199577437,
+      1.3858853566062606
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 59.45,
+     "comparator_shd_mean": 58.8,
+     "empty_shd_mean": 144.55,
+     "andrey_lag0_shd_mean": 10.1,
+     "comparator_lag0_shd_mean": 10.15,
+     "andrey_lagged_shd_mean": 49.35,
+     "comparator_lagged_shd_mean": 48.65,
+     "andrey_f1_mean": 0.7624819404507364,
+     "comparator_f1_mean": 0.7638100218395479,
+     "andrey_fewer_errors": 8,
+     "comparator_fewer_errors": 11,
+     "mean_D": 0.65,
+     "bootstrap_95": [
+      -0.75,
+      2.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -85.1,
+       "bootstrap_95": [
+        -88.7,
+        -81.25
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 14,
+      "comparator_shd_mean": 59.35,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       -0.15,
+       0.35
+      ],
+      "centered_minus_as_given": 0.55,
+      "centered_minus_as_given_95": [
+       -0.7,
+       1.8
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 100,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 785.39383,
+     "comparator_s": 839.430142,
+     "ratio": 1.1390542136261201,
+     "ratio_95": [
+      1.0567078224172795,
+      1.248757105194664
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 148.95,
+     "comparator_shd_mean": 145.75,
+     "empty_shd_mean": 283.25,
+     "andrey_lag0_shd_mean": 31.0,
+     "comparator_lag0_shd_mean": 30.0,
+     "andrey_lagged_shd_mean": 117.95,
+     "comparator_lagged_shd_mean": 115.75,
+     "andrey_f1_mean": 0.6852621910256064,
+     "comparator_f1_mean": 0.6926332383587003,
+     "andrey_fewer_errors": 5,
+     "comparator_fewer_errors": 15,
+     "mean_D": 3.2,
+     "bootstrap_95": [
+      0.1,
+      6.0
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -134.3,
+       "bootstrap_95": [
+        -142.05,
+        -126.05
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 8,
+      "comparator_shd_mean": 148.2,
+      "mean_D": 0.75,
+      "bootstrap_95": [
+       0.2,
+       1.4
+      ],
+      "centered_minus_as_given": 2.45,
+      "centered_minus_as_given_95": [
+       -0.65,
+       5.35
+      ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 0,
+      "andrey_shd_mean": 154.45,
+      "comparator_shd_mean": 150.3,
+      "andrey_fewer_errors": 6,
+      "comparator_fewer_errors": 13,
+      "mean_D": 4.15,
+      "bootstrap_95": [
+       1.3,
+       7.1
+      ],
+      "above_zero": true,
+      "empty_shd_mean": 284.55,
+      "seeds": "20-39",
+      "verdict": "worse",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 4,
+       "comparator_shd_mean": 153.9,
+       "mean_D": 0.55,
+       "bootstrap_95": [
+        -0.2,
+        1.45
+       ]
+      }
+     },
+     "complete": true,
+     "final_verdict": "worse"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_ba_sbm",
+   "length": 500,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.33920300000000003,
+     "comparator_s": 0.3784035000000001,
+     "ratio": 1.2267096851630743,
+     "ratio_95": [
+      1.044335524614513,
+      1.290281769686589
+     ],
+     "same_graph": 20,
+     "paired": 20,
+     "andrey_shd_mean": 0.75,
+     "comparator_shd_mean": 0.75,
+     "empty_shd_mean": 14.65,
+     "andrey_lag0_shd_mean": 0.4,
+     "comparator_lag0_shd_mean": 0.4,
+     "andrey_lagged_shd_mean": 0.35,
+     "comparator_lagged_shd_mean": 0.35,
+     "andrey_f1_mean": 0.9724672531769306,
+     "comparator_f1_mean": 0.9724672531769306,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -13.9,
+       "bootstrap_95": [
+        -14.9,
+        -12.9
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.7400885000000001,
+     "comparator_s": 1.0615755000000002,
+     "ratio": 1.5194934979388677,
+     "ratio_95": [
+      1.404659350040936,
+      1.5954525597286007
+     ],
+     "same_graph": 19,
+     "paired": 20,
+     "andrey_shd_mean": 0.2,
+     "comparator_shd_mean": 0.25,
+     "empty_shd_mean": 31.45,
+     "andrey_lag0_shd_mean": 0.0,
+     "comparator_lag0_shd_mean": 0.0,
+     "andrey_lagged_shd_mean": 0.2,
+     "comparator_lagged_shd_mean": 0.25,
+     "andrey_f1_mean": 0.9965531140593329,
+     "comparator_f1_mean": 0.9959358301087157,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 0,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -31.25,
+       "bootstrap_95": [
+        -33.45,
+        -29.05
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 1,
+      "centered_comparator_gives_andreys_graph": 1
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 2.9574365,
+     "comparator_s": 4.520172500000001,
+     "ratio": 1.5660428153764956,
+     "ratio_95": [
+      1.4589261488051102,
+      1.6410193918421774
+     ],
+     "same_graph": 20,
+     "paired": 20,
+     "andrey_shd_mean": 0.55,
+     "comparator_shd_mean": 0.55,
+     "empty_shd_mean": 67.75,
+     "andrey_lag0_shd_mean": 0.2,
+     "comparator_lag0_shd_mean": 0.2,
+     "andrey_lagged_shd_mean": 0.35,
+     "comparator_lagged_shd_mean": 0.35,
+     "andrey_f1_mean": 0.9954424510658617,
+     "comparator_f1_mean": 0.9954424510658617,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -67.2,
+       "bootstrap_95": [
+        -69.15,
+        -65.2
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 34.997575499999996,
+     "comparator_s": 60.709112999999995,
+     "ratio": 1.635082337118427,
+     "ratio_95": [
+      1.5540093731001359,
+      1.7423080450983774
+     ],
+     "same_graph": 15,
+     "paired": 20,
+     "andrey_shd_mean": 1.85,
+     "comparator_shd_mean": 1.95,
+     "empty_shd_mean": 176.6,
+     "andrey_lag0_shd_mean": 0.15,
+     "comparator_lag0_shd_mean": 0.15,
+     "andrey_lagged_shd_mean": 1.7,
+     "comparator_lagged_shd_mean": 1.8,
+     "andrey_f1_mean": 0.9946914896503396,
+     "comparator_f1_mean": 0.9944029694120624,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 1,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.3,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -174.75,
+       "bootstrap_95": [
+        -179.05,
+        -170.75
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 5,
+      "centered_comparator_gives_andreys_graph": 5
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n50",
+   "setting": "lambda1=0.2, w_threshold=0.3, lag_threshold=0.2, tau_max=1 (the paper's for 50 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n50",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.2, lambda_a=0.2, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.2",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_ba_sbm",
+   "length": 50,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.2746415,
+     "comparator_s": 0.2837630000000002,
+     "ratio": 1.0892131792268018,
+     "ratio_95": [
+      1.021048794687315,
+      1.1423356452634006
+     ],
+     "same_graph": 14,
+     "paired": 20,
+     "andrey_shd_mean": 6.1,
+     "comparator_shd_mean": 5.85,
+     "empty_shd_mean": 14.65,
+     "andrey_lag0_shd_mean": 1.05,
+     "comparator_lag0_shd_mean": 0.95,
+     "andrey_lagged_shd_mean": 5.05,
+     "comparator_lagged_shd_mean": 4.9,
+     "andrey_f1_mean": 0.7476849139380697,
+     "comparator_f1_mean": 0.7618002491276178,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 5,
+     "mean_D": 0.25,
+     "bootstrap_95": [
+      0.0,
+      0.55
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.55,
+       "bootstrap_95": [
+        -9.5,
+        -7.5
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 6.1,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": 0.25,
+      "centered_minus_as_given_95": [
+       0.0,
+       0.55
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 10,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.6615759999999999,
+     "comparator_s": 0.8654424999999999,
+     "ratio": 1.2000325791762643,
+     "ratio_95": [
+      1.1401874987772538,
+      1.2514236614886367
+     ],
+     "same_graph": 7,
+     "paired": 20,
+     "andrey_shd_mean": 10.35,
+     "comparator_shd_mean": 10.0,
+     "empty_shd_mean": 31.45,
+     "andrey_lag0_shd_mean": 2.35,
+     "comparator_lag0_shd_mean": 2.15,
+     "andrey_lagged_shd_mean": 8.0,
+     "comparator_lagged_shd_mean": 7.85,
+     "andrey_f1_mean": 0.8118315852857634,
+     "comparator_f1_mean": 0.8202205333984404,
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 8,
+     "mean_D": 0.35,
+     "bootstrap_95": [
+      0.05,
+      0.65
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -21.1,
+       "bootstrap_95": [
+        -22.75,
+        -19.45
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 19,
+      "comparator_shd_mean": 10.3,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "centered_minus_as_given": 0.3,
+      "centered_minus_as_given_95": [
+       -0.05,
+       0.65
+      ]
+     },
+     "replication": {
+      "paired": 20,
+      "same_graph": 9,
+      "andrey_shd_mean": 9.9,
+      "comparator_shd_mean": 9.7,
+      "andrey_fewer_errors": 3,
+      "comparator_fewer_errors": 7,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       -0.3,
+       0.65
+      ],
+      "above_zero": false,
+      "empty_shd_mean": 33.1,
+      "seeds": "20-39",
+      "verdict": "tie",
+      "centered_comparator": {
+       "paired": 20,
+       "same_graph": 20,
+       "comparator_shd_mean": 9.9,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 3.7429664999999996,
+     "comparator_s": 4.8961455,
+     "ratio": 1.3819846888247,
+     "ratio_95": [
+      1.2603083851610895,
+      1.4607114995333306
+     ],
+     "same_graph": 2,
+     "paired": 20,
+     "andrey_shd_mean": 24.2,
+     "comparator_shd_mean": 23.4,
+     "empty_shd_mean": 67.75,
+     "andrey_lag0_shd_mean": 5.95,
+     "comparator_lag0_shd_mean": 5.1,
+     "andrey_lagged_shd_mean": 18.25,
+     "comparator_lagged_shd_mean": 18.3,
+     "andrey_f1_mean": 0.7939542329013725,
+     "comparator_f1_mean": 0.8005425290459242,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 9,
+     "mean_D": 0.8,
+     "bootstrap_95": [
+      -0.65,
+      3.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -43.55,
+       "bootstrap_95": [
+        -46.9,
+        -40.1
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 18,
+      "comparator_shd_mean": 24.3,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "centered_minus_as_given": 0.9,
+      "centered_minus_as_given_95": [
+       -0.6,
+       3.1
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 65.912261,
+     "comparator_s": 88.28438650000001,
+     "ratio": 1.3391549262504001,
+     "ratio_95": [
+      1.2713579808047304,
+      1.4027400425661292
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 88.45,
+     "comparator_shd_mean": 87.8,
+     "empty_shd_mean": 176.6,
+     "andrey_lag0_shd_mean": 27.2,
+     "comparator_lag0_shd_mean": 26.6,
+     "andrey_lagged_shd_mean": 61.25,
+     "comparator_lagged_shd_mean": 61.2,
+     "andrey_f1_mean": 0.7114180530260177,
+     "comparator_f1_mean": 0.7142734763875851,
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 8,
+     "mean_D": 0.65,
+     "bootstrap_95": [
+      -0.65,
+      2.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -88.15,
+       "bootstrap_95": [
+        -94.4,
+        -82.29875000000001
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 13,
+      "comparator_shd_mean": 88.6,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -0.35,
+       0.05
+      ],
+      "centered_minus_as_given": 0.8,
+      "centered_minus_as_given_95": [
+       -0.4,
+       2.05
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_uncentered",
+   "length": 500,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.3167955000000001,
+     "comparator_s": 0.6394095,
+     "ratio": 2.034501922295783,
+     "ratio_95": [
+      1.7795862598450118,
+      2.291555086736456
+     ],
+     "same_graph": 3,
+     "paired": 20,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 4.85,
+     "empty_shd_mean": 13.5,
+     "andrey_lag0_shd_mean": 0.0,
+     "comparator_lag0_shd_mean": 0.2,
+     "andrey_lagged_shd_mean": 0.15,
+     "comparator_lagged_shd_mean": 4.65,
+     "andrey_f1_mean": 0.9952222222222222,
+     "comparator_f1_mean": 0.8494321801706712,
+     "andrey_fewer_errors": 17,
+     "comparator_fewer_errors": 0,
+     "mean_D": -4.7,
+     "bootstrap_95": [
+      -6.4,
+      -3.25
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -13.35,
+       "bootstrap_95": [
+        -14.15,
+        -12.45
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n500",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 0.15,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": -4.7,
+      "centered_minus_as_given_95": [
+       -6.4,
+       -3.25
+      ]
+     },
+     "complete": true,
+     "final_verdict": "better"
+    },
+    {
+     "d": 10,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.7195079999999998,
+     "comparator_s": 2.8162854999999993,
+     "ratio": 3.410015613053447,
+     "ratio_95": [
+      2.702231944841518,
+      3.8843707907070852
+     ],
+     "same_graph": 4,
+     "paired": 20,
+     "andrey_shd_mean": 1.35,
+     "comparator_shd_mean": 12.45,
+     "empty_shd_mean": 29.3,
+     "andrey_lag0_shd_mean": 0.2,
+     "comparator_lag0_shd_mean": 0.35,
+     "andrey_lagged_shd_mean": 1.15,
+     "comparator_lagged_shd_mean": 12.1,
+     "andrey_f1_mean": 0.9765583181187656,
+     "comparator_f1_mean": 0.8237281776410393,
+     "andrey_fewer_errors": 15,
+     "comparator_fewer_errors": 0,
+     "mean_D": -11.1,
+     "bootstrap_95": [
+      -16.00125,
+      -6.5
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -27.95,
+       "bootstrap_95": [
+        -30.2,
+        -25.9
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n500",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 1.35,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": -11.1,
+      "centered_minus_as_given_95": [
+       -16.00125,
+       -6.5
+      ]
+     },
+     "complete": true,
+     "final_verdict": "better"
+    },
+    {
+     "d": 20,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 2.8028690000000003,
+     "comparator_s": 9.590449,
+     "ratio": 3.1235814947543536,
+     "ratio_95": [
+      2.8429577122344263,
+      3.9808624143859443
+     ],
+     "same_graph": 5,
+     "paired": 20,
+     "andrey_shd_mean": 1.35,
+     "comparator_shd_mean": 8.5,
+     "empty_shd_mean": 57.65,
+     "andrey_lag0_shd_mean": 0.2,
+     "comparator_lag0_shd_mean": 0.7,
+     "andrey_lagged_shd_mean": 1.15,
+     "comparator_lagged_shd_mean": 7.8,
+     "andrey_f1_mean": 0.9874810650741033,
+     "comparator_f1_mean": 0.9278604739525349,
+     "andrey_fewer_errors": 15,
+     "comparator_fewer_errors": 0,
+     "mean_D": -7.15,
+     "bootstrap_95": [
+      -10.25,
+      -4.3
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -56.3,
+       "bootstrap_95": [
+        -59.05,
+        -53.55
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n500",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 1.35,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": -7.15,
+      "centered_minus_as_given_95": [
+       -10.25,
+       -4.3
+      ]
+     },
+     "complete": true,
+     "final_verdict": "better"
+    },
+    {
+     "d": 50,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 28.499285,
+     "comparator_s": 82.74162100000001,
+     "ratio": 2.746244575178597,
+     "ratio_95": [
+      2.5657134515495157,
+      3.0059501872546437
+     ],
+     "same_graph": 3,
+     "paired": 20,
+     "andrey_shd_mean": 2.15,
+     "comparator_shd_mean": 6.9,
+     "empty_shd_mean": 144.55,
+     "andrey_lag0_shd_mean": 0.3,
+     "comparator_lag0_shd_mean": 0.25,
+     "andrey_lagged_shd_mean": 1.85,
+     "comparator_lagged_shd_mean": 6.65,
+     "andrey_f1_mean": 0.9923803720152113,
+     "comparator_f1_mean": 0.9768460332193193,
+     "andrey_fewer_errors": 16,
+     "comparator_fewer_errors": 0,
+     "mean_D": -4.75,
+     "bootstrap_95": [
+      -8.15,
+      -2.3
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -142.4,
+       "bootstrap_95": [
+        -146.25,
+        -138.55
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n500",
+      "paired": 20,
+      "same_graph": 19,
+      "comparator_shd_mean": 2.2,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "centered_minus_as_given": -4.7,
+      "centered_minus_as_given_95": [
+       -8.1,
+       -2.2
+      ]
+     },
+     "complete": true,
+     "final_verdict": "better"
+    },
+    {
+     "d": 100,
+     "n": 500,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 322.906988,
+     "comparator_s": 615.020747,
+     "ratio": 1.7342716419038473,
+     "ratio_95": [
+      1.582691049073779,
+      1.9854940263843335
+     ],
+     "same_graph": 2,
+     "paired": 20,
+     "andrey_shd_mean": 6.2,
+     "comparator_shd_mean": 8.7,
+     "empty_shd_mean": 283.25,
+     "andrey_lag0_shd_mean": 1.0,
+     "comparator_lag0_shd_mean": 0.85,
+     "andrey_lagged_shd_mean": 5.2,
+     "comparator_lagged_shd_mean": 7.85,
+     "andrey_f1_mean": 0.9881818033806506,
+     "comparator_f1_mean": 0.9838904282544669,
+     "andrey_fewer_errors": 13,
+     "comparator_fewer_errors": 5,
+     "mean_D": -2.5,
+     "bootstrap_95": [
+      -4.75,
+      -0.75
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -277.05,
+       "bootstrap_95": [
+        -285.4,
+        -268.05
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n500",
+      "paired": 20,
+      "same_graph": 16,
+      "comparator_shd_mean": 6.4,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.55,
+       0.05
+      ],
+      "centered_minus_as_given": -2.3,
+      "centered_minus_as_given_95": [
+       -4.6,
+       -0.4
+      ]
+     },
+     "complete": true,
+     "final_verdict": "better"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n50",
+   "setting": "lambda1=0.2, w_threshold=0.3, lag_threshold=0.2, tau_max=1 (the paper's for 50 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n50",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.2, lambda_a=0.2, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.2",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_uncentered",
+   "length": 50,
+   "claim": "in",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.2926510000000001,
+     "comparator_s": 0.4177624999999998,
+     "ratio": 1.5317735709081868,
+     "ratio_95": [
+      1.258686676095047,
+      1.6593710846837841
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 5.4,
+     "comparator_shd_mean": 6.55,
+     "empty_shd_mean": 13.5,
+     "andrey_lag0_shd_mean": 0.8,
+     "comparator_lag0_shd_mean": 1.3,
+     "andrey_lagged_shd_mean": 4.6,
+     "comparator_lagged_shd_mean": 5.25,
+     "andrey_f1_mean": 0.7586191849495328,
+     "comparator_f1_mean": 0.7224119232217059,
+     "andrey_fewer_errors": 12,
+     "comparator_fewer_errors": 6,
+     "mean_D": -1.15,
+     "bootstrap_95": [
+      -2.1,
+      -0.2
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -8.1,
+       "bootstrap_95": [
+        -9.0,
+        -7.3
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 20,
+      "comparator_shd_mean": 5.4,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "centered_minus_as_given": -1.15,
+      "centered_minus_as_given_95": [
+       -2.1,
+       -0.2
+      ]
+     },
+     "complete": true,
+     "final_verdict": "better"
+    },
+    {
+     "d": 10,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.0207640000000002,
+     "comparator_s": 1.697968,
+     "ratio": 1.626578780403206,
+     "ratio_95": [
+      1.3973504252120281,
+      2.159915213595118
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 13.0,
+     "comparator_shd_mean": 14.9,
+     "empty_shd_mean": 29.3,
+     "andrey_lag0_shd_mean": 2.45,
+     "comparator_lag0_shd_mean": 2.8,
+     "andrey_lagged_shd_mean": 10.55,
+     "comparator_lagged_shd_mean": 12.1,
+     "andrey_f1_mean": 0.7378039774929019,
+     "comparator_f1_mean": 0.70905423344975,
+     "andrey_fewer_errors": 12,
+     "comparator_fewer_errors": 3,
+     "mean_D": -1.9,
+     "bootstrap_95": [
+      -3.9,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.3,
+       "bootstrap_95": [
+        -18.651249999999997,
+        -14.15
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 18,
+      "comparator_shd_mean": 12.9,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "centered_minus_as_given": -2.0,
+      "centered_minus_as_given_95": [
+       -4.0,
+       0.0
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 20,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 4.1054200000000005,
+     "comparator_s": 7.1692745,
+     "ratio": 1.6979044045346319,
+     "ratio_95": [
+      1.4835723694986995,
+      2.0772589297800312
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 23.55,
+     "comparator_shd_mean": 23.5,
+     "empty_shd_mean": 57.65,
+     "andrey_lag0_shd_mean": 4.5,
+     "comparator_lag0_shd_mean": 4.0,
+     "andrey_lagged_shd_mean": 19.05,
+     "comparator_lagged_shd_mean": 19.5,
+     "andrey_f1_mean": 0.7548196145245393,
+     "comparator_f1_mean": 0.7609486013959323,
+     "andrey_fewer_errors": 8,
+     "comparator_fewer_errors": 7,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -1.7,
+      1.95
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -34.1,
+       "bootstrap_95": [
+        -37.8,
+        -30.55
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 19,
+      "comparator_shd_mean": 23.5,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "centered_minus_as_given": 0.0,
+      "centered_minus_as_given_95": [
+       -1.75,
+       1.9
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 50,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 62.989208000000005,
+     "comparator_s": 88.915085,
+     "ratio": 1.4322555813627544,
+     "ratio_95": [
+      1.239965129910241,
+      1.591695879382553
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 59.4,
+     "comparator_shd_mean": 62.05,
+     "empty_shd_mean": 144.55,
+     "andrey_lag0_shd_mean": 10.15,
+     "comparator_lag0_shd_mean": 10.45,
+     "andrey_lagged_shd_mean": 49.25,
+     "comparator_lagged_shd_mean": 51.6,
+     "andrey_f1_mean": 0.7623648346762849,
+     "comparator_f1_mean": 0.7545751566609501,
+     "andrey_fewer_errors": 12,
+     "comparator_fewer_errors": 7,
+     "mean_D": -2.65,
+     "bootstrap_95": [
+      -5.65,
+      0.2
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -85.15,
+       "bootstrap_95": [
+        -88.75,
+        -81.34875000000001
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 12,
+      "comparator_shd_mean": 59.35,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.3
+      ],
+      "centered_minus_as_given": -2.7,
+      "centered_minus_as_given_95": [
+       -5.8,
+       0.2
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    },
+    {
+     "d": 100,
+     "n": 50,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 761.9814275000001,
+     "comparator_s": 1008.0435525,
+     "ratio": 1.3154311120789899,
+     "ratio_95": [
+      1.1792668134600408,
+      1.3769458572353352
+     ],
+     "same_graph": 0,
+     "paired": 20,
+     "andrey_shd_mean": 148.7,
+     "comparator_shd_mean": 147.45,
+     "empty_shd_mean": 283.25,
+     "andrey_lag0_shd_mean": 30.85,
+     "comparator_lag0_shd_mean": 30.05,
+     "andrey_lagged_shd_mean": 117.85,
+     "comparator_lagged_shd_mean": 117.4,
+     "andrey_f1_mean": 0.6853154778509987,
+     "comparator_f1_mean": 0.6896313154080964,
+     "andrey_fewer_errors": 9,
+     "comparator_fewer_errors": 10,
+     "mean_D": 1.25,
+     "bootstrap_95": [
+      -3.1,
+      5.5
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -134.55,
+       "bootstrap_95": [
+        -142.3,
+        -126.55
+       ]
+      }
+     },
+     "centered_comparator": {
+      "comparator_solution": "causalnex.dynotears.centered.n50",
+      "paired": 20,
+      "same_graph": 7,
+      "comparator_shd_mean": 148.35,
+      "mean_D": 0.35,
+      "bootstrap_95": [
+       -0.2,
+       1.0
+      ],
+      "centered_minus_as_given": 0.9,
+      "centered_minus_as_given_95": [
+       -3.15,
+       4.85
+      ]
+     },
+     "complete": true,
+     "final_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper",
+   "length": 50,
+   "claim": "out",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 50,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.4168894999999999,
+     "comparator_s": 0.523625,
+     "ratio": 1.2553213440849134,
+     "ratio_95": [
+      1.1697391838598987,
+      1.3389500229252647
+     ],
+     "same_graph": 6,
+     "paired": 10,
+     "andrey_shd_mean": 4.7,
+     "comparator_shd_mean": 4.7,
+     "empty_shd_mean": 14.6,
+     "andrey_lag0_shd_mean": 0.5,
+     "comparator_lag0_shd_mean": 0.4,
+     "andrey_lagged_shd_mean": 4.2,
+     "comparator_lagged_shd_mean": 4.3,
+     "andrey_f1_mean": 0.8504352537846451,
+     "comparator_f1_mean": 0.8510512740323641,
+     "andrey_fewer_errors": 2,
+     "comparator_fewer_errors": 2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.4,
+      0.4
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -9.9,
+       "bootstrap_95": [
+        -11.8,
+        -7.6
+       ]
+      }
+     },
+     "complete": true
+    },
+    {
+     "d": 10,
+     "n": 50,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.8540024999999998,
+     "comparator_s": 2.909605,
+     "ratio": 1.5880890718390475,
+     "ratio_95": [
+      1.3780432168068326,
+      1.9689169431725655
+     ],
+     "same_graph": 0,
+     "paired": 10,
+     "andrey_shd_mean": 22.7,
+     "comparator_shd_mean": 22.5,
+     "empty_shd_mean": 29.9,
+     "andrey_lag0_shd_mean": 1.8,
+     "comparator_lag0_shd_mean": 1.9,
+     "andrey_lagged_shd_mean": 20.9,
+     "comparator_lagged_shd_mean": 20.6,
+     "andrey_f1_mean": 0.6982699717779559,
+     "comparator_f1_mean": 0.6979061418118845,
+     "andrey_fewer_errors": 4,
+     "comparator_fewer_errors": 6,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      -1.6,
+      2.0
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -7.2,
+       "bootstrap_95": [
+        -11.5,
+        -3.0
+       ]
+      }
+     },
+     "complete": true
+    },
+    {
+     "d": 20,
+     "n": 50,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 14.0854135,
+     "comparator_s": 16.615453,
+     "ratio": 1.2113332844139486,
+     "ratio_95": [
+      0.9673459167329761,
+      1.6274319950487666
+     ],
+     "same_graph": 0,
+     "paired": 10,
+     "andrey_shd_mean": 88.4,
+     "comparator_shd_mean": 84.8,
+     "empty_shd_mean": 59.4,
+     "andrey_lag0_shd_mean": 7.7,
+     "comparator_lag0_shd_mean": 6.4,
+     "andrey_lagged_shd_mean": 80.7,
+     "comparator_lagged_shd_mean": 78.4,
+     "andrey_f1_mean": 0.5340797415452028,
+     "comparator_f1_mean": 0.5489269817700195,
+     "andrey_fewer_errors": 3,
+     "comparator_fewer_errors": 7,
+     "mean_D": 3.6,
+     "bootstrap_95": [
+      0.0,
+      7.2
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": 29.0,
+       "bootstrap_95": [
+        18.8,
+        38.0
+       ]
+      }
+     },
+     "complete": true
+    },
+    {
+     "d": 50,
+     "n": 50,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 182.0279445,
+     "comparator_s": 193.7315855,
+     "ratio": 1.058167041888841,
+     "ratio_95": [
+      1.0418846956517578,
+      1.091315142523475
+     ],
+     "same_graph": 0,
+     "paired": 10,
+     "andrey_shd_mean": 330.7,
+     "comparator_shd_mean": 337.1,
+     "empty_shd_mean": 147.2,
+     "andrey_lag0_shd_mean": 21.8,
+     "comparator_lag0_shd_mean": 21.7,
+     "andrey_lagged_shd_mean": 308.9,
+     "comparator_lagged_shd_mean": 315.4,
+     "andrey_f1_mean": 0.4086350161717262,
+     "comparator_f1_mean": 0.4068954981149776,
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 4,
+     "mean_D": -6.4,
+     "bootstrap_95": [
+      -14.6,
+      2.6
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": 183.5,
+       "bootstrap_95": [
+        162.8,
+        201.80249999999998
+       ]
+      }
+     },
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_paper_standardized",
+   "length": 500,
+   "claim": "out",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.2684335000000001,
+     "comparator_s": 0.3016540000000003,
+     "ratio": 1.1731417922810203,
+     "ratio_95": [
+      1.0669874072235117,
+      1.2693731567154831
+     ],
+     "same_graph": 10,
+     "paired": 10,
+     "andrey_shd_mean": 8.3,
+     "comparator_shd_mean": 8.3,
+     "empty_shd_mean": 14.6,
+     "andrey_lag0_shd_mean": 3.1,
+     "comparator_lag0_shd_mean": 3.1,
+     "andrey_lagged_shd_mean": 5.2,
+     "comparator_lagged_shd_mean": 5.2,
+     "andrey_f1_mean": 0.6477212577821098,
+     "comparator_f1_mean": 0.6477212577821098,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -6.3,
+       "bootstrap_95": [
+        -8.1,
+        -4.7
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true
+    },
+    {
+     "d": 10,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.509803,
+     "comparator_s": 0.7762255,
+     "ratio": 1.5047615957623224,
+     "ratio_95": [
+      1.3769961315624373,
+      1.5512360835762715
+     ],
+     "same_graph": 10,
+     "paired": 10,
+     "andrey_shd_mean": 19.7,
+     "comparator_shd_mean": 19.7,
+     "empty_shd_mean": 29.9,
+     "andrey_lag0_shd_mean": 7.0,
+     "comparator_lag0_shd_mean": 7.0,
+     "andrey_lagged_shd_mean": 12.7,
+     "comparator_lagged_shd_mean": 12.7,
+     "andrey_f1_mean": 0.6024304804504841,
+     "comparator_f1_mean": 0.6024304804504841,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -10.2,
+       "bootstrap_95": [
+        -15.6,
+        -4.7
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true
+    },
+    {
+     "d": 20,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.6084900000000002,
+     "comparator_s": 2.476845,
+     "ratio": 1.612388263248794,
+     "ratio_95": [
+      1.5077095386024135,
+      1.7309255221800264
+     ],
+     "same_graph": 9,
+     "paired": 10,
+     "andrey_shd_mean": 39.2,
+     "comparator_shd_mean": 39.1,
+     "empty_shd_mean": 59.4,
+     "andrey_lag0_shd_mean": 14.0,
+     "comparator_lag0_shd_mean": 13.9,
+     "andrey_lagged_shd_mean": 25.2,
+     "comparator_lagged_shd_mean": 25.2,
+     "andrey_f1_mean": 0.6038497868919132,
+     "comparator_f1_mean": 0.6051974957867918,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 1,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      0.0,
+      0.3
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -20.2,
+       "bootstrap_95": [
+        -24.8,
+        -15.2
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 1,
+      "centered_comparator_gives_andreys_graph": 1
+     },
+     "complete": true
+    },
+    {
+     "d": 50,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 6.2338385,
+     "comparator_s": 11.1817885,
+     "ratio": 1.7864817661453287,
+     "ratio_95": [
+      1.7020122580003738,
+      1.9213569034080134
+     ],
+     "same_graph": 8,
+     "paired": 10,
+     "andrey_shd_mean": 82.6,
+     "comparator_shd_mean": 82.4,
+     "empty_shd_mean": 147.2,
+     "andrey_lag0_shd_mean": 27.9,
+     "comparator_lag0_shd_mean": 27.9,
+     "andrey_lagged_shd_mean": 54.7,
+     "comparator_lagged_shd_mean": 54.5,
+     "andrey_f1_mean": 0.6661065045408416,
+     "comparator_f1_mean": 0.6668564717051515,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 2,
+     "mean_D": 0.2,
+     "bootstrap_95": [
+      0.0,
+      0.5
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -64.6,
+       "bootstrap_95": [
+        -75.2025,
+        -53.7
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 2,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "DYNOTEARS",
+   "family": "time series",
+   "solution": "andrey.dynotears.n500",
+   "setting": "lambda1=0.05, w_threshold=0.3, lag_threshold=0.1, tau_max=1 (the defaults, the paper's for 500 steps)",
+   "comparator": "CausalNex 0.12.2",
+   "comparator_solution": "causalnex.dynotears.n500",
+   "comparator_setting": "from_pandas_dynamic(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.0), then same-step weights kept at abs(w) >= 0.3 and lagged ones at abs(a) >= 0.1",
+   "lane": "dynotears",
+   "output": "window over lags 0 and 1: a same-step DAG and lag-1 links, self-lags included",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release builds: the 0.13.0 branch of 31 October 2026 for the Gaussian, centered exponential, Barabasi-Albert, and out-of-claim settings, and the 0.14.0 branch of 3 November 2026 for the exponential noise of mean 1 and the Barabasi-Albert graphs at 50 steps",
+   "same_graph_test": "equal window marks (structure_hash)",
+   "regime": "dynotears_sin_tanh",
+   "length": 500,
+   "claim": "out",
+   "error_metric": "edge SHD over lags 0 and 1 (Pamfil et al. 2020, Appendix B.7): a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1; andrey_shd_mean, comparator_shd_mean, and empty_shd_mean hold their means over the paired series, and the lag0 and lagged fields the two parts",
+   "complete": true,
+   "rows": [
+    {
+     "d": 5,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.24412599999999995,
+     "comparator_s": 0.25609249999999983,
+     "ratio": 1.0325976396957715,
+     "ratio_95": [
+      0.9983322023530775,
+      1.0955176645086138
+     ],
+     "same_graph": 9,
+     "paired": 10,
+     "andrey_shd_mean": 4.1,
+     "comparator_shd_mean": 4.2,
+     "empty_shd_mean": 15.8,
+     "andrey_lag0_shd_mean": 1.3,
+     "comparator_lag0_shd_mean": 1.3,
+     "andrey_lagged_shd_mean": 2.8,
+     "comparator_lagged_shd_mean": 2.9,
+     "andrey_f1_mean": 0.8605299539170508,
+     "comparator_f1_mean": 0.858110599078341,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 0,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.3,
+      0.0
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -11.7,
+       "bootstrap_95": [
+        -13.1,
+        -10.6
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 1,
+      "centered_comparator_gives_andreys_graph": 1
+     },
+     "complete": true
+    },
+    {
+     "d": 10,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 0.547961,
+     "comparator_s": 0.8393459999999999,
+     "ratio": 1.524421583281761,
+     "ratio_95": [
+      1.4130969000254672,
+      1.6258859707627704
+     ],
+     "same_graph": 10,
+     "paired": 10,
+     "andrey_shd_mean": 9.4,
+     "comparator_shd_mean": 9.4,
+     "empty_shd_mean": 30.0,
+     "andrey_lag0_shd_mean": 3.3,
+     "comparator_lag0_shd_mean": 3.3,
+     "andrey_lagged_shd_mean": 6.1,
+     "comparator_lagged_shd_mean": 6.1,
+     "andrey_f1_mean": 0.8203197617105765,
+     "comparator_f1_mean": 0.8203197617105765,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -20.6,
+       "bootstrap_95": [
+        -23.1,
+        -17.9
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 0,
+      "centered_comparator_gives_andreys_graph": 0
+     },
+     "complete": true
+    },
+    {
+     "d": 20,
+     "n": 500,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "andrey_failed": 0,
+     "comparator_ok": 10,
+     "comparator_timeouts": 0,
+     "comparator_failed": 0,
+     "andrey_s": 1.7984794999999998,
+     "comparator_s": 3.10251,
+     "ratio": 1.6196392679158769,
+     "ratio_95": [
+      1.4202404908657638,
+      1.7844573707219809
+     ],
+     "same_graph": 8,
+     "paired": 10,
+     "andrey_shd_mean": 13.6,
+     "comparator_shd_mean": 13.6,
+     "empty_shd_mean": 54.4,
+     "andrey_lag0_shd_mean": 5.4,
+     "comparator_lag0_shd_mean": 5.4,
+     "andrey_lagged_shd_mean": 8.2,
+     "comparator_lagged_shd_mean": 8.2,
+     "andrey_f1_mean": 0.8596031878865331,
+     "comparator_f1_mean": 0.8593686413431836,
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.3
+     ],
+     "above_zero": false,
+     "floor": {
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -40.8,
+       "bootstrap_95": [
+        -44.4,
+        -36.897500000000036
+       ]
+      }
+     },
+     "differences_traced": {
+      "different_graph": 2,
+      "centered_comparator_gives_andreys_graph": 2
+     },
      "complete": true
     }
    ]

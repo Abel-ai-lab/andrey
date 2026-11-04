@@ -213,6 +213,17 @@
       "cause": "correct-by-paper",
       "reason": "With three or more environments, the approximate test compares each environment's residuals with the other rows' and takes the smallest of the K p-values times K, the paper's Bonferroni correction; InvariantCausalPrediction multiplies by K - 1, below the Bonferroni factor at K >= 3 (with two environments both use 1, as the two comparisons are one). Andrey therefore accepts a superset of the reference's sets and names fewer variables: on all 21 of this row's 500 paired fits that differ, Andrey's parents are a subset of the reference's. At 6 nodes that costs 0.024 errors per fit, all from parents not named (missed 1.592 against 1.556 per fit), while the share of fits naming a non-parent is 0.010 against 0.018; at 10 nodes the same correction gives Andrey fewer errors, 0.406 against 0.420 per fit.",
       "citation": "Peters, J., Buhlmann, P., and Meinshausen, N. (2016). Causal inference by using invariant prediction: identification and confidence intervals. JRSS-B 78(5), 947-1012, Section 3.1 (Method II, Bonferroni over the K environments). InvariantCausalPrediction 0.8 (GPL): R/getpval.R, pval <- min(pvalvec) * (length(IN) - 1)."
+    },
+    {
+      "summary": "0.14.0",
+      "method": "DYNOTEARS",
+      "comparator": "CausalNex 0.12.2",
+      "row": {"regime": "dynotears_paper_exponential", "d": 100, "n": 50},
+      "andrey_errors": 154.45,
+      "comparator_errors": 150.3,
+      "cause": "trade-off",
+      "reason": "Andrey centers every column before the fit, the same as fitting an intercept, a default kept by the user's choice on 2026-11-04 for what it gains on the series the paper's simulations draw: exponential noise of scale 1, whose mean of 1 a loss without an intercept, the paper's loss, cannot absorb. On that noise Andrey makes fewer errors than CausalNex in 6 of 10 settings and no more in the rest. With the noise centered, as this row's is, the means the centering estimates are 0, and estimating them costs about one time step of data, which shows only where the fit has more weights than steps: at 100 variables and 50 steps. On this row's 40 series Andrey's fit without centering makes 3.50 fewer errors (95% interval 1.48 to 5.50) and ties CausalNex (+0.65 [+0.05, +1.35] on seeds 0-19, -0.30 [-1.00, +0.35] on seeds 20-39); a fit not centered on 49 of the 50 steps makes 3.25 more errors [+0.50, +6.30] than on all 50. CausalNex on centered columns makes 0.55 fewer errors than Andrey on seeds 20-39 [-0.20, +1.45], the optimizer's path.",
+      "citation": "Pamfil, R., et al. (2020). DYNOTEARS: Structure learning from time-series data. AISTATS, PMLR 108, Appendix B.4: noise drawn from exponential distributions of scale 1, as in NOTEARS (Zheng et al. 2018). benchmarks/published/0.14.0/dynotears.json: centering."
     }
   ]
 }
