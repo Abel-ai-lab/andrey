@@ -83,17 +83,15 @@ and new weights with a random sign, and never subsamples.
 Cell C's datasets come from `andrey.data`: `SCM.sample` with `envs=`, each environment's
 do-intervention as `hard(2.0, sd=0.2)`, on the scenario's DAG (`FixedDAG`), weights, and noise
 scales, in the data's own units (`scale="raw"`), and `icp` takes the sample's `env` and `targets`.
-The weights and noise scales are pinned by small subclasses of the linear functional and the
-Gaussian noise, since a seed of `SCM.sample` redraws both. On four scenarios of 300 datasets each,
-the two generators' per-environment means and covariances, and Andrey's false selections and
-successes, agree within sampling error. The other cells keep the driver's generator, since
-`envs=` cannot express their settings exactly: Appendix G multiplies the noise of an intervened
-variable by a new uniform draw on every row, where `soft(noise_scale=...)` multiplies it by one
-number per environment; it draws each new weight into an intervened variable on its own, where
-`soft(weight_scale=...)` multiplies them all by one number; and a scenario fixes its SEM across
-datasets. E-hidden places one hidden parent of the target and of one other variable, where
-`latents=` places the hidden variables itself, and E-nonlinear makes one term of the target's
-equation nonlinear, where a functional applies to every equation. The speed cells use cell A's
+The weights and noise scales are the scenario's, set by small subclasses of the linear functional
+and the Gaussian noise. On four scenarios of 300 datasets each, the two generators'
+per-environment means and covariances, and Andrey's false selections and successes, agree within
+sampling error. The other cells keep the driver's generator, since `envs=` cannot express all of
+their settings: Appendix G draws each new weight into an intervened variable from a range of its
+own, where `soft(weights="redraw")` draws from the functional's `weight_range`. E-hidden places one
+hidden parent of the target and of one other variable, where `latents=` places the hidden variables
+itself, and E-nonlinear makes one term of the target's equation nonlinear, where a functional
+applies to every equation. The speed cells use cell A's
 generator.
 
 | Cell | Claim | Data | Scenarios x datasets, Andrey / R |

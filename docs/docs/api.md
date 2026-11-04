@@ -804,6 +804,9 @@ noise, and `andrey.data.SCM` builds one from those parts; both take a linear, no
 time-series model. `functional="location_scale"` gives each variable noise whose scale depends on
 its parents, the location-scale noise model of Immer et al. (2023); with `scale="rescale"` that
 scale stays a smooth function of the parents at every depth of the graph.
+`andrey.data.functional.linear(positive=True)` makes every weight positive, and
+`variance_range=(lo, hi)` on a noise family draws each variable's noise variance from `U[lo, hi]`,
+as the simulations of GnIES (Gamella et al. 2022) do.
 `andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
 scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
 for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
@@ -858,10 +861,15 @@ $R^2$-sortability averages 0.74 raw or standardized, 0.52 with `"rescale"`, and 
 `SCM.do` returns the model under interventions, and its `sample` draws from it.
 `andrey.data.interventions.hard` cuts a variable from its parents and sets it to a value, or draws
 it from a Gaussian; `soft` keeps the parents and changes the mechanism: it shifts or rescales the
-variable's noise, or rescales its parents' weights. You name a variable by its column in the data
-`sample` returns, after the column shuffle, and give values and shifts in the units of those data,
-whatever the `scale`. The sample under `do` draws the noise the sample without interventions draws,
-so every column the interventions do not reach is the same in the two.
+variable's noise, or rescales its parents' weights. `soft(noise_scale=(low, high))` multiplies the
+noise of each row by its own draw from `U[low, high]`, the noise interventions of the ICP
+simulations (Peters, Buhlmann and Meinshausen 2016, Appendix G). `soft(weights="redraw")` draws each
+parent's weight anew, on its own, from the functional's own `weight_range`; the new weights of
+Appendix G come from a range of their own, which `soft` does not take. A variable without parents
+has no weights to rescale or draw anew. You name a variable by its column in the data `sample`
+returns, after the column shuffle, and give values and shifts in the units of those data, whatever
+the `scale`. The sample under `do` draws the noise the sample without interventions draws, so every
+column the interventions do not reach is the same in the two.
 
 `envs=` on `SCM.sample` and `sample_discrete` draws several environments into one dataset: one
 mapping of interventions per environment, `{}` for none. Each environment draws its own noise, and
@@ -885,6 +893,17 @@ without interventions on the same noise and apply them to every environment, so 
 environment stays a shift in the data. On discrete data, `hard(category)` or `hard(probs=...)`
 gives a variable one distribution whatever its parents, and `soft()` draws its table anew. The true
 graph is the graph without interventions.
+
+`model_seed=` on `SCM.sample` and `sample_discrete` keeps one model across datasets. The model
+comes from `model_seed`: the graph, the weights or tables, the noise scales, the column order, and
+the weights or tables a `soft` intervention draws anew. Each environment draws its own, and `params`
+holds those of the model without interventions. `seed` draws only the rows, so samples with one
+`model_seed` and different seeds are datasets of one model, with the same true graph and `params`:
+
+```python
+datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(weights="redraw")}])
+            for s in range(10)]
+```
 
 ## Metrics
 
