@@ -130,10 +130,11 @@ reference's; the cell is worse when the 95% percentile bootstrap interval of the
 entirely above 0, better when it lies entirely below 0, and a tie otherwise. A worse cell counts
 only if a rerun on seeds 20 to 39 is worse too, and a better cell is cited only if its rerun is
 better too. The interval comes from 10,000 resamples of the datasets, with the generator seeded by
-the CRC-32 of the cell, metric, and comparison names. In every cell with 100 rows per environment
-or more, Andrey must also beat the empty graph on both errors: the interval of its error minus the
-empty graph's must lie entirely below 0. With 10 rows per environment it must beat the empty
-graph's SHD only where the reference does, and the target-error floor does not apply.
+the CRC-32 of the cell, metric, and comparison names. Andrey must also beat the empty estimate
+wherever the reference does: on each error, where the interval of the reference's error minus the
+empty estimate's (the empty graph's SHD, or the target error of no targets, the true targets'
+count) lies entirely below 0, Andrey's must lie entirely below 0 too. Elsewhere the floor does not
+apply and is reported with its numbers.
 
 Run it with the reference's environment built as above:
 
@@ -219,11 +220,15 @@ and leave their cells' pairs; every Andrey fit finished.
 
 ### Floors
 
-In all 16 cells with 100 or more rows per environment, Andrey beats the empty graph on both errors,
-on seeds 0 to 19 and on the reruns of C100, D100, and F100. With 10 rows per environment, the SHD
-floor applied in F10 on seeds 0 to 19 and in A10, C10, and D10 on seeds 20 to 39, the cells where
-the reference beat the empty graph. Andrey passed it in F10 (its SHD minus the empty graph's
--3.75 [-5.85, -1.75]), A10 (-3.05 [-4.75, -1.3]), and C10 (-4.5 [-6.45, -2.6]).
+In all 16 cells with 100 or more rows per environment the reference beats the empty estimate on
+both errors, so both floors apply, and Andrey beats it too, on seeds 0 to 19 and on the reruns of
+C100, D100, and F100. With 10 rows per environment, the SHD floor applied in F10 on seeds 0 to 19
+and in A10, C10, and D10 on seeds 20 to 39, the cells where the reference beat the empty graph.
+Andrey passed it in F10 (its SHD minus the empty graph's -3.75 [-5.85, -1.75]), A10 (-3.05
+[-4.75, -1.3]), and C10 (-4.5 [-6.45, -2.6]). The target-error floor applied in C10 on both seed
+sets and in F10 on seeds 0 to 19, where the reference's target error was below the true targets'
+count, and Andrey passed it: its target error minus that count was -4.65 [-5.2, -4.15] and -5.1
+[-5.6, -4.65] in C10 and -1.3 [-1.65, -0.95] in F10.
 
 D10 failed it on seeds 20 to 39 only. On seeds 0 to 19 the reference's SHD minus the empty graph's
 was 0.3 [-1.65, 2.35], so the floor did not apply there; Andrey's was -2.1 [-4.35, 0.2]. On seeds
@@ -247,8 +252,8 @@ The empty graph's SHD is 14 and its target error 3 in every row.
 |---|---|---|---|---|---|---|---|---|
 | O1-100 | hard interventions, 100 rows | 3.2 | 3.95 | -0.75 [-2.55, 0.85] | 0.35 | 0.2 | pass | pass |
 | O1-1000 | hard interventions | 3.75 | 3.75 | 0.0 [0.0, 0.0] | 0.65 | 0.65 | pass | pass |
-| O2 | mean shift alone | 4.0 | 3.6 | 0.4 [-1.2, 2.4] | 3.1 | 3.2 | pass | fail |
-| O3 | each target's incoming weights halved | 11.6 | 11.8 | -0.2 [-0.55, 0.0] | 3.05 | 3.0 | fail | fail |
+| O2 | mean shift alone | 4.0 | 3.6 | 0.4 [-1.2, 2.4] | 3.1 | 3.2 | pass | not applied |
+| O3 | each target's incoming weights halved | 11.6 | 11.8 | -0.2 [-0.55, 0.0] | 3.05 | 3.0 | not applied | not applied |
 | O4 | Laplace noise | 1.65 | 2.0 | -0.35 [-1.0, 0.0] | 0.35 | 0.35 | pass | pass |
 | O5 | additive nonlinear equations | 7.55 | 8.0 | -0.45 [-1.2, 0.25] | 0.7 | 0.7 | pass | pass |
 
@@ -258,7 +263,7 @@ centers each environment: Andrey's target error minus the true count was 0.1 [-0
 SHD against the observational CPDAG was 2.55 (the reference's 2.35). Halving each target's
 incoming weights breaks the shared weights the model assumes: Andrey's SHD minus the empty graph's
 was -2.4 [-4.75, 0.0] and its target error minus the true count 0.05 [-0.35, 0.45]; the
-reference's floors fail there too.
+reference's intervals reach above 0 there too, so neither floor applies.
 
 On 20 to 100 variables (O6), the A design with 1,000 rows per environment and three
 single-target environments, seeds 0 to 9, a 3,600 s cap per fit; medians:

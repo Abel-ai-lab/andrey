@@ -25,7 +25,7 @@
   "note": "cpu_models is the CPU of the gate, rerun, out-of-claim, and ladder fits, on 24 hosts; the order check, which counts results and not times, ran on one more host, whose CPU model was not recorded"
  },
  "parity_rule": "paired bootstrap",
- "verdict_rule": "per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors: in every cell with 100 or more rows per environment, the interval of shd(Andrey) - shd(empty) and of target_error(Andrey) - |true targets| must lie entirely below 0; in a cell with 10 rows per environment the shd floor applies only when the reference's own interval against the empty graph lies entirely below 0, and the target-error floor does not apply. Out-of-claim cells are reported and never judged",
+ "verdict_rule": "per cell and per metric (shd, target_error), D = error(Andrey at its defaults) - error(gnies at its defaults) per dataset, on datasets both finished and the model check passed; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; fewer than 10 pairs is reported, not judged. 10,000 resamples of the datasets, the generator seeded by the CRC-32 of '<cell>/<metric>/<comparison>'. A worse cell counts only if its rerun on seeds 20-39 is worse too; a better cell is cited only if its rerun is better too. Floors (floors.shd, floors.target_error): the interval of shd(Andrey) - shd(empty) or of target_error(Andrey) - |true targets| must lie entirely below 0 wherever the reference's own interval against the same empty estimate (reference_minus_empty) lies entirely below 0; elsewhere the floor does not apply (applies false) and is reported with its numbers. Out-of-claim cells are reported and never judged",
  "fit_protocol": "every arm of a dataset back to back on one pinned core with one BLAS thread; a cap of 1,800 s per fit at 10 variables (300 s for gnies with the true targets fixed) and 3,600 s on the variable ladder; a fit past its cap is a timeout, never an empty graph; a gnies fit whose total is not finite or whose local scores returned NaN is an error and leaves its cell's pairs",
  "error_metric": "shd: SHD of the returned interventional essential graph against the true one, the true DAG with every edge at a true target oriented; target_error: false plus missed targets. Means over the paired datasets unless a field says median",
  "data": "andrey.data: an Erdos-Renyi DAG on 10 variables with exactly round(k p / 2) edges, positive weights U[0.5, 1], Gaussian noise variances U[1, 2], each environment's targets distinct and their noise variance set to v; every environment draws its own noise; columns standardized on the pooled rows",
@@ -2871,8 +2871,8 @@
      }
     },
     "target_error": {
-     "applies": false,
-     "pass": null,
+     "applies": true,
+     "pass": true,
      "andrey_minus_empty": {
       "paired": 20,
       "mean": -4.65,
@@ -3276,8 +3276,8 @@
       }
      },
      "target_error": {
-      "applies": false,
-      "pass": null,
+      "applies": true,
+      "pass": true,
       "andrey_minus_empty": {
        "paired": 20,
        "mean": -5.1,
@@ -6707,8 +6707,8 @@
      }
     },
     "target_error": {
-     "applies": false,
-     "pass": null,
+     "applies": true,
+     "pass": true,
      "andrey_minus_empty": {
       "paired": 20,
       "mean": -1.3,
@@ -10486,8 +10486,8 @@
      }
     },
     "target_error": {
-     "applies": true,
-     "pass": false,
+     "applies": false,
+     "pass": null,
      "andrey_minus_empty": {
       "paired": 20,
       "mean": 0.1,
@@ -10875,8 +10875,8 @@
    },
    "floors": {
     "shd": {
-     "applies": true,
-     "pass": false,
+     "applies": false,
+     "pass": null,
      "andrey_minus_empty": {
       "paired": 20,
       "mean": -2.4,
@@ -10895,8 +10895,8 @@
      }
     },
     "target_error": {
-     "applies": true,
-     "pass": false,
+     "applies": false,
+     "pass": null,
      "andrey_minus_empty": {
       "paired": 20,
       "mean": 0.05,

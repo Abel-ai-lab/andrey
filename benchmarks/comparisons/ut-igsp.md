@@ -102,16 +102,18 @@ of the generating DAG under the true targets.
 A dataset's error per package is the mean over its draws, and D is Andrey's error minus the
 library's, per dataset. A comparison is worse when the 95% percentile bootstrap interval of the mean
 of D over the 20 datasets lies above 0 and its rerun on 20 fresh datasets lies above 0 too, and
-better when it lies below 0 and so does a rerun. At Andrey's defaults a comparison can have two
-reruns, on seeds 2000 to 2019 and on seeds 4000 to 4019 (see [Replication](#replication)); one below
-0 is enough. An interval that contains 0 is a tie. Its ends are rounded to 10 decimals before its
-side is read, so an end that is floating-point residue of an exact 0, such as 5e-18, counts as 0.
-The run's own scripts read 3 such intervals as above or below 0; here they tie, which changes no
-decision, and at `1e-5` with the lexicographic objective the confirmation has 2 comparisons above 0
-where the run recorded 3. In claim, a cell also fails when Andrey timed out on a dataset the library
-finished, when Andrey's `shd` is not below the empty graph's, or when Andrey's targets are not
-better than the given targets alone where those miss some. `qa/reference_parity.py` applies the rule
-to a summary in this format.
+better when it lies below 0 and so does its rerun on seeds 2000 to 2019. At Andrey's defaults a
+comparison also has seeds 4000 to 4019, the seeds that chose the default (see
+[Replication](#replication)); they are shown and decide no verdict. An interval that contains 0 is a
+tie. Its ends are rounded to 10 decimals before its side is read, so an end that is floating-point
+residue of an exact 0, such as 5e-18, counts as 0. The run's own scripts read 3 such intervals as
+above or below 0; here they tie, which changes no decision, and at `1e-5` with the lexicographic
+objective the confirmation has 2 comparisons above 0 where the run recorded 3. In claim, a cell also
+fails when Andrey timed out on a dataset the library finished, or when Andrey is not below the empty
+estimate where the library is: its `shd` against the empty graph's, and where the given targets miss
+some, its target error against theirs alone. The floor applies only where the library's own interval
+against the empty estimate lies below 0. `qa/reference_parity.py` applies the rule to a summary in
+this format.
 
 ## Run
 
@@ -143,30 +145,31 @@ the context arms, the coverage, and the floors of every cell.
 
 ### In the claim
 
-At its defaults, Andrey is worse than the library in none of the 112 comparisons (56 cells, SHD
-and target error) and better in 18: its errors were lower on seeds 0 to 19 and again on a rerun,
-on seeds 4000 to 4019 for 17 of them and on seeds 2000 to 2019 for 1. Seeds 4000 to 4019 are those
-of the run that chose the default, as the setting with the most comparisons below 0 there, so they
-favor below 0 for it (see [Replication](#replication)). Another 15 were lower on seeds 0 to 19 and
-tied on the rerun, 1 was higher on seeds 0 to 19 and tied on the rerun, and the other 78 tie. At
-the paper's level, Andrey is worse in none and better in none: 5 comparisons were higher on seeds 0
-to 19 and tied on the rerun, 3 were lower and had no rerun, and the other 104 tie.
+At its defaults, Andrey is worse than the library in none of the 112 comparisons (56 cells, SHD and
+target error) and better in 1: its errors were lower on seeds 0 to 19 and again on the rerun on
+seeds 2000 to 2019. 17 more were lower on seeds 0 to 19 and on seeds 4000 to 4019, the seeds that
+chose the default, as the setting with the most comparisons below 0 there; those seeds are not an
+independent rerun, so these count as ties (see [Replication](#replication)). Another 15 were lower
+on seeds 0 to 19 and tied on the rerun, 1 was higher on seeds 0 to 19 and tied on the rerun, and the
+other 78 tie. At the paper's level, Andrey is worse in none and better in none: 5 comparisons were
+higher on seeds 0 to 19 and tied on the rerun, 3 were lower and had no rerun, and the other 104 tie.
 
-The 18 come mostly from the level. Run at Andrey's defaults, alpha one over the observational
-rows and 10 runs, the library ties Andrey in 107 of the 112 comparisons; in the other 5, all with
-weight changes (G6), Andrey's errors were lower on seeds 0 to 19, with no rerun.
+The 18 lower on seeds 0 to 19 and on a second seed set come mostly from the level. Run at Andrey's
+defaults, alpha one over the observational rows and 10 runs, the library ties Andrey in 107 of the
+112 comparisons; in the other 5, all with weight changes (G6), Andrey's errors were lower on seeds 0
+to 19, with no rerun.
 
 At Andrey's defaults, means over the 20 datasets of each cell, seeds 0 to 19. D is Andrey's error
 minus the library's, with its 95% interval. The empty graph's SHD is 15 in every cell.
 
 | Cell | SHD, Andrey | SHD, reference | SHD D [95%] | SHD | Target error, Andrey | Target error, reference | Target error D [95%] | Target error |
 |---|---|---|---|---|---|---|---|---|
-| G1 `shift`, l 0, n 1,000 | 0.06 | 1.08 | -1.02 [-1.63, -0.47] | better | 0.14 | 0.20 | -0.06 [-0.20, +0.08] | tie |
+| G1 `shift`, l 0, n 1,000 | 0.06 | 1.08 | -1.02 [-1.63, -0.47] | lower on seeds 0-19 and 4000-4019 | 0.14 | 0.20 | -0.06 [-0.20, +0.08] | tie |
 | G1 `shift`, l 0, n 2,000 | 0.09 | 0.14 | -0.05 [-0.22, +0.11] | tie | 0.07 | 0.05 | +0.02 [-0.09, +0.15] | tie |
 | G1 `shift`, l 0, n 3,000 | 0.10 | 0.06 | +0.04 [-0.09, +0.18] | tie | 0.10 | 0.00 | +0.10 [0.00, +0.25] | tie |
 | G1 `shift`, l 0, n 4,000 | 0.02 | 0.04 | -0.02 [-0.12, +0.06] | tie | 0.05 | 0.00 | +0.05 [0.00, +0.15] | tie |
 | G1 `shift`, l 0, n 5,000 | 0.02 | 0.04 | -0.02 [-0.12, +0.06] | tie | 0.00 | 0.00 | 0.00 [0.00, 0.00] | tie |
-| G1 `shift`, l 1, n 1,000 | 0.28 | 1.18 | -0.90 [-1.42, -0.42] | better | 0.25 | 0.57 | -0.32 [-0.57, -0.07] | lower on seeds 0-19 only |
+| G1 `shift`, l 1, n 1,000 | 0.28 | 1.18 | -0.90 [-1.42, -0.42] | lower on seeds 0-19 and 4000-4019 | 0.25 | 0.57 | -0.32 [-0.57, -0.07] | lower on seeds 0-19 only |
 | G1 `shift`, l 1, n 2,000 | 0.30 | 0.44 | -0.14 [-0.40, +0.07] | tie | 0.17 | 0.18 | -0.01 [-0.08, +0.07] | tie |
 | G1 `shift`, l 1, n 3,000 | 0.18 | 0.25 | -0.07 [-0.39, +0.17] | tie | 0.14 | 0.11 | +0.03 [-0.15, +0.20] | tie |
 | G1 `shift`, l 1, n 4,000 | 0.01 | 0.08 | -0.07 [-0.20, +0.02] | tie | 0.05 | 0.03 | +0.02 [-0.07, +0.15] | tie |
@@ -191,32 +194,32 @@ minus the library's, with its 95% interval. The empty graph's SHD is 15 in every
 | G2 `perfect`, l 1, n 3,000 | 0.10 | 0.05 | +0.05 [-0.08, +0.20] | tie | 0.10 | 0.01 | +0.09 [-0.02, +0.25] | tie |
 | G2 `perfect`, l 1, n 4,000 | 0.01 | 0.04 | -0.03 [-0.12, +0.03] | tie | 0.05 | 0.01 | +0.04 [-0.03, +0.15] | tie |
 | G2 `perfect`, l 1, n 5,000 | 0.00 | 0.04 | -0.04 [-0.12, 0.00] | tie | 0.00 | 0.01 | -0.01 [-0.03, 0.00] | tie |
-| G2 `perfect`, l 2, n 1,000 | 0.10 | 1.08 | -0.98 [-1.71, -0.39] | better | 0.22 | 1.04 | -0.82 [-1.65, -0.16] | lower on seeds 0-19 only |
+| G2 `perfect`, l 2, n 1,000 | 0.10 | 1.08 | -0.98 [-1.71, -0.39] | lower on seeds 0-19 and 4000-4019 | 0.22 | 1.04 | -0.82 [-1.65, -0.16] | lower on seeds 0-19 only |
 | G2 `perfect`, l 2, n 2,000 | 0.05 | 0.25 | -0.20 [-0.49, +0.05] | tie | 0.05 | 0.13 | -0.08 [-0.23, +0.05] | tie |
 | G2 `perfect`, l 2, n 3,000 | 0.10 | 0.13 | -0.03 [-0.24, +0.14] | tie | 0.10 | 0.06 | +0.04 [-0.11, +0.21] | tie |
 | G2 `perfect`, l 2, n 4,000 | 0.00 | 0.08 | -0.08 [-0.24, 0.00] | tie | 0.05 | 0.04 | +0.01 [-0.12, +0.15] | tie |
 | G2 `perfect`, l 2, n 5,000 | 0.00 | 0.08 | -0.08 [-0.24, 0.00] | tie | 0.00 | 0.04 | -0.04 [-0.12, 0.00] | tie |
-| G2 `perfect`, l 3, n 1,000 | 0.08 | 0.78 | -0.70 [-1.16, -0.33] | better | 0.16 | 0.98 | -0.82 [-1.53, -0.27] | lower on seeds 0-19 only |
+| G2 `perfect`, l 3, n 1,000 | 0.08 | 0.78 | -0.70 [-1.16, -0.33] | lower on seeds 0-19 and 4000-4019 | 0.16 | 0.98 | -0.82 [-1.53, -0.27] | lower on seeds 0-19 only |
 | G2 `perfect`, l 3, n 2,000 | 0.05 | 0.19 | -0.14 [-0.41, +0.07] | tie | 0.00 | 0.23 | -0.23 [-0.59, 0.00] | tie |
 | G2 `perfect`, l 3, n 3,000 | 0.10 | 0.07 | +0.03 [-0.14, +0.19] | tie | 0.10 | 0.06 | +0.04 [-0.13, +0.20] | tie |
 | G2 `perfect`, l 3, n 4,000 | 0.00 | 0.06 | -0.06 [-0.18, 0.00] | tie | 0.05 | 0.06 | -0.01 [-0.18, +0.15] | tie |
 | G2 `perfect`, l 3, n 5,000 | 0.00 | 0.03 | -0.03 [-0.09, 0.00] | tie | 0.00 | 0.03 | -0.03 [-0.09, 0.00] | tie |
-| G3 `shift2`, l 0, n 1,000 | 0.00 | 0.84 | -0.84 [-1.41, -0.34] | lower on seeds 0-19 only | 0.05 | 0.32 | -0.27 [-0.56, -0.01] | better |
+| G3 `shift2`, l 0, n 1,000 | 0.00 | 0.84 | -0.84 [-1.41, -0.34] | lower on seeds 0-19 only | 0.05 | 0.32 | -0.27 [-0.56, -0.01] | lower on seeds 0-19 and 4000-4019 |
 | G3 `shift2`, l 3, n 1,000 | 0.20 | 0.98 | -0.78 [-1.38, -0.25] | lower on seeds 0-19 only | 0.28 | 1.56 | -1.28 [-2.34, -0.37] | lower on seeds 0-19 only |
-| G3 `perfect_code`, l 0, n 1,000 | 0.10 | 1.04 | -0.94 [-1.55, -0.39] | better | 0.19 | 0.20 | -0.01 [-0.11, +0.11] | tie |
-| G3 `perfect_code`, l 3, n 1,000 | 0.08 | 0.78 | -0.70 [-1.16, -0.33] | better | 0.14 | 1.00 | -0.86 [-1.58, -0.29] | lower on seeds 0-19 only |
-| G4 `variance`, l 0, n 1,000 | 0.20 | 1.01 | -0.81 [-1.43, -0.27] | better | 0.10 | 0.12 | -0.02 [-0.17, +0.13] | tie |
+| G3 `perfect_code`, l 0, n 1,000 | 0.10 | 1.04 | -0.94 [-1.55, -0.39] | lower on seeds 0-19 and 4000-4019 | 0.19 | 0.20 | -0.01 [-0.11, +0.11] | tie |
+| G3 `perfect_code`, l 3, n 1,000 | 0.08 | 0.78 | -0.70 [-1.16, -0.33] | lower on seeds 0-19 and 4000-4019 | 0.14 | 1.00 | -0.86 [-1.58, -0.29] | lower on seeds 0-19 only |
+| G4 `variance`, l 0, n 1,000 | 0.20 | 1.01 | -0.81 [-1.43, -0.27] | lower on seeds 0-19 and 4000-4019 | 0.10 | 0.12 | -0.02 [-0.17, +0.13] | tie |
 | G4 `variance`, l 0, n 5,000 | 0.06 | 0.04 | +0.02 [0.00, +0.05] | tie | 0.00 | 0.00 | 0.00 [0.00, 0.00] | tie |
-| G4 `variance`, l 3, n 1,000 | 0.20 | 0.87 | -0.67 [-1.08, -0.32] | better | 0.15 | 0.74 | -0.59 [-1.14, -0.14] | lower on seeds 0-19 only |
+| G4 `variance`, l 3, n 1,000 | 0.20 | 0.87 | -0.67 [-1.08, -0.32] | lower on seeds 0-19 and 4000-4019 | 0.15 | 0.74 | -0.59 [-1.14, -0.14] | lower on seeds 0-19 only |
 | G4 `variance`, l 3, n 5,000 | 0.01 | 0.03 | -0.02 [-0.09, +0.03] | tie | 0.00 | 0.02 | -0.02 [-0.06, 0.00] | tie |
-| G5 `shift`, l 0, n 1,000 | 0.10 | 0.95 | -0.85 [-1.37, -0.37] | better | 0.10 | 0.13 | -0.03 [-0.17, +0.10] | tie |
+| G5 `shift`, l 0, n 1,000 | 0.10 | 0.95 | -0.85 [-1.37, -0.37] | lower on seeds 0-19 and 4000-4019 | 0.10 | 0.13 | -0.03 [-0.17, +0.10] | tie |
 | G5 `shift`, l 0, n 5,000 | 0.02 | 0.04 | -0.02 [-0.12, +0.06] | tie | 0.00 | 0.00 | 0.00 [0.00, 0.00] | tie |
 | G5 `shift`, l 3, n 1,000 | 0.18 | 1.05 | -0.87 [-1.55, -0.34] | lower on seeds 0-19 only | 0.35 | 1.22 | -0.87 [-1.58, -0.29] | lower on seeds 0-19 only |
 | G5 `shift`, l 3, n 5,000 | 0.25 | 0.17 | +0.08 [-0.20, +0.45] | tie | 0.26 | 0.19 | +0.07 [-0.10, +0.31] | tie |
-| G6 `weight`, l 0, n 1,000 | 1.00 | 3.06 | -2.06 [-3.12, -1.18] | better | 0.11 | 0.11 | 0.00 [-0.09, +0.13] | tie |
-| G6 `weight`, l 0, n 5,000 | 0.08 | 0.39 | -0.31 [-0.62, -0.03] | better | 0.01 | 0.19 | -0.18 [-0.37, -0.04] | better |
-| G6 `weight`, l 3, n 1,000 | 1.58 | 3.56 | -1.98 [-2.77, -1.26] | better | 3.15 | 5.67 | -2.52 [-3.81, -1.39] | better |
-| G6 `weight`, l 3, n 5,000 | 0.10 | 0.51 | -0.41 [-0.74, -0.11] | better | 0.12 | 1.50 | -1.38 [-2.55, -0.38] | better |
+| G6 `weight`, l 0, n 1,000 | 1.00 | 3.06 | -2.06 [-3.12, -1.18] | lower on seeds 0-19 and 4000-4019 | 0.11 | 0.11 | 0.00 [-0.09, +0.13] | tie |
+| G6 `weight`, l 0, n 5,000 | 0.08 | 0.39 | -0.31 [-0.62, -0.03] | lower on seeds 0-19 and 4000-4019 | 0.01 | 0.19 | -0.18 [-0.37, -0.04] | lower on seeds 0-19 and 4000-4019 |
+| G6 `weight`, l 3, n 1,000 | 1.58 | 3.56 | -1.98 [-2.77, -1.26] | lower on seeds 0-19 and 4000-4019 | 3.15 | 5.67 | -2.52 [-3.81, -1.39] | lower on seeds 0-19 and 4000-4019 |
+| G6 `weight`, l 3, n 5,000 | 0.10 | 0.51 | -0.41 [-0.74, -0.11] | lower on seeds 0-19 and 4000-4019 | 0.12 | 1.50 | -1.38 [-2.55, -0.38] | lower on seeds 0-19 and 4000-4019 |
 
 At the paper's level, alpha `1e-5` and 5 starts, against the same library fits:
 
@@ -287,15 +290,16 @@ defaults](#choosing-the-defaults)) reran on seeds 2000 to 2019; they hold every 
 here. At Andrey's defaults every comparison also has seeds 4000 to 4019, where the same settings ran
 on an earlier build of the same search in the run that chose the default; a comparison with both
 shows both. That run chose the setting with the most comparisons below 0 on seeds 4000 to 4019, so
-those seeds favor below 0 for the default: 17 of the 18 better comparisons repeated there, and one,
-G2 `perfect` l 1 SHD, was lower on seeds 2000 to 2019 and tied on 4000 to 4019. The 3 comparisons at
-the paper's level that were lower on seeds 0 to 19 (G3 `perfect_code` l 3 SHD, and G6 `weight` l 3
-target error at 1,000 and 5,000 rows) are in cells that did not rerun.
+those seeds favor below 0 for the default and decide no verdict: 17 comparisons were lower on seeds
+0 to 19 and on seeds 4000 to 4019, and the one better comparison, G2 `perfect` l 1 SHD, was lower on
+seeds 2000 to 2019 and tied on 4000 to 4019. The 3 comparisons at the paper's level that were lower
+on seeds 0 to 19 (G3 `perfect_code` l 3 SHD, and G6 `weight` l 3 target error at 1,000 and 5,000
+rows) are in cells that did not rerun.
 
 | Settings | Cell | Error | D, seeds 0-19 | D, fresh seeds | Fresh seeds | Result |
 |---|---|---|---|---|---|---|
-| defaults | G1 `shift`, l 0, n 1,000 | SHD | -1.02 [-1.63, -0.47] | -0.49 [-0.94, -0.08] | 4000-4019 | better |
-| defaults | G1 `shift`, l 1, n 1,000 | SHD | -0.90 [-1.42, -0.42] | -0.57 [-1.06, -0.14] | 4000-4019 | better |
+| defaults | G1 `shift`, l 0, n 1,000 | SHD | -1.02 [-1.63, -0.47] | -0.49 [-0.94, -0.08] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G1 `shift`, l 1, n 1,000 | SHD | -0.90 [-1.42, -0.42] | -0.57 [-1.06, -0.14] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G1 `shift`, l 1, n 1,000 | target error | -0.32 [-0.57, -0.07] | -0.09 [-0.41, +0.23] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G1 `shift`, l 2, n 1,000 | SHD | -0.80 [-1.35, -0.26] | -0.53 [-1.15, 0.00] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G1 `shift`, l 2, n 1,000 | target error | -0.87 [-1.80, -0.15] | -0.13 [-0.53, +0.24] | 4000-4019 | lower on seeds 0-19 only |
@@ -304,30 +308,30 @@ target error at 1,000 and 5,000 rows) are in cells that did not rerun.
 | defaults | G1 `shift`, l 3, n 3,000 | target error | +0.21 [+0.01, +0.45] | -0.15 [-0.53, +0.15]; +0.16 [0.00, +0.40] | 2000-2019; 4000-4019 | higher on seeds 0-19 only |
 | defaults | G2 `perfect`, l 0, n 1,000 | SHD | -0.94 [-1.57, -0.37] | -0.27 [-0.78, +0.23] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G2 `perfect`, l 1, n 1,000 | SHD | -0.79 [-1.35, -0.30] | -0.90 [-1.71, -0.10]; -0.40 [-0.90, +0.07] | 2000-2019; 4000-4019 | better |
-| defaults | G2 `perfect`, l 2, n 1,000 | SHD | -0.98 [-1.71, -0.39] | -0.66 [-1.21, -0.18] | 4000-4019 | better |
+| defaults | G2 `perfect`, l 2, n 1,000 | SHD | -0.98 [-1.71, -0.39] | -0.66 [-1.21, -0.18] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G2 `perfect`, l 2, n 1,000 | target error | -0.82 [-1.65, -0.16] | +0.04 [-0.26, +0.36] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G2 `perfect`, l 3, n 1,000 | SHD | -0.70 [-1.16, -0.33] | -0.40 [-0.76, -0.08] | 4000-4019 | better |
+| defaults | G2 `perfect`, l 3, n 1,000 | SHD | -0.70 [-1.16, -0.33] | -0.40 [-0.76, -0.08] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G2 `perfect`, l 3, n 1,000 | target error | -0.82 [-1.53, -0.27] | -0.15 [-0.66, +0.39] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G3 `shift2`, l 0, n 1,000 | SHD | -0.84 [-1.41, -0.34] | -0.34 [-0.86, +0.17] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G3 `shift2`, l 0, n 1,000 | target error | -0.27 [-0.56, -0.01] | -0.13 [-0.26, -0.02] | 4000-4019 | better |
+| defaults | G3 `shift2`, l 0, n 1,000 | target error | -0.27 [-0.56, -0.01] | -0.13 [-0.26, -0.02] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G3 `shift2`, l 3, n 1,000 | SHD | -0.78 [-1.38, -0.25] | -0.31 [-0.65, +0.03] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G3 `shift2`, l 3, n 1,000 | target error | -1.28 [-2.34, -0.37] | -0.37 [-0.86, +0.09] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G3 `perfect_code`, l 0, n 1,000 | SHD | -0.94 [-1.55, -0.39] | -0.47 [-0.95, -0.05] | 4000-4019 | better |
-| defaults | G3 `perfect_code`, l 3, n 1,000 | SHD | -0.70 [-1.16, -0.33] | -0.48 [-0.87, -0.11] | 4000-4019 | better |
+| defaults | G3 `perfect_code`, l 0, n 1,000 | SHD | -0.94 [-1.55, -0.39] | -0.47 [-0.95, -0.05] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G3 `perfect_code`, l 3, n 1,000 | SHD | -0.70 [-1.16, -0.33] | -0.48 [-0.87, -0.11] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G3 `perfect_code`, l 3, n 1,000 | target error | -0.86 [-1.58, -0.29] | -0.15 [-0.68, +0.43] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G4 `variance`, l 0, n 1,000 | SHD | -0.81 [-1.43, -0.27] | -0.57 [-1.02, -0.17] | 4000-4019 | better |
-| defaults | G4 `variance`, l 3, n 1,000 | SHD | -0.67 [-1.08, -0.32] | -0.43 [-0.84, -0.04] | 4000-4019 | better |
+| defaults | G4 `variance`, l 0, n 1,000 | SHD | -0.81 [-1.43, -0.27] | -0.57 [-1.02, -0.17] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G4 `variance`, l 3, n 1,000 | SHD | -0.67 [-1.08, -0.32] | -0.43 [-0.84, -0.04] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G4 `variance`, l 3, n 1,000 | target error | -0.59 [-1.14, -0.14] | -0.02 [-0.41, +0.43] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G5 `shift`, l 0, n 1,000 | SHD | -0.85 [-1.37, -0.37] | -0.47 [-0.93, -0.07] | 4000-4019 | better |
+| defaults | G5 `shift`, l 0, n 1,000 | SHD | -0.85 [-1.37, -0.37] | -0.47 [-0.93, -0.07] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | defaults | G5 `shift`, l 3, n 1,000 | SHD | -0.87 [-1.55, -0.34] | -0.27 [-0.82, +0.25] | 4000-4019 | lower on seeds 0-19 only |
 | defaults | G5 `shift`, l 3, n 1,000 | target error | -0.87 [-1.58, -0.29] | +0.08 [-0.55, +0.72] | 4000-4019 | lower on seeds 0-19 only |
-| defaults | G6 `weight`, l 0, n 1,000 | SHD | -2.06 [-3.12, -1.18] | -1.42 [-2.26, -0.61] | 4000-4019 | better |
-| defaults | G6 `weight`, l 0, n 5,000 | SHD | -0.31 [-0.62, -0.03] | -0.50 [-0.80, -0.25] | 4000-4019 | better |
-| defaults | G6 `weight`, l 0, n 5,000 | target error | -0.18 [-0.37, -0.04] | -0.23 [-0.38, -0.09] | 4000-4019 | better |
-| defaults | G6 `weight`, l 3, n 1,000 | SHD | -1.98 [-2.77, -1.26] | -1.76 [-2.55, -1.05] | 4000-4019 | better |
-| defaults | G6 `weight`, l 3, n 1,000 | target error | -2.52 [-3.81, -1.39] | -2.63 [-3.95, -1.39] | 4000-4019 | better |
-| defaults | G6 `weight`, l 3, n 5,000 | SHD | -0.41 [-0.74, -0.11] | -0.51 [-0.91, -0.20] | 4000-4019 | better |
-| defaults | G6 `weight`, l 3, n 5,000 | target error | -1.38 [-2.55, -0.38] | -1.15 [-2.16, -0.33] | 4000-4019 | better |
+| defaults | G6 `weight`, l 0, n 1,000 | SHD | -2.06 [-3.12, -1.18] | -1.42 [-2.26, -0.61] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G6 `weight`, l 0, n 5,000 | SHD | -0.31 [-0.62, -0.03] | -0.50 [-0.80, -0.25] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G6 `weight`, l 0, n 5,000 | target error | -0.18 [-0.37, -0.04] | -0.23 [-0.38, -0.09] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G6 `weight`, l 3, n 1,000 | SHD | -1.98 [-2.77, -1.26] | -1.76 [-2.55, -1.05] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G6 `weight`, l 3, n 1,000 | target error | -2.52 [-3.81, -1.39] | -2.63 [-3.95, -1.39] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G6 `weight`, l 3, n 5,000 | SHD | -0.41 [-0.74, -0.11] | -0.51 [-0.91, -0.20] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
+| defaults | G6 `weight`, l 3, n 5,000 | target error | -1.38 [-2.55, -0.38] | -1.15 [-2.16, -0.33] | 4000-4019 | lower on seeds 0-19 and 4000-4019 |
 | paper's level | G1 `shift`, l 3, n 2,000 | SHD | +0.63 [+0.11, +1.32] | -0.06 [-0.35, +0.22] | 2000-2019 | higher on seeds 0-19 only |
 | paper's level | G1 `shift`, l 3, n 2,000 | target error | +0.35 [+0.08, +0.66] | -0.13 [-0.47, +0.24] | 2000-2019 | higher on seeds 0-19 only |
 | paper's level | G1 `shift`, l 3, n 3,000 | SHD | +0.27 [+0.04, +0.55] | -0.21 [-0.55, +0.09] | 2000-2019 | higher on seeds 0-19 only |
@@ -336,12 +340,14 @@ target error at 1,000 and 5,000 rows) are in cells that did not rerun.
 
 ### Floors and coverage
 
-In all 56 cells, at both settings, Andrey's SHD is below the empty graph's: the interval of its
-SHD minus the empty graph's lies below 0, with its upper end at most -12.75 at the defaults and
--10.39 at the paper's level. In the 40 cells where the given targets miss some (`l` of 1 or more,
-and G5), its target error is below the given targets' alone, with the interval's upper end at most
--4.45 and -4.11. Every draw of both packages finished within its cap, on all 1,120 datasets of
-seeds 0 to 19 and on every rerun.
+In all 56 cells the library's SHD is below the empty graph's (the interval of its SHD minus the
+empty graph's has its upper end at most -10.62), and in the 40 cells where the given targets miss
+some (`l` of 1 or more, and G5), its target error is below the given targets' alone (upper end at
+most -4.01), so every floor applies. Andrey passes each: at both settings its SHD is below the empty
+graph's, with the interval's upper end at most -12.75 at the defaults and -10.39 at the paper's
+level, and its target error is below the given targets' alone, with the upper end at most -4.45 and
+-4.11. Every draw of both packages finished within its cap, on all 1,120 datasets of seeds 0 to 19
+and on every rerun.
 
 ### Choosing the defaults
 
