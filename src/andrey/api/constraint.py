@@ -1083,7 +1083,7 @@ def gfci(
 @method_spec("cdnod")
 def cdnod(
     data: npt.ArrayLike,
-    env: npt.ArrayLike | str,
+    env: npt.ArrayLike | str | None = None,
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -1104,19 +1104,24 @@ def cdnod(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``. A column that ``env`` names is not a variable: it leaves
         the data before the fit, and ``categorical``, ``knowledge``, and the result's positions
-        count the other columns.
-    env : array-like of shape (n_samples,) or (n_samples, 1), or str
+        count the other columns. A list of DataFrames or 2-D arrays gives each domain's rows
+        apart, labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows
+        are stacked in that order, and ``env`` stays ``None``. A position is the domain's number,
+        so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the order of the list
+        can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
         The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
         or the time step for data that drift over time, or the name of a column of the DataFrame
         ``data`` that holds them. Numbers are coerced to ``float64`` and read as numbers; whole
         numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels
         are coded ``0, 1, ...`` in sorted order, whatever the row order; a label is a string or a
         number, not both. See Notes for more than two domains. When every row has the same value,
-        the data come from one domain, and the result equals :func:`~andrey.pc`'s.
+        the data come from one domain, and the result equals :func:`~andrey.pc`'s. ``None``
+        needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
@@ -1205,13 +1210,15 @@ def cdnod(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``env``
-        does not hold one value per row of ``data``, holds ``NaN`` / ``inf`` or a missing label,
-        mixes strings and numbers, or names a column ``data`` lacks; if ``data`` has too few rows
+        is given with each domain's rows apart; if those rows' tables differ in kind or columns,
+        or one has no rows or holds ``inf``; if ``env`` does not hold one value per row
+        of ``data``, holds ``NaN`` / ``inf`` or a missing label, mixes strings and numbers, or
+        names a column ``data`` lacks; if ``data`` has too few rows
         for a test, if ``data`` or ``categorical`` does not suit the test, as for
         :func:`~andrey.pc`, or, with a categorical or mixed-data test, if a numeric ``env`` holds a
         value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a column of
@@ -1363,6 +1370,10 @@ def cdnod(
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
     from andrey.core.environments import normalize_env_targets
 
+    if env is None:
+        raise TypeError(
+            "cdnod needs env, the environment of each row, or data as each environment's rows apart"
+        )
     data, codes, env_labels, _ = normalize_env_targets(
         data, env, None, require_known_targets=False, method="cdnod"
     )
