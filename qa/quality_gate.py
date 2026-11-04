@@ -51,6 +51,7 @@ from qa import reference_parity
 # The regimes whose data is not one plain sample, the published settings, and the scores of the
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
+import camuv_cpu  # noqa: E402
 import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
 import ut_igsp_cpu  # noqa: E402
@@ -210,6 +211,15 @@ UNKNOWN_TARGET_CELLS: dict[str, str] = {
     "unknown_target_variance_gauss_er_d20": "G4_variance_l3_n1000",
 }
 
+#: CAM-UV's published regimes, drawn by its benchmark driver (``benchmarks/camuv_cpu.py``) at two
+#: in-claim cells of the comparison where its errors are below the empty graph's: the paper's
+#: simulation at 1,000 rows, 10 observed variables and 4 hidden, and additive noise with one node in
+#: ten hidden, 20 observed and 2 hidden at 1,000 rows. ``d`` counts the hidden nodes too.
+HIDDEN_CAUSE_CELLS: dict[str, tuple[str, int, int]] = {
+    "camuv_paper_d14_n1000": ("camuv_paper", 14, 1000),
+    "latent_anm_er_tenth_d22_n1000": ("latent_anm_er_tenth", 22, 1000),
+}
+
 #: ``(d, n)`` of the invariance draws, ``d`` variables and ``n`` rows in each environment, as in
 #: ICP's published ``icp_do`` regime: observation and do-interventions ``N(2, 0.2^2)`` at 6 or 10
 #: variables and 200 rows per environment. The gate intervenes on every variable but the target
@@ -316,6 +326,18 @@ def model_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
         x, marks, kind, _ = regime_models.sample(
             model, d=d, n=n, seed=seed, density=2.0, noise=noise
         )
+        out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind, node_types=types)))
+    return tuple(out)
+
+
+def hidden_cause_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
+    """The observed columns of one CAM-UV lane dataset per seed, with the true DAG over every node,
+    the hidden ones last. A seed whose graph cannot hide its nodes is skipped and the next one
+    taken, as the benchmark driver does."""
+    out = []
+    for key in camuv_cpu.regime_keys(regime, d, n, seeds=len(SEEDS), seed_start=SEEDS[0]):
+        x, marks, kind, _ = datasets.generate_one(key)
+        types = datasets.latent_node_types(len(marks), key.latents)
         out.append(Draw(x, GraphStructure.from_numpy(marks, kind=kind, node_types=types)))
     return tuple(out)
 
@@ -518,6 +540,10 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         for d, n in sizes_
     },
     **{f"icp_do_d{d}": functools.partial(invariance_draws, d, n) for d, n in INVARIANCE_SIZES},
+    **{
+        name: functools.partial(hidden_cause_draws, *cell)
+        for name, cell in HIDDEN_CAUSE_CELLS.items()
+    },
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
     "sachs": sachs_draws,
@@ -554,8 +580,10 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: identifiable, recorded with it: the interventional essential graph, or the CPDAG in which the
 #: domain index orients the edges it reaches. ``clusters`` counts the latents missed
 #: (:func:`latents_missed`). ``parents`` scores the parents of the last variable as a set
-#: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`). A
-#: time-series estimate is scored in its published summary's unit (:func:`series_error`).
+#: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`).
+#: ``direct`` scores the directed edges against those between observed variables that no hidden
+#: path joins (:func:`direct`). A time-series estimate is scored in its published summary's unit
+#: (:func:`series_error`).
 Target = Literal[
     "cpdag",
     "dag",
@@ -564,6 +592,7 @@ Target = Literal[
     "essential",
     "clusters",
     "parents",
+    "direct",
     "lagged",
     "window",
     "window_edges",
@@ -592,7 +621,8 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # <-> and scores worse than the empty graph, and on Sachs BottomUpParceLiNGAM does. ANM and PNL take
 # one pair of variables, so each runs on its benchmark's pairs only. GIES, GnIES, CD-NOD,
 # MultiGroupDirectLiNGAM, and GIN need what only their regimes have: interventions, environments
-# that change noise variances, domains, groups, or latents measured by indicators.
+# that change noise variances, domains, groups, or latents measured by indicators. CAM-UV runs on
+# its benchmark's nonlinear regimes with hidden variables.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -601,6 +631,8 @@ LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
 INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTION_SIZES)
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
+#: CAM-UV needs nonlinear additive-noise data with hidden variables.
+HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
 
 
 def _models(regime: str) -> tuple[str, ...]:
@@ -698,6 +730,7 @@ SUPPORTED: dict[str, Method] = {
     "BottomUpParceLiNGAM": Method(
         lambda x: andrey.bottom_up_parce_lingam(x), "projection", CONFOUNDED_DATA
     ),
+    "CAM-UV": Method(lambda x: andrey.camuv(x), "direct", HIDDEN_CAUSE_DATA),
     "GIN": Method(lambda x: andrey.gin(x), "clusters", _models("latent_measurement")),
     "ANM": Method(lambda x: andrey.anm(x), "dag", (f"anm_pair_n{PAIR_N}",)),
     "PNL": Method(lambda x: andrey.pnl(x), "dag", (f"pnl_pair_n{PAIR_N}",)),
@@ -786,12 +819,32 @@ def projection(truth: GraphStructure) -> GraphStructure:
     return GraphStructure.from_numpy(out, kind="pag")
 
 
+def directed(graph: Any) -> set[tuple[int, int]]:
+    """Return the directed edges ``(i, j)``, ``i -> j``, of ``graph``, a structure or an output."""
+    marks = getattr(graph, "structure", graph).to_numpy()
+    return set(zip(*map(np.ndarray.tolist, np.nonzero((marks == TAIL) & (marks.T == ARROW)))))
+
+
+def direct(truth: GraphStructure) -> GraphStructure:
+    """Return the DAG over the observed nodes of ``truth`` with the edges CAM-UV can identify as
+    direct: those between two observed nodes that no hidden causal or backdoor path joins
+    (``andrey_bench.scoring.direct_edges``), the truth of its published direct-edge errors."""
+    n_observed = truth.n_nodes - int(np.count_nonzero(np.asarray(truth.node_types) == LATENT))
+    out = np.zeros((n_observed, n_observed), dtype=np.int8)
+    for i, j in scoring.direct_edges(truth):
+        out[i, j], out[j, i] = TAIL, ARROW
+    return GraphStructure.from_numpy(out, kind="dag")
+
+
 def target_truth(truth: GraphStructure, target: Target) -> GraphStructure:
     """Return what an estimate scored as ``target`` is compared with, as in the published summary.
 
     A CPDAG is scored against the truth's CPDAG, a DAG against the DAG, a PAG against the PAG of
-    the observed variables, and a ``projection`` estimate against :func:`projection`.
+    the observed variables, a ``projection`` estimate against :func:`projection`, and a ``direct``
+    one against :func:`direct`.
     """
+    if target == "direct":
+        return direct(truth)
     if target == "pag":
         return marginal(truth, "pag", max_nodes=truth.n_nodes)
     if target == "projection":
@@ -803,7 +856,10 @@ def target_truth(truth: GraphStructure, target: Target) -> GraphStructure:
 
 def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     """Return the SHD of ``estimate`` against ``target_truth``; PAG-like targets count endpoints,
-    ``clusters`` the latents missed, and ``parents`` the errors in the last variable's parents."""
+    ``clusters`` the latents missed, ``parents`` the errors in the last variable's parents, and
+    ``direct`` the directed edges in one graph and not the other, a reversed edge twice."""
+    if target == "direct":
+        return len(directed(estimate) ^ directed(truth))
     if target == "clusters":
         return latents_missed(estimate, truth)
     if target == "parents":
@@ -885,6 +941,8 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
     if target == "parents":  # the data hold each row's environment beside the variables
         return empty_graph(truth.n_nodes, "dag")
     if target == "clusters":
+        return empty_graph(draw.data.shape[1], "dag")
+    if target == "direct":
         return empty_graph(draw.data.shape[1], "dag")
     return empty_graph(draw.data.shape[1], target)
 
