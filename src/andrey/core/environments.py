@@ -181,6 +181,10 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
     """
     import pandas as pd
 
+    if isinstance(env, np.ndarray) and env.shape in ((n,), (n, 1)) and env.dtype.kind in "iuU":
+        # Integer or text labels: none can be missing or of the other kind, so no row is checked.
+        codes, labels = pd.factorize(np.asarray(env).reshape(-1), sort=True)
+        return codes.astype(np.intp), labels.tolist()
     prefix = f"{method}: " if method else ""
     values = np.asarray(env, dtype=object)
     if values.shape not in ((n,), (n, 1)):

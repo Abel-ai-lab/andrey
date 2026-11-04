@@ -59,8 +59,9 @@ TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
-#: Settings that shorten a slow fit; the labels come from the same facade path.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Settings that shorten a slow fit, and the target ICP needs; the labels come from the same
+#: facade path.
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
 #: The targets of a method that reads three environments: observational, one with the known
 #: target z, and one whose targets are unknown.
 CONTEXT = {"ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}}}

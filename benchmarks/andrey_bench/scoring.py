@@ -379,6 +379,13 @@ def _pag_of(truth: GraphStructure) -> GraphStructure:
     return hit[1]
 
 
+def _hidden(truth: GraphStructure) -> np.ndarray:
+    """The hidden nodes of `truth` as a boolean mask; none when it has no node types."""
+    if truth.node_types is None:
+        return np.zeros(truth.n_nodes, dtype=bool)
+    return np.asarray(truth.node_types) == LATENT
+
+
 def _directed_adjacency(truth: GraphStructure) -> np.ndarray:
     """Return binary adjacency where ``A[i, j] = 1`` represents ``i -> j``."""
     marks = np.asarray(truth.to_numpy())
@@ -392,9 +399,11 @@ CONFOUNDED_MARKS = {"bidirected": _ARROW, "circle": _CIRCLE}
 #: What counts as a true confounded pair. ``pag``: the observed pairs joined by ``<->`` in the
 #: observed PAG. A PAG keeps ``<->`` only where conditional independences fix both arrowheads, so a
 #: sparse graph has few. ``hidden_cause``: the observed pairs reached from one hidden node by
-#: directed paths that pass through hidden nodes only, the target of RCD and BottomUpParceLiNGAM,
-#: which mark a pair whether or not one node is the other's parent.
-CONFOUNDED_TARGETS = ("pag", "hidden_cause")
+#: directed paths that pass through hidden nodes only, the target of RCD and BottomUpParceLiNGAM.
+#: ``unobserved_path``: CAM-UV's target, the pairs joined by an unobserved causal or backdoor path
+#: (:func:`unobserved_path_pairs`). Each method marks its pairs whether or not one node is the
+#: other's parent.
+CONFOUNDED_TARGETS = ("pag", "hidden_cause", "unobserved_path")
 
 #: The columns :func:`confounded_pair_scores` returns, in order: the number of estimated pairs, then
 #: per target the number of true pairs, precision, recall, and F1.
@@ -417,7 +426,7 @@ def _marked_pairs(marks: np.ndarray, mark: int) -> set[tuple[int, int]]:
 def _hidden_cause_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
     """Return the observed pairs ``i < j`` that one hidden node reaches through hidden nodes only."""
     directed = _directed_adjacency(truth).astype(bool)
-    hidden = np.asarray(truth.node_types) == LATENT
+    hidden = _hidden(truth)
     pairs: set[tuple[int, int]] = set()
     for source in np.flatnonzero(hidden):
         seen, stack, reached = {int(source)}, [int(source)], set()
@@ -439,7 +448,7 @@ def projected_directed(truth: GraphStructure) -> set[tuple[int, int]]:
     them hidden, a direct edge included.
     """
     directed = _directed_adjacency(truth).astype(bool)
-    hidden = np.asarray(truth.node_types) == LATENT
+    hidden = _hidden(truth)
     edges: set[tuple[int, int]] = set()
     for source in np.flatnonzero(~hidden):
         seen, stack = {int(source)}, [int(source)]
@@ -453,6 +462,50 @@ def projected_directed(truth: GraphStructure) -> set[tuple[int, int]]:
     return edges
 
 
+def unobserved_path_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
+    """Return the observed pairs ``i < j`` of a DAG `truth` joined by an unobserved path.
+
+    CAM-UV's definitions (Maeda and Shimizu, 2021): an unobserved causal path from ``i`` to ``j`` is
+    a directed path that enters ``j`` from a hidden parent; an unobserved backdoor path enters both
+    ``i`` and ``j`` from hidden parents that share an ancestor (either may be that ancestor). Nodes
+    inside either path may be observed.
+    """
+    directed = _directed_adjacency(truth).astype(bool)
+    hidden = _hidden(truth)
+    reach = directed | np.eye(len(hidden), dtype=bool)  # reach[a, b]: a is b or an ancestor of b
+    for k in range(len(hidden)):
+        reach |= reach[:, [k]] & reach[[k], :]
+    hidden_parents = [np.flatnonzero(directed[:, v] & hidden) for v in range(len(hidden))]
+    pairs: set[tuple[int, int]] = set()
+    for i, j in combinations(map(int, np.flatnonzero(~hidden)), 2):
+        causal = any(reach[i, h] for h in hidden_parents[j]) or any(
+            reach[j, h] for h in hidden_parents[i]
+        )
+        backdoor = any(
+            (reach[:, a] & reach[:, b]).any() for a in hidden_parents[i] for b in hidden_parents[j]
+        )
+        if causal or backdoor:
+            pairs.add((i, j))
+    return pairs
+
+
+def direct_edges(truth: GraphStructure) -> set[tuple[int, int]]:
+    """Return the edges ``(i, j)`` of a DAG `truth` that CAM-UV can identify as direct.
+
+    These join two observed nodes with no unobserved path between them
+    (:func:`unobserved_path_pairs`): CAM-UV marks a pair with such a path instead of orienting it,
+    even when one node is the other's parent.
+    """
+    hidden = _hidden(truth)
+    directed = _directed_adjacency(truth).astype(bool) & ~hidden[:, None] & ~hidden[None, :]
+    unresolved = unobserved_path_pairs(truth)
+    return {
+        (int(i), int(j))
+        for i, j in zip(*np.nonzero(directed), strict=True)
+        if (min(i, j), max(i, j)) not in unresolved
+    }
+
+
 def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, int]]:
     """Return the true confounded pairs ``i < j`` of a DAG `truth` with hidden nodes.
 
@@ -463,6 +516,8 @@ def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, 
         return _marked_pairs(np.asarray(_pag_of(truth).to_numpy()), _ARROW)
     if target == "hidden_cause":
         return _hidden_cause_pairs(truth)
+    if target == "unobserved_path":
+        return unobserved_path_pairs(truth)
     raise ValueError(f"unknown target {target!r}; known: {list(CONFOUNDED_TARGETS)}")
 
 
@@ -491,8 +546,13 @@ def confounded_pair_scores(
 
 #: What counts as a true directed edge. ``projection``: the latent projection's edges
 #: (:func:`projected_directed`) whose endpoints share no hidden cause, what RCD and
-#: BottomUpParceLiNGAM estimate; a pair with a hidden cause is marked, not oriented.
-DIRECTED_TARGETS = ("projection",)
+#: BottomUpParceLiNGAM estimate; a pair with a hidden cause is marked, not oriented. ``direct``: the
+#: edges between two observed nodes with no unobserved path between them (:func:`direct_edges`),
+#: what CAM-UV estimates; it marks a pair with such a path instead. ``latent_projection``: every
+#: edge of the latent projection, ``i -> j`` wherever a directed path runs from ``i`` to ``j`` with
+#: no observed node between them, the truth the CAM-UV paper scores against (Maeda and Shimizu,
+#: 2021, Sect. 5), which also holds the pairs CAM-UV marks.
+DIRECTED_TARGETS = ("projection", "direct", "latent_projection")
 
 #: The columns :func:`directed_edge_scores` returns, in order.
 DIRECTED_COLUMNS = (
@@ -518,13 +578,18 @@ def directed_edge_scores(estimate: GraphStructure, truth: GraphStructure) -> dic
     scores: dict[str, float] = {"directed_n_est": len(claimed)}
     confounded = _hidden_cause_pairs(truth)
     projection = {e for e in projected_directed(truth) if tuple(sorted(e)) not in confounded}
-    hits = len(claimed & projection)
-    both = len(claimed) + len(projection)
-    scores["directed_projection_n_true"] = len(projection)
-    scores["directed_projection_precision"] = hits / len(claimed) if claimed else np.nan
-    scores["directed_projection_recall"] = hits / len(projection) if projection else np.nan
-    scores["directed_projection_f1"] = 2 * hits / both if both else np.nan
-    scores["directed_projection_errors"] = len(claimed ^ projection)
+    for target, true in (
+        ("projection", projection),
+        ("direct", direct_edges(truth)),
+        ("latent_projection", projected_directed(truth)),
+    ):
+        hits = len(claimed & true)
+        both = len(claimed) + len(true)
+        scores[f"directed_{target}_n_true"] = len(true)
+        scores[f"directed_{target}_precision"] = hits / len(claimed) if claimed else np.nan
+        scores[f"directed_{target}_recall"] = hits / len(true) if true else np.nan
+        scores[f"directed_{target}_f1"] = 2 * hits / both if both else np.nan
+        scores[f"directed_{target}_errors"] = len(claimed ^ true)
     return scores
 
 

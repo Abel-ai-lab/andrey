@@ -139,6 +139,24 @@ def test_env_codes_follow_the_sorted_labels():
     assert codes.tolist() == [1, 0, 2, 0] and labels == ["a", "b", "c"]
 
 
+@pytest.mark.parametrize(
+    "env",
+    [
+        np.array(["b", "a", "c", "a"]),
+        np.array([3, -1, 7, -1]),
+        np.array([2**63 + 1, 5, 2**64 - 1, 5], dtype=np.uint64),
+    ],
+    ids=["text", "int", "uint"],
+)
+def test_a_typed_array_gives_the_codes_and_labels_of_its_list(env):
+    expected_codes, expected_labels = env_codes(env.tolist(), 4)
+    for shaped in (env, env.reshape(4, 1), np.asmatrix(env).T):
+        codes, labels = env_codes(shaped, 4)
+        assert codes.dtype == np.intp and codes.tolist() == expected_codes.tolist()
+        assert labels == expected_labels
+        assert [type(v) for v in labels] == [type(v) for v in expected_labels]
+
+
 def test_the_docstring_example_runs():
     import doctest
 

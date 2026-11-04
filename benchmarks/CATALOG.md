@@ -19,6 +19,7 @@ whose Reproduce table lists the driver.
 | [Tabu search](comparisons/tabu.md) | `tabu_cpu.py` | Tabu search, hill climbing | bnlearn | 0.3.0, 0.9.0 |
 | [GIES](comparisons/gies.md) | `gies_cpu.py` | GIES | pcalg | 0.7.0, 0.9.0 |
 | [GnIES](comparisons/gnies.md) | `gnies_cpu.py`, `gnies_cases.py` | GnIES | gnies | |
+| [ICP](comparisons/icp.md) | `icp_cpu.py`, `icp_correction.py` | ICP, both tests | InvariantCausalPrediction (R) | |
 | [UT-IGSP](comparisons/ut-igsp.md) | `ut_igsp_cpu.py`, `ut_igsp_cases.py` | UT-IGSP; GIES and CD-NOD as context | graphical-model-learning (UT-IGSP; IGSP and JCI-GSP as context) | |
 | [Exact search](comparisons/exact-search.md) | `exact_cpu.py` | Exact search | causal-learn | 0.7.0, 0.9.0 |
 | [CALM](comparisons/calm.md) | `calm_cpu.py` | CALM | causal-learn | 0.7.0, 0.9.0 |
@@ -28,6 +29,7 @@ whose Reproduce table lists the driver.
 | [FCI collider configurations](comparisons/fci-colliders.md) | `fci_latent.py` | FCI, both collider rules | causal-learn | 0.1.0, 0.2.0, 0.9.0 |
 | [GFCI](comparisons/gfci.md) | `gfci_latent.py` | GFCI | Tetrad | 0.7.0, 0.9.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
+| [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
@@ -54,9 +56,11 @@ Each release card publishes its numbers from a summary in `published/<release>/`
 hold measurements no card of their own presents: `published/0.2.0-small-fits/`, the faster small
 fits the 0.2.0 card links, and `published/0.4.1/`, DirectLiNGAM's causal-order search in the 0.4.1
 fix. [`published/0.14.0/gnies.json`](published/0.14.0/gnies.json) holds the comparison of the
-experimental GnIES with gnies, and [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
-that of the experimental UT-IGSP with graphical-model-learning; their comparison pages,
-[GnIES](comparisons/gnies.md) and [UT-IGSP](comparisons/ut-igsp.md), present them.
+experimental GnIES with gnies, [`published/0.14.0/ut-igsp.json`](published/0.14.0/ut-igsp.json)
+that of the experimental UT-IGSP with graphical-model-learning, and
+[`published/0.14.0/camuv.json`](published/0.14.0/camuv.json) that of the experimental CAM-UV with
+lingam and causal-learn; their comparison pages, [GnIES](comparisons/gnies.md),
+[UT-IGSP](comparisons/ut-igsp.md), and [CAM-UV](comparisons/camuv.md), present them.
 
 | Release | Release card | Summary |
 |---|---|---|
