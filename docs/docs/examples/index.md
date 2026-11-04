@@ -49,8 +49,8 @@ Recover a three-variable chain with GES.
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, and CD-NOD on data
-from several domains.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, CD-NOD on data from
+several domains, and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

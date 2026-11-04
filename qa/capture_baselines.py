@@ -55,6 +55,13 @@ def _run_gnies(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.gnies(X, env), algorithm)
 
 
+def _run_icp(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    target = int(datagen.column_of("gauss_5v")[3])  # the column of x3, whose parents are x1, x2
+    return project_output(andrey.icp(X, datagen.domain_index("gauss_5v"), target=target), algorithm)
+
+
 def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
     from andrey.api._temporal import _adapt_var_lingam
     from andrey.lingam.var import var_lingam
@@ -109,6 +116,7 @@ ALGORITHMS = {
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
     "CDNOD": (_run_cdnod, "gauss_5v"),
+    "ICP": (_run_icp, "gauss_5v"),
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
     "GnIES": (_run_gnies, "gauss_5v_noise_shift"),

@@ -27,6 +27,7 @@ DRAWS = {
         "sample_chain": "CHAIN",
         "sample_hidden": "HIDDEN",
         "sample_domains": "DOMAINS",
+        "sample_environments": "ENVIRONMENTS",
     },
     "ges_quickstart": {"sample": "CHAIN"},
     "lingam": {"sample_groups": "CHAIN", "sample_indicators": "INDICATORS"},

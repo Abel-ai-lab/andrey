@@ -13,6 +13,7 @@
       "GES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
       "GIES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "GnIES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
+      "ICP": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline invariance test, a set's p-value near alpha, to differ on another host."},
       "XGES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "HC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "Tabu": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
@@ -93,6 +94,10 @@
       "GnIES": {
         "noise_interventional_gauss_er_d10": {"median_shd": 0.0, "empty_median_shd": 14.0, "shd": [9, 0, 0, 0, 0, 4, 11, 0, 0, 0]},
         "noise_interventional_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 27.0, "shd": [0, 0, 6, 0, 2, 0, 0, 7, 0, 0]}
+      },
+      "ICP": {
+        "icp_do_d6": {"median_shd": 0.0, "empty_median_shd": 1.5, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+        "icp_do_d10": {"median_shd": 0.0, "empty_median_shd": 1.5, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
       },
       "XGES": {
         "linear_gauss_er_d20": {"median_shd": 0.0, "empty_median_shd": 20.0, "shd": [0, 0, 5, 0, 0, 6, 0, 1, 22, 0]},

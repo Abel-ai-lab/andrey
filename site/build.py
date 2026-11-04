@@ -143,6 +143,15 @@ REGIMES = {
     "the method's claim",
     "fcm_linear_gauss_er_raw": "linear-Gaussian data from Erdos-Renyi graphs, not standardized, "
     "outside the method's claim",
+    "icp_appendix_g": "linear-Gaussian data in two environments, with noise interventions on "
+    "variables other than the target",
+    "icp_appendix_g_target": "linear-Gaussian data in two environments, with noise interventions "
+    "that can hit the target, outside the method's claim",
+    "icp_do": "linear-Gaussian data from observation and do-interventions on two or three "
+    "variables other than the target",
+    "icp_appendix_g_capped": "linear-Gaussian data in two environments with 16 or 21 variables, "
+    "the target's parents capped at three",
+    "icp_speed": "linear-Gaussian data in two environments with 9 to 15 variables",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
