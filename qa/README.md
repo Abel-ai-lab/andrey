@@ -215,7 +215,9 @@ nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonline
   variables: an observational environment and one setting of 10 targets
   (`known_targets_one_setting_gauss_er`) or two disjoint settings of 8
   (`known_targets_two_settings_gauss_er`), 1,000 rows each, every target cut from its causes and
-  given. Each row's environment and its setting's targets sit beside the samples.
+  given. Each row's environment and its setting's targets sit beside the samples. IGSP runs at its
+  defaults, where alpha, one over the observational rows, is `1e-3`, the level of the comparison's
+  rows in these cells.
 - **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when

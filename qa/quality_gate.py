@@ -167,7 +167,8 @@ TARGET_SHARE = 0.4
 #: IGSP's published regime, drawn by its benchmark driver (``benchmarks/igsp_cpu.py``) as two of
 #: the comparison's cells, Wang et al. (2017), Figure 2, at 20 variables: an observational
 #: environment and settings of 1,000 rows each, every target cut from its causes and given, one
-#: setting of 10 targets (``K`` 1) or two disjoint settings of 8 (``K`` 2).
+#: setting of 10 targets (``K`` 1) or two disjoint settings of 8 (``K`` 2). At ``igsp``'s defaults
+#: alpha, one over the observational rows, is ``1e-3``, the level of the comparison's rows here.
 KNOWN_TARGET_CELLS: dict[str, str] = {
     "known_targets_one_setting_gauss_er_d20": "W_K1_p20_n1000",
     "known_targets_two_settings_gauss_er_d20": "W_K2_p20_n1000",

@@ -53,8 +53,8 @@
   "igsp_y8_perfect": "linear effects on 10-variable Erdos-Renyi DAGs with round(1.5 p / 2) edges (mean degree 1.5), weights uniform on [0.25, 1] in absolute value with a random sign, standard normal noise; an observational environment and one setting for every pair of variables; each target cut from its causes, its noise N(0, 1) kept; in claim, Yang, Katcoff, and Uhler (2018), Figure 8"
  },
  "parity_rule": "paired bootstrap",
- "verdict_rule": "per cell, row, level, and comparator: D = SHD(Andrey) - SHD(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D lies, read on the ends as computed, as the gate read them; worse = above 0 on seeds 0-19 and on a rerun on fresh seeds 100-119; better = below 0 on seeds 0-19 and on a rerun on fresh seeds (100-119, or 6000-6019 for J2 at the default level); a row is judged only where the library beats the empty graph. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 100-119, confirmation the rerun on seeds 6000-6019 (at the defaults), and verdict the result; out of claim, verdict is the side",
- "residue_note": "interval ends that are floating-point residue of an exact 0, read as computed (the gate's reading); a positive lower end sends a row to a rerun; an entry is on seeds 0-19 unless it names a rerun's seeds. Read exactly, as 0, four verdicts change: the W row's interval on seeds 0-19 contains 0, so it ties and is not rerun; the two Y8 inhibiting n 1,000 rows at alpha 1e-2 against the patched copy tie instead of lower, no rerun; and Y8 inhibiting n 10,000 at the defaults against the library contains 0 on seeds 6000-6019, so it is lower on seeds 0-19 only instead of better (10 better, not 11), and the confirmation counts 17 rows below 0 for each candidate, a tie that its rule, written before any fit, gives to alpha one over the observational rows. Here interval ends are rounded to 4 decimals except those residue ends, which stay as computed",
+ "verdict_rule": "per cell, row, level, and comparator: D = SHD(Andrey) - SHD(reference) per dataset, each the mean over 5 draws; side = where the 95% percentile bootstrap interval of mean D lies, read exactly (an end within 1e-12 of 0, floating-point residue of an exact 0, is read as 0; the gate read the ends as computed); worse = above 0 on seeds 0-19 and on a rerun on fresh seeds 100-119; better = below 0 on seeds 0-19 and on a rerun on fresh seeds (100-119, or 6000-6019 for J2 at alpha 1e-3); a row is judged only where the library beats the empty graph. In a row, multi_draw holds the interval on seeds 0-19, side its side, replication the rerun on seeds 100-119, confirmation the rerun on seeds 6000-6019 (at alpha 1e-3, 10 starts), default igsp at its default level on those seeds against the comparator at alpha 1e-3 (the default's evidence, one seed set, so its side is not a verdict), and verdict the result; out of claim, verdict is the side",
+ "residue_note": "an interval end within 1e-12 of 0, floating-point residue of an exact 0, is read as 0, as the UT-IGSP lane reads it; residue lists every such end, on seeds 0-19 unless it names a rerun's seeds, and side_as_computed fields give the side where the reading changes it. The gate and the confirmation's scripts read the ends as computed, under which four verdicts differ: the W row (J1 alpha 1e-4 patched) is above 0 on seeds 0-19 and again on seeds 100-119, a replicated worse row, where read exactly it ties; the two Y8 inhibiting n 1,000 rows at alpha 1e-2 against the patched copy are lower with no rerun instead of tied; Y8 inhibiting n 10,000 at alpha 1e-3 with 10 starts against the library is below 0 on seeds 6000-6019, so better (11, not 10); and the confirmation counts 18 rows below 0 for alpha 1e-3 against 17, keeping 1e-3, where read exactly the two tie at 17 and the rule, written before any fit, gives the tie to one over the observational rows, the default. Here interval ends are rounded to 4 decimals except those residue ends, which stay as computed, so above_zero reads them as computed, as qa/reference_parity.py does, while side and verdict read them as 0",
  "fit_protocol": "every package of a dataset in its own child process pinned to one core with one BLAS thread; 5 draws per dataset in claim (Andrey seed 0-4, the library's Python random and NumPy global generator seeded 0-4), one out of claim; a cap of 1,800 s per draw in claim and 3,600 s out of it, a draw over it a timeout, never scored",
  "error_metric": "SHD of the interventional essential graph, as the median over the paired datasets of each dataset's mean over its draws (the _mean fields hold the means)",
  "packages": {
@@ -74,7 +74,7 @@
  },
  "complete": false,
  "complete_definition": "true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted in the timeout columns and never scored",
- "seeds_note": "seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 100-119 in the {len(rerun_cells)} in-claim cells with a comparison above 0 on seeds 0-19, and, at the defaults, the confirmation's seeds 6000-6019 in every in-claim cell. Categorical data (Andrey alone) and 200 and 400 variables (no library run) are in the lane file only",
+ "seeds_note": "seeds is the number of datasets attempted per setting: 20 (seeds 0-19), 10 (seeds 0-9) at 50 and 100 variables; 5 draws per dataset in claim, 1 out of claim; reruns on seeds 100-119 in the {len(rerun_cells)} in-claim cells with a comparison above 0 on seeds 0-19, and, at alpha 1e-3 with 10 starts, the confirmation's seeds 6000-6019 in every in-claim cell. Categorical data (Andrey alone) and 200 and 400 variables (no library run) are in the lane file only",
  "coverage": {
   "igsp_k_kci_k4": {
    "planned_seeds": 20,
@@ -423,7 +423,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family45_c0p1",
    "claim": "in",
@@ -495,7 +495,22 @@
        0.1
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.9,
+      "comparator_shd_mean": 1.0,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.3,
+       0.1
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -585,7 +600,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.25,
+      "comparator_shd_mean": 0.25,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -675,7 +705,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -714,7 +759,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family45_c0p25",
    "claim": "in",
@@ -786,7 +831,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.15,
+      "comparator_shd_mean": 0.21,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.16,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -876,7 +936,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -966,7 +1041,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1005,7 +1095,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family45_c0p5",
    "claim": "in",
@@ -1077,7 +1167,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1167,7 +1272,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1257,7 +1377,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1296,7 +1431,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family4_c0p1",
    "claim": "in",
@@ -1372,7 +1507,22 @@
        0.15
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.2,
+      "comparator_shd_mean": 1.15,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1466,7 +1616,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.3,
+      "comparator_shd_mean": 0.25,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.3
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1560,7 +1725,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1599,7 +1779,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family4_c0p25",
    "claim": "in",
@@ -1675,7 +1855,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.2,
+      "comparator_shd_mean": 0.26,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.16,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1769,7 +1964,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1863,7 +2073,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -1902,7 +2127,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family4_c0p5",
    "claim": "in",
@@ -1978,7 +2203,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2072,7 +2312,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2166,7 +2421,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2205,7 +2475,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family5_c0p1",
    "claim": "in",
@@ -2281,7 +2551,22 @@
        0.45
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.0,
+      "comparator_shd_mean": 0.85,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2375,7 +2660,22 @@
        0.03
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.25,
+      "comparator_shd_mean": 0.25,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2469,7 +2769,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2508,7 +2823,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family5_c0p25",
    "claim": "in",
@@ -2584,7 +2899,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.15,
+      "comparator_shd_mean": 0.21,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.16,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2678,7 +3008,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2772,7 +3117,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2811,7 +3171,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family5_c0p5",
    "claim": "in",
@@ -2887,7 +3247,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -2981,7 +3356,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3075,7 +3465,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3114,7 +3519,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_w_k1",
    "claim": "in",
@@ -3186,7 +3591,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 2.24,
+      "comparator_shd_mean": 3.04,
+      "mean_D": -0.8,
+      "bootstrap_95": [
+       -1.54,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3276,7 +3696,22 @@
        -0.51
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.9,
+      "comparator_shd_mean": 2.0,
+      "mean_D": -1.1,
+      "bootstrap_95": [
+       -1.83,
+       -0.38
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3366,7 +3801,22 @@
        -0.72
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.6,
+      "comparator_shd_mean": 1.92,
+      "mean_D": -1.32,
+      "bootstrap_95": [
+       -1.99,
+       -0.64
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3456,7 +3906,22 @@
        -0.86
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.6,
+      "comparator_shd_mean": 5.38,
+      "mean_D": -1.78,
+      "bootstrap_95": [
+       -2.64,
+       -0.86
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3546,7 +4011,22 @@
        -2.41
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.96,
+      "comparator_shd_mean": 4.31,
+      "mean_D": -3.35,
+      "bootstrap_95": [
+       -4.15,
+       -2.54
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3636,7 +4116,22 @@
        -2.19
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.35,
+      "comparator_shd_mean": 3.59,
+      "mean_D": -3.24,
+      "bootstrap_95": [
+       -4.11,
+       -2.36
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3675,7 +4170,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_w_k2",
    "claim": "in",
@@ -3768,7 +4263,22 @@
        0.0802
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.89,
+      "comparator_shd_mean": 2.71,
+      "mean_D": -0.82,
+      "bootstrap_95": [
+       -1.7,
+       0.0802
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3859,7 +4369,22 @@
        -0.66
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.75,
+      "comparator_shd_mean": 2.0,
+      "mean_D": -1.25,
+      "bootstrap_95": [
+       -2.03,
+       -0.46
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -3950,7 +4475,22 @@
        -0.63
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.3,
+      "comparator_shd_mean": 1.68,
+      "mean_D": -1.38,
+      "bootstrap_95": [
+       -2.09,
+       -0.63
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4041,7 +4581,22 @@
        -1.37
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.58,
+      "comparator_shd_mean": 5.69,
+      "mean_D": -2.11,
+      "bootstrap_95": [
+       -2.85,
+       -1.37
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4132,7 +4687,22 @@
        -2.65
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.98,
+      "comparator_shd_mean": 4.56,
+      "mean_D": -3.58,
+      "bootstrap_95": [
+       -4.34,
+       -2.82
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4223,7 +4793,22 @@
        -2.1
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.25,
+      "comparator_shd_mean": 3.52,
+      "mean_D": -3.27,
+      "bootstrap_95": [
+       -4.21,
+       -2.33
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4262,7 +4847,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y5_imperfect",
    "claim": "in",
@@ -4357,7 +4942,22 @@
        0.19
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.23,
+      "comparator_shd_mean": 3.53,
+      "mean_D": -0.3,
+      "bootstrap_95": [
+       -0.79,
+       0.19
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4470,7 +5070,22 @@
        -0.02
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 2.06,
+      "comparator_shd_mean": 2.61,
+      "mean_D": -0.55,
+      "bootstrap_95": [
+       -1.13,
+       -0.03
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4509,7 +5124,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y5_inhibiting",
    "claim": "in",
@@ -4604,7 +5219,22 @@
        0.58
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.31,
+      "comparator_shd_mean": 3.5,
+      "mean_D": -0.19,
+      "bootstrap_95": [
+       -1.1503,
+       0.58
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4717,7 +5347,22 @@
        -0.18
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.7,
+      "comparator_shd_mean": 2.45,
+      "mean_D": -0.75,
+      "bootstrap_95": [
+       -1.32,
+       -0.21
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4756,7 +5401,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y5_perfect",
    "claim": "in",
@@ -4851,7 +5496,22 @@
        0.31
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.19,
+      "comparator_shd_mean": 3.51,
+      "mean_D": -0.32,
+      "bootstrap_95": [
+       -1.07,
+       0.31
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -4964,7 +5624,22 @@
        -0.03
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.88,
+      "comparator_shd_mean": 2.37,
+      "mean_D": -0.49,
+      "bootstrap_95": [
+       -1.14,
+       0.11
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5003,7 +5678,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_imperfect_k1",
    "claim": "in",
@@ -5079,7 +5754,22 @@
        0.24
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.15,
+      "comparator_shd_mean": 1.25,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.46,
+       0.24
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5173,7 +5863,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.3,
+      "comparator_shd_mean": 0.36,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.18,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5212,7 +5917,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_imperfect_k10",
    "claim": "in",
@@ -5317,7 +6022,22 @@
        0.34
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.72,
+      "comparator_shd_mean": 1.84,
+      "mean_D": -0.12,
+      "bootstrap_95": [
+       -0.67,
+       0.34
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5420,7 +6140,22 @@
        0.36
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.25,
+      "comparator_shd_mean": 1.31,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.47,
+       0.36
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5459,7 +6194,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_imperfect_k2",
    "claim": "in",
@@ -5556,7 +6291,22 @@
        0.47
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.55,
+      "comparator_shd_mean": 1.42,
+      "mean_D": 0.13,
+      "bootstrap_95": [
+       -0.2,
+       0.47
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5651,7 +6401,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.15,
+      "comparator_shd_mean": 0.21,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.18,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5690,7 +6455,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_imperfect_k4",
    "claim": "in",
@@ -5769,7 +6534,22 @@
        0.7802
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.88,
+      "comparator_shd_mean": 1.72,
+      "mean_D": 0.16,
+      "bootstrap_95": [
+       -0.45,
+       0.7802
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5866,7 +6646,22 @@
        0.98
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.9,
+      "comparator_shd_mean": 0.55,
+      "mean_D": 0.35,
+      "bootstrap_95": [
+       -0.25,
+       0.98
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -5905,7 +6700,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_imperfect_k6",
    "claim": "in",
@@ -6006,7 +6801,22 @@
        0.3902
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.25,
+      "comparator_shd_mean": 1.43,
+      "mean_D": -0.18,
+      "bootstrap_95": [
+       -0.84,
+       0.3902
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6105,7 +6915,22 @@
        0.23
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.63,
+      "comparator_shd_mean": 0.64,
+      "mean_D": -0.01,
+      "bootstrap_95": [
+       -0.23,
+       0.23
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6144,7 +6969,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_imperfect_k8",
    "claim": "in",
@@ -6247,7 +7072,22 @@
        0.29
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.44,
+      "comparator_shd_mean": 1.44,
+      "mean_D": -1.1102230246251566e-17,
+      "bootstrap_95": [
+       -0.25,
+       0.29
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6348,7 +7188,22 @@
        0.47
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.1,
+      "comparator_shd_mean": 1.04,
+      "mean_D": 0.06,
+      "bootstrap_95": [
+       -0.3,
+       0.47
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6387,7 +7242,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_inhibiting_k1",
    "claim": "in",
@@ -6483,7 +7338,22 @@
        0.32
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.23,
+      "comparator_shd_mean": 1.25,
+      "mean_D": -0.02,
+      "bootstrap_95": [
+       -0.36,
+       0.32
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6577,7 +7447,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.3,
+      "comparator_shd_mean": 0.3,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6616,7 +7501,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_inhibiting_k10",
    "claim": "in",
@@ -6701,7 +7586,22 @@
        0.4502
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.9,
+      "comparator_shd_mean": 1.78,
+      "mean_D": 0.12,
+      "bootstrap_95": [
+       -0.18,
+       0.4502
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6804,7 +7704,22 @@
        0.22
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.16,
+      "comparator_shd_mean": 1.22,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.32,
+       0.22
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -6843,7 +7758,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_inhibiting_k2",
    "claim": "in",
@@ -6920,7 +7835,22 @@
        0.48
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.05,
+      "comparator_shd_mean": 1.14,
+      "mean_D": -0.09,
+      "bootstrap_95": [
+       -0.76,
+       0.48
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7015,7 +7945,22 @@
        0.75
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.4,
+      "comparator_shd_mean": 0.21,
+      "mean_D": 0.19,
+      "bootstrap_95": [
+       -0.18,
+       0.75
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7054,7 +7999,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_inhibiting_k4",
    "claim": "in",
@@ -7133,7 +8078,22 @@
        0.38
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.39,
+      "comparator_shd_mean": 1.64,
+      "mean_D": -0.25,
+      "bootstrap_95": [
+       -0.94,
+       0.38
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7230,7 +8190,22 @@
        0.06
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.45,
+      "comparator_shd_mean": 0.37,
+      "mean_D": 0.08,
+      "bootstrap_95": [
+       -0.1,
+       0.32
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7269,7 +8244,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_inhibiting_k6",
    "claim": "in",
@@ -7350,7 +8325,22 @@
        0.73
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.48,
+      "comparator_shd_mean": 1.44,
+      "mean_D": 0.04,
+      "bootstrap_95": [
+       -0.73,
+       0.73
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7449,7 +8439,22 @@
        0.32
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.7,
+      "comparator_shd_mean": 0.61,
+      "mean_D": 0.09,
+      "bootstrap_95": [
+       -0.13,
+       0.32
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7488,7 +8493,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_inhibiting_k8",
    "claim": "in",
@@ -7571,7 +8576,22 @@
        0.55
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.65,
+      "comparator_shd_mean": 1.41,
+      "mean_D": 0.24,
+      "bootstrap_95": [
+       -0.08,
+       0.55
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7672,7 +8692,22 @@
        0.21
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.89,
+      "comparator_shd_mean": 0.78,
+      "mean_D": 0.11,
+      "bootstrap_95": [
+       -0.25,
+       0.55
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7711,7 +8746,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_perfect_k1",
    "claim": "in",
@@ -7787,7 +8822,22 @@
        0.58
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.4,
+      "comparator_shd_mean": 1.25,
+      "mean_D": 0.15,
+      "bootstrap_95": [
+       -0.22,
+       0.58
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7881,7 +8931,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.3,
+      "comparator_shd_mean": 0.3,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -7920,7 +8985,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_perfect_k10",
    "claim": "in",
@@ -8005,7 +9070,22 @@
        0.34
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.76,
+      "comparator_shd_mean": 1.74,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       -0.35,
+       0.34
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8108,7 +9188,22 @@
        0.34
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.3,
+      "comparator_shd_mean": 1.2,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       -0.13,
+       0.37
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8147,7 +9242,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_perfect_k2",
    "claim": "in",
@@ -8224,7 +9319,22 @@
        0.34
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.1,
+      "comparator_shd_mean": 1.14,
+      "mean_D": -0.04,
+      "bootstrap_95": [
+       -0.42,
+       0.34
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8319,7 +9429,22 @@
        0.75
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.4,
+      "comparator_shd_mean": 0.21,
+      "mean_D": 0.19,
+      "bootstrap_95": [
+       -0.18,
+       0.75
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8358,7 +9483,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_perfect_k4",
    "claim": "in",
@@ -8437,7 +9562,22 @@
        0.35
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.28,
+      "comparator_shd_mean": 1.64,
+      "mean_D": -0.36,
+      "bootstrap_95": [
+       -1.16,
+       0.35
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8534,7 +9674,22 @@
        -0.06
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.15,
+      "comparator_shd_mean": 0.45,
+      "mean_D": -0.3,
+      "bootstrap_95": [
+       -0.65,
+       -0.06
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8573,7 +9728,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_perfect_k6",
    "claim": "in",
@@ -8654,7 +9809,22 @@
        0.51
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.46,
+      "comparator_shd_mean": 1.44,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       -0.51,
+       0.51
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8753,7 +9923,22 @@
        0.11
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.53,
+      "comparator_shd_mean": 0.6,
+      "mean_D": -0.07,
+      "bootstrap_95": [
+       -0.26,
+       0.11
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8792,7 +9977,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y6_perfect_k8",
    "claim": "in",
@@ -8875,7 +10060,22 @@
        0.67
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.55,
+      "comparator_shd_mean": 1.37,
+      "mean_D": 0.18,
+      "bootstrap_95": [
+       -0.28,
+       0.67
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -8976,7 +10176,22 @@
        0.26
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.8,
+      "comparator_shd_mean": 0.79,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       -0.2,
+       0.26
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9015,7 +10230,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y8_imperfect",
    "claim": "in",
@@ -9131,7 +10346,22 @@
        0.42
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.73,
+      "comparator_shd_mean": 1.8,
+      "mean_D": -0.07,
+      "bootstrap_95": [
+       -0.59,
+       0.42
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9265,7 +10495,22 @@
        0.17
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.25,
+      "comparator_shd_mean": 1.4,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -0.58,
+       0.24
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9304,7 +10549,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y8_inhibiting",
    "claim": "in",
@@ -9420,7 +10665,22 @@
        0.17
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.62,
+      "comparator_shd_mean": 1.92,
+      "mean_D": -0.3,
+      "bootstrap_95": [
+       -0.84,
+       0.17
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9538,7 +10798,7 @@
       "above_zero": false
      },
      "side": "below 0",
-     "verdict": "better",
+     "verdict": "below 0, not replicated",
      "reference_floor_95": [
       -7.09,
       -6.11
@@ -9553,8 +10813,23 @@
        -0.89,
        -2.2204460492503132e-17
       ],
+      "side": "contains 0",
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.05,
+      "comparator_shd_mean": 1.53,
+      "mean_D": -0.48,
+      "bootstrap_95": [
+       -0.92,
+       -0.08
+      ],
+      "above_zero": false,
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9593,7 +10868,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y8_perfect",
    "claim": "in",
@@ -9729,7 +11004,22 @@
        0.47
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.89,
+      "comparator_shd_mean": 1.92,
+      "mean_D": -0.03,
+      "bootstrap_95": [
+       -0.58,
+       0.47
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9863,7 +11153,22 @@
        -0.01
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.2,
+      "comparator_shd_mean": 1.6,
+      "mean_D": -0.4,
+      "bootstrap_95": [
+       -0.8002,
+       -0.01
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -9902,7 +11207,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family45_c0p1",
    "claim": "in",
@@ -9978,7 +11283,22 @@
        0.15
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.9,
+      "comparator_shd_mean": 0.85,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10072,7 +11392,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.25,
+      "comparator_shd_mean": 0.25,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10166,7 +11501,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10205,7 +11555,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family45_c0p25",
    "claim": "in",
@@ -10281,7 +11631,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.15,
+      "comparator_shd_mean": 0.21,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.16,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10375,7 +11740,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10469,7 +11849,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10508,7 +11903,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_s_family45_c0p5",
    "claim": "in",
@@ -10584,7 +11979,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10678,7 +12088,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10772,7 +12197,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.05,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10811,7 +12251,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_w_k1",
    "claim": "in",
@@ -10887,7 +12327,22 @@
        0.08
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 2.24,
+      "comparator_shd_mean": 2.36,
+      "mean_D": -0.12,
+      "bootstrap_95": [
+       -0.34,
+       0.08
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -10981,7 +12436,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.9,
+      "comparator_shd_mean": 0.8,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       -0.04,
+       0.26
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11075,7 +12545,22 @@
        0.36
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.6,
+      "comparator_shd_mean": 0.38,
+      "mean_D": 0.22,
+      "bootstrap_95": [
+       0.0,
+       0.56
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11169,7 +12654,22 @@
        0.61
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.6,
+      "comparator_shd_mean": 3.41,
+      "mean_D": 0.19,
+      "bootstrap_95": [
+       -0.21,
+       0.61
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11263,7 +12763,22 @@
        -0.16
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.96,
+      "comparator_shd_mean": 1.74,
+      "mean_D": -0.78,
+      "bootstrap_95": [
+       -1.32,
+       -0.33
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11357,7 +12872,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.35,
+      "comparator_shd_mean": 0.57,
+      "mean_D": -0.22,
+      "bootstrap_95": [
+       -0.67,
+       0.15
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11396,7 +12926,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_w_k2",
    "claim": "in",
@@ -11493,7 +13023,22 @@
        0.12
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.89,
+      "comparator_shd_mean": 1.95,
+      "mean_D": -0.06,
+      "bootstrap_95": [
+       -0.23,
+       0.12
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11588,7 +13133,22 @@
        0.1
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.75,
+      "comparator_shd_mean": 0.62,
+      "mean_D": 0.13,
+      "bootstrap_95": [
+       -0.02,
+       0.31
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11683,7 +13243,22 @@
        0.0
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.3,
+      "comparator_shd_mean": 0.32,
+      "mean_D": -0.02,
+      "bootstrap_95": [
+       -0.06,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11778,7 +13353,22 @@
        0.77
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 3.58,
+      "comparator_shd_mean": 3.28,
+      "mean_D": 0.3,
+      "bootstrap_95": [
+       -0.15,
+       0.77
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11873,7 +13463,22 @@
        -0.09
       ],
       "side": "below 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 0.98,
+      "comparator_shd_mean": 1.7,
+      "mean_D": -0.72,
+      "bootstrap_95": [
+       -1.34,
+       -0.23
+      ],
+      "above_zero": false,
+      "side": "below 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -11968,7 +13573,22 @@
        0.04
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 1e-05,
+      "paired": 20,
+      "andrey_shd_mean": 0.25,
+      "comparator_shd_mean": 0.62,
+      "mean_D": -0.37,
+      "bootstrap_95": [
+       -0.87,
+       0.0
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -12007,7 +13627,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y8_imperfect",
    "claim": "in",
@@ -12127,7 +13747,22 @@
        0.42
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.73,
+      "comparator_shd_mean": 1.8,
+      "mean_D": -0.07,
+      "bootstrap_95": [
+       -0.59,
+       0.42
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -12265,7 +13900,22 @@
        0.2
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.25,
+      "comparator_shd_mean": 1.22,
+      "mean_D": 0.03,
+      "bootstrap_95": [
+       -0.23,
+       0.27
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -12304,7 +13954,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y8_inhibiting",
    "claim": "in",
@@ -12424,7 +14074,22 @@
        0.37
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.62,
+      "comparator_shd_mean": 1.59,
+      "mean_D": 0.03,
+      "bootstrap_95": [
+       -0.29,
+       0.37
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -12562,7 +14227,22 @@
        0.2302
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.05,
+      "comparator_shd_mean": 1.13,
+      "mean_D": -0.08,
+      "bootstrap_95": [
+       -0.3,
+       0.16
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -12601,7 +14281,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8, patched to Definition 4.2",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default; its I-contradicting test for settings of two or more targets patched to Definition 4.2 of Yang, Katcoff, and Uhler (2018) (benchmarks/patches/gml-igsp-def42.patch)",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_y8_perfect",
    "claim": "in",
@@ -12741,7 +14421,22 @@
        0.71
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.001,
+      "paired": 20,
+      "andrey_shd_mean": 1.89,
+      "comparator_shd_mean": 1.69,
+      "mean_D": 0.2,
+      "bootstrap_95": [
+       -0.25,
+       0.71
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -12879,7 +14574,22 @@
        0.36
       ],
       "side": "contains 0",
-      "note": "the seeds on which the default was confirmed"
+      "note": "this row's rerun at alpha 1e-3, on the confirmation's seeds"
+     },
+     "default": {
+      "seeds": "6000-6019",
+      "alpha": 0.0001,
+      "paired": 20,
+      "andrey_shd_mean": 1.2,
+      "comparator_shd_mean": 1.13,
+      "mean_D": 0.07,
+      "bootstrap_95": [
+       -0.2,
+       0.36
+      ],
+      "above_zero": false,
+      "side": "contains 0",
+      "note": "igsp at its default, alpha one over the observational rows, 10 starts, against the same comparator at alpha 1e-3, on the confirmation's seeds: the default's evidence; at n 1,000 the same fits as the confirmation row"
      },
      "context": {
       "reference_with_10_runs": {
@@ -21818,8 +23528,8 @@
       ],
       "above_zero": false
      },
-     "side": "below 0",
-     "verdict": "below 0, no rerun",
+     "side": "contains 0",
+     "verdict": "tie",
      "floor_95": [
       -7.24,
       -6.35
@@ -31121,8 +32831,8 @@
       ],
       "above_zero": false
      },
-     "side": "below 0",
-     "verdict": "below 0, no rerun",
+     "side": "contains 0",
+     "verdict": "tie",
      "floor_95": [
       -7.24,
       -6.35
@@ -58303,8 +60013,8 @@
       ],
       "above_zero": true
      },
-     "side": "above 0",
-     "verdict": "worse",
+     "side": "contains 0",
+     "verdict": "tie",
      "floor_95": [
       -6.22,
       -4.7398
@@ -59433,7 +61143,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_k_kci_k4",
    "claim": "out",
@@ -59592,7 +61302,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o1_perfect_k10",
    "claim": "out",
@@ -59763,7 +61473,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o2_perfect_k4",
    "claim": "out",
@@ -59922,7 +61632,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o2_perfect_k8",
    "claim": "out",
@@ -60089,7 +61799,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o3_perfect_k8",
    "claim": "out",
@@ -60256,7 +61966,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o8_wang_k4_laplace",
    "claim": "out",
@@ -60415,7 +62125,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o8_wang_k4_uniform",
    "claim": "out",
@@ -60574,7 +62284,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o9_family45_c0p25",
    "claim": "out",
@@ -60729,7 +62439,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o9_family45_c0p25_c10",
    "claim": "out",
@@ -60884,7 +62594,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o9_family45_c0p25_c3",
    "claim": "out",
@@ -61039,7 +62749,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o9_perfect_k4_c10",
    "claim": "out",
@@ -61129,7 +62839,7 @@
    "build": "Andrey pre-release build of 3 November 2026",
    "comparator": "graphical-model-learning 0.1a8",
    "comparator_setting": "alpha 1e-3 for both tests, the same as Andrey's, depth 4 and 5 runs (nruns), every other argument at its default",
-   "setting": "alpha=1e-3, n_starts=10 (the defaults); Gaussian tests; every target given",
+   "setting": "alpha=1e-3, n_starts=10 (the default level at 1,000 observational rows and the former default; the default is alpha=None, one over the observational rows, whose rows on the confirmation's seeds are each row's default); Gaussian tests; every target given",
    "lane": "igsp",
    "regime": "igsp_o9_perfect_k4_c3",
    "claim": "out",
