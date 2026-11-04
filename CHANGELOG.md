@@ -38,7 +38,8 @@ names its pull request.
 - `ut_igsp`, experimental, learns from an observational environment and settings whose
   intervention targets are known in part or not at all (UT-IGSP, Squires, Wang, and Uhler 2020):
   it returns the interventional essential graph and, in `metadata["targets"]`, each setting's
-  targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
+  targets, known and learned, keyed by the labels of `env`, so they pass back as `targets`. It
+  takes `env` and `targets` as `gies` does, with `None` in the
   mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
   `"indicator"`, the test of whether a variable's distribution given others changes. Against
   graphical-model-learning 0.1a8, the authors' library, on simulated data in the paper's setting
@@ -51,8 +52,8 @@ names its pull request.
   on one core. ([#668])
 - `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
   environments that differ in the noise variances of variables it is not told: it returns those
-  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
-  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  variables, the targets, in `metadata["changing_variables"]`, with the interventional essential
+  graph they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
   authors' package, on simulated data in the paper's settings and the settings it claims, 10
   variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
   the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10

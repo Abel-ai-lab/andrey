@@ -100,7 +100,7 @@ def fit(
             logger.setLevel(level)
     return {
         "marks": np.asarray(out.structure.to_numpy(), dtype=np.int8),
-        "targets": sorted(int(j) for j, _ in out.metadata["index_edges"]),
+        "targets": sorted(int(j) for j in out.metadata["changing_variables"]),
         "deviance": float(out.metadata["score"]),
         "seconds": seconds,
         "counts": dict(handler.counts),

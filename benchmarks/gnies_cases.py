@@ -66,7 +66,7 @@ def _fit(X: np.ndarray, env: np.ndarray, **kwargs: float) -> andrey.StructureOut
 
 
 def _targets(out: andrey.StructureOutput) -> list[int]:
-    return [int(v) for v, _ in out.metadata["index_edges"]]
+    return [int(v) for v in out.metadata["changing_variables"]]
 
 
 def main() -> None:

@@ -62,7 +62,7 @@ def _draw(
 
 
 def _targets(out: andrey.StructureOutput) -> list:
-    return [v for v, _ in out.metadata["index_edges"]]
+    return out.metadata["changing_variables"]
 
 
 def test_effect_with_a_changed_noise_variance_is_the_target():
