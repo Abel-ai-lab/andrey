@@ -88,7 +88,7 @@ names its pull request.
   more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
   centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
   steps, where the centering costs about one time step of data. `dynotears` stays experimental.
-  ([#PR])
+  ([#682])
 
 ### Fixed
 
@@ -1725,3 +1725,4 @@ First alpha release.
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
+[#682]: https://github.com/Abel-ai-lab/andrey/pull/682
