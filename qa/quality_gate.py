@@ -42,12 +42,14 @@ from andrey import GraphStructure, data, metrics
 from andrey.core import ARROW, LATENT, OBSERVED, TAIL
 from andrey.data.latent import marginal
 from andrey.data.real import SACHS_ARCS, SACHS_NODES
+from andrey.search.gnies import singleton_cut
 from qa import reference_parity
 
 # The regimes whose data is not one plain sample, the published settings, and the scores of the
 # published errors live in the benchmark harness; the gate draws and scores those methods with them.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
 import gies_cpu  # noqa: E402
+import gnies_cpu  # noqa: E402
 
 from andrey_bench import lingam_models, regime_models, scoring, temporal_models  # noqa: E402
 from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
@@ -162,6 +164,13 @@ PAIR_N = 1000
 #: targets, and the rows split evenly between no intervention and each target.
 INTERVENTION_SIZES: tuple[tuple[int, int], ...] = ((20, 1000), (50, 2500))
 TARGET_SHARE = 0.4
+#: GnIES's published regime, drawn by its benchmark driver (``benchmarks/gnies_cpu.py``) as the
+#: comparison's cells: an observational environment and three that each change the noise variance
+#: of one variable, 1,000 rows each, at 10 variables (A1000) and at 20, the variable ladder's first.
+NOISE_INTERVENTION_CELLS: dict[str, str] = {
+    "noise_interventional_gauss_er_d10": "A1000",
+    "noise_interventional_gauss_er_d20": "O6-20",
+}
 
 #: The published regimes that :mod:`andrey_bench.regime_models` draws, as its model and noise, and
 #: the ``(d, n)`` the gate draws each at: two published sizes, with the published rows. CD-NOD's
@@ -244,6 +253,19 @@ def intervention_draws(d: int, n: int) -> tuple[Draw, ...]:
         )
         truth = gies_cpu.essential_graph(dag, interventions)
         out.append(Draw(stack(x, interventions), GraphStructure.from_numpy(truth, kind="cpdag")))
+    return tuple(out)
+
+
+def noise_intervention_draws(cell: str) -> tuple[Draw, ...]:
+    """The samples with each row's environment as the last column, and the interventional essential
+    graph of the true DAG under the true targets."""
+    spec = gnies_cpu.BY_NAME[cell]
+    out = []
+    for seed in SEEDS:
+        ds = gnies_cpu.draw(spec, seed)
+        truth = gnies_cpu.essential_graph(ds.dag, singleton_cut(ds.true_targets, spec.d))
+        x = np.column_stack([ds.X, ds.env])
+        out.append(Draw(x, GraphStructure.from_numpy(truth, kind="cpdag")))
     return tuple(out)
 
 
@@ -376,6 +398,10 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
         for d, n in INTERVENTION_SIZES
     },
     **{
+        name: functools.partial(noise_intervention_draws, cell)
+        for name, cell in NOISE_INTERVENTION_CELLS.items()
+    },
+    **{
         f"{regime}_d{d}": functools.partial(model_draws, regime, d, n)
         for regime, sizes_ in MODEL_SIZES.items()
         for d, n in sizes_
@@ -444,9 +470,9 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # methods need non-Gaussian noise. Sachs is measured data that fits each only approximately. RCD and
 # BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000 rows RCD marks most pairs
 # <-> and scores worse than the empty graph, and on Sachs BottomUpParceLiNGAM does. ANM and PNL take
-# one pair of variables, so each runs on its benchmark's pairs only. GIES, CD-NOD,
-# MultiGroupDirectLiNGAM, and GIN need what only their regimes have: interventions, domains,
-# groups, or latents measured by indicators.
+# one pair of variables, so each runs on its benchmark's pairs only. GIES, GnIES, CD-NOD,
+# MultiGroupDirectLiNGAM, and GIN need what only their regimes have: interventions, environments
+# that change noise variances, domains, groups, or latents measured by indicators.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -454,6 +480,7 @@ PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
 INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTION_SIZES)
+NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 
 
 def _models(regime: str) -> tuple[str, ...]:
@@ -468,6 +495,12 @@ def gies_fit(x: np.ndarray) -> Any:
     """``andrey.gies`` on the samples of a GIES draw, its intervention matrix as ``targets``."""
     samples, mask = unstack(x)
     return andrey.gies(samples, targets=mask)
+
+
+def gnies_fit(x: np.ndarray) -> Any:
+    """``andrey.gnies`` on the samples of a GnIES draw, its last column as ``env``; the targets stay
+    unknown."""
+    return andrey.gnies(x[:, :-1], x[:, -1])
 
 
 def _adapted(adapter: Any) -> Callable[[Any], Any]:
@@ -497,6 +530,7 @@ SUPPORTED: dict[str, Method] = {
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
     "GIES": Method(gies_fit, "essential", INTERVENTION_DATA),
+    "GnIES": Method(gnies_fit, "essential", NOISE_INTERVENTION_DATA),
     "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
@@ -665,7 +699,7 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
         return CoefficientStack(np.zeros_like(truth.stack), kind=truth.kind)
     if target == "lagged_edges":
         return np.zeros_like(truth)
-    if target == "essential":  # GIES's data holds its intervention matrix beside the samples
+    if target == "essential":  # GIES's and GnIES's data hold the targets or environments too
         return empty_graph(truth.n_nodes, "cpdag")
     if target == "clusters":
         return empty_graph(draw.data.shape[1], "dag")
@@ -793,6 +827,7 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("DirectLiNGAM", "lingam_sf_d50"),
     ("RCD", "latent_lingam_er_d10"),
     ("ANM", "anm_pair_n1000"),
+    ("GnIES", "noise_interventional_gauss_er_d20"),
     ("GIN", "latent_measurement_d12"),
     ("GPDC", "anm_er_d5"),
     ("VARMA-LiNGAM", "varma_lingam_paper_d3_n300"),

@@ -5,7 +5,8 @@ environments gives the directed edge, with the effect as the one target. The gro
 linear-Gaussian data from ``andrey.data`` with an observational environment and three that each
 scale one variable's noise variance, at 10 variables and 10,000 rows per environment: the true
 class and targets on each of the first five seeds the shipped defaults recover (seeds 0-19
-recovered on 19 of 20). The recorded outputs are the marks and targets of three small draws.
+recovered on 19 of 20). The recorded outputs are the marks and targets of three small draws, and
+the graph, score, and targets of the ``gauss_5v_noise_shift`` baseline.
 """
 
 from __future__ import annotations
@@ -25,6 +26,8 @@ from andrey.data.noise import gaussian
 from andrey.metrics import shd
 from andrey.search.gies import replace_unprotected
 from andrey.search.gnies import singleton_cut
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 
 @pytest.fixture(autouse=True)
@@ -123,3 +126,9 @@ def test_recorded_output(seed):
     X, env, _, _ = _draw(seed, [400, 300, 200], d=5, avg_degree=2.0, n_targets=2)
     out = _fit(X, env)
     assert (out.structure.oriented_edges(), _targets(out)) == RECORDED[seed]
+
+
+def test_recorded_baseline():
+    case = "gauss_5v_noise_shift"
+    out = _fit(datagen.generate(case), datagen.environment_index(case))
+    assert_recorded_output(out, "GnIES", case=case)

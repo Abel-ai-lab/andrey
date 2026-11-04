@@ -73,7 +73,7 @@ BOSS and GRaSP search over orderings of the variables for the best-scoring graph
 :img-alt: The true graph of this notebook's data
 
 XGES, hill climbing, Tabu search, and exact search look for the graph with the best BIC score;
-GIES also learns from interventions.
+GIES also learns from interventions, and GnIES from environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
