@@ -150,7 +150,7 @@ def test_env_codes_follow_the_sorted_labels():
 )
 def test_a_typed_array_gives_the_codes_and_labels_of_its_list(env):
     expected_codes, expected_labels = env_codes(env.tolist(), 4)
-    for shaped in (env, env.reshape(4, 1)):
+    for shaped in (env, env.reshape(4, 1), np.asmatrix(env).T):
         codes, labels = env_codes(shaped, 4)
         assert codes.dtype == np.intp and codes.tolist() == expected_codes.tolist()
         assert labels == expected_labels
