@@ -60,6 +60,13 @@ names its pull request.
   the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
   on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
   graph's 135 in a median 176 s. ([#665])
+- `andrey.icp`, experimental, finds the causal parents of one `target` from continuous data pooled
+  from several environments that leave the target's mechanism alone (Peters, Buhlmann and
+  Meinshausen 2016), by the paper's approximate or exact test, with each variable's p-value and
+  confidence interval. Against InvariantCausalPrediction 0.8, the authors' package, on simulated
+  data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
+  environments, and it names a variable outside the true parents in at most 1.23% of fits at
+  `alpha=0.05` in the settings it claims. ([#677])
 
 ### Changed
 
@@ -1706,4 +1713,5 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#677]: https://github.com/Abel-ai-lab/andrey/pull/677
 [#679]: https://github.com/Abel-ai-lab/andrey/pull/679

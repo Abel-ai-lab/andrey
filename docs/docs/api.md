@@ -17,8 +17,9 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with five
 exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
 `targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
-targets, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a
-list of datasets and returns one result per dataset. The first argument of every method is `data`;
+targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
+`longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a list of
+datasets and returns one result per dataset. The first argument of every method is `data`;
 `andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
 dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
@@ -31,15 +32,18 @@ matrix shaped like `data`. Every environment needs its targets, so `env` without
 environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
 `ValueError`. `gnies` takes the same forms of `targets`, but for the targets it knows: an
 environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
-`targets=None`, the default, learns them all. `andrey run` takes a mapping as `targets=`, a JSON
-object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the number
-label `0` of `--env`.
+`targets=None`, the default, learns them all. `icp` takes `targets` in the same forms but reads
+only whether an environment intervened on its `target`: it leaves such an environment's rows out,
+and keeps an environment whose targets are unknown. `andrey run` takes a mapping as `targets=`, a
+JSON object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the
+number label `0` of `--env`.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
 out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["index_edges"]
+out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
@@ -201,13 +205,13 @@ tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph
-represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
+`gfci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents: no DAG the returned
+graph represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
 `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
-the cap, `boss` and
-`grasp` grow no parent set past it, `exact_search` scores only the parent sets within it, and
-`cam`'s order search adds no edge past it. `gfci` caps its GES phase; the PAG its tests then orient
-can put more arrowheads at a node.
+the cap, `boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets
+within it, and `cam`'s order search adds no edge past it. `icp` tests only the sets of at most that
+many variables, and its guarantee then needs the target to have no more parents. `gfci` caps its
+GES phase; the PAG its tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
@@ -396,6 +400,7 @@ its first call in a process.
    dynotears
    ut_igsp
    gnies
+   icp
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -435,6 +440,14 @@ which directs every edge at a target, and lists the targets in `metadata["index_
 set of targets it tries, it runs the search of `gies` from the empty graph, with the paper's
 likelihood: one noise variance per environment for a target and one in all for the others. Known
 targets in `targets` stay in the set; with every environment's targets known, one search runs.
+
+ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
+of one `target` from continuous data pooled from several environments, such as observation and
+experiments, that leave the target's mechanism alone. It tests every set of the other variables,
+or every set of at most `max_parents`, for a regression on the target that is the same in every
+environment, by the paper's approximate or exact test, and returns the variables in every accepted
+set: in a linear model, they are causal parents with probability at least `1 - alpha`. Its
+`metadata` holds each variable's p-value and confidence interval and the accepted sets.
 
 A method becomes supported once it has:
 

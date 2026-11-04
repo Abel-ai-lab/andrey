@@ -319,6 +319,86 @@ _add(
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
 )
+_add(
+    MethodSpec(
+        name="icp",
+        family="constraint",
+        summary="Invariant causal prediction: the causal parents of one target from continuous "
+        "data pooled from several environments, such as observation and experiments, that leave "
+        "the target's mechanism alone. Tests every set of the other variables for a regression "
+        "that is the same in every environment; the variables in every accepted set are parents "
+        "with probability at least 1 - alpha. Returns a DAG of edges into the target, with "
+        "per-variable p-values and confidence intervals.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "At least two environments.",
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="edges into the target from its estimated parents; metadata['parents'], "
+            "metadata['p_values'] and metadata['confidence_intervals'] per column, "
+            "metadata['accepted_sets'], metadata['model_rejected']",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        order_note="The listing order of `metadata['accepted_sets']` follows the column order.",
+        params=(
+            ParamSpec(
+                name="target",
+                type="str",
+                default=None,
+                doc="Required: the variable whose parents to find, a column name from the data "
+                "file's header or a 0-based position.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env, as for gies: a JSON "
+                "object mapping each label of env to a list of variables. An environment that "
+                "intervened on target is left out; one without an entry is kept. null keeps every "
+                "environment.",
+                nullable=True,
+            ),
+            concept_param(
+                "alpha",
+                doc="The significance level of every set's invariance test: the estimated parents "
+                "are a subset of the true parents with probability at least 1 - alpha.",
+            ),
+            ParamSpec(
+                name="invariance_test",
+                type="str",
+                default="approximate",
+                choices=("approximate", "exact"),
+                concept="invariance_test",
+                doc="approximate = one regression on every row, each environment's residuals "
+                "against the others' by Welch's t-test and the F-test of their variances; exact = "
+                "the regression on the other rows predicts each environment's rows, by Chow's "
+                "F-test, exact for Gaussian noise.",
+            ),
+            concept_param(
+                "max_parents",
+                doc="A cap on the target's parents, at least 0: only sets of at most max_parents "
+                "variables are tested, and the guarantee holds when the target has at most that "
+                "many parents. null tests every set.",
+            ),
+        ),
+        references=("Peters, Buhlmann & Meinshausen 2016", "Chow 1960"),
+    )
+)
 
 # --- local structure: one variable's Markov blanket or parents and children ----------------------
 
@@ -2477,6 +2557,16 @@ for _name in CONCEPTS["categorical"].suitable:
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
     "cdnod": ("conflicts",),
+    "icp": (
+        "target",
+        "parents",
+        "p_values",
+        "confidence_intervals",
+        "accepted_sets",
+        "best_p_value",
+        "model_rejected",
+        "environments_left_out",
+    ),
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
