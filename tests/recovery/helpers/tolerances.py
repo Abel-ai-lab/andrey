@@ -23,6 +23,11 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    # IGSP: the graph and its objective, the edges and the I-contradicting edges, all counts.
+    "IGSP": {
+        "structural": ["graph", "score", "n_contradicting"],
+        "numeric": {},
+    },
     "XGES": {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
