@@ -18,8 +18,6 @@ settings each change the noise of one variable, both given as targets.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -42,13 +40,6 @@ FIGURE_1 = data.graphs.FixedDAG(
     nodes=("1", "2", "3", "4", "5", "6", "7"),
     arcs=(("1", "4"), ("2", "4"), ("3", "4"), ("3", "5"), ("7", "5"), ("4", "6")),
 )
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def paper_dataset(paper: str, seed: int, n: int):

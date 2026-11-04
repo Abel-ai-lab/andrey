@@ -11,8 +11,6 @@ the noise of one variable, neither of them given.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -30,13 +28,6 @@ INTERVENTIONS = {"shift": soft(shift=1.0), "perfect": hard(1.0, sd=0.1**0.5)}
 RECORDED = {
     (seed, off, kind): (0, 0) for seed in range(3) for off in (0, 3) for kind in INTERVENTIONS
 }
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def paper_dataset(seed: int, n: int, off: int, kind: str):

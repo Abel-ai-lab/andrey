@@ -13,8 +13,6 @@ rows, so every other set is rejected; the true parents' set is accepted with pro
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -63,9 +61,7 @@ def environments(
 
 
 def fit(data, env, *, target: str | int = "y", **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.icp(data, env, target=target, **kwargs)
+    return andrey.icp(data, env, target=target, **kwargs)
 
 
 SINGLE = [{}, *({column: ("do", 2.0)} for column in ("a", "b", "c", "d"))]

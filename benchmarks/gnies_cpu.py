@@ -50,7 +50,6 @@ import math
 import signal
 import socket
 import statistics
-import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -485,15 +484,13 @@ def run_arm(arm: str, data: Draw, truth: Truth, caps: dict[str, float]) -> dict[
         with capped(caps[arm]):
             if arm in andrey_gnies.ARMS:
                 return {"status": "ok", **andrey_gnies.fit(data.X, data.env, arm, data.targets)}
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-                start = time.perf_counter()
-                if arm == "andrey.ges":
-                    out, targets = andrey.ges(data.X), []
-                else:
-                    mapping = {k: t for k, t in enumerate(data.targets)}
-                    out, targets = andrey.gies(data.X, data.env, targets=mapping), truth.targets
-                seconds = time.perf_counter() - start
+            start = time.perf_counter()
+            if arm == "andrey.ges":
+                out, targets = andrey.ges(data.X), []
+            else:
+                mapping = {k: t for k, t in enumerate(data.targets)}
+                out, targets = andrey.gies(data.X, data.env, targets=mapping), truth.targets
+            seconds = time.perf_counter() - start
             marks = np.asarray(out.structure.to_numpy(), dtype=np.int8)
             return {"status": "ok", "marks": marks, "targets": targets, "seconds": seconds}
     except FitTimeout:

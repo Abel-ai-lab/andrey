@@ -147,8 +147,6 @@ def record(python: str) -> None:
 
 def compare() -> list[dict]:
     """Fit Andrey on every recorded case and seed; return one row per case."""
-    import warnings
-
     import andrey
 
     rows = []
@@ -160,9 +158,7 @@ def compare() -> list[dict]:
             )
         found = 0
         for seed in ANDREY_SEEDS:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-                out = andrey.igsp(ds.data, ds.env, targets=targets, alpha=ALPHA, seed=seed)
+            out = andrey.igsp(ds.data, ds.env, targets=targets, alpha=ALPHA, seed=seed)
             found += out.structure.to_numpy().tolist() == case["marks"]
         rows.append({"seed": case["seed"], "p": case["p"], "found": found})
     return rows

@@ -149,8 +149,6 @@ def record(python: str) -> None:
 
 def compare() -> list[dict]:
     """Fit Andrey on every recorded case; return one row per case."""
-    import warnings
-
     import andrey
 
     rows = []
@@ -160,9 +158,7 @@ def compare() -> list[dict]:
             raise ValueError(
                 f"case seed {case['seed']}: the data differ from the recorded case; re-record"
             )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-            out = andrey.ut_igsp(ds.data, ds.env, targets=known, alpha=ALPHA)
+        out = andrey.ut_igsp(ds.data, ds.env, targets=known, alpha=ALPHA)
         marks = out.structure.to_numpy()
         reference = np.array(case["marks"])
         upper = np.triu_indices(marks.shape[0], 1)
