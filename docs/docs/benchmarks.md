@@ -37,8 +37,6 @@ Interventional data
 their authors' code: GnIES and UT-IGSP, which learn the targets of experiments they are not told,
 IGSP, ICP, CAM-UV, and DYNOTEARS.
 
-% TODO(freeze): the stats follow the promotion PRs that land.
-
 :::{div} release-stats
 
 - **6 methods** newly supported: GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS
