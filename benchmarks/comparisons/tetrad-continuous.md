@@ -108,8 +108,9 @@ PAG covers every column, context variables included. pcalg's FCI-JCI (`pcalg.fci
 The two releases differ:
 
 - **Possible-d-separation.** causal-cmd's FCI and GRaSP-FCI run it (`--possibleMsepDone`), as
-  GFCI does; its `bfci` has no such step. In tetrad-lib 7.6.10, only FCI has it (`doPossibleDsep
-  true`): BOSS-FCI and GRaSP-FCI take their FCI steps from `StarFci`, which has none.
+  GFCI does; its `bfci` has no setting for it. In tetrad-lib 7.6.10, only FCI has one
+  (`doPossibleDsep true`): BOSS-FCI and GRaSP-FCI take their FCI steps from `StarFci`, which has
+  none.
 - **Knowledge and selection bias.** tetrad-lib 7.6.10's FCI steps orient by knowledge only when
   they leave out the rules for selection bias (`excludeSelectionBias true`), so its adapters refuse
   knowledge without that setting, and its FCI-JCI sets it, as pcalg's does. causal-cmd 1.12.0's FCI

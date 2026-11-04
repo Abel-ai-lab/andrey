@@ -364,7 +364,7 @@ class TetradFCIJCI(TetradFCI):
 
 
 #: The settings BOSS-FCI and GRaSP-FCI share: the test, the score, and the FCI steps of Tetrad's
-#: ``StarFci``, which in 7.6.10 has no possible-d-separation step.
+#: ``StarFci``, which in 7.6.10 has no setting for possible-d-separation.
 _STAR_FCI = {
     "alpha": _ALPHA,
     "indep_test": "fisherz",
