@@ -32,17 +32,18 @@ matrix shaped like `data`. Every environment needs its targets, so `env` without
 environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
 `ValueError`. `gnies` takes the same forms of `targets`, but for the targets it knows: an
 environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
-`targets=None`, the default, learns them all. `icp` takes `targets` in the same forms but reads
-only whether an environment intervened on its `target`: it leaves such an environment's rows out,
-and keeps an environment whose targets are unknown. `andrey run` takes a mapping as `targets=`, a
-JSON object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the
-number label `0` of `--env`.
+`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
+names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
+it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
+its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
+unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
+`targets` in `--config`, and reads an `--env` of whole numbers as integers.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
-out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["index_edges"]
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
 
@@ -432,15 +433,22 @@ level for the conditional-independence and invariance tests, `alpha=None`, is on
 of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was
 better than the paper's reference implementation at the paper's `1e-5` in 18 of 112 comparisons
 and worse in none. It returns the interventional essential graph with each setting's
-targets in `metadata["targets"]` and the level used in `metadata["alpha"]`.
+targets in `metadata["targets"]`, keyed by the labels of `env`, and the level used in
+`metadata["alpha"]`. The targets pass back as `targets`, where they are known: `ut_igsp` may
+learn more, and `gies` refits the graph under exactly these. A setting where it found no target
+maps to `[]`, which `targets` reads as observational.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
 without being told which. It returns the interventional essential graph of the targets it learns,
-which directs every edge at a target, and lists the targets in `metadata["index_edges"]`. For each
-set of targets it tries, it runs the search of `gies` from the empty graph, with the paper's
-likelihood: one noise variance per environment for a target and one in all for the others. Known
-targets in `targets` stay in the set; with every environment's targets known, one search runs.
+which directs every edge at a target, and lists the targets in `metadata["changing_variables"]`: the
+variables whose noise variance differs between some two environments. With `env`,
+`metadata["environments"]` holds its labels, and
+`targets=dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])` refits the
+graph under the learned targets. For each set of targets it tries, it runs the search of `gies` from
+the empty graph, with the paper's likelihood: one noise variance per environment for a target and
+one in all for the others. Known targets in `targets` stay in the set; with every environment's
+targets known, one search runs.
 
 ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
 of one `target` from continuous data pooled from several environments, such as observation and

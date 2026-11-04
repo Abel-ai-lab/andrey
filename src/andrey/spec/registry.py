@@ -591,7 +591,7 @@ _add(
         "variance changes between environments (unknown targets) together with the graph, for "
         "linear-Gaussian data from two or more environments that share one set of weights. "
         "Returns the interventional essential graph + score; the learned targets are "
-        "metadata['index_edges'].",
+        "metadata['changing_variables'].",
         data=DataSpec(
             inputs=(
                 _DATA_MATRIX,
@@ -610,8 +610,10 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="score in metadata['score']; the learned targets in metadata['index_edges'] as "
-            "[variable, 'directed']; the environments' labels in metadata['environments']",
+            doc="score in metadata['score']; the targets, known and learned, in "
+            "metadata['changing_variables']: the variables whose noise variance differs between "
+            "some two environments, in column order; with env, its labels in "
+            "metadata['environments']",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1380,7 +1382,8 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['targets'] maps each environment to its targets, known and learned; "
+            doc="metadata['targets'] maps each label of env to its targets, known and learned, "
+            "and passes back as targets=; "
             "metadata['score'] is the edges plus the targets of the DAG found; "
             "metadata['invariance_test'] names the invariance test; metadata['alpha'] is the "
             "level of the conditional-independence tests",
@@ -2573,7 +2576,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     **dict.fromkeys(
         ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
     ),
-    "gnies": ("score", "index_edges", "environments"),
+    "gnies": ("score", "changing_variables", "environments"),
     "exact_search": ("dag",),
     "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
     "calm": ("h_final", "objective"),

@@ -87,9 +87,18 @@ def test_metadata_is_readonly_view():
         {"x": {1, 2}},
         {"x": (1, 2)},
         {1: "non-str-key"},
+        {1.5: "a top-level number key"},
+        {"x": {np.int64(1): []}},
+        {"x": {np.float64(1.5): []}},
+        {"x": {(0, 1): []}},
+        {"x": {None: []}},
+        {"x": {"a": [], 1: []}},
+        {"x": [{float("nan"): [], float("nan"): []}]},
     ],
 )
 def test_metadata_json_safety_rejected(bad):
+    """Through ``StructureOutput.new``: a value or key that JSON cannot write, a nested NumPy
+    number key, a dict that mixes text and number keys, and two keys that write one JSON key."""
     with pytest.raises(TypeError):
         StructureOutput.new(dag([(0, 1)], 2), metadata=bad)
 
@@ -98,6 +107,34 @@ def test_metadata_json_safe_values_accepted():
     ok = {"s": "a", "b": True, "i": 3, "f": 1.5, "n": None, "lst": [1, 2.0, "x"], "d": {"k": 1}}
     out = StructureOutput.new(dag([(0, 1)], 2), metadata=ok)
     assert dict(out.metadata) == ok
+
+
+@pytest.mark.parametrize("keys", [{0: [], 1: ["x"]}, {0.5: [], 2.0: [1]}, {False: [], True: [0]}])
+def test_nested_number_keys_are_accepted_and_load_as_their_json_text(tmp_path, keys):
+    import json
+
+    out = StructureOutput.new(dag([(0, 1)], 2), metadata={"targets": keys})
+    assert dict(out.metadata) == {"targets": keys}
+    for fmt in ("json", "npz"):
+        out.save(tmp_path / f"out.{fmt}", fmt=fmt)
+        loaded = StructureOutput.load(tmp_path / f"out.{fmt}")
+        assert loaded.metadata["targets"] == {json.dumps(k): v for k, v in keys.items()}
+
+
+def test_structure_output_makes_numpy_keys_python_and_refuses_other_keys():
+    from andrey.api._adapt import structure_output
+
+    graph = dag([(0, 1)], 2)
+    keys = {
+        "n": {np.int64(3): [], np.float64(2.5): [], np.bool_(True): []},
+        "s": {np.str_("a"): []},
+    }
+    out = structure_output(graph, metadata=keys)
+    assert [type(k) for k in out.metadata["n"]] == [int, float, bool]
+    assert [type(k) for k in out.metadata["s"]] == [str]
+    for key in [(0, 1), None]:
+        with pytest.raises(TypeError, match="key in metadata"):
+            structure_output(graph, metadata={"targets": {key: []}})
 
 
 @pytest.mark.parametrize("fmt", ["json", "npz"])
