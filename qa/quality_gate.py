@@ -50,6 +50,7 @@ from qa import reference_parity
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
 import gies_cpu  # noqa: E402
 import gnies_cpu  # noqa: E402
+import ut_igsp_cpu  # noqa: E402
 
 from andrey_bench import lingam_models, regime_models, scoring, temporal_models  # noqa: E402
 from andrey_bench.adapters.andrey_cdnod import AndreyCDNOD  # noqa: E402
@@ -86,6 +87,8 @@ class Draw:
 
     data: np.ndarray
     truth: Any
+    #: Each setting's true targets, where the draw's settings have targets to learn.
+    targets: Any = None
 
 
 #: The published regimes as ``andrey.data.sample_scm`` arguments: mean degree 2 and standardized
@@ -186,6 +189,14 @@ MODEL_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "domain_shift_er": ((20, 2000), (50, 2000)),
     "multi_group_er": ((10, 1000), (20, 1000)),
     "latent_measurement": ((8, 1000), (12, 1000)),
+}
+#: UT-IGSP's published regime, drawn by its benchmark driver (``benchmarks/ut_igsp_cpu.py``) as
+#: two of the comparison's cells: 20 variables, an observational environment and 5 settings of
+#: 1,000 rows, each setting with one given target and more it is not told: a mean shift with 1 more
+#: per setting (G1, ``l`` 1) and a doubled noise standard deviation with 3 (G4, ``l`` 3).
+UNKNOWN_TARGET_CELLS: dict[str, str] = {
+    "unknown_target_shift_gauss_er_d20": "G1_shift_l1_n1000",
+    "unknown_target_variance_gauss_er_d20": "G4_variance_l3_n1000",
 }
 
 
@@ -296,6 +307,43 @@ def asia_draws(noise: str) -> tuple[Draw, ...]:
     )
     samples = (scm.sample(n=ASIA_N, seed=s, scale="standardize") for s in SEEDS)
     return tuple(Draw(ds.data, ds.graph) for ds in samples)
+
+
+def unknown_target_stack(x: np.ndarray, env: np.ndarray, given: list[list[int]]) -> np.ndarray:
+    """The samples, each row's environment, and a 0/1 matrix marking, in each row of a setting, the
+    targets the fit is given: the benchmark driver's ``known`` matrix."""
+    known = np.zeros(x.shape)
+    for k, targets in enumerate(given, start=1):
+        known[np.ix_(env == k, targets)] = 1
+    return np.column_stack([x, env, known])
+
+
+def unknown_target_unstack(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, list[list[int]]]:
+    """The samples, the environments, and each setting's given targets of
+    :func:`unknown_target_stack`."""
+    p = (x.shape[1] - 1) // 2
+    env = x[:, p].astype(int)
+    known = x[:, p + 1 :]
+    given = [np.flatnonzero(known[env == k][0]).tolist() for k in range(1, env.max() + 1)]
+    return x[:, :p], env, given
+
+
+def unknown_target_draws(cell: str) -> tuple[Draw, ...]:
+    """The stacked samples (:func:`unknown_target_stack`), the interventional essential graph of the
+    true DAG under the true targets, and the true targets."""
+    spec = ut_igsp_cpu.cell_named(cell)
+    out = []
+    for seed in SEEDS:
+        x, env, truth = ut_igsp_cpu.dataset(spec, seed)
+        graph = ut_igsp_cpu.essential(np.asarray(truth["dag"]), truth["true"])
+        out.append(
+            Draw(
+                unknown_target_stack(x, env, truth["given"]),
+                GraphStructure.from_numpy(graph, kind="cpdag"),
+                targets=truth["true"],
+            )
+        )
+    return tuple(out)
 
 
 #: The published time-series regimes and the benchmark harness's model of each; a test checks the
@@ -410,6 +458,10 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
     "asia_lingam": functools.partial(asia_draws, "uniform"),
     "sachs": sachs_draws,
     **{
+        name: functools.partial(unknown_target_draws, cell)
+        for name, cell in UNKNOWN_TARGET_CELLS.items()
+    },
+    **{
         f"{regime}_d{d}_n{n}": functools.partial(series_draws, regime, d, n)
         for regime, sizes_ in SERIES_SIZES.items()
         for d, n in sizes_
@@ -438,7 +490,7 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: identifiable, recorded with it: the interventional essential graph, or the CPDAG in which the
 #: domain index orients the edges it reaches. ``clusters`` counts the latents missed
 #: (:func:`latents_missed`). A time-series estimate is scored in its published summary's unit
-#: (:func:`series_error`).
+#: (:func:`series_error`), and ``targets``, each setting's learned targets, by :func:`set_errors`.
 Target = Literal[
     "cpdag",
     "dag",
@@ -450,6 +502,7 @@ Target = Literal[
     "window",
     "cross_links",
     "lagged_edges",
+    "targets",
 ]
 SERIES_TARGETS = ("lagged", "window", "cross_links", "lagged_edges")
 
@@ -491,6 +544,10 @@ def _series(regime: str) -> tuple[str, ...]:
     return tuple(f"{regime}_d{d}_n{n}" for d, n in SERIES_SIZES[regime])
 
 
+#: UT-IGSP needs settings whose targets are known in part or not at all.
+UNKNOWN_TARGET_DATA = tuple(UNKNOWN_TARGET_CELLS)
+
+
 def gies_fit(x: np.ndarray) -> Any:
     """``andrey.gies`` on the samples of a GIES draw, its intervention matrix as ``targets``."""
     samples, mask = unstack(x)
@@ -513,6 +570,20 @@ def _granger(x: np.ndarray) -> np.ndarray:
     effect)``."""
     out = andrey.granger(x, tau_max=GRANGER_LAGS)
     return np.stack([np.asarray(w) != 0 for w in out.structure.lag_weights])
+
+
+def ut_igsp_fit(x: np.ndarray) -> Any:
+    """``andrey.ut_igsp`` on a stacked draw (:func:`unknown_target_stack`), as the benchmark driver
+    calls it: each setting with given targets maps to them, and the others are left unknown."""
+    samples, env, given = unknown_target_unstack(x)
+    known = {k: targets for k, targets in enumerate(given, start=1) if targets}
+    return andrey.ut_igsp(samples, env, targets={0: [], **known})
+
+
+def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
+    """The targets :func:`ut_igsp_fit` returns for each setting, given and learned."""
+    learned = ut_igsp_fit(x).metadata["targets"]
+    return [learned[str(k)] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
 
 
 #: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
@@ -543,6 +614,7 @@ SUPPORTED: dict[str, Method] = {
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
+    "UT-IGSP": Method(ut_igsp_fit, "essential", UNKNOWN_TARGET_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),
     "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, seed=0), "dag", LINGAM_DATA),
     "MultiGroupDirectLiNGAM": Method(
@@ -592,8 +664,12 @@ SUPPORTED_TESTS: dict[str, Method] = {
     "CMIknn": Method(lambda x: andrey.pc(x, indep_test="cmiknn"), "cpdag", SMALL_NONLINEAR_DATA),
     "GPDC": Method(lambda x: andrey.pc(x, indep_test="gpdc"), "cpdag", SMALL_NONLINEAR_DATA),
 }
-#: Every check of the gate: the supported methods, then the supported tests.
-CHECKS: dict[str, Method] = {**SUPPORTED, **SUPPORTED_TESTS}
+#: The targets a supported method learns, scored by :func:`set_errors`, beside its graph above.
+SUPPORTED_TARGETS: dict[str, Method] = {
+    "UT-IGSP targets": Method(ut_igsp_targets, "targets", UNKNOWN_TARGET_DATA),
+}
+#: Every check of the gate: the supported methods, the supported tests, then the learned targets.
+CHECKS: dict[str, Method] = {**SUPPORTED, **SUPPORTED_TESTS, **SUPPORTED_TARGETS}
 
 
 def projection(truth: GraphStructure) -> GraphStructure:
@@ -687,9 +763,18 @@ def series_error(estimate: Any, truth: Any, target: Target) -> int:
     return int((np.asarray(estimate) ^ np.asarray(truth)).sum())
 
 
+def set_errors(found: list[list[int]], true: list[list[int]]) -> int:
+    """Return the false plus the missed members of each set in ``found`` against its own in
+    ``true``, over the sets: the target error of the published summary."""
+    return sum(len(set(f) ^ set(t)) for f, t in zip(found, true, strict=True))
+
+
 def empty_estimate(draw: Draw, target: Target) -> Any:
-    """The empty graph of ``draw`` in the form ``target`` scores."""
+    """The empty graph of ``draw`` in the form ``target`` scores; for ``targets``, the given targets
+    alone."""
     truth = draw.truth
+    if target == "targets":
+        return unknown_target_unstack(draw.data)[2]
     if target == "lagged":
         return temporal_from_links(np.zeros_like(links_from_temporal(truth)))
     if target == "window":
@@ -786,6 +871,10 @@ def evaluate(method: str, dataset: str, fit: Callable[[Draw], object] | None = N
     with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         for draw in draws(dataset):
             empty = empty_estimate(draw, spec.target)
+            if spec.target == "targets":
+                shds.append(set_errors(run(draw), draw.targets))
+                empties.append(set_errors(empty, draw.targets))
+                continue
             if spec.target in SERIES_TARGETS:
                 shds.append(series_error(run(draw), draw.truth, spec.target))
                 empties.append(series_error(empty, draw.truth, spec.target))

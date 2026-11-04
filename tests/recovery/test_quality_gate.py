@@ -31,7 +31,11 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling. A
-    measurement model moves its indicators and keeps its latents last."""
+    measurement model moves its indicators and keeps its latents last; learned targets move to
+    the next variable."""
+    if target == "targets":
+        p = draw.truth.n_nodes
+        return [sorted((v + 1) % p for v in t) for t in draw.targets]
     if target in qg.SERIES_TARGETS:
         return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)

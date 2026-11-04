@@ -4,7 +4,7 @@
  "lane": "ut-igsp",
  "method": "UT-IGSP",
  "status": "experimental",
- "about": "UT-IGSP's own published measurements, one file per lane; it holds no release-summary entry, and no release card reads it",
+ "about": "UT-IGSP's own published measurements, one file per lane; the release summary's UT-IGSP entries are built from it",
  "build": "Andrey pre-release build of 3 November 2026 (version string 0.13.0) for Andrey's fits; the reference's fits ran in an earlier job on the same data, which the build regenerated identically",
  "comparator": "graphical-model-learning 0.1a8 (unknown_target_igsp) with conditional-independence 0.1a6 and graphical-models 0.1a21, the authors' library and the method's only implementation",
  "packages": {
