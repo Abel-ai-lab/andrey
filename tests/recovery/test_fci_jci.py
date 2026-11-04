@@ -349,6 +349,14 @@ def test_reordering_the_rows_leaves_fci_jci_unchanged():
     assert again.metadata == first.metadata
 
 
+def test_fci_jci_takes_env_as_a_column_of_data():
+    x, index = _pooled(0)
+    frame = pd.DataFrame(x).assign(site=index)
+    by_column, by_values = andrey.fci_jci(frame, "site"), andrey.fci_jci(x, index)
+    assert np.array_equal(by_column.structure.to_numpy(), by_values.structure.to_numpy())
+    assert by_column.metadata["index_edges"] == by_values.metadata["index_edges"]
+
+
 def test_fci_jci_names_the_index_edges_by_column():
     x, index = _chain()
     out = andrey.fci_jci(pd.DataFrame(x, columns=["a", "b", "c"]), index)

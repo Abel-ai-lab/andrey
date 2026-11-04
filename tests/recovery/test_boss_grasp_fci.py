@@ -122,7 +122,7 @@ def test_hybrid_recovers_the_pag_in_the_papers_setting(name, params):
     """The paper's central cell: 20 measured linear-Gaussian variables and 4 hidden common causes,
     mean degree 4, 1,000 rows, against the true PAG, at the defaults and at the paper's penalty
     discount and alpha. Nearly every adjacency found is true, and the endpoint errors stay below
-    0.85 times the empty graph's: the tests miss many of the adjacencies the hidden causes add."""
+    0.85 times the empty graph's."""
     ds = data.sample_scm(d=24, n=1000, seed=0, density=4.0, latents=4)
     truth = marginal(ds.graph, "pag")
     found = FIT[name](ds.data, **params).structure

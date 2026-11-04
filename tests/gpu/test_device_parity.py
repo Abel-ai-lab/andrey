@@ -106,6 +106,25 @@ def test_fci_jci_matches_the_cpu(device, confounded_index):
     assert actual.metadata["index_edges"] == expected.metadata["index_edges"]
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", ["boss_fci", "grasp_fci"])
+def test_permutation_fci_matches_the_cpu(device, method):
+    """The score search and FCI phase give the same confounded PAG on NumPy and the device."""
+    x = datagen.generate("confounded_gauss_5v")
+    fit = getattr(andrey, method)
+    with andrey.config(backend="numpy", n_jobs=1):
+        expected = fit(x, seed=0).structure
+
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device, n_jobs=1):
+        actual = fit(x, seed=0).structure
+
+    counts = backend.dispatch_stats()
+    assert counts.get(("cov", device), 0) > 0
+    assert counts.get(("corrcoef", device), 0) > 0
+    assert actual == expected
+
+
 @pytest.fixture
 def nonlinear():
     """Columns ``x, y, z1, z2, w``: ``x`` and ``y`` nonlinear in ``z``, ``w`` driven by ``y``."""
