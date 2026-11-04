@@ -61,6 +61,10 @@ names its pull request.
   the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
   on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
   graph's 135 in a median 176 s. ([#665])
+- `StructureOutput` metadata takes `int`, `float`, and `bool` keys in a nested mapping, such as
+  the labels of `env` that key `ut_igsp`'s `metadata["targets"]`; `save` writes them as their JSON
+  text, `"1"` for `1`. A nested mapping that mixes text and number keys, or a NumPy, tuple, or
+  `None` key, raises `TypeError`. ([#680])
 
 ### Changed
 
@@ -68,6 +72,12 @@ names its pull request.
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
+- `targets=` reads a text key that spells a number as the label of `env` it spells, in Python as on
+  the command line, so a mapping read back from JSON passes as it is: `"1"` names the label `1`.
+  Two keys that name one label, such as `1` and `"1"`, raise `ValueError` instead of the last one
+  winning. ([#680])
+- `andrey run` and `andrey bootstrap` read an `--env` of whole numbers as integers, so the labels in
+  their output and messages read `1`, not `1.0`; the graphs do not change. ([#680])
 
 ### Fixed
 
@@ -1702,3 +1712,4 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#680]: https://github.com/Abel-ai-lab/andrey/pull/680
