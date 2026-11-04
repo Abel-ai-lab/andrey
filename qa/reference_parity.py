@@ -32,9 +32,14 @@ summary's ``parity_rule`` sets how its rows are judged:
 - ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
   not, under the time cap. An in-claim row with ``andrey_short`` above 0 fails, whatever its number
   of paired datasets: a timeout never becomes a smaller mean. So does its replication's.
-- ``floor_95`` or ``target_floor_95``: the bootstrap 95% interval of the mean of Andrey's error
-  minus a floor's, the empty graph's ``shd`` or the ``target_error`` of the targets the method was
-  given. An in-claim row fails when the interval's upper end is not below 0.
+- ``floor_95`` or ``target_floor_95``, or a ``floor`` record with the interval in
+  ``andrey_minus_empty.bootstrap_95``: the bootstrap 95% interval of the mean of Andrey's error
+  minus a floor's, the empty graph's error, or for ``target_error`` the error of the targets the
+  method was given or of no targets. An in-claim row fails when the interval's upper end is not
+  below 0. A ``floor`` record with ``applies`` false is a floor its lane's rule, fixed before the
+  run, does not apply to the row, such as a setting where the reference's own interval against the
+  empty graph does not lie below 0; it is reported, not judged. A row with a ``replication`` that
+  records a floor fails its floor only when the replication's fails too.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -90,8 +95,9 @@ ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 #: The ``role`` of an entry whose comparator is reported and never judged.
 CONTEXT = "context"
-#: A row's floor intervals: Andrey's error minus the empty graph's, and minus the given targets'.
-FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95")
+#: A row's floor fields: Andrey's error minus the empty graph's, minus the given targets', or a
+#: ``floor`` record that holds the interval and whether its lane's rule applies it to the row.
+FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95", "floor")
 #: The ``metric`` values an entry may name, with the text a row prints for each.
 METRICS: dict[str, str] = {
     "shd": "SHD",
@@ -268,6 +274,9 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
                     raise ValueError(f"{where} has a replication, but no paired bootstrap rule")
                 replication = row["replication"]
                 short = marks["andrey_short"] + _andrey_short(replication, f"{where}, replication")
+                floor = marks["floor"]
+                if floor is not None and floor[1] >= 0 and any(k in replication for k in FLOORS):
+                    marks["floor"] = _floor(replication, f"{where}, replication")
                 rows.append(
                     replace(
                         _replicated(name, replication, column, where, metric),
@@ -300,14 +309,33 @@ def _andrey_short(row: dict, where: str) -> int:
 
 
 def _floor(row: dict, where: str) -> tuple[float, float] | None:
-    """Return the row's floor interval, ``floor_95`` or ``target_floor_95``; ``None`` without."""
-    present = [row[name] for name in FLOORS if name in row]
+    """Return the row's floor interval; ``None`` without one or where its ``floor`` does not apply.
+
+    A ``floor`` record's ``applies`` must be absent or a bool, and a ``pass`` beside it must agree
+    with the interval, so a lane's verdict and this check cannot disagree unseen.
+    """
+    present = [name for name in FLOORS if name in row]
     if not present:
         return None
-    if len(present) > 1 or len(present[0]) != 2:
+    if len(present) > 1:
         raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
-    lo, hi = present[0]
-    return float(lo), float(hi)
+    value = row[present[0]]
+    applies = None
+    if present[0] == "floor":
+        if not isinstance(value, dict):
+            raise ValueError(f"{where}: floor must be a record with andrey_minus_empty")
+        applies = value.get("applies")
+        if applies not in (None, True, False):
+            raise ValueError(f"{where}: floor applies must be true or false, not {applies!r}")
+        value = value.get("andrey_minus_empty", {}).get("bootstrap_95")
+    if not isinstance(value, list | tuple) or len(value) != 2:
+        raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
+    lo, hi = float(value[0]), float(value[1])
+    if applies is False:
+        return None
+    if applies and row["floor"].get("pass") not in (None, hi < 0):
+        raise ValueError(f"{where}: floor pass disagrees with its interval [{lo}, {hi}]")
+    return lo, hi
 
 
 def _out_of_claim(row: dict, method: dict, where: str) -> bool:

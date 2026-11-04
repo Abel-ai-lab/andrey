@@ -353,9 +353,13 @@ judged by: its rows are printed with their numbers and not gated. Two more field
 row whatever its interval. Its `coverage` holds `andrey_short`, the datasets the reference finished
 and Andrey did not under the time cap: above 0, the row fails at any number of paired datasets,
 since a timeout never becomes a smaller mean, and so does a replication's. Its `floor_95` or
-`target_floor_95` is the bootstrap 95% interval of the mean of Andrey's error minus a floor's, the
-empty graph's SHD or the target errors of the targets the method was given alone: the row fails
-when the interval's upper end is not below 0.
+`target_floor_95`, or the `andrey_minus_empty.bootstrap_95` of a `floor` record, is the bootstrap
+95% interval of the mean of Andrey's error minus a floor's, the empty graph's error or the target
+errors of the targets the method was given alone, or of no targets: the row fails when the
+interval's upper end is not below 0. A `floor` record with `"applies": false` holds a floor that
+its lane's rule, fixed before the run, does not apply to the row, and is reported, not judged; a
+`pass` beside `"applies": true` must agree with the interval. A floor failure on a row with a
+replication that records a floor counts only if the replication's floor fails too.
 
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
