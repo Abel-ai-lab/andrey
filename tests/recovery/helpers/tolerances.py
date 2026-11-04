@@ -63,6 +63,18 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    "FCIJCI": {
+        "structural": ["graph", "index_edges"],
+        "numeric": {},
+    },
+    "BOSSFCI": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
+    "GRaSPFCI": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
     "GFCI": {
         "structural": ["graph"],
         "numeric": {},

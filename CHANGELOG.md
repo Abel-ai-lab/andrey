@@ -68,6 +68,16 @@ names its pull request.
   data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
   environments, and it names a variable outside the true parents in at most 1.23% of fits at
   `alpha=0.05` in the settings it claims. ([#677])
+- `andrey.fci_jci`, experimental, learns a PAG from data pooled across environments while allowing
+  hidden common causes (Joint Causal Inference, Mooij, Magliacane, and Claassen 2020): FCI with the
+  environment as a variable that no data variable causes, which removes the edges pooling adds and
+  can orient more. It takes `env` as `cdnod` does, `confounded_index=False` when the environment is
+  set from outside, as in a randomized experiment, and lists the environment's edges in
+  `metadata["index_edges"]`.
+- `andrey.boss_fci` and `andrey.grasp_fci`, experimental, learn a PAG that allows hidden common
+  causes (BOSS-FCI and GRaSP-FCI, Ramsey, Andrews, and Spirtes 2025): GFCI's tests and orientation
+  rules on the CPDAG of a BOSS or GRaSP search in place of GES's, with GFCI's possible-d-separation
+  step kept.
 
 ### Changed
 

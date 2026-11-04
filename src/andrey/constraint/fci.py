@@ -698,6 +698,7 @@ def _fci_orient(
     *,
     max_depth: int | None = None,
     in_column_order: bool = False,
+    selection_bias: bool = True,
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
@@ -719,6 +720,9 @@ def _fci_orient(
     R4 discriminating-path rule) followed by the tail and possibly-directed-path rules R5-R10, each
     rule setting its marks at once and visiting the nodes in column order, so of two firings that
     conflict the first decides; sweeps repeat until no endpoint changes.
+
+    ``selection_bias=False`` skips R5-R7, the rules for selection bias, leaving R1-R4 and R8-R10,
+    Zhang's complete set for PAGs without selection bias.
     """
     if not in_column_order:
         test = _memoized(test)  # R4 repeats its tests in every round
@@ -727,9 +731,10 @@ def _fci_orient(
             _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
             _rule_r3(marks, sepsets, False, ambiguous, out=implied)
             _rule_r4(marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied)
-            _rule_r5(marks, False, ambiguous, out=implied)
-            _rule_r6(marks, False, out=implied)
-            _rule_r7(marks, False, ambiguous, out=implied)
+            if selection_bias:
+                _rule_r5(marks, False, ambiguous, out=implied)
+                _rule_r6(marks, False, out=implied)
+                _rule_r7(marks, False, ambiguous, out=implied)
             _rule_r8(marks, False, out=implied)
             _rule_r9(marks, False, ambiguous, out=implied)
             _rule_r10(marks, False, ambiguous, out=implied)
@@ -742,9 +747,10 @@ def _fci_orient(
         change = _rule_r3(marks, sepsets, change, ambiguous)
         # R4 runs every sweep because a discriminating path can orient an otherwise unchanged graph.
         change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth)
-        change = _rule_r5(marks, change, ambiguous)
-        change = _rule_r6(marks, change)
-        change = _rule_r7(marks, change, ambiguous)
+        if selection_bias:
+            change = _rule_r5(marks, change, ambiguous)
+            change = _rule_r6(marks, change)
+            change = _rule_r7(marks, change, ambiguous)
         change = _rule_r8(marks, change)
         change = _rule_r9(marks, change, ambiguous)
         change = _rule_r10(marks, change, ambiguous)

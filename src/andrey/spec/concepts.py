@@ -116,7 +116,20 @@ def _absent(fixed_in: Release, reason: str, *methods: str) -> tuple[Deviation, .
 
 
 # Method groups the rules below name.
-CI_SEARCHES = ("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2")
+CI_SEARCHES = (
+    "pc",
+    "fci",
+    "gfci",
+    "boss_fci",
+    "grasp_fci",
+    "cdnod",
+    "fci_jci",
+    "iamb",
+    "inter_iamb",
+    "mmpc",
+    "mmhc",
+    "rsmax2",
+)
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
     "ges",
@@ -130,6 +143,8 @@ SCORE_SEARCHES = (
     "mmhc",
     "rsmax2",
     "gfci",
+    "boss_fci",
+    "grasp_fci",
 )
 _PURE_SCORE = ("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
 _CONTINUOUS = ("notears", "dagma")
@@ -142,11 +157,13 @@ _LINGAM = (
 )
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
-_STARTS = ("boss", "grasp", "hc", "tabu", "ut_igsp")
+_STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
-    *("pc", "fci", "gfci", "cdnod", "icp", "iamb", "inter_iamb", "mmpc"),
+    *("pc", "fci", "gfci", "cdnod", "fci_jci", "icp", "iamb", "inter_iamb", "mmpc"),
+    "boss_fci",
+    "grasp_fci",
     *_PURE_SCORE,
     "gnies",
     "calm",
@@ -389,6 +406,17 @@ _CONCEPTS = (
                 reason="The standard BIC: the extended term lowered its errors only slightly and "
                 "raised them on some dense graphs; its docstring gives the measurements.",
             ),
+            *(
+                Deviation(
+                    method=m,
+                    name="ebic_gamma",
+                    default=0.0,
+                    fixed_in=None,
+                    reason="The standard BIC, as in gfci, the same pipeline with GES, and in the "
+                    "published method.",
+                )
+                for m in ("boss_fci", "grasp_fci")
+            ),
         ),
     ),
     Concept(
@@ -589,6 +617,7 @@ _CONCEPTS = (
                 "pc",
                 "fci",
                 "cdnod",
+                "fci_jci",
                 "iamb",
                 "inter_iamb",
                 "mmpc",
@@ -722,9 +751,10 @@ _CONCEPTS = (
     Concept(
         key="n_starts",
         summary="The number of searches a fit runs, each later one from a start drawn from seed: "
-        "a random order (boss, grasp), a minimum-degree order with ties drawn from seed "
-        "(ut_igsp), or the best DAG so far after n_perturbations random edge changes (hc, tabu); "
-        "the best-scoring one is returned, and 1, the default, runs one search.",
+        "a random order (boss, grasp, boss_fci, grasp_fci), a minimum-degree order with ties "
+        "drawn from seed (ut_igsp), or the best DAG so far after n_perturbations random edge "
+        "changes (hc, tabu); the best-scoring one is returned, and 1, the default, runs one "
+        "search.",
         param=_template(
             "n_starts",
             "int",
@@ -941,6 +971,7 @@ _CONCEPTS = (
             "pc",
             "fci",
             "cdnod",
+            "fci_jci",
             "iamb",
             "inter_iamb",
             "mmpc",
@@ -949,7 +980,14 @@ _CONCEPTS = (
             "pnl",
         ),
         exempt=(
-            *_exempt("Its score phase reads every column.", "gfci", "mmhc", "rsmax2"),
+            *_exempt(
+                "Its score phase reads every column.",
+                "gfci",
+                "boss_fci",
+                "grasp_fci",
+                "mmhc",
+                "rsmax2",
+            ),
             *_exempt(
                 "A score or a regression reads every column.",
                 *_PURE_SCORE,
@@ -1015,6 +1053,24 @@ _CONCEPTS = (
         key="data",
         summary="The first argument is data: a matrix, or a sequence of matrices for a panel.",
         suitable=ALL_METHODS,
+    ),
+    Concept(
+        key="confounded_index",
+        summary="With an environment index, whether a hidden variable may cause both the index and "
+        "a data variable (FCI-JCI1, the default), or the index is set from outside, as in a "
+        "randomized experiment, so every edge it keeps points out of it (FCI-JCI123).",
+        param=_template(
+            "confounded_index",
+            "bool",
+            True,
+            "Whether a hidden variable may cause both the index and a data variable (FCI-JCI1). "
+            "false assumes the index is set from outside, as in a randomized experiment, so every "
+            "edge it keeps points out of it (FCI-JCI123).",
+        ),
+        fragment="hidden variable may cause both the index and a data variable",
+        suitable=("fci_jci",),
+        others_exempt="Not an FCI-JCI search: only those choose between JCI's assumptions on the "
+        "index.",
     ),
     Concept(
         key="measure",
@@ -1087,7 +1143,7 @@ _CONCEPTS = (
             choices=COLLIDER_RULES,
         ),
         fragment="collider",
-        suitable=("pc", "fci", "gfci", "cdnod", "pcmciplus"),
+        suitable=("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci", "pcmciplus"),
         exempt=(
             *_exempt(
                 "Its collider phase follows LPCMCI's own orientation rules, not yet compared with "
@@ -1112,7 +1168,10 @@ _CONCEPTS = (
                         "pc",
                         "fci",
                         "gfci",
+                        "boss_fci",
+                        "grasp_fci",
                         "cdnod",
+                        "fci_jci",
                         "pcmciplus",
                         "lpcmci",
                         "iamb",

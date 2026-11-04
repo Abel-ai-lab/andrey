@@ -13,14 +13,14 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 """
 
 from .blanket import iamb, inter_iamb, mmpc
-from .constraint import cdnod, fci, gfci, icp, pc
+from .constraint import cdnod, fci, fci_jci, gfci, icp, pc
 from .continuous import dagma, notears
 from .fcm import cam, camuv, resit
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
-from .permutation import boss, grasp, ut_igsp
+from .permutation import boss, boss_fci, grasp, grasp_fci, ut_igsp
 from .score import calm, exact_search, ges, gies, gnies, hc, tabu, xges
 from .temporal import (
     dynotears,
@@ -38,6 +38,7 @@ __all__ = [
     "fci",
     "gfci",
     "cdnod",
+    "fci_jci",
     "icp",
     # local structure: one variable's Markov blanket or parents and children
     "iamb",
@@ -60,6 +61,8 @@ __all__ = [
     # permutation-based
     "boss",
     "grasp",
+    "boss_fci",
+    "grasp_fci",
     "ut_igsp",
     # functional causal models: LiNGAM, then nonlinear additive noise
     "direct_lingam",

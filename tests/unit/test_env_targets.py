@@ -397,8 +397,9 @@ def test_cli_former_flags_warn_and_fit_alike(files, capsys):
     assert "DeprecatedArgumentWarning" in {w["category"] for w in warned}
 
 
-def test_cli_bootstrap_takes_an_env_column(files, capsys):
-    argv = ["bootstrap", "cdnod", "--data", str(files["data.csv"]), "--env", "e"]
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+def test_cli_bootstrap_takes_an_env_column(method, files, capsys):
+    argv = ["bootstrap", method, "--data", str(files["data.csv"]), "--env", "e"]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["x0", "x1", "x2"]
 
@@ -420,6 +421,7 @@ def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkey
             f"targets={files['t.json']}",
         ],
         ["run", "cdnod", "--data", data, "--env", env, "--domain-index", env],
+        ["run", "fci_jci", "--data", data, "--domain-index", env],
         ["run", "gies", "--data", data, "--env", env, "targets=[1, 2]"],
         ["run", "pc", "--data", data, "--domain-index", env],
     ]

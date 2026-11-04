@@ -48,6 +48,13 @@ def _run_cdnod(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.cdnod(X, datagen.domain_index("gauss_5v")), algorithm)
 
 
+def _run_fci_jci(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    shifted, index = datagen.domain_shift("gauss_5v", (0,))
+    return project_output(andrey.fci_jci(shifted, index), algorithm)
+
+
 def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
     from andrey.api._temporal import _adapt_var_lingam
     from andrey.lingam.var import var_lingam
@@ -95,6 +102,7 @@ ALGORITHMS = {
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
     "CDNOD": (_run_cdnod, "gauss_5v"),
+    "FCIJCI": (_run_fci_jci, "gauss_5v"),
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
     "XGES": (_facade("xges"), "gauss_5v"),

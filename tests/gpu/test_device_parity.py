@@ -17,6 +17,7 @@ from andrey.core import backend, stats
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_kernel import KCI
 from andrey.irregular.pnl import pnl_pairs
+from tests.recovery.helpers import datagen
 
 pytest.importorskip("torch")
 
@@ -85,6 +86,24 @@ def test_on_device_determinism(device, standardized, data):
         # docs/docs/ci.md).
         assert np.allclose(e1, e2, rtol=1e-5, atol=1e-6)
         assert np.allclose(c1, c2, rtol=1e-5, atol=1e-6)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("confounded_index", [True, False])
+def test_fci_jci_matches_the_cpu(device, confounded_index):
+    """A domain shift gives the same PAG and index marks on NumPy and the device."""
+    x, index = datagen.domain_shift("gauss_5v", (0,))
+    with andrey.config(backend="numpy", n_jobs=1):
+        expected = andrey.fci_jci(x, index, confounded_index=confounded_index)
+    assert expected.metadata["index_edges"]
+
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device, n_jobs=1):
+        actual = andrey.fci_jci(x, index, confounded_index=confounded_index)
+
+    assert backend.dispatch_stats().get(("corrcoef", device), 0) > 0
+    assert actual.structure == expected.structure
+    assert actual.metadata["index_edges"] == expected.metadata["index_edges"]
 
 
 @pytest.fixture

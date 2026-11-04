@@ -932,10 +932,10 @@ def bootstrap(
     resample is drawn within each environment of ``env``: of an environment's ``m`` rows, a
     subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample draws
     ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
-    ``cdnod``, which reads it as numbers, such as a domain number or a time step, resamples the rows
-    as a whole. A time-series method on one series subsamples one stretch of consecutive rows (and
-    bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
-    ``multi_group_direct_lingam`` resamples each dataset on its own.
+    ``cdnod`` or ``fci_jci``, which read it as numbers, such as a domain number or a time step,
+    resamples the rows as a whole. A time-series method on one series subsamples one stretch of
+    consecutive rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples
+    whole units, and ``multi_group_direct_lingam`` resamples each dataset on its own.
 
     Parameters
     ----------

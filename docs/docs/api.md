@@ -15,8 +15,8 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 ## Structure-learning methods
 
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with five
-exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
-`targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
+exceptions: `cdnod` and `fci_jci` also take `env`, each row's environment, `gies` also takes `env`
+with `targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
 targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
 `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a list of
 datasets and returns one result per dataset. The first argument of every method is `data`;
@@ -103,42 +103,40 @@ raises a `ValueError` that names the argument and, for a bad cell, its row and c
 column gives a one-node graph.
 
 % concept: missing
-`pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
-missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
-conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and so do the pair tests `anm` and `pnl`, which read the rows where both columns are
-observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read. A
-column with no observed value, or a constant one over its observed values, raises a `ValueError`
-before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
-`"student_t"` and 2 for the other tests, raises one during it. `cdnod` needs a complete
-`env`. Every other method raises a `ValueError` that names it and says what to do instead,
-as [Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say
-why.
+`pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
+accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file:
+each conditional-independence test reads only the rows where all of its variables are observed
+(test-wise deletion), and so do the pair tests `anm` and `pnl`, which read the rows where both
+columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test
+read. A column with no observed value, or a constant one over its observed values, raises a
+`ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
+`"student_t"` and 2 for the other tests, raises one during it. `cdnod` and `fci_jci` need a complete
+`env`. Every other method raises a `ValueError` that names it and says what to do instead, as
+[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
-`pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
-`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
-`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
-`"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
-from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
-`lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
-the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
-likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance
-correlation. A test you register that reports only p-values is ordered by its p-value, smallest
-first.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
+`mmhc`, `rsmax2`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices:
+`"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for
+categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests
+`"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
+tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
+`"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and `lpcmci` run each test on the lagged
+values of the series, and order the candidate conditions by the test's statistic, as tigramite does:
+the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's conditional mutual
+information estimate, or GPDC's distance correlation. A test you register that reports only p-values
+is ordered by its p-value, smallest first.
 
 % concept: knowledge
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`,
-`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`,
-`cam`, `resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
-`longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
-`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of
-required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. Every required edge is in the result, whatever its
-weight, test, or score says. For the time-series methods, an edge `(cause, effect, lag)` is the
-link from `cause` at time `t - lag` to `effect` at time `t`.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`,
+`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`,
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
+`granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a
+{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
+temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
+in the result, whatever its weight, test, or score says. For the time-series methods, an edge
+`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -167,14 +165,13 @@ links in the skeleton phase and reports the adjusted values in `metadata["p_valu
 changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum conditioning-set size of their
-conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2` cap their
-restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and `inter_iamb`
-stop growing at the cap.
-`rcd`'s cap is the most variables it regresses out together, and `camuv`'s the most variables a
-sink test adds together as a variable's candidate parents, each with a default of 2, its paper's
-setting.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
+`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum
+conditioning-set size of their conditional-independence tests; `None`, the default, sets no cap.
+`mmhc` and `rsmax2` cap their restrict phase and `pcmci` and `pcmciplus` their PC1 step; the
+blankets of `iamb` and `inter_iamb` stop growing at the cap. `rcd`'s cap is the most variables it
+regresses out together, and `camuv`'s the most variables a sink test adds together as a variable's
+candidate parents, each with a default of 2, its paper's setting.
 
 % concept: max_p_global
 `lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test takes
@@ -194,48 +191,51 @@ other parents, so it has no moral graph. These are the defaults of the correspon
 the R package bnlearn. With a `target`, each returns that variable's set, whatever `structure` is.
 
 % concept: collider_rule
-`pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
-an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
-that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"`
-(Colombo and Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors
-and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
-triple the vote cannot decide is ambiguous: no rule orients through it, and
-`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. `pcmciplus`
-takes the same three rules for its same-step colliders, with `"majority"` as its default, as in
-tigramite, since its orientations do not depend on the order of the variables.
+`pc`, `cdnod`, `fci`, `gfci`, `fci_jci`, `boss_fci`, and `grasp_fci` take `collider_rule`, which
+decides whether the middle node of an unshielded triple `x - z - y` is a collider. `"sepsets"`, the
+default, reads the separating set that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang,
+and Spirtes 2006) and `"majority"` (Colombo and Maathuis 2014) test `x` and `y` again given every
+subset of either one's neighbors and make `z` a collider when none, or fewer than half, of the
+separating subsets contain it. A triple the vote cannot decide is ambiguous: no rule orients through
+it, and `metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
+`pcmciplus` takes the same three rules for its same-step colliders, with `"majority"` as its
+default, as in tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents: no DAG the returned
-graph represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
-`gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
-the cap, `boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets
-within it, and `cam`'s order search adds no edge past it. `icp` tests only the sets of at most that
-many variables, and its guarantee then needs the target to have no more parents. `gfci` caps its
-GES phase; the PAG its tests then orient can put more arrowheads at a node.
+`gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:
+no DAG the returned graph represents gives a node more than that many parents. `None`, the default,
+sets no cap. `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and
+`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, `exact_search`
+scores only the parent sets within it, and `cam`'s order search adds no edge past it. `icp` tests
+only the sets of at most that many variables, and its guarantee then needs the target to have no
+more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
+tests then orient can put more arrowheads at a node.
 
 % concept: seed
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take
-`seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is
-the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
-exactly. The methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with
-`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
-that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
-seed.
+`pc`, `fci`, `gfci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `boss_fci`, `grasp_fci`, `ut_igsp`, `hc`, `tabu`, `calm`,
+and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws.
+`None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random
+one, so a call repeats exactly. The methods that test independence draw random numbers only under
+`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `boss_fci` and `grasp_fci` also for their search's
+order, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1;
+otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does
+not depend on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs:
-the first from the start the method describes, each later one from a start drawn from `seed` and
-the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` from a
-minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
-after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
-replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
-count of edges and targets). `ut_igsp` runs 10 by default: on 15 groups of simulated datasets, 12
-of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
-that setting, and more in none. Each search builds its own caches and drops the previous one's, so
-more starts take more time but little more memory. `1`, the default for the others, runs one search.
+`boss`, `grasp`, `boss_fci`, `grasp_fci`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of
+searches a fit runs: the first from the start the method describes, each later one from a start
+drawn from `seed` and the search's index. `boss` and `grasp`, and the BOSS or GRaSP phase of
+`boss_fci` and `grasp_fci`, start it from a random order, `ut_igsp` from a minimum-degree order with
+its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations`
+random edge changes. The fit returns the best-scoring search; a later one replaces an earlier one
+only when it scores better by more than `1e-6` (for `ut_igsp`, a lower count of edges and targets);
+`boss_fci` and `grasp_fci` run their tests on the best search's CPDAG. `ut_igsp` runs 10 by default:
+on 15 groups of simulated datasets, 12 of them in its paper's setting, 10 searches had fewer SHD
+errors than 5 in 4 groups, 2 of them in that setting, and more in none. Each search builds its own
+caches and drops the previous one's, so more starts take more time but little more memory. `1`, the
+default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -250,17 +250,18 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
-`rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of
-Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the default, with
-`ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per
+parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the
+default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
 `metadata["penalty_discount"]` records the value the score used.
 
 % concept: ebic_gamma
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
-`rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
-linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's
-score, a penalty that grows with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1
+(Chen and Chen 2008): their linear-Gaussian BIC adds
+`2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows
+with the number of variables. `gfci`, `boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the
 standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice and
 {py:func}`~andrey.gfci` says why its default differs. Only `score_func="bic"` adds the term, so
 passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
@@ -268,15 +269,15 @@ passing `ebic_gamma` with another score, named or picked by `None`, raises a `Va
 adds it.
 
 % concept: equivalent_sample_size
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman, Geiger and
-Chickering 1995; Buntine 1991): the number of rows its uniform prior over each variable's
-conditional distributions is worth, a positive number. `1.0`, the default, is what the score used
-before the argument existed. A larger value weighs the prior more against the data, and the learned
-graph can change with it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value.
-Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size` with another score, named or
-picked by `None`, raises a `ValueError`; `metadata["equivalent_sample_size"]` records the value a
-`"bdeu"` fit used.
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`grasp_fci`, `mmhc`, and `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the
+BDeu score (Heckerman, Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform
+prior over each variable's conditional distributions is worth, a positive number. `1.0`, the
+default, is what the score used before the argument existed. A larger value weighs the prior more
+against the data, and the learned graph can change with it (Silander, Kontkanen and Myllymaki 2007),
+so compare fits at one value. Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size`
+with another score, named or picked by `None`, raises a `ValueError`;
+`metadata["equivalent_sample_size"]` records the value a `"bdeu"` fit used.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -402,6 +403,9 @@ its first call in a process.
    ut_igsp
    gnies
    icp
+   fci_jci
+   boss_fci
+   grasp_fci
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -575,12 +579,12 @@ begins with the shorter run's fits. A method that takes a row-aligned input (`en
 `targets` as a 0/1 matrix) resamples it with the rows, and a column that `env` or `targets` names
 travels with its rows. When `env` holds text labels, or for `gies`, each resample takes the same
 share of every environment's rows, at least one, so no resample drops an environment; `cdnod`'s
-numeric index, such as a time step, resamples the rows as a whole. `multi_group_direct_lingam`
-resamples each dataset on its own and returns one result per dataset; `longitudinal_lingam`
-resamples the units, the same rows of every dataset. A time-series method on one series subsamples
-one stretch of consecutive rows; with `resampling="bootstrap"` it resamples blocks of `block_length`
-consecutive rows, by default at least ten times its `tau_max`. `gin` is the one method it does not
-take, since its number of latent nodes differs from fit to fit.
+numeric index, and that of `fci_jci`, such as a time step, resamples the rows as a whole.
+`multi_group_direct_lingam` resamples each dataset on its own and returns one result per dataset;
+`longitudinal_lingam` resamples the units, the same rows of every dataset. A time-series method on
+one series subsamples one stretch of consecutive rows; with `resampling="bootstrap"` it resamples
+blocks of `block_length` consecutive rows, by default at least ten times its `tau_max`. `gin` is the
+one method it does not take, since its number of latent nodes differs from fit to fit.
 
 {py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
 cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,

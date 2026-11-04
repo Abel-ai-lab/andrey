@@ -161,7 +161,9 @@ def _ambiguous_back(triples: list[list[int]], order: np.ndarray) -> list[tuple[i
     return sorted((min(a, c), b, max(a, c)) for a, b, c in back)
 
 
-@pytest.mark.parametrize("method", ["pc", "fci", "gfci", "cdnod"])
+@pytest.mark.parametrize(
+    "method", ["pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"]
+)
 @pytest.mark.parametrize("rule", VOTING)
 def test_results_do_not_depend_on_the_column_order(method, rule):
     """Five column orders give the same graph and the same ambiguous triples once mapped back."""
@@ -170,7 +172,7 @@ def test_results_do_not_depend_on_the_column_order(method, rule):
     x[:75, 0] += 1.5  # the index shifts one column, so CD-NOD keeps an edge out of it
 
     def fit(columns):
-        args = (x[:, columns], domain) if method == "cdnod" else (x[:, columns],)
+        args = (x[:, columns], domain) if method in ("cdnod", "fci_jci") else (x[:, columns],)
         return getattr(andrey, method)(*args, collider_rule=rule)
 
     reference = fit(np.arange(8))
