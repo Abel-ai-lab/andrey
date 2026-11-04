@@ -61,7 +61,8 @@ from several domains.
 :img-top: /_generated/thumbs/permutation_based.svg
 :img-alt: The graph BOSS or GRaSP recovers in this notebook
 
-BOSS and GRaSP search over orderings of the variables for the best-scoring graph.
+BOSS and GRaSP search over orderings of the variables for the best-scoring graph; IGSP does
+too, on settings whose changed variables it is told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
