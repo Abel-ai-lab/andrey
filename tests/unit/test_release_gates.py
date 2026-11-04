@@ -988,11 +988,18 @@ def test_parity_reads_a_floor_record_with_its_lane_rule():
         return _entry_rows({**_paired_row([-0.9, -0.1]), **fields})[0].failed
 
     assert failed(floor=reaches) and not failed(floor=below)
-    # A floor its lane's rule does not apply to the row is reported, not judged.
+    # A floor its lane's rule does not apply to the row is printed with its numbers, not judged.
     assert not failed(floor=off)
+    [unapplied] = _entry_rows({**_paired_row([-0.9, -0.1]), "floor": off})
+    assert "[-0.40, +1.20], not below 0" in unapplied.numbers()
+    assert "does not apply to this row: not judged" in unapplied.numbers()
     assert failed(floor={**reaches, "applies": True, "pass": False})
-    with pytest.raises(ValueError, match="disagrees"):
-        failed(floor={**reaches, "applies": True, "pass": True})
+    # A lane's pass must agree with the interval wherever the floor applies, and be empty where not.
+    for floor in ({**reaches, "applies": True, "pass": True}, {**reaches, "pass": True}):
+        with pytest.raises(ValueError, match="disagrees"):
+            failed(floor=floor)
+    with pytest.raises(ValueError, match="does not apply"):
+        failed(floor={**off, "pass": False})
     with pytest.raises(ValueError, match="floor"):
         failed(floor=below, floor_95=[-2.0, -1.0])
     # A floor failure counts only when the replication's floor fails too.

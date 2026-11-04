@@ -36,10 +36,12 @@ summary's ``parity_rule`` sets how its rows are judged:
   ``andrey_minus_empty.bootstrap_95``: the bootstrap 95% interval of the mean of Andrey's error
   minus a floor's, the empty graph's error, or for ``target_error`` the error of the targets the
   method was given or of no targets. An in-claim row fails when the interval's upper end is not
-  below 0. A ``floor`` record with ``applies`` false is a floor its lane's rule, fixed before the
-  run, does not apply to the row, such as a setting where the reference's own interval against the
-  empty graph does not lie below 0; it is reported, not judged. A row with a ``replication`` that
-  records a floor fails its floor only when the replication's fails too.
+  below 0. A ``floor`` record's ``applies`` holds its lane's rule for the row, such as applying the
+  floor only where the reference's own interval against the empty graph lies wholly below 0. A
+  floor with ``applies`` false is printed with the row's numbers and not judged; one with
+  ``applies`` true or absent is judged, and a ``pass`` beside it must agree with the interval. A
+  row with a ``replication`` fails a floor that applies only when the replication's floor, where it
+  records one, fails too.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -97,6 +99,7 @@ IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 CONTEXT = "context"
 #: A row's floor fields: Andrey's error minus the empty graph's, minus the given targets', or a
 #: ``floor`` record that holds the interval and whether its lane's rule applies it to the row.
+#: ``floor_95`` and ``target_floor_95`` always apply.
 FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95", "floor")
 #: The ``metric`` values an entry may name, with the text a row prints for each.
 METRICS: dict[str, str] = {
@@ -126,7 +129,9 @@ class Row:
     measured outside its method's claim and ``context`` a row against a comparator the method is
     not judged by: both are reported with their numbers and never gated. ``metric`` names the
     error the row compares, ``andrey_short`` the datasets the reference finished and Andrey did
-    not, and ``floor`` the interval of Andrey's error minus its floor's.
+    not, ``floor`` the interval of Andrey's error minus its floor's, and ``floor_applies`` whether
+    the lane's rule applies that floor to the row; a floor that does not apply is printed, never
+    judged.
     """
 
     summary: str
@@ -147,6 +152,7 @@ class Row:
     metric: str = "shd"
     andrey_short: int = 0
     floor: tuple[float, float] | None = None
+    floor_applies: bool = True
 
     @property
     def reported(self) -> bool:
@@ -160,7 +166,7 @@ class Row:
     def failed(self) -> bool:
         if self.out_of_claim or self.context:
             return False
-        if self.andrey_short > 0 or (self.floor is not None and self.floor[1] >= 0):
+        if self.andrey_short > 0 or (self.floor_applies and self.floor and self.floor[1] >= 0):
             return True
         if self.interval is not None:
             return self.interval[0] > 0
@@ -200,6 +206,8 @@ class Row:
             lo, hi = self.floor
             below = "below 0" if hi < 0 else "not below 0"
             text += f"; Andrey minus its floor: bootstrap 95% [{lo:+.2f}, {hi:+.2f}], {below}"
+            if not self.floor_applies:
+                text += ", a floor its lane's rule does not apply to this row: not judged"
         if self.out_of_claim:
             text += "; out of the method's claim: reported, not gated"
         elif self.context:
@@ -263,8 +271,8 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
                 "context": role == CONTEXT,
                 "metric": metric,
                 "andrey_short": _andrey_short(row, where),
-                "floor": _floor(row, where),
             }
+            marks["floor"], marks["floor_applies"] = _floor(row, where)
             judged = row.get("multi_draw") or row
             pairs = judged.get("paired") if rule == PAIRED_BOOTSTRAP else None
             if rule == PAIRED_BOOTSTRAP and not isinstance(pairs, int):
@@ -275,8 +283,11 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
                 replication = row["replication"]
                 short = marks["andrey_short"] + _andrey_short(replication, f"{where}, replication")
                 floor = marks["floor"]
-                if floor is not None and floor[1] >= 0 and any(k in replication for k in FLOORS):
-                    marks["floor"] = _floor(replication, f"{where}, replication")
+                fails = marks["floor_applies"] and floor is not None and floor[1] >= 0
+                if fails and any(k in replication for k in FLOORS):
+                    marks["floor"], marks["floor_applies"] = _floor(
+                        replication, f"{where}, replication"
+                    )
                 rows.append(
                     replace(
                         _replicated(name, replication, column, where, metric),
@@ -308,15 +319,16 @@ def _andrey_short(row: dict, where: str) -> int:
     return short
 
 
-def _floor(row: dict, where: str) -> tuple[float, float] | None:
-    """Return the row's floor interval; ``None`` without one or where its ``floor`` does not apply.
+def _floor(row: dict, where: str) -> tuple[tuple[float, float] | None, bool]:
+    """Return the row's floor interval, ``None`` without one, and whether its lane applies it.
 
-    A ``floor`` record's ``applies`` must be absent or a bool, and a ``pass`` beside it must agree
-    with the interval, so a lane's verdict and this check cannot disagree unseen.
+    A ``floor`` record's ``applies`` must be absent (applies) or a bool. Its ``pass`` must be empty
+    where the floor does not apply and otherwise agree with the interval, so a lane's verdict and
+    this check cannot disagree unseen.
     """
     present = [name for name in FLOORS if name in row]
     if not present:
-        return None
+        return None, True
     if len(present) > 1:
         raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
     value = row[present[0]]
@@ -331,11 +343,12 @@ def _floor(row: dict, where: str) -> tuple[float, float] | None:
     if not isinstance(value, list | tuple) or len(value) != 2:
         raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
     lo, hi = float(value[0]), float(value[1])
-    if applies is False:
-        return None
-    if applies and row["floor"].get("pass") not in (None, hi < 0):
+    verdict = row["floor"].get("pass") if present[0] == "floor" else None
+    if applies is False and verdict is not None:
+        raise ValueError(f"{where}: floor pass {verdict!r} on a floor that does not apply")
+    if verdict not in (None, hi < 0):
         raise ValueError(f"{where}: floor pass disagrees with its interval [{lo}, {hi}]")
-    return lo, hi
+    return (lo, hi), applies is not False
 
 
 def _out_of_claim(row: dict, method: dict, where: str) -> bool:
@@ -533,12 +546,18 @@ def main() -> int:
     allowlist = json.loads(ALLOWLIST.read_text())["entries"]
     failures, exemptions = check(rows, allowlist)
     reported = [f"REPORTED {r.label()}: {r.numbers()}" for r in rows if r.reported]
+    unfloored = [
+        f"FLOOR NOT APPLIED {r.label()}: {r.numbers()}"
+        for r in rows
+        if r.floor is not None and not r.floor_applies and not r.reported
+    ]
     print("Reference parity: Andrey's errors against the reference's, per published row.\n")
-    for line in exemptions + reported + failures:
+    for line in exemptions + reported + unfloored + failures:
         print(line)
     print(
         f"\n{len(rows)} rows, {len(exemptions)} exempt, {len(reported)} reported (out of "
-        f"claim, context, or under {MIN_PAIRS} paired datasets; not gated), {len(failures)} failed."
+        f"claim, context, or under {MIN_PAIRS} paired datasets; not gated), {len(unfloored)} "
+        f"judged without a floor their lane's rule does not apply, {len(failures)} failed."
     )
     return 1 if failures else 0
 
