@@ -51,8 +51,9 @@ requested backend uses `auto`, without a warning.
   send the larger conditioning-set sizes of each possible-d-separation search to them with the
   `fisherz`, `student_t`, and `normal_scores` tests; the pairs are still searched one at a time, in
   the serial order, and every graph is the serial one. `andrey.bootstrap` fits its resamples on
-  them, one fit per worker, with the same result at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
-  threads unlimited and with several limits each thread to one, so on a machine with several cores
+  them, one fit per worker, with the same result at any number. `1` (the default) and `0` run
+  serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited
+  and with several limits each thread to one, so on a machine with several cores
   its p-values and statistics can differ in the last digits between one worker and several. Each
   `pnl` thread holds three n x n float64 matrices; when the threads you ask for would hold more than
   4 GiB, fewer run, with a `PerformanceWarning`. `ANDREY_NUM_WORKERS`, its former name, is still
