@@ -1681,7 +1681,7 @@ def dynotears(
     simulations draw it; 5 to 100 variables; 500 and 50 time steps at the paper's settings for each;
     20 series per setting, in the data's units. Errors are SHD over the same-step and lagged edges
     together, means over the series. This method made no more errors in 37 of the 38 settings, and
-    fewer in 6, all with the noise of mean 1, whose mean the centering above absorbs. It made more
+    fewer in 5, all with the noise of mean 1, whose mean the centering above absorbs. It made more
     in one: exponential noise of mean zero at 100 variables and 50 time steps, about 3 to 4 more of
     about 150 on two sets of 20 series. The centering is the cause: on those 40 series the same fit
     without it made 3.50 fewer errors (95% interval 1.48 to 5.50) and tied with the reference
