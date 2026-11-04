@@ -1,11 +1,10 @@
 """The 0.14.0 post's figure on why an intervention shows which way an effect runs.
 
 One pair ``x -> y`` with ``y = 0.8 x + e`` and Gaussian ``x`` and ``e``, in three panels: (a) the
-observational rows alone, (b) those rows and rows where ``x`` is set from outside, and (c) those
-rows and rows where ``y`` is set from outside. Under (b) and (c), a two-sample Kolmogorov-Smirnov
-test asks whether the variable that was not set changed between the observational and the
-interventional rows: setting the cause moves the effect, and setting the effect leaves the cause
-alone.
+observational rows alone, (b) those rows and rows under ``do(x)``, and (c) those rows and rows
+under ``do(y)``. Under (b) and (c), a two-sample Kolmogorov-Smirnov test asks whether the variable
+that was not intervened on changed between the observational and the interventional rows: an
+intervention on the cause moves the effect, and one on the effect leaves the cause alone.
 
 The figure is inline SVG written next to this script as ``intervention.html``, whose colors are
 ``--andrey-*`` tokens, so it follows the page's light or dark theme. Run with
@@ -59,7 +58,7 @@ def dots(x0: float, y0: float, xy: tuple[np.ndarray, np.ndarray], cls: str) -> s
 
 
 def verdict(name: str, before: np.ndarray, after: np.ndarray) -> str:
-    """The note under an interventional panel: did the variable that was not set change?"""
+    """The note under an interventional panel: did the variable not intervened on change?"""
     p = ks_2samp(before, after).pvalue
     shown = "p &lt; 0.001" if p < 0.001 else f"p = {p:.2f}"
     return f"{name} {'changes' if p < 0.05 else 'does not change'}, {shown}"
@@ -71,8 +70,8 @@ def figure() -> str:
     observed = d["observed"]
     panels = [
         ("(a) Observation", None, "x -> y and y -> x fit alike"),
-        ("(b) Set x", d["set_x"], verdict("y", observed[1], d["set_x"][1])),
-        ("(c) Set y", d["set_y"], verdict("x", observed[0], d["set_y"][0])),
+        ("(b) do(x)", d["set_x"], verdict("y", observed[1], d["set_x"][1])),
+        ("(c) do(y)", d["set_y"], verdict("x", observed[0], d["set_y"][0])),
     ]
     width = LEFT + 3 * PANEL + 2 * GAP + 8
     height = TOP + PANEL + 44
@@ -104,7 +103,7 @@ def figure() -> str:
     )
     svg = (
         f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="A pair x causes y, observed, '
-        f'with x set, and with y set">{"".join(parts)}</svg>'
+        f'under do(x), and under do(y)">{"".join(parts)}</svg>'
     )
     caption = (
         "<figcaption>One pair in which x causes y. In (b) and (c), the gray points are the "
