@@ -737,12 +737,13 @@ def camuv(
     It ties the reference implementations in all 9 settings, each 95% interval of the paired
     difference including zero once replicated, and ran 2.1 to 3.1 times faster than the faster of
     the two and 7.4 to 13.5 times faster than the other with sets of up to 3, and 1.9 to 3.2 times
-    faster than the faster one at its default. With one node in five hidden, neither it nor the
-    reference implementations made fewer errors than the empty graph on average, a weakness of the
-    method rather than of one implementation: at 8 observed variables and 2 hidden it made 1.50 more
+    faster than the faster one at its default. With one node in five hidden, no implementation, this
+    one or the references, made fewer errors than the empty graph, a weakness of the method rather
+    than of one implementation: at 8 observed variables and 2 hidden this method made 1.50 more
     errors per graph than the empty graph on seeds 0 to 19, the 95% interval from +0.30 to +2.75,
-    and 1.20 more on seeds 20 to 40 without 31, from -0.20 to +2.60; over the 40 graphs it made 1.35
-    more, from +0.40 to +2.30, and the reference implementations 1.53 to 1.58 more. With one hidden
+    and 1.20 more on seeds 20 to 40 without 31, from -0.20 to +2.60, and the reference
+    implementations 1.85 to 1.90 and 1.20 to 1.30 more; over the 40 graphs it made 1.35 more, from
+    +0.40 to +2.30, and the reference implementations 1.53 to 1.58 more. With one hidden
     variable per ten observed ones its errors were about the empty graph's at 10 observed variables
     and 68% and 70% of them at 20 and 50; on the paper's simulation they were 59% to 79% of them. At
     50 observed variables it marked more pairs ``o-o`` than the reference implementations, 336
