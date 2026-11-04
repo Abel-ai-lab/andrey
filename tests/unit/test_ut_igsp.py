@@ -85,14 +85,66 @@ def test_every_form_of_env_and_targets_gives_one_result_when_the_known_targets_d
     assert alone.metadata["targets"] == {"": [], "x1": ["x1"], "x3": ["x3", "x4"], "x5": ["x5"]}
 
 
-def test_a_numbered_array_names_targets_by_position_and_numbered_environments_by_text():
+NUMBER = {"observed": 0, "one": 1, "two": 2, "three": 3}
+
+
+def test_a_numbered_array_names_targets_by_position_and_environments_by_their_labels():
     frame, env, _, truth = sample()
-    number = {"observed": 0, "one": 1, "two": 2, "three": 3}
-    codes = np.array([number[label] for label in env])
+    codes = np.array([NUMBER[label] for label in env])
     out = andrey.ut_igsp(frame.to_numpy(), codes, targets={0: [], 1: [1], 2: [3]})
     assert out.metadata["targets"] == {
-        str(number[k]): [int(v[1:]) for v in variables] for k, variables in truth.items()
+        NUMBER[k]: [int(v[1:]) for v in variables] for k, variables in truth.items()
     }
+    assert [type(k) for k in out.metadata["targets"]] == [int] * 4
+
+
+def test_the_targets_pass_back_as_given_after_save_load_and_json_alike(tmp_path):
+    """Passed back, the targets are known: the refit keeps them and may learn more, so it need not
+    repeat the fit. The Python keys, the keys ``load`` gives, and the keys of a JSON pass name the
+    same environments, so their refits agree; ``gies`` takes the mapping too."""
+    import json
+
+    frame, env, _, _ = sample()
+    X, codes = frame.to_numpy(), np.array([NUMBER[label] for label in env])
+    out = andrey.ut_igsp(X, codes, targets={0: [], 1: [1], 2: [3]})
+    assert all(out.metadata["targets"][k] for k in (1, 2, 3))  # every setting has a target
+    out.save(tmp_path / "out.json")
+    loaded = andrey.StructureOutput.load(tmp_path / "out.json").metadata["targets"]
+    passed = json.loads(json.dumps(dict(out.metadata)))["targets"]
+    assert set(loaded) == set(passed) == {"0", "1", "2", "3"}
+    refits = [
+        andrey.ut_igsp(X, codes, targets=given)
+        for given in (out.metadata["targets"], loaded, passed)
+    ]
+    for refit in refits:
+        assert np.array_equal(refit.structure.to_numpy(), refits[0].structure.to_numpy())
+        assert refit.metadata["targets"] == refits[0].metadata["targets"]
+        for k, variables in out.metadata["targets"].items():
+            assert set(variables) <= set(refit.metadata["targets"][k])
+    by_gies = [andrey.gies(X, codes, targets=given) for given in (out.metadata["targets"], loaded)]
+    assert np.array_equal(by_gies[0].structure.to_numpy(), by_gies[1].structure.to_numpy())
+
+
+def test_a_setting_with_no_target_found_passes_back_as_observational():
+    """A setting identical to the observational one maps to ``[]``, which ``targets`` reads as
+    observational; with every setting so, the refit has no interventional environment."""
+    frame, env, _, _ = sample()
+    X = frame.to_numpy()[env == "observed"]  # setting 1: the second half of the observational rows
+    codes = np.repeat([0, 1], [len(X) // 2, len(X) - len(X) // 2])
+    out = andrey.ut_igsp(X, codes, targets={0: [], 1: None})
+    assert out.metadata["targets"] == {0: [], 1: []}
+    with pytest.raises(ValueError, match="at least one interventional environment"):
+        andrey.ut_igsp(X, codes, targets=out.metadata["targets"])
+
+
+def test_bootstrap_fits_kept_hold_the_labels_as_keys():
+    frame, env, _, _ = sample(n=200)
+    X, codes = frame.to_numpy(), np.array([NUMBER[label] for label in env])
+    out = andrey.bootstrap(
+        andrey.ut_igsp, X, env=codes, targets={0: [], 1: [1]}, n_resamples=2, keep_fits=True
+    )
+    for fit in out.fits:
+        assert set(fit.metadata["targets"]) == {0, 1, 2, 3}
 
 
 def test_without_env_two_environments_with_one_key_raise():

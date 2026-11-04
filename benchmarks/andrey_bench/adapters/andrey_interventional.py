@@ -47,7 +47,7 @@ def run_fit(fit: dict, X: np.ndarray, env: np.ndarray, known: dict[int, list[int
             out = andrey.ut_igsp(X, env, targets=mapping, seed=seed, **kwargs)
         finally:
             igsp.UT_IGSP_OBJECTIVE = previous
-        targets = [sorted(out.metadata["targets"][str(k)]) for k in sorted(known)]
+        targets = [sorted(out.metadata["targets"][k]) for k in sorted(known)]
         return {
             "marks": out.structure.to_numpy().astype(int).tolist(),
             "targets": targets,

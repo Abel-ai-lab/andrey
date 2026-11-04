@@ -367,7 +367,7 @@ you do not know to `None`:
 from andrey import ut_igsp
 
 result = ut_igsp(data, "condition", targets={"control": [], "drug": ["dose"], "knockout": None})
-result.metadata["targets"]  # each environment's targets, known and learned
+result.metadata["targets"]  # each environment's targets, known and learned, by its label
 ```
 
 ## Background knowledge
