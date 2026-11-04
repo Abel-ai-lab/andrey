@@ -168,7 +168,7 @@ most series up to 50 variables.
 
 ## Replication
 
-In claim, 37 of the 38 settings count as no worse, 6 of them better, and 1 as worse:
+In claim, 31 of the 38 settings count as ties, 6 as better, and 1 as worse:
 
 | setting | seeds 0 to 19 | seeds 20 to 39 | counts as |
 |---|---|---|---|

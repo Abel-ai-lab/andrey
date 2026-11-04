@@ -1041,10 +1041,10 @@ def bootstrap(
     For a time-series method on one series, a subsample is one stretch of consecutive rows, which
     keeps the lags inside it [5]_. With ``pcmci``, ``pcmciplus``, ``lpcmci``, and ``varma_lingam``
     on simulated series with 5 and 10 variables and 500 and 1,000 rows (10 series per cell, 14
-    cells; 30 series per cell, 12 cells, for the first three), a stretch of half of the series was
-    worse than the block bootstrap in none of the cells and had fewer errors (SHD), by an interval
-    below 0, in 9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows,
-    shorter than ten times the longest lag.
+    cells; 30 series per cell, 12 cells, for the first three), a stretch of half of the series had
+    fewer errors (SHD) than the block bootstrap, by an interval below 0, in 9 of the 14 cells of 10
+    series and tied in the other 5, and in 10 of the 12 cells of 30 series and tied in the other 2.
+    Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter than ten times the longest lag.
 
     **The averaged graph.** Each pair of variables takes its most frequent state in the fits, no
     edge counted as one of the states: the pair gets its most frequent edge when more fits have

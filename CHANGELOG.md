@@ -93,11 +93,14 @@ names its pull request.
   makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
 - `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
   implementation, on the structural vector autoregressions of the paper's design, with 5 to 100
-  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it makes no
-  more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
+  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it ties in
+  31 of the 38 judged settings, makes fewer errors in 6, all with noise of mean 1, whose mean its
   centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
   steps, where the centering costs about one time step of data. `dynotears` stays experimental.
   ([#682])
+- The Limitations of `cam` and `resit` and the subsampling evidence in `bootstrap` count a setting
+  whose paired interval contains 0 as a tie instead of saying the method made no more errors there.
+  ([#687])
 
 ### Fixed
 
@@ -105,9 +108,6 @@ names its pull request.
   group the rows alike under other labels break ties by column position, as identical columns do,
   so adding a constant to a copy or relabeling its categories no longer changes which column a tie
   goes to. ([#660])
-- The Limitations of `cam` and `resit` and the subsampling evidence in `bootstrap` count a setting
-  whose paired interval contains 0 as a tie instead of saying the method made no more errors there.
-  ([#687])
 
 ## [0.13.0] - 2026-11-03
 
