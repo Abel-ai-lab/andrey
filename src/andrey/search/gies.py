@@ -113,15 +113,17 @@ def intervention_mask(targets: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
 
 
 def cut_pairs(mask: np.ndarray) -> np.ndarray:
-    """``cut[a, b]`` is True when some row intervenes on exactly one of ``a`` and ``b``.
+    """``cut[a, b]`` is True when some row intervenes on exactly one of ``a`` and ``b``, that is,
+    when columns ``a`` and ``b`` of the boolean ``mask`` differ.
 
     Such an edge has the same orientation in every DAG of the interventional class.
     """
-    d = mask.shape[1]
-    cut = np.zeros((d, d), dtype=bool)
-    for target in np.unique(mask, axis=0):
-        cut |= target[:, None] != target[None, :]
-    return cut
+    index: dict[bytes, int] = {}
+    ids = np.array(
+        [index.setdefault(col.tobytes(), len(index)) for col in np.ascontiguousarray(mask.T)],
+        dtype=np.intp,
+    )
+    return ids[:, None] != ids[None, :]
 
 
 class InterventionalScore:
