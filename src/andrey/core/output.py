@@ -86,7 +86,8 @@ class StructureOutput:
             Edge weights, ``W[i, j]`` for ``i -> j``, stored sparsely. ``None`` gives no weights.
         metadata : Mapping[str, JSONValue] or None, default=None
             Run values by name. Keys are strings; values are ``str``, ``bool``, ``int``,
-            ``float``, ``None``, or lists and dicts of them.
+            ``float``, ``None``, or lists and dicts of them. A nested dict's keys are all text or
+            all numbers, ``int``, ``float``, or ``bool``, such as an environment's label.
 
         Returns
         -------
@@ -96,8 +97,11 @@ class StructureOutput:
         Raises
         ------
         TypeError
-            If ``metadata`` has a non-string key or a value of another type, such as a tuple, a
-            set, or a NumPy array or integer.
+            If ``metadata`` has a value of another type, such as a tuple, a set, or a NumPy array
+            or integer; a top-level key that is not a string; or a nested key that is neither text
+            nor an ``int``, ``float``, or ``bool``, such as a NumPy integer, a tuple, or ``None``.
+            Also if a nested dict mixes text and number keys, or has two keys that JSON writes
+            alike, such as two ``NaN`` keys.
         ValueError
             If ``weighted_adjacency`` is not ``(n_nodes, n_nodes)``, ``ordering`` is not a
             permutation of ``range(n_nodes)``, or a graph in ``structure`` fails ``validate()``.
@@ -263,7 +267,9 @@ class StructureOutput:
         ``node_types``, ``ordering``, ``weighted``, and ``metadata``; a temporal result stores one
         such graph per lag under ``lags``. The npz file holds the same arrays, with the other
         fields as one JSON string, and ``load`` reads it without pickle, so loading a file never
-        runs code from it.
+        runs code from it. JSON keys are text, so a number key of a nested metadata dict, such as
+        an environment's label, is written as its JSON text: ``1`` as ``"1"``, ``1.5`` as
+        ``"1.5"``, ``True`` as ``"true"``.
         """
         doc = self._to_doc()
         if fmt == "json":
@@ -310,7 +316,9 @@ class StructureOutput:
     def load(cls, path: str | os.PathLike) -> StructureOutput:
         """Read a result written by ``save``.
 
-        After ``out.save(path)``, ``StructureOutput.load(path) == out``.
+        After ``out.save(path)``, ``StructureOutput.load(path) == out``, unless a nested metadata
+        dict has number keys: JSON keys are text, so they come back as their JSON text, ``1`` as
+        ``"1"``. A method's ``targets=`` reads such a key as the label it spells.
 
         Parameters
         ----------
@@ -585,23 +593,42 @@ def _check_format_version(version: object) -> None:
         )
 
 
-def _check_json_safe(obj: object, path: str) -> None:
+def _check_json_safe(obj: object, path: str, *, nested: bool = False) -> None:
     """Raise unless ``obj`` is JSON-safe (str/bool/int/float/None + list/dict thereof).
 
     Rejects numpy scalars (``np.int64``, ``np.float32``), ``np.ndarray``, ``set``, and ``tuple``
-    so metadata cannot silently break ``json.dump`` or round-trip lossily.
+    so metadata cannot silently break ``json.dump`` or round-trip lossily. Top-level keys are text;
+    a nested dict's keys are all text or all ``int``, ``float``, or ``bool``, so ``json.dump``
+    with ``sort_keys`` can order them, and no two of them write one JSON key.
     """
     if obj is None or isinstance(obj, (str, bool, int, float)):
         return
     if isinstance(obj, list):
         for i, item in enumerate(obj):
-            _check_json_safe(item, f"{path}[{i}]")
+            _check_json_safe(item, f"{path}[{i}]", nested=True)
         return
     if isinstance(obj, dict):
+        written: dict[str, object] = {}
         for key, value in obj.items():
-            if not isinstance(key, str):
-                raise TypeError(f"metadata keys must be str, got {type(key).__name__} at {path}")
-            _check_json_safe(value, f"{path}.{key}")
+            number = type(key) in (int, float, bool)
+            if not isinstance(key, str) and not (nested and number):
+                kinds = "str, int, float, or bool" if nested else "str"
+                raise TypeError(
+                    f"metadata keys must be {kinds}, got {type(key).__name__} at {path}"
+                )
+            text = json.dumps(key) if number else key
+            if text in written:
+                raise TypeError(
+                    f"metadata keys {written[text]!r} and {key!r} at {path} write one JSON key, "
+                    f"{text!r}"
+                )
+            written[text] = key
+            _check_json_safe(value, f"{path}.{key}", nested=True)
+        if len({isinstance(key, str) for key in obj}) > 1:
+            raise TypeError(
+                f"metadata keys at {path} mix text and numbers, which JSON cannot sort; give them "
+                "one type"
+            )
         return
     raise TypeError(f"non-JSON-safe metadata value of type {type(obj).__name__} at {path}")
 
