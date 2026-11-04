@@ -3,8 +3,8 @@
  "generated": "2026-11-03",
  "lane": "gnies",
  "method": "GnIES",
- "status": "experimental",
- "about": "GnIES's own published measurements, one file per lane; it holds no release-summary entry, and no release card reads it",
+ "status": "supported",
+ "about": "GnIES's own published measurements, one file per lane; the release summary's GnIES entries and the release card's GnIES table hold its numbers",
  "build": "Andrey pre-release build of 3 November 2026 (version string 0.13.0) for every fit but the order check, which ran on a build of the same day that adds DEBUG records of the steps a tie decided; with the records off, its GIES and GES outputs equal the first build's",
  "comparator": "gnies 0.3.3, the authors' package and the method's only implementation",
  "packages": {
