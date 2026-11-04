@@ -980,36 +980,27 @@ def test_parity_fails_a_row_whose_floor_interval_reaches_zero():
 
 
 def test_parity_reads_a_floor_record_with_its_lane_rule():
-    better = _paired_row([-0.9, -0.1])
     reaches = {"andrey_minus_empty": {"paired": 20, "mean": 0.5, "bootstrap_95": [-0.4, 1.2]}}
     below = {"andrey_minus_empty": {"paired": 20, "mean": -3.0, "bootstrap_95": [-4.0, -2.0]}}
-    assert _entry_rows({**better, "floor": reaches})[0].failed
-    assert not _entry_rows({**better, "floor": below})[0].failed
+    off = {**reaches, "applies": False, "pass": None}
+
+    def failed(**fields) -> bool:
+        return _entry_rows({**_paired_row([-0.9, -0.1]), **fields})[0].failed
+
+    assert failed(floor=reaches) and not failed(floor=below)
     # A floor its lane's rule does not apply to the row is reported, not judged.
-    assert not _entry_rows({**better, "floor": {**reaches, "applies": False, "pass": None}})[0].failed
-    assert _entry_rows({**better, "floor": {**reaches, "applies": True, "pass": False}})[0].failed
+    assert not failed(floor=off)
+    assert failed(floor={**reaches, "applies": True, "pass": False})
     with pytest.raises(ValueError, match="disagrees"):
-        _entry_rows({**better, "floor": {**reaches, "applies": True, "pass": True}})
+        failed(floor={**reaches, "applies": True, "pass": True})
     with pytest.raises(ValueError, match="floor"):
-        _entry_rows({**better, "floor": below, "floor_95": [-2.0, -1.0]})
+        failed(floor=below, floor_95=[-2.0, -1.0])
     # A floor failure counts only when the replication's floor fails too.
-    assert not _entry_rows(
-        {**better, "floor": reaches, "replication": _replication([-0.3, 0.2], floor=below)}
-    )[0].failed
-    assert _entry_rows(
-        {**better, "floor": reaches, "replication": _replication([-0.3, 0.2], floor=reaches)}
-    )[0].failed
-    assert _entry_rows(
-        {**better, "floor": reaches, "replication": _replication([-0.3, 0.2])}
-    )[0].failed
+    assert not failed(floor=reaches, replication=_replication([-0.3, 0.2], floor=below))
+    assert failed(floor=reaches, replication=_replication([-0.3, 0.2], floor=reaches))
+    assert failed(floor=reaches, replication=_replication([-0.3, 0.2]))
     # A first-seed floor that does not apply leaves nothing for the replication to confirm.
-    assert not _entry_rows(
-        {
-            **better,
-            "floor": {**reaches, "applies": False, "pass": None},
-            "replication": _replication([-0.3, 0.2], floor={**reaches, "applies": True}),
-        }
-    )[0].failed
+    assert not failed(floor=off, replication=_replication([-0.3, 0.2], floor=reaches))
 
 
 def test_parity_judges_each_metric_of_a_method_on_its_own_key():
