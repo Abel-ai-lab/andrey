@@ -79,11 +79,7 @@ def ci_search_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
 def inputs(method: str) -> list:
     """The data, and a two-context index for a method that also requires one (cdnod)."""
     data = linear_data(0)
-    extra = [
-        inp
-        for inp in REGISTRY[method].data.inputs[1:]
-        if inp.required or (method, inp.name) == ("cdnod", "env")
-    ]
+    extra = [inp for inp in REGISTRY[method].data.inputs[1:] if inp.required]
     return [data] + [np.repeat([0.0, 1.0], len(data) // 2).reshape(-1, 1) for _ in extra]
 
 

@@ -944,8 +944,8 @@ def bootstrap(
     data : array-like of shape (n_samples, n_variables), or a sequence of them
         The data, as the method takes it. ``multi_group_direct_lingam`` and
         ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
-        each environment's rows apart, as a list or a mapping, resampled as the one table and
-        ``env`` they pool into.
+        each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
+        and resampled within each environment, ``cdnod``'s domains included.
     n_resamples : int, default=100
         The number of resamples and fits. ``n_boot``, the former name, works with a
         ``DeprecatedArgumentWarning`` for one more release.
@@ -1290,17 +1290,25 @@ def _job(
     """Check the call against ``spec`` and bundle it for the workers.
 
     Data given as each environment's rows apart become one table and ``env`` first
-    (:func:`~andrey.core.environments.pool_environments`), so the resamples draw from its rows.
+    (:func:`~andrey.core.environments.pool_environments`), so the resamples draw from its rows,
+    within each environment.
     """
     kwargs = dict(kwargs)
     entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
+    apart = False
     if entry is not None:
         key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
+        targets = next((p for p in spec.params if p.type == "targets"), None)
+        names = () if targets is None else (targets.name, *targets.aliases)
         data, env = environments.pool_environments(
-            data, kwargs.get(key), kwargs.get("targets"), spec.name
+            data,
+            kwargs.get(key),
+            next((kwargs[k] for k in names if k in kwargs), None),
+            spec.name,
+            missing=spec.data.missing,
         )
         if env is not None:
-            kwargs[key] = env
+            kwargs[key], apart = env, True
     panel = spec.data.inputs[0].kind == "panel"
     temporal = spec.family == "temporal"
     if panel:
@@ -1340,7 +1348,7 @@ def _job(
         if len(value) != sizes[0]:
             raise ValueError(f"{key} has {len(value)} rows but data has {sizes[0]}")
         aligned[key] = kwargs.pop(key)
-    strata = _strata(spec, data, aligned, kwargs) if unit == "rows" else None
+    strata = _strata(spec, data, aligned, kwargs, apart=apart) if unit == "rows" else None
     return _Job(
         name=spec.name,
         data=data,
@@ -1359,17 +1367,22 @@ def _job(
 
 
 def _strata(
-    spec: MethodSpec, data: Any, aligned: dict[str, Any], kwargs: dict[str, Any]
+    spec: MethodSpec,
+    data: Any,
+    aligned: dict[str, Any],
+    kwargs: dict[str, Any],
+    *,
+    apart: bool = False,
 ) -> tuple[np.ndarray, ...] | None:
     """Return the rows of each environment when a resample is drawn within environments.
 
     ``None`` when it is not. A resample is drawn within environments when the call gives ``env`` (or
-    its former name) as one label per row or as a column of ``data``, and ``env`` holds text labels
-    or the method takes ``targets``. A numeric ``env`` of a method without ``targets``, such as
-    ``cdnod``'s domain or time index, which the method reads as numbers, leaves the rows drawn as a
-    whole. The environments are in the order of their codes
-    (:func:`~andrey.core.environments.env_codes`); labels the method cannot read leave the rows
-    drawn as a whole, and the fit raises on them.
+    its former name) as one label per row or as a column of ``data``, and ``env`` holds text labels,
+    the method takes ``targets``, or ``apart``: the data came as each environment's rows apart. A
+    numeric ``env`` of a method without ``targets`` in one table, such as ``cdnod``'s domain or time
+    index, which the method reads as numbers, leaves the rows drawn as a whole. The environments
+    are in the order of their codes (:func:`~andrey.core.environments.env_codes`); labels the
+    method cannot read leave the rows drawn as a whole, and the fit raises on them.
     """
     entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
     if entry is None:
@@ -1383,7 +1396,7 @@ def _strata(
     values = np.asarray(value, dtype=object)
     values = values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
     text = values.ndim == 1 and any(isinstance(v, str) for v in values)
-    if values.ndim != 1 or not (text or any(p.type == "targets" for p in spec.params)):
+    if values.ndim != 1 or not (apart or text or any(p.type == "targets" for p in spec.params)):
         return None
     try:
         codes, labels = environments.env_codes(values, len(values))

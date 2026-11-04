@@ -61,11 +61,13 @@ names its pull request.
   on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
   graph's 135 in a median 176 s. ([#665])
 - Every method that takes `env`, `cdnod`, `gies`, `gnies`, and `ut_igsp`, also takes its data as
-  each environment's rows apart, as `gnies` and the UT-IGSP authors' library do: a list of
-  DataFrames or 2-D arrays, each labeled by its position, or a dict from each label to its table,
-  with `env` left out and `targets` a mapping from those labels. The rows are stacked in that
-  order, so the fit, and `andrey.bootstrap`'s resamples, are those of the stacked table with `env`;
-  `cdnod`'s `env` is optional for this, and one table without it raises. ([#676])
+  each environment's rows apart, as gnies, the GnIES authors' package, and the UT-IGSP authors'
+  library do: a list of DataFrames or 2-D arrays, each labeled by its position, or a dict from each
+  label to its table, with `env` left out and `targets` a mapping from those labels. The rows are
+  stacked in that order, so the fit is that of the stacked table with `env`, and
+  `andrey.bootstrap` resamples within each environment, `cdnod`'s domains included. In Python,
+  `cdnod`'s `env` is optional for this, and one table without it raises `TypeError`; the command
+  line still needs `--env`. ([#676])
 
 ### Changed
 

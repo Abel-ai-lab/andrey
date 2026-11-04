@@ -271,7 +271,6 @@ _add(
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
                     "1, ... in sorted order.",
-                    required=False,
                     aliases=("domain_index",),
                 ),
             ),

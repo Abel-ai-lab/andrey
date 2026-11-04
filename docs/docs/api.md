@@ -46,7 +46,8 @@ In Python, every method that takes `env` also takes each environment's rows apar
 place of one table and `env`: a list of DataFrames or 2-D arrays, each labeled by its position
 `0, 1, ...`, or a dict from each label to its table. `env` is then left out, and `targets` is a
 mapping from those labels, or `None`. DataFrames need the same columns, in any order, which take
-the first one's order; arrays need the same number of columns. The rows are stacked in the order
+the first one's order, and a column of the `category` type in each keeps it, with every
+DataFrame's categories; arrays need the same number of columns. The rows are stacked in the order
 of the list or dict, so the fit is the one on the stacked table with `env` naming each row's
 label.
 

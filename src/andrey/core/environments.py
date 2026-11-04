@@ -21,6 +21,7 @@ The module is a building block for the methods; ``andrey`` does not export it.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -137,9 +138,9 @@ def normalize_env_targets(
         by_code: dict[int, frozenset[int] | None] = dict.fromkeys(range(len(envs)))
         if require_known_targets:
             raise ValueError(
-                f"{prefix}env needs targets, the variables intervened on in each environment; "
-                "pass targets as a mapping from each label of env to its variables, [] for an "
-                "observational one"
+                f"{prefix}each environment needs its targets, the variables intervened on in "
+                "it; pass targets as a mapping from each environment's label to its variables, [] "
+                "for an observational one"
             )
         return X, codes, envs, by_code
     if isinstance(targets, Mapping):
@@ -178,26 +179,30 @@ def normalize_env_targets(
 
 
 def pool_environments(
-    data: Any, env: Any, targets: Any = None, method: str | None = None
+    data: Any, env: Any, targets: Any = None, method: str | None = None, missing: bool = False
 ) -> tuple[Any, Any]:
     """Return ``data`` as one table and ``env`` as each row's label, when ``data`` holds each
     environment's rows apart.
 
-    ``data`` holds them apart as a list or tuple of tables, each labeled by its position
-    ``0..K-1``, or as a mapping from each label, a string or a number, to its table; a table is a
-    DataFrame or a 2-D array. The rows are stacked in the order ``data`` holds them, so the pooled
-    table and ``env``, the label of each row, are what a call with one table passes. DataFrames
-    keep their columns, in the order of the first, and their column types as ``pandas.concat``
-    joins them. Any other ``data`` returns unchanged, with ``env``.
+    ``data`` holds them apart as a list or tuple, empty or with a table among its members, each
+    member labeled by its position ``0..K-1``, or as a mapping from each label, a string or a finite
+    number, to its table; a table is a DataFrame or a 2-D array. The rows are stacked in the order
+    ``data`` holds them, so the pooled table and ``env``, the label of each row, are what a call
+    with one table passes. DataFrames keep their columns, in the order of the first, and their
+    column types; a column of the ``category`` type in every DataFrame keeps it, with the union of
+    their categories. Any other ``data`` returns unchanged, with ``env``.
 
     Raises ``ValueError``, naming ``method``, when ``env`` is also given, ``targets`` is neither
     ``None`` nor a mapping, ``data`` holds no environment, an environment has no rows or is not a
-    table, the tables mix DataFrames and arrays, the DataFrames' columns differ, the arrays' numbers
-    of columns differ, or the labels are not strings or numbers, or mix them.
+    table, the tables mix DataFrames and arrays, a DataFrame repeats a column name, the
+    DataFrames' columns differ, the arrays' numbers of columns differ, the labels are not strings
+    or finite numbers, or mix them, or an environment holds ``inf``, or ``NaN`` without
+    ``missing``, which a method that accepts missing values passes; the message names the
+    environment and its own row.
     """
     if isinstance(data, Mapping):
         labels, tables = list(data.keys()), list(data.values())
-    elif isinstance(data, (list, tuple)) and all(_is_table(table) for table in data):
+    elif isinstance(data, (list, tuple)) and (not data or any(_is_table(t) for t in data)):
         labels, tables = list(range(len(data))), list(data)
     else:
         return data, env
@@ -214,8 +219,10 @@ def pool_environments(
         )
     if not tables:
         raise ValueError(f"{prefix}data holds no environment; give each environment's rows")
-    if not all(isinstance(k, str) or _is_number(k) for k in labels) or any(k != k for k in labels):
-        raise ValueError(f"{prefix}the keys of data label the environments: strings or numbers")
+    if not all(isinstance(k, str) or (_is_number(k) and math.isfinite(k)) for k in labels):
+        raise ValueError(
+            f"{prefix}the keys of data label the environments: strings or finite numbers"
+        )
     if len({isinstance(k, str) for k in labels}) > 1:
         raise ValueError(f"{prefix}the keys of data mix strings and numbers; give them one type")
     other = [k for k, table in zip(labels, tables, strict=True) if not _is_table(table)]
@@ -233,21 +240,51 @@ def pool_environments(
     empty = [k for k, size in zip(labels, sizes, strict=True) if size == 0]
     if empty:
         raise ValueError(f"{prefix}environments {empty} have no rows; leave them out")
-    if all(frames):
-        import pandas as pd
+    import pandas as pd
 
+    for k, table in zip(labels, tables, strict=True):
+        cells = pd.DataFrame(table)
+        bad = cells.isin([np.inf, -np.inf]).to_numpy()
+        if not missing:
+            bad = bad | cells.isna().to_numpy()
+        if bad.any():
+            row, j = (int(i) for i in np.argwhere(bad)[0])
+            where = f"{prefix}environment {k!r} of data, at row {row}, column {cells.columns[j]!r},"
+            if not pd.isna(cells.iat[row, j]):
+                raise ValueError(f"{where} holds inf; drop or replace it before the fit")
+            raise ValueError(
+                f"{where} holds NaN, and {method or 'this method'} does not accept missing "
+                "values; drop the rows that hold one (see Missing values in the getting-started "
+                "guide)"
+            )
+    if all(frames):
+        repeated = [
+            k for k, table in zip(labels, tables, strict=True) if table.columns.has_duplicates
+        ]
+        if repeated:
+            raise ValueError(
+                f"{prefix}the DataFrames of environments {repeated} repeat a column name; give "
+                "each column one name"
+            )
         columns = list(tables[0].columns)
         differ = [
-            k
-            for k, table in zip(labels, tables, strict=True)
-            if len(table.columns) != len(columns) or set(table.columns) != set(columns)
+            k for k, table in zip(labels, tables, strict=True) if set(table.columns) != set(columns)
         ]
         if differ:
             raise ValueError(
                 f"{prefix}the DataFrames of environments {differ} have other columns than "
                 f"those of environment {labels[0]!r}, {columns}; give each the same columns"
             )
-        pooled = pd.concat([table[columns] for table in tables], ignore_index=True)
+        tables = [table[columns] for table in tables]
+        union = {}
+        for column in columns:
+            kinds = [table[column].dtype for table in tables]
+            if all(isinstance(kind, pd.CategoricalDtype) for kind in kinds) and len(set(kinds)) > 1:
+                categories = kinds[0].categories
+                for kind in kinds[1:]:
+                    categories = categories.union(kind.categories, sort=False)
+                union[column] = pd.CategoricalDtype(categories)
+        pooled = pd.concat([table.astype(union) for table in tables], ignore_index=True)
     else:
         arrays = [np.asarray(table) for table in tables]
         widths = [a.shape[1] for a in arrays]

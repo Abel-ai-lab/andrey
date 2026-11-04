@@ -136,7 +136,11 @@ def pool_environments(spec: MethodSpec, arguments: dict[str, Any]) -> None:
         return
     data_key = spec.data.inputs[0].name
     arguments[data_key], env = environments.pool_environments(
-        arguments[data_key], arguments.get("env"), arguments.get("targets"), spec.name
+        arguments[data_key],
+        arguments.get("env"),
+        arguments.get("targets"),
+        spec.name,
+        missing=spec.data.missing,
     )
     if env is not None:
         arguments["env"] = env

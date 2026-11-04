@@ -1109,7 +1109,9 @@ def cdnod(
         the data before the fit, and ``categorical``, ``knowledge``, and the result's positions
         count the other columns. A list of DataFrames or 2-D arrays gives each domain's rows
         apart, labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows
-        are stacked in that order, and ``env`` stays ``None``.
+        are stacked in that order, and ``env`` stays ``None``. A position is the domain's number,
+        so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the order of the list
+        can change the result (see Notes).
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
         The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
         or the time step for data that drift over time, or the name of a column of the DataFrame
@@ -1207,13 +1209,13 @@ def cdnod(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
         message names the method, the argument, what it accepts, and the value. Also if ``env``
-        is ``None`` with one table, or given with each domain's rows apart; if those rows' tables
-        differ in kind or columns, or one has no rows; if ``env`` does not hold one value per row
+        is given with each domain's rows apart; if those rows' tables differ in kind or columns,
+        or one has no rows or holds ``inf``; if ``env`` does not hold one value per row
         of ``data``, holds ``NaN`` / ``inf`` or a missing label, mixes strings and numbers, or
         names a column ``data`` lacks; if ``data`` has too few rows
         for a test, if ``data`` or ``categorical`` does not suit the test, as for
@@ -1368,9 +1370,8 @@ def cdnod(
     from andrey.core.environments import normalize_env_targets
 
     if env is None:
-        raise ValueError(
-            "cdnod needs env, the environment of each row, or data as a list of each "
-            "environment's rows"
+        raise TypeError(
+            "cdnod needs env, the environment of each row, or data as each environment's rows apart"
         )
     data, codes, env_labels, _ = normalize_env_targets(
         data, env, None, require_known_targets=False, method="cdnod"
