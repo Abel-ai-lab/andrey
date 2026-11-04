@@ -35,13 +35,13 @@ Interventional data
 
 0.14.0 is here: interventional data. The card measures the methods it makes supported against
 their authors' code: GnIES and UT-IGSP, which learn the targets of experiments they are not told,
-ICP, and CAM-UV.
+IGSP, ICP, CAM-UV, and DYNOTEARS.
 
 % TODO(freeze): the stats follow the promotion PRs that land.
 
 :::{div} release-stats
 
-- **4 methods** newly supported: GnIES, UT-IGSP, ICP, and CAM-UV
+- **6 methods** newly supported: GnIES, UT-IGSP, IGSP, ICP, CAM-UV, and DYNOTEARS
 - **0 of 112** comparisons where UT-IGSP's authors' library makes significantly fewer errors
 - **34x** GnIES's median speed over the authors' gnies package
 :::
