@@ -74,6 +74,14 @@ names its pull request.
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
+- `camuv`'s Limitations report its benchmark against three references: lingam 1.13.0 and
+  causal-learn 0.1.4.8, each run with sets of up to 3 variables, the paper's setting, and lingam at
+  its default of 2, on simulated nonlinear additive data with and without hidden variables, 4 to 50
+  observed variables and 500 to 2,000 rows, and on the paper's simulation. `camuv` is worse in none
+  of the 9 judged settings against any of the three, two of them after a rerun on fresh datasets,
+  and fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
+  core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
+  makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
 
 ### Fixed
 
@@ -1708,4 +1716,5 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
