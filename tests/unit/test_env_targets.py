@@ -2,7 +2,9 @@
 
 Every accepted form of ``env`` and ``targets`` gives the same fit as the 0/1 intervention matrix
 it describes, each former form warns once and gives the same fit as its replacement, and every
-form that cannot say which variables an environment intervened on raises.
+form that cannot say which variables an environment intervened on raises. Data given as each
+environment's rows apart fit, in every method that takes ``env``, what the table they stack into
+fits.
 """
 
 from __future__ import annotations
@@ -18,6 +20,8 @@ import andrey
 from andrey.cli import main
 from andrey.constraint.cdnod import cdnod as cdnod_engine
 from andrey.core import warning_policy
+from andrey.resample import _job
+from andrey.spec import get_spec
 
 N = 900
 #: Each row's environment: observational rows, then rows that set x1, then rows that set x2.
@@ -325,6 +329,194 @@ def test_bootstrap_draws_cdnod_rows_whole_for_numbers_and_within_domains_for_tex
     assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
 
 
+# --- data as each environment's rows apart -------------------------------------------------------
+
+#: The rows of ``DATA`` by environment; ``ENV`` holds its labels in this order, so the tables stack
+#: back into ``DATA``.
+APART = {label: DATA[ENV == label] for label in TARGETS}
+#: Each row's position in the list of ``APART``'s tables, the label a list gives it.
+POSITIONS = np.repeat([0, 1, 2], [500, 200, 200])
+#: ``ut_igsp``'s targets: ``set x2``'s unknown.
+UT_TARGETS = {"observed": [], "set x1": ["x1"], "set x2": None}
+#: The domains of ``X`` apart, in the order of ``DOMAIN``'s rows.
+DOMAINS = [X[DOMAIN == k] for k in (0.0, 1.0, 2.0)]
+
+
+def _with_nan(table):
+    """A copy of ``table`` with a missing value at row 3, column 1."""
+    table = table.copy()
+    if hasattr(table, "iloc"):
+        table.iloc[3, 1] = np.nan
+    else:
+        table[3, 1] = np.nan
+    return table
+
+
+#: Each call with the environments apart, and the call with the table they stack into.
+APART_FITS = {
+    "gies, a mapping of DataFrames": (
+        lambda: andrey.gies(APART, targets=TARGETS),
+        lambda: andrey.gies(DATA, ENV, targets=TARGETS),
+    ),
+    "gies, a list of arrays": (
+        lambda: andrey.gies([t.to_numpy() for t in APART.values()], targets={0: [], 1: [1], 2: 2}),
+        lambda: andrey.gies(DATA.to_numpy(), POSITIONS, targets={0: [], 1: [1], 2: 2}),
+    ),
+    "gies, DataFrames with their columns in another order": (
+        lambda: andrey.gies(
+            [t[["x2", "x0", "x1"]] if i else t for i, t in enumerate(APART.values())],
+            targets={0: [], 1: ["x1"], 2: ["x2"]},
+        ),
+        lambda: andrey.gies(DATA, POSITIONS, targets={0: [], 1: ["x1"], 2: ["x2"]}),
+    ),
+    "gnies, a list of DataFrames": (
+        lambda: andrey.gnies(list(APART.values())),
+        lambda: andrey.gnies(DATA, POSITIONS),
+    ),
+    "gnies, a mapping with known targets": (
+        lambda: andrey.gnies(APART, targets={"observed": []}),
+        lambda: andrey.gnies(DATA, ENV, targets={"observed": []}),
+    ),
+    "ut_igsp, a mapping of DataFrames": (
+        lambda: andrey.ut_igsp(APART, targets=UT_TARGETS),
+        lambda: andrey.ut_igsp(DATA, ENV, targets=UT_TARGETS),
+    ),
+    "ut_igsp, a list of DataFrames": (
+        lambda: andrey.ut_igsp(list(APART.values()), targets={0: [], 1: ["x1"], 2: None}),
+        lambda: andrey.ut_igsp(DATA, POSITIONS, targets={0: [], 1: ["x1"], 2: None}),
+    ),
+    "cdnod, a list of arrays": (
+        lambda: andrey.cdnod(DOMAINS),
+        lambda: andrey.cdnod(X, DOMAIN),
+    ),
+    "cdnod, a list of arrays with a missing value, which cdnod accepts": (
+        lambda: andrey.cdnod([DOMAINS[0], _with_nan(DOMAINS[1]), DOMAINS[2]]),
+        lambda: andrey.cdnod(
+            np.concatenate([DOMAINS[0], _with_nan(DOMAINS[1]), DOMAINS[2]]),
+            np.repeat([0, 1, 2], [len(t) for t in DOMAINS]),
+        ),
+    ),
+    "cdnod, a mapping of DataFrames": (
+        lambda: andrey.cdnod(
+            {k: pd.DataFrame(t, columns=["x", "y"]) for k, t in zip("abc", DOMAINS)}
+        ),
+        lambda: andrey.cdnod(
+            pd.DataFrame(X, columns=["x", "y"]), np.array(["a", "b", "c"])[DOMAIN.astype(int)]
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(APART_FITS))
+def test_environments_apart_fit_what_their_stacked_rows_fit(case):
+    apart, pooled = APART_FITS[case]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        assert _same(apart(), pooled())
+
+
+APART_ERRORS = {
+    "env with the environments apart": lambda: andrey.gies(APART, ENV, targets=TARGETS),
+    "a targets matrix with the environments apart": lambda: andrey.gies(APART, targets=MASK),
+    "a targets column with the environments apart": lambda: andrey.gies(
+        {k: t.assign(t="") for k, t in APART.items()}, targets="t"
+    ),
+    "no environment": lambda: andrey.gies({}, targets={}),
+    "an environment without rows": lambda: andrey.gies(
+        {**APART, "set x2": DATA.iloc[:0]}, targets=TARGETS
+    ),
+    "DataFrames and arrays": lambda: andrey.gies(
+        {**APART, "set x2": APART["set x2"].to_numpy()}, targets=TARGETS
+    ),
+    "DataFrames with other columns": lambda: andrey.gies(
+        {**APART, "set x2": APART["set x2"].rename(columns={"x2": "x3"})}, targets=TARGETS
+    ),
+    "arrays with other numbers of columns": lambda: andrey.cdnod([DOMAINS[0], DOMAINS[1][:, :1]]),
+    "keys that mix strings and numbers": lambda: andrey.cdnod({0: DOMAINS[0], "b": DOMAINS[1]}),
+    "an environment that is not a table": lambda: andrey.cdnod({"a": DOMAINS[0], "b": [1.0, 2.0]}),
+    "a list with a member that is not a table": lambda: andrey.gies(
+        [APART["observed"], APART["set x1"]["x0"]], targets={0: [], 1: []}
+    ),
+    "a key that is not finite": lambda: andrey.cdnod({np.inf: DOMAINS[0], 1: DOMAINS[1]}),
+    "a DataFrame that repeats a column name": lambda: andrey.gies(
+        [pd.DataFrame(t.to_numpy(), columns=["x0", "x0", "x1"]) for t in APART.values()],
+        targets={0: [], 1: [], 2: []},
+    ),
+    "DataFrames that repeat other column names": lambda: andrey.gies(
+        [pd.DataFrame(DOMAINS[0][:, [0, 1, 0]], columns=list(c)) for c in ("aab", "abb")],
+        targets={0: [], 1: []},
+    ),
+    "a missing value, which gies does not accept": lambda: andrey.gies(
+        {**APART, "set x1": _with_nan(APART["set x1"])}, targets=TARGETS
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(APART_ERRORS))
+def test_environments_apart_that_cannot_be_read_raise(case):
+    """Each refusal names the method, as a ``ValueError``, before the rows are stacked."""
+    with pytest.raises(ValueError, match=r"^(gies|cdnod): "):
+        APART_ERRORS[case]()
+
+
+def test_a_missing_value_names_its_environment_and_row():
+    nan = {**APART, "set x1": _with_nan(APART["set x1"])}
+    with pytest.raises(ValueError, match=r"environment 'set x1'.* row 3,"):
+        andrey.gies(nan, targets=TARGETS)
+
+
+def test_cdnod_with_one_table_and_no_env_raises_as_a_missing_argument():
+    with pytest.raises(TypeError):
+        andrey.cdnod(X)
+
+
+def test_categories_join_across_environments():
+    """A hard intervention leaves its target with fewer categories in its environment; the
+    stacked table keeps every column categorical, so the fit is the declared table's."""
+    rng = np.random.default_rng(0)
+    a = rng.integers(0, 2, 600)
+    b = a ^ (rng.random(600) < 0.2)
+    c = b ^ (rng.random(600) < 0.2)
+    table = pd.DataFrame({"a": a, "b": b, "c": c})
+    table.loc[400:, "a"] = 1
+    observed, knockout = (table.iloc[:400].astype("category"), table.iloc[400:].astype("category"))
+    targets = {0: [], 1: ["a"]}
+    apart = andrey.gies([observed, knockout], targets=targets)
+    pooled = andrey.gies(table.astype("category"), np.repeat([0, 1], [400, 200]), targets=targets)
+    assert _same(apart, pooled)
+
+
+def test_the_former_targets_name_meets_the_same_refusal_in_bootstrap():
+    """``interventions``, gies's former name of ``targets``, as a column of data apart."""
+    apart = {k: t.assign(t="") for k, t in APART.items()}
+    with pytest.raises(ValueError, match="targets maps each environment"):
+        andrey.bootstrap("gies", apart, n_resamples=2, interventions="t")
+
+
+def test_bootstrap_resamples_environments_apart_as_their_stacked_rows():
+    apart = andrey.bootstrap("gies", APART, n_resamples=2, targets=TARGETS)
+    pooled = andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=TARGETS)
+    assert apart.structure.labels == ("x0", "x1", "x2")
+    assert np.array_equal(apart.frequency("->"), pooled.frequency("->"))
+    domains = andrey.bootstrap("cdnod", DOMAINS, n_resamples=2)
+    labeled = np.array(["a", "b", "c"])[DOMAIN.astype(int)]  # coded 0, 1, 2, drawn within each
+    assert np.array_equal(
+        domains.frequency("->"),
+        andrey.bootstrap("cdnod", X, n_resamples=2, env=labeled).frequency("->"),
+    )
+
+
+@pytest.mark.parametrize("form", ["list", "mapping"])
+def test_bootstrap_draws_within_each_domain_given_apart(form):
+    """Tables apart are one domain each, so cdnod's numbered positions draw within each domain,
+    as text labels do, where a numeric index of one table draws its rows as a whole."""
+    data = DOMAINS if form == "list" else dict(enumerate(DOMAINS))
+    job = _job(get_spec("cdnod"), data, {}, None, 0, "subsample", 0.5)
+    assert job.strata is not None
+    assert [len(rows) for rows in job.strata] == [len(t) for t in DOMAINS]
+    assert _job(get_spec("cdnod"), X, {"env": DOMAIN}, None, 0, "subsample", 0.5).strata is None
+
+
 # --- the command line ---------------------------------------------------------------------------
 
 
@@ -395,6 +587,16 @@ def test_cli_former_flags_warn_and_fit_alike(files, capsys):
     assert code == 0 and _edges(out_former) == _edges(out)
     warned = json.loads(out_former)["run"]["warnings"]
     assert "DeprecatedArgumentWarning" in {w["category"] for w in warned}
+
+
+def test_cli_cdnod_needs_env(files, capsys):
+    """One data file cannot hold the environments apart, so the command line needs ``--env``, and
+    the help schema says so."""
+    code, _, err = _run(["run", "cdnod", "--data", str(files["plain.csv"]), "--json"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "missing_input"
+    code, out, _ = _run(["run", "cdnod", "--help", "--json"], capsys)
+    inputs = json.loads(out)["method"]["data"]["inputs"]
+    assert code == 0 and all(i["required"] for i in inputs)
 
 
 def test_cli_bootstrap_takes_an_env_column(files, capsys):

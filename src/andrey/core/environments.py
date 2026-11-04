@@ -7,6 +7,8 @@ environments' labels, and each environment's targets as a set of column position
 where they are unknown. A method then builds what it reads from that form, such as GIES's row mask
 ``mask[i] = targets_by_code[env_codes[i]]``.
 
+``data`` is one table, or each environment's rows apart: a list of tables, labeled by position
+``0..K-1``, or a mapping from each label to its table (:func:`pool_environments`).
 ``env`` is ``None``, one label per row, or the name of a column of a DataFrame ``data``.
 ``targets`` is ``None``; a mapping from each label of ``env`` to its variables; one cell per row,
 given as the name of a column of a DataFrame ``data`` or as a 1-D array; or an
@@ -33,7 +35,7 @@ from andrey.core.structure import node_labels
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-__all__ = ["env_codes", "normalize_env_targets", "take_columns"]
+__all__ = ["env_codes", "normalize_env_targets", "pool_environments", "take_columns"]
 
 
 def normalize_env_targets(
@@ -48,8 +50,10 @@ def normalize_env_targets(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_columns), or a DataFrame
-        The data. A column that ``env`` or ``targets`` names leaves it.
+    data : array-like of shape (n_samples, n_columns), a DataFrame, or a list or mapping of them
+        The data. A column that ``env`` or ``targets`` names leaves it. A list or mapping holds
+        each environment's rows apart, labeled by position or key (:func:`pool_environments`),
+        with ``env`` ``None`` and ``targets`` a mapping from those labels or ``None``.
     env : array-like of shape (n_samples,) or (n_samples, 1), str, or None
         Each row's environment: a label per row, strings or numbers but not both, or the name of a
         column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
@@ -102,7 +106,8 @@ def normalize_env_targets(
     Raises
     ------
     ValueError
-        If ``env`` does not hold one label per row, misses a label (``None`` or ``NaN``), holds a
+        If ``data`` holds each environment apart and :func:`pool_environments` raises; if
+        ``env`` does not hold one label per row, misses a label (``None`` or ``NaN``), holds a
         label that is neither a string nor a number, or mixes strings and numbers; if ``env`` or
         ``targets`` names a column ``data`` lacks, or both name one column; if a mapping comes
         without ``env``, has a key that names no label of ``env``, or has two keys that name one
@@ -126,6 +131,7 @@ def normalize_env_targets(
     ([0, 1, 0, 1], ['observed', 'set y'], {0: frozenset(), 1: frozenset({1})})
     """
     prefix = f"{method}: " if method else ""
+    data, env = pool_environments(data, env, targets, method)
     named = {key: v for key, v in (("env", env), ("targets", targets)) if isinstance(v, str)}
     variables, values = take_columns(data, named, method)
     env, targets = values.get("env", env), values.get("targets", targets)
@@ -139,9 +145,9 @@ def normalize_env_targets(
         by_code: dict[int, frozenset[int] | None] = dict.fromkeys(range(len(envs)))
         if require_known_targets:
             raise ValueError(
-                f"{prefix}env needs targets, the variables intervened on in each environment; "
-                "pass targets as a mapping from each label of env to its variables, [] for an "
-                "observational one"
+                f"{prefix}each environment needs its targets, the variables intervened on in "
+                "it; pass targets as a mapping from each environment's label to its variables, [] "
+                "for an observational one"
             )
         return X, codes, envs, by_code
     if isinstance(targets, Mapping):
@@ -177,6 +183,125 @@ def normalize_env_targets(
             "needs its intervened variables, [] for an observational one"
         )
     return X, codes, envs, by_code
+
+
+def pool_environments(
+    data: Any, env: Any, targets: Any = None, method: str | None = None, missing: bool = False
+) -> tuple[Any, Any]:
+    """Return ``data`` as one table and ``env`` as each row's label, when ``data`` holds each
+    environment's rows apart.
+
+    ``data`` holds them apart as a list or tuple, empty or with a table among its members, each
+    member labeled by its position ``0..K-1``, or as a mapping from each label, a string or a finite
+    number, to its table; a table is a DataFrame or a 2-D array. The rows are stacked in the order
+    ``data`` holds them, so the pooled table and ``env``, the label of each row, are what a call
+    with one table passes. DataFrames keep their columns, in the order of the first, and their
+    column types; a column of the ``category`` type in every DataFrame keeps it, with the union of
+    their categories. Any other ``data`` returns unchanged, with ``env``.
+
+    Raises ``ValueError``, naming ``method``, when ``env`` is also given, ``targets`` is neither
+    ``None`` nor a mapping, ``data`` holds no environment, an environment has no rows or is not a
+    table, the tables mix DataFrames and arrays, a DataFrame repeats a column name, the
+    DataFrames' columns differ, the arrays' numbers of columns differ, the labels are not strings
+    or finite numbers, or mix them, or an environment holds ``inf``, or ``NaN`` without
+    ``missing``, which a method that accepts missing values passes; the message names the
+    environment and its own row.
+    """
+    if isinstance(data, Mapping):
+        labels, tables = list(data.keys()), list(data.values())
+    elif isinstance(data, (list, tuple)) and (not data or any(_is_table(t) for t in data)):
+        labels, tables = list(range(len(data))), list(data)
+    else:
+        return data, env
+    prefix = f"{method}: " if method else ""
+    if env is not None:
+        raise ValueError(
+            f"{prefix}data holds each environment's rows apart, which gives each row's "
+            "environment; leave env out, or pass data as one table with env"
+        )
+    if targets is not None and not isinstance(targets, Mapping):
+        raise ValueError(
+            f"{prefix}with each environment's rows apart, targets maps each environment's "
+            "position in the list, or key in the mapping, to its variables"
+        )
+    if not tables:
+        raise ValueError(f"{prefix}data holds no environment; give each environment's rows")
+    if not all(isinstance(k, str) or (_is_number(k) and math.isfinite(k)) for k in labels):
+        raise ValueError(
+            f"{prefix}the keys of data label the environments: strings or finite numbers"
+        )
+    if len({isinstance(k, str) for k in labels}) > 1:
+        raise ValueError(f"{prefix}the keys of data mix strings and numbers; give them one type")
+    other = [k for k, table in zip(labels, tables, strict=True) if not _is_table(table)]
+    if other:
+        raise ValueError(
+            f"{prefix}each environment's rows are a DataFrame or a 2-D array; environments "
+            f"{other} are not"
+        )
+    frames = [hasattr(table, "columns") for table in tables]
+    if any(frames) and not all(frames):
+        raise ValueError(
+            f"{prefix}data mixes DataFrames and arrays; give every environment the same kind"
+        )
+    sizes = [np.shape(table)[0] for table in tables]
+    empty = [k for k, size in zip(labels, sizes, strict=True) if size == 0]
+    if empty:
+        raise ValueError(f"{prefix}environments {empty} have no rows; leave them out")
+    import pandas as pd
+
+    for k, table in zip(labels, tables, strict=True):
+        cells = pd.DataFrame(table)
+        bad = cells.isin([np.inf, -np.inf]).to_numpy()
+        if not missing:
+            bad = bad | cells.isna().to_numpy()
+        if bad.any():
+            row, j = (int(i) for i in np.argwhere(bad)[0])
+            where = f"{prefix}environment {k!r} of data, at row {row}, column {cells.columns[j]!r},"
+            if not pd.isna(cells.iat[row, j]):
+                raise ValueError(f"{where} holds inf; drop or replace it before the fit")
+            raise ValueError(
+                f"{where} holds NaN, and {method or 'this method'} does not accept missing "
+                "values; drop the rows that hold one (see Missing values in the getting-started "
+                "guide)"
+            )
+    if all(frames):
+        repeated = [
+            k for k, table in zip(labels, tables, strict=True) if table.columns.has_duplicates
+        ]
+        if repeated:
+            raise ValueError(
+                f"{prefix}the DataFrames of environments {repeated} repeat a column name; give "
+                "each column one name"
+            )
+        columns = list(tables[0].columns)
+        differ = [
+            k for k, table in zip(labels, tables, strict=True) if set(table.columns) != set(columns)
+        ]
+        if differ:
+            raise ValueError(
+                f"{prefix}the DataFrames of environments {differ} have other columns than "
+                f"those of environment {labels[0]!r}, {columns}; give each the same columns"
+            )
+        tables = [table[columns] for table in tables]
+        union = {}
+        for column in columns:
+            kinds = [table[column].dtype for table in tables]
+            if all(isinstance(kind, pd.CategoricalDtype) for kind in kinds) and len(set(kinds)) > 1:
+                categories = kinds[0].categories
+                for kind in kinds[1:]:
+                    categories = categories.union(kind.categories, sort=False)
+                union[column] = pd.CategoricalDtype(categories)
+        pooled = pd.concat([table.astype(union) for table in tables], ignore_index=True)
+    else:
+        arrays = [np.asarray(table) for table in tables]
+        widths = [a.shape[1] for a in arrays]
+        if len(set(widths)) > 1:
+            raise ValueError(
+                f"{prefix}the environments' arrays have {widths} columns; give each the same "
+                "columns"
+            )
+        pooled = np.concatenate(arrays)
+    return pooled, np.repeat(np.array(labels, dtype=object), sizes)
 
 
 def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np.ndarray, list]:
@@ -237,6 +362,16 @@ def take_columns(
         raise ValueError(f"{prefix}{' and '.join(named)} name one column; name two columns")
     values = {key: data[column].to_numpy() for key, column in named.items()}
     return data.drop(columns=list(named.values())), values
+
+
+def _is_table(value: object) -> bool:
+    """Whether ``value`` is one environment's rows: a DataFrame or a 2-D array."""
+    if hasattr(value, "columns"):
+        return True
+    try:
+        return np.ndim(value) == 2  # ty: ignore[invalid-argument-type]  # a ValueError is caught
+    except ValueError:  # a ragged nested list
+        return False
 
 
 def _column_labels(X: Any) -> tuple[str, ...] | None:
