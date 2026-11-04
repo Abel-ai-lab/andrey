@@ -1674,23 +1674,24 @@ def dynotears(
     Gaussian noise, exponential noise of mean zero, and exponential noise of mean 1 as the paper's
     simulations draw it; 5 to 100 variables; 500 and 50 time steps at the paper's settings for each;
     20 series per setting, in the data's units. Errors are SHD over the same-step and lagged edges
-    together, means over the series. This method made no more errors in 37 of the 38 settings, and
-    fewer in 6, all with the noise of mean 1, whose mean the centering above absorbs. It made more
-    in one: exponential noise of mean zero at 100 variables and 50 time steps, about 3 to 4 more of
-    about 150 on two sets of 20 series. The centering is the cause: on those 40 series the same fit
-    without it made 3.50 fewer errors (95% interval 1.48 to 5.50) and tied with the reference
-    implementation. With noise of mean zero the means it estimates are zero, and estimating them
-    costs about one time step of data, which shows only where the fit has more weights than steps.
-    At 500 time steps and the default settings the errors were 0.15 to 6.25, against the empty
-    graph's 13.5 to 283.2, with F1 at least 0.969. The defaults made more errors than the empty
-    graph from 20 variables on at 50 time steps, so set ``lambda1=0.2`` and ``lag_threshold=0.2``,
-    the paper's settings for 50 steps, for a short series. With the columns z-scored at 500 steps
-    the errors rose to more than half the empty graph's, over ten series each at 5 to 50 variables.
-    With 500 time steps on one core, four fits at a time on four cores, the median fit took 0.3 s at
-    5 variables, about 30 s at 50, and 299 to 385 s at 100; from 50 to 100 variables the time grew
-    faster than the cube of the number of variables, from the matrix exponential of every evaluation
-    and the ``(tau_max + 1) * d * d`` weights. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    together, means over the series. This method tied the reference implementation in 31 of the 38
+    settings and made fewer errors in 6, all with the noise of mean 1, whose mean the centering
+    above absorbs. It made more in one: exponential noise of mean zero at 100 variables and 50 time
+    steps, about 3 to 4 more of about 150 on two sets of 20 series. The centering is the cause: on
+    those 40 series the same fit without it made 3.50 fewer errors (95% interval 1.48 to 5.50) and
+    tied with the reference implementation. With noise of mean zero the means it estimates are zero,
+    and estimating them costs about one time step of data, which shows only where the fit has more
+    weights than steps. At 500 time steps and the default settings the errors were 0.15 to 6.25,
+    against the empty graph's 13.5 to 283.2, with F1 at least 0.969. The defaults made more errors
+    than the empty graph from 20 variables on at 50 time steps, so set ``lambda1=0.2`` and
+    ``lag_threshold=0.2``, the paper's settings for 50 steps, for a short series. With the columns
+    z-scored at 500 steps the errors rose to more than half the empty graph's, over ten series each
+    at 5 to 50 variables. With 500 time steps on one core, four fits at a time on four cores, the
+    median fit took 0.3 s at 5 variables, about 30 s at 50, and 299 to 385 s at 100; from 50 to 100
+    variables the time grew faster than the cube of the number of variables, from the matrix
+    exponential of every evaluation and the ``(tau_max + 1) * d * d`` weights. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

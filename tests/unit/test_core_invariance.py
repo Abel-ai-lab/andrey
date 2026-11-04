@@ -97,12 +97,23 @@ def test_the_gaussian_level_holds_under_the_null():
 
 @pytest.mark.parametrize(
     "change",
-    [{"shift": 1.0}, {"weight": 0.25}, {"sd": 2**0.5}],
-    ids=["shift", "weight", "variance"],
+    [{"shift": 1.0}, {"weight": 0.25}, {"sd": 2**0.5}, {"weight": 0.05}, {"sd": 0.2**0.5}],
+    ids=["shift", "weight", "variance", "weight / 10", "variance 0.2"],
 )
 def test_the_gaussian_test_rejects_a_changed_conditional(change):
     X, groups = two_groups(np.random.default_rng(3), 2000, 2000, **change)
     assert make_invariance_test("gaussian", X, groups, indep_test="fisherz")(2, [0]) < 1e-5
+
+
+def test_with_no_conditioning_set_the_gaussian_test_sees_a_variance_change_alone():
+    """A variable cut from its causes and given the noise N(0, 0.2) keeps its mean 0; the test of
+    its marginal compares the variances too, where the indicator under fisherz sees only means."""
+    rng = np.random.default_rng(5)
+    x = np.r_[rng.standard_normal(1000), 0.2**0.5 * rng.standard_normal(1000)]
+    X = np.column_stack([x, rng.standard_normal(2000)])
+    groups = np.repeat([0, 1], 1000)
+    assert make_invariance_test("gaussian", X, groups, indep_test="fisherz")(0, []) < 1e-10
+    assert make_invariance_test("indicator", X, groups, indep_test="fisherz")(0, []) > 1e-3
 
 
 def test_the_gaussian_test_reads_no_units_and_no_group_order():

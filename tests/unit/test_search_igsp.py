@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import itertools
 
 import numpy as np
@@ -240,3 +241,165 @@ def test_tiers_order_every_order_the_search_starts_from():
     )
     assert all(found[3] >> v & 1 == 0 for v in range(3))  # nothing into the first tier
     assert all(found[v] >> 3 & 1 for v in range(3))  # the complete DAG: 3 -> every other
+
+
+def oracles(parents: list[list[int]], family: list[set[int]]):
+    """The d-separation oracles of the DAG ``parents`` under the settings ``family``: one context
+    node per setting into its targets, every context given in the observational distribution."""
+    p, K = len(parents), len(family)
+    augmented = [list(pa) for pa in parents] + [[] for _ in range(K)]
+    for k, t in enumerate(family):
+        for v in t:
+            augmented[v].append(p + k)
+    graph = GraphStructure.from_numpy(marks(augmented), kind="dag")
+    contexts = list(range(p, p + K))
+
+    @functools.cache
+    def independent(i, j, S):
+        return graph.d_separated(i, j, [*S, *contexts])
+
+    @functools.cache
+    def invariant(j, S, k):
+        return graph.d_separated(p + k, j, [*S, *(c for c in contexts if c != p + k)])
+
+    return independent, invariant
+
+
+@functools.cache
+def igsp_case(seed: int):
+    """A random DAG on 4-7 variables with mean degree 1.5 (even seeds) or 3 (odd ones), and 1-4
+    settings of one target each, of 2-3 each, or of 1-3 each, in turn by ``seed // 2``."""
+    rng = np.random.default_rng([seed, 655])
+    p = int(rng.integers(4, 8))
+    probability = min(1.0, (1.5, 3.0)[seed % 2] / (p - 1))
+    order = rng.permutation(p)
+    parents: list[list[int]] = [[] for _ in range(p)]
+    for a, b in itertools.combinations(range(p), 2):
+        if rng.random() < probability:
+            parents[order[b]].append(int(order[a]))
+    sizes = ((1, 2), (2, 4), (1, 4))[(seed // 2) % 3]
+    family = [
+        {int(v) for v in rng.choice(p, size=int(rng.integers(*sizes)), replace=False)}
+        for _ in range(int(rng.integers(1, 5)))
+    ]
+    return parents, family, *oracles(parents, family)
+
+
+def igsp_misses(depth: int) -> list[tuple[int, int]]:
+    """The (case, start) pairs whose search from a random order misses the true class."""
+    missed = []
+    for seed in range(200):
+        parents, family, independent, invariant = igsp_case(seed)
+        truth = essential(parents, family)
+        test = igsp._memoized(independent)
+        for start in range(5):
+            order = [int(v) for v in np.random.default_rng([start, seed]).permutation(len(parents))]
+            rules = igsp.igsp_rules(invariant, [frozenset(t) for t in family])
+            found, _ = igsp._run(igsp._imap(order, test, None), test, rules, depth, None, None)
+            if not np.array_equal(essential(as_lists(found), family), truth):
+                missed.append((seed, start))
+    return missed
+
+
+def test_the_igsp_oracle_search_returns_the_true_class_from_any_start():
+    """Consistency (Yang, Katcoff, and Uhler 2018, Theorem 4.6): with every test answered by
+    d-separation, an unbounded search from any order finds the true I-essential graph, for
+    single-target, multi-target, and mixed families."""
+    assert igsp_misses(depth=10**6) == []
+
+
+#: The (case, start) pairs of :func:`igsp_misses` missed at depth 4: 8 of 1,000.
+IGSP_MISSES_AT_DEPTH_4 = {(1, 0), (17, 4), (25, 0), (25, 1), (25, 3), (95, 2), (101, 0), (101, 2)}
+
+
+def test_the_igsp_oracle_search_at_depth_4_misses_no_more_than_recorded():
+    assert set(igsp_misses(depth=igsp.DEPTH)) <= IGSP_MISSES_AT_DEPTH_4
+
+
+def test_the_igsp_oracle_search_from_its_own_starts_returns_the_true_class():
+    for seed in range(200):
+        parents, family, independent, invariant = igsp_case(seed)
+        rules = igsp.igsp_rules(invariant, [frozenset(t) for t in family])
+        found, _ = igsp.igsp_search(len(parents), independent, rules, n_starts=5, seed=0)
+        assert np.array_equal(essential(as_lists(found), family), essential(parents, family))
+
+
+def test_no_arc_of_the_true_dag_is_i_contradicting_under_the_oracle():
+    for seed in range(200):
+        parents, family, _, invariant = igsp_case(seed)
+        rules = igsp.igsp_rules(invariant, [frozenset(t) for t in family])
+        dag = tuple(sum(1 << i for i in pa) for pa in parents)
+        assert rules.objective(dag) == (sum(map(len, parents)), 0), seed
+
+
+def as_masks(parents: list[list[int]]) -> tuple[int, ...]:
+    return tuple(sum(1 << i for i in pa) for pa in parents)
+
+
+def table_rules(variant: set[tuple[int, tuple[int, ...], int]], family: list[set[int]]):
+    """IGSP's rules under an invariance test that finds ``x_j`` given ``S`` variant in setting
+    ``k`` exactly for the ``(j, S, k)`` in ``variant``."""
+    return igsp.igsp_rules(lambda j, S, k: (j, S, k) not in variant, [frozenset(t) for t in family])
+
+
+def test_a_covered_arc_is_i_covered_unless_its_head_varies_in_a_setting_of_its_tail_alone():
+    dag = as_masks([[], [0], []])  # 0 -> 1; 2 alone
+    # Two settings with the targets {0}: x_1 varies in one, so 0 -> 1 is not I-covered.
+    assert not table_rules({(1, (), 1)}, [{0}, {0}]).icovered(dag, 0, 1)
+    assert table_rules(set(), [{0}, {0}]).icovered(dag, 0, 1)
+    # Only multi-target settings: every covered arc is I-covered.
+    assert table_rules({(1, (), 0)}, [{0, 2}]).icovered(dag, 0, 1)
+
+
+def test_the_single_target_and_the_general_definitions_differ_on_a_chain():
+    """Truth 0 -> 1 -> 2 (3 and 4 alone) and the minimal I-MAP of the order (0, 2, 1): 0 -> 1,
+    0 -> 2, 2 -> 1. Under the setting {0}, x_2's marginal changes, so the single-target
+    definition does not mark 0 -> 2; the general one, which a two-target setting switches on,
+    marks it, since x_2 given x_1 does not change."""
+    truth = [[], [0], [1], [], []]
+    imap = as_masks([[], [0, 2], [0], [], []])
+    _, single = oracles(truth, [{0}])
+    _, general = oracles(truth, [{0}, {3, 4}])
+    assert igsp.igsp_rules(single, [frozenset({0})]).priority(imap, 0, 2) == 1
+    assert igsp.igsp_rules(general, [frozenset({0}), frozenset({3, 4})]).priority(imap, 0, 2) == 0
+
+
+def test_condition_2_asks_every_subset_for_some_varying_setting():
+    """0 -> 1 with 2 -> 0, and two settings that target 1 and not 0: x_0 varies in setting 0
+    given nothing and in setting 1 given x_2, so for every subset of 0's other neighbors some
+    setting varies, although no one setting varies for all of them."""
+    dag = as_masks([[2], [0], []])
+    assert table_rules({(0, (), 0), (0, (2,), 1)}, [{1, 2}, {1}]).priority(dag, 0, 1) == 0
+    assert table_rules({(0, (), 0)}, [{1, 2}, {1}]).priority(dag, 0, 1) == 1
+
+
+def test_with_no_setting_holding_one_end_alone_condition_1_marks_nothing():
+    """Every setting holds both 0 and 1, so neither condition applies to 0 -> 1, though x_1 is
+    invariant everywhere."""
+    rules = table_rules(set(), [{0, 1}])
+    dag = as_masks([[], [0]])
+    assert rules.priority(dag, 0, 1) == 1
+    assert rules.objective(dag) == (1, 0)
+
+
+def test_igsp_restarts_on_fewer_arcs_only_and_admits_every_child():
+    rules = table_rules(set(), [{0}])
+    assert rules.restarts((3, 5), (4, 0))
+    assert not rules.restarts((4, 0), (4, 5))
+    assert rules.admits((4, 9), (4, 0))
+
+
+def test_the_reversals_of_i_contradicting_arcs_are_visited_first():
+    """0 -> 1 and 2 -> 3 are covered; under the setting {2}, x_3 does not change, so 2 -> 3 is
+    I-contradicting and its reversal comes first."""
+    rules = table_rules(set(), [{2}])
+    dag = as_masks([[], [0], [], [2]])
+    assert igsp._moves(dag, rules, None, None) == [(2, 3), (0, 1)]
+
+
+def test_a_restart_goes_to_the_lowest_of_the_children_that_pass_the_restart_test():
+    """Two children of the start are lower; the search restarts from the lower, -1, though the
+    first, 0, leads to -5."""
+    first, lower = swapped(START, 0), swapped(START, 3)
+    values = {START: 1, first: 0, lower: -1, swapped(first, 2): -5}
+    assert search(values)[1] == -1

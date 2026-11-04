@@ -35,13 +35,19 @@ class Functional:
 
     name: str
     weight_range: tuple[float, float] = (0.5, 2.0)
+    positive: bool = False
     is_temporal: ClassVar[bool] = False  # temporal families set this and provide generate_temporal
 
     def draw_weights(self, draw: DAGDraw, rng: np.random.Generator) -> np.ndarray:
-        """Per-edge weights, magnitude ``U[weight_range]`` with a random sign (``(m,)``)."""
+        """Per-edge weights, magnitude ``U[weight_range]`` with a random sign (``(m,)``).
+
+        Under ``positive``, each weight is the magnitude alone: the signs are drawn and dropped,
+        so the weights are those of the signed draw on the same stream, made positive.
+        """
         m = draw.parents.shape[0]
         lo, hi = self.weight_range
-        return rng.uniform(lo, hi, size=m) * rng.choice(np.array([-1.0, 1.0]), size=m)
+        weights = rng.uniform(lo, hi, size=m) * rng.choice(np.array([-1.0, 1.0]), size=m)
+        return np.abs(weights) if self.positive else weights
 
     def draw_scale_weights(self, draw: DAGDraw, rng: np.random.Generator) -> np.ndarray:
         """Per-edge weights of the noise scale; empty, with no draws, unless a subclass has one."""
@@ -385,9 +391,23 @@ class VARMA(VAR):
         return data, temporal.build_truth(draw, b0, a_stack, m_stack)
 
 
-def linear(weight_range: tuple[float, float] = (0.5, 2.0)) -> Linear:
-    """Build a linear structural-equation spec with per-edge weights from ``+/- weight_range``."""
-    return Linear(weight_range=weight_range)
+def linear(weight_range: tuple[float, float] = (0.5, 2.0), *, positive: bool = False) -> Linear:
+    """Build a linear structural-equation spec with per-edge weights from ``+/- weight_range``.
+
+    Parameters
+    ----------
+    weight_range : tuple of float, default=(0.5, 2.0)
+        Magnitude range of the edge weights, each drawn with a random sign.
+    positive : bool, default=False
+        Make every weight positive: its magnitude, with the sign dropped. A sample then has the
+        weights of the signed model on the same seed, in absolute value, and every other draw
+        unchanged. ``scale="unitless"`` draws its own weights and does not take it.
+
+    Returns
+    -------
+    Linear
+    """
+    return Linear(weight_range=weight_range, positive=positive)
 
 
 def additive_noise(weight_range: tuple[float, float] = (0.5, 2.0)) -> AdditiveNoise:
