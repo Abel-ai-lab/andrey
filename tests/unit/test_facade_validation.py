@@ -60,6 +60,7 @@ SINGLE = {
     "fci": andrey.fci,
     "gfci": andrey.gfci,
     "cdnod": lambda data, **kw: andrey.cdnod(data, env=np.arange(len(data)) % 2, **kw),
+    "icp": lambda data, **kw: andrey.icp(data, env=np.arange(len(data)) % 2, target=0, **kw),
     "iamb": andrey.iamb,
     "inter_iamb": andrey.inter_iamb,
     "mmpc": andrey.mmpc,
@@ -205,7 +206,7 @@ def _two_groups_of_copies():
 
 
 # The searches that reject copies before the fit: the BIC searches, the partial-correlation
-# constraint searches, the lagged partial-correlation searches, CAM, RESIT, and CAM-UV.
+# constraint searches, the lagged partial-correlation searches, CAM, RESIT, CAM-UV, and ICP.
 COPY_CHECKED = [
     *BIC,
     "pc",
@@ -222,6 +223,7 @@ COPY_CHECKED = [
     "cam",
     "resit",
     "camuv",
+    "icp",
 ]
 
 
