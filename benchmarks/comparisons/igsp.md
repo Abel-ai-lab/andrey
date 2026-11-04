@@ -164,10 +164,14 @@ comparisons (87 cells against the library, and the 27 cells with a setting of tw
 against the patched copy) and better in 11: its errors were lower on seeds 0 to 19 and again on a
 rerun on seeds 6000 to 6019. All 11 are against the unpatched library, in cells with settings of
 two or more targets (10 of W's 12 and Y8 `inhibiting` at n 10,000), where the library's test
-inverts Definition 4.2; against the patched copy the same 11 cells tie. Seeds 6000 to 6019 are
-those of the run that confirmed the default (see [Choosing the defaults](#choosing-the-defaults)),
-which chose it as the candidate with the most comparisons below 0 there, 18 against 17, so they
-favor below 0 for it. Another 4 were lower on seeds 0 to 19 and tied on the rerun, and the other
+inverts Definition 4.2; against the patched copy none of the 11 is better: 9 tie and 2 were lower
+on seeds 0 to 19 only. Seeds 6000 to 6019 are those of the run that confirmed the default (see
+[Choosing the defaults](#choosing-the-defaults)), which chose it as the candidate with the most
+comparisons below 0 there, 18 against 17, so they favor below 0 for it. One of the 11, Y8
+`inhibiting` at n 10,000, is below 0 on seeds 6000 to 6019 only through its upper end, `-2e-17`,
+floating-point residue of 0, read as below 0 as computed; read exactly, that interval contains 0,
+the row is lower on seeds 0 to 19 only, the better comparisons are 10, and the confirmation's
+count is 17 against 17. Another 4 were lower on seeds 0 to 19 and tied on the rerun, and the other
 99 tie. Against the patched copy alone, Andrey is worse in none and better in none of 27.
 
 With 5 starts, the library's number of runs, at the same level, Andrey is worse in none of the 114
@@ -376,6 +380,10 @@ agrees; "no rerun" marks rows lower on seeds 0 to 19 in cells that were not reru
 | `1e-2` | 10 | reference | 0 | 0 | 1 | 1 | 34 | 51 |
 | `1e-2` | 10 | patched copy | 0 | 0 | 0 | 1 | 13 | 13 |
 
+At `1e-2` against the patched copy, one of the 13 rows lower with no rerun at each number of
+starts, Y8 `inhibiting` at n 1,000, has an upper end of `-2e-17` on seeds 0 to 19, floating-point
+residue of 0, read as below 0; read exactly, both tie.
+
 ### Replication
 
 Every comparison whose interval lay above 0 on seeds 0 to 19, with its interval on fresh seeds
@@ -397,7 +405,9 @@ per setting on 10 variables; none is at the default level or at `1e-2`.
 The W row's lower end on seeds 0 to 19 is `4e-17`, floating-point residue of 0, read as above 0,
 which sent the row to the rerun. On the rerun it was higher again, so it counts as worse: the one
 replicated row of the campaign. The same rerun found 3 comparisons in these cells lower again,
-which count as better at their levels (in the table above).
+which count as better at their levels (in the table above). The confirmation's rerun has one such
+end as well: at the default, Y8 `inhibiting` at n 10,000 against the library is below 0 on seeds
+6000 to 6019 through an upper end of `-2e-17` (see [In the claim](#in-the-claim)).
 
 ### The replicated row
 
@@ -431,16 +441,19 @@ row was filtered and no dataset is missing.
 ### Choosing the defaults
 
 The defaults were chosen before this comparison, by Andrey alone on seeds 1000 to 1019, one draw,
-over the 87 cells (Notes of `igsp`). Alpha `1e-3` won 123 comparisons and lost none against the
-other levels of the authors' sweep: it was better than `1e-4` in 4 cells, `5e-3` in 16, `1e-2` in
-20, and `5e-2` in 83, and tied `5e-4` in all 87. At `1e-3`, 10 starts and 5 tied each other in
-every cell; against one start, 10 were better in 21 cells and 5 in 19.
+over the 87 cells (Notes of `igsp`), with no rerun, so lower and higher below mean the interval
+on these seeds alone. Against the other levels of the authors' sweep, alpha `1e-3` was lower in
+123 comparisons and worse in none: lower than `1e-4` in 4 cells, `5e-3` in 16, `1e-2` in 20, and
+`5e-2` in 83, and tied with `5e-4` in all 87. At `1e-3`, 10 starts and 5 tied each other in every
+cell; against one start, 10 were lower in 21 cells and 5 in 19.
 
 A confirmation run, its rule written before any fit, then compared alpha `1e-3` with alpha one
 over the observational rows, both at 10 starts, against the library at `1e-3` (and the patched
 copy in the multi-target cells), on seeds 6000 to 6019 with 5 draws: worse in none of 114 for
 either, below 0 in 18 for `1e-3` and in 17 for one over the observational rows. The rule kept the
-candidate with the most comparisons below 0, `1e-3`.
+candidate with the most comparisons below 0, `1e-3`. One of its 18 is the Y8 `inhibiting` row at n
+10,000 whose upper end is residue of 0 (see [In the claim](#in-the-claim)); read exactly, the two
+candidates tie at 17, and the rule gives a tie to one over the observational rows.
 
 ### Other methods
 
@@ -505,7 +518,7 @@ beside it in every row but those with additive noise.
 | p 10, 4 `perfect` settings, n 1,000, observational 10x | 8.00 | 0.35 | 0.65 | -0.30 [-0.80, +0.05] | 0.15 | 0.05 | 0.02 |
 
 On the off-target rows, Andrey's `ut_igsp`, told the targets that are known and learning the
-others, reached SHD 0.15 and 0.05. The rows by number of variables stopped at 400, where no
+others, reached SHD 0.05 and 0.15. The rows by number of variables stopped at 400, where no
 Andrey fit finished within the cap. At 100 variables the library finished 1 of 10 datasets within
 the cap, its finished fit peaking at 72 GB of memory against Andrey's 0.5 GB; these library fits
 ran later than Andrey's, with more memory, after a first attempt ran out of it. At 50 variables
@@ -513,12 +526,12 @@ the library's fits peaked at up to 5.4 GB, Andrey's at 0.3 GB.
 
 ### Speed
 
-Andrey's median fit took longer than the library's in 84 of the 87 cells at the default level, and
+Andrey was slower than the library in 84 of the 87 cells at the default level, and
 the ratio grows with the rows: its median over cells was 1.83 at 1,000 rows per setting, 4.29 at
 10,000, and 3.48 at 100,000 (W and S only). Andrey's fit time grows with the total number of rows,
 the library's much less. Where the search dominates, Andrey is faster: with the kernel tests 1.72 s
 against 8.69 s at 200 rows and 13.83 s against 21.19 s at 500, and on 50 variables 1.56 s against
-4.28 s. The ratio is per row the median over datasets of Andrey's median fit time over its draws
+4.28 s. The ratio is per row the median over datasets of Andrey's mean fit time over its draws
 divided by the library's at 5 runs.
 
 | Block | n | Rows | Andrey, median fit (s) | Reference, median fit (s) | Ratio, median [range] |
@@ -539,8 +552,9 @@ divided by the library's at 5 runs.
 ### Where the differences show
 
 Of the named differences, the multi-target test accounts for the 11 comparisons better than the
-unpatched library, since the patched copy ties in all 11, and the first start, with a smaller share
-from the one-sided start test, for the replicated row.
+unpatched library, since against the patched copy none of the 11 is better (9 tie and 2 were lower
+on seeds 0 to 19 only), and the first start, with a smaller share from the one-sided start test,
+for the replicated row.
 
 ## References
 

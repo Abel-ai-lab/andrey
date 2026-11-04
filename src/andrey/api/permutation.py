@@ -777,18 +777,19 @@ def igsp(
     **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' settings
     [1]_ [2]_: linear effects and Gaussian noise on 7 to 20 variables, with one or two settings of
     up to 10 targets or up to 45 settings of one or two targets, perfect, inhibiting, or imperfect,
-    and 1,000 to 100,000 rows per setting: 87 groups of 20 datasets, one fit each. A candidate
-    counts as better or worse than another in a group when the 95% bootstrap interval of the mean
-    difference in SHD, paired by dataset, lies wholly below or above 0. Among the levels the authors
-    swept, ``alpha=1e-3`` was worse than none in any group and better than ``1e-4`` in 4 groups,
-    ``5e-3`` in 16, ``1e-2`` in 20, and ``0.05`` in 83, by 0.2 to 10.7 edges; ``5e-4`` tied with it
-    in every group. On 20 variables at mean degree 3 with 8 perfect single-variable settings and
-    1,000 or 10,000 rows per setting, outside these groups, no level was better than ``1e-3``. At
-    ``alpha=1e-3``, 10 starts and 5 were each worse than none in any group and tied with each other
-    in every group; against one start, 10 were better in 21 groups and 5 in 19, by 0.4 to 1.7 edges,
-    at a median of 0.10 s per fit against 0.07 s for 5. On fresh datasets, 5 fits each, against
-    the reference implementation at ``1e-3``, ``alpha=1e-3`` and one over the observational rows,
-    both with 10 starts, were each worse in none of 114 comparisons, and lower in 18 and 17.
+    and 1,000 to 100,000 rows per setting: 87 groups of 20 datasets, one fit each, one set of
+    datasets with no rerun. A candidate's SHD counts as lower or higher than another's in a group
+    when the 95% bootstrap interval of the mean difference, paired by dataset, lies wholly below or
+    above 0. Among the levels the authors swept, ``alpha=1e-3`` was worse in none of the groups and
+    lower than ``1e-4`` in 4 groups, ``5e-3`` in 16, ``1e-2`` in 20, and ``0.05`` in 83, by 0.2 to
+    10.7 edges; ``5e-4`` tied with it in every group. On 20 variables at mean degree 3 with 8
+    perfect single-variable settings and 1,000 or 10,000 rows per setting, outside these groups, no
+    level was lower than ``1e-3``. At ``alpha=1e-3``, 10 starts and 5 were each worse in none of the
+    groups and tied with each other in every group; against one start, 10 were lower in 21 groups
+    and 5 in 19, by 0.4 to 1.7 edges, at a median of 0.10 s per fit against 0.07 s for 5. On fresh
+    datasets, 5 fits each, against the reference implementation at ``1e-3``, ``alpha=1e-3`` and one
+    over the observational rows, both with 10 starts, were each worse in none of 114 comparisons,
+    and lower in 18 and 17.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other

@@ -234,12 +234,13 @@ fit runs: the first from the start the method describes, each later one from a s
 best DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring
 search; a later one replaces an earlier one only when it scores better by more than `1e-6` (for
 `igsp`, fewer edges, then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and
-targets). `igsp` and `ut_igsp` run 10 by default. On simulated data in `igsp`'s papers' settings,
-10 searches and 5 had fewer errors than one in 21 and 19 of 87 groups of datasets and more in none,
-and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated datasets, 12 of
-them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in that
-setting, and more in none. Each search builds its own caches and drops the previous one's, so more
-starts take more time but little more memory. `1`, the default for the others, runs one search.
+targets). `igsp` and `ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s
+papers' settings, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were
+worse in none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated
+datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2
+of them in that setting, and more in none. Each search builds its own caches and drops the previous
+one's, so more starts take more time but little more memory. `1`, the default for the others, runs
+one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -433,9 +434,9 @@ IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observatio
 and settings whose intervention targets are all known, as GIES does: it searches variable orders
 for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
 the settings' invariance tests contradict. Its default level for both tests, `alpha=1e-3`, was
-the best of the levels its authors swept, from `1e-4` to `0.05`, on data simulated as in its
-papers: fewer errors than each of the others in some groups of datasets, except `5e-4`, which tied
-it, and more in none. It returns the interventional essential graph.
+chosen from the levels its authors swept, from `1e-4` to `0.05`, on one set of datasets simulated
+as in its papers: its SHD was lower than each other level's in some groups of datasets, except
+`5e-4`, which tied it, and it was worse in none. It returns the interventional essential graph.
 
 UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
 whose intervention targets are known in part or not at all: it searches variable orders for the

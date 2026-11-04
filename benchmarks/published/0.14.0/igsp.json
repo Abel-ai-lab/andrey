@@ -16623,7 +16623,7 @@
    "verdict": "above 0, not replicated"
   }
  ],
- "residue_note": "interval ends that are floating-point residue of an exact 0, read as computed (the gate's reading); a positive lower end sends a row to a rerun",
+ "residue_note": "interval ends that are floating-point residue of an exact 0, read as computed (the gate's reading); a positive lower end sends a row to a rerun; an entry is on seeds 0-19 unless it names a rerun's seeds. Read exactly, as 0, four verdicts change: the W row's interval on seeds 0-19 contains 0, so it ties and is not rerun; the two Y8 inhibiting n 1,000 rows at alpha 1e-2 against the patched copy tie instead of lower, no rerun; and Y8 inhibiting n 10,000 at the defaults against the library contains 0 on seeds 6000-6019, so it is lower on seeds 0-19 only instead of better (10 better, not 11), and the confirmation counts 17 rows below 0 for each candidate, a tie that its rule, written before any fit, gives to alpha one over the observational rows",
  "residue": [
   [
    "W_K2_p10_n1000 J1 alpha 1e-4 graphical-model-learning+def42",
@@ -16639,6 +16639,10 @@
   ],
   [
    "Y8_inhibiting_p10_n1000 J2 alpha 1e-2 graphical-model-learning+def42",
+   -2.2204460492503132e-17
+  ],
+  [
+   "Y8_inhibiting_p10_n10000 J2 alpha 1e-3 graphical-model-learning rerun seeds 6000-6019",
    -2.2204460492503132e-17
   ],
   [
@@ -23648,7 +23652,7 @@
   }
  },
  "speed": {
-  "ratio": "per row, the median over datasets of Andrey's median fit time over its draws divided by the reference's (alpha 1e-3, nruns 5); every fit on one pinned core with one BLAS thread, the two packages' fits of a dataset back to back on the same core",
+  "ratio": "per row, the median over datasets of Andrey's mean fit time over its draws divided by the reference's (alpha 1e-3, nruns 5); every fit on one pinned core with one BLAS thread, the two packages' fits of a dataset back to back on the same core",
   "rows_above_1": 84,
   "rows": 87,
   "by_arm_and_n": {
@@ -23775,7 +23779,7 @@
   }
  },
  "default_selection": {
-  "seeds": "1000-1019, Andrey only, the 87 in-claim cells, one draw",
+  "seeds": "1000-1019, Andrey only, the 87 in-claim cells, one draw, no rerun: lower and higher mean the 95% interval of the paired mean difference below or above 0 on these seeds",
   "alpha": {
    "step": 1,
    "candidates": [
@@ -23789,33 +23793,33 @@
    "winner": "a0.001_s5",
    "counts": {
     "a0.0001_s5": {
-     "wins": 107,
-     "losses": 14,
+     "lower": 107,
+     "higher": 14,
      "eligible": false
     },
     "a0.0005_s5": {
-     "wins": 120,
-     "losses": 2,
+     "lower": 120,
+     "higher": 2,
      "eligible": false
     },
     "a0.001_s5": {
-     "wins": 123,
-     "losses": 0,
+     "lower": 123,
+     "higher": 0,
      "eligible": true
     },
     "a0.005_s5": {
-     "wins": 108,
-     "losses": 46,
+     "lower": 108,
+     "higher": 46,
      "eligible": false
     },
     "a0.01_s5": {
-     "wins": 87,
-     "losses": 74,
+     "lower": 87,
+     "higher": 74,
      "eligible": false
     },
     "a0.05_s5": {
-     "wins": 0,
-     "losses": 409,
+     "lower": 0,
+     "higher": 409,
      "eligible": false
     }
    },
@@ -23840,7 +23844,7 @@
      "Q_perfect_k8_p20_n10000_deg3",
      "Q_perfect_k8_p20_n1000_deg3"
     ],
-    "beaten_by": {
+    "lower_than_winner": {
      "Q_perfect_k8_p20_n10000_deg3": [],
      "Q_perfect_k8_p20_n1000_deg3": []
     },
@@ -23856,7 +23860,7 @@
       "paired": 20
      },
      "a0.0001_s5 vs a0.001_s5 | Q_perfect_k8_p20_n1000_deg3": {
-      "verdict": "worse",
+      "verdict": "higher",
       "mean_D": 2.3,
       "bootstrap_95": [
        0.4,
@@ -23883,7 +23887,7 @@
       "paired": 20
      },
      "a0.005_s5 vs a0.001_s5 | Q_perfect_k8_p20_n10000_deg3": {
-      "verdict": "worse",
+      "verdict": "higher",
       "mean_D": 0.75,
       "bootstrap_95": [
        0.15,
@@ -23901,7 +23905,7 @@
       "paired": 20
      },
      "a0.01_s5 vs a0.001_s5 | Q_perfect_k8_p20_n10000_deg3": {
-      "verdict": "worse",
+      "verdict": "higher",
       "mean_D": 1.95,
       "bootstrap_95": [
        0.95,
@@ -23919,7 +23923,7 @@
       "paired": 20
      },
      "a0.05_s5 vs a0.001_s5 | Q_perfect_k8_p20_n10000_deg3": {
-      "verdict": "worse",
+      "verdict": "higher",
       "mean_D": 9.8,
       "bootstrap_95": [
        6.4,
@@ -23928,7 +23932,7 @@
       "paired": 20
      },
      "a0.05_s5 vs a0.001_s5 | Q_perfect_k8_p20_n1000_deg3": {
-      "verdict": "worse",
+      "verdict": "higher",
       "mean_D": 8.9,
       "bootstrap_95": [
        5.7,
@@ -23950,18 +23954,18 @@
    "winner": "a0.001_s10",
    "counts": {
     "a0.001_s1": {
-     "wins": 0,
-     "losses": 40,
+     "lower": 0,
+     "higher": 40,
      "eligible": false
     },
     "a0.001_s5": {
-     "wins": 19,
-     "losses": 0,
+     "lower": 19,
+     "higher": 0,
      "eligible": true
     },
     "a0.001_s10": {
-     "wins": 21,
-     "losses": 0,
+     "lower": 21,
+     "higher": 0,
      "eligible": true
     }
    },
@@ -23980,28 +23984,28 @@
   "alpha_1e-3_against_each_level": {
    "a0.0001_s5": {
     "tie": 83,
-    "better": 4
+    "lower": 4
    },
    "a0.0005_s5": {
     "tie": 87
    },
    "a0.005_s5": {
     "tie": 71,
-    "better": 16
+    "lower": 16
    },
    "a0.01_s5": {
     "tie": 67,
-    "better": 20
+    "lower": 20
    },
    "a0.05_s5": {
     "tie": 4,
-    "better": 83
+    "lower": 83
    }
   },
   "10_starts_against_each": {
    "a0.001_s1": {
     "tie": 66,
-    "better": 21
+    "lower": 21
    },
    "a0.001_s5": {
     "tie": 87
@@ -24010,7 +24014,7 @@
   "5_starts_against_each": {
    "a0.001_s1": {
     "tie": 68,
-    "better": 19
+    "lower": 19
    },
    "a0.001_s10": {
     "tie": 87
@@ -24018,13 +24022,13 @@
   }
  },
  "confirmation": {
-  "seeds": "6000-6019, 5 draws, against the reference at alpha 1e-3 and nruns 5 (the patched copy in multi-target cells), 114 rows per candidate; the rule was written before any fit and chose among eligible candidates by the most rows below 0",
+  "seeds": "6000-6019, 5 draws, against the reference at alpha 1e-3 and nruns 5 (and the patched copy in multi-target cells), 114 rows per candidate; the rule was written before any fit and chose among eligible candidates by the most rows below 0",
   "chosen": "a0.001_s10",
   "summary": {
    "a0.001_s10": {
-    "worse_D": 0,
-    "better_D": 18,
-    "tie_D": 96,
+    "above_0_D": 0,
+    "below_0_D": 18,
+    "contains_0_D": 96,
     "fail_D": 0,
     "unjudged_D": 0,
     "out_D": 0,
@@ -24033,9 +24037,9 @@
     "eligible": true
    },
    "ainv_n_s10": {
-    "worse_D": 0,
-    "better_D": 17,
-    "tie_D": 97,
+    "above_0_D": 0,
+    "below_0_D": 17,
+    "contains_0_D": 97,
     "fail_D": 0,
     "unjudged_D": 0,
     "out_D": 0,

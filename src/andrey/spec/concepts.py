@@ -260,9 +260,10 @@ _CONCEPTS = (
                 fixed_in=None,
                 reason="Of the levels its authors swept, 1e-4 to 0.05 (Wang et al. 2017), 1e-3 "
                 "had the fewest errors on simulated data in the settings of Wang et al. (2017) and "
-                "Yang, Katcoff and Uhler (2018): better in 123 of its 435 comparisons with another "
-                "level over 87 groups of datasets and worse in none, and no level was better on 20 "
-                "variables at mean degree 3 outside those groups.",
+                "Yang, Katcoff and Uhler (2018): on one set of datasets, its SHD was lower in 123 "
+                "of its 435 comparisons with another level over 87 groups of datasets and it was "
+                "worse in none, and no level's was lower on 20 variables at mean degree 3 outside "
+                "those groups.",
             ),
             Deviation(
                 method="ut_igsp",
@@ -762,9 +763,9 @@ _CONCEPTS = (
                 reason="Further searches from minimum-degree orders whose ties are drawn from "
                 "seed guard against a poor first order; each one runs the paper's Algorithm 1, "
                 "which restarts its depth-first search within one run from a single starting "
-                "order (Yang, Katcoff and Uhler 2018). On simulated data in its papers' settings, "
-                "10 searches were better than one in 21 of 87 groups of datasets, 5 in 19, and "
-                "neither was worse than the other anywhere.",
+                "order (Yang, Katcoff and Uhler 2018). On one set of simulated datasets in its "
+                "papers' settings, the SHD of 10 searches was lower than one search's in 21 of 87 "
+                "groups, that of 5 in 19, and neither was higher than the other's anywhere.",
             ),
             Deviation(
                 method="ut_igsp",
