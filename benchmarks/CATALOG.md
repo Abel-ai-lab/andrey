@@ -48,6 +48,10 @@ whose Reproduce table lists the driver.
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
+Tetrad's FCI-JCI, BOSS-FCI, and GRaSP-FCI adapters, through both Tetrad drivers and with background
+knowledge, and pcalg's FCI-JCI adapter have no driver yet; [Tetrad on continuous
+data](comparisons/tetrad-continuous.md#knowledge-fci-jci-boss-fci-and-grasp-fci) describes them.
+
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`,
 `start_causalnex.sh`, and `start_utigsp.sh` build the separate environments some comparisons need

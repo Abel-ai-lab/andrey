@@ -1,16 +1,22 @@
 import edu.cmu.tetrad.data.BoxDataSet;
 import edu.cmu.tetrad.data.ContinuousVariable;
 import edu.cmu.tetrad.data.DataSet;
+import edu.cmu.tetrad.data.DelimiterType;
 import edu.cmu.tetrad.data.DoubleDataBox;
+import edu.cmu.tetrad.data.Knowledge;
+import edu.cmu.tetrad.data.SimpleDataLoader;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.search.Boss;
+import edu.cmu.tetrad.search.BossFci;
 import edu.cmu.tetrad.search.Fas;
 import edu.cmu.tetrad.search.Fci;
 import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.search.Grasp;
+import edu.cmu.tetrad.search.GraspFci;
 import edu.cmu.tetrad.search.Pc;
 import edu.cmu.tetrad.search.PermutationSearch;
+import edu.cmu.tetrad.search.StarFci;
 import edu.cmu.tetrad.search.score.SemBicScore;
 import edu.cmu.tetrad.search.test.IndTestFisherZ;
 
@@ -26,16 +32,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Runs Tetrad's PC, FGES, BOSS, GRaSP, and FCI on a CSV of continuous columns named x0..x{d-1}.
+ * Runs Tetrad's PC, FGES, BOSS, GRaSP, FCI, BOSS-FCI, and GRaSP-FCI on a CSV of continuous columns
+ * named x0..x{d-1}.
  *
  * <p>The file runs from source against tetrad-lib's shaded jar, with no build step. Every search
  * calls Tetrad's own class directly and takes the settings below from its arguments; any other
- * setting stays at Tetrad's default, which is no background knowledge, no time lag, and no
- * max-P collider rule:
+ * setting stays at Tetrad's default, which is no time lag and no max-P collider rule:
  *
  * <pre>
  * java --class-path tetrad-lib-shaded.jar TetradContinuousDriver.java search ALGORITHM DATA.csv
- *     WARMUP OUT [--setting VALUE ...]
+ *     WARMUP OUT [--knowledge FILE] [--setting VALUE ...]
  * java --class-path tetrad-lib-shaded.jar TetradContinuousDriver.java ptest DATA.csv QUERIES
  * java --class-path tetrad-lib-shaded.jar TetradContinuousDriver.java score DATA.csv PENALTY QUERIES
  * </pre>
@@ -57,7 +63,23 @@ import java.util.Set;
  *        numStarts seed
  * fci    alpha depth stable doPossibleDsep completeRuleSetUsed maxDiscriminatingPathLength
  *        r0ColliderRule guaranteePag excludeSelectionBias
+ * bfci   alpha penaltyDiscount structurePrior ruleType precomputeCovariances numStarts useBes
+ *        numThreads depth useMaxP completeRuleSetUsed maxDiscriminatingPathLength guaranteePag
+ *        excludeSelectionBias
+ * grasp-fci  alpha penaltyDiscount structurePrior ruleType precomputeCovariances depth
+ *        singularDepth nonSingularDepth ordered useScore useRaskuttiUhler useDataOrder numStarts
+ *        seed useMaxP completeRuleSetUsed maxDiscriminatingPathLength guaranteePag
+ *        excludeSelectionBias
  * </pre>
+ *
+ * <p>{@code bfci} runs {@code BossFci} and {@code grasp-fci} {@code GraspFci}. Their FCI steps come
+ * from {@code StarFci}, which in 7.6.10 has no possible-d-separation step to switch on, and
+ * {@code GraspFci.setDepth} sets GRaSP's depth and the cap on the FCI steps' separating sets alike.
+ *
+ * <p>{@code --knowledge FILE}, which fci, bfci, and grasp-fci take, is Tetrad's knowledge file
+ * ({@code addtemporal} tiers, {@code forbiddirect} and {@code requiredirect} edges), read by
+ * Tetrad's own reader as causal-cmd reads it, before the clock; without it a search has no
+ * background knowledge, and any other search stops on it.
  *
  * <p>Tetrad 7.6.10 wraps the test of {@code Fci} in a cache that is a plain {@code HashMap}, and
  * runs its stable skeleton search in a parallel stream over that test, which on several threads
@@ -128,19 +150,31 @@ public class TetradContinuousDriver {
         DataSet data = read(Path.of(args[1]));
         int warmup = Integer.parseInt(args[2]);
         Path out = Path.of(args[3]);
+        int from = 4;
+        Knowledge knowledge = null;
+        if (args.length > from + 1 && args[from].equals("--knowledge")) {
+            knowledge = SimpleDataLoader.loadKnowledge(
+                    Path.of(args[from + 1]).toFile(), DelimiterType.WHITESPACE, "//");
+            from += 2;
+        }
         Graph graph = null;
         double seconds = 0;
         for (int i = 0; i <= warmup; i++) {
-            Settings settings = new Settings(args, 4);
+            Settings settings = new Settings(args, from);
+            Knowledge copy = knowledge == null ? null : knowledge.copy();
             long start = System.nanoTime();
-            graph = run(algorithm, data, settings);
+            graph = run(algorithm, data, settings, copy);
             seconds = (System.nanoTime() - start) / 1e9;
             settings.done();
         }
         Files.writeString(out, "Search seconds: " + seconds + "\n\n" + graph + "\n");
     }
 
-    static Graph run(String algorithm, DataSet data, Settings s) throws Exception {
+    static Graph run(String algorithm, DataSet data, Settings s, Knowledge knowledge)
+            throws Exception {
+        if (knowledge != null && !List.of("fci", "bfci", "grasp-fci").contains(algorithm)) {
+            throw new IllegalArgumentException(algorithm + " takes no knowledge here");
+        }
         switch (algorithm) {
             case "pc": {
                 Pc pc = new Pc(new IndTestFisherZ(data, s.real("alpha")));
@@ -202,8 +236,32 @@ public class TetradContinuousDriver {
                 fci.setR0ColliderRule(Fci.ColliderRule.valueOf(upper(s.text("r0ColliderRule"))));
                 fci.setGuaranteePag(s.bool("guaranteePag"));
                 fci.setExcludeSelectionBias(s.bool("excludeSelectionBias"));
+                if (knowledge != null) fci.setKnowledge(knowledge);
                 fci.setVerbose(false);
                 return fci.search(new Fas(test));
+            }
+            case "bfci": {
+                BossFci bfci =
+                        new BossFci(new IndTestFisherZ(data, s.real("alpha")), score(data, s));
+                bfci.setNumStarts(s.integer("numStarts"));
+                bfci.setBossUseBes(s.bool("useBes"));
+                bfci.setNumThreads(s.integer("numThreads"));
+                bfci.setDepth(s.integer("depth"));
+                return starFci(bfci, s, knowledge);
+            }
+            case "grasp-fci": {
+                GraspFci graspFci =
+                        new GraspFci(new IndTestFisherZ(data, s.real("alpha")), score(data, s));
+                graspFci.setDepth(s.integer("depth"));
+                graspFci.setSingularDepth(s.integer("singularDepth"));
+                graspFci.setNonSingularDepth(s.integer("nonSingularDepth"));
+                graspFci.setOrdered(s.bool("ordered"));
+                graspFci.setUseScore(s.bool("useScore"));
+                graspFci.setUseRaskuttiUhler(s.bool("useRaskuttiUhler"));
+                graspFci.setUseDataOrder(s.bool("useDataOrder"));
+                graspFci.setNumStarts(s.integer("numStarts"));
+                graspFci.setSeed(s.integer("seed"));
+                return starFci(graspFci, s, knowledge);
             }
             default:
                 throw new IllegalArgumentException("unknown algorithm " + algorithm);
@@ -212,6 +270,18 @@ public class TetradContinuousDriver {
 
     static String upper(String name) {
         return name.toUpperCase(Locale.ROOT);
+    }
+
+    /** The FCI steps BOSS-FCI and GRaSP-FCI share, set from {@code s}; then the search. */
+    static Graph starFci(StarFci search, Settings s, Knowledge knowledge) throws Exception {
+        search.setUseMaxP(s.bool("useMaxP"));
+        search.setCompleteRuleSetUsed(s.bool("completeRuleSetUsed"));
+        search.setMaxDiscriminatingPathLength(s.integer("maxDiscriminatingPathLength"));
+        search.setGuaranteePag(s.bool("guaranteePag"));
+        search.setExcludeSelectionBias(s.bool("excludeSelectionBias"));
+        if (knowledge != null) search.setKnowledge(knowledge);
+        search.setVerbose(false);
+        return search.search();
     }
 
     /** Tetrad's linear-Gaussian BIC from the score settings the three score searches share. */
