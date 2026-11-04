@@ -121,7 +121,7 @@ def test_environments_with_one_target_set_are_two_settings_with_env_and_one_with
         ("one", {"a": ["x0"]}, "needs an observational environment"),
         ("two", {"a": [], "b": None}, "targets gives no variables for environments"),
         ("two", {"a": []}, "targets gives no variables for environments"),
-        ("one", None, "env needs targets"),
+        ("one", None, "each environment needs its targets"),
         ("small", {"a": [], "b": ["x0"]}, "at least 3 rows in every environment"),
     ],
 )
