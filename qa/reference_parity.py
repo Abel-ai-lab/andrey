@@ -97,8 +97,8 @@ ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 #: The ``role`` of an entry whose comparator is reported and never judged.
 CONTEXT = "context"
-#: A row's floor record: Andrey's and the reference's error minus the empty estimate's, each as
-#: ``{"paired", "mean", "bootstrap_95"}``.
+#: A row's floor record: Andrey's and the reference's error minus the empty estimate's, each a
+#: record with at least its ``bootstrap_95``.
 FLOOR = "floor"
 FLOOR_SIDES: tuple[str, str] = ("andrey_minus_empty", "reference_minus_empty")
 #: Floor fields of an older format, an interval without the reference's: a row with one raises.
