@@ -20,12 +20,12 @@ Tetrad (causal-cmd)                  Andrey
 Every search runs the complete rule set R1-R10 and the discriminating-path rule with no cap on
 conditioning sets or path lengths (``completeRuleSetUsed``, ``doDiscriminatingPathRule``, ``depth
 -1``, ``maxPathLength -1``). FCI and GRaSP-FCI run the possible-d-separation step
-(``possibleMsepDone``); causal-cmd's ``bfci`` has no such step. The two score searches use the BIC
-with no structure prior and the standard penalty rule (``semBicStructurePrior 0``, ``semBicRule
-1``), one start (``numStarts 1``), and the covariance matrix read once (``precomputeCovariances``);
-BOSS-FCI runs without BES, and GRaSP-FCI at GRaSP's depth 3 from the data's column order. A boolean
-setting that is off is left out: causal-cmd turns a boolean on whenever it is named, and each is
-off by default.
+(``possibleMsepDone``); causal-cmd's ``bfci`` has no setting for it. The two score searches use
+the BIC with no structure prior and the standard penalty rule (``semBicStructurePrior 0``,
+``semBicRule 1``), one start (``numStarts 1``), and the covariance matrix read once
+(``precomputeCovariances``); BOSS-FCI runs without BES, and GRaSP-FCI at GRaSP's depth 3 from the
+data's column order. A boolean setting that is off is left out: causal-cmd turns a boolean on
+whenever it is named, and each is off by default.
 
 FCI-JCI is FCI with the context variables in Tetrad's first knowledge tier, so no system variable
 causes a context variable: JCI assumption 1 only. Tetrad's FCI in causal-cmd 1.12.0 has no setting

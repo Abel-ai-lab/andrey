@@ -73,7 +73,7 @@ import java.util.Set;
  * </pre>
  *
  * <p>{@code bfci} runs {@code BossFci} and {@code grasp-fci} {@code GraspFci}. Their FCI steps come
- * from {@code StarFci}, which in 7.6.10 has no possible-d-separation step to switch on, and
+ * from {@code StarFci}, which in 7.6.10 has no setting for possible-d-separation, and
  * {@code GraspFci.setDepth} sets GRaSP's depth and the cap on the FCI steps' separating sets alike.
  *
  * <p>{@code --knowledge FILE}, which fci, bfci, and grasp-fci take, is Tetrad's knowledge file
