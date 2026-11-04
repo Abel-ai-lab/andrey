@@ -219,8 +219,10 @@ def environments(n: int) -> np.ndarray:
 
 
 def facade(method: str):
-    """The method's facade, with the settings ``CONTEXT`` gives it."""
-    return functools.partial(getattr(andrey, method), **CONTEXT.get(method, {}))
+    """The method's facade, with the settings ``CONTEXT`` and ``REQUIRED`` give it."""
+    return functools.partial(
+        getattr(andrey, method), **CONTEXT.get(method, {}), **REQUIRED.get(method, {})
+    )
 
 
 def needed(method: str, inp) -> bool:
@@ -249,6 +251,8 @@ def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: The arguments a method needs beyond its inputs: ICP's target, by position.
+REQUIRED = {"icp": {"target": 2}}
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
@@ -318,6 +322,7 @@ UNIT_CASES = {
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "camuv": "nonmonotone_4v",
+    "icp": "gauss_5v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.

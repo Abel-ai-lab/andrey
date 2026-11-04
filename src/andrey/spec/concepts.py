@@ -143,10 +143,10 @@ _LINGAM = (
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
 _STARTS = ("boss", "grasp", "hc", "tabu", "igsp", "ut_igsp")
-#: The methods with no edge to name in knowledge.
-_NO_KNOWLEDGE = ("gin", "anm", "pnl")
+#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
+_NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
-    *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc"),
+    *("pc", "fci", "gfci", "cdnod", "icp", "iamb", "inter_iamb", "mmpc"),
     *_PURE_SCORE,
     "gnies",
     "calm",
@@ -189,6 +189,7 @@ _CONCEPTS = (
             "cam",
             "resit",
             "camuv",
+            "icp",
             "igsp",
             "ut_igsp",
         ),
@@ -303,6 +304,10 @@ _CONCEPTS = (
             *_exempt("Its moral-graph screen is part of its own model.", "calm"),
             *_exempt("No conditional-independence test.", "granger", "dynotears"),
             *_exempt("Its pruning tests the smooth terms of its own additive model.", "cam"),
+            *_exempt(
+                "It tests the invariance of regressions across environments, invariance_test.",
+                "icp",
+            ),
         ),
     ),
     Concept(
@@ -324,6 +329,17 @@ _CONCEPTS = (
         suitable=("igsp", "ut_igsp"),
         others_exempt="Takes no invariance test: its data come from one environment, or its "
         "environments enter its own tests or score.",
+        deviations=(
+            Deviation(
+                method="icp",
+                name="invariance_test",
+                default="approximate",
+                choices=("approximate", "exact"),
+                fixed_in=None,
+                reason="Its tests are the paper's two, which compare every environment with the "
+                "others' rows, two or more of them; the two-group tests compare two environments.",
+            ),
+        ),
     ),
     Concept(
         key="score_func",
@@ -502,6 +518,9 @@ _CONCEPTS = (
                 "pnl",
             ),
             *_exempt(
+                "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
+            ),
+            *_exempt(
                 "The minimal I-MAP conditions each pair on every earlier variable; no "
                 "conditioning-set cap.",
                 "igsp",
@@ -577,7 +596,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=(*SCORE_SEARCHES, "cam", "gnies"),
+        suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
         exempt=(
             *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
@@ -711,6 +730,7 @@ _CONCEPTS = (
                 "dynotears",
                 *_RESIDUAL,
                 "camuv",
+                "icp",
             ),
         ),
     ),
@@ -883,6 +903,11 @@ _CONCEPTS = (
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt("Two variables: knowledge of the edge would be the answer.", "anm", "pnl"),
+            *_exempt(
+                "Its tests read each set of the target's predictors as the data give it; no "
+                "knowledge of edges enters an invariance test.",
+                "icp",
+            ),
         ),
     ),
     Concept(
@@ -891,8 +916,12 @@ _CONCEPTS = (
         "result, or its score: a required edge whose least-squares weight is 0, or whose "
         "variables look independent, is in the graph all the same.",
         suitable=tuple(m for m in ALL_METHODS if m not in _NO_KNOWLEDGE),
-        exempt=_exempt(
-            "Has no edge for knowledge to name (the knowledge concept).", *_NO_KNOWLEDGE
+        exempt=(
+            *_exempt(
+                "Has no edge for knowledge to name (the knowledge concept).",
+                *(m for m in _NO_KNOWLEDGE if m != "icp"),
+            ),
+            *_exempt("Takes no knowledge (the knowledge concept).", "icp"),
         ),
     ),
     Concept(
@@ -962,6 +991,7 @@ _CONCEPTS = (
                 "rcd",
                 "bottom_up_parce_lingam",
                 "camuv",
+                "icp",
                 "igsp",
                 "ut_igsp",
             ),

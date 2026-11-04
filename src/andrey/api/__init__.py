@@ -13,7 +13,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 """
 
 from .blanket import iamb, inter_iamb, mmpc
-from .constraint import cdnod, fci, gfci, pc
+from .constraint import cdnod, fci, gfci, icp, pc
 from .continuous import dagma, notears
 from .fcm import cam, camuv, resit
 from .hybrid import mmhc, rsmax2
@@ -38,6 +38,7 @@ __all__ = [
     "fci",
     "gfci",
     "cdnod",
+    "icp",
     # local structure: one variable's Markov blanket or parents and children
     "iamb",
     "inter_iamb",
