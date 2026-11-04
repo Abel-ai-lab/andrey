@@ -14,8 +14,14 @@ lingam and causal-learn.
 parents, the familywise error rate (FWER), and the fits that accepted the same sets; then ICP's FWER
 over every fit, in its claim and out of it.
 
-The numbers come from the published lanes ``gnies.json``, ``ut-igsp.json``, ``camuv.json``, and
-``icp.json``, from ``benchmarks/published/0.14.0`` or from the paths given, in that order. The
+``dynotears.html``: DYNOTEARS against CausalNex at the paper's settings for 500 and 50 steps.
+
+``igsp.html``: IGSP against the authors' library and its Definition 4.2 copy at Andrey's defaults,
+then the verdicts of every judged row.
+
+The numbers come from the published lanes ``gnies.json``, ``ut-igsp.json``, ``camuv.json``,
+``icp.json``, ``dynotears.json``, and ``igsp.json``, from ``benchmarks/published/0.14.0`` or from
+the paths given, in that order. The
 script runs with ``uv run python docs/docs/benchmarks/0.14.0/tables.py [paths]``.
 """
 
@@ -511,11 +517,62 @@ def igsp(lane: dict) -> str:
     return defaults_table + counts_table
 
 
+# DYNOTEARS's regimes in claim, in the comparison page's words.
+DYNOTEARS_GROUPS = {
+    "dynotears_paper": "Gaussian noise",
+    "dynotears_paper_exponential": "Exponential noise of mean 0",
+    "dynotears_paper_ba_sbm": "Barabasi-Albert and block-model graphs",
+    "dynotears_paper_uncentered": "Exponential noise of mean 1",
+}
+
+
+def dynotears(lane: dict) -> str:
+    """DYNOTEARS against CausalNex, in its claim, at the paper's settings for each length."""
+    head = (
+        '<tr><td rowspan="2"></td>'
+        '<th scope="colgroup" colspan="4" class="ct-start">SHD over lags 0 and 1</th></tr><tr>'
+        '<th scope="col" class="ct-ours ct-start">Andrey</th><th scope="col">CausalNex</th>'
+        '<th scope="col">Empty window</th><th scope="col" class="ct-ours">Difference</th></tr>'
+    )
+    body = ""
+    for m in lane["methods"]:
+        if m["claim"] != "in":
+            continue
+        section = f"{DYNOTEARS_GROUPS[m['regime']]}, {m['length']} steps"
+        body += (
+            f'<tr class="ct-section"><th scope="rowgroup" colspan="5">{escape(section)}</th></tr>'
+        )
+        for r in m["rows"]:
+            low, high = r["bootstrap_95"]
+            rerun = (r.get("replication") or {}).get("verdict")
+            body += (
+                f'<tr><th scope="row">{r["d"]} variables</th>'
+                f'<td class="ct-ours ct-start">{r["andrey_shd_mean"]:.2f}</td>'
+                f"<td>{r['comparator_shd_mean']:.2f}</td><td>{r['empty_shd_mean']:.1f}</td>"
+                f'<td class="ct-ours">{interval(r["mean_D"], low, high)}'
+                f"{verdict(r['verdict'], rerun)}</td></tr>"
+            )
+    return (
+        '<figure class="ct"><p class="ct-title">DYNOTEARS against CausalNex 0.12.2</p>'
+        '<div class="ct-scroll"><table class="ct-table ct-nested">'
+        f"<thead>{head}</thead><tbody>{body}</tbody></table></div><figcaption>Means over 20 "
+        "series, seeds 0 to 19, at the paper's settings for 500 and for 50 steps. The empty "
+        "window is the SHD of returning no edge. The difference is Andrey's mean SHD minus "
+        "CausalNex's, with its 95% interval, marked better or worse only where a rerun on seeds "
+        "20 to 39 agreed; unmarked is a tie."
+        "</figcaption></figure>\n"
+    )
+
+
 if __name__ == "__main__":
-    names = ("gnies", "ut-igsp", "camuv", "icp", "igsp")
-    paths = [Path(p) for p in sys.argv[1:]] or [PUBLISHED / f"{name}.json" for name in names]
-    (HERE / "gnies.html").write_text(gnies(json.loads(paths[0].read_text())))
-    (HERE / "ut-igsp.html").write_text(ut_igsp(json.loads(paths[1].read_text())))
-    (HERE / "camuv.html").write_text(camuv(json.loads(paths[2].read_text())))
-    (HERE / "icp.html").write_text(icp(json.loads(paths[3].read_text())))
-    (HERE / "igsp.html").write_text(igsp(json.loads(paths[4].read_text())))
+    tables = {
+        "gnies": gnies,
+        "ut-igsp": ut_igsp,
+        "camuv": camuv,
+        "icp": icp,
+        "dynotears": dynotears,
+        "igsp": igsp,
+    }
+    paths = [Path(p) for p in sys.argv[1:]] or [PUBLISHED / f"{name}.json" for name in tables]
+    for (name, make), path in zip(tables.items(), paths, strict=True):
+        (HERE / f"{name}.html").write_text(make(json.loads(path.read_text())))
