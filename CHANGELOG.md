@@ -60,6 +60,12 @@ names its pull request.
   the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
   on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
   graph's 135 in a median 176 s. ([#665])
+- Every method that takes `env`, `cdnod`, `gies`, `gnies`, and `ut_igsp`, also takes its data as
+  each environment's rows apart, as `gnies` and the UT-IGSP authors' library do: a list of
+  DataFrames or 2-D arrays, each labeled by its position, or a dict from each label to its table,
+  with `env` left out and `targets` a mapping from those labels. The rows are stacked in that
+  order, so the fit, and `andrey.bootstrap`'s resamples, are those of the stacked table with `env`;
+  `cdnod`'s `env` is optional for this, and one table without it raises. ([#676])
 
 ### Changed
 
@@ -1701,3 +1707,4 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#676]: https://github.com/Abel-ai-lab/andrey/pull/676
