@@ -10,7 +10,9 @@ where they are unknown. A method then builds what it reads from that form, such 
 ``env`` is ``None``, one label per row, or the name of a column of a DataFrame ``data``.
 ``targets`` is ``None``; a mapping from each label of ``env`` to its variables; one cell per row,
 given as the name of a column of a DataFrame ``data`` or as a 1-D array; or an
-``(n_samples, n_variables)`` 0/1 matrix. A named column is not a variable: it leaves the data, and
+``(n_samples, n_variables)`` 0/1 matrix. A mapping's key is a label of ``env``; when the labels are
+numbers, a text key that spells one also names it, so a mapping written to JSON, whose keys are
+text, names the same environments. A named column is not a variable: it leaves the data, and
 every position counts the columns that remain. Variables are named by column label (a string) or
 by 0-based position (an integer).
 
@@ -19,6 +21,7 @@ The module is a building block for the methods; ``andrey`` does not export it.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -59,6 +62,10 @@ def normalize_env_targets(
         - A mapping ``{label: variables}`` from labels of ``env``: a list of variables, or one
           label or position, with ``[]`` for an observational environment, or ``None`` for unknown
           targets. A label of ``env`` the mapping leaves out has unknown targets. It needs ``env``.
+          A key names the label it equals. When the labels are numbers, a text key names the label
+          it spells, read by ``int`` or else by ``float``, finite: ``"1"``, ``"1.0"``, and
+          ``"01"`` name the label ``1``. When the labels are booleans, ``"true"`` and ``"false"``
+          name them. Text labels are never read as numbers.
         - A string, the name of a column of the DataFrame ``data``, or a 1-D array: one cell per
           row, a label or a position, a list of them, or an empty cell (``None``, ``NaN``, ``""``,
           or an empty list) for an observational row.
@@ -98,7 +105,8 @@ def normalize_env_targets(
         If ``env`` does not hold one label per row, misses a label (``None`` or ``NaN``), holds a
         label that is neither a string nor a number, or mixes strings and numbers; if ``env`` or
         ``targets`` names a column ``data`` lacks, or both name one column; if a mapping comes
-        without ``env`` or has a key that is not a label of ``env``; if a cell or a mapping names a
+        without ``env``, has a key that names no label of ``env``, or has two keys that name one
+        label, such as ``1`` and ``"1"``; if a cell or a mapping names a
         variable ``data`` lacks, or a value that is neither a label nor a position; if a matrix is
         not ``(n_samples, n_variables)`` or holds a value other than 0 or 1; if two rows of one
         environment give different targets; or, with ``require_known_targets``, if some
@@ -181,6 +189,10 @@ def env_codes(env: npt.ArrayLike, n: int, method: str | None = None) -> tuple[np
     """
     import pandas as pd
 
+    if isinstance(env, np.ndarray) and env.shape in ((n,), (n, 1)) and env.dtype.kind in "iuU":
+        # Integer or text labels: none can be missing or of the other kind, so no row is checked.
+        codes, labels = pd.factorize(np.asarray(env).reshape(-1), sort=True)
+        return codes.astype(np.intp), labels.tolist()
     prefix = f"{method}: " if method else ""
     values = np.asarray(env, dtype=object)
     if values.shape not in ((n,), (n, 1)):
@@ -242,17 +254,55 @@ def _mapped(
 ) -> dict[int, frozenset[int] | None]:
     """Return each code's targets from a mapping keyed by the labels ``envs``."""
     index = {label: k for k, label in enumerate(envs)}
-    unknown = [key for key in targets if key not in index]
+    codes = {key: _code(key, index, envs) for key in targets}
+    unknown = [key for key, code in codes.items() if code is None]
     if unknown:
+        number = next((key for key in unknown if not isinstance(key, str)), None)
+        text = number is not None and isinstance(envs[0], str)
+        hint = f"; the labels are text, so write the key {str(number)!r}" if text else ""
         raise ValueError(
             f"{prefix}targets names environments {unknown} that env does not have; its labels "
-            f"are {envs}"
+            f"are {envs}{hint}"
+        )
+    resolved = {key: code for key, code in codes.items() if code is not None}
+    keys: dict[int, list] = {}
+    for key, code in resolved.items():
+        keys.setdefault(code, []).append(key)
+    shared = [f"{group} name {envs[code]!r}" for code, group in keys.items() if len(group) > 1]
+    if shared:
+        raise ValueError(
+            f"{prefix}targets gives one environment more than one key: {'; '.join(shared)}; keep "
+            "one key per label of env"
         )
     by_code: dict[int, frozenset[int] | None] = dict.fromkeys(range(len(envs)))
     for key, value in targets.items():
         if value is not None:
-            by_code[index[key]] = frozenset(_positions(value, labels, d, prefix))
+            by_code[resolved[key]] = frozenset(_positions(value, labels, d, prefix))
     return by_code
+
+
+def _code(key: object, index: dict, envs: list) -> int | None:
+    """Return the code of the label ``key`` names, or ``None`` when it names none.
+
+    A key names the label it equals. When the labels are numbers, a text key names the label it
+    spells: by ``int``, so a label beyond ``2**53`` matches exactly, or else by ``float``, finite.
+    When they are booleans, the text ``"true"`` or ``"false"``.
+    """
+    if key in index:
+        return index[key]
+    if not isinstance(key, str) or not envs or isinstance(envs[0], str):
+        return None
+    if all(isinstance(label, (bool, np.bool_)) for label in envs):
+        return index.get({"true": True, "false": False}.get(key))
+    try:
+        return index.get(int(key))
+    except ValueError:
+        pass
+    try:
+        number = float(key)
+    except ValueError:
+        return None
+    return index.get(number) if math.isfinite(number) else None
 
 
 def _row_cells(

@@ -12,6 +12,7 @@ from itertools import permutations
 
 import numpy as np
 import pytest
+from scipy.stats import rankdata
 
 import andrey
 from andrey.constraint.pc import pc
@@ -25,9 +26,23 @@ from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
 from andrey.search.gies import gies
+from andrey.search.hc import _centered_ranks
 from andrey.search.xges import xges
 from andrey.temporal.pcmci import design_test
 from tests.recovery.helpers.xges_rescan import xges_rescan
+
+
+def test_centered_ranks_are_the_doubled_average_ranks() -> None:
+    """Each column's ranks, tied or not, are its doubled average ranks minus ``m + 1``; NaN is 0."""
+    x = np.random.default_rng(0).standard_normal((50, 4))
+    x[:, 1] = np.round(x[:, 1])
+    x[::7, 2] = np.nan
+    x[:, 3] = 1.0
+    for col, ranks in zip(x.T, _centered_ranks(x).T, strict=True):
+        present = ~np.isnan(col)
+        expected = np.zeros(len(col))
+        expected[present] = 2 * rankdata(col[present]) - (present.sum() + 1)
+        np.testing.assert_array_equal(ranks, expected)
 
 
 def _swap_symmetric(seed: int, n: int = 200) -> np.ndarray:

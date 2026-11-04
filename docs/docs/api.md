@@ -17,8 +17,9 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with five
 exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
 `targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
-targets, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a
-list of datasets and returns one result per dataset. The first argument of every method is `data`;
+targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
+`longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a list of
+datasets and returns one result per dataset. The first argument of every method is `data`;
 `andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
 dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
@@ -31,15 +32,19 @@ matrix shaped like `data`. Every environment needs its targets, so `env` without
 environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
 `ValueError`. `gnies` takes the same forms of `targets`, but for the targets it knows: an
 environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
-`targets=None`, the default, learns them all. `andrey run` takes a mapping as `targets=`, a JSON
-object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the number
-label `0` of `--env`.
+`targets=None`, the default, learns them all. When the labels of `env` are numbers, a text key
+names the label it spells, so `"0"` names the label `0` and a mapping read back from JSON passes as
+it is. `icp` takes `targets` in the same forms but reads only whether an environment intervened on
+its `target`: it leaves such an environment's rows out, and keeps an environment whose targets are
+unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
+`targets` in `--config`, and reads an `--env` of whole numbers as integers.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
-out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["index_edges"]
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
+out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
 
 Every method checks its arguments first: a value of the wrong type raises `TypeError`, and a value
@@ -76,9 +81,9 @@ distinct value of a column one category. Every method defaults to `indep_test=No
 `category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
 `"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`; the
 result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score the fit
-used. Values never decide: a column of a few whole numbers reads as numbers, with a `DataTypeWarning` that it may
-hold category codes, from every method that reads columns as numbers, as [Data
-types](guides/getting-started.md#data-types) describes. The mixed-data settings,
+used. Values never decide: a column of a few whole numbers reads as numbers, with a
+`DataTypeWarning` that it may hold category codes, from every method that reads columns as
+numbers, as [Data types](guides/getting-started.md#data-types) describes. The mixed-data settings,
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
 the categorical columns that `categorical` lists, or a DataFrame's `category`, `bool`, and text
 columns, and never a column by its values; a categorical column of numbers needs whole numbers. A
@@ -114,8 +119,9 @@ why.
 % concept: indep_test
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
 `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
-`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
-for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
+`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
+`"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks
 from the declared column types, `"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and
 `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
@@ -201,13 +207,13 @@ tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, and `cam` take `max_parents`, a cap on every node's parents: no DAG the returned graph
-represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
+`gfci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents: no DAG the returned
+graph represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
 `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
-the cap, `boss` and
-`grasp` grow no parent set past it, `exact_search` scores only the parent sets within it, and
-`cam`'s order search adds no edge past it. `gfci` caps its GES phase; the PAG its tests then orient
-can put more arrowheads at a node.
+the cap, `boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets
+within it, and `cam`'s order search adds no edge past it. `icp` tests only the sets of at most that
+many variables, and its guarantee then needs the target to have no more parents. `gfci` caps its
+GES phase; the PAG its tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
@@ -396,6 +402,7 @@ its first call in a process.
    dynotears
    ut_igsp
    gnies
+   icp
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -426,15 +433,30 @@ level for the conditional-independence and invariance tests, `alpha=None`, is on
 of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was
 better than the paper's reference implementation at the paper's `1e-5` in 18 of 112 comparisons
 and worse in none. It returns the interventional essential graph with each setting's
-targets in `metadata["targets"]` and the level used in `metadata["alpha"]`.
+targets in `metadata["targets"]`, keyed by the labels of `env`, and the level used in
+`metadata["alpha"]`. The targets pass back as `targets`, where they are known: `ut_igsp` may
+learn more, and `gies` refits the graph under exactly these. A setting where it found no target
+maps to `[]`, which `targets` reads as observational.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
 without being told which. It returns the interventional essential graph of the targets it learns,
-which directs every edge at a target, and lists the targets in `metadata["index_edges"]`. For each
-set of targets it tries, it runs the search of `gies` from the empty graph, with the paper's
-likelihood: one noise variance per environment for a target and one in all for the others. Known
-targets in `targets` stay in the set; with every environment's targets known, one search runs.
+which directs every edge at a target, and lists the targets in `metadata["changing_variables"]`: the
+variables whose noise variance differs between some two environments. With `env`,
+`metadata["environments"]` holds its labels, and
+`targets=dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])` refits the
+graph under the learned targets. For each set of targets it tries, it runs the search of `gies` from
+the empty graph, with the paper's likelihood: one noise variance per environment for a target and
+one in all for the others. Known targets in `targets` stay in the set; with every environment's
+targets known, one search runs.
+
+ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
+of one `target` from continuous data pooled from several environments, such as observation and
+experiments, that leave the target's mechanism alone. It tests every set of the other variables,
+or every set of at most `max_parents`, for a regression on the target that is the same in every
+environment, by the paper's approximate or exact test, and returns the variables in every accepted
+set: in a linear model, they are causal parents with probability at least `1 - alpha`. Its
+`metadata` holds each variable's p-value and confidence interval and the accepted sets.
 
 A method becomes supported once it has:
 
@@ -788,8 +810,8 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    sample_mixed
    interventions.hard
    interventions.soft
-   interventions.Hard
-   interventions.Soft
+   interventions.HardIntervention
+   interventions.SoftIntervention
 ```
 
 #### Scale

@@ -680,7 +680,8 @@ def json_safe(value: object) -> JSONValue:
     """Coerce a result value (score, p-values, metadata) into a JSON-safe metadata value.
 
     numpy scalars/arrays collapse to Python ``int`` / ``float`` / ``bool`` / ``list``; mappings and
-    sequences recurse. Raises ``TypeError`` on a value with no JSON-safe form, mirroring the
+    sequences recurse. A mapping keeps its text and number keys, a NumPy scalar key as its Python
+    scalar. Raises ``TypeError`` on a value or a key with no JSON-safe form, mirroring the
     fail-fast ``StructureOutput`` metadata check.
     """
     if value is None or isinstance(value, str):
@@ -694,10 +695,23 @@ def json_safe(value: object) -> JSONValue:
     if isinstance(value, np.ndarray):
         return [json_safe(v) for v in value.tolist()]
     if isinstance(value, Mapping):
-        return {str(k): json_safe(v) for k, v in value.items()}
+        return {_json_key(k): json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [json_safe(v) for v in value]
     raise TypeError(f"cannot coerce {type(value).__name__} to a JSON-safe metadata value")
+
+
+def _json_key(key: object) -> str | int | float | bool:
+    """Return a mapping key as a JSON-safe metadata key: text, or a Python number."""
+    if isinstance(key, str):
+        return str(key)
+    if isinstance(key, (bool, np.bool_)):
+        return bool(key)
+    if isinstance(key, (int, np.integer)):
+        return int(key)
+    if isinstance(key, (float, np.floating)):
+        return float(key)
+    raise TypeError(f"cannot use a {type(key).__name__} key in metadata; use text or a number")
 
 
 def structure_output(

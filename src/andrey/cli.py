@@ -979,14 +979,30 @@ def _load_method_inputs(
             import numpy as np
 
             j = headers[0].index(vals[0])
-            positional.append(positional[0][:, j])
+            column = positional[0][:, j]
+            positional.append(_env_labels(column) if inp.name == "env" else column)
             positional[0] = np.delete(positional[0], j, axis=1)
             headers[0] = headers[0][:j] + headers[0][j + 1 :]
             continue
         arr, labels = load_input(inp, vals)
-        positional.append(arr)
+        positional.append(_env_labels(arr) if inp.name == "env" else arr)
         headers.append(labels)
     return positional, headers[0]
+
+
+def _env_labels(values: np.ndarray | list[np.ndarray]) -> np.ndarray:
+    """Return an ``--env`` of whole numbers as integers, so its labels read ``0``, not ``0.0``.
+
+    Every input loads as float64. Fractional labels stay floats, and so do ``NaN`` and infinity,
+    which the method's own check names. A label of ``2**53`` or more stays a float too: float64
+    cannot tell such integers apart, so their integer form would not be exact.
+    """
+    import numpy as np
+
+    values = np.asarray(values)
+    if not np.isfinite(values).all() or (np.abs(values) >= 2.0**53).any():
+        return values
+    return values.astype(np.int64) if (values == np.round(values)).all() else values
 
 
 def column_positions(
@@ -1021,11 +1037,11 @@ def _prepare_call(
 ) -> tuple[list, dict, dict, tuple[str, ...] | None]:
     """Shape the loaded inputs and coerced params into what the facade takes.
 
-    ``categorical=`` names become positions, ``knowledge=`` becomes an ``andrey.Knowledge``, and
-    each key of ``targets=`` that reads as a number becomes that number, a label of ``--env``. A
-    method that reads column types or knowledge, or whose graph adds latent nodes (GIN), gets the
-    data as a DataFrame, so its warnings and its graph name the header's columns. Returns the
-    inputs, params, resolved params, and the labels still to apply to the result.
+    ``categorical=`` names become positions, and ``knowledge=`` becomes an ``andrey.Knowledge``;
+    the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
+    it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
+    (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
+    Returns the inputs, params, resolved params, and the labels still to apply to the result.
     """
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
@@ -1036,9 +1052,6 @@ def _prepare_call(
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
         except (TypeError, ValueError) as exc:
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
-    if isinstance(fkwargs.get("targets"), dict):  # JSON keys are text; --env labels are numbers
-        targets = {_number_or_text(k): v for k, v in fkwargs["targets"].items()}
-        fkwargs = {**fkwargs, "targets": targets}
     named = any(p.name in ("categorical", "knowledge") for p in spec.params)
     if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
@@ -1056,14 +1069,6 @@ def _prepare_call(
         if spec.output.has_latents:
             labels = None
     return positional, fkwargs, resolved, labels
-
-
-def _number_or_text(key: object) -> object:
-    """Return a JSON key that reads as a number as that number, an ``int`` when it is whole."""
-    if not isinstance(key, str) or not _is_number(key):
-        return key
-    number = float(key)
-    return int(number) if number.is_integer() else number
 
 
 @contextlib.contextmanager
@@ -1967,8 +1972,8 @@ _EnvOption = Annotated[
     typer.Option(
         "--env",
         metavar="COLUMN|PATH",
-        help="cdnod, gies, gnies, ut_igsp only: the environment of each row, a column of --data's "
-        "header (then not a variable) or a file with one value per row of --data.",
+        help="cdnod, icp, gies, gnies, ut_igsp only: the environment of each row, a column of "
+        "--data's header (then not a variable) or a file with one value per row of --data.",
     ),
 ]
 _DomainIndexOption = Annotated[

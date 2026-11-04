@@ -261,7 +261,8 @@ def capped_graph(method: str, monkeypatch):
     return graph
 
 
-@pytest.mark.parametrize("method", methods_with("max_parents"))
+# ICP's cap bounds the sets it tests, which tests/unit/test_icp.py checks on data from environments.
+@pytest.mark.parametrize("method", [m for m in methods_with("max_parents") if m != "icp"])
 def test_max_parents_caps_every_dag_the_result_represents(method, monkeypatch):
     data = linear_data(1, d=7, n=500)
     graph = capped_graph(method, monkeypatch)
@@ -312,7 +313,9 @@ def test_a_cap_no_graph_can_reach_returns_the_uncapped_graph(method):
         assert fit(data, max_parents=6).structure == fit(data).structure
 
 
-@pytest.mark.parametrize("method", methods_with("max_parents"))
+@pytest.mark.parametrize(
+    "method", sorted(set(methods_with("max_parents")) & set(methods_with("knowledge")))
+)
 def test_required_edges_above_the_parent_cap_are_refused(method):
     data = pd.DataFrame(linear_data(2, d=4, n=200), columns=["x0", "x1", "x2", "x3"])
     knowledge = andrey.Knowledge(required=[("x0", "x3"), ("x1", "x3")])
