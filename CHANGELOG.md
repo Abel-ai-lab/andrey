@@ -83,12 +83,11 @@ names its pull request.
   core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
   makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
 - `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
-  implementation, on structural vector autoregressions of the paper's design: one lag, 5 to 100
-  variables, 500 and 50 time steps, Gaussian and centered exponential noise. It makes no more
-  errors in 23 of the 24 judged settings and more in one, exponential noise with 100 variables and
-  50 time steps, on two sets of 20 series (3.20 and 4.15 more of about 150), of which CausalNex
-  fitted on centered columns, as `dynotears` centers them, makes 2.45 and 3.60. The median fit at
-  100 variables and 500 time steps takes 299 to 385 s on one core. `dynotears` stays experimental.
+  implementation, on the structural vector autoregressions of the paper's design, with 5 to 100
+  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it makes no
+  more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
+  centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
+  steps, where the centering costs about one time step of data. `dynotears` stays experimental.
   ([#PR])
 
 ### Fixed

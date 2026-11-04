@@ -81,21 +81,21 @@ coverage and never scored.
 
 The numbers come from [`published/0.14.0/dynotears.json`](../published/0.14.0/dynotears.json):
 Andrey pre-release builds of the 0.13.0 branch (31 October 2026) and, for the exponential noise of
-mean 1, of the 0.14.0 branch (3 November 2026), against CausalNex 0.12.2, on one Intel Core
-i7-7820X, one core and one BLAS thread per fit, four fits at a time. Refitted on the 0.14.0 build,
-every recorded Andrey fit up to 50 variables, and 20 at 100 variables, returns the recorded graph.
-Every setting in claim has 20 series (seeds 0 to 19), every one out of claim 10 (seeds 0 to 9), each
-fitted once with a 3,600 s cap; no fit reached it. SHD and F1 are means over the series, CPU s the
-median CPU time of a fit. D is Andrey's SHD minus CausalNex's, split into its same-step and lagged
-parts.
+mean 1 and the Barabasi-Albert graphs at 50 steps, of the 0.14.0 branch (3 November 2026), against
+CausalNex 0.12.2, on one Intel Core i7-7820X, one core and one BLAS thread per fit, four fits at a
+time. Refitted on the 0.14.0 build, every recorded Andrey fit up to 50 variables, and 20 at 100
+variables, returns the recorded graph. Every setting in claim has 20 series (seeds 0 to 19), every
+one out of claim 10 (seeds 0 to 9), each fitted once with a 3,600 s cap; no fit reached it. SHD and
+F1 are means over the series, CPU s the median CPU time of a fit. D is Andrey's SHD minus
+CausalNex's, split into its same-step and lagged parts.
 
 At 500 steps, the paper's settings for 500 steps and Andrey's defaults, every setting with noise of
 mean 0 is a tie, with an F1 of at least 0.968 for both packages. Where the graphs differ, CausalNex
 on centered columns, fitted afterward on those series alone, returns Andrey's graph on 29 of 34; the
-last column gives both counts. Of the other 5, a rounding-level change, the data multiplied by
-`1 + 1e-12` noise or the columns fitted in their given order, changes Andrey's graph on 4. On the
-fifth, the one edge that differs is a true lagged link whose weight lies within 0.001 of the
-threshold in both fits, kept by Andrey and dropped by CausalNex.
+last column gives both counts. Of the other 5, a rounding-level change, the data multiplied by `1 +
+1e-12` noise or the columns fitted in their given order, changes Andrey's graph on 4. On the fifth,
+the one edge that differs is a true lagged link whose weight lies within 0.001 of the threshold in
+both fits, kept by Andrey and dropped by CausalNex.
 
 | noise | d | same graph | SHD Andrey | SHD CausalNex | SHD empty | D same-step | D lagged | D [95% CI] | F1 Andrey | F1 CausalNex | CPU s Andrey | CPU s CausalNex | graphs differ, centering explains |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -128,8 +128,8 @@ once replicated. Against CausalNex as given, three settings have an interval abo
 | exponential | 50 | 0 | 59.45 | 58.80 | 144.6 | -0.05 | +0.70 | +0.65 [-0.75, +2.00] | 0.762 | 0.764 | 62 | 76 | 59.35 | +0.10 [-0.15, +0.35] | 14 |
 | exponential | 100 | 0 | 148.95 | 145.75 | 283.2 | +1.00 | +2.20 | +3.20 [+0.10, +6.00] | 0.685 | 0.693 | 785 | 839 | 148.20 | +0.75 [+0.20, +1.40] | 8 |
 
-The Barabasi-Albert and block-model graphs, at 500 steps and up to 50 variables, are a tie at every
-size.
+The Barabasi-Albert and block-model graphs, up to 50 variables, are a tie at every size at 500 steps
+and, once replicated, at 50 steps.
 
 | noise | d | same graph | SHD Andrey | SHD CausalNex | SHD empty | D same-step | D lagged | D [95% CI] | F1 Andrey | F1 CausalNex | CPU s Andrey | CPU s CausalNex | graphs differ, centering explains |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -138,8 +138,15 @@ size.
 | Gaussian | 20 | 20 | 0.55 | 0.55 | 67.8 | +0.00 | +0.00 | +0.00 [+0.00, +0.00] | 0.995 | 0.995 | 2.96 | 4.52 | 0 / 0 |
 | Gaussian | 50 | 15 | 1.85 | 1.95 | 176.6 | +0.00 | -0.10 | -0.10 [-0.30, +0.10] | 0.995 | 0.994 | 35 | 61 | 5 / 5 |
 
-With the exponential noise of mean 1 that the paper's simulations draw, every series has a mean
-that CausalNex's loss cannot fit, and Andrey makes fewer errors at every size at 500 steps and at 5
+| noise | d | same graph | SHD Andrey | SHD CausalNex | SHD empty | D same-step | D lagged | D [95% CI] | F1 Andrey | F1 CausalNex | CPU s Andrey | CPU s CausalNex | SHD CausalNex centered | D vs centered [95% CI] | same graph vs centered |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Gaussian | 5 | 14 | 6.10 | 5.85 | 14.7 | +0.10 | +0.15 | +0.25 [+0.00, +0.55] | 0.748 | 0.762 | 0.27 | 0.28 | 6.10 | +0.00 [+0.00, +0.00] | 20 |
+| Gaussian | 10 | 7 | 10.35 | 10.00 | 31.4 | +0.20 | +0.15 | +0.35 [+0.05, +0.65] | 0.812 | 0.820 | 0.66 | 0.87 | 10.30 | +0.05 [+0.00, +0.15] | 19 |
+| Gaussian | 20 | 2 | 24.20 | 23.40 | 67.8 | +0.85 | -0.05 | +0.80 [-0.65, +3.00] | 0.794 | 0.801 | 3.74 | 4.90 | 24.30 | -0.10 [-0.25, +0.00] | 18 |
+| Gaussian | 50 | 0 | 88.45 | 87.80 | 176.6 | +0.60 | +0.05 | +0.65 [-0.65, +2.00] | 0.711 | 0.714 | 66 | 88 | 88.60 | -0.15 [-0.35, +0.05] | 13 |
+
+With the exponential noise of mean 1 that the paper's simulations draw, every series has a mean that
+CausalNex's loss cannot fit, and Andrey makes fewer errors at every size at 500 steps and at 5
 variables at 50 steps, and ties elsewhere. CausalNex on centered columns returns Andrey's graph on
 most series up to 50 variables.
 
@@ -161,37 +168,39 @@ most series up to 50 variables.
 
 ## Replication
 
-In claim, 33 of the 34 settings count as no worse, 6 of them better, and one as worse:
+In claim, 37 of the 38 settings count as no worse, 6 of them better, and 1 as worse:
 
 | setting | seeds 0 to 19 | seeds 20 to 39 | counts as |
 |---|---|---|---|
 | Gaussian, 20 variables, 50 steps | worse | tie | tie |
 | Gaussian, 100 variables, 50 steps | worse | tie | tie |
 | exponential of mean 0, 100 variables, 50 steps | worse | worse | worse |
+| Gaussian, Barabasi-Albert, 10 variables, 50 steps | worse | tie | tie |
 
-| noise | d | seeds | same graph | SHD Andrey | SHD CausalNex | D [95% CI] | SHD CausalNex centered | D vs centered [95% CI] | same graph vs centered |
+| noise, graphs | d | seeds | same graph | SHD Andrey | SHD CausalNex | D [95% CI] | SHD CausalNex centered | D vs centered [95% CI] | same graph vs centered |
 |---|---|---|---|---|---|---|---|---|---|
-| Gaussian | 20 | 0-19 | 4 | 21.65 | 20.80 | +0.85 [+0.05, +1.65] | 21.65 | +0.00 [-0.15, +0.15] | 18 |
-| Gaussian | 20 | 20-39 | 3 | 21.55 | 20.90 | +0.65 [-0.45, +1.70] | 21.55 | +0.00 [+0.00, +0.00] | 20 |
-| Gaussian | 100 | 0-19 | 0 | 143.95 | 137.05 | +6.90 [+4.30, +9.55] | 143.30 | +0.65 [-0.40, +2.45] | 6 |
-| Gaussian | 100 | 20-39 | 0 | 144.70 | 142.90 | +1.80 [-1.05, +4.70] | 144.65 | +0.05 [-0.30, +0.35] | 10 |
-| exponential | 100 | 0-19 | 0 | 148.95 | 145.75 | +3.20 [+0.10, +6.00] | 148.20 | +0.75 [+0.20, +1.40] | 8 |
-| exponential | 100 | 20-39 | 0 | 154.45 | 150.30 | +4.15 [+1.30, +7.10] | 153.90 | +0.55 [-0.20, +1.45] | 4 |
+| Gaussian, Erdos-Renyi | 20 | 0-19 | 4 | 21.65 | 20.80 | +0.85 [+0.05, +1.65] | 21.65 | +0.00 [-0.15, +0.15] | 18 |
+| Gaussian, Erdos-Renyi | 20 | 20-39 | 3 | 21.55 | 20.90 | +0.65 [-0.45, +1.70] | 21.55 | +0.00 [+0.00, +0.00] | 20 |
+| Gaussian, Erdos-Renyi | 100 | 0-19 | 0 | 143.95 | 137.05 | +6.90 [+4.30, +9.55] | 143.30 | +0.65 [-0.40, +2.45] | 6 |
+| Gaussian, Erdos-Renyi | 100 | 20-39 | 0 | 144.70 | 142.90 | +1.80 [-1.05, +4.70] | 144.65 | +0.05 [-0.30, +0.35] | 10 |
+| exponential, Erdos-Renyi | 100 | 0-19 | 0 | 148.95 | 145.75 | +3.20 [+0.10, +6.00] | 148.20 | +0.75 [+0.20, +1.40] | 8 |
+| exponential, Erdos-Renyi | 100 | 20-39 | 0 | 154.45 | 150.30 | +4.15 [+1.30, +7.10] | 153.90 | +0.55 [-0.20, +1.45] | 4 |
+| Gaussian, Barabasi-Albert | 10 | 0-19 | 7 | 10.35 | 10.00 | +0.35 [+0.05, +0.65] | 10.30 | +0.05 [+0.00, +0.15] | 19 |
+| Gaussian, Barabasi-Albert | 10 | 20-39 | 9 | 9.90 | 9.70 | +0.20 [-0.30, +0.65] | 9.90 | +0.00 [+0.00, +0.00] | 20 |
 
 The worse setting comes from centering, Andrey's fit of every column on its own mean. Refitted with
 its columns not centered, the second moments in place of the covariance, Andrey makes fewer errors:
 the centered fit minus that one is +3.50 per series [+1.48, +5.50] over the 40 series. Not centered,
 Andrey ties CausalNex as given: +0.65 [+0.05, +1.35] on seeds 0 to 19 and -0.30 [-1.00, +0.35] on
-seeds 20 to 39. The noise has mean 0,
-so the means centering estimates are 0, and estimating them costs about one fitted step: the fit not
-centered on 49 of the 50 steps makes 3.25 more errors [+0.50, +6.30] than on all 50, and the centered
-fit on 50 steps -0.70 [-5.25, +3.50] against it (seeds 0 to 19). Centering biases no weight in one
-direction: the true edges' weights move both ways in about equal numbers, by 0.002 to 0.017 in
-mean magnitude. Such moves matter at 100 variables and 50 steps because the fit has more weights
-than steps, and the true lagged links' estimated weights average 0.19 against a threshold of 0.2,
-so a small change moves many of them across it.
+seeds 20 to 39. The noise has mean 0, so the means centering estimates are 0, and estimating them
+costs about one fitted step: the fit not centered on 49 of the 50 steps makes 3.25 more errors
+[+0.50, +6.30] than on all 50, and the centered fit on 50 steps -0.70 [-5.25, +3.50] against it
+(seeds 0 to 19). Centering biases no weight in one direction: the true edges' weights move both ways
+in about equal numbers, by 0.002 to 0.017 in mean magnitude. Such moves matter at 100 variables and
+50 steps because the fit has more weights than steps, and the true lagged links' estimated weights
+average 0.19 against a threshold of 0.2, so a small change moves many of them across it.
 
-What remains, Andrey against CausalNex on centered columns, is 0.75 [+0.20, +1.40] and 0.55
+What remains, Andrey against CausalNex on centered columns, is +0.75 [+0.20, +1.40] and +0.55
 [-0.20, +1.45]: above 0 on seeds 0 to 19 alone. On four of the series where those two graphs differ,
 Andrey stops on `h_tol` with no edge removed by the cycle repair, refitting it with CausalNex's cap
 on the penalty weight, `1e20`, returns CausalNex's graph on none of them, and the data multiplied by
@@ -201,8 +210,8 @@ exactly.
 ## Centering
 
 Centering is the same as fitting an intercept, which the paper's loss does not; it trades accuracy
-on short series with noise of mean 0 for series with a nonzero mean. On CausalNex's solver, the
-same fit on centered columns minus the fit on the columns as given (seeds 0 to 19; negative means
+on short series with noise of mean 0 for series with a nonzero mean. On CausalNex's solver, the same
+fit on centered columns minus the fit on the columns as given (seeds 0 to 19; negative means
 centering makes fewer errors):
 
 | noise | T | d = 5 | 10 | 20 | 50 | 100 |
@@ -212,17 +221,16 @@ centering makes fewer errors):
 | exponential, mean 1 | 500 | -4.70 [-6.40, -3.25] | -11.10 [-16.00, -6.50] | -7.15 [-10.25, -4.30] | -4.70 [-8.10, -2.20] | -2.30 [-4.60, -0.40] |
 | exponential, mean 1 | 50 | -1.15 [-2.10, -0.20] | -2.00 [-4.00, +0.00] | +0.00 [-1.75, +1.90] | -2.70 [-5.80, +0.20] | +0.90 [-3.15, +4.85] |
 
-At 500 steps with noise of mean 0 Andrey ties CausalNex as given at every size, so centering
-changes no verdict there. With noise of mean 0 at 50 steps it costs errors, most at 100 variables;
-with noise of mean 1 it removes 2.3 to 11.1 errors per series at 500 steps, and at 50 steps and 100
+At 500 steps with noise of mean 0 Andrey ties CausalNex as given at every size, so centering changes
+no verdict there. With noise of mean 0 at 50 steps it costs errors, most at 100 variables; with
+noise of mean 1 it removes 2.3 to 11.1 errors per series at 500 steps, and at 50 steps and 100
 variables the two effects cancel.
 
 ## Out of claim
 
-Out of claim, at ten series per setting: the defaults at 50 steps, z-scored columns, and a
-nonlinear vector autoregression. Both packages read the data's units, so z-scored columns raise
-both packages' errors alike, and the defaults at 50 steps pass the empty window's errors from 20
-variables on.
+Out of claim, at ten series per setting: the defaults at 50 steps, z-scored columns, and a nonlinear
+vector autoregression. Both packages read the data's units, so z-scored columns raise both packages'
+errors alike, and the defaults at 50 steps pass the empty window's errors from 20 variables on.
 
 | regime | T | d | same graph | SHD Andrey | SHD CausalNex | SHD empty | D [95% CI] | F1 Andrey | F1 CausalNex |
 |---|---|---|---|---|---|---|---|---|---|
