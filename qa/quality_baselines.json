@@ -29,6 +29,7 @@
       "MultiGroupDirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline ordering decision to differ on another host."},
       "RCD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "BottomUpParceLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "CAM-UV": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence test to differ on another host."},
       "GIN": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, three times. One allows a single borderline cluster or order decision to differ on another host."},
       "ANM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
       "PNL": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
@@ -40,6 +41,7 @@
       "VARMA-LiNGAM": {"median_shd": 2, "reason": "Where the likelihood fit stops depends on the CPU's BLAS kernels, so a draw's graph can differ between CPU types; the gate checks the median. Under a relative 1e-12 input perturbation, three times, 4 of 60 draws changed and no median moved. Two covers a moved median with one to spare."},
       "LongitudinalLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline ordering decision to differ on another host."},
       "Granger": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single p-value that lies on the edge of alpha to flip on another host."},
+      "DYNOTEARS": {"median_shd": 1, "reason": "Under a relative 1e-12 input perturbation, ten times, 1 of 20 draws changed once, by one edge, and no median moved. One allows a single weight near a threshold to fall on the other side of it on another host."},
       "KCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "RCoT": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "CMIknn": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
@@ -193,6 +195,10 @@
         "latent_lingam_er_d10": {"median_shd": 13.0, "empty_median_shd": 20.0, "shd": [22, 17, 3, 14, 16, 1, 12, 9, 9, 15]},
         "latent_lingam_er_d15": {"median_shd": 25.0, "empty_median_shd": 29.0, "shd": [21, 41, 13, 24, 32, 31, 17, 26, 44, 22]}
       },
+      "CAM-UV": {
+        "camuv_paper_d14_n1000": {"median_shd": 6.0, "empty_median_shd": 9.0, "shd": [6, 4, 1, 2, 4, 10, 6, 6, 7, 6]},
+        "latent_anm_er_tenth_d22_n1000": {"median_shd": 11.0, "empty_median_shd": 14.5, "shd": [12, 14, 13, 18, 8, 10, 10, 6, 8, 12]}
+      },
       "GIN": {
         "latent_measurement_d8": {"median_shd": 0.0, "empty_median_shd": 2.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
         "latent_measurement_d12": {"median_shd": 0.0, "empty_median_shd": 3.0, "shd": [0, 0, 2, 0, 0, 0, 0, 3, 2, 0]}
@@ -226,6 +232,10 @@
       "Granger": {
         "var2_lagged_d5_n1000": {"median_shd": 6.5, "empty_median_shd": 28.5, "shd": [3, 8, 10, 11, 8, 5, 3, 5, 1, 14]},
         "var2_lagged_d5_n2000": {"median_shd": 4.0, "empty_median_shd": 28.5, "shd": [1, 5, 7, 7, 5, 1, 2, 3, 0, 11]}
+      },
+      "DYNOTEARS": {
+        "dynotears_paper_d10_n500": {"median_shd": 0.5, "empty_median_shd": 29.5, "shd": [1, 7, 0, 0, 0, 1, 0, 0, 7, 1]},
+        "dynotears_paper_d20_n500": {"median_shd": 1.0, "empty_median_shd": 59.5, "shd": [0, 3, 6, 0, 0, 1, 1, 4, 1, 0]}
       },
       "KCI": {
         "anm_er_d5": {"median_shd": 1.0, "empty_median_shd": 5.0, "shd": [0, 0, 0, 1, 1, 1, 1, 3, 0, 2]},
