@@ -341,6 +341,8 @@ with a reason and a citation:
   breaks by column order. Its `evidence` holds the row's two error values with the columns in
   reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
   row must pass.
+- `trade-off`: the row is the cost of a default chosen for what it gains on other rows; the reason
+  gives both.
 
 Each entry pins the row's two error values (its two series counts, where the row has them, or each
 side's mean SHD over the paired datasets under the paired bootstrap), so a re-run that changes the

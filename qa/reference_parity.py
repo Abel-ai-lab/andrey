@@ -42,9 +42,10 @@ mode on the same datasets (``andrey_column_shd_by_seed``, ``comparator_shd_by_se
 context: its series counts are printed beside the row and never judged.
 
 ``parity-allowlist.json``, next to the summaries, exempts a failing row only when it names the
-cause: Andrey is correct by the paper the method comes from, the reference has a defect, or the two
+cause: Andrey is correct by the paper the method comes from, the reference has a defect, the two
 packages end at different local optima after an exact score tie that Andrey breaks by column order
-(a tie-break). Each entry gives the reason and a citation, and pins the row's two error values, so
+(a tie-break), or the row is the cost of a default chosen for what it gains on other rows (a
+trade-off). Each entry gives the reason and a citation, and pins the row's two error values, so
 a re-run that changes the row voids the entry. A tie-break entry also gives, as its evidence, the
 row's two error values with the columns in reversed order, where the row must pass. An entry that
 matches no failing row also fails. A released summary never changes, so a method re-measured
@@ -92,7 +93,9 @@ FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95")
 #: The ``metric`` values an entry may name, with the text a row prints for each.
 METRICS: dict[str, str] = {"shd": "SHD", "target_error": "target error"}
 #: The causes an allowlist entry may name.
-CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect", "tie-break"})
+CAUSES: frozenset[str] = frozenset(
+    {"correct-by-paper", "reference-defect", "tie-break", "trade-off"}
+)
 
 
 @dataclass(frozen=True)
