@@ -363,18 +363,17 @@ error. An entry with `"role": "context"` pairs Andrey with a comparator it is re
 judged by: its rows are printed with their numbers and not gated. Two more fields gate an in-claim
 row whatever its interval. Its `coverage` holds `andrey_short`, the datasets the reference finished
 and Andrey did not under the time cap: above 0, the row fails at any number of paired datasets,
-since a timeout never becomes a smaller mean, and so does a replication's. Its `floor_95` or
-`target_floor_95`, or the `andrey_minus_empty.bootstrap_95` of a `floor` record, is the bootstrap
-95% interval of the mean of Andrey's error minus a floor's, the empty graph's error or the target
-errors of the targets the method was given alone, or of no targets: the row fails when the
-interval's upper end is not below 0. A `floor` record's `applies` holds its lane's rule for the
-row, such as applying the floor only where the reference's own interval against the empty graph
-(`reference_minus_empty`) lies wholly below 0. A floor with `"applies": false` is printed with the
-row's numbers, as `FLOOR NOT APPLIED` where the row is gated, and is not judged; one with
-`"applies": true` or no `applies` is judged, as `floor_95` and `target_floor_95` always are. A
-`pass` beside a floor that applies must agree with the interval, and one beside a floor that does
-not must be empty. A floor failure on a row with a replication that records a floor counts only if
-the replication's floor fails too.
+since a timeout never becomes a smaller mean, and so does a replication's. Its `floor` record
+holds two bootstrap 95% intervals: `andrey_minus_empty`, of the mean of Andrey's error minus the
+empty estimate's (the empty graph's error, or the target error of the targets the method was given
+alone, or of no targets), and `reference_minus_empty`, of the reference's error minus the same. The
+floor applies only where the reference's interval lies wholly below 0, where the reference itself
+beats the empty estimate; there the row fails when Andrey's interval's upper end is not below 0.
+Elsewhere the floor is printed with the row's numbers, as `FLOOR NOT APPLIED` where the row is
+gated, and is not judged. The record's `applies` and `pass`, where given, must agree with the two
+intervals, `pass` empty where the floor does not apply; a floor without both intervals, or a
+`floor_95` or `target_floor_95` interval alone, is an error. A floor failure on a row with a
+replication that records a floor counts only if the replication's floor fails too.
 
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 

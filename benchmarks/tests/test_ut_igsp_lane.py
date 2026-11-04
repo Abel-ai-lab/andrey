@@ -157,7 +157,8 @@ def test_the_summary_entries_are_read_and_judged_by_the_parity_check():
     [row] = shd["rows"]
     assert (row["d"], row["n"], row["paired"]) == (20, 1000, 20)
     assert row["multi_draw"]["above_zero"] and row["coverage"]["andrey_short"] == 0
-    assert row["floor_95"][1] < 0
+    assert row["floor"]["andrey_minus_empty"]["bootstrap_95"][1] < 0
+    assert row["floor"]["reference_minus_empty"]["bootstrap_95"][1] < 0
     assert (
         entries[("G1_shift_l3_J1_targets", "graphical-model-learning.unknown_target_igsp")][
             "metric"

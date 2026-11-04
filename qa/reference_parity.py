@@ -32,16 +32,15 @@ summary's ``parity_rule`` sets how its rows are judged:
 - ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
   not, under the time cap. An in-claim row with ``andrey_short`` above 0 fails, whatever its number
   of paired datasets: a timeout never becomes a smaller mean. So does its replication's.
-- ``floor_95`` or ``target_floor_95``, or a ``floor`` record with the interval in
-  ``andrey_minus_empty.bootstrap_95``: the bootstrap 95% interval of the mean of Andrey's error
-  minus a floor's, the empty graph's error, or for ``target_error`` the error of the targets the
-  method was given or of no targets. An in-claim row fails when the interval's upper end is not
-  below 0. A ``floor`` record's ``applies`` holds its lane's rule for the row, such as applying the
-  floor only where the reference's own interval against the empty graph lies wholly below 0. A
-  floor with ``applies`` false is printed with the row's numbers and not judged; one with
-  ``applies`` true or absent is judged, and a ``pass`` beside it must agree with the interval. A
-  row with a ``replication`` fails a floor that applies only when the replication's floor, where it
-  records one, fails too.
+- ``floor``: a record of two bootstrap 95% intervals, ``andrey_minus_empty`` of the mean of
+  Andrey's error minus the empty estimate's (the empty graph's, or for ``target_error`` the given
+  targets' alone, or no targets), and ``reference_minus_empty`` of the reference's error minus the
+  same. The floor applies only where the reference's interval lies wholly below 0, where the
+  reference itself beats the empty estimate; there an in-claim row fails when Andrey's interval's
+  upper end is not below 0. A floor that does not apply is printed with the row's numbers and not
+  judged. The record's ``applies`` and ``pass``, where given, must agree with the two intervals
+  (``pass`` empty where the floor does not apply). A row with a ``replication`` fails a floor that
+  applies only when the replication's floor, where it records one, fails too.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -98,10 +97,12 @@ ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 #: The ``role`` of an entry whose comparator is reported and never judged.
 CONTEXT = "context"
-#: A row's floor fields: Andrey's error minus the empty graph's, minus the given targets', or a
-#: ``floor`` record that holds the interval and whether its lane's rule applies it to the row.
-#: ``floor_95`` and ``target_floor_95`` always apply.
-FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95", "floor")
+#: A row's floor record: Andrey's and the reference's error minus the empty estimate's, each as
+#: ``{"paired", "mean", "bootstrap_95"}``.
+FLOOR = "floor"
+FLOOR_SIDES: tuple[str, str] = ("andrey_minus_empty", "reference_minus_empty")
+#: Floor fields of an older format, an interval without the reference's: a row with one raises.
+UNRULED_FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95")
 #: The ``metric`` values an entry may name, with the text a row prints for each.
 METRICS: dict[str, str] = {
     "shd": "SHD",
@@ -130,9 +131,9 @@ class Row:
     measured outside its method's claim and ``context`` a row against a comparator the method is
     not judged by: both are reported with their numbers and never gated. ``metric`` names the
     error the row compares, ``andrey_short`` the datasets the reference finished and Andrey did
-    not, ``floor`` the interval of Andrey's error minus its floor's, and ``floor_applies`` whether
-    the lane's rule applies that floor to the row; a floor that does not apply is printed, never
-    judged.
+    not, ``floor`` the interval of Andrey's error minus the empty estimate's, and ``floor_applies``
+    whether the reference's own interval against the empty estimate lies wholly below 0, the only
+    rows where the floor is judged; a floor that does not apply is printed, never judged.
     """
 
     summary: str
@@ -208,7 +209,10 @@ class Row:
             below = "below 0" if hi < 0 else "not below 0"
             text += f"; Andrey minus its floor: bootstrap 95% [{lo:+.2f}, {hi:+.2f}], {below}"
             if not self.floor_applies:
-                text += ", a floor its lane's rule does not apply to this row: not judged"
+                text += (
+                    ", a floor that does not apply where the reference does not beat the empty "
+                    "estimate: not judged"
+                )
         if self.out_of_claim:
             text += "; out of the method's claim: reported, not gated"
         elif self.context:
@@ -231,8 +235,8 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
     has no result (a fit over the time cap) is skipped, and so is a series of the column-order arm.
     A paired row with no known error field, a ``paired bootstrap`` row with ``MIN_PAIRS`` paired
     datasets and no consistent interval, an unknown ``parity_rule``, an unknown ``claim``,
-    ``metric`` or ``role``, a ``coverage`` without ``andrey_short``, a floor that is not an
-    interval, and a column-order arm on a reference not marked order-dependent or with one of its
+    ``metric`` or ``role``, a ``coverage`` without ``andrey_short``, a floor without both of its
+    intervals, and a column-order arm on a reference not marked order-dependent or with one of its
     two series missing or of unequal lengths raise, so a new summary format cannot pass unchecked.
     """
     rule = data.get("parity_rule")
@@ -285,7 +289,7 @@ def paired_rows(summary: str, data: dict) -> list[Row]:
                 short = marks["andrey_short"] + _andrey_short(replication, f"{where}, replication")
                 floor = marks["floor"]
                 fails = marks["floor_applies"] and floor is not None and floor[1] >= 0
-                if fails and any(k in replication for k in FLOORS):
+                if fails and FLOOR in replication:
                     marks["floor"], marks["floor_applies"] = _floor(
                         replication, f"{where}, replication"
                     )
@@ -321,35 +325,44 @@ def _andrey_short(row: dict, where: str) -> int:
 
 
 def _floor(row: dict, where: str) -> tuple[tuple[float, float] | None, bool]:
-    """Return the row's floor interval, ``None`` without one, and whether its lane applies it.
+    """Return the row's floor interval, ``None`` without one, and whether the floor applies.
 
-    A ``floor`` record's ``applies`` must be absent (applies) or a bool. Its ``pass`` must be empty
-    where the floor does not apply and otherwise agree with the interval, so a lane's verdict and
-    this check cannot disagree unseen.
+    The floor applies where the reference's interval against the empty estimate lies wholly below
+    0. A record's ``applies`` and ``pass``, where given, must agree with its intervals, so a lane's
+    verdict and this check cannot disagree unseen. A floor of the older format, or a record without
+    both intervals, raises.
     """
-    present = [name for name in FLOORS if name in row]
-    if not present:
+    old = [name for name in UNRULED_FLOORS if name in row]
+    if old:
+        raise ValueError(f"{where}: {old[0]} has no reference interval; give a {FLOOR} record")
+    if FLOOR not in row:
         return None, True
-    if len(present) > 1:
-        raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
-    value = row[present[0]]
-    applies = None
-    if present[0] == "floor":
-        if not isinstance(value, dict):
-            raise ValueError(f"{where}: floor must be a record with andrey_minus_empty")
-        applies = value.get("applies")
-        if applies not in (None, True, False):
-            raise ValueError(f"{where}: floor applies must be true or false, not {applies!r}")
-        value = value.get("andrey_minus_empty", {}).get("bootstrap_95")
-    if not isinstance(value, list | tuple) or len(value) != 2:
-        raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
-    lo, hi = float(value[0]), float(value[1])
-    verdict = row["floor"].get("pass") if present[0] == "floor" else None
-    if applies is False and verdict is not None:
+    record = row[FLOOR]
+    if not isinstance(record, dict):
+        raise ValueError(f"{where}: {FLOOR} must be a record with {' and '.join(FLOOR_SIDES)}")
+    (lo, hi), (_, ref_hi) = (
+        _interval(record.get(side), f"{where}: {side}") for side in FLOOR_SIDES
+    )
+    applies = ref_hi < 0
+    if record.get("applies", applies) != applies:
+        raise ValueError(
+            f"{where}: floor applies {record['applies']!r} disagrees with the reference's interval "
+            f"against the empty estimate, upper end {ref_hi}"
+        )
+    verdict = record.get("pass")
+    if not applies and verdict is not None:
         raise ValueError(f"{where}: floor pass {verdict!r} on a floor that does not apply")
     if verdict not in (None, hi < 0):
         raise ValueError(f"{where}: floor pass disagrees with its interval [{lo}, {hi}]")
-    return (lo, hi), applies is not False
+    return (lo, hi), applies
+
+
+def _interval(side: object, where: str) -> tuple[float, float]:
+    """Return a floor side's ``bootstrap_95`` as two numbers; raise without one."""
+    value = side.get("bootstrap_95") if isinstance(side, dict) else None
+    if not isinstance(value, list | tuple) or len(value) != 2:
+        raise ValueError(f"{where} needs a bootstrap_95 interval of two numbers")
+    return float(value[0]), float(value[1])
 
 
 def _out_of_claim(row: dict, method: dict, where: str) -> bool:
@@ -566,7 +579,8 @@ def main() -> int:
     print(
         f"\n{len(rows)} rows, {len(exemptions)} exempt, {len(reported)} reported (out of "
         f"claim, context, or under {MIN_PAIRS} paired datasets; not gated), {len(unfloored)} "
-        f"judged without a floor their lane's rule does not apply, {len(failures)} failed."
+        f"judged without a floor where the reference does not beat the empty estimate, "
+        f"{len(failures)} failed."
     )
     return 1 if failures else 0
 
