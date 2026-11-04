@@ -39,8 +39,7 @@ names its pull request.
 - `ut_igsp`, experimental, learns from an observational environment and settings whose
   intervention targets are known in part or not at all (UT-IGSP, Squires, Wang, and Uhler 2020):
   it returns the interventional essential graph and, in `metadata["targets"]`, each setting's
-  targets, known and learned, keyed by the labels of `env`, so they pass back as `targets`. It
-  takes `env` and `targets` as `gies` does, with `None` in the
+  targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
   mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
   `"indicator"`, the test of whether a variable's distribution given others changes. Against
   graphical-model-learning 0.1a8, the authors' library, on simulated data in the paper's setting
@@ -53,8 +52,8 @@ names its pull request.
   on one core. ([#668])
 - `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
   environments that differ in the noise variances of variables it is not told: it returns those
-  variables, the targets, in `metadata["changing_variables"]`, with the interventional essential
-  graph they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
+  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
   authors' package, on simulated data in the paper's settings and the settings it claims, 10
   variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
   the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
@@ -62,14 +61,7 @@ names its pull request.
   the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
   on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
   graph's 135 in a median 176 s. ([#665])
-- `StructureOutput` metadata takes `int`, `float`, and `bool` keys in a nested mapping, such as
-
-  the labels of `env` that key `ut_igsp`'s `metadata["targets"]`; `save` writes them as their JSON
-  text, `"1"` for `1`. A nested mapping that mixes text and number keys, or a NumPy, tuple, or
-  `None` key, raises `TypeError`. ([#680])
-
 - `andrey.icp`, experimental, finds the causal parents of one `target` from continuous data pooled
-
   from several environments that leave the target's mechanism alone (Peters, Buhlmann and
   Meinshausen 2016), by the paper's approximate or exact test, with each variable's p-value and
   confidence interval. Against InvariantCausalPrediction 0.8, the authors' package, on simulated
@@ -83,15 +75,12 @@ names its pull request.
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
-- `targets=` reads a text key that spells a number as the label of `env` it spells, in Python as on
-
-  the command line, so a mapping read back from JSON passes as it is: `"1"` names the label `1`.
-  Two keys that name one label, such as `1` and `"1"`, raise `ValueError` instead of the last one
-  winning. ([#680])
-- `andrey run` and `andrey bootstrap` read an `--env` of whole numbers as integers, so the labels in
-  their output and messages read `1`, not `1.0`; the graphs do not change. ([#680])
-
 - `gies` and `ut_igsp` prepare their rows faster, with bit-identical outputs. On one core, with 20
+
+  variables, an observational environment, and 5 settings that each intervene on one variable,
+  `gies` fits about 3 times as fast at 10,000 rows per environment and 1.8 to 2.2 times as fast at
+  100,000, and `ut_igsp` about 1.2 times as fast. The ranks that break ties, which most methods
+  compute, take about a quarter less time. ([#679])
 
 - `camuv`'s Limitations report its benchmark against three references: lingam 1.13.0 and
 
@@ -102,10 +91,13 @@ names its pull request.
   and fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
   core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
   makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
-  variables, an observational environment, and 5 settings that each intervene on one variable,
-  `gies` fits about 3 times as fast at 10,000 rows per environment and 1.8 to 2.2 times as fast at
-  100,000, and `ut_igsp` about 1.2 times as fast. The ranks that break ties, which most methods
-  compute, take about a quarter less time. ([#679])
+- `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
+  implementation, on the structural vector autoregressions of the paper's design, with 5 to 100
+  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it makes no
+  more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
+  centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
+  steps, where the centering costs about one time step of data. `dynotears` stays experimental.
+  ([#682])
 
 ### Fixed
 
@@ -1744,4 +1736,4 @@ First alpha release.
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
 [#679]: https://github.com/Abel-ai-lab/andrey/pull/679
-[#680]: https://github.com/Abel-ai-lab/andrey/pull/680
+[#682]: https://github.com/Abel-ai-lab/andrey/pull/682
