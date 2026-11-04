@@ -41,6 +41,8 @@ Packages:
   separate environment; see below and [UT-IGSP](comparisons/ut-igsp.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
+- [CausalNex](https://github.com/mckinsey/causalnex) - uses a separate environment; see below and
+  [DYNOTEARS](comparisons/dynotears.md)
 
 ## Setup
 
@@ -99,6 +101,14 @@ run in a third environment, on Python 3.12 (see [CAM-UV](comparisons/camuv.md)):
 ```shell
 benchmarks/start_lingam.sh
 export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
+```
+
+CausalNex 0.12.2, the reference for DYNOTEARS, pins Python below 3.11, NumPy below 1.24, and pandas
+below 2, so its fits run in an environment on Python 3.10:
+
+```shell
+benchmarks/start_causalnex.sh
+export ANDREY_BENCH_CAUSALNEX_PYTHON=$PWD/benchmarks/.venv-causalnex/bin/python
 ```
 
 The authors' UT-IGSP library, graphical-model-learning 0.1a8 with its pinned dependencies, has an
