@@ -74,7 +74,7 @@ names its pull request.
   of the 9 judged settings against any of the three, two of them after a rerun on fresh datasets,
   and fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
   core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
-  makes fewer errors than the empty graph. `camuv` stays experimental. ([#PR])
+  makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
 
 ### Fixed
 
@@ -1709,3 +1709,4 @@ First alpha release.
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
 [#665]: https://github.com/Abel-ai-lab/andrey/pull/665
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#675]: https://github.com/Abel-ai-lab/andrey/pull/675
