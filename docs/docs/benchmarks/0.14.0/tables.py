@@ -17,7 +17,7 @@ over every fit, in its claim and out of it.
 ``dynotears.html``: DYNOTEARS against CausalNex at the paper's settings for 500 and 50 steps.
 
 ``igsp.html``: IGSP against the authors' library and its Definition 4.2 copy at Andrey's defaults,
-then the verdicts of every judged row.
+from the lane's confirmation on fresh seeds, then the verdicts of the gate's rows at three levels.
 
 The numbers come from the published lanes ``gnies.json``, ``ut-igsp.json``, ``camuv.json``,
 ``icp.json``, ``dynotears.json``, and ``igsp.json``, from ``benchmarks/published/0.14.0`` or from
@@ -28,6 +28,7 @@ script runs with ``uv run python docs/docs/benchmarks/0.14.0/tables.py [paths]``
 from __future__ import annotations
 
 import json
+import re
 import sys
 from html import escape
 from pathlib import Path
@@ -364,157 +365,129 @@ def icp(lane: dict) -> str:
     return paired + rates
 
 
-# IGSP's in-claim blocks, by the paper each follows, and Yang et al.'s kinds of intervention.
-IGSP_BLOCKS = {
-    "W": "Wang et al., Figure 2",
-    "S": "Wang et al., Figure 3",
-    "Y": "Yang et al.",
+# IGSP's comparators in the lane, and their columns on the card.
+IGSP_COPIES = ("reference", "patched")
+IGSP_COMPARATORS = {
+    "graphical-model-learning": "Library",
+    "graphical-model-learning+def42": "Library, Definition 4.2",
 }
-IGSP_KINDS = ("perfect", "inhibiting", "imperfect")
+IGSP_SIDES = {"below 0": "better", "above 0": "worse", "contains 0": "tie"}
 
 
-def level(alpha: float) -> str:
-    """A test level as the comparison page writes it: ``1e-3``."""
-    mantissa, exponent = f"{alpha:e}".split("e")
-    return f"{float(mantissa):g}e{int(exponent)}"
-
-
-def igsp_rerun(row: dict) -> str | None:
-    """The verdict of a judged row's rerun on fresh seeds, from its interval."""
-    rerun = row.get("replication")
-    if not rerun:
-        return None
-    low, high = rerun["bootstrap_95"]
-    return "worse" if low > 0 else "better" if high < 0 else "tie"
-
-
-def igsp_label(regime: str, row: dict) -> tuple[str, tuple, str]:
-    """A row's section, its sort key (block first), and its label, from its regime, ``d``, and
-    ``n``."""
-    parts = dict(p.split("=", 1) if "=" in p else (p, p) for p in regime.split("|")[1:])
-    arm = regime.split("|")[0]
-    n = f"<small>{row['n']:,} rows per setting</small>"
+def igsp_cell(name: str, n: int) -> tuple[tuple, str, str]:
+    """A cell's sort key, section, and row label, from its name in the lane."""
+    parts = dict(re.findall(r"_([a-zA-Z]+)([\d.]+)", name))
+    arm, kind = name.split("_")[:2]
+    rows = f"<small>{n:,} rows per setting</small>"
     if arm == "W":
         k = int(parts["K"])
-        section = f"{IGSP_BLOCKS['W']}: {k} setting{'s' if k > 1 else ''}"
-        return section, (0, k, row["d"], row["n"]), f"{row['d']} variables{n}"
+        section = f"Wang et al., Figure 2: {k} setting{'s' if k > 1 else ''}"
+        return (0, k, int(parts["p"]), n), section, f"{parts['p']} variables{rows}"
     if arm == "S":
-        family = parts["family"].replace(",", " and ")
-        section = f"{IGSP_BLOCKS['S']}: targets {family}"
-        return section, (1, family, float(parts["c"]), row["n"]), f"weights from {parts['c']}{n}"
-    kind = next(k for k in IGSP_KINDS if k in parts)
-    section = f"{IGSP_BLOCKS['Y']}: {kind} interventions"
+        order = ("4", "5", "45")
+        family = {"4": "4", "5": "5", "45": "4 and 5"}[parts["family"]]
+        section = f"Wang et al., Figure 3: targets {family}"
+        return (
+            (1, order.index(parts["family"]), float(parts["c"]), n),
+            section,
+            f"weights from {parts['c']}{rows}",
+        )
+    section = f"Yang et al.: {kind} interventions"
+    kind_order = ("perfect", "inhibiting", "imperfect").index(kind)
     if arm == "Y6":
         k = int(parts["k"])
         label = f"{k} single-target setting{'s' if k > 1 else ''}"
-        return section, (2, kind, 0, k, row["n"]), f"{label}{n}"
+        return (2, kind_order, 0, k, n), section, f"{label}{rows}"
     if arm == "Y5":
-        return section, (2, kind, 1, 0, row["n"]), f"Every variable, 20 variables{n}"
-    return section, (2, kind, 2, 0, row["n"]), f"Every pair of variables{n}"
+        return (2, kind_order, 1, 0, n), section, f"Every variable, 20 variables{rows}"
+    return (2, kind_order, 2, 0, n), section, f"Every pair of variables{rows}"
 
 
 def igsp(lane: dict) -> str:
-    """IGSP against the authors' library and its Definition 4.2 copy, at Andrey's defaults, then
-    the verdicts of every judged row."""
-    defaults = lane["andrey_defaults"]
-    alpha = level(defaults["alpha"])
-    tail = f"|alpha={alpha}|n_starts={defaults['n_starts']}"
-    judged = [m for m in lane["methods"] if "role" not in m]
-    copies = {"graphical-model-learning": 0, "graphical-model-learning+def42": 1}
-    cells: dict[tuple, dict] = {}
-    for m in judged:
-        if not m["regime"].endswith(tail):
-            continue
-        regime = m["regime"][: -len(tail)]
-        for r in m["rows"]:
-            section, key, label = igsp_label(regime, r)
-            entry = cells.setdefault(
-                key, {"section": section, "label": label, "sides": [None, None]}
+    """IGSP at its defaults against the authors' library and its Definition 4.2 copy, then the
+    verdicts of every row of the gate at three levels."""
+    cells = lane["in_claim"]["cells"]
+    rows = []
+    for name, sides in lane["confirmation"]["default_rows"].items():
+        n = cells[name]["n"]
+        key, section, label = igsp_cell(name, n)
+        tds = ""
+        for i, copy in enumerate(IGSP_COPIES):
+            r = sides.get(copy)
+            if r is None:
+                tds += '<td class="ct-start">-</td><td class="ct-ours">-</td>'
+                continue
+            # At 1,000 observational rows the default level is 1e-3, so the gate's row at 1e-3
+            # and 10 starts on seeds 0 to 19 is the same comparison on other seeds.
+            earlier = cells[name]["rows"].get(f"J2 alpha 1e-3 {copy}") if n == 1000 else None
+            again = IGSP_SIDES[earlier["side_seeds_0_19"]] if earlier else None
+            low, high = r["ci95"]
+            lead = f'<td class="ct-ours ct-start">{r["andrey_shd_mean"]:.2f}</td>' if i == 0 else ""
+            tds += (
+                f'{lead}<td class="ct-start">{r["reference_shd_mean"]:.2f}</td>'
+                f'<td class="ct-ours">{interval(r["D"], low, high)}'
+                f"{verdict(IGSP_SIDES[r['side']], again)}</td>"
             )
-            entry["sides"][copies[m["comparator"]]] = r
-
-    def side(r: dict | None, first: bool) -> str:
-        if r is None:
-            return '<td class="ct-start">-</td><td class="ct-ours">-</td>' if not first else ""
-        d = r["multi_draw"]
-        low, high = d["bootstrap_95"]
-        if r.get("claim") == "out":
-            note = "<small>not judged: the library does not beat the empty graph</small>"
-        else:
-            note = verdict(r["verdict"], igsp_rerun(r))
-        lead = f'<td class="ct-ours ct-start">{d["andrey_shd_mean"]:.2f}</td>' if first else ""
-        return (
-            f'{lead}<td class="{"" if first else "ct-start"}">{d["comparator_shd_mean"]:.2f}</td>'
-            f'<td class="ct-ours">{interval(d["mean_D"], low, high)}{note}</td>'
-        )
-
+        rows.append((key, section, f'<tr><th scope="row">{label}</th>{tds}</tr>'))
     head = (
         '<tr><td rowspan="2"></td>'
         '<th scope="col" rowspan="2" class="ct-ours ct-start">Andrey</th>'
         '<th scope="colgroup" colspan="2" class="ct-start">Library</th>'
         '<th scope="colgroup" colspan="2" class="ct-start">Library, Definition 4.2</th></tr>'
-        "<tr>" + 2 * '<th scope="col" class="ct-start">SHD</th>'
-        '<th scope="col" class="ct-ours">Difference</th>' + "</tr>"
+        "<tr>"
+        + 2
+        * '<th scope="col" class="ct-start">SHD</th><th scope="col" class="ct-ours">Difference</th>'
+        + "</tr>"
     )
     body, current = "", None
-    for _, entry in sorted(cells.items()):
-        section = entry["section"]
+    for _, section, row in sorted(rows):
         if section != current:
             body += (
                 '<tr class="ct-section"><th scope="rowgroup" colspan="6">'
                 f"{escape(section)}</th></tr>"
             )
             current = section
-        reference, copy = entry["sides"]
-        body += (
-            f'<tr><th scope="row">{entry["label"]}</th>'
-            f"{side(reference, True)}{side(copy, False)}</tr>"
-        )
-    defaults_table = (
-        f'<figure class="ct"><p class="ct-title">IGSP against the authors\' library, at Andrey\'s '
-        f'defaults</p><div class="ct-scroll"><table class="ct-table ct-nested"><thead>{head}'
-        f"</thead><tbody>{body}</tbody></table></div><figcaption>Mean SHD over 20 datasets, "
-        f"seeds 0 to 19, 5 draws each, at alpha {alpha} and {defaults['n_starts']} starts; the "
-        "library runs 5 times from its threshold graph. Definition 4.2 is a copy of the library "
+        body += row
+    defaults = (
+        '<figure class="ct"><p class="ct-title">IGSP against the authors\' library, at Andrey\'s '
+        'defaults</p><div class="ct-scroll"><table class="ct-table ct-nested">'
+        f"<thead>{head}</thead><tbody>{body}</tbody></table></div><figcaption>Mean SHD over 20 "
+        "datasets, seeds 6000 to 6019, 5 draws each. Andrey runs at its defaults: 10 starts, at a "
+        "level of one over the observational rows, 1e-3 at 1,000 rows, 1e-4 at 10,000, and 1e-5 "
+        "at 100,000. The library runs 5 times at 1e-3. Definition 4.2 is a copy of the library "
         "whose I-contradicting test follows Yang et al.'s definition, run where a setting has two "
         "or more targets. The difference is Andrey's mean minus the library's, with its 95% "
-        "interval, marked better or worse only where a rerun on fresh seeds agreed; unmarked is a "
-        "tie."
-        "</figcaption></figure>\n"
+        "interval, marked better only where seeds 0 to 19 agreed at 1,000 rows, the one size "
+        "where both levels match; unmarked is a tie.</figcaption></figure>\n"
     )
 
-    counts: dict[tuple, dict] = {}
-    for m in judged:
-        _, a, starts = m["regime"].rsplit("|", 2)
-        key = (float(a.split("=")[1]), int(starts.split("=")[1]), copies[m["comparator"]])
-        c = counts.setdefault(key, {"better": 0, "tie": 0, "worse": 0, "not judged": 0})
-        for r in m["rows"]:
-            if r.get("claim") == "out":
-                c["not judged"] += 1
-                continue
-            first, rerun = r["verdict"], igsp_rerun(r)
-            c[first if first == "tie" or first == rerun else "tie"] += 1
-    names = ("Library", "Library, Definition 4.2")
-    rows = ""
-    for (a, starts, copy), c in sorted(counts.items()):
-        total = sum(c.values())
-        cells_ = "".join(f"<td>{c[k]}</td>" for k in ("better", "tie", "worse", "not judged"))
-        rows += (
-            f'<tr><th scope="row">alpha {level(a)}, {starts} starts</th><td>{names[copy]}</td>'
-            f"<td>{total}</td>{cells_}</tr>"
-        )
-    grand = sum(sum(c.values()) for c in counts.values())
-    counts_table = (
-        '<figure class="ct"><p class="ct-title">IGSP: every judged row</p><div class="ct-scroll">'
-        '<table class="ct-table"><thead><tr><td></td><th scope="col">Against</th>'
-        '<th scope="col">Rows</th><th scope="col">Better</th><th scope="col">Tie</th>'
-        '<th scope="col">Worse</th><th scope="col">Not judged</th></tr></thead>'
-        f"<tbody>{rows}</tbody></table></div><figcaption>The {grand:,} rows in claim, at each "
-        "level and number of starts. Better and worse count only where a rerun on fresh seeds "
-        "agreed. A row is not judged where the library does not beat the empty graph."
+    lines, total = "", 0
+    for row, by_comparator in lane["in_claim"]["counts"].items():
+        starts = {"J1": 5, "J2": 10}[row.split()[0]]
+        alpha = row.split()[-1]
+        for comparator, counts in by_comparator.items():
+            c = {"better": 0, "tie": 0, "worse": 0}
+            for category, count in counts.items():
+                c[category if category in c else "tie"] += count
+            total += sum(c.values())
+            lines += (
+                f'<tr><th scope="row">alpha {alpha}, {starts} starts</th>'
+                f"<td>{IGSP_COMPARATORS[comparator]}</td><td>{sum(c.values())}</td>"
+                + "".join(f"<td>{c[k]}</td>" for k in ("better", "tie", "worse"))
+                + "</tr>"
+            )
+    assert total == lane["in_claim"]["gated_rows"], (total, lane["in_claim"]["gated_rows"])
+    grid = (
+        '<figure class="ct"><p class="ct-title">IGSP at three levels, both packages at the same '
+        'one</p><div class="ct-scroll"><table class="ct-table"><thead><tr><td></td>'
+        '<th scope="col">Against</th><th scope="col">Rows</th><th scope="col">Better</th>'
+        '<th scope="col">Tie</th><th scope="col">Worse</th></tr></thead>'
+        f"<tbody>{lines}</tbody></table></div><figcaption>The {total:,} rows of the 87 settings "
+        "above at three levels inside the authors' sweep, the library running 5 times, on seeds "
+        "0 to 19. Better and worse count only where a rerun on fresh seeds agreed."
         "</figcaption></figure>\n"
     )
-    return defaults_table + counts_table
+    return defaults + grid
 
 
 # DYNOTEARS's regimes in claim, in the comparison page's words.
