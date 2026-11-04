@@ -53,9 +53,14 @@ UT_GROUPS = {
 }
 
 
+def signed(value: float) -> str:
+    """A signed number to two decimals, with no negative zero."""
+    return f"{value + 0.0:+.2f}".replace("-0.00", "+0.00")
+
+
 def interval(mean: float, low: float, high: float) -> str:
     """A mean difference with its 95% interval."""
-    return f"{mean:+.2f}<small>[{low:+.2f}, {high:+.2f}]</small>"
+    return f"{signed(mean)}<small>[{signed(low)}, {signed(high)}]</small>"
 
 
 def verdict(first: str, rerun: str | None) -> str:
