@@ -35,13 +35,38 @@ names its pull request.
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
-- `icp`, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal
-  parents of one `target` from continuous data pooled from several environments that leave the
-  target's mechanism alone: it tests every set of the other variables, or of at most
-  `max_parents`, for a regression on the target that is the same in every environment, with the
-  paper's approximate or exact test, and returns the variables in every accepted set, which are
-  parents with probability at least `1 - alpha`, with each variable's p-value and confidence
-  interval; it is experimental.
+- `ut_igsp`, experimental, learns from an observational environment and settings whose
+  intervention targets are known in part or not at all (UT-IGSP, Squires, Wang, and Uhler 2020):
+  it returns the interventional essential graph and, in `metadata["targets"]`, each setting's
+  targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
+  mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
+  `"indicator"`, the test of whether a variable's distribution given others changes. Against
+  graphical-model-learning 0.1a8, the authors' library, on simulated data in the paper's setting
+  with every kind of intervention it claims (20 variables, 5 settings, 1,000 to 5,000 rows per
+  setting, up to 3 unknown targets per setting), `ut_igsp` at its defaults, alpha one over the
+  observational rows and 10 starts, is worse in none of the 112 comparisons, on the graph or the
+  targets, and better in 18, its errors lower on two sets of datasets (for 17 of the 18 the second
+  set is the one its default was chosen on); at the paper's alpha `1e-5` it is worse in none and
+  better in none. A median fit on 20 variables takes 0.24 s, about 1.7 times the library's time
+  on one core. ([#668])
+- `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
+  environments that differ in the noise variances of variables it is not told: it returns those
+  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
+  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
+  authors' package, on simulated data in the paper's settings and the settings it claims, 10
+  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
+  the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
+  rows per environment and on the targets in 1 of them, on fresh datasets too; at the standard BIC
+  the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
+  on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
+  graph's 135 in a median 176 s. ([#665])
+- `andrey.icp`, experimental, finds the causal parents of one `target` from continuous data pooled
+  from several environments that leave the target's mechanism alone (Peters, Buhlmann and
+  Meinshausen 2016), by the paper's approximate or exact test, with each variable's p-value and
+  confidence interval. Against InvariantCausalPrediction 0.8, the authors' package, on simulated
+  data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
+  environments, and it names a variable outside the true parents in at most 1.23% of fits at
+  `alpha=0.05` in the settings it claims. ([#677])
 
 ### Changed
 
@@ -1681,3 +1706,6 @@ First alpha release.
 [#660]: https://github.com/Abel-ai-lab/andrey/pull/660
 [#662]: https://github.com/Abel-ai-lab/andrey/pull/662
 [#663]: https://github.com/Abel-ai-lab/andrey/pull/663
+[#665]: https://github.com/Abel-ai-lab/andrey/pull/665
+[#668]: https://github.com/Abel-ai-lab/andrey/pull/668
+[#677]: https://github.com/Abel-ai-lab/andrey/pull/677

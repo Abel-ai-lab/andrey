@@ -16,12 +16,12 @@ the dataset loaders and simulators of `andrey.data`, and the conditional-indepen
 
 Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with five
 exceptions: `cdnod` also takes `env`, each row's environment, `gies` also takes `env` with
-`targets`, the variables intervened on in each environment, `icp` also takes `env` and `target`,
-the variable whose parents it finds, `longitudinal_lingam` takes a list of datasets, and
-`multi_group_direct_lingam` takes a list of datasets and returns one result per dataset. The first
-argument of every method is `data`; `andrey run` reads it from `--data`, which a method that takes
-a list of datasets needs once per dataset. Each method is either supported or experimental;
-`andrey list` prints the status.
+`targets`, the variables intervened on in each environment, `gnies` takes `env` and learns the
+targets, `icp` also takes `env` and `target`, the variable whose parents it finds,
+`longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes a list of
+datasets and returns one result per dataset. The first argument of every method is `data`;
+`andrey run` reads it from `--data`, which a method that takes a list of datasets needs once per
+dataset. Each method is either supported or experimental; `andrey list` prints the status.
 
 `env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
 then not a variable; `andrey run` reads it from `--env`, a column of `--data` or a file. `gies`
@@ -30,15 +30,19 @@ position, with `[]` for an observational environment; as the name of a column wh
 each row's variables, from whose distinct values `env` follows when you leave it out; or as a 0/1
 matrix shaped like `data`. Every environment needs its targets, so `env` without `targets`, an
 environment the mapping leaves out or gives `None`, and a key that is not a label of `env` raise a
-`ValueError`. `andrey run` takes a mapping as `targets=`, a JSON object inline or in a file, or as
-`targets` in `--config`; a key such as `"0"` names the number label `0` of `--env`. `icp` takes
-`targets` in the same forms but reads only whether an environment intervened on its `target`: it
-leaves such an environment's rows out, and keeps an environment whose targets are unknown.
+`ValueError`. `gnies` takes the same forms of `targets`, but for the targets it knows: an
+environment the mapping leaves out or gives `None` has unknown targets, which it learns, and
+`targets=None`, the default, learns them all. `icp` takes `targets` in the same forms but reads
+only whether an environment intervened on its `target`: it leaves such an environment's rows out,
+and keeps an environment whose targets are unknown. `andrey run` takes a mapping as `targets=`, a
+JSON object inline or in a file, or as `targets` in `--config`; a key such as `"0"` names the
+number label `0` of `--env`.
 
 ```python
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
+out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["index_edges"]
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```
 
@@ -112,7 +116,7 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `ut_igsp`, `pcmci`,
 `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`, and
 `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"`
 for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
@@ -125,16 +129,16 @@ correlation. A test you register that reports only p-values is ordered by its p-
 first.
 
 % concept: knowledge
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `xges`, `hc`, `tabu`,
-`mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`,
-`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and
-`camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs
-allowed to be adjacent, and temporal tiers; each method's `knowledge` parameter says how it honors
-them. Every required edge is in the result, whatever its weight, test, or score says. For the
-time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
-`effect` at time `t`. [Background knowledge](guides/getting-started.md#background-knowledge) shows
-them in use.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`,
+`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`,
+`cam`, `resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of
+required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`knowledge` parameter says how it honors them. Every required edge is in the result, whatever its
+weight, test, or score says. For the time-series methods, an edge `(cause, effect, lag)` is the
+link from `cause` at time `t - lag` to `effect` at time `t`.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
 `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take `tau_max`,
@@ -200,33 +204,37 @@ takes the same three rules for its same-step colliders, with `"majority"` as its
 tigramite, since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
-`ges`, `gies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`, `gfci`,
-`cam`, and `icp` take `max_parents`, a cap on every node's parents: no DAG the returned graph
-represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
-`gies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap,
-`boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within
-it, and `cam`'s order search adds no edge past it. `icp` tests only the sets of at most that many
-variables, and its guarantee then needs the target to have no more parents. `gfci` caps its GES
-phase; the PAG its tests then orient can put more arrowheads at a node.
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
+`gfci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents: no DAG the returned
+graph represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
+`gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
+the cap, `boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets
+within it, and `cam`'s order search adds no edge past it. `icp` tests only the sets of at most that
+many variables, and its guarantee then needs the target to have no more parents. `gfci` caps its
+GES phase; the PAG its tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole
-number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured
-seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. The
-methods that test independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or
-`"gpdc"`, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`pcmciplus`, `lpcmci`, `boss`, `grasp`, `ut_igsp`, `hc`, `tabu`, `calm`, and `ica_lingam` take
+`seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is
+the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
+exactly. The methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`, `ut_igsp` also with `n_starts` above 1, and `hc` and `tabu` only with
+`n_starts` above 1; otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
+that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
+seed.
 
 % concept: n_starts
-`boss`, `grasp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs: the first
-from the start the method describes, each later one from a start drawn from `seed` and the
-search's index. `boss` and `grasp` start it from a random order, and `hc` and `tabu` from the best
-DAG so far after `n_perturbations` random edge changes. The fit returns the best-scoring search; a
-later one replaces an earlier one only when it scores better by more than `1e-6`. Each search
-builds its own caches and drops the previous one's, so more starts take more time but little more
-memory. `1`, the default, runs one search.
+`boss`, `grasp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit runs:
+the first from the start the method describes, each later one from a start drawn from `seed` and
+the search's index. `boss` and `grasp` start it from a random order, `ut_igsp` from a
+minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
+after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
+replaces an earlier one only when it scores better by more than `1e-6` (for `ut_igsp`, a lower
+count of edges and targets). `ut_igsp` runs 10 by default: on 15 groups of simulated datasets, 12
+of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
+that setting, and more in none. Each search builds its own caches and drops the previous one's, so
+more starts take more time but little more memory. `1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -241,21 +249,22 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of Ramsey et al.
-(2017): larger values give sparser graphs, and `1.0`, the default, with `ebic_gamma=0.0` is the
-standard BIC. Every score but `"bdeu"` has this penalty, and `metadata["penalty_discount"]` records
-the value the score used.
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+`rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of
+Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the default, with
+`ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
+`metadata["penalty_discount"]` records the value the score used.
 
 % concept: ebic_gamma
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
+`rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
 linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's
 score, a penalty that grows with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the
 standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice and
 {py:func}`~andrey.gfci` says why its default differs. Only `score_func="bic"` adds the term, so
 passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
-`metadata["ebic_gamma"]` records the value a `"bic"` fit used.
+`metadata["ebic_gamma"]` records the value a `"bic"` fit used. `gnies`, which has one score, always
+adds it.
 
 % concept: equivalent_sample_size
 `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
@@ -389,6 +398,8 @@ its first call in a process.
    dagma
    camuv
    dynotears
+   ut_igsp
+   gnies
    icp
 ```
 
@@ -411,6 +422,24 @@ time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-ste
 on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
 temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
 lag 0.
+
+UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
+whose intervention targets are known in part or not at all: it searches variable orders for the
+DAG with the fewest edges plus targets, where a setting's targets are its known ones and every
+variable whose distribution given its parents differs from the observational one. Its default
+level for the conditional-independence and invariance tests, `alpha=None`, is one over the number
+of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was
+better than the paper's reference implementation at the paper's `1e-5` in 18 of 112 comparisons
+and worse in none. It returns the interventional essential graph with each setting's
+targets in `metadata["targets"]` and the level used in `metadata["alpha"]`.
+
+GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
+that share one set of weights and differ in the noise variances of some variables, its targets,
+without being told which. It returns the interventional essential graph of the targets it learns,
+which directs every edge at a target, and lists the targets in `metadata["index_edges"]`. For each
+set of targets it tries, it runs the search of `gies` from the empty graph, with the paper's
+likelihood: one noise variance per environment for a target and one in all for the others. Known
+targets in `targets` stay in the set; with every environment's targets known, one search runs.
 
 ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
 of one `target` from continuous data pooled from several environments, such as observation and

@@ -228,10 +228,18 @@ def test_a_max_p_global_above_every_search_returns_the_uncapped_pcmciplus_graph(
 # --- max_parents: the returned graph -----------------------------------------------------------
 
 
+def fitter(method: str):
+    """``method``'s fit on data alone; gnies gets two environments, the even and the odd rows."""
+    fit = getattr(andrey, method)
+    if method == "gnies":
+        return lambda data, **kw: fit(data, np.arange(len(data)) % 2, **kw)
+    return fit
+
+
 def capped_graph(method: str, monkeypatch):
     """A function that fits ``method`` and returns the marks of the graph its cap bounds: gfci's
     GES CPDAG, recorded before the tests prune and orient it, else the returned graph."""
-    fit = getattr(andrey, method)
+    fit = fitter(method)
     if method != "gfci":
         return lambda data, **kw: fit(data, **kw).structure.to_numpy()
     found = []
@@ -312,7 +320,7 @@ def test_required_edges_above_the_parent_cap_are_refused(method):
     data = pd.DataFrame(linear_data(2, d=4, n=200), columns=["x0", "x1", "x2", "x3"])
     knowledge = andrey.Knowledge(required=[("x0", "x3"), ("x1", "x3")])
     with pytest.raises(ValueError, match="max_parents"):
-        getattr(andrey, method)(data, max_parents=1, knowledge=knowledge)
+        fitter(method)(data, max_parents=1, knowledge=knowledge)
 
 
 # --- iteration caps --------------------------------------------------------------------------

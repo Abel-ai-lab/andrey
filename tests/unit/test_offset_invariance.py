@@ -70,7 +70,8 @@ def marks(out) -> list[np.ndarray]:
 
 
 def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
-    """The method's required inputs built from ``data`` shifted to ``data * scale + offset``."""
+    """The method's required inputs, gnies's env, and the environments of a method in ``CONTEXT``,
+    built from ``data`` shifted to ``data * scale + offset``."""
     scale, offset = shift
 
     def moved(x: np.ndarray) -> np.ndarray:
@@ -78,7 +79,9 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
 
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
+            if spec.name in CONTEXT and inp.kind == "context":
+                args.append(np.arange(N) * 3 // N)
             continue
         if inp.kind == "matrix":
             args.append(moved(data[:, :2] if spec.family == "pairwise" else data))
@@ -91,6 +94,9 @@ def inputs(spec, data: np.ndarray, shift: tuple[float, float]) -> list:
 
 #: Settings that shorten a slow fit, and the target ICP needs.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
+#: The targets of a method that reads three environments: observational, one with the known
+#: target 2, and one whose targets are unknown.
+CONTEXT = {"ut_igsp": {"targets": {0: [], 1: [2], 2: None}}}
 
 TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
@@ -103,9 +109,10 @@ def test_shifting_the_columns_keeps_every_methods_graphs(spec):
         pytest.importorskip("torch")
     fit = getattr(andrey, spec.name)
     data = chain()
-    want = marks(fit(*inputs(spec, data, (1.0, 0.0)), **SHORT.get(spec.name, {})))
+    settings = {**SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {})}
+    want = marks(fit(*inputs(spec, data, (1.0, 0.0)), **settings))
     for shift in SHIFTS.values():
-        got = marks(fit(*inputs(spec, data, shift), **SHORT.get(spec.name, {})))
+        got = marks(fit(*inputs(spec, data, shift), **settings))
         assert len(got) == len(want)
         for have, expected in zip(got, want, strict=True):
             np.testing.assert_array_equal(have, expected, err_msg=f"{shift}")

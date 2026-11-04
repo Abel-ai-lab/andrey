@@ -20,6 +20,19 @@ summary's ``parity_rule`` sets how its rows are judged:
   measured for the method's Limitations, so it is reported with its numbers and never gated. A row
   with ``"claim": "in"``, or with no ``claim``, is in claim and is judged as above; the row's own
   field overrides its entry's.
+- ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent) or
+  ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
+  targets). A row's means are ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the
+  ``*_shd_mean`` fields, which then hold that error's means. A method with a gated metric beside
+  SHD has one entry per metric, and a row's key names the ``metric``.
+- ``role``: ``"context"`` on an entry marks a comparator the method is reported against and never
+  judged by, such as another method on the same data. Its rows are reported with their numbers.
+- ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
+  not, under the time cap. An in-claim row with ``andrey_short`` above 0 fails, whatever its number
+  of paired datasets: a timeout never becomes a smaller mean. So does its replication's.
+- ``floor_95`` or ``target_floor_95``: the bootstrap 95% interval of the mean of Andrey's error
+  minus a floor's, the empty graph's ``shd`` or the ``target_error`` of the targets the method was
+  given. An in-claim row fails when the interval's upper end is not below 0.
 - no ``parity_rule`` (the summaries released before 0.8.0): a row fails when the reference has
   fewer errors on more series than Andrey; where the row records only its central errors (the mean
   or median over the series), it fails when Andrey's are higher, at any margin.
@@ -72,6 +85,12 @@ ERRORS: tuple[str, ...] = ("shd", "directed_errors")
 ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
 #: The ``claim`` values: a row in the setting its method claims, and one outside it.
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
+#: The ``role`` of an entry whose comparator is reported and never judged.
+CONTEXT = "context"
+#: A row's floor intervals: Andrey's error minus the empty graph's, and minus the given targets'.
+FLOORS: tuple[str, ...] = ("floor_95", "target_floor_95")
+#: The ``metric`` values an entry may name, with the text a row prints for each.
+METRICS: dict[str, str] = {"shd": "SHD", "target_error": "target error"}
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect", "tie-break"})
 
@@ -89,7 +108,10 @@ class Row:
     reported. ``column`` holds the column-order arm's ``(reference fewer, Andrey fewer)`` series
     counts, which are printed but not judged. ``replicated`` marks a row judged by its
     ``replication`` on fresh seeds: its numbers are the rerun's. ``out_of_claim`` marks a row
-    measured outside its method's claim: it is reported with its numbers and never gated.
+    measured outside its method's claim and ``context`` a row against a comparator the method is
+    not judged by: both are reported with their numbers and never gated. ``metric`` names the
+    error the row compares, ``andrey_short`` the datasets the reference finished and Andrey did
+    not, and ``floor`` the interval of Andrey's error minus its floor's.
     """
 
     summary: str
@@ -106,16 +128,25 @@ class Row:
     column: tuple[int, int] | None = None
     replicated: bool = False
     out_of_claim: bool = False
+    context: bool = False
+    metric: str = "shd"
+    andrey_short: int = 0
+    floor: tuple[float, float] | None = None
 
     @property
     def reported(self) -> bool:
-        """Whether the row is not gated: out of claim, or under ``MIN_PAIRS`` paired datasets."""
-        return self.out_of_claim or (self.pairs is not None and self.pairs < MIN_PAIRS)
+        """Whether the row is not gated: out of claim, context, or under ``MIN_PAIRS`` paired
+        datasets."""
+        return (
+            self.out_of_claim or self.context or (self.pairs is not None and self.pairs < MIN_PAIRS)
+        )
 
     @property
     def failed(self) -> bool:
-        if self.out_of_claim:
+        if self.out_of_claim or self.context:
             return False
+        if self.andrey_short > 0 or (self.floor is not None and self.floor[1] >= 0):
+            return True
         if self.interval is not None:
             return self.interval[0] > 0
         return not self.reported and self.andrey > self.reference
@@ -134,9 +165,11 @@ class Row:
             each = f", the mean of {self.draws} draws each" if self.draws > 1 else ""
             text = (
                 f"mean D {self.mean_d:+.2f}, bootstrap 95% [{lo:+.2f}, {hi:+.2f}], over "
-                f"{self.pairs} paired datasets{each} (mean SHD Andrey {self.andrey:.2f}, "
-                f"{self.comparator} {self.reference:.2f})"
+                f"{self.pairs} paired datasets{each} (mean {METRICS[self.metric]} Andrey "
+                f"{self.andrey:.2f}, {self.comparator} {self.reference:.2f})"
             )
+        elif self.pairs == 0:
+            text = "no paired dataset"
         elif self.rule == "series":
             text = (
                 f"{self.comparator} has fewer errors on {self.andrey:g} series, "
@@ -144,8 +177,18 @@ class Row:
             )
         else:
             text = f"{self.rule} Andrey {self.andrey:g}, {self.comparator} {self.reference:g}"
+        if self.andrey_short:
+            text += (
+                f"; {self.andrey_short} datasets finished by {self.comparator} and not by Andrey"
+            )
+        if self.floor is not None:
+            lo, hi = self.floor
+            below = "below 0" if hi < 0 else "not below 0"
+            text += f"; Andrey minus its floor: bootstrap 95% [{lo:+.2f}, {hi:+.2f}], {below}"
         if self.out_of_claim:
             text += "; out of the method's claim: reported, not gated"
+        elif self.context:
+            text += "; a context comparator: reported, not gated"
         elif self.reported:
             text += f"; {self.pairs} paired datasets, under {MIN_PAIRS}: reported, not gated"
         if self.column is not None:
@@ -159,54 +202,103 @@ class Row:
 def paired_rows(summary: str, data: dict) -> list[Row]:
     """Return the rows of one summary that pair Andrey with a reference package.
 
-    A row where either side has no result (a fit over the time cap) is skipped, and so is a series
-    of the column-order arm. A paired row with no known error field, a ``paired bootstrap`` row
-    with ``MIN_PAIRS`` paired datasets and no consistent interval, an unknown ``parity_rule``, an
-    unknown ``claim``, and a column-order arm on a reference not marked order-dependent or with one
-    of its two series missing or of unequal lengths raise, so a new summary format cannot pass
-    unchecked.
+    An entry's ``metric`` joins the key of each of its rows, and two entries of one method against
+    one reference need a ``regime`` only when they also share their metric. A row where either side
+    has no result (a fit over the time cap) is skipped, and so is a series of the column-order arm.
+    A paired row with no known error field, a ``paired bootstrap`` row with ``MIN_PAIRS`` paired
+    datasets and no consistent interval, an unknown ``parity_rule``, an unknown ``claim``,
+    ``metric`` or ``role``, a ``coverage`` without ``andrey_short``, a floor that is not an
+    interval, and a column-order arm on a reference not marked order-dependent or with one of its
+    two series missing or of unequal lengths raise, so a new summary format cannot pass unchecked.
     """
     rule = data.get("parity_rule")
     if rule not in (None, PAIRED_BOOTSTRAP):
         raise ValueError(f"{summary}: unknown parity_rule {rule!r}")
-    entries = Counter((m["method"], m.get("comparator")) for m in data["methods"])
-    rows = []
+    entries = Counter(
+        (m["method"], m.get("comparator"), m.get("metric", "shd")) for m in data["methods"]
+    )
+    rows: list[Row] = []
     for method in data["methods"]:
         comparator = method.get("comparator")
         if not comparator:
             continue
-        by_regime = entries[(method["method"], comparator)] > 1
+        metric = method.get("metric", "shd")
+        if metric not in METRICS:
+            raise ValueError(f"{summary}: {method['method']} has an unknown metric {metric!r}")
+        by_regime = entries[(method["method"], comparator, metric)] > 1
         if by_regime and not method.get("regime"):
             raise ValueError(
                 f"{summary}: {method['method']} vs {comparator} has two entries and no regime"
             )
+        role = method.get("role")
+        if role not in (None, CONTEXT):
+            raise ValueError(
+                f"{summary}: {method['method']} vs {comparator}: unknown role {role!r}"
+            )
         for row in method.get("rows", []):
             key = {"regime": method["regime"]} if by_regime else {}
+            if "metric" in method:
+                key["metric"] = metric
             key.update({k: row[k] for k in ROW_KEYS if k in row})
             where = f"{summary}: {method['method']} vs {comparator} {key}"
             name = (summary, method["method"], comparator, key)
             column = _column_series(row, where)
-            out = _out_of_claim(row, method, where)
+            marks = {
+                "out_of_claim": _out_of_claim(row, method, where),
+                "context": role == CONTEXT,
+                "metric": metric,
+                "andrey_short": _andrey_short(row, where),
+                "floor": _floor(row, where),
+            }
             judged = row.get("multi_draw") or row
             pairs = judged.get("paired") if rule == PAIRED_BOOTSTRAP else None
             if rule == PAIRED_BOOTSTRAP and not isinstance(pairs, int):
                 raise ValueError(f"{where} has no paired count")
-            if pairs == 0:
-                continue
             if "replication" in row:
                 if rule != PAIRED_BOOTSTRAP:
                     raise ValueError(f"{where} has a replication, but no paired bootstrap rule")
+                replication = row["replication"]
+                short = marks["andrey_short"] + _andrey_short(replication, f"{where}, replication")
                 rows.append(
-                    replace(_replicated(name, row["replication"], column, where), out_of_claim=out)
+                    replace(
+                        _replicated(name, replication, column, where, metric),
+                        **{**marks, "andrey_short": short},
+                    )
                 )
                 continue
+            if pairs == 0:
+                if marks["andrey_short"]:
+                    nan = float("nan")
+                    rows.append(Row(*name, PAIRED_BOOTSTRAP, nan, nan, pairs=0, **marks))
+                continue
             if pairs is not None and pairs >= MIN_PAIRS:
-                rows.append(replace(_judged(name, judged, column, where), out_of_claim=out))
+                rows.append(replace(_judged(name, judged, column, where, metric), **marks))
                 continue
             counted = _errors(row, where)
             if counted is not None:
-                rows.append(Row(*name, *counted, pairs=pairs, column=column, out_of_claim=out))
+                rows.append(Row(*name, *counted, pairs=pairs, column=column, **marks))
     return rows
+
+
+def _andrey_short(row: dict, where: str) -> int:
+    """Return the datasets the reference finished and Andrey did not, from ``coverage``."""
+    if "coverage" not in row:
+        return 0
+    short = row["coverage"].get("andrey_short")
+    if not isinstance(short, int):
+        raise ValueError(f"{where}: coverage needs andrey_short")
+    return short
+
+
+def _floor(row: dict, where: str) -> tuple[float, float] | None:
+    """Return the row's floor interval, ``floor_95`` or ``target_floor_95``; ``None`` without."""
+    present = [row[name] for name in FLOORS if name in row]
+    if not present:
+        return None
+    if len(present) > 1 or len(present[0]) != 2:
+        raise ValueError(f"{where}: one floor interval of two numbers, from {FLOORS}")
+    lo, hi = present[0]
+    return float(lo), float(hi)
 
 
 def _out_of_claim(row: dict, method: dict, where: str) -> bool:
@@ -237,17 +329,30 @@ def _errors(row: dict, where: str) -> tuple[str, float, float] | None:
     return rule, andrey, reference
 
 
+def _means(fields: dict, metric: str) -> tuple[str, str]:
+    """Return the names of the row's mean fields for ``metric``: ``andrey_<metric>_mean`` and
+    ``comparator_<metric>_mean``, or, when neither is there, the ``*_shd_mean`` fields that hold
+    the metric's means."""
+    names = (f"andrey_{metric}_mean", f"comparator_{metric}_mean")
+    if all(fields.get(name) is None for name in names):
+        return ("andrey_shd_mean", "comparator_shd_mean")
+    return names
+
+
 def _judged(
     name: tuple[str, str, str, dict[str, Any]],
     fields: dict,
     column: tuple[int, int] | None,
     where: str,
+    metric: str = "shd",
 ) -> Row:
     """Return a row judged by its paired interval; ``fields`` is the row or its ``multi_draw``.
 
-    The fields must all be present, and ``above_zero`` must say what the interval says.
+    The fields must all be present, with the means of ``metric``, and ``above_zero`` must say what
+    the interval says.
     """
-    names = ("andrey_shd_mean", "comparator_shd_mean", "mean_D", "bootstrap_95", "above_zero")
+    means = _means(fields, metric)
+    names = (*means, "mean_D", "bootstrap_95", "above_zero")
     if any(fields.get(field) is None for field in names):
         raise ValueError(f"{where} needs {names} for the paired bootstrap rule")
     lo, hi = fields["bootstrap_95"]
@@ -256,8 +361,8 @@ def _judged(
     return Row(
         *name,
         PAIRED_BOOTSTRAP,
-        fields["andrey_shd_mean"],
-        fields["comparator_shd_mean"],
+        fields[means[0]],
+        fields[means[1]],
         pairs=fields["paired"],
         mean_d=fields["mean_D"],
         interval=(lo, hi),
@@ -271,6 +376,7 @@ def _replicated(
     replication: dict,
     column: tuple[int, int] | None,
     where: str,
+    metric: str = "shd",
 ) -> Row:
     """Return the row as its replication judges it, the rerun on fresh seeds.
 
@@ -284,10 +390,11 @@ def _replicated(
     if not isinstance(pairs, int):
         raise ValueError(f"{where} has no paired count")
     if pairs >= MIN_PAIRS:
-        return replace(_judged(name, replication, column, where), replicated=True)
-    means = (replication.get("andrey_shd_mean"), replication.get("comparator_shd_mean"))
+        return replace(_judged(name, replication, column, where, metric), replicated=True)
+    fields = _means(replication, metric)
+    means = (replication.get(fields[0]), replication.get(fields[1]))
     if None in means:
-        raise ValueError(f"{where} needs andrey_shd_mean and comparator_shd_mean")
+        raise ValueError(f"{where} needs {fields[0]} and {fields[1]}")
     return Row(*name, PAIRED_BOOTSTRAP, *means, pairs=pairs, column=column, replicated=True)
 
 
@@ -394,7 +501,7 @@ def main() -> int:
         print(line)
     print(
         f"\n{len(rows)} rows, {len(exemptions)} exempt, {len(reported)} reported (out of "
-        f"claim, or under {MIN_PAIRS} paired datasets; not gated), {len(failures)} failed."
+        f"claim, context, or under {MIN_PAIRS} paired datasets; not gated), {len(failures)} failed."
     )
     return 1 if failures else 0
 

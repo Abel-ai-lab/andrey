@@ -1470,7 +1470,7 @@ def icp(
         are a subset of the true parents with probability at least ``1 - alpha``. Smaller values
         accept more sets and give fewer parents.
     invariance_test : {"approximate", "exact"}, default="approximate"
-        How a set's invariance is tested. ``"approximate"`` fits one regression on every row and
+        The invariance test of each set. ``"approximate"`` fits one regression on every row and
         compares each environment's residuals with the other rows' by Welch's t-test of their means
         and the F-test of their variances. ``"exact"`` fits the regression on the other rows,
         predicts each environment's rows, and tests the prediction errors with Chow's F-test, exact

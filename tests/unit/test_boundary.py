@@ -138,10 +138,10 @@ class _Checked(Exception):
 
 
 def _call(method: str, data: np.ndarray) -> object:
-    """Fit ``method`` on ``data``: environments for cdnod and icp, two or three copies for a
-    panel."""
-    if method == "cdnod":
-        return andrey.cdnod(data, env=np.arange(len(data)) % 2)
+    """Fit ``method`` on ``data``: two environments for cdnod, gnies, and icp, two or three copies
+    for a panel."""
+    if method in ("cdnod", "gnies"):
+        return getattr(andrey, method)(data, env=np.arange(len(data)) % 2)
     if method == "icp":
         return andrey.icp(data, env=np.arange(len(data)) % 2, target=0)
     if method in ("multi_group_direct_lingam", "longitudinal_lingam"):
