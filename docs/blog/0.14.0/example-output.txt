@@ -2,4 +2,4 @@ true graph: 10 edges, targets {0: [], 1: [2], 2: [5], 3: [7]}
 ges:     2 errors, 2 edges undirected
 gies:    0 errors, 0 edges undirected
 gnies:   0 errors, 0 edges undirected, targets [2, 5, 7]
-ut_igsp: 0 errors, 0 edges undirected, targets {'0': [], '1': [2], '2': [5], '3': [7]}
+ut_igsp: 0 errors, 0 edges undirected, targets {0: [], 1: [2], 2: [5], 3: [7]}

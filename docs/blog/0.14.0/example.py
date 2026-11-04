@@ -32,10 +32,9 @@ if __name__ == "__main__":  # worker processes re-import this script
     # GnIES and UT-IGSP are not told the targets, and learn them. GnIES learns the variables
     # whose noise changes in some environment; UT-IGSP learns each environment's targets.
     gnies = andrey.gnies(truth.data, truth.env)
-    learned = [v for v, _ in gnies.metadata["index_edges"]]
     print(
         f"gnies:   {shd(gnies.structure, truth.graph)} errors, {undirected(gnies)} edges "
-        f"undirected, targets {learned}"
+        f"undirected, targets {gnies.metadata['changing_variables']}"
     )
     unknown = {0: [], 1: None, 2: None, 3: None}
     ut_igsp = andrey.ut_igsp(truth.data, truth.env, targets=unknown)
