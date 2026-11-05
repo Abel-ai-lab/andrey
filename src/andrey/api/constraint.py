@@ -1196,7 +1196,15 @@ def cdnod(
         leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
         can identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
         :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
-        against the graph CD-NOD can identify instead.
+        against the graph CD-NOD can identify instead. ``metadata["index_edges"]`` lists the
+        index's edges, each ``env -> variable``, as ``[variable, "directed"]`` pairs, and
+        ``metadata["changing_variables"]`` the same variables, by name or 0-based position, in
+        column order: the variables whose causal module, the distribution given their causes,
+        changes across the environments, under CD-NOD's assumption that the index is only a cause
+        and no hidden common cause varies apart from it [1]_. Their descendants change in
+        distribution too, through them, and are not listed. Both are empty for a single
+        environment. With ``"fisherz"`` or ``"student_t"``, only a change in a variable's mean
+        that follows the index's values is found.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
@@ -1405,6 +1413,7 @@ def cdnod(
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
+    index_edges: list[int] = []
     with (
         copies_named(labels, lambda j: "env" if j == d else column(j)),
         rows_tested() as rows,
@@ -1424,9 +1433,13 @@ def cdnod(
             seed=seed,
             _ambiguous=ambiguous,
             _conflicts=conflicts,
+            _index_edges=index_edges,
         )
+    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
     metadata = {
         "conflicts": [list(edge) for edge in sorted(conflicts)],
+        "index_edges": [[variable(j), "directed"] for j in index_edges],
+        "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),

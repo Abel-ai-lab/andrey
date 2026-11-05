@@ -178,7 +178,11 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
 edges that the CPDAG of observational data leaves undirected, so score it against the graph CD-NOD
-can identify rather than the true DAG's CPDAG.
+can identify rather than the true DAG's CPDAG. The index itself is not a node of the graph: its
+edges, each `env -> variable`, are in `metadata["index_edges"]`, and
+`metadata["changing_variables"]` lists the same variables. They are the variables whose causal
+module, the distribution given their causes, changes across the environments; their descendants
+change through them and are not listed.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.
