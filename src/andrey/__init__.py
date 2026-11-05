@@ -78,7 +78,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 __all__ = [
     "__version__",

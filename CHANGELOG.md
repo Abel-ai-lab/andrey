@@ -10,6 +10,8 @@ names its pull request.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-04
+
 ### Highlights
 
 - `gnies` is supported and joins the quality gate. Against gnies 0.3.3, the authors' package, on
@@ -1625,7 +1627,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0

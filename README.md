@@ -18,15 +18,16 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.13.0
+## ⭐ What's new in 0.14.0
 
-Functional causal models: each variable is a function of its causes plus independent noise, and the
-shape of the function or the noise shows which way an effect runs. CAM and RESIT learn nonlinear
-graphs as accurately as their authors' code and faster, IAMB and MMPC are supported, and CAM-UV
-and DYNOTEARS are experimental.
+Interventional data: rows from experiments, where a variable was changed from outside. Where
+observation leaves the direction of an edge open, an experiment on either end can settle it. IGSP
+learns graphs from experiments with known targets, GnIES and UT-IGSP from experiments whose targets
+they are not told, and ICP finds the causes of one variable, all as accurately as their authors'
+code. CAM-UV and DYNOTEARS are supported too.
 
-**[Read the post](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.13.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261104-andrey-0-14-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.14.0.html)**
 
 ---
 
@@ -184,7 +185,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.13.0},
+  version = {0.14.0},
   url = {https://andrey.abel.ai},
 }
 ```
