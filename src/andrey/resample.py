@@ -636,8 +636,8 @@ def _valid_graph(
 def _nearest(s: _Slice, coded: list[np.ndarray], fits: Sequence[StructureOutput]) -> _Nearest:
     """Return the valid fit nearest the others: the first with the highest agreement.
 
-    This is Tetrad's Median among the fits that are valid graphs of the slice's kind
-    (``_is_valid``). A fit's agreement sums, over the pairs, the number of fits that give the pair
+    It picks among the fits that are valid graphs of the slice's kind (``_is_valid``). A fit's
+    agreement sums, over the pairs, the number of fits that give the pair
     the fit's own state, no edge included; the highest agreement is the least mean SHD to the
     fits. ``coded`` holds each fit's codes, as ``_codes`` makes them. When no fit is valid, it
     returns the fit with the highest agreement, marked invalid.
@@ -919,12 +919,13 @@ def bootstrap(
     graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
     with a row-aligned input (``env``, or ``targets`` as a 0/1 matrix) resamples that input with the
     rows, and a column that ``env`` or ``targets`` names travels with the rows of ``data``. When
-    ``env`` holds text labels, or the method takes ``targets`` (``gies``, ``igsp``, and
-    ``ut_igsp``), a resample is drawn within each environment of ``env``: of an environment's ``m``
-    rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample
-    draws ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
-    ``cdnod``, which reads it as numbers, such as a domain number or a time step, resamples the rows
-    as a whole. For a method that takes ``targets``, the averaged graph is made a CPDAG without the
+    ``env`` holds text labels, or the method takes ``targets`` (``gies``, ``gnies``, ``igsp``,
+    ``ut_igsp``, and ``icp``), a resample is drawn within each environment of ``env``: of an
+    environment's ``m`` rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a
+    bootstrap resample draws ``m`` with replacement, so every resample keeps every environment. A
+    numeric ``env`` of ``cdnod``, which reads it as numbers, such as a domain number or a time step,
+    resamples the rows as a whole. For a method that takes ``targets`` and returns a CPDAG
+    (``gies``, ``gnies``, ``igsp``, and ``ut_igsp``), the averaged graph is made a CPDAG without the
     targets, so an edge that only the interventions orient is undirected there; the edge frequencies
     keep its direction. A time-series method on one series subsamples one stretch of consecutive
     rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units,
@@ -1048,39 +1049,38 @@ def bootstrap(
     that edge than have no edge, which needs the pair adjacent in more than half of them, and
     ``threshold`` can ask for more. When two edges tie, the pair takes the least committal one,
     ``--``, or ``o-o`` for a ``pag``. This vote is the graph with the least mean structural Hamming
-    distance to the fits. It is the ``Highest`` ensemble of Tetrad [6]_, with a tie between an edge
-    and no edge going to no edge, as in tigramite's majority vote [7]_.
+    distance to the fits. A tie between an edge and no edge goes to no edge, as in the majority vote
+    of [6]_.
 
     A vote of CPDAGs or PAGs is often not a valid CPDAG or PAG: it can direct an edge that no
     v-structure compels. So the vote is then made a valid graph of the method's kind by the
     published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
-    v-structures, and directed edges [8]_: the vote itself when it has no directed cycle, with a
+    v-structures, and directed edges [7]_: the vote itself when it has no directed cycle, with a
     tie edge pointing as the columns' :func:`~andrey.search.hc.tie_ranks` on ``data`` decide
     (``tie_break``, :data:`andrey.config`: ranks computed from the data, or the
     column order under ``"position"``), so reordering the columns relabels the graph. A ``cpdag``
-    becomes the CPDAG [9]_ of a consistent extension, so an edge that no v-structure compels is
+    becomes the CPDAG [8]_ of a consistent extension, so an edge that no v-structure compels is
     undirected. A ``pag`` becomes
-    the PAG of the MAG that Zhang's construction builds from it [10]_. With ``knowledge``, the
+    the PAG of the MAG that Zhang's construction builds from it [9]_. With ``knowledge``, the
     edges it directs stay directed: a ``cpdag`` becomes its maximally oriented PDAG, and a ``pag``
     is oriented as ``fci`` orients one under knowledge: the endpoints the knowledge sets come
     first, and Zhang's orientation rules then run from them until no endpoint changes, as they do
-    in a fit [10]_, [11]_. A time-series result's lag graphs
-    keep the vote, as tigramite's does [7]_: a lag-0 graph is oriented with the lagged edges, which
+    in a fit [9]_, [10]_. A time-series result's lag graphs
+    keep the vote, as in [6]_: a lag-0 graph is oriented with the lagged edges, which
     the steps for one graph do not see.
 
-    The vote has no consistent extension or MAG when, for example, its directed edges form a
-    cycle or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``,
-    the averaged graph is then the resample graph nearest the others, a graph the method returned:
-    the fit whose state of each pair the most fits share, summed over the pairs, which is the fit
-    with the least mean structural Hamming distance to the others (Tetrad's ``Median`` [6]_). Only
-    a resample that is a valid graph of the method's kind can be that fit: a ``cpdag`` with a
-    consistent DAG extension, or a PAG that passes the steps above, because a method can return a
-    graph labeled ``cpdag`` that no DAG extends (``pc`` leaves conflicting orientations
-    undirected). A warning says so, and ``metadata["averaged_graph"]`` is ``"nearest_resample"``;
-    it is ``"vote"`` otherwise. When no resample is valid, a warning says so, the averaged graph is
-    the resample nearest the others, and ``metadata["averaged_graph"]`` is
-    ``"nearest_resample_invalid"``. ``strict=True`` raises in both cases instead, as bnlearn's
-    ``cextend`` does by default [12]_. Either way, ``frequency`` and ``table`` keep the whole vote.
+    The vote has no consistent extension or MAG when, for example, its directed edges form a cycle
+    or its undirected edges a chordless cycle of four or more nodes. With ``strict=False``, the
+    averaged graph is then the resample graph nearest the others, a graph the method returned: the
+    fit whose state of each pair the most fits share, summed over the pairs, which is the fit with
+    the least mean structural Hamming distance to the others. Only a resample that is a valid graph
+    of the method's kind can be that fit: a ``cpdag`` with a consistent DAG extension, or a PAG that
+    passes the steps above, because a method can return a graph labeled ``cpdag`` that no DAG
+    extends (``pc`` leaves conflicting orientations undirected). A warning says so, and
+    ``metadata["averaged_graph"]`` is ``"nearest_resample"``; it is ``"vote"`` otherwise. When no
+    resample is valid, a warning says so, the averaged graph is the resample nearest the others, and
+    ``metadata["averaged_graph"]`` is ``"nearest_resample_invalid"``. ``strict=True`` raises in both
+    cases instead. Either way, ``frequency`` and ``table`` keep the whole vote.
 
     On linear data with 20 and 50 variables and 500, 1,000, and 5,000 rows (``pc``, ``ges``,
     ``fci``, and ``direct_lingam``; 20 datasets per cell; 100 resamples with
@@ -1119,25 +1119,20 @@ def bootstrap(
     .. [4] Meinshausen, N., and Buhlmann, P. (2010). Stability selection. Journal of the Royal
        Statistical Society: Series B, 72(4), 417-473.
     .. [5] Politis, D. N., Romano, J. P., and Wolf, M. (1999). Subsampling. Springer.
-    .. [6] Tetrad, ``edu.pitt.dbmi.algo.resampling.ResamplingEdgeEnsemble`` and
-       ``edu.cmu.tetrad.util.GraphSampling``, github.com/cmu-phil/tetrad, development branch,
-       2026-08-13. ``Median`` is not in release 7.6.10.
-    .. [7] Debeire, K., Gerhardus, A., Runge, J., and Eyring, V. (2024). Bootstrap aggregation and
+    .. [6] Debeire, K., Gerhardus, A., Runge, J., and Eyring, V. (2024). Bootstrap aggregation and
        confidence measures to improve time series causal discovery. Proceedings of the Third
        Conference on Causal Learning and Reasoning, PMLR 236.
-    .. [8] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension
+    .. [7] Dor, D., and Tarsi, M. (1992). A simple algorithm to construct a consistent extension
        of a partially oriented graph. Technical Report R-185, Cognitive Systems Laboratory, UCLA.
-    .. [9] Chickering, D. M. (2002). Learning equivalence classes of Bayesian-network structures.
+    .. [8] Chickering, D. M. (2002). Learning equivalence classes of Bayesian-network structures.
        Journal of Machine Learning Research, 2, 445-498.
-    .. [10] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+    .. [9] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
        presence of latent confounders and selection bias. Artificial Intelligence, 172(16-17),
        1873-1896.
-    .. [11] Andrews, B., Spirtes, P., and Cooper, G. F. (2020). On the completeness of causal
+    .. [10] Andrews, B., Spirtes, P., and Cooper, G. F. (2020). On the completeness of causal
        discovery in the presence of latent confounding with tiered background knowledge.
        Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics,
        PMLR 108, 4002-4011.
-    .. [12] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
-       Statistical Software, 35(3), 1-22.
 
     Examples
     --------

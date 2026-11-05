@@ -1,11 +1,11 @@
 """Public wrappers over the Andrey engines.
 
-Each algorithm is a callable returning one uniform ``StructureOutput`` that wraps a first-class
-``Structure`` (``.structure``; concrete ``GraphStructure`` / ``TemporalStructure``). A
-``GraphStructure`` exposes ``.adjacency`` (lazy dense ndarray) plus ``.to_numpy`` /
-``.to_scipy_sparse`` / ``.to_networkx`` exports and the ``.oriented_edges`` list, and the envelope
-adds ``.ordering`` / ``.weighted_adjacency`` / ``.metadata``. A DataFrame's column names become the
-structure's ``labels``. Each callable is re-exported at the top level
+Each algorithm is a callable returning a ``StructureOutput`` (``multi_group_direct_lingam``, one
+per group) that wraps a first-class ``Structure`` (``.structure``; concrete ``GraphStructure`` /
+``TemporalStructure``). A ``GraphStructure`` exposes ``.adjacency`` (lazy dense ndarray) plus
+``.to_numpy`` / ``.to_scipy_sparse`` / ``.to_networkx`` exports and the ``.oriented_edges`` list,
+and the envelope adds ``.ordering`` / ``.weighted_adjacency`` / ``.metadata``. A DataFrame's column
+names become the structure's ``labels``. Each callable is re-exported at the top level
 (``andrey.pc`` ...).
 
 Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe metadata, and

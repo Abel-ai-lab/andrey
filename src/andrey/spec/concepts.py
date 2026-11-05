@@ -25,6 +25,7 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
 from andrey.core.score import SCORES
@@ -43,8 +44,6 @@ BLANKET_STRUCTURES: dict[str, Kind] = {
     "skeleton": "undirected",
     "moral": "undirected",
 }
-#: The largest seed NumPy and torch accept.
-SEED_MAX = 2**32 - 1
 
 
 class Exemption(Spec):
@@ -461,8 +460,8 @@ _CONCEPTS = (
     ),
     Concept(
         key="fdr_method",
-        summary="The correction of the lagged links' p-values for the number of links tested "
-        "(tigramite's name): fdr_bh, the default, replaces them with their Benjamini-Hochberg "
+        summary="The correction of the lagged links' p-values for the number of links tested: "
+        "fdr_bh, the default, replaces them with their Benjamini-Hochberg "
         "adjusted values over all the lagged links together, and none leaves them as tested. A "
         "method whose graph is thresholded on those p-values (pcmci, granger) thresholds the "
         "adjusted ones; a method that decides its links before it reports them (pcmciplus) "
@@ -479,7 +478,6 @@ _CONCEPTS = (
         fragment="benjamini-hochberg",
         suitable=("pcmci", "pcmciplus", "granger"),
         exempt=_exempt(
-            "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
             "The marks come from the removal phases and the orientation rules at alpha, not from "
             "a threshold on the p-values the method reports.",
             "lpcmci",
@@ -560,9 +558,9 @@ _CONCEPTS = (
                     default=None,
                     fixed_in=None,
                     fragment="pc1",
-                    reason="It caps the PC1 step that selects the lagged parents, as tigramite's "
-                    "max_conds_dim does; the later tests condition on those parents, however "
-                    "many, which max_p_global caps in pcmciplus.",
+                    reason="It caps the PC1 step that selects the lagged parents; the later tests "
+                    "condition on those parents, however many, which max_p_global caps in "
+                    "pcmciplus.",
                 )
                 for m in ("pcmci", "pcmciplus")
             ),
@@ -571,7 +569,7 @@ _CONCEPTS = (
     Concept(
         key="max_p_global",
         summary="The largest number of conditions beyond the default conditions every test "
-        "includes (tigramite's LPCMCI name).",
+        "includes.",
         param=_template(
             "max_p_global",
             "int",
@@ -1074,12 +1072,11 @@ _CONCEPTS = (
     ),
     Concept(
         key="structure",
-        summary="The graph a Markov-blanket search returns without a target. The default follows "
-        "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
-        "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
-        "bnlearn's mmpc does (undirected=TRUE). cpdag is the CPDAG of the Grow-Shrink structure "
-        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
-        "Markov blankets.",
+        summary="The graph a Markov-blanket search returns without a target: iamb and inter_iamb "
+        "return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its sets of "
+        "parents and children give. cpdag is the CPDAG of the Grow-Shrink structure learner "
+        "(Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the Markov "
+        "blankets.",
         param=_template(
             "structure",
             "str",
@@ -1100,8 +1097,8 @@ _CONCEPTS = (
                 default="skeleton",
                 choices=("skeleton", "cpdag"),
                 fixed_in=None,
-                reason="bnlearn's mmpc returns the skeleton (undirected=TRUE), which is the graph "
-                "MMPC's sets give; cpdag stays available. MMPC learns parents and children, which "
+                reason="The skeleton is the graph MMPC's sets give (Tsamardinos, Brown and "
+                "Aliferis 2006); cpdag stays available. MMPC learns parents and children, which "
                 "hold no child's other parents, so it has no moral graph to return.",
             ),
         ),
@@ -1164,10 +1161,9 @@ _CONCEPTS = (
                 default="majority",
                 choices=COLLIDER_RULES,
                 fixed_in=None,
-                reason="majority is tigramite's default (contemp_collider_rule) and orients the "
-                "same-step links without regard to the order of the variables, where sepsets reads "
-                "the one separating set the skeleton phase stored, which can change with it "
-                "(Runge 2020).",
+                reason="majority orients the same-step links without regard to the order of the "
+                "variables, where sepsets reads the one separating set the skeleton phase stored, "
+                "which can change with it (Runge 2020).",
             ),
         ),
     ),

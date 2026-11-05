@@ -45,8 +45,7 @@ def _estimate_var(X: np.ndarray, lags: int) -> tuple[np.ndarray, np.ndarray]:
 
     ``ar_coefs`` has shape ``(lags, d, d)`` with ``ar_coefs[tau - 1]`` the lag-``tau`` matrix
     ``A_tau`` (``x(t) ~ sum_tau A_tau x(t - tau)``); ``residuals`` has shape ``(n_samples - lags,
-    d)``, one row per fitted time step. Matches statsmodels ``VAR(X).fit(maxlags=lags,
-    trend="n")``.
+    d)``, one row per fitted time step.
     """
     n_samples, d = X.shape
     if n_samples <= lags:

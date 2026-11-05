@@ -1963,7 +1963,8 @@ _add(
                 default="majority",
                 doc="How a same-step collider is judged: sepsets = the middle is not in the one "
                 "separating set found; majority = fewer than half of the separating subsets hold "
-                "the middle; conservative = none does. The default majority is tigramite's.",
+                "the middle; conservative = none does. The default majority does not depend on the "
+                "order of the variables.",
             ),
             _INDEP_TEST,
             _CATEGORICAL,
@@ -1971,8 +1972,8 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a skeleton or collider test takes beyond the default "
-                "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
-                "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
+                "conditions, the lagged parents of both ends, at least 0; max_depth caps the "
+                "lagged phase. null sets no limit. A cap bounds the number of "
                 "tests and can keep links that a larger conditioning set would remove.",
             ),
             concept_param(
@@ -2039,7 +2040,7 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a test takes beyond the default conditions, the parents "
-                "of both ends, at least 0 (tigramite's name); max_depth elsewhere counts the whole "
+                "of both ends, at least 0; max_depth elsewhere counts the whole "
                 "conditioning set. null sets no limit. A cap bounds the number of tests and can "
                 "keep links that a larger conditioning set would remove.",
             ),

@@ -35,9 +35,8 @@ def directed_adjacency(edges: np.ndarray, d: int) -> np.ndarray:
 def varsortability(x: np.ndarray, adjacency: np.ndarray, *, tol: float = 1e-9) -> float:
     """Varsortability of data ``x`` under directed ``adjacency`` (Reisach et al. 2021), all paths.
 
-    Matches the reference (``github.com/Scriddie/Varsortability``): counts, over directed paths of
-    every length, the fraction ordered by increasing marginal variance; ties (variance ratio within
-    ``tol`` of 1) score ``0.5``.
+    Counts, over directed paths of every length, the fraction ordered by increasing marginal
+    variance; ties (variance ratio within ``tol`` of 1) score ``0.5``.
 
     Parameters
     ----------

@@ -56,9 +56,12 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
 
     Raises
     ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if two of
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if two of
         ``data``'s column names are equal as text.
 
     Notes

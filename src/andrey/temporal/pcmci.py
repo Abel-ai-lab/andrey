@@ -26,12 +26,12 @@ conditional-independence test (:func:`~andrey.core.ci.make_indep_test`) built ov
 categorical mask repeated for every lag. A PC1 round tests all of a target's candidates in one call,
 and MCI tests all links into a target together, grouped by conditioning-set size. Any object with
 ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
-can drive :func:`pc1` and :func:`mci`: a candidate's strength is its test statistic, as in the
-reference implementation, tigramite: the partial correlation, the chi-square or G-square
-statistic, the likelihood ratio of the mixed-data tests, CMIknn's estimate of the conditional
-mutual information, GPDC's squared distance correlation, RCoT's statistic, or KCI's relative to
-its mean under independence. A registered test that reports only p-values is asked one query at a
-time and its candidates are ranked by p-value, smallest first (:class:`~andrey.core.ci.PValueTest`).
+can drive :func:`pc1` and :func:`mci`: a candidate's strength is its test statistic: the partial
+correlation, the chi-square or G-square statistic, the likelihood ratio of the mixed-data tests,
+CMIknn's estimate of the conditional mutual information, GPDC's squared distance correlation, RCoT's
+statistic, or KCI's relative to its mean under independence. A registered test that reports only
+p-values is asked one query at a time and its candidates are ranked by p-value, smallest first
+(:class:`~andrey.core.ci.PValueTest`).
 
 A partial correlation is the correlation of the residuals of ``x`` and ``y`` after a least-squares
 fit on the conditioning columns. The partial-correlation tests, ``"student_t"``

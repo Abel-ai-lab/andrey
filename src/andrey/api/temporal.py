@@ -134,10 +134,12 @@ def varma_lingam(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``order`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``order`` is
         ``(0, 0)``, or if ``data`` has fewer than 2 columns. Also if ``knowledge`` names a column
         ``data`` lacks, contradicts itself, requires a link without a lag or beyond ``order[0]``,
         forbids a lagged link while ``prune=False``, or requires a link at a lag beyond the ``p``
@@ -317,10 +319,12 @@ def longitudinal_lingam(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if
         ``data`` has fewer than two time points, if ``tau_max`` is at least the number of time
         points, if the per-time arrays differ in shape, or if the DataFrames' column names differ.
         Also if ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
@@ -457,21 +461,19 @@ def pcmci(
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
-        distribution, as the authors' reference implementation does. ``"normal_scores"`` applies
-        ``"fisherz"`` to the normal scores of each column of the lagged values, for monotone
-        effects. ``"chisq"`` (Pearson's
-        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical series, coded
-        by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed series, continuous and categorical columns, by a likelihood ratio.
-        Four more tests detect nonlinear dependence in continuous data, at a far higher cost per
-        test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test, and
-        ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
-        tests the method was published with; ``"kci"``, the kernel test; and ``"rcot"``, its
-        random-feature approximation. ``None`` picks from the declared column types: ``"gsq"``
-        when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
-        column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
-        ``bool``, or text type, never by its values.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        distribution. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column
+        of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
+        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
+        mixed series, continuous and categorical columns, by a likelihood ratio. Four more tests
+        detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
+        a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
+        regression with a distance correlation test, the nonlinear tests the method was published
+        with; ``"kci"``, the kernel test; and ``"rcot"``, its random-feature approximation. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
@@ -522,10 +524,12 @@ def pcmci(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the
         length at which every test keeps a degree of freedom. With ``"fisherz"`` or ``"student_t"``,
         also if a variable repeats another up to scale and shift, at the same step or up to ``2 *
@@ -556,20 +560,16 @@ def pcmci(
     statistic, ``"degen_gauss"`` and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
     ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
-    independence. A candidate's strength is the smallest absolute statistic it has had, as in the
-    authors' reference implementation, tigramite; strengths compare within one test only. A test
-    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is
-    asked one query at a time, its candidates are ranked by p-value, smallest first, and its
-    statistic reads ``-log10(p)``.
-    The default, ``"fisherz"``, takes the p-value from Fisher's z-transform of the partial
-    correlation. ``"student_t"`` takes it from the Student-t
-    distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions, as the authors'
-    reference implementation does; its p-values differ slightly, so a link close to ``alpha`` can
-    flip. The partial correlation
-    is the correlation of the least-squares residuals of the two tested values given the
-    conditions. It is computed from the correlation matrix, and from the residuals themselves when
-    the conditions are collinear to working precision, as lagged copies of a strongly
-    autocorrelated series can be.
+    independence. A candidate's strength is the smallest absolute statistic it has had; strengths
+    compare within one test only. A test registered with :func:`~andrey.core.ci.register_indep_test`
+    that reports only p-values is asked one query at a time, its candidates are ranked by p-value,
+    smallest first, and its statistic reads ``-log10(p)``. The default, ``"fisherz"``, takes the
+    p-value from Fisher's z-transform of the partial correlation. ``"student_t"`` takes it from the
+    Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions; its
+    p-values differ slightly, so a link close to ``alpha`` can flip. The partial correlation is the
+    correlation of the least-squares residuals of the two tested values given the conditions. It is
+    computed from the correlation matrix, and from the residuals themselves when the conditions are
+    collinear to working precision, as lagged copies of a strongly autocorrelated series can be.
 
     **Choosing fdr_method.** The MCI step tests ``n_variables ** 2 * tau_max`` links, each at level
     ``alpha``. With ``"none"`` about ``alpha`` of the absent links are returned by chance, so the
@@ -577,11 +577,9 @@ def pcmci(
     ``m`` p-values of the links and gives the one of rank ``k`` the smallest value, over its rank
     and every higher one, of ``p * m / rank``, at most ``1``; equal p-values get equal results. It
     returns fewer links than ``"none"``: the false ones, and also true ones whose p-value is not
-    small enough for the number of tests. The authors' reference implementation, tigramite,
-    corrects the MCI p-values of the same links in the same way with ``fdr_method="fdr_bh"`` and
-    thresholds the adjusted values at ``alpha_level``, as ``alpha`` does here. The PC1 step is not
-    corrected. The guarantee of [4]_ needs independent or positively dependent tests, which the
-    MCI tests of one series are not shown to be.
+    small enough for the number of tests. The links are thresholded at ``alpha`` on the adjusted
+    p-values. The PC1 step is not corrected. The guarantee of [4]_ needs independent or positively
+    dependent tests, which the MCI tests of one series are not shown to be.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
     where every lag a test can condition on exists: the MCI test of a link at lag ``k`` conditions
@@ -758,27 +756,25 @@ def pcmciplus(
         and ``c`` again given every subset of their same-step neighbors and look at the subsets
         that separate them: ``"majority"`` calls the triple a collider when fewer than half hold
         ``b``, and ``"conservative"`` when none does; a triple neither rule can decide is ambiguous
-        and orients nothing. The default, ``"majority"``, is tigramite's, and its orientations do
-        not depend on the order of the variables.
+        and orients nothing. The default, ``"majority"``, gives orientations that do not depend
+        on the order of the variables [1]_.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
-        distribution, as the authors' reference implementation does. ``"normal_scores"`` applies
-        ``"fisherz"`` to the normal scores of each column of the lagged values, for monotone
-        effects. ``"chisq"`` (Pearson's
-        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical series, coded
-        by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed series, continuous and categorical columns, by a likelihood ratio.
-        Four more tests detect nonlinear dependence in continuous data, at a far higher cost per
-        test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test, and
-        ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
-        tests the method was published with; ``"kci"``, the kernel test; and ``"rcot"``, its
-        random-feature approximation. ``None`` picks from the declared column types: ``"gsq"``
-        when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
-        column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
-        ``bool``, or text type, never by its values.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        distribution. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column
+        of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
+        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
+        mixed series, continuous and categorical columns, by a likelihood ratio. Four more tests
+        detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
+        a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
+        regression with a distance correlation test, the nonlinear tests the method was published
+        with; ``"kci"``, the kernel test; and ``"rcot"``, its random-feature approximation. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
@@ -800,12 +796,12 @@ def pcmciplus(
     max_p_global : int or None, default=None
         The most conditions a test of the skeleton and collider phases takes beyond the default
         conditions, at least ``0``: every such test conditions on the lagged parents of both ends,
-        the default conditions, and on a subset of at most ``max_p_global`` same-step neighbors;
-        the cap also bounds the subsets the collider vote reads. It is tigramite's name for this
-        cap, as in :func:`~andrey.lpcmci`. Unlike ``max_depth``, it does not count the default
-        conditions, so a test can condition on more than ``max_p_global`` values. ``None`` sets no
-        limit. The number of tests grows exponentially with the same-step links at one variable; a
-        cap bounds it and can keep links that a larger conditioning set would remove.
+        the default conditions, and on a subset of at most ``max_p_global`` same-step neighbors; the
+        cap also bounds the subsets the collider vote reads. Unlike ``max_depth``, it does not count
+        the default conditions, so a test can condition on more than ``max_p_global`` values.
+        ``None`` sets no limit. The number of tests grows exponentially with the same-step links at
+        one variable; a cap bounds it and can keep links that a larger conditioning set would
+        remove.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -852,10 +848,12 @@ def pcmciplus(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + n_variables + 1``
         rows, the length at which every test keeps a degree of freedom. With ``"fisherz"`` or
         ``"student_t"``, also if a variable repeats another up to scale and shift, at the same step
@@ -900,13 +898,11 @@ def pcmciplus(
     **Choosing fdr_method.** The skeleton phase tests each lagged link at level ``alpha`` and keeps
     the links whose tests all stay at or below it, so absent links are kept by chance, more of them
     as the number of variables grows, whatever ``fdr_method`` is. ``"fdr_bh"`` [4]_ sorts the ``m``
-    lagged-link p-values and gives the one of rank ``k`` the smallest value, over its rank and
-    every higher one, of ``p * m / rank``, at most ``1``; equal p-values get equal results. The
-    reported p-values then show which lagged links of the graph the correction would keep, where
-    ``"none"`` reports them as tested. The authors' reference implementation, tigramite, corrects
-    the lagged p-values it returns in the same way with ``fdr_method="fdr_bh"`` and leaves the
-    graph as the skeleton phase decided it, as this method does. The guarantee of [4]_ needs
-    independent or positively dependent tests, which these tests are not shown to be.
+    lagged-link p-values and gives the one of rank ``k`` the smallest value, over its rank and every
+    higher one, of ``p * m / rank``, at most ``1``; equal p-values get equal results. The reported
+    p-values then show which lagged links of the graph the correction would keep, where ``"none"``
+    reports them as tested. The graph stays as the skeleton phase decided it. The guarantee of [4]_
+    needs independent or positively dependent tests, which these tests are not shown to be.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``.
     Every test reads the lagged values as the columns of one design. ``"fisherz"`` and
@@ -914,17 +910,16 @@ def pcmciplus(
     statistic, ``"degen_gauss"`` and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
     ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
-    independence. A candidate's strength is the smallest absolute statistic it has had, as in the
-    authors' reference implementation, tigramite; strengths compare within one test only. A test
-    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is
-    asked one query at a time, its candidates are ranked by p-value, smallest first, and its
-    statistic reads ``-log10(p)``.
-    The default test, ``"fisherz"``, takes the p-value from Fisher's z-transform of the partial
-    correlation, and ``"student_t"`` from the Student-t distribution with ``n - |S| - 2`` degrees of
-    freedom, for ``|S|`` conditions. The partial correlation is the correlation
-    of the least-squares residuals of the two tested values given the conditions. It is computed
-    from the correlation matrix, and from the residuals themselves when the conditions are collinear
-    to working precision, as lagged copies of a strongly autocorrelated series can be.
+    independence. A candidate's strength is the smallest absolute statistic it has had; strengths
+    compare within one test only. A test registered with :func:`~andrey.core.ci.register_indep_test`
+    that reports only p-values is asked one query at a time, its candidates are ranked by p-value,
+    smallest first, and its statistic reads ``-log10(p)``. The default test, ``"fisherz"``, takes
+    the p-value from Fisher's z-transform of the partial correlation, and ``"student_t"`` from the
+    Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions. The
+    partial correlation is the correlation of the least-squares residuals of the two tested values
+    given the conditions. It is computed from the correlation matrix, and from the residuals
+    themselves when the conditions are collinear to working precision, as lagged copies of a
+    strongly autocorrelated series can be.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
     that reads it holds it, and each test reads only the design rows where all of its lagged
@@ -1065,21 +1060,19 @@ def lpcmci(
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
-        distribution, as the authors' reference implementation does. ``"normal_scores"`` applies
-        ``"fisherz"`` to the normal scores of each column of the lagged values, for monotone
-        effects. ``"chisq"`` (Pearson's
-        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical series, coded
-        by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed series, continuous and categorical columns, by a likelihood ratio.
-        Four more tests detect nonlinear dependence in continuous data, at a far higher cost per
-        test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test, and
-        ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
-        tests the method was published with; ``"kci"``, the kernel test; and ``"rcot"``, its
-        random-feature approximation. ``None`` picks from the declared column types: ``"gsq"``
-        when every column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A
-        column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
-        ``bool``, or text type, never by its values.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        distribution. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column
+        of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
+        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
+        mixed series, continuous and categorical columns, by a likelihood ratio. Four more tests
+        detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
+        a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
+        regression with a distance correlation test, the nonlinear tests the method was published
+        with; ``"kci"``, the kernel test; and ``"rcot"``, its random-feature approximation. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
@@ -1094,15 +1087,14 @@ def lpcmci(
         tests, ``metadata["seed"]`` records the seed used.
     max_p_global : int or None, default=None
         The most conditions a test takes beyond the default conditions, at least ``0``: every test
-        of the removal phases conditions on the parents of both ends, the default conditions, and
-        on a searched subset of at most ``max_p_global`` neighbors; the cap also bounds the subsets
-        the majority vote reads. It is tigramite's name for this cap. Unlike ``max_depth`` on
-        :func:`~andrey.pc` or :func:`~andrey.pcmci`, it does not count the default conditions, so a
-        test can condition on more than ``max_p_global`` nodes. ``None`` sets no limit, as in the
-        paper. The number of tests grows exponentially with the links at one node, so on many
-        strongly related series an uncapped run may not finish. A cap bounds the number of tests,
-        though a capped run can still take long, and can keep links that a larger conditioning set
-        would remove.
+        of the removal phases conditions on the parents of both ends, the default conditions, and on
+        a searched subset of at most ``max_p_global`` neighbors; the cap also bounds the subsets the
+        majority vote reads. Unlike ``max_depth`` on :func:`~andrey.pc` or :func:`~andrey.pcmci`, it
+        does not count the default conditions, so a test can condition on more than ``max_p_global``
+        nodes. ``None`` sets no limit, as in the paper. The number of tests grows exponentially with
+        the links at one node, so on many strongly related series an uncapped run may not finish. A
+        cap bounds the number of tests, though a capped run can still take long, and can keep links
+        that a larger conditioning set would remove.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables: required and forbidden links, the pairs allowed to be linked, and temporal
@@ -1145,10 +1137,12 @@ def lpcmci(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
         rows, the length at which every test keeps a degree of freedom. With ``"fisherz"`` or
         ``"student_t"``, also if a variable repeats another up to scale and shift, at the same step
@@ -1200,21 +1194,19 @@ def lpcmci(
     the variables.
 
     Without missing values, all tests use the same time steps, the last ``n_samples - 2 * tau_max``,
-    and every node a test conditions on lies within ``tau_max`` steps of the later end.
-    Every test reads the lagged values as the columns of one design. ``"fisherz"`` and
-    ``"student_t"`` report the partial correlation, ``"chisq"`` and ``"gsq"`` their chi-square
-    statistic, ``"degen_gauss"`` and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its
-    estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
-    ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
-    independence. A candidate's strength is the smallest absolute statistic it has had, as in the
-    authors' reference implementation, tigramite; strengths compare within one test only. A test
-    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is
-    asked one query at a time, its candidates are ranked by p-value, smallest first, and its
-    statistic reads ``-log10(p)``.
-    A test's partial correlation is computed from the correlation matrix, and from the least-squares
-    residuals when the conditions are collinear to working precision. The defaults are the authors'
-    published defaults. The earlier end of a lagged link is searched with the empty set only, since
-    time order already rules out the later end as its cause.
+    and every node a test conditions on lies within ``tau_max`` steps of the later end. Every test
+    reads the lagged values as the columns of one design. ``"fisherz"`` and ``"student_t"`` report
+    the partial correlation, ``"chisq"`` and ``"gsq"`` their chi-square statistic, ``"degen_gauss"``
+    and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its estimate of the conditional mutual
+    information, ``"gpdc"`` the squared distance correlation, ``"rcot"`` its statistic, and
+    ``"kci"`` its statistic over the statistic's mean under independence. A candidate's strength is
+    the smallest absolute statistic it has had; strengths compare within one test only. A test
+    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is asked
+    one query at a time, its candidates are ranked by p-value, smallest first, and its statistic
+    reads ``-log10(p)``. A test's partial correlation is computed from the correlation matrix, and
+    from the least-squares residuals when the conditions are collinear to working precision. The
+    defaults are the authors' published defaults. The earlier end of a lagged link is searched with
+    the empty set only, since time order already rules out the later end as its cause.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
     that reads it holds it, and each test reads only the design rows where all of its lagged
@@ -1384,10 +1376,12 @@ def granger(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         fewer than ``(n_variables + 1) * tau_max + 2`` rows, so that the regression has no degree of
         freedom left, or fewer than 2 columns, or if a regression is singular, as when one variable
         is a linear combination of others. Also if ``knowledge`` names a column ``data`` lacks,
@@ -1413,15 +1407,13 @@ def granger(
     The test of each coefficient is the F-test of one regressor in Granger's regression [1]_, the
     test a vector autoregression reports for a coefficient [2]_. Its p-value takes the coefficient's
     t-ratio against the Student ``t`` distribution with the regression's residual degrees of
-    freedom, which is exact for Gaussian noise; statsmodels' ``VARResults.pvalues`` takes the same
-    t-ratio against the normal distribution, which gives the same p-values as the series grows. Each
-    link is tested at ``alpha``, and ``fdr_method="none"`` makes no correction for the
-    ``n_variables**2 * tau_max`` tests, so on a series with many variables about ``alpha`` of the
-    absent links appear as edges, which the default ``"fdr_bh"`` avoids; with ``"none"``, lower
-    ``alpha`` or judge the edges by their p-values and weights. The regressions are fitted on
-    standardized variables, so the edges do not depend on the units of any variable; the
-    coefficients are converted back to the data's units. The fit is deterministic and has no random
-    component.
+    freedom, which is exact for Gaussian noise. Each link is tested at ``alpha``, and
+    ``fdr_method="none"`` makes no correction for the ``n_variables**2 * tau_max`` tests, so on a
+    series with many variables about ``alpha`` of the absent links appear as edges, which the
+    default ``"fdr_bh"`` avoids; with ``"none"``, lower ``alpha`` or judge the edges by their
+    p-values and weights. The regressions are fitted on standardized variables, so the edges do not
+    depend on the units of any variable; the coefficients are converted back to the data's units.
+    The fit is deterministic and has no random component.
 
     **Choosing fdr_method.** The method tests ``n_variables ** 2 * tau_max`` links, each at level
     ``alpha``. With ``"none"`` about ``alpha`` of the absent links are returned by chance, so the
@@ -1589,10 +1581,12 @@ def dynotears(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a finite numeric matrix without a constant column, or has fewer than ``tau_max + 2``
         rows, so that fewer than 2 steps have ``tau_max`` steps before them. Also if a column
         repeats another up to scale and shift, as the direction between copies cannot be told
@@ -1667,19 +1661,16 @@ def dynotears(
 
     **Limitations.** The least-squares score with an ``l1`` penalty and the weight thresholds read
     the data's units, as in NOTEARS [4]_ [5]_: rescaling a column changes the fit, and on series
-    whose variance grows along the causal order the fit gains from that order. Measured against the
-    reference implementation on linear structural vector autoregressions of the paper's design [1]_:
-    one lag; Erdos-Renyi same-step graphs of mean degree 2 and lagged graphs of mean in-degree 2,
-    self-lags included, or Barabasi-Albert same-step and two-block lagged graphs up to 50 variables;
-    Gaussian noise, exponential noise of mean zero, and exponential noise of mean 1 as the paper's
-    simulations draw it; 5 to 100 variables; 500 and 50 time steps at the paper's settings for each;
-    20 series per setting, in the data's units. Errors are SHD over the same-step and lagged edges
-    together, means over the series. This method tied the reference implementation in 32 of the 38
-    settings and made fewer errors in 5, all with the noise of mean 1, whose mean the centering
-    above absorbs. It made more in one: exponential noise of mean zero at 100 variables and 50 time
-    steps, about 3 to 4 more of about 150 on two sets of 20 series. The centering is the cause: on
-    those 40 series the same fit without it made 3.50 fewer errors (95% interval 1.48 to 5.50) and
-    tied with the reference implementation. With noise of mean zero the means it estimates are zero,
+    whose variance grows along the causal order the fit gains from that order. Measured on linear
+    structural vector autoregressions of the paper's design [1]_: one lag; Erdos-Renyi same-step
+    graphs of mean degree 2 and lagged graphs of mean in-degree 2, self-lags included, or
+    Barabasi-Albert same-step and two-block lagged graphs up to 50 variables; Gaussian noise,
+    exponential noise of mean zero, and exponential noise of mean 1 as the paper's simulations draw
+    it; 5 to 100 variables; 500 and 50 time steps at the paper's settings for each; 20 series per
+    setting, in the data's units. Errors are SHD over the same-step and lagged edges together, means
+    over the series. The centering above can cost errors: with exponential noise of mean zero at 100
+    variables and 50 time steps, on 40 series, the same fit without it made 3.50 fewer errors (95%
+    interval 1.48 to 5.50) of about 150. With noise of mean zero the means it estimates are zero,
     and estimating them costs about one time step of data, which shows only where the fit has more
     weights than steps. At 500 time steps and the default settings the errors were 0.15 to 6.25,
     against the empty graph's 13.5 to 283.2, with F1 at least 0.969. The defaults made more errors

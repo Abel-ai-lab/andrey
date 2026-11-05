@@ -20,7 +20,7 @@ import pytest
 
 import andrey
 from andrey.api import _method as method_wrapper
-from andrey.api._method import PENALTIES
+from andrey.api._method import PENALTIES, SCORE_ONLY
 from andrey.core import ci, warning_policy
 from andrey.core import score as score_module
 from andrey.core.knowledge import KNOWLEDGE_PARTS
@@ -171,6 +171,77 @@ def test_docstring_entry_states_the_concept(concept, method):
     name = tagged(concept, method).name  # ty: ignore[possibly-missing-attribute]
     entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[name]
     assert fragment.lower() in entry
+
+
+def docstring_section(doc: str, title: str) -> str:
+    """The text of one numpydoc section, up to the next section heading."""
+    section = doc.split(f"\n{title}\n{'-' * len(title)}\n", 1)[1]
+    return re.split(r"\n[A-Z][A-Za-z ]+\n-{3,}\n", section)[0]
+
+
+def raises_entries(doc: str) -> dict[str, str]:
+    """Each ``Raises`` entry's description by exception, lowercase, markup and breaks removed."""
+    entries: dict[str, list[str]] = {}
+    name = None
+    for line in docstring_section(doc, "Raises").splitlines():
+        if re.fullmatch(r"[A-Z]\w*", line):
+            name = line
+            entries[name] = []
+        elif name:
+            entries[name].append(line)
+    return {k: " ".join(" ".join(v).replace("`", "").lower().split()) for k, v in entries.items()}
+
+
+@pytest.mark.parametrize("method", list(REGISTRY))
+def test_raises_lists_each_bad_value_under_the_error_it_raises(method):
+    """A wrong-typed argument raises ``TypeError`` and one outside its range or choices raises
+    ``ValueError`` (``test_a_bad_value_raises_one_message_shape``); the Raises section says so."""
+    entries = raises_entries(inspect.getdoc(getattr(andrey, method)) or "")
+    assert "wrong type" in entries.get("TypeError", "")
+    assert "wrong type" not in entries.get("ValueError", "")
+    assert "outside its range" in entries.get("ValueError", "")
+
+
+@pytest.mark.parametrize(
+    ("method", "name"),
+    [
+        pytest.param(m, p.name, id=f"{m}-{p.name}")
+        for m in REGISTRY
+        if tagged(CONCEPTS["score_func"], m)
+        for p in REGISTRY[m].params
+        if p.concept in SCORE_ONLY
+    ],
+)
+def test_an_argument_one_score_reads_is_documented_as_the_call_checks_it(method, name):
+    """Passing an argument that one score reads with another score raises before the fit
+    (``check_penalties``), and its entry says so instead of saying the other scores ignore it."""
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[name]
+    assert "passing it with another score raises valueerror" in entry
+    assert "ignore" not in entry
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if tagged(CONCEPTS["ebic_gamma"], m)])
+def test_the_ebic_gamma_entry_states_the_bounds_the_call_checks(method):
+    param = tagged(CONCEPTS["ebic_gamma"], method)
+    assert param is not None
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[param.name]
+    assert f"from {param.minimum:g} to {param.maximum:g}" in entry
+
+
+@pytest.mark.parametrize("method", list(REGISTRY))
+def test_no_parameter_entry_states_a_sentence_twice(method):
+    for name, entry in docstring_entries(inspect.getdoc(getattr(andrey, method)) or "").items():
+        sentences = [s for s in re.split(r"(?<=\.) ", entry) if len(s.split()) > 3]
+        repeated = {s for s in sentences if sentences.count(s) > 1}
+        assert not repeated, f"{method}.{name}: {sorted(repeated)}"
+
+
+@pytest.mark.parametrize(
+    "method", [m for m, spec in REGISTRY.items() if "categorical" in spec.output.metadata]
+)
+def test_returns_names_the_categorical_columns_a_fit_records(method):
+    returns = docstring_section(inspect.getdoc(getattr(andrey, method)) or "", "Returns")
+    assert 'metadata["categorical"]' in returns
 
 
 # --- behaviors ------------------------------------------------------------------------------------
@@ -1193,6 +1264,21 @@ def test_documented_method_lists_match_the_table():
         else:
             takes = {m for m in REGISTRY if tagged(CONCEPTS[key], m) is not None}
         assert named == takes, f"{key}: documented {sorted(named)}, table {sorted(takes)}"
+
+
+def test_the_bootstrap_docstring_names_the_methods_it_stratifies_and_makes_a_cpdag():
+    """Every method that takes ``targets`` is resampled within each environment, and those that
+    return a CPDAG get a CPDAG without the targets as the averaged graph; the docstring names
+    exactly them."""
+    doc = " ".join((inspect.getdoc(andrey.bootstrap) or "").split())
+    stratified = re.search(r"takes ``targets`` \(([^)]*)\)", doc)
+    cpdag = re.search(r"takes ``targets`` and returns a CPDAG \(([^)]*)\)", doc)
+    assert stratified and cpdag
+    takes = {m for m, spec in REGISTRY.items() if any(p.type == "targets" for p in spec.params)}
+    assert set(re.findall(r"``(\w+)``", stratified.group(1))) == takes
+    assert set(re.findall(r"``(\w+)``", cpdag.group(1))) == {
+        m for m in takes if REGISTRY[m].output.graph_kind == "cpdag"
+    }
 
 
 def test_the_graph_types_guide_lists_each_method_under_its_kind():

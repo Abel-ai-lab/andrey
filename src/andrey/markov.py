@@ -42,8 +42,8 @@ Fact = tuple[int, int, tuple[int, ...]]
 class MarkovCheckOutput:
     """The result of :func:`~andrey.markov_check`.
 
-    It holds one p-value for each independence the graph implies, and the test of whether those
-    p-values look uniform.
+    It holds one p-value for each tested independence, and the test of whether those p-values look
+    uniform.
 
     ``structure`` is the graph as checked, and ``dag`` the DAG whose independences were tested (the
     graph itself for a DAG, a consistent extension for a CPDAG). ``p_values`` and ``table`` list the
@@ -219,7 +219,7 @@ def markov_check(
     -----
     **Rows per test.** The tests read the same data, so their p-values are uniform one by one but
     not independent, and the Anderson-Darling p-value assumes independence. With every test on every
-    row (``sample_fraction=1.0``, the script of [1]_ and the default of Tetrad), the check rejected
+    row (``sample_fraction=1.0``, the script of [1]_), the check rejected
     a true graph in 9% to 21% of 1,000 simulated linear datasets per cell at ``alpha=0.05``, more
     with more tests (10 and 20 variables, average degree 2 and 4, 200 and 1,000 rows). With each
     test on its own random half of the rows (the default, as in the text of [1]_), the rate was 6%
