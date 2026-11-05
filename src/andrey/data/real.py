@@ -166,13 +166,15 @@ immune-system cells, in all nine conditions: 7,466 cells. The first condition is
 observational cells; in each other one a reagent stimulated or inhibited the network. ``env``
 gives each cell's condition as a code, in the order of ``conditions``, and ``targets`` the measured
 variables each reagent acts on, as Mooij, Magliacane, and Claassen (2020, Table 3) read the
-reagents: none for CD3/CD28 and ICAM-2, akt, pkc, pip2, mek, and pip2 with pip3 for the AKT
-inhibitor, G0076, psitectorigenin, U0126, and LY294002, and unknown for PMA and b2cAMP, which
-leave out the CD3/CD28 stimulation. The AKT inhibitor, G0076, and U0126 inhibit an enzyme's
-activity rather than its measured abundance, so they change the mechanisms of their targets'
-children more than the targets themselves (Mooij and Heskes 2013). The graph is the 17-arc
-consensus network; Mooij, Magliacane, and Claassen (2020) note it is contested, with evidence of
-feedback from mek to raf and of mek independent of erk.
+reagents: akt for the AKT inhibitor, pkc for G0076, pip2 for psitectorigenin, mek for U0126, and
+pip2 and pip3 for LY294002. ICAM-2, which Table 3 calls a global activator like CD3/CD28, has no
+measured target, so its targets, like the first condition's, are ``[]``, which the methods that
+take ``targets`` read as observational. PMA and b2cAMP leave out the CD3/CD28 stimulation, so their
+targets are unknown (``None``). The AKT inhibitor, G0076, and U0126 inhibit an enzyme's activity
+rather than its measured abundance, so they change the mechanisms of their targets' children more
+than the targets themselves (Mooij and Heskes 2013). The graph is the 17-arc consensus network;
+Mooij, Magliacane, and Claassen (2020) note it is contested, with evidence of feedback from mek to
+raf and of mek independent of erk.
 
 Source: cmu-phil/example-causal-datasets (CC0-1.0),
 real/sachs/data/sachs.2005.with.jittered.experimental.continuous.txt, whose jittered 0/1 indicator
@@ -599,9 +601,10 @@ def load_dataset(
         With ``"sachs"``, load all nine conditions, 7,466 cells, instead of the 853 observational
         ones, with each cell's condition in ``env``, the reagents' declared targets in
         ``targets``, and the conditions' names in ``conditions``: data from several environments,
-        for :func:`~andrey.cdnod`, :func:`~andrey.gies`, :func:`~andrey.gnies`,
-        :func:`~andrey.icp`, :func:`~andrey.igsp`, and :func:`~andrey.ut_igsp`. The other
-        datasets take no ``conditions``.
+        for :func:`~andrey.cdnod`, :func:`~andrey.gnies`, :func:`~andrey.icp`, and
+        :func:`~andrey.ut_igsp`, and, on the rows of the seven conditions whose targets are known,
+        for :func:`~andrey.gies` and :func:`~andrey.igsp`, which need every condition's targets.
+        The other datasets take no ``conditions``.
     shuffle : bool, default=True
         List a published network's variables in an order drawn from the seed, with
         ``feature_names`` and the graph's labels in the same order. A network file lists its

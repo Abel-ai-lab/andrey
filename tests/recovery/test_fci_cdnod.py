@@ -618,9 +618,8 @@ def sachs_conditions(tmp_path_factory):
 
 
 def test_the_sachs_conditions_env_removes_the_adjacencies_pooling_adds(sachs_conditions):
-    """Pooled across the nine conditions, PC keeps adjacencies under half of which are in the
-    consensus network; with the condition as a categorical ``env``, CD-NOD keeps 9, 8 of them in it.
-    """
+    """Pooled across the nine conditions, under half of PC's adjacencies are in the consensus
+    network; with the condition as a categorical ``env``, over 85% of CD-NOD's are."""
     from andrey.metrics import skeleton_scores
 
     data, env, consensus = sachs_conditions

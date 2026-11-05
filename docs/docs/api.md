@@ -818,13 +818,18 @@ the 853 observational cells and eight conditions in which a reagent stimulated o
 network. `env` gives each cell's condition as a code and `conditions` their names, and `targets`
 the measured variables each reagent acts on, `None` for PMA and b2cAMP, whose targets are unknown.
 They are the inputs of the methods that take `env`: `cdnod`, `gies`, `gnies`, `icp`, `igsp`, and
-`ut_igsp`. `gies` and `igsp` need every condition's targets, so they take the seven whose targets
-are known; `ut_igsp` learns the other two:
+`ut_igsp`. `gies` and `igsp` need every condition's targets, so you pass them the rows of the
+seven conditions whose targets are known; `ut_igsp` takes all nine and learns each condition's
+targets beyond the declared ones:
 
 ```python
 pooled = load_dataset("sachs", conditions=True)
 andrey.cdnod(pooled.data, env=pooled.env)
 andrey.ut_igsp(pooled.data, pooled.env, targets=pooled.targets)
+
+known = {k: cols for k, cols in pooled.targets.items() if cols is not None}
+rows = np.isin(pooled.env, list(known))
+andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
 ```
 
 ```{eval-rst}

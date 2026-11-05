@@ -88,10 +88,19 @@ def test_sachs_conditions_run_the_methods_that_take_env(offline_datasets):
     pooled = load_dataset("sachs", conditions=True)
     known = {k: cols for k, cols in pooled.targets.items() if cols is not None}
     rows = np.isin(pooled.env, list(known))
-    andrey.gies(pooled.data[rows], env=pooled.env[rows], targets=known)
-    with pytest.raises(ValueError, match="no variables"):
-        andrey.gies(pooled.data, env=pooled.env, targets=pooled.targets)
-    andrey.cdnod(pooled.data, env=pooled.env)
+    for method in (andrey.gies, andrey.igsp):
+        with pytest.raises(ValueError, match=r"no variables for environments \[7, 8\]"):
+            method(pooled.data, pooled.env, targets=pooled.targets)
+    outs = [
+        andrey.gies(pooled.data[rows], pooled.env[rows], targets=known),
+        andrey.igsp(pooled.data[rows], pooled.env[rows], targets=known),
+        andrey.cdnod(pooled.data, env=pooled.env),
+        andrey.gnies(pooled.data, pooled.env, targets=pooled.targets),
+    ]
+    assert all(tuple(out.structure.labels) == real.SACHS_NODES for out in outs)
+    learned = andrey.ut_igsp(pooled.data, pooled.env, targets=pooled.targets).metadata["targets"]
+    for k, cols in known.items():
+        assert {pooled.feature_names[j] for j in cols} <= set(learned[k])
 
 
 def test_sachs_conditions_cache_under_their_own_file(offline_datasets, tmp_path):
