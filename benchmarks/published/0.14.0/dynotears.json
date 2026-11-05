@@ -18,8 +18,8 @@
  "fit_protocol": "one timed fit per series, no warm-up, one BLAS thread on one core, four fits at a time on four cores, a 3600 s wall cap per fit; andrey_cpu_s and comparator_cpu_s are the medians of the fits' CPU time, cpu_ratio the median over the paired series of CausalNex's CPU time over Andrey's, with its bootstrap 95% interval",
  "error_metric": "edge SHD over the window of lags 0 and 1: a same-step pair whose state differs (missing, extra, or reversed) costs 1, a lagged link in one graph and not the other costs 1 (lag0_shd + lagged_shd = shd); F1 of the directed edges, per block and over both; the _mean fields are means over the paired series",
  "parity_rule": "paired bootstrap",
- "verdict_rule": "D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0. Settings with claim 'out' are reported, not judged",
- "seeds_note": "20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39",
+ "verdict_rule": "D = SHD(Andrey) - SHD(CausalNex) per series on the series both finished; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a setting in claim with at least 10 pairs is worse when the interval lies above 0, better when below, a tie otherwise; a worse setting is run again on 20 fresh seeds (20-39, the replication in its row) and counts as worse only if the replication's interval also lies above 0; a better setting is run again the same way and counts as better only if its replication's interval also lies below 0. Settings with claim 'out' are reported, not judged",
+ "seeds_note": "20 series per setting in claim (seeds 0-19), 10 per setting out of claim (seeds 0-9); replications on seeds 20-39 of every setting judged worse or better",
  "identity": "the 0.14.0 build's tie ranks keep the column order of all 640 stored series, the fit's code is otherwise unchanged, and refitted on that build 580 of 580 recorded Andrey fits (every one up to 50 variables, and the 20 of exponential noise at 100 variables and 50 steps on seeds 0-19) return the same structure_hash",
  "settings": {
   "n500": "the paper's settings for 500 steps and Andrey's defaults: lambda1 0.05, w_threshold 0.3, lag_threshold 0.1, tau_max 1",
@@ -39,7 +39,8 @@
  "timeouts": 0,
  "differences": {
   "500_steps": "in claim, 34 of the 280 paired series end on a different graph; CausalNex on centered columns (fitted on those 34 alone) returns Andrey's graph on 29. Of the other 5, Andrey's graph changes on 4 when the data are multiplied by 1 + 1e-12 noise or the columns are fitted in their given order. On the fifth (exponential noise, 20 variables, seed 1) neither moves either package's graph; the one edge that differs is a true lagged edge of weight 0.10026 in Andrey's fit and 0.09975 in CausalNex's on centered columns, against the threshold 0.1, the largest weight difference between the two fits being 0.0048",
-  "50_steps": "every run has the centered arm (same_graph in each row's centered block). At 100 variables, on 4 exponential-noise series where Andrey's graph differs from CausalNex's on centered columns: Andrey stops on h_tol (h_final below 1e-8) with no edge removed by the cycle repair, refitting at rho_max 1e20 keeps the graph on 3 and matches CausalNex on none, and multiplying the data by 1 + 1e-12 noise changes the graph on 3 of the 4 (SHD -5, +4, -2; on one series to CausalNex's graph exactly), the columns in their given order on 2"
+  "50_steps": "every run has the centered arm (same_graph in each row's centered block). At 100 variables, on 4 exponential-noise series where Andrey's graph differs from CausalNex's on centered columns: Andrey stops on h_tol (h_final below 1e-8) with no edge removed by the cycle repair, refitting at rho_max 1e20 keeps the graph on 3 and matches CausalNex on none, and multiplying the data by 1 + 1e-12 noise changes the graph on 3 of the 4 (SHD -5, +4, -2; on one series to CausalNex's graph exactly), the columns in their given order on 2",
+  "mean_1": "with exponential noise of mean 1, 36 paired series end on a graph other than CausalNex's on centered columns, 13 of them at 50 steps and 100 variables; 27 were traced (4 of those 13). On 24 the data multiplied by 1 + 1e-12 noise or the columns fitted in their given order changes Andrey's graph; on the other 3 the one edge that differs has a weight within 0.002 of the threshold in both fits (0.19848 and 0.20013 against 0.2; 0.09856 and 0.10018, and 0.09848 and 0.10031, against 0.1)"
  },
  "centering": {
   "what": "Andrey's fit with its columns not centered (the second moments in place of the covariance), on the exponential-noise series of mean 0 at 50 steps and 100 variables; D is a paired mean difference of SHD with its bootstrap 95% interval",
@@ -102,11 +103,12 @@
   },
   "weights_of_true_edges_seeds_0_19": "mean magnitude centered minus not centered: same-step -0.014, self-lags -0.017, cross-lags -0.002; the share of true edges whose magnitude shrinks: 51%, 54%, 41%"
  },
+ "comparator_minus_empty_note": "mean_D_comparator_empty and bootstrap_95_comparator_empty, in every row and replication: the mean over the paired series of CausalNex's SHD minus the empty window's, and its percentile bootstrap 95% interval, beside Andrey's mean_D_empty and bootstrap_95_empty. They come from a refit of every series on a second machine, an AMD EPYC 9534, with CausalNex 0.12.2 on Python 3.10 and OpenBLAS's SKYLAKEX kernel. The interval draws 10,000 resamples of the paired series in seed order with NumPy's default_rng(0) and takes percentiles 2.5 and 97.5; the seed of the lane's other intervals is not recorded, so these use their own. The refit reproduces the empty window's SHD on every row and replication, every CausalNex fit finishes again, and CausalNex's mean errors match the published ones in 51 of the 59 rows and replications. In the other 8, all at 100 variables, CausalNex's mean SHD differs by at most 1.05 and its interval against the empty window lies at least 125 below 0, so no floor decision changes; mean_D_comparator_empty there is the refit's mean.",
  "methods": [
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_paper",
    "length": 500,
@@ -188,6 +190,11 @@
      "bootstrap_95_empty": [
       -14.15,
       -12.498750000000019
+     ],
+     "mean_D_comparator_empty": -13.35,
+     "bootstrap_95_comparator_empty": [
+      -14.15,
+      -12.5
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -275,6 +282,11 @@
       -29.85,
       -25.5
      ],
+     "mean_D_comparator_empty": -27.5,
+     "bootstrap_95_comparator_empty": [
+      -29.8,
+      -25.45
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -360,6 +372,11 @@
      "bootstrap_95_empty": [
       -59.05,
       -53.45
+     ],
+     "mean_D_comparator_empty": -56.35,
+     "bootstrap_95_comparator_empty": [
+      -59.05,
+      -53.5
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -447,6 +464,11 @@
       -147.25,
       -139.4
      ],
+     "mean_D_comparator_empty": -142.8,
+     "bootstrap_95_comparator_empty": [
+      -146.65,
+      -139.0
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -533,6 +555,11 @@
       -286.85,
       -273.15
      ],
+     "mean_D_comparator_empty": -279.9,
+     "bootstrap_95_comparator_empty": [
+      -286.55,
+      -273.05
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -548,7 +575,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n50",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n50",
    "regime": "dynotears_paper",
    "length": 50,
@@ -633,6 +660,11 @@
      "bootstrap_95_empty": [
       -9.3,
       -7.7
+     ],
+     "mean_D_comparator_empty": -8.15,
+     "bootstrap_95_comparator_empty": [
+      -9.05,
+      -7.3
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -765,6 +797,11 @@
       -19.1,
       -14.8
      ],
+     "mean_D_comparator_empty": -17.1,
+     "bootstrap_95_comparator_empty": [
+      -19.3,
+      -15.0
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -896,6 +933,11 @@
       -39.90125,
       -31.95
      ],
+     "mean_D_comparator_empty": -36.85,
+     "bootstrap_95_comparator_empty": [
+      -40.4,
+      -33.1
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -1016,6 +1058,11 @@
       "bootstrap_95_empty": [
        -38.9,
        -33.148750000000014
+      ],
+      "mean_D_comparator_empty": -36.75,
+      "bootstrap_95_comparator_empty": [
+       -39.15,
+       -34.2
       ],
       "andrey_worse_than_empty": 0,
       "comparator_worse_than_empty": 0,
@@ -1148,6 +1195,11 @@
       -89.7,
       -80.6
      ],
+     "mean_D_comparator_empty": -85.55,
+     "bootstrap_95_comparator_empty": [
+      -90.35,
+      -81.05
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -1279,6 +1331,11 @@
       -146.45,
       -131.89875000000004
      ],
+     "mean_D_comparator_empty": -145.15,
+     "bootstrap_95_comparator_empty": [
+      -152.8,
+      -137.25
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -1400,6 +1457,11 @@
        -144.75,
        -134.6
       ],
+      "mean_D_comparator_empty": -141.7,
+      "bootstrap_95_comparator_empty": [
+       -147.3,
+       -135.24875000000003
+      ],
       "andrey_worse_than_empty": 0,
       "comparator_worse_than_empty": 0,
       "centered": {
@@ -1457,7 +1519,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_paper_exponential",
    "length": 500,
@@ -1537,6 +1599,11 @@
      "empty_shd_mean": 13.5,
      "mean_D_empty": -13.35,
      "bootstrap_95_empty": [
+      -14.15,
+      -12.5
+     ],
+     "mean_D_comparator_empty": -13.35,
+     "bootstrap_95_comparator_empty": [
       -14.15,
       -12.5
      ],
@@ -1626,6 +1693,11 @@
       -30.15,
       -25.9
      ],
+     "mean_D_comparator_empty": -28.0,
+     "bootstrap_95_comparator_empty": [
+      -30.3,
+      -25.95
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -1711,6 +1783,11 @@
      "bootstrap_95_empty": [
       -59.0,
       -53.6
+     ],
+     "mean_D_comparator_empty": -56.3,
+     "bootstrap_95_comparator_empty": [
+      -58.95,
+      -53.55
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -1798,6 +1875,11 @@
       -146.4,
       -138.65
      ],
+     "mean_D_comparator_empty": -142.6,
+     "bootstrap_95_comparator_empty": [
+      -146.45125,
+      -138.75
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -1884,6 +1966,11 @@
       -285.35,
       -267.99875000000003
      ],
+     "mean_D_comparator_empty": -276.9,
+     "bootstrap_95_comparator_empty": [
+      -285.45,
+      -267.6
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -1899,7 +1986,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n50",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n50",
    "regime": "dynotears_paper_exponential",
    "length": 50,
@@ -1984,6 +2071,11 @@
      "bootstrap_95_empty": [
       -9.0,
       -7.3
+     ],
+     "mean_D_comparator_empty": -8.25,
+     "bootstrap_95_comparator_empty": [
+      -9.1,
+      -7.45
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -2116,6 +2208,11 @@
       -18.7,
       -14.25
      ],
+     "mean_D_comparator_empty": -16.55,
+     "bootstrap_95_comparator_empty": [
+      -18.95,
+      -14.3
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -2246,6 +2343,11 @@
      "bootstrap_95_empty": [
       -37.85,
       -30.5
+     ],
+     "mean_D_comparator_empty": -34.25,
+     "bootstrap_95_comparator_empty": [
+      -38.0,
+      -30.6
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -2378,6 +2480,11 @@
       -88.7,
       -81.25
      ],
+     "mean_D_comparator_empty": -85.75,
+     "bootstrap_95_comparator_empty": [
+      -89.05,
+      -82.3
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -2509,6 +2616,11 @@
       -142.05,
       -126.05
      ],
+     "mean_D_comparator_empty": -137.2,
+     "bootstrap_95_comparator_empty": [
+      -144.2,
+      -129.85
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -2630,6 +2742,11 @@
        -138.05,
        -121.55
       ],
+      "mean_D_comparator_empty": -134.1,
+      "bootstrap_95_comparator_empty": [
+       -141.85,
+       -125.6
+      ],
       "andrey_worse_than_empty": 0,
       "comparator_worse_than_empty": 0,
       "centered": {
@@ -2687,7 +2804,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_paper_ba_sbm",
    "length": 500,
@@ -2768,6 +2885,11 @@
      "mean_D_empty": -13.9,
      "bootstrap_95_empty": [
       -14.9,
+      -12.9
+     ],
+     "mean_D_comparator_empty": -13.9,
+     "bootstrap_95_comparator_empty": [
+      -14.95,
       -12.9
      ],
      "andrey_worse_than_empty": 0,
@@ -2856,6 +2978,11 @@
       -33.45,
       -29.05
      ],
+     "mean_D_comparator_empty": -31.2,
+     "bootstrap_95_comparator_empty": [
+      -33.3,
+      -29.05
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -2941,6 +3068,11 @@
      "bootstrap_95_empty": [
       -69.15,
       -65.2
+     ],
+     "mean_D_comparator_empty": -67.2,
+     "bootstrap_95_comparator_empty": [
+      -69.1,
+      -65.15
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -3028,6 +3160,11 @@
       -179.05,
       -170.75
      ],
+     "mean_D_comparator_empty": -174.65,
+     "bootstrap_95_comparator_empty": [
+      -178.95,
+      -170.5
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "verdict": "tie",
@@ -3043,7 +3180,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n50",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n50",
    "regime": "dynotears_paper_ba_sbm",
    "length": 50,
@@ -3128,6 +3265,11 @@
      "bootstrap_95_empty": [
       -9.5,
       -7.5
+     ],
+     "mean_D_comparator_empty": -8.8,
+     "bootstrap_95_comparator_empty": [
+      -9.8,
+      -7.8
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -3260,6 +3402,11 @@
       -22.75,
       -19.45
      ],
+     "mean_D_comparator_empty": -21.45,
+     "bootstrap_95_comparator_empty": [
+      -23.1,
+      -19.8
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -3380,6 +3527,11 @@
       "bootstrap_95_empty": [
        -25.4,
        -21.05
+      ],
+      "mean_D_comparator_empty": -23.4,
+      "bootstrap_95_comparator_empty": [
+       -25.45,
+       -21.4
       ],
       "andrey_worse_than_empty": 0,
       "comparator_worse_than_empty": 0,
@@ -3512,6 +3664,11 @@
       -46.9,
       -40.1
      ],
+     "mean_D_comparator_empty": -44.35,
+     "bootstrap_95_comparator_empty": [
+      -47.85,
+      -40.8
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -3643,6 +3800,11 @@
       -94.4,
       -82.29875000000001
      ],
+     "mean_D_comparator_empty": -88.8,
+     "bootstrap_95_comparator_empty": [
+      -95.55125,
+      -82.65
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -3700,7 +3862,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_paper_uncentered",
    "length": 500,
@@ -3786,6 +3948,11 @@
       -14.15,
       -12.45
      ],
+     "mean_D_comparator_empty": -8.65,
+     "bootstrap_95_comparator_empty": [
+      -10.3,
+      -6.75
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 1,
      "centered": {
@@ -3836,6 +4003,132 @@
      },
      "verdict": "better",
      "complete": true,
+     "replication": {
+      "seeds": [
+       20,
+       39
+      ],
+      "andrey_ok": 20,
+      "andrey_timeouts": 0,
+      "andrey_failed": 0,
+      "comparator_ok": 20,
+      "comparator_timeouts": 0,
+      "comparator_failed": 0,
+      "centered_ok": 20,
+      "centered_timeouts": 0,
+      "centered_failed": 0,
+      "andrey_shd_mean": 1.05,
+      "andrey_lag0_shd_mean": 0.15,
+      "andrey_lagged_shd_mean": 0.9,
+      "andrey_f1_mean": 0.9595557625495706,
+      "andrey_lag0_f1_mean": 0.9761904761904763,
+      "andrey_lagged_f1_mean": 0.9502523018776889,
+      "andrey_cpu_s": 0.3925345,
+      "andrey_wall_s": 0.39256076514720917,
+      "paired": 20,
+      "same_graph": 0,
+      "comparator_shd_mean": 8.95,
+      "comparator_lag0_shd_mean": 0.7,
+      "comparator_lagged_shd_mean": 8.25,
+      "comparator_f1_mean": 0.7013908311289456,
+      "comparator_lag0_f1_mean": 0.9194771894771895,
+      "comparator_lagged_f1_mean": 0.6121966366929013,
+      "mean_D": -7.9,
+      "bootstrap_95": [
+       -9.4,
+       -6.35
+      ],
+      "above_zero": false,
+      "below_zero": true,
+      "mean_D_lag0_shd": -0.55,
+      "bootstrap_95_lag0_shd": [
+       -1.05,
+       -0.15
+      ],
+      "mean_D_lagged_shd": -7.35,
+      "bootstrap_95_lagged_shd": [
+       -8.75,
+       -5.95
+      ],
+      "mean_D_f1": 0.25816493142062497,
+      "bootstrap_95_f1": [
+       0.2052735940686612,
+       0.3110780751417876
+      ],
+      "mean_D_lag0_f1": 0.05671328671328672,
+      "bootstrap_95_lag0_f1": [
+       0.013636363636363641,
+       0.10769696969696967
+      ],
+      "mean_D_lagged_f1": 0.3380556651847875,
+      "bootstrap_95_lagged_f1": [
+       0.2683414746944848,
+       0.4051774437282741
+      ],
+      "andrey_fewer_errors": 20,
+      "comparator_fewer_errors": 0,
+      "comparator_cpu_s": 0.701276,
+      "empty_shd_mean": 13.7,
+      "mean_D_empty": -12.65,
+      "bootstrap_95_empty": [
+       -14.1,
+       -11.25
+      ],
+      "mean_D_comparator_empty": -4.75,
+      "bootstrap_95_comparator_empty": [
+       -7.1012499999999985,
+       -2.4
+      ],
+      "andrey_worse_than_empty": 0,
+      "comparator_worse_than_empty": 3,
+      "centered": {
+       "comparator_solution": "causalnex.dynotears.centered.n500",
+       "paired": 20,
+       "same_graph": 20,
+       "centered_shd_mean": 1.05,
+       "centered_lag0_shd_mean": 0.15,
+       "centered_lagged_shd_mean": 0.9,
+       "centered_f1_mean": 0.9595557625495706,
+       "centered_lag0_f1_mean": 0.9761904761904763,
+       "centered_lagged_f1_mean": 0.9502523018776889,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ],
+       "above_zero": false,
+       "below_zero": false,
+       "bootstrap_95_lag0_shd": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_shd": [
+        0.0,
+        0.0
+       ],
+       "mean_D_f1": 0.0,
+       "bootstrap_95_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lag0_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_f1": [
+        0.0,
+        0.0
+       ],
+       "andrey_fewer_errors": 0,
+       "centered_fewer_errors": 0,
+       "mean_D_vs_comparator": -7.9,
+       "bootstrap_95_vs_comparator": [
+        -9.4,
+        -6.35
+       ]
+      },
+      "verdict": "better"
+     },
      "final_verdict": "better"
     },
     {
@@ -3917,6 +4210,11 @@
       -30.2,
       -25.9
      ],
+     "mean_D_comparator_empty": -16.85,
+     "bootstrap_95_comparator_empty": [
+      -22.0,
+      -11.5
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 2,
      "centered": {
@@ -3967,6 +4265,132 @@
      },
      "verdict": "better",
      "complete": true,
+     "replication": {
+      "seeds": [
+       20,
+       39
+      ],
+      "andrey_ok": 20,
+      "andrey_timeouts": 0,
+      "andrey_failed": 0,
+      "comparator_ok": 20,
+      "comparator_timeouts": 0,
+      "comparator_failed": 0,
+      "centered_ok": 20,
+      "centered_timeouts": 0,
+      "centered_failed": 0,
+      "andrey_shd_mean": 1.25,
+      "andrey_lag0_shd_mean": 0.2,
+      "andrey_lagged_shd_mean": 1.05,
+      "andrey_f1_mean": 0.9775768392509466,
+      "andrey_lag0_f1_mean": 0.9833821070234114,
+      "andrey_lagged_f1_mean": 0.9743330482283972,
+      "andrey_cpu_s": 0.7323530000000001,
+      "andrey_wall_s": 0.7323346119374037,
+      "paired": 20,
+      "same_graph": 1,
+      "comparator_shd_mean": 12.9,
+      "comparator_lag0_shd_mean": 0.25,
+      "comparator_lagged_shd_mean": 12.65,
+      "comparator_f1_mean": 0.8012098215639669,
+      "comparator_lag0_f1_mean": 0.9848235930735931,
+      "comparator_lagged_f1_mean": 0.7347128823598343,
+      "mean_D": -11.65,
+      "bootstrap_95": [
+       -14.9,
+       -8.55
+      ],
+      "above_zero": false,
+      "below_zero": true,
+      "mean_D_lag0_shd": -0.05,
+      "bootstrap_95_lag0_shd": [
+       -0.2,
+       0.1
+      ],
+      "mean_D_lagged_shd": -11.6,
+      "bootstrap_95_lagged_shd": [
+       -14.75,
+       -8.55
+      ],
+      "mean_D_f1": 0.17636701768697996,
+      "bootstrap_95_f1": [
+       0.12859304275405722,
+       0.22521139541542992
+      ],
+      "mean_D_lag0_f1": -0.0014414860501817007,
+      "bootstrap_95_lag0_f1": [
+       -0.012598995207690844,
+       0.008380952380952373
+      ],
+      "mean_D_lagged_f1": 0.2396201658685627,
+      "bootstrap_95_lagged_f1": [
+       0.17773908516708076,
+       0.3046552279112016
+      ],
+      "andrey_fewer_errors": 19,
+      "comparator_fewer_errors": 0,
+      "comparator_cpu_s": 2.856204,
+      "empty_shd_mean": 26.7,
+      "mean_D_empty": -25.45,
+      "bootstrap_95_empty": [
+       -26.95,
+       -23.9
+      ],
+      "mean_D_comparator_empty": -13.8,
+      "bootstrap_95_comparator_empty": [
+       -17.25,
+       -10.2
+      ],
+      "andrey_worse_than_empty": 0,
+      "comparator_worse_than_empty": 1,
+      "centered": {
+       "comparator_solution": "causalnex.dynotears.centered.n500",
+       "paired": 20,
+       "same_graph": 20,
+       "centered_shd_mean": 1.25,
+       "centered_lag0_shd_mean": 0.2,
+       "centered_lagged_shd_mean": 1.05,
+       "centered_f1_mean": 0.9775768392509466,
+       "centered_lag0_f1_mean": 0.9833821070234114,
+       "centered_lagged_f1_mean": 0.9743330482283972,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ],
+       "above_zero": false,
+       "below_zero": false,
+       "bootstrap_95_lag0_shd": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_shd": [
+        0.0,
+        0.0
+       ],
+       "mean_D_f1": 0.0,
+       "bootstrap_95_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lag0_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_f1": [
+        0.0,
+        0.0
+       ],
+       "andrey_fewer_errors": 0,
+       "centered_fewer_errors": 0,
+       "mean_D_vs_comparator": -11.65,
+       "bootstrap_95_vs_comparator": [
+        -14.9,
+        -8.55
+       ]
+      },
+      "verdict": "better"
+     },
      "final_verdict": "better"
     },
     {
@@ -4048,6 +4472,11 @@
       -59.05,
       -53.55
      ],
+     "mean_D_comparator_empty": -49.15,
+     "bootstrap_95_comparator_empty": [
+      -53.55,
+      -44.6
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -4098,6 +4527,132 @@
      },
      "verdict": "better",
      "complete": true,
+     "replication": {
+      "seeds": [
+       20,
+       39
+      ],
+      "andrey_ok": 20,
+      "andrey_timeouts": 0,
+      "andrey_failed": 0,
+      "comparator_ok": 20,
+      "comparator_timeouts": 0,
+      "comparator_failed": 0,
+      "centered_ok": 20,
+      "centered_timeouts": 0,
+      "centered_failed": 0,
+      "andrey_shd_mean": 1.1,
+      "andrey_lag0_shd_mean": 0.2,
+      "andrey_lagged_shd_mean": 0.9,
+      "andrey_f1_mean": 0.9886757610265485,
+      "andrey_lag0_f1_mean": 0.9888528138528139,
+      "andrey_lagged_f1_mean": 0.9885857053266882,
+      "andrey_cpu_s": 2.523612,
+      "andrey_wall_s": 2.5150495329871774,
+      "paired": 20,
+      "same_graph": 4,
+      "comparator_shd_mean": 8.0,
+      "comparator_lag0_shd_mean": 0.25,
+      "comparator_lagged_shd_mean": 7.75,
+      "comparator_f1_mean": 0.9337282771434406,
+      "comparator_lag0_f1_mean": 0.9860750360750361,
+      "comparator_lagged_f1_mean": 0.9151832771505516,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -10.8,
+       -3.598750000000018
+      ],
+      "above_zero": false,
+      "below_zero": true,
+      "mean_D_lag0_shd": -0.05,
+      "bootstrap_95_lag0_shd": [
+       -0.15,
+       0.0
+      ],
+      "mean_D_lagged_shd": -6.85,
+      "bootstrap_95_lagged_shd": [
+       -10.75,
+       -3.55
+      ],
+      "mean_D_f1": 0.054947483883107974,
+      "bootstrap_95_f1": [
+       0.030403552151558804,
+       0.08315303143830172
+      ],
+      "mean_D_lag0_f1": 0.002777777777777779,
+      "bootstrap_95_lag0_f1": [
+       0.0,
+       0.008333333333333337
+      ],
+      "mean_D_lagged_f1": 0.0734024281761366,
+      "bootstrap_95_lagged_f1": [
+       0.04029302158882004,
+       0.11197410074090222
+      ],
+      "andrey_fewer_errors": 15,
+      "comparator_fewer_errors": 1,
+      "comparator_cpu_s": 9.5745365,
+      "empty_shd_mean": 57.65,
+      "mean_D_empty": -56.55,
+      "bootstrap_95_empty": [
+       -59.55,
+       -53.5
+      ],
+      "mean_D_comparator_empty": -49.65,
+      "bootstrap_95_comparator_empty": [
+       -54.65,
+       -44.6
+      ],
+      "andrey_worse_than_empty": 0,
+      "comparator_worse_than_empty": 0,
+      "centered": {
+       "comparator_solution": "causalnex.dynotears.centered.n500",
+       "paired": 20,
+       "same_graph": 19,
+       "centered_shd_mean": 1.15,
+       "centered_lag0_shd_mean": 0.2,
+       "centered_lagged_shd_mean": 0.95,
+       "centered_f1_mean": 0.988233354334142,
+       "centered_lag0_f1_mean": 0.9888528138528139,
+       "centered_lagged_f1_mean": 0.9880481993543997,
+       "mean_D": -0.05,
+       "bootstrap_95": [
+        -0.15,
+        0.0
+       ],
+       "above_zero": false,
+       "below_zero": false,
+       "bootstrap_95_lag0_shd": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_shd": [
+        -0.15,
+        0.0
+       ],
+       "mean_D_f1": 0.0004424066924066827,
+       "bootstrap_95_f1": [
+        0.0,
+        0.0013272200772200481
+       ],
+       "bootstrap_95_lag0_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_f1": [
+        0.0,
+        0.0016125179168657467
+       ],
+       "andrey_fewer_errors": 1,
+       "centered_fewer_errors": 0,
+       "mean_D_vs_comparator": -6.85,
+       "bootstrap_95_vs_comparator": [
+        -10.75,
+        -3.5
+       ]
+      },
+      "verdict": "better"
+     },
      "final_verdict": "better"
     },
     {
@@ -4179,6 +4734,11 @@
       -146.25,
       -138.55
      ],
+     "mean_D_comparator_empty": -137.65,
+     "bootstrap_95_comparator_empty": [
+      -142.25,
+      -133.05
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -4229,6 +4789,132 @@
      },
      "verdict": "better",
      "complete": true,
+     "replication": {
+      "seeds": [
+       20,
+       39
+      ],
+      "andrey_ok": 20,
+      "andrey_timeouts": 0,
+      "andrey_failed": 0,
+      "comparator_ok": 20,
+      "comparator_timeouts": 0,
+      "comparator_failed": 0,
+      "centered_ok": 20,
+      "centered_timeouts": 0,
+      "centered_failed": 0,
+      "andrey_shd_mean": 1.9,
+      "andrey_lag0_shd_mean": 0.2,
+      "andrey_lagged_shd_mean": 1.7,
+      "andrey_f1_mean": 0.993098893250869,
+      "andrey_lag0_f1_mean": 0.9971099887766555,
+      "andrey_lagged_f1_mean": 0.9912857247433001,
+      "andrey_cpu_s": 28.789673,
+      "andrey_wall_s": 28.79796363785863,
+      "paired": 20,
+      "same_graph": 1,
+      "comparator_shd_mean": 4.9,
+      "comparator_lag0_shd_mean": 0.2,
+      "comparator_lagged_shd_mean": 4.7,
+      "comparator_f1_mean": 0.9826944987355191,
+      "comparator_lag0_f1_mean": 0.9976585781183482,
+      "comparator_lagged_f1_mean": 0.9762669844451667,
+      "mean_D": -3.0,
+      "bootstrap_95": [
+       -4.05,
+       -1.9
+      ],
+      "above_zero": false,
+      "below_zero": true,
+      "mean_D_lag0_shd": 0.0,
+      "bootstrap_95_lag0_shd": [
+       0.0,
+       0.0
+      ],
+      "mean_D_lagged_shd": -3.0,
+      "bootstrap_95_lagged_shd": [
+       -4.05,
+       -1.9
+      ],
+      "mean_D_f1": 0.010404394515349946,
+      "bootstrap_95_f1": [
+       0.006576280417201623,
+       0.014187542287901015
+      ],
+      "mean_D_lag0_f1": -0.0005485893416927956,
+      "bootstrap_95_lag0_f1": [
+       -0.0016457680250783868,
+       0.0
+      ],
+      "mean_D_lagged_f1": 0.015018740298133354,
+      "bootstrap_95_lagged_f1": [
+       0.009649859573385116,
+       0.020200627701754726
+      ],
+      "andrey_fewer_errors": 17,
+      "comparator_fewer_errors": 1,
+      "comparator_cpu_s": 78.643331,
+      "empty_shd_mean": 140.2,
+      "mean_D_empty": -138.3,
+      "bootstrap_95_empty": [
+       -140.6,
+       -135.95
+      ],
+      "mean_D_comparator_empty": -135.3,
+      "bootstrap_95_comparator_empty": [
+       -138.05,
+       -132.4
+      ],
+      "andrey_worse_than_empty": 0,
+      "comparator_worse_than_empty": 0,
+      "centered": {
+       "comparator_solution": "causalnex.dynotears.centered.n500",
+       "paired": 20,
+       "same_graph": 17,
+       "centered_shd_mean": 2.0,
+       "centered_lag0_shd_mean": 0.2,
+       "centered_lagged_shd_mean": 1.8,
+       "centered_f1_mean": 0.9929222205701528,
+       "centered_lag0_f1_mean": 0.9976585781183482,
+       "centered_lagged_f1_mean": 0.9907881880588034,
+       "mean_D": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ],
+       "above_zero": false,
+       "below_zero": false,
+       "bootstrap_95_lag0_shd": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_shd": [
+        -0.25,
+        0.0
+       ],
+       "mean_D_f1": 0.00017667268071619446,
+       "bootstrap_95_f1": [
+        -0.00033881199538638996,
+        0.0007055100950618579
+       ],
+       "bootstrap_95_lag0_f1": [
+        -0.0016457680250783868,
+        0.0
+       ],
+       "bootstrap_95_lagged_f1": [
+        0.0,
+        0.0012463167674446108
+       ],
+       "andrey_fewer_errors": 2,
+       "centered_fewer_errors": 0,
+       "mean_D_vs_comparator": -2.9,
+       "bootstrap_95_vs_comparator": [
+        -3.95,
+        -1.85
+       ]
+      },
+      "verdict": "better"
+     },
      "final_verdict": "better"
     },
     {
@@ -4310,6 +4996,11 @@
       -285.4,
       -268.05
      ],
+     "mean_D_comparator_empty": -274.6,
+     "bootstrap_95_comparator_empty": [
+      -283.35,
+      -265.45
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -4360,14 +5051,140 @@
      },
      "verdict": "better",
      "complete": true,
-     "final_verdict": "better"
+     "replication": {
+      "seeds": [
+       20,
+       39
+      ],
+      "andrey_ok": 20,
+      "andrey_timeouts": 0,
+      "andrey_failed": 0,
+      "comparator_ok": 20,
+      "comparator_timeouts": 0,
+      "comparator_failed": 0,
+      "centered_ok": 20,
+      "centered_timeouts": 0,
+      "centered_failed": 0,
+      "andrey_shd_mean": 5.15,
+      "andrey_lag0_shd_mean": 0.85,
+      "andrey_lagged_shd_mean": 4.3,
+      "andrey_f1_mean": 0.9905037180383506,
+      "andrey_lag0_f1_mean": 0.9944496517340318,
+      "andrey_lagged_f1_mean": 0.9887800023675999,
+      "andrey_cpu_s": 312.824284,
+      "andrey_wall_s": 314.69279973581433,
+      "paired": 20,
+      "same_graph": 1,
+      "comparator_shd_mean": 6.55,
+      "comparator_lag0_shd_mean": 0.35,
+      "comparator_lagged_shd_mean": 6.2,
+      "comparator_f1_mean": 0.9881790958281679,
+      "comparator_lag0_f1_mean": 0.9971598341923864,
+      "comparator_lagged_f1_mean": 0.9841246480175204,
+      "mean_D": -1.4,
+      "bootstrap_95": [
+       -2.55,
+       0.1
+      ],
+      "above_zero": false,
+      "below_zero": false,
+      "mean_D_lag0_shd": 0.5,
+      "bootstrap_95_lag0_shd": [
+       0.05,
+       1.25
+      ],
+      "mean_D_lagged_shd": -1.9,
+      "bootstrap_95_lagged_shd": [
+       -2.85,
+       -1.0
+      ],
+      "mean_D_f1": 0.0023246222101827086,
+      "bootstrap_95_f1": [
+       -0.0004670029233175027,
+       0.0044278623946518445
+      ],
+      "mean_D_lag0_f1": -0.0027101824583547094,
+      "bootstrap_95_lag0_f1": [
+       -0.0070455499645318736,
+       1.157485285769866e-05
+      ],
+      "mean_D_lagged_f1": 0.004655354350079572,
+      "bootstrap_95_lagged_f1": [
+       0.0023698522340160366,
+       0.006939702973639756
+      ],
+      "andrey_fewer_errors": 15,
+      "comparator_fewer_errors": 1,
+      "comparator_cpu_s": 532.2349025,
+      "empty_shd_mean": 284.55,
+      "mean_D_empty": -279.4,
+      "bootstrap_95_empty": [
+       -285.8,
+       -273.65
+      ],
+      "mean_D_comparator_empty": -277.95,
+      "bootstrap_95_comparator_empty": [
+       -284.25,
+       -272.2
+      ],
+      "andrey_worse_than_empty": 0,
+      "comparator_worse_than_empty": 0,
+      "centered": {
+       "comparator_solution": "causalnex.dynotears.centered.n500",
+       "paired": 20,
+       "same_graph": 17,
+       "centered_shd_mean": 5.25,
+       "centered_lag0_shd_mean": 0.9,
+       "centered_lagged_shd_mean": 4.35,
+       "centered_f1_mean": 0.9903239511629645,
+       "centered_lag0_f1_mean": 0.9941606343929912,
+       "centered_lagged_f1_mean": 0.9886563403179902,
+       "mean_D": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ],
+       "above_zero": false,
+       "below_zero": false,
+       "bootstrap_95_lag0_shd": [
+        -0.15,
+        0.0
+       ],
+       "bootstrap_95_lagged_shd": [
+        -0.2,
+        0.1
+       ],
+       "mean_D_f1": 0.0001797668753862114,
+       "bootstrap_95_f1": [
+        0.0,
+        0.00045089717882368927
+       ],
+       "bootstrap_95_lag0_f1": [
+        0.0,
+        0.0008670520231213785
+       ],
+       "bootstrap_95_lagged_f1": [
+        -0.00026738436604400453,
+        0.000525750382732465
+       ],
+       "andrey_fewer_errors": 2,
+       "centered_fewer_errors": 0,
+       "mean_D_vs_comparator": -1.3,
+       "bootstrap_95_vs_comparator": [
+        -2.45,
+        0.2
+       ]
+      },
+      "verdict": "tie"
+     },
+     "final_verdict": "tie"
     }
    ]
   },
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n50",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n50",
    "regime": "dynotears_paper_uncentered",
    "length": 50,
@@ -4453,6 +5270,11 @@
       -9.0,
       -7.3
      ],
+     "mean_D_comparator_empty": -6.95,
+     "bootstrap_95_comparator_empty": [
+      -8.05,
+      -5.9
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -4503,6 +5325,132 @@
      },
      "verdict": "better",
      "complete": true,
+     "replication": {
+      "seeds": [
+       20,
+       39
+      ],
+      "andrey_ok": 20,
+      "andrey_timeouts": 0,
+      "andrey_failed": 0,
+      "comparator_ok": 20,
+      "comparator_timeouts": 0,
+      "comparator_failed": 0,
+      "centered_ok": 20,
+      "centered_timeouts": 0,
+      "centered_failed": 0,
+      "andrey_shd_mean": 6.05,
+      "andrey_lag0_shd_mean": 1.35,
+      "andrey_lagged_shd_mean": 4.7,
+      "andrey_f1_mean": 0.7202402380189827,
+      "andrey_lag0_f1_mean": 0.8434121434121433,
+      "andrey_lagged_f1_mean": 0.6153939172282824,
+      "andrey_cpu_s": 0.3266399999999998,
+      "andrey_wall_s": 0.32661075703799725,
+      "paired": 20,
+      "same_graph": 0,
+      "comparator_shd_mean": 7.7,
+      "comparator_lag0_shd_mean": 1.65,
+      "comparator_lagged_shd_mean": 6.05,
+      "comparator_f1_mean": 0.676819677233552,
+      "comparator_lag0_f1_mean": 0.8035939060939061,
+      "comparator_lagged_f1_mean": 0.5825188275851219,
+      "mean_D": -1.65,
+      "bootstrap_95": [
+       -2.6,
+       -0.7
+      ],
+      "above_zero": false,
+      "below_zero": true,
+      "mean_D_lag0_shd": -0.3,
+      "bootstrap_95_lag0_shd": [
+       -0.75,
+       0.1
+      ],
+      "mean_D_lagged_shd": -1.35,
+      "bootstrap_95_lagged_shd": [
+       -2.2,
+       -0.5
+      ],
+      "mean_D_f1": 0.043420560785430586,
+      "bootstrap_95_f1": [
+       -0.00257642106048763,
+       0.09043569070788018
+      ],
+      "mean_D_lag0_f1": 0.03981823731823733,
+      "bootstrap_95_lag0_f1": [
+       -0.02937429237429235,
+       0.11400983044733048
+      ],
+      "mean_D_lagged_f1": 0.032875089643160695,
+      "bootstrap_95_lagged_f1": [
+       -0.033855049434308095,
+       0.09659727482176667
+      ],
+      "andrey_fewer_errors": 15,
+      "comparator_fewer_errors": 4,
+      "comparator_cpu_s": 0.46396499999999996,
+      "empty_shd_mean": 13.7,
+      "mean_D_empty": -7.65,
+      "bootstrap_95_empty": [
+       -9.1,
+       -6.25
+      ],
+      "mean_D_comparator_empty": -6.0,
+      "bootstrap_95_comparator_empty": [
+       -7.5,
+       -4.55
+      ],
+      "andrey_worse_than_empty": 0,
+      "comparator_worse_than_empty": 0,
+      "centered": {
+       "comparator_solution": "causalnex.dynotears.centered.n50",
+       "paired": 20,
+       "same_graph": 20,
+       "centered_shd_mean": 6.05,
+       "centered_lag0_shd_mean": 1.35,
+       "centered_lagged_shd_mean": 4.7,
+       "centered_f1_mean": 0.7202402380189827,
+       "centered_lag0_f1_mean": 0.8434121434121433,
+       "centered_lagged_f1_mean": 0.6153939172282824,
+       "mean_D": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ],
+       "above_zero": false,
+       "below_zero": false,
+       "bootstrap_95_lag0_shd": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_shd": [
+        0.0,
+        0.0
+       ],
+       "mean_D_f1": 0.0,
+       "bootstrap_95_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lag0_f1": [
+        0.0,
+        0.0
+       ],
+       "bootstrap_95_lagged_f1": [
+        0.0,
+        0.0
+       ],
+       "andrey_fewer_errors": 0,
+       "centered_fewer_errors": 0,
+       "mean_D_vs_comparator": -1.65,
+       "bootstrap_95_vs_comparator": [
+        -2.6,
+        -0.7
+       ]
+      },
+      "verdict": "better"
+     },
      "final_verdict": "better"
     },
     {
@@ -4583,6 +5531,11 @@
      "bootstrap_95_empty": [
       -18.651249999999997,
       -14.15
+     ],
+     "mean_D_comparator_empty": -14.4,
+     "bootstrap_95_comparator_empty": [
+      -16.75,
+      -12.25
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -4715,6 +5668,11 @@
       -37.8,
       -30.55
      ],
+     "mean_D_comparator_empty": -34.15,
+     "bootstrap_95_comparator_empty": [
+      -38.0,
+      -30.15
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -4845,6 +5803,11 @@
      "bootstrap_95_empty": [
       -88.75,
       -81.34875000000001
+     ],
+     "mean_D_comparator_empty": -82.5,
+     "bootstrap_95_comparator_empty": [
+      -86.95,
+      -78.05
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -4977,6 +5940,11 @@
       -142.3,
       -126.55
      ],
+     "mean_D_comparator_empty": -135.3,
+     "bootstrap_95_comparator_empty": [
+      -142.95,
+      -127.7
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "centered": {
@@ -5034,7 +6002,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_paper",
    "length": 50,
@@ -5117,6 +6085,11 @@
       -11.8,
       -7.6
      ],
+     "mean_D_comparator_empty": -9.9,
+     "bootstrap_95_comparator_empty": [
+      -11.6,
+      -7.7
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "complete": true
@@ -5195,6 +6168,11 @@
      "mean_D_empty": -7.2,
      "bootstrap_95_empty": [
       -11.5,
+      -3.0
+     ],
+     "mean_D_comparator_empty": -7.4,
+     "bootstrap_95_comparator_empty": [
+      -11.7,
       -3.0
      ],
      "andrey_worse_than_empty": 1,
@@ -5277,6 +6255,11 @@
       18.8,
       38.0
      ],
+     "mean_D_comparator_empty": 25.4,
+     "bootstrap_95_comparator_empty": [
+      14.6,
+      35.8
+     ],
      "andrey_worse_than_empty": 9,
      "comparator_worse_than_empty": 9,
      "complete": true
@@ -5357,6 +6340,11 @@
       162.8,
       201.80249999999998
      ],
+     "mean_D_comparator_empty": 189.9,
+     "bootstrap_95_comparator_empty": [
+      167.3,
+      206.5
+     ],
      "andrey_worse_than_empty": 10,
      "comparator_worse_than_empty": 10,
      "complete": true
@@ -5366,7 +6354,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_paper_standardized",
    "length": 500,
@@ -5448,6 +6436,11 @@
      "bootstrap_95_empty": [
       -8.1,
       -4.7
+     ],
+     "mean_D_comparator_empty": -6.3,
+     "bootstrap_95_comparator_empty": [
+      -8.1,
+      -4.697500000000036
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -5531,6 +6524,11 @@
      "mean_D_empty": -10.2,
      "bootstrap_95_empty": [
       -15.6,
+      -4.7
+     ],
+     "mean_D_comparator_empty": -10.2,
+     "bootstrap_95_comparator_empty": [
+      -15.702499999999997,
       -4.7
      ],
      "andrey_worse_than_empty": 1,
@@ -5617,6 +6615,11 @@
       -24.8,
       -15.2
      ],
+     "mean_D_comparator_empty": -20.3,
+     "bootstrap_95_comparator_empty": [
+      -24.8,
+      -15.3
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "complete": true,
@@ -5701,6 +6704,11 @@
       -75.2025,
       -53.7
      ],
+     "mean_D_comparator_empty": -64.8,
+     "bootstrap_95_comparator_empty": [
+      -75.2025,
+      -53.69750000000004
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "complete": true,
@@ -5714,7 +6722,7 @@
   {
    "method": "DYNOTEARS",
    "solution": "andrey.dynotears.n500",
-   "comparator": "CausalNex",
+   "comparator": "CausalNex 0.12.2",
    "comparator_solution": "causalnex.dynotears.n500",
    "regime": "dynotears_sin_tanh",
    "length": 500,
@@ -5796,6 +6804,11 @@
      "bootstrap_95_empty": [
       -13.1,
       -10.6
+     ],
+     "mean_D_comparator_empty": -11.6,
+     "bootstrap_95_comparator_empty": [
+      -13.0,
+      -10.4
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
@@ -5881,6 +6894,11 @@
       -23.1,
       -17.9
      ],
+     "mean_D_comparator_empty": -20.6,
+     "bootstrap_95_comparator_empty": [
+      -23.0,
+      -18.0
+     ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,
      "complete": true,
@@ -5964,6 +6982,11 @@
      "bootstrap_95_empty": [
       -44.4,
       -36.897500000000036
+     ],
+     "mean_D_comparator_empty": -40.8,
+     "bootstrap_95_comparator_empty": [
+      -44.5,
+      -36.8
      ],
      "andrey_worse_than_empty": 0,
      "comparator_worse_than_empty": 0,

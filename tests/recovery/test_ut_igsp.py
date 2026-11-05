@@ -4,12 +4,12 @@ The setting is Squires, Wang, and Uhler (2020, Section 5.1): Erdos-Renyi DAGs on
 mean degree 1.5, weights uniform on [0.25, 1] in absolute value, standard normal noise, an
 observational environment and 5 settings with n rows each. Each setting intervenes on one known
 target and 0 or 3 unknown ones: a shift of the noise mean to 1, or a perfect intervention that sets
-the target to N(1, 0.1). The fits run at the facade's defaults.
+the target to N(1, 0.1). The fits run at the facade's defaults. The recorded output is the graph,
+objective, and targets of the ``gauss_5v_noise_shift`` baseline, whose two settings each change
+the noise of one variable, neither of them given.
 """
 
 from __future__ import annotations
-
-import warnings
 
 import numpy as np
 import pytest
@@ -19,6 +19,8 @@ import andrey.data as data
 from andrey.core import ARROW, TAIL
 from andrey.data.interventions import hard, soft
 from andrey.search.gies import cut_pairs, replace_unprotected
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 P, K = 20, 5
 INTERVENTIONS = {"shift": soft(shift=1.0), "perfect": hard(1.0, sd=0.1**0.5)}
@@ -26,13 +28,6 @@ INTERVENTIONS = {"shift": soft(shift=1.0), "perfect": hard(1.0, sd=0.1**0.5)}
 RECORDED = {
     (seed, off, kind): (0, 0) for seed in range(3) for off in (0, 3) for kind in INTERVENTIONS
 }
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def paper_dataset(seed: int, n: int, off: int, kind: str):
@@ -108,3 +103,10 @@ def test_a_chain_with_an_unknown_and_a_known_target_is_fully_oriented(kind):
     dag[0, 1] = dag[1, 2] = TAIL
     dag[1, 0] = dag[2, 1] = ARROW
     assert np.array_equal(out.structure.to_numpy(), dag)
+
+
+def test_recorded_baseline():
+    case = "gauss_5v_noise_shift"
+    env = datagen.environment_index(case)
+    out = andrey.ut_igsp(datagen.generate(case), env, targets={0: [], 1: None, 2: None})
+    assert_recorded_output(out, "UT-IGSP", case=case)

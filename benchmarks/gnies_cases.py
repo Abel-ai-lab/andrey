@@ -19,7 +19,6 @@ prints the table as Markdown.
 from __future__ import annotations
 
 import sys
-import warnings
 
 import numpy as np
 
@@ -59,12 +58,6 @@ def reference(X: np.ndarray, env: np.ndarray, mode: str, **fields: object) -> di
     return answer
 
 
-def _fit(X: np.ndarray, env: np.ndarray, **kwargs: float) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.gnies(X, env, **kwargs)
-
-
 def _targets(out: andrey.StructureOutput) -> list[int]:
     return [int(v) for v in out.metadata["changing_variables"]]
 
@@ -79,8 +72,8 @@ def main() -> None:
     for case, (d, k, seed) in enumerate(CASES, start=1):
         X, env, truth = draw(d, k, seed)
         ref = reference(X, env, "fit")
-        bic = _fit(X, env, ebic_gamma=0.0)
-        default = _fit(X, env)
+        bic = andrey.gnies(X, env, ebic_gamma=0.0)
+        default = andrey.gnies(X, env)
         same_graph = bool(np.array_equal(bic.structure.to_numpy(), marks(ref["icpdag"])))
         same_targets = _targets(bic) == ref["targets"]
         defaults_agree = bool(

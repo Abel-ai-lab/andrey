@@ -48,6 +48,20 @@ def _run_cdnod(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.cdnod(X, datagen.domain_index("gauss_5v")), algorithm)
 
 
+def _run_gnies(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    env = datagen.environment_index("gauss_5v_noise_shift")
+    return project_output(andrey.gnies(X, env), algorithm)
+
+
+def _run_icp(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    target = int(datagen.column_of("gauss_5v")[3])  # the column of x3, whose parents are x1, x2
+    return project_output(andrey.icp(X, datagen.domain_index("gauss_5v"), target=target), algorithm)
+
+
 def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
     from andrey.api._temporal import _adapt_var_lingam
     from andrey.lingam.var import var_lingam
@@ -75,6 +89,13 @@ def _run_granger(X: np.ndarray, algorithm: str) -> dict:
     return {"coeff": coeff, "adj": (coeff != 0.0).astype(int)}
 
 
+def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    env = datagen.environment_index("gauss_5v_noise_shift")
+    return project_output(andrey.ut_igsp(X, env, targets={0: [], 1: None, 2: None}), algorithm)
+
+
 def _run_ci_test(X: np.ndarray, algorithm: str) -> dict:
     from tests.recovery.helpers.ci_tests import recorded_pvalues
 
@@ -87,6 +108,17 @@ def _run_multi_group_direct_lingam(groups: list[np.ndarray], algorithm: str) -> 
     return project_output(andrey.multi_group_direct_lingam(groups), algorithm)
 
 
+def _run_igsp(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    case = "gauss_5v_noise_shift"
+    column = list(datagen.column_order(case)).index
+    targets = {0: [], 1: [column(3)], 2: [column(4)]}
+    return project_output(
+        andrey.igsp(X, datagen.environment_index(case), targets=targets), algorithm
+    )
+
+
 # algorithm -> (runner, case id). Single-input methods take one matrix.
 ALGORITHMS = {
     "DirectLiNGAM": (_facade("direct_lingam"), "lingam_5v_uniform"),
@@ -95,8 +127,11 @@ ALGORITHMS = {
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
     "CDNOD": (_run_cdnod, "gauss_5v"),
+    "ICP": (_run_icp, "gauss_5v"),
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
+    "GnIES": (_run_gnies, "gauss_5v_noise_shift"),
+    "IGSP": (_run_igsp, "gauss_5v_noise_shift"),
     "XGES": (_facade("xges"), "gauss_5v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
@@ -108,6 +143,7 @@ ALGORITHMS = {
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),
     "BOSS": (_facade("boss", penalty_discount=2.0), "gauss_5v"),
     "GRaSP": (_facade("grasp", penalty_discount=2.0), "gauss_5v"),
+    "UT-IGSP": (_run_ut_igsp, "gauss_5v_noise_shift"),
     "CALM": (_facade("calm"), "gauss_tree_5v"),
     "CAM": (_facade("cam"), "nonmonotone_4v"),
     "VARLiNGAM": (_run_varlingam, "var_4v_stable"),

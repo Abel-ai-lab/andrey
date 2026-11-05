@@ -21,7 +21,6 @@ import argparse
 import dataclasses
 import json
 import sys
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -165,9 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     with (
         andrey.config(backend="numpy", n_jobs=1),
         threadpool_limits(limits=1),
-        warnings.catch_warnings(),
     ):
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         for d in args.sizes:
             for n in ROWS:
                 for seed in SEEDS:

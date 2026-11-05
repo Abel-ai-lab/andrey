@@ -921,12 +921,26 @@ def compare(mine: dict[int, dict], theirs: dict[int, dict], metric: str, dataset
 
 
 def floor_interval(mine: dict[int, dict], metric: str, floor: str) -> list[float] | None:
-    """The bootstrap interval of the mean of Andrey's ``metric`` minus ``floor`` over its complete
+    """The bootstrap interval of the mean of an arm's ``metric`` minus ``floor`` over its complete
     datasets; ``None`` when the floor is 0 on every one of them."""
     done = [e for e in mine.values() if e["complete"] and e.get(metric) is not None]
     if not done or not any(e[floor] for e in done):
         return None
     return bootstrap_95(np.array([e[metric] - e[floor] for e in done]))
+
+
+def floor_record(
+    mine: dict[int, dict], theirs: dict[int, dict], metric: str, floor: str
+) -> dict | None:
+    """A row's ``floor``: Andrey's and the reference's :func:`floor_interval`, the record the parity
+    check reads; ``None`` when either arm has no interval."""
+    andrey, reference = floor_interval(mine, metric, floor), floor_interval(theirs, metric, floor)
+    if andrey is None or reference is None:
+        return None
+    return {
+        "andrey_minus_empty": {"bootstrap_95": andrey},
+        "reference_minus_empty": {"bootstrap_95": reference},
+    }
 
 
 COMPARATORS = {
@@ -1024,9 +1038,9 @@ def summarize(records: list[dict], replications: list[dict] | None = None) -> di
                     if rerun is not None:
                         row["replication"] = rerun
                 floor = "empty_shd" if metric == "shd" else "target_floor"
-                interval = floor_interval(mine, metric, floor)
-                if interval is not None:
-                    row["floor_95" if metric == "shd" else "target_floor_95"] = interval
+                record = floor_record(mine, theirs, metric, floor)
+                if record is not None:
+                    row["floor"] = record
                 entry["rows"].append(row)
     return {
         "parity_rule": "paired bootstrap",

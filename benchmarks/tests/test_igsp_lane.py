@@ -174,12 +174,19 @@ def test_the_summary_filters_rows_whose_reference_loses_to_the_empty_graph():
     level = f"alpha={lane.alpha_text(lane.LEVEL)}"
     level += f"|n_starts={lane.andrey_defaults()['n_starts']}"
     [worse] = entries[(f"Y6|perfect|k=4|{level}", "graphical-model-learning")]["rows"]
-    assert worse["verdict"] == "worse" and worse["floor_95"][1] < 0 and "claim" not in worse
+    assert (
+        worse["verdict"] == "worse"
+        and worse["floor"]["andrey_minus_empty"]["bootstrap_95"][1] < 0
+        and "claim" not in worse
+    )
     [out] = entries[(f"W|K=2|{level}", "graphical-model-learning")]["rows"]
-    assert out["claim"] == "out" and "floor_95" not in out
+    assert out["claim"] == "out" and "floor" not in out
     assert out["reason"] == "reference not better than the empty graph"
     [patched] = entries[(f"W|K=2|{level}", "graphical-model-learning+def42")]["rows"]
-    assert patched["verdict"] == "tie" and patched["floor_95"][1] < 0
+    assert (
+        patched["verdict"] == "tie"
+        and patched["floor"]["andrey_minus_empty"]["bootstrap_95"][1] < 0
+    )
     assert entries[("Y6|perfect|k=4", "andrey.gies")]["role"] == "context"
     assert summary["counts"] == {"better": 0, "tie": 1, "worse": 1} and summary["filtered"] == 1
     failures, _ = reference_parity.check(reference_parity.paired_rows("lane", summary), [])

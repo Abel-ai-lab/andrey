@@ -17,17 +17,31 @@ import numpy as np
 COLUMN_STREAM = zlib.crc32(b"columns")
 
 
-def _linear_sem(seed: int, n_samples: int, weights: list[list[float]], noise: str) -> np.ndarray:
+def _linear_sem(
+    seed: int,
+    n_samples: int,
+    weights: list[list[float]],
+    noise: str,
+    environments: list[dict[int, float]] | None = None,
+) -> np.ndarray:
     """Linear structural equation model ``x_j = sum_i B[j, i] x_i + e_j``.
 
     ``weights`` is a strictly lower-triangular ``(d, d)`` coefficient matrix, so
     the recurrence fills columns in causal order ``0 -> 1 -> ... -> d-1``.
     ``noise`` selects ``"uniform"`` (non-Gaussian, for LiNGAM) or ``"gaussian"``.
+    ``environments`` splits the rows into that many consecutive equal blocks
+    (:func:`environment_index`); block ``k`` multiplies the noise of each variable
+    ``environments[k]`` names by its factor, so those variables are its targets.
     """
     rng = np.random.default_rng(seed)
     B = np.asarray(weights, dtype=np.float64)
     d = B.shape[0]
     e = _noise(rng, (n_samples, d), noise)
+    if environments:
+        blocks = np.array_split(np.arange(n_samples), len(environments))
+        for rows, scales in zip(blocks, environments, strict=True):
+            for j, scale in scales.items():
+                e[rows, j] *= scale
     X = np.zeros((n_samples, d), dtype=np.float64)
     for j in range(d):
         X[:, j] = e[:, j] + X @ B[j]
@@ -330,6 +344,22 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
         ],
+    },
+    # The ``gauss_5v`` model in three environments of 500 rows: the second multiplies the noise
+    # standard deviation of variable 3 by 3, the third that of variable 4 - GnIES, which learns
+    # those targets with the graph they orient.
+    "gauss_5v_noise_shift": {
+        "noise": "gaussian",
+        "seed": 20261104,
+        "n_samples": 1500,
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.8, 0.0, 0.0, 0.0, 0.0],
+            [0.7, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.6, 0.5, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.9, 0.0],
+        ],
+        "environments": [{}, {3: 3.0}, {4: 3.0}],
     },
     # Nonlinear SEM with non-monotone links (see ``_nonmonotone``) - the nonlinear CI tests.
     # ``edges`` is the true DAG, whose CPDAG is fully oriented: the collider 0 -> 2 <- 1 and, by
@@ -746,6 +776,7 @@ def _generate(case_id: str, replicate: int) -> np.ndarray:
             n_samples=spec["n_samples"],
             weights=spec["weights"],
             noise=spec["noise"],
+            environments=spec.get("environments"),
         )
     if model == "var":
         X = _var_process(
@@ -960,6 +991,14 @@ def domain_index(case_id: str, *, n_domains: int = 2) -> np.ndarray:
     for k in range(1, n_domains):
         c[k * block :, 0] = float(k)
     return c
+
+
+def environment_index(case_id: str) -> np.ndarray:
+    """The environment of each row of a case with ``environments``: ``0 .. k-1`` over ``k``
+    consecutive equal blocks, as :func:`_linear_sem` draws them."""
+    spec = CASES[case_id]
+    blocks = np.array_split(np.arange(spec["n_samples"]), len(spec["environments"]))
+    return np.concatenate([np.full(len(rows), k) for k, rows in enumerate(blocks)])
 
 
 def input_sha256(case_id: str) -> str:

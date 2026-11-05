@@ -23,6 +23,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "GnIES": {
+        "structural": ["graph", "targets"],
+        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
+    },
+    # IGSP: the graph and its objective, the edges and the I-contradicting edges, all counts.
+    "IGSP": {
+        "structural": ["graph", "score", "n_contradicting"],
+        "numeric": {},
+    },
     "XGES": {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
@@ -81,12 +90,22 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    # ICP: the DAG into the target and the accepted sets exactly; the p-values, NaN at the target,
+    # within rounding.
+    "ICP": {
+        "structural": ["graph", "accepted_sets"],
+        "numeric": {"p_values": {"atol": 1e-8, "rtol": 1e-6}},
+    },
     "BOSS": {
         "structural": ["graph"],
         "numeric": {},
     },
     "GRaSP": {
         "structural": ["graph"],
+        "numeric": {},
+    },
+    "UT-IGSP": {
+        "structural": ["graph", "score", "targets"],
         "numeric": {},
     },
     "ICALiNGAM": {

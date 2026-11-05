@@ -4,7 +4,6 @@ refuses."""
 from __future__ import annotations
 
 import logging
-import warnings
 
 import numpy as np
 import pytest
@@ -16,12 +15,6 @@ from andrey.fcm.camuv import drop_cycles
 from andrey.search.hc import tie_ranks
 
 N = 600
-
-
-def _fit(X, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.camuv(X, **kwargs)
 
 
 def _edges(out: andrey.StructureOutput, kind: str = "directed") -> set[tuple]:
@@ -42,7 +35,7 @@ def _fork(seed: int = 0) -> np.ndarray:
 
 @pytest.fixture(scope="module")
 def fork_fit():
-    return _fit(_fork())
+    return andrey.camuv(_fork())
 
 
 def test_the_fork_is_found(fork_fit):
@@ -51,13 +44,13 @@ def test_the_fork_is_found(fork_fit):
 
 
 def test_rescaling_a_column_changes_nothing(fork_fit):
-    out = _fit(_fork() * np.array([1e-4, 3.7, 2e3, 0.02]))
+    out = andrey.camuv(_fork() * np.array([1e-4, 3.7, 2e3, 0.02]))
     assert out.structure == fork_fit.structure
     assert out.metadata == fork_fit.metadata
 
 
 def test_shifting_a_column_changes_nothing(fork_fit):
-    out = _fit(_fork() + np.array([1e3, -50.0, 7.0, 1e4]))
+    out = andrey.camuv(_fork() + np.array([1e3, -50.0, 7.0, 1e4]))
     assert out.structure == fork_fit.structure
     assert out.metadata == fork_fit.metadata
 
@@ -72,23 +65,26 @@ def _additive(seed: int = 0) -> np.ndarray:
 def test_a_new_row_order_changes_nothing():
     X = _additive()
     rows = np.random.default_rng(100).permutation(X.shape[0])
-    assert _fit(X[rows]).structure == _fit(X).structure
+    assert andrey.camuv(X[rows]).structure == andrey.camuv(X).structure
 
 
 def test_flipping_a_column_sign_changes_nothing():
     X = _additive()
-    assert _fit(X * np.array([1.0, -1.0, 1.0, 1.0, 1.0, 1.0])).structure == _fit(X).structure
+    assert (
+        andrey.camuv(X * np.array([1.0, -1.0, 1.0, 1.0, 1.0, 1.0])).structure
+        == andrey.camuv(X).structure
+    )
 
 
 def test_a_power_of_two_unit_changes_nothing():
     X = np.arange(60.0)[:, None] + np.random.default_rng(0).uniform(-0.4, 0.4, (60, 4))
-    assert _fit(X * np.array([4.0, 1.0, 1.0, 1.0])).structure == _fit(X).structure
+    assert andrey.camuv(X * np.array([4.0, 1.0, 1.0, 1.0])).structure == andrey.camuv(X).structure
 
 
 def test_a_new_column_order_relabels_the_result():
     pd = pytest.importorskip("pandas")
     frame = pd.DataFrame(_fork(), columns=list("abcd"))
-    fits = [_fit(frame[list(columns)]) for columns in ("abcd", "dbca", "cadb")]
+    fits = [andrey.camuv(frame[list(columns)]) for columns in ("abcd", "dbca", "cadb")]
     named = [(_edges(out), _edges(out, "circle")) for out in fits]
     assert named[0] == ({("a", "d"), ("b", "c")}, {("a", "b")})
     for edges, circles in named[1:]:
@@ -114,9 +110,9 @@ def test_a_tied_sink_is_the_lower_ranked_column_in_any_column_order():
     ranks = dict(zip("xy", tie_ranks(frame.to_numpy()).tolist(), strict=True))
     sink, cause = sorted("xy", key=ranks.get)
     for columns in (["x", "y"], ["y", "x"]):
-        assert _edges(_fit(frame[columns])) == {(cause, sink)}
+        assert _edges(andrey.camuv(frame[columns])) == {(cause, sink)}
     with andrey.config(tie_break="position"):
-        assert _edges(_fit(frame[["y", "x"]])) == {("x", "y")}
+        assert _edges(andrey.camuv(frame[["y", "x"]])) == {("x", "y")}
 
 
 def test_every_edge_on_a_directed_cycle_goes_but_a_required_one():
@@ -144,7 +140,7 @@ def _has_directed_cycle(edges: set[tuple[int, int]], d: int) -> bool:
 def test_a_fit_whose_parents_close_cycles_drops_and_records_their_edges(caplog):
     case = sample_scm(functional="additive_noise", d=12, n=500, seed=14, density=2)
     with caplog.at_level(logging.INFO, logger="andrey.api.fcm"):
-        out = _fit(np.asarray(case.data, dtype=float))
+        out = andrey.camuv(np.asarray(case.data, dtype=float))
     dropped = {tuple(e) for e in out.metadata["cycle_edges"]}
     assert dropped
     assert not _has_directed_cycle(_edges(out), 12)
@@ -153,26 +149,26 @@ def test_a_fit_whose_parents_close_cycles_drops_and_records_their_edges(caplog):
 
 
 def test_a_forbidden_edge_is_never_in_the_graph():
-    out = _fit(_fork(), knowledge=andrey.Knowledge(forbidden=[(1, 2)]))
+    out = andrey.camuv(_fork(), knowledge=andrey.Knowledge(forbidden=[(1, 2)]))
     assert (1, 2) not in _edges(out)
 
 
 def test_a_required_edge_stays_on_independent_columns():
     X = np.random.default_rng(1).standard_normal((N, 3))
-    out = _fit(X, knowledge=andrey.Knowledge(required=[(2, 0)]))
+    out = andrey.camuv(X, knowledge=andrey.Knowledge(required=[(2, 0)]))
     assert _edges(out) == {(2, 0)}
     assert out.metadata["latent_pairs"] == []
 
 
 def test_a_pair_forbidden_both_ways_is_never_marked():
-    out = _fit(_fork(), knowledge=andrey.Knowledge(forbidden=[(0, 1), (1, 0)]))
+    out = andrey.camuv(_fork(), knowledge=andrey.Knowledge(forbidden=[(0, 1), (1, 0)]))
     assert _edges(out, "circle") == set()
     assert _edges(out) == {(0, 3), (1, 2)}
 
 
 def test_tiers_forbid_edges_into_an_earlier_tier():
     # x2 and x3 first: no edge may enter them from x0 or x1, so neither true edge is found.
-    out = _fit(_fork(), knowledge=andrey.Knowledge(tiers=[[2, 3], [0, 1]]))
+    out = andrey.camuv(_fork(), knowledge=andrey.Knowledge(tiers=[[2, 3], [0, 1]]))
     assert all(i in (2, 3) for i, j in _edges(out) if j in (2, 3))
 
 
@@ -192,7 +188,7 @@ def _tiered(seed: int = 0) -> np.ndarray:
 def test_tiers_and_edges_hold_among_ten_variables():
     early, late = [0, 4, 7], [1, 2, 3, 5, 6, 8, 9]
     knowledge = andrey.Knowledge(tiers=[early, late], required=[(7, 9)], forbidden=[(5, 6)])
-    out = _fit(_tiered(), knowledge=knowledge)
+    out = andrey.camuv(_tiered(), knowledge=knowledge)
     edges = _edges(out)
     assert (7, 9) in edges and (5, 6) not in edges
     assert not any(i in late and j in early for i, j in edges)
@@ -210,7 +206,7 @@ def test_a_binary_column_is_named():
     frame = pd.DataFrame(_fork(), columns=list("abcd"))
     frame["b"] = np.arange(N) % 2
     with pytest.raises(ValueError, match="'b'"):
-        _fit(frame)
+        andrey.camuv(frame)
 
 
 def test_a_column_that_totals_others_is_named():
@@ -218,20 +214,20 @@ def test_a_column_that_totals_others_is_named():
     frame = pd.DataFrame(_fork(), columns=list("abcd"))
     frame["t"] = frame["a"] + frame["c"]
     with pytest.raises(ValueError, match="'t'"):
-        _fit(frame)
+        andrey.camuv(frame)
 
 
 def test_fewer_rows_than_twice_the_columns_are_refused():
     X = np.random.default_rng(4).standard_normal((15, 8))
     with pytest.raises(ValueError, match="16"):
-        _fit(X)
-    assert _fit(X[:, :7]).structure.n_nodes == 7
+        andrey.camuv(X)
+    assert andrey.camuv(X[:, :7]).structure.n_nodes == 7
 
 
 def test_a_balanced_grid_of_independent_columns_fits():
     """Each value of one column meets each of the other once, so the HSIC statistic is 0 in exact
     arithmetic and slightly negative after rounding."""
     X = np.array([(i, j) for i in range(4) for j in range(4)], dtype=float)
-    out = _fit(X)
+    out = andrey.camuv(X)
     assert out.structure.n_nodes == 2
     assert out.structure.oriented_edges() == []

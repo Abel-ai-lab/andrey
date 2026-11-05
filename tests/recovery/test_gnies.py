@@ -5,12 +5,11 @@ environments gives the directed edge, with the effect as the one target. The gro
 linear-Gaussian data from ``andrey.data`` with an observational environment and three that each
 scale one variable's noise variance, at 10 variables and 10,000 rows per environment: the true
 class and targets on each of the first five seeds the shipped defaults recover (seeds 0-19
-recovered on 19 of 20). The recorded outputs are the marks and targets of three small draws.
+recovered on 19 of 20). The recorded outputs are the marks and targets of three small draws, and
+the graph, score, and targets of the ``gauss_5v_noise_shift`` baseline.
 """
 
 from __future__ import annotations
-
-import warnings
 
 import numpy as np
 import pytest
@@ -25,17 +24,13 @@ from andrey.data.noise import gaussian
 from andrey.metrics import shd
 from andrey.search.gies import replace_unprotected
 from andrey.search.gnies import singleton_cut
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 
 @pytest.fixture(autouse=True)
 def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-
-
-def _fit(*args, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.gnies(*args, **kwargs)
 
 
 def _draw(
@@ -70,7 +65,7 @@ def test_effect_with_a_changed_noise_variance_is_the_target():
     env = np.repeat([0, 1], 1000)
     x = rng.standard_normal(2000)
     y = 0.8 * x + rng.standard_normal(2000) * np.where(env == 1, 3.0, 1.0)
-    out = _fit(np.column_stack([x, y]), env)
+    out = andrey.gnies(np.column_stack([x, y]), env)
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
     assert _targets(out) == [1]
 
@@ -78,7 +73,7 @@ def test_effect_with_a_changed_noise_variance_is_the_target():
 @pytest.mark.parametrize("seed", [0, 1, 2, 3, 5])
 def test_recovers_the_class_and_targets(seed):
     X, env, targets, truth = _draw(seed, 10_000, d=10, avg_degree=2.7, n_targets=3)
-    out = _fit(X, env)
+    out = andrey.gnies(X, env)
     assert shd(out.structure, truth) == 0
     assert _targets(out) == targets
 
@@ -121,5 +116,11 @@ RECORDED = {
 @pytest.mark.parametrize("seed", sorted(RECORDED))
 def test_recorded_output(seed):
     X, env, _, _ = _draw(seed, [400, 300, 200], d=5, avg_degree=2.0, n_targets=2)
-    out = _fit(X, env)
+    out = andrey.gnies(X, env)
     assert (out.structure.oriented_edges(), _targets(out)) == RECORDED[seed]
+
+
+def test_recorded_baseline():
+    case = "gauss_5v_noise_shift"
+    out = andrey.gnies(datagen.generate(case), datagen.environment_index(case))
+    assert_recorded_output(out, "GnIES", case=case)

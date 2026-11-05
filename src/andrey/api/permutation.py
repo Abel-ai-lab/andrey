@@ -745,9 +745,6 @@ def igsp(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which a continuous test reads as numbers. Each message warns once per process.
@@ -1128,9 +1125,6 @@ def ut_igsp(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which a continuous test reads as numbers. Each message warns once per process.
@@ -1153,10 +1147,11 @@ def ut_igsp(
     rows per setting. It returns the interventional essential graph and each setting's targets.
     Measured in that setting against the paper's reference implementation, with every kind of
     intervention above and up to 3 unknown targets per setting, it was worse in none of 112
-    comparisons and better in 18, its errors lower on two sets of datasets; for 17 of the 18 the
-    second set is the one its default was chosen on (see Limitations). When every target is known,
-    use :func:`~andrey.gies`; with no observational environment, or with environments that differ in
-    ways that are not interventions, use :func:`~andrey.cdnod`.
+    comparisons and better in 1, its errors lower on its datasets and on fresh ones; in 17 more they
+    were lower on its datasets and on those its default was chosen on, which are not fresh, so these
+    count as ties (see Limitations). When every target is known, use :func:`~andrey.gies`; with no
+    observational environment, or with environments that differ in ways that are not
+    interventions, use :func:`~andrey.cdnod`.
 
     **Choosing alpha and n_starts.** The defaults come from simulated data with linear effects,
     Gaussian noise, and 5 settings, 5 seeds per dataset, mostly in the authors' setting of 20

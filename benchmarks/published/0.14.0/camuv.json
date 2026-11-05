@@ -20,6 +20,7 @@
  "error_metric": "direct_errors: the directed edges claimed against the edges between observed variables that no unobserved causal or backdoor path joins, the edges CAM-UV can identify as direct; a missing or extra edge costs 1 and a reversed one 2. shd_endpoint: the endpoint SHD against the PAG of the observed variables. shd_endpoint_bidirected: the same with the estimate's marked pairs drawn <->, the references' mark (Andrey draws o-o), so the two packages' graphs are compared without the mark convention. pair_precision and pair_recall: the marked pairs against the pairs an unobserved causal or backdoor path joins, pooled over the datasets of a cell. same_graph: the same directed edges and the same marked pairs, whatever the mark; same_marks: the same endpoint marks. The paper (Sect. 5) scores directed edges against another truth, x_j -> x_i wherever a directed path from x_j to x_i has no other observed variable on it, which also holds the pairs joined through a hidden intermediate and the direct edges a hidden common cause confounds; latent_projection_errors count the directed edges against it, a missing or extra edge 1 and a reversed one 2, and latent_projection_precision, _recall, and _f1, the paper's three scores, are means over the datasets of a cell; the verdict does not read them",
  "parity_rule": "paired bootstrap",
  "verdict_rule": "D = direct_errors(Andrey) - direct_errors(reference) per dataset on the datasets both finished, for each of lingam and causal-learn at the paper's set size and lingam at its default; the mean D with its percentile bootstrap 95% interval (10,000 resamples); a cell in claim is worse when the interval lies above 0, better when below, a tie otherwise; a cell worse or better is run again on 20 fresh seeds (20-39, the replication rows) and keeps its verdict only if the replication's interval lies on the same side of 0 (final_verdict). Cells with claim 'out' are reported, not judged",
+ "floor_rule": "a reference's beats_empty (in lingam_vs_empty, lingam_default_vs_empty, and causal_learn_vs_empty) is true where the bootstrap 95% interval of its mean direct_errors minus the empty graph's lies wholly below 0; Andrey's floor against the empty graph (vs_empty) applies to a row and reference only where it is true",
  "seeds_note": "20 datasets per cell in claim (seeds 0-19), 10 per cell out of claim (seeds 0-9), and replications on seeds 20-39: the paper's simulation at both sizes and one node in five hidden at d = 10, and nothing hidden on seeds 0-19; a seed whose graph cannot hide its nodes is skipped and the next one taken: seed 31 at d = 10 with one node in five hidden, so that replication reads seeds 20-30 and 32-40",
  "settings": {
   "andrey": "andrey.camuv defaults: alpha 0.01, max_depth 2 (sets of up to 3 variables)",
@@ -348,7 +349,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.65,
        -0.15
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -361,7 +363,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.55,
        -0.05
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -374,7 +377,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.65,
        -0.3
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -710,7 +714,8 @@
       "bootstrap_95_latent_projection_errors": [
        -0.9,
        1.65
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -723,7 +728,8 @@
       "bootstrap_95_latent_projection_errors": [
        -0.8,
        1.65
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -736,7 +742,8 @@
       "bootstrap_95_latent_projection_errors": [
        -0.7,
        1.55
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -1111,7 +1118,8 @@
       "bootstrap_95_latent_projection_errors": [
        -2.05,
        1.9
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -1124,7 +1132,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.9,
        2.0
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -1137,7 +1146,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.801,
        1.9
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -1477,7 +1487,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.45,
        1.6
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -1490,7 +1501,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.4,
        1.65
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -1503,7 +1515,8 @@
       "bootstrap_95_latent_projection_errors": [
        -1.5,
        1.55
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -1854,7 +1867,8 @@
       "bootstrap_95_latent_projection_errors": [
        -2.85,
        0.55
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -1867,7 +1881,8 @@
       "bootstrap_95_latent_projection_errors": [
        -2.8,
        0.6
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -1880,7 +1895,8 @@
       "bootstrap_95_latent_projection_errors": [
        -2.5,
        0.8
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -2220,7 +2236,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.6,
        -1.999
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -2233,7 +2250,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.6,
        -2.05
-      ]
+      ],
+      "beats_empty": true
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -2246,7 +2264,8 @@
       "bootstrap_95_latent_projection_errors": [
        -7.55,
        -3.3
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -2586,7 +2605,8 @@
       "bootstrap_95_latent_projection_errors": [
        -18.65,
        -10.75
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -2599,7 +2619,8 @@
       "bootstrap_95_latent_projection_errors": [
        -18.7,
        -10.9
-      ]
+      ],
+      "beats_empty": true
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -2612,7 +2633,8 @@
       "bootstrap_95_latent_projection_errors": [
        -17.8,
        -9.6
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -2963,7 +2985,8 @@
       "bootstrap_95_latent_projection_errors": [
        -5.25,
        -2.35
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -2976,7 +2999,8 @@
       "bootstrap_95_latent_projection_errors": [
        -5.25,
        -2.35
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -2989,7 +3013,8 @@
       "bootstrap_95_latent_projection_errors": [
        -5.05,
        -2.3
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -3361,7 +3386,8 @@
       "bootstrap_95_latent_projection_errors": [
        -5.65,
        -3.75
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -3374,7 +3400,8 @@
       "bootstrap_95_latent_projection_errors": [
        -5.45,
        -3.35
-      ]
+      ],
+      "beats_empty": true
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -3387,7 +3414,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.1,
        -3.85
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -3756,7 +3784,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.4,
        -3.3
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -3769,7 +3798,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.4,
        -3.35
-      ]
+      ],
+      "beats_empty": true
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -3782,7 +3812,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.4,
        -3.2
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -4116,7 +4147,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.6,
        -3.7
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -4129,7 +4161,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.65,
        -3.8
-      ]
+      ],
+      "beats_empty": true
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -4142,7 +4175,8 @@
       "bootstrap_95_latent_projection_errors": [
        -6.5,
        -3.7
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -4484,7 +4518,8 @@
       "bootstrap_95_latent_projection_errors": [
        -12.25,
        -7.2
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_empty": {
       "paired": 20,
@@ -4497,7 +4532,8 @@
       "bootstrap_95_latent_projection_errors": [
        -12.25,
        -7.1
-      ]
+      ],
+      "beats_empty": true
      },
      "causal_learn_vs_empty": {
       "paired": 20,
@@ -4510,7 +4546,8 @@
       "bootstrap_95_latent_projection_errors": [
        -11.75,
        -6.45
-      ]
+      ],
+      "beats_empty": true
      },
      "lingam_default_vs_lingam": {
       "paired": 20,
@@ -4790,7 +4827,8 @@
       "bootstrap_95_latent_projection_errors": [
        4.9,
        10.1
-      ]
+      ],
+      "beats_empty": false
      },
      "causal_learn_vs_empty": {
       "paired": 10,
@@ -4803,7 +4841,8 @@
       "bootstrap_95_latent_projection_errors": [
        6.6,
        11.7
-      ]
+      ],
+      "beats_empty": false
      },
      "lingam_vs_causal_learn": {
       "paired": 10,

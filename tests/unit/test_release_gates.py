@@ -587,7 +587,10 @@ def test_parity_allowlist_exempts_a_tie_break_only_when_the_reversed_order_passe
         return _entry(cause="tie-break", andrey_errors=4, comparator_errors=0, evidence=evidence)
 
     assert _failures(row, allowlist=(tie_break(reversed_order),)) == []
+    reversed_ranks = {"tie_ranks": "reversed", "andrey_errors": 1, "comparator_errors": 1}
+    assert _failures(row, allowlist=(tie_break(reversed_ranks),)) == []
     for evidence in (
+        {**reversed_ranks, "tie_ranks": "random"},
         None,
         "pgmpy wins on ties",
         {**reversed_order, "column_order": "random"},
@@ -966,17 +969,69 @@ def test_parity_fails_a_row_where_andrey_timed_out_on_a_dataset_the_reference_fi
         _entry_rows({**row, "coverage": {"datasets": 20}})
 
 
-def test_parity_fails_a_row_whose_floor_interval_reaches_zero():
+def _floor(andrey: list, reference: list, **changes) -> dict:
+    """A floor record: Andrey's and the reference's interval against the empty estimate."""
+    return {
+        "andrey_minus_empty": {"paired": 20, "mean": sum(andrey) / 2, "bootstrap_95": andrey},
+        "reference_minus_empty": {
+            "paired": 20,
+            "mean": sum(reference) / 2,
+            "bootstrap_95": reference,
+        },
+        **changes,
+    }
+
+
+def test_parity_judges_a_floor_only_where_the_reference_beats_the_empty_estimate():
     from qa import reference_parity
 
-    better = _paired_row([-0.9, -0.1])
-    assert not _entry_rows({**better, "floor_95": [-12.0, -9.5]})[0].failed
-    [parsed] = _entry_rows({**better, "target_floor_95": [-1.5, 0.0]})
-    assert parsed.failed
+    beats, misses = [-4.0, -2.0], [-1.0, 0.5]
+    reaches, below = [-0.4, 1.2], [-4.0, -2.0]
+
+    def rows(**fields) -> list:
+        return _entry_rows({**_paired_row([-0.9, -0.1]), **fields})
+
+    def failed(**fields) -> bool:
+        return rows(**fields)[0].failed
+
+    assert failed(floor=_floor(reaches, beats)) and not failed(floor=_floor(below, beats))
+    [parsed] = rows(floor=_floor([-1.5, 0.0], beats))
     [failure] = reference_parity.check([parsed], [])[0]
     assert "Andrey minus its floor: bootstrap 95% [-1.50, +0.00], not below 0" in failure
-    with pytest.raises(ValueError, match="floor"):
-        _entry_rows({**better, "floor_95": [-2.0, -1.0], "target_floor_95": [-2.0, -1.0]})
+    # Where the reference does not beat the empty estimate, the floor is printed, not judged.
+    [unapplied] = rows(floor=_floor(reaches, misses))
+    assert not unapplied.failed and not unapplied.floor_applies
+    assert "[-0.40, +1.20], not below 0" in unapplied.numbers()
+    assert "not judged" in unapplied.numbers()
+    # A record's applies and pass must agree with its two intervals.
+    assert failed(floor=_floor(reaches, beats, applies=True))
+    assert failed(floor={**_floor(reaches, beats), "applies": True, "pass": False})
+    with pytest.raises(ValueError, match="disagrees with the reference"):
+        failed(floor={**_floor(reaches, misses), "applies": True})
+    with pytest.raises(ValueError, match="disagrees with the reference"):
+        failed(floor={**_floor(below, beats), "applies": False})
+    with pytest.raises(ValueError, match="disagrees with its interval"):
+        failed(floor={**_floor(reaches, beats), "pass": True})
+    with pytest.raises(ValueError, match="does not apply"):
+        failed(floor={**_floor(reaches, misses), "pass": False})
+    # A floor without the reference's interval, or of the older format, raises.
+    with pytest.raises(ValueError, match="reference_minus_empty"):
+        failed(floor={"andrey_minus_empty": {"bootstrap_95": below}})
+    for old in ("floor_95", "target_floor_95"):
+        with pytest.raises(ValueError, match="no reference interval"):
+            failed(**{old: [-2.0, -1.0]})
+    # A floor failure counts only when the replication's floor fails too.
+    replicated = {"floor": _floor(reaches, beats)}
+    assert not failed(
+        **replicated, replication=_replication([-0.3, 0.2], floor=_floor(below, beats))
+    )
+    assert failed(**replicated, replication=_replication([-0.3, 0.2], floor=_floor(reaches, beats)))
+    assert failed(**replicated, replication=_replication([-0.3, 0.2]))
+    # A first-seed floor that does not apply leaves nothing for the replication to confirm.
+    unruled = {"floor": _floor(reaches, misses)}
+    assert not failed(
+        **unruled, replication=_replication([-0.3, 0.2], floor=_floor(reaches, beats))
+    )
 
 
 def test_parity_judges_each_metric_of_a_method_on_its_own_key():

@@ -1601,12 +1601,6 @@ def dynotears(
         names a column ``data`` lacks, contradicts itself, or requires a link without a lag or
         beyond ``tau_max``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process: the method has no published benchmark, and its API may
-        change without deprecation.
-
     Notes
     -----
     **When to use.** DYNOTEARS suits one continuous, observational, stationary multivariate time
@@ -1680,8 +1674,8 @@ def dynotears(
     Gaussian noise, exponential noise of mean zero, and exponential noise of mean 1 as the paper's
     simulations draw it; 5 to 100 variables; 500 and 50 time steps at the paper's settings for each;
     20 series per setting, in the data's units. Errors are SHD over the same-step and lagged edges
-    together, means over the series. This method tied the reference implementation in 31 of the 38
-    settings and made fewer errors in 6, all with the noise of mean 1, whose mean the centering
+    together, means over the series. This method tied the reference implementation in 32 of the 38
+    settings and made fewer errors in 5, all with the noise of mean 1, whose mean the centering
     above absorbs. It made more in one: exponential noise of mean zero at 100 variables and 50 time
     steps, about 3 to 4 more of about 150 on two sets of 20 series. The centering is the cause: on
     those 40 series the same fit without it made 3.50 fewer errors (95% interval 1.48 to 5.50) and

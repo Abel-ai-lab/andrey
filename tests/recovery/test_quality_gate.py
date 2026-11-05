@@ -31,7 +31,11 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling. A
-    measurement model moves its indicators and keeps its latents last."""
+    measurement model moves its indicators and keeps its latents last; learned targets move to
+    the next variable."""
+    if target == "targets":
+        p = draw.truth.n_nodes
+        return [sorted((v + 1) % p for v in t) for t in draw.targets]
     if target in qg.SERIES_TARGETS:
         return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)
@@ -55,6 +59,8 @@ def shifted_series_truth(truth: object, target: qg.Target) -> object:
     if target == "window":
         n = truth.n_nodes - truth.latents
         return qg.WindowGraph(np.roll(truth.marks[:, :n, :n], 1, axis=(1, 2)), lag0="cpdag")
+    if target == "window_edges":
+        return qg.WindowGraph(np.roll(truth.marks, 1, axis=(1, 2)), lag0="dag")
     if target == "cross_links":
         blocks = truth.stack[[1, 0, 2]] if truth.kind == "varma" else truth.stack[:, ::-1]
         return qg.CoefficientStack(blocks, kind=truth.kind)

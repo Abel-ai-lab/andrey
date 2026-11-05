@@ -333,8 +333,10 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    iamb
    inter_iamb
    mmpc
+   icp
    ges
    gies
+   gnies
    xges
    hc
    tabu
@@ -344,11 +346,14 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    rsmax2
    boss
    grasp
+   igsp
+   ut_igsp
    direct_lingam
    ica_lingam
    multi_group_direct_lingam
    cam
    resit
+   camuv
    anm
    pnl
    rcd
@@ -360,6 +365,7 @@ The score-based rows of those cards use the standard BIC, `ebic_gamma=0.0`.
    pcmciplus
    lpcmci
    granger
+   dynotears
 ```
 
 CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
@@ -401,6 +407,73 @@ with `possible_dsep="order_free"`, the default, their result does not depend on 
 unless two columns are identical; `"fast"` visits them in column order and is the default under
 `andrey.config(tie_break="position")`.
 
+GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
+that share one set of weights and differ in the noise variances of some variables, its targets,
+without being told which. It returns the interventional essential graph of the targets it learns,
+which directs every edge at a target, and lists the targets in `metadata["changing_variables"]`: the
+variables whose noise variance differs between some two environments. With `env`,
+`metadata["environments"]` holds its labels, and
+`targets=dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])` refits the
+graph under the learned targets. For each set of targets it tries, it runs the search of `gies` from
+the empty graph, with the paper's likelihood: one noise variance per environment for a target and
+one in all for the others. Known targets in `targets` stay in the set; with every environment's
+targets known, one search runs. The [0.14.0](benchmarks/0.14.0.md#gnies) release card measures it
+against gnies, the authors' package.
+
+IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
+and settings whose intervention targets are all known, as GIES does: it searches variable orders
+for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
+the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
+over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
+authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
+as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
+and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
+in 17, with interval ends that are floating-point residue of 0 read as 0. It returns the
+interventional essential graph and the level used in `metadata["alpha"]`. The
+[0.14.0](benchmarks/0.14.0.md#igsp) release card measures it against graphical-model-learning, the
+authors' library.
+
+UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings whose
+intervention targets are known in part or not at all: it searches variable orders for the DAG with
+the fewest edges plus targets, where a setting's targets are its known ones and every variable whose
+distribution given its parents differs from the observational one. Its default level for the
+conditional-independence and invariance tests, `alpha=None`, is one over the number of observational
+rows, `0.001` at 1,000 rows: on simulated data in the paper's setting, against the paper's reference
+implementation at the paper's `1e-5`, it was worse in none of 112 comparisons and better in 1 on
+fresh datasets, and lower in 17 more on the datasets that chose it. It returns the interventional
+essential graph with each setting's targets in `metadata["targets"]`, keyed by the labels of `env`,
+and the level used in `metadata["alpha"]`. The targets pass back as `targets`, where they are known:
+`ut_igsp` may learn more, and `gies` refits the graph under exactly these. A setting where it found
+no target maps to `[]`, which `targets` reads as observational. The
+[0.14.0](benchmarks/0.14.0.md#ut-igsp) release card measures it against graphical-model-learning,
+the authors' library.
+
+ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
+of one `target` from continuous data pooled from several environments, such as observation and
+experiments, that leave the target's mechanism alone. It tests every set of the other variables, or
+every set of at most `max_parents`, for a regression on the target that is the same in every
+environment, by the paper's approximate or exact test, and returns the variables in every accepted
+set: in a linear model, they are causal parents with probability at least `1 - alpha`. Its
+`metadata` holds each variable's p-value and confidence interval and the accepted sets. The
+[0.14.0](benchmarks/0.14.0.md#icp) release card measures it against R's InvariantCausalPrediction.
+
+CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits CAM's
+additive model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
+on the residuals of additive spline fits find each variable's candidate parents over sets of up to 3
+variables and then its parents, and mark `o-o` each pair that a hidden common cause or a causal path
+through a hidden variable joins, whose relation no regression can identify. The
+[0.14.0](benchmarks/0.14.0.md#cam-uv) release card measures it from 4 to 50 observed variables
+against lingam and causal-learn.
+
+DYNOTEARS (Pamfil et al. 2020) learns a linear structural vector autoregression from one time series
+the way NOTEARS learns a DAG: the least-squares loss of each step on the same step and the `tau_max`
+steps before it, with an l1 penalty, under the acyclicity constraint on the same-step weights alone,
+since a lagged edge points forward in time. It keeps the paper's settings for 500 time steps:
+`lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-step weights and 0.1 on the lagged
+ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a temporal
+structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at lag 0. The
+[0.14.0](benchmarks/0.14.0.md#dynotears) release card measures it against CausalNex.
+
 ### Experimental methods
 
 A new method ships as experimental: it passes recovery tests but has no published benchmark, its
@@ -416,78 +489,12 @@ its first call in a process.
 
    notears
    dagma
-   camuv
-   dynotears
-   igsp
-   ut_igsp
-   gnies
-   icp
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-CAM-UV, causal additive models with unobserved variables (Maeda and Shimizu 2021), fits the same
-kind of model where some causes are hidden, with the paper's settings: HSIC tests at `alpha=0.01`
-on the residuals of additive spline fits find each variable's candidate parents over sets of up to
-3 variables and then its parents, and mark `o-o` each pair that a hidden common cause or a causal
-path through a hidden variable joins, whose relation no regression can identify.
-
-DYNOTEARS (Pamfil et al. 2020) learns a linear structural vector autoregression from one time
-series the way NOTEARS learns a DAG: the least-squares loss of each step on the same step and the
-`tau_max` steps before it, with an l1 penalty, under the acyclicity constraint on the same-step
-weights alone, since a lagged edge points forward in time. It keeps the paper's settings for 500
-time steps: `lambda1=0.05` on both blocks, and thresholds of 0.3 on the same-step weights and 0.1
-on the lagged ones; for 50 steps the paper used `lambda1=0.2` and `lag_threshold=0.2`. It returns a
-temporal structure whose `lag_weights` are the coefficients in the data's units, with a `dag` at
-lag 0.
-
-IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observational environment
-and settings whose intervention targets are all known, as GIES does: it searches variable orders
-for the DAG with the fewest edges, then the fewest I-contradicting edges, the edges whose direction
-the settings' invariance tests contradict. Its default level for both tests, `alpha=None`, is one
-over the number of observational rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its
-authors swept, from `1e-4` to `0.05`, `1e-3` had the fewest errors on one set of datasets simulated
-as in its papers; on fresh datasets, against the authors' reference implementation at `1e-3`, it
-and one over the observational rows were each worse in none of 114 comparisons and had fewer errors
-in 17, with interval ends that are floating-point residue of 0 read as 0, and a rule written before
-the run gives a tie to one over the observational rows. It returns the interventional essential
-graph and the level used in `metadata["alpha"]`.
-
-UT-IGSP (Squires, Wang, and Uhler 2020) learns from an observational environment and settings
-whose intervention targets are known in part or not at all: it searches variable orders for the
-DAG with the fewest edges plus targets, where a setting's targets are its known ones and every
-variable whose distribution given its parents differs from the observational one. Its default
-level for the conditional-independence and invariance tests, `alpha=None`, is one over the number
-of observational rows, `0.001` at 1,000 rows: on simulated data in the paper's setting it was
-better than the paper's reference implementation at the paper's `1e-5` in 18 of 112 comparisons
-and worse in none. It returns the interventional essential graph with each setting's
-targets in `metadata["targets"]`, keyed by the labels of `env`, and the level used in
-`metadata["alpha"]`. The targets pass back as `targets`, where they are known: `ut_igsp` may
-learn more, and `gies` refits the graph under exactly these. A setting where it found no target
-maps to `[]`, which `targets` reads as observational.
-
-GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
-that share one set of weights and differ in the noise variances of some variables, its targets,
-without being told which. It returns the interventional essential graph of the targets it learns,
-which directs every edge at a target, and lists the targets in `metadata["changing_variables"]`: the
-variables whose noise variance differs between some two environments. With `env`,
-`metadata["environments"]` holds its labels, and
-`targets=dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])` refits the
-graph under the learned targets. For each set of targets it tries, it runs the search of `gies` from
-the empty graph, with the paper's likelihood: one noise variance per environment for a target and
-one in all for the others. Known targets in `targets` stay in the set; with every environment's
-targets known, one search runs.
-
-ICP, invariant causal prediction (Peters, Buhlmann and Meinshausen 2016), finds the causal parents
-of one `target` from continuous data pooled from several environments, such as observation and
-experiments, that leave the target's mechanism alone. It tests every set of the other variables,
-or every set of at most `max_parents`, for a regression on the target that is the same in every
-environment, by the paper's approximate or exact test, and returns the variables in every accepted
-set: in a linear model, they are causal parents with probability at least `1 - alpha`. Its
-`metadata` holds each variable's p-value and confidence interval and the accepted sets.
 
 A method becomes supported once it has:
 

@@ -197,6 +197,12 @@ every setting once replicated. Andrey ran 1.9 to 3.2 times faster than lingam at
 
 ## The empty-graph floor
 
+The floor applies to a setting only where the reference's own interval against the empty graph lies
+wholly below 0. With one node in five hidden, at 4 + 1, 8 + 2, and 12 + 3 variables, and at 10 + 1
+with one hidden per ten, no reference's interval does, so there no implementation beats the empty
+graph and the floor is reported, not judged. Nor does it on the paper's simulation at 500 rows,
+where Andrey's own interval lies below 0.
+
 With one node in five hidden at 8 + 2 variables, every CAM-UV made more errors than the empty
 graph on seeds 0 to 19, each interval above 0. On fresh seeds, 20 to 40 with seed 31 skipped as one
 that cannot hide its nodes, every mean stays above the empty graph's but every interval includes 0,

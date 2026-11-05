@@ -13,13 +13,13 @@ rows, so every other set is rejected; the true parents' set is accepted with pro
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pandas as pd
 import pytest
 
 import andrey
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 COLUMNS = ["a", "b", "y", "c", "d"]
 #: ``WEIGHTS[j][i]`` is the weight of ``COLUMNS[i] -> COLUMNS[j]``, in causal order.
@@ -60,10 +60,8 @@ def environments(
     return pd.DataFrame(X, columns=COLUMNS), np.repeat(np.arange(len(settings)), n)
 
 
-def fit(data, env, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.icp(data, env, target="y", **kwargs)
+def fit(data, env, *, target: str | int = "y", **kwargs) -> andrey.StructureOutput:
+    return andrey.icp(data, env, target=target, **kwargs)
 
 
 SINGLE = [{}, *({column: ("do", 2.0)} for column in ("a", "b", "c", "d"))]
@@ -117,3 +115,11 @@ def test_a_fit_repeats():
     data, env = environments(4, 500, SINGLE)
     first, second = fit(data, env), fit(data, env)
     assert first.metadata == second.metadata
+
+
+def test_icp_keeps_the_recorded_output():
+    """The observational case ``gauss_5v`` split in two blocks: x3 keeps no parent, and the record
+    pins the accepted sets and the p-values."""
+    target = int(datagen.column_of("gauss_5v")[3])
+    out = fit(datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v"), target=target)
+    assert_recorded_output(out, "ICP", case="gauss_5v")

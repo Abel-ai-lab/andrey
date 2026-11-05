@@ -11,11 +11,12 @@ interventions change. The fits run at the facade's defaults.
 
 Wang et al. (2017, Figure 1): the 7-variable DAG on which the score search of GIES is not
 consistent, with the setting ``{4}``, ``{5}``, or ``{4, 5}`` and 100,000 rows per environment.
+
+The recorded output is the graph and objective of the ``gauss_5v_noise_shift`` baseline, whose two
+settings each change the noise of one variable, both given as targets.
 """
 
 from __future__ import annotations
-
-import warnings
 
 import numpy as np
 import pytest
@@ -25,6 +26,8 @@ import andrey.data as data
 from andrey.core import ARROW, TAIL
 from andrey.data.interventions import hard
 from andrey.search.gies import cut_pairs, replace_unprotected
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 P = 10
 #: Each paper's weights, intervention, and settings: (number of settings, targets per setting).
@@ -37,13 +40,6 @@ FIGURE_1 = data.graphs.FixedDAG(
     nodes=("1", "2", "3", "4", "5", "6", "7"),
     arcs=(("1", "4"), ("2", "4"), ("3", "4"), ("3", "5"), ("7", "5"), ("4", "6")),
 )
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def paper_dataset(paper: str, seed: int, n: int):
@@ -110,3 +106,11 @@ def test_igsp_recovers_the_dag_where_gies_is_not_consistent(family):
     out = andrey.igsp(ds.data, ds.env, targets={0: [], 1: sorted(setting)})
     truth = essential(ds.graph.to_numpy(), [set(setting)])
     assert np.array_equal(out.structure.to_numpy(), truth)
+
+
+def test_recorded_baseline():
+    case = "gauss_5v_noise_shift"
+    column = list(datagen.column_order(case)).index
+    targets = {0: [], 1: [column(3)], 2: [column(4)]}
+    out = andrey.igsp(datagen.generate(case), datagen.environment_index(case), targets=targets)
+    assert_recorded_output(out, "IGSP", case=case)

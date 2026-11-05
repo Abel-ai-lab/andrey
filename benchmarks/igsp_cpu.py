@@ -75,6 +75,7 @@ from ut_igsp_cpu import (
     dag_from_arcs,
     essential,
     floor_interval,
+    floor_record,
     pairs_differ,
     parse_seeds,
     replication,
@@ -908,8 +909,8 @@ def summarize(records: list[dict], replications: list[dict] | None = None) -> di
     one row per (``mean_degree``, ``d``, ``n``). A gated row whose reference does not beat the
     empty graph (the interval of the reference's ``shd`` minus the empty graph's not wholly below
     0) is marked ``claim: "out"`` with that reason. A gated row that passes this filter carries
-    ``floor_95``, Andrey against the empty graph, except the unpatched reference's rows in
-    multi-target cells, whose floor is the patched copy's row. ``replications`` are the records
+    ``floor``, Andrey's and the reference's interval against the empty graph, except the unpatched
+    reference's rows in multi-target cells, whose floor is the patched copy's row. ``replications`` are the records
     of block C's reruns.
     """
     reruns = _arms(replications or [])
@@ -961,7 +962,7 @@ def summarize(records: list[dict], replications: list[dict] | None = None) -> di
                 elif reference_floor is None or reference_floor[1] >= 0:
                     row.update(claim="out", reason="reference not better than the empty graph")
                 elif package == "def42" or not cell.multi_target:
-                    row["floor_95"] = floor_interval(mine, "shd", "empty_shd")
+                    row["floor"] = floor_record(mine, theirs, "shd", "empty_shd")
                 rerun_mine = reruns.get((name, "andrey", "igsp", config_name(alpha, starts)))
                 rerun_theirs = reruns.get((name, package, algorithm, config))
                 if rerun_mine and rerun_theirs:

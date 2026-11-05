@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,13 +12,6 @@ from andrey.core.environments import normalize_env_targets
 from andrey.data.interventions import hard, soft
 from andrey.search import igsp
 from andrey.search.gies import cut_pairs, replace_unprotected
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def sample(seed: int = 2, n: int = 500):

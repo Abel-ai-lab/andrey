@@ -9,7 +9,6 @@ rows.
 from __future__ import annotations
 
 import itertools
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -22,9 +21,7 @@ from andrey.core.score import CopiedColumnsError
 
 
 def fit(data, env, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.icp(data, env, **kwargs)
+    return andrey.icp(data, env, **kwargs)
 
 
 def _data(sizes: tuple[int, ...], seed: int = 0) -> tuple[np.ndarray, np.ndarray]:

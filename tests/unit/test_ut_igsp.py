@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,13 +9,6 @@ import pytest
 import andrey
 import andrey.data as data
 from andrey.data.interventions import hard, soft
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def sample(seed: int = 1, n: int = 500):

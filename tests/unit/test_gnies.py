@@ -5,7 +5,6 @@ from __future__ import annotations
 import itertools
 import logging
 import math
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -23,12 +22,6 @@ from andrey.search.gnies import NoiseInterventionScore, alternating_fit, singlet
 from andrey.search.hc import tie_ranks
 
 D = 5
-
-
-def _fit(*args, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.gnies(*args, **kwargs)
 
 
 def _sem(
@@ -70,7 +63,7 @@ def case() -> tuple[np.ndarray, np.ndarray]:
 
 @pytest.fixture(scope="module")
 def fitted(case) -> andrey.StructureOutput:
-    return _fit(*case)
+    return andrey.gnies(*case)
 
 
 def _within_cov(X: np.ndarray, env: np.ndarray) -> np.ndarray:
@@ -167,7 +160,7 @@ def test_a_target_family_needs_two_rows_more_than_parents_in_every_environment(c
         assert view.score(3, (0, 1, 2)) == math.inf
         assert math.isfinite(view.score(3, (0, 2)))
     assert any("unavailable" in r.getMessage() for r in caplog.records)
-    out = _fit(X, env, targets={0: [], 1: [3], 2: [3]})
+    out = andrey.gnies(X, env, targets={0: [], 1: [3], 2: [3]})
     marks = _marks(out)
     for target in _targets(out):
         assert np.sum((marks[target] == ARROW) & (marks[:, target] == TAIL)) <= 4 - 2
@@ -176,13 +169,13 @@ def test_a_target_family_needs_two_rows_more_than_parents_in_every_environment(c
 def test_the_column_check_counts_the_rows_left_after_centering_each_environment():
     rng = np.random.default_rng(3)
     env = np.repeat(np.arange(5), 2)  # 10 rows, 5 left after centering each environment
-    _fit(rng.standard_normal((10, 5)), env)  # as many rows left as variables
+    andrey.gnies(rng.standard_normal((10, 5)), env)  # as many rows left as variables
     with pytest.raises(ValueError, match="leave 5 once each environment's mean"):
-        _fit(rng.standard_normal((10, 6)), env)
+        andrey.gnies(rng.standard_normal((10, 6)), env)
     X, env = _sem(_chain_weights(), [60, 40], [{}, {1: 2.0}], seed=5)
     data = pd.DataFrame(X, columns=list("abcde")).assign(f=lambda t: t["a"] - 2.0 * t["c"])
     with pytest.raises(ValueError, match="linearly dependent") as raised:
-        _fit(data, env)
+        andrey.gnies(data, env)
     assert "'f'" in str(raised.value)
 
 
@@ -195,7 +188,9 @@ def test_the_score_bits_do_not_depend_on_the_blas_thread_count():
     scores = []
     for threads in (1, 8):
         with threadpool_limits(limits=threads):
-            scores.append(_fit(X, env, targets=dict.fromkeys(range(4), [])).metadata["score"])
+            scores.append(
+                andrey.gnies(X, env, targets=dict.fromkeys(range(4), [])).metadata["score"]
+            )
     assert scores[0] == scores[1]
 
 
@@ -279,8 +274,8 @@ def test_a_variable_whose_noise_changes_is_learned_as_a_target(case):
 
 def test_known_targets_stay_and_a_full_mapping_runs_one_search(case):
     X, env = case
-    assert 0 in _targets(_fit(X, env, targets={0: [0]}))
-    out = _fit(X, env, targets={0: [], 1: [1], 2: [2]})
+    assert 0 in _targets(andrey.gnies(X, env, targets={0: [0]}))
+    out = andrey.gnies(X, env, targets={0: [], 1: [1], 2: [2]})
     assert _targets(out) == [1, 2]
     score = NoiseInterventionScore(X, env)
     ranks = tie_ranks(score.centered, np.zeros(D, dtype=bool)).tolist()
@@ -291,9 +286,9 @@ def test_known_targets_stay_and_a_full_mapping_runs_one_search(case):
 
 def test_max_parents_and_knowledge_hold(case):
     X, env = case
-    assert _fit(X, env, max_parents=0).structure.oriented_edges() == []
+    assert andrey.gnies(X, env, max_parents=0).structure.oriented_edges() == []
     forbidden = andrey.Knowledge(forbidden=[(0, 1), (1, 0)])
-    edges = _fit(X, env, knowledge=forbidden).structure.oriented_edges()
+    edges = andrey.gnies(X, env, knowledge=forbidden).structure.oriented_edges()
     assert not any({i, j} == {0, 1} for i, j, _ in edges)
 
 
@@ -301,11 +296,11 @@ def test_required_edges_a_target_cannot_carry_keep_the_variable_out_of_the_targe
     # The second environment has 3 rows, so a target has at most one parent; 3 must have two.
     X, env = _sem(_chain_weights(), [200, 3], [{}, {3: 3.0}], seed=6)
     knowledge = andrey.Knowledge(required=[(0, 3), (2, 3)])
-    out = _fit(X, env, knowledge=knowledge)
+    out = andrey.gnies(X, env, knowledge=knowledge)
     assert 3 not in _targets(out)
     assert {(0, 3, "directed"), (2, 3, "directed")} <= set(out.structure.oriented_edges())
     with pytest.raises(ValueError, match="2 parents to the known target 3"):
-        _fit(X, env, targets={0: [], 1: [3]}, knowledge=knowledge)
+        andrey.gnies(X, env, targets={0: [], 1: [3]}, knowledge=knowledge)
     constraints = resolve(knowledge, D, None, method="gnies")
     score = NoiseInterventionScore(X, env)
     ranks = tie_ranks(score.centered, np.zeros(D, dtype=bool)).tolist()
@@ -323,7 +318,7 @@ def test_required_edges_a_target_cannot_carry_keep_the_variable_out_of_the_targe
 def test_a_column_relabeling_relabels_the_result(case, fitted):
     X, env = case
     perm = np.array([3, 0, 4, 2, 1])
-    out = _fit(X[:, perm], env)
+    out = andrey.gnies(X[:, perm], env)
     assert np.array_equal(_marks(out), _marks(fitted)[np.ix_(perm, perm)])
     assert sorted(int(perm[j]) for j in _targets(out)) == _targets(fitted)
 
@@ -331,7 +326,7 @@ def test_a_column_relabeling_relabels_the_result(case, fitted):
 def test_a_row_shuffle_changes_nothing(case, fitted):
     X, env = case
     rows = np.random.default_rng(0).permutation(len(env))
-    out = _fit(X[rows], env[rows])
+    out = andrey.gnies(X[rows], env[rows])
     assert np.array_equal(_marks(out), _marks(fitted))
     assert _targets(out) == _targets(fitted)
     assert out.metadata["score"] == pytest.approx(fitted.metadata["score"], rel=1e-12)
@@ -339,7 +334,7 @@ def test_a_row_shuffle_changes_nothing(case, fitted):
 
 def test_relabeled_environments_give_the_same_bits(case, fitted):
     X, env = case
-    out = _fit(X, np.array(["c", "a", "b"])[env])
+    out = andrey.gnies(X, np.array(["c", "a", "b"])[env])
     assert np.array_equal(_marks(out), _marks(fitted))
     assert _targets(out) == _targets(fitted)
     assert out.metadata["score"] == fitted.metadata["score"]
@@ -350,7 +345,7 @@ def test_units_and_environment_means_do_not_matter(case, fitted):
     scaled = X * np.array([3.0, 0.01, 7.0, 0.5, 40.0]) + np.array([1.0, -2.0, 5.0, 0.0, 9.0])
     shifted = X + np.where(env[:, None] == 2, 4.0, 0.0)
     for data in (scaled, shifted):
-        out = _fit(data, env)
+        out = andrey.gnies(data, env)
         assert np.array_equal(_marks(out), _marks(fitted))
         assert _targets(out) == _targets(fitted)
 
@@ -360,7 +355,7 @@ def test_standardizing_each_environment_changes_the_result(case, fitted):
     each = X.copy()
     for k in np.unique(env):
         each[env == k] = (X[env == k] - X[env == k].mean(axis=0)) / X[env == k].std(axis=0)
-    assert _targets(_fit(each, env)) != _targets(fitted)
+    assert _targets(andrey.gnies(each, env)) != _targets(fitted)
 
 
 def test_a_step_the_tie_ranks_decide_is_logged_and_logging_changes_nothing(caplog):
@@ -368,10 +363,10 @@ def test_a_step_the_tie_ranks_decide_is_logged_and_logging_changes_nothing(caplo
     # alike and lead to different graphs, so a step between them is decided by the tie ranks.
     X, env = _sem(_chain_weights(), [300, 200], [{}, {4: 2.0}], seed=4)
     X, env = np.vstack([X, X[:, [1, 0, 2, 3, 4]]]), np.concatenate([env, env])
-    plain = _fit(X, env)
+    plain = andrey.gnies(X, env)
     gies = andrey.gies(X, env, targets={0: [], 1: [4]})
     with caplog.at_level(logging.DEBUG, logger="andrey.search.gies"):
-        logged = _fit(X, env)
+        logged = andrey.gnies(X, env)
         gies_logged = andrey.gies(X, env, targets={0: [], 1: [4]})
     assert any("two moves tie" in r.getMessage() for r in caplog.records)
     assert np.array_equal(_marks(logged), _marks(plain)) and _targets(logged) == _targets(plain)
@@ -385,7 +380,7 @@ def test_a_step_the_tie_ranks_decide_is_logged_and_logging_changes_nothing(caplo
 
 def test_the_fit_repeats_and_records_its_metadata(case, fitted):
     X, env = case
-    again = _fit(X, env)
+    again = andrey.gnies(X, env)
     assert np.array_equal(_marks(again), _marks(fitted))
     assert again.metadata == fitted.metadata
     assert fitted.metadata["algorithm"] == "gnies"
@@ -399,7 +394,7 @@ def test_labels_name_the_targets_and_without_env_no_environments_are_listed(case
     X, env = case
     data = pd.DataFrame(X, columns=list("abcde"))
     data["changed"] = np.array(["", "b", "e"], dtype=object)[env]
-    out = _fit(data, targets="changed")
+    out = andrey.gnies(data, targets="changed")
     assert out.metadata["changing_variables"] == ["b", "e"]
     assert "environments" not in out.metadata
 
@@ -409,10 +404,10 @@ def test_the_learned_targets_given_as_known_refit_the_same_graph_and_score(case)
     targets, and the one search on them repeats the outer search's final run, bit for bit."""
     X, env = case
     data = pd.DataFrame(X, columns=list("abcde")).assign(site=np.array(["p", "q", "r"])[env])
-    out = _fit(data, "site")
+    out = andrey.gnies(data, "site")
     assert out.metadata["environments"] == ["p", "q", "r"]
     targets = dict.fromkeys(out.metadata["environments"], out.metadata["changing_variables"])
-    refit = _fit(data, "site", targets=targets)
+    refit = andrey.gnies(data, "site", targets=targets)
     assert np.array_equal(_marks(refit), _marks(out))
     assert refit.metadata["score"] == out.metadata["score"]
     assert refit.metadata["changing_variables"] == out.metadata["changing_variables"] == ["b", "e"]
@@ -425,11 +420,11 @@ def test_errors_name_an_environment_from_targets_by_its_targets(case):
     one_row = data.copy()
     one_row.loc[0, "changed"] = "c"
     with pytest.raises(ValueError, match=r"^gnies: .*\[\['c'\]\] have fewer"):
-        _fit(one_row, targets="changed")
+        andrey.gnies(one_row, targets="changed")
     flat = data.copy()
     flat.loc[env == 2, "a"] = 1.0
     with pytest.raises(ValueError, match=r"^gnies: column 'a' is constant in environment \['e'\]"):
-        _fit(flat, targets="changed")
+        andrey.gnies(flat, targets="changed")
 
 
 @pytest.mark.parametrize(
@@ -463,4 +458,4 @@ def test_invalid_input_raises(case, change, match):
         data = X.copy()
         data[3, 2] = np.nan
     with pytest.raises(ValueError, match=match):
-        _fit(data, env, targets=targets)
+        andrey.gnies(data, env, targets=targets)

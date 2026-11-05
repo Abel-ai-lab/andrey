@@ -73,9 +73,9 @@ Two solutions return the same graph when their window marks are equal (`structur
 the same series fitted by both solutions in one run. D is Andrey's SHD minus the other solution's,
 and its interval the percentile bootstrap 95% interval of the mean D over the pairs (10,000
 resamples). A cell in claim is worse when the interval lies above 0, better when it lies below, and
-a tie otherwise; a worse cell is run again on 20 fresh seeds and counts as worse only if that
-interval also lies above 0. A fit stopped at the wall cap is a timeout: it is counted in the
-coverage and never scored.
+a tie otherwise; a worse or better cell is run again on 20 fresh seeds and counts as worse only if
+that interval also lies above 0, and as better only if it also lies below 0. A fit stopped at the
+wall cap is a timeout: it is counted in the coverage and never scored.
 
 ## Results
 
@@ -88,6 +88,26 @@ variables, returns the recorded graph. Every setting in claim has 20 series (see
 one out of claim 10 (seeds 0 to 9), each fitted once with a 3,600 s cap; no fit reached it. SHD and
 F1 are means over the series, CPU s the median CPU time of a fit. D is Andrey's SHD minus
 CausalNex's, split into its same-step and lagged parts.
+
+For every setting and replication, `dynotears.json` holds Andrey's and CausalNex's SHD minus that of
+the empty window, which has no edge, each a mean over the paired series with its 95% interval. The
+floor applies where CausalNex beats the empty window, its interval wholly below 0: in all 38
+settings in claim and their 10 replications, and in 9 of the 11 out of claim. Andrey beats the empty
+window in all 57. In the other 2, the defaults at 50 steps at 20 and 50 variables, neither package
+beats it, and the floor is reported, not judged.
+
+CausalNex's intervals against the empty window come from a refit of every series on a second
+machine, an AMD EPYC 9534 with CausalNex 0.12.2 on Python 3.10 and OpenBLAS's SKYLAKEX kernel. The
+refit reproduces the empty window's SHD on every setting and replication, and CausalNex's mean
+errors on 51 of the 59. On the other 8, all at 100 variables, CausalNex's mean SHD differs by at
+most 1.05, and its interval against the empty window lies at least 125 below 0, so no floor decision
+changes. These intervals draw their own 10,000 bootstrap resamples, from NumPy's `default_rng(0)`;
+the seed of the lane's other intervals is not recorded. Andrey's own fits on the second machine
+differ from the recorded ones in 16 of the 59, all at 10 variables or more, with mean SHD within
+0.6. The tables keep the recorded fits. On the second machine's fits, the one worse setting
+(exponential noise, 100 variables, 50 steps) would be a tie on seeds 0 to 19, D in [-0.20, +5.55],
+and one tie (exponential noise of mean 1, 100 variables, 500 steps, seeds 20 to 39) would be
+better, D in [-2.55, -0.05]; the recorded verdicts are the less favorable to Andrey.
 
 At 500 steps, the paper's settings for 500 steps and Andrey's defaults, every setting with noise of
 mean 0 is a tie, with an F1 of at least 0.968 for both packages. Where the graphs differ, CausalNex
@@ -146,9 +166,12 @@ and, once replicated, at 50 steps.
 | Gaussian | 50 | 0 | 88.45 | 87.80 | 176.6 | +0.60 | +0.05 | +0.65 [-0.65, +2.00] | 0.711 | 0.714 | 66 | 88 | 88.60 | -0.15 [-0.35, +0.05] | 13 |
 
 With the exponential noise of mean 1 that the paper's simulations draw, every series has a mean that
-CausalNex's loss cannot fit, and Andrey makes fewer errors at every size at 500 steps and at 5
-variables at 50 steps, and ties elsewhere. CausalNex on centered columns returns Andrey's graph on
-most series up to 50 variables.
+CausalNex's loss cannot fit. Andrey makes fewer errors at 5, 10, 20 and 50 variables at 500 steps
+and at 5 variables at 50 steps, each on seeds 0 to 19 and again on the fresh seeds 20 to 39, and
+ties elsewhere. CausalNex on centered columns returns Andrey's graph on most series up to 50
+variables; where it does not, a rounding-level change of the data or the column order moves Andrey's
+graph on 24 of the 27 series traced, and on the other 3 the one edge that differs has a weight
+within 0.002 of the threshold in both fits.
 
 | noise | d | same graph | SHD Andrey | SHD CausalNex | SHD empty | D same-step | D lagged | D [95% CI] | F1 Andrey | F1 CausalNex | CPU s Andrey | CPU s CausalNex | SHD CausalNex centered | D vs centered [95% CI] | same graph vs centered |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -168,7 +191,7 @@ most series up to 50 variables.
 
 ## Replication
 
-In claim, 31 of the 38 settings count as ties, 6 as better, and 1 as worse:
+In claim, 32 of the 38 settings count as ties, 5 as better, and 1 as worse:
 
 | setting | seeds 0 to 19 | seeds 20 to 39 | counts as |
 |---|---|---|---|
@@ -176,17 +199,35 @@ In claim, 31 of the 38 settings count as ties, 6 as better, and 1 as worse:
 | Gaussian, 100 variables, 50 steps | worse | tie | tie |
 | exponential of mean 0, 100 variables, 50 steps | worse | worse | worse |
 | Gaussian, Barabasi-Albert, 10 variables, 50 steps | worse | tie | tie |
+| exponential of mean 1, 5 variables, 500 steps | better | better | better |
+| exponential of mean 1, 10 variables, 500 steps | better | better | better |
+| exponential of mean 1, 20 variables, 500 steps | better | better | better |
+| exponential of mean 1, 50 variables, 500 steps | better | better | better |
+| exponential of mean 1, 100 variables, 500 steps | better | tie | tie |
+| exponential of mean 1, 5 variables, 50 steps | better | better | better |
 
-| noise, graphs | d | seeds | same graph | SHD Andrey | SHD CausalNex | D [95% CI] | SHD CausalNex centered | D vs centered [95% CI] | same graph vs centered |
-|---|---|---|---|---|---|---|---|---|---|
-| Gaussian, Erdos-Renyi | 20 | 0-19 | 4 | 21.65 | 20.80 | +0.85 [+0.05, +1.65] | 21.65 | +0.00 [-0.15, +0.15] | 18 |
-| Gaussian, Erdos-Renyi | 20 | 20-39 | 3 | 21.55 | 20.90 | +0.65 [-0.45, +1.70] | 21.55 | +0.00 [+0.00, +0.00] | 20 |
-| Gaussian, Erdos-Renyi | 100 | 0-19 | 0 | 143.95 | 137.05 | +6.90 [+4.30, +9.55] | 143.30 | +0.65 [-0.40, +2.45] | 6 |
-| Gaussian, Erdos-Renyi | 100 | 20-39 | 0 | 144.70 | 142.90 | +1.80 [-1.05, +4.70] | 144.65 | +0.05 [-0.30, +0.35] | 10 |
-| exponential, Erdos-Renyi | 100 | 0-19 | 0 | 148.95 | 145.75 | +3.20 [+0.10, +6.00] | 148.20 | +0.75 [+0.20, +1.40] | 8 |
-| exponential, Erdos-Renyi | 100 | 20-39 | 0 | 154.45 | 150.30 | +4.15 [+1.30, +7.10] | 153.90 | +0.55 [-0.20, +1.45] | 4 |
-| Gaussian, Barabasi-Albert | 10 | 0-19 | 7 | 10.35 | 10.00 | +0.35 [+0.05, +0.65] | 10.30 | +0.05 [+0.00, +0.15] | 19 |
-| Gaussian, Barabasi-Albert | 10 | 20-39 | 9 | 9.90 | 9.70 | +0.20 [-0.30, +0.65] | 9.90 | +0.00 [+0.00, +0.00] | 20 |
+| noise, graphs | T | d | seeds | same graph | SHD Andrey | SHD CausalNex | D [95% CI] | SHD CausalNex centered | D vs centered [95% CI] | same graph vs centered |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Gaussian, Erdos-Renyi | 50 | 20 | 0-19 | 4 | 21.65 | 20.80 | +0.85 [+0.05, +1.65] | 21.65 | +0.00 [-0.15, +0.15] | 18 |
+| Gaussian, Erdos-Renyi | 50 | 20 | 20-39 | 3 | 21.55 | 20.90 | +0.65 [-0.45, +1.70] | 21.55 | +0.00 [+0.00, +0.00] | 20 |
+| Gaussian, Erdos-Renyi | 50 | 100 | 0-19 | 0 | 143.95 | 137.05 | +6.90 [+4.30, +9.55] | 143.30 | +0.65 [-0.40, +2.45] | 6 |
+| Gaussian, Erdos-Renyi | 50 | 100 | 20-39 | 0 | 144.70 | 142.90 | +1.80 [-1.05, +4.70] | 144.65 | +0.05 [-0.30, +0.35] | 10 |
+| exponential, Erdos-Renyi | 50 | 100 | 0-19 | 0 | 148.95 | 145.75 | +3.20 [+0.10, +6.00] | 148.20 | +0.75 [+0.20, +1.40] | 8 |
+| exponential, Erdos-Renyi | 50 | 100 | 20-39 | 0 | 154.45 | 150.30 | +4.15 [+1.30, +7.10] | 153.90 | +0.55 [-0.20, +1.45] | 4 |
+| Gaussian, Barabasi-Albert | 50 | 10 | 0-19 | 7 | 10.35 | 10.00 | +0.35 [+0.05, +0.65] | 10.30 | +0.05 [+0.00, +0.15] | 19 |
+| Gaussian, Barabasi-Albert | 50 | 10 | 20-39 | 9 | 9.90 | 9.70 | +0.20 [-0.30, +0.65] | 9.90 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 500 | 5 | 0-19 | 3 | 0.15 | 4.85 | -4.70 [-6.40, -3.25] | 0.15 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 500 | 5 | 20-39 | 0 | 1.05 | 8.95 | -7.90 [-9.40, -6.35] | 1.05 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 500 | 10 | 0-19 | 4 | 1.35 | 12.45 | -11.10 [-16.00, -6.50] | 1.35 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 500 | 10 | 20-39 | 1 | 1.25 | 12.90 | -11.65 [-14.90, -8.55] | 1.25 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 500 | 20 | 0-19 | 5 | 1.35 | 8.50 | -7.15 [-10.25, -4.30] | 1.35 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 500 | 20 | 20-39 | 4 | 1.10 | 8.00 | -6.90 [-10.80, -3.60] | 1.15 | -0.05 [-0.15, +0.00] | 19 |
+| exponential, mean 1, Erdos-Renyi | 500 | 50 | 0-19 | 3 | 2.15 | 6.90 | -4.75 [-8.15, -2.30] | 2.20 | -0.05 [-0.15, +0.00] | 19 |
+| exponential, mean 1, Erdos-Renyi | 500 | 50 | 20-39 | 1 | 1.90 | 4.90 | -3.00 [-4.05, -1.90] | 2.00 | -0.10 [-0.25, +0.00] | 17 |
+| exponential, mean 1, Erdos-Renyi | 500 | 100 | 0-19 | 2 | 6.20 | 8.70 | -2.50 [-4.75, -0.75] | 6.40 | -0.20 [-0.55, +0.05] | 16 |
+| exponential, mean 1, Erdos-Renyi | 500 | 100 | 20-39 | 1 | 5.15 | 6.55 | -1.40 [-2.55, +0.10] | 5.25 | -0.10 [-0.25, +0.00] | 17 |
+| exponential, mean 1, Erdos-Renyi | 50 | 5 | 0-19 | 0 | 5.40 | 6.55 | -1.15 [-2.10, -0.20] | 5.40 | +0.00 [+0.00, +0.00] | 20 |
+| exponential, mean 1, Erdos-Renyi | 50 | 5 | 20-39 | 0 | 6.05 | 7.70 | -1.65 [-2.60, -0.70] | 6.05 | +0.00 [+0.00, +0.00] | 20 |
 
 The worse setting comes from centering, Andrey's fit of every column on its own mean. Refitted with
 its columns not centered, the second moments in place of the covariance, Andrey makes fewer errors:
