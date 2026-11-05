@@ -102,7 +102,12 @@ refit reproduces the empty window's SHD on every setting and replication, and Ca
 errors on 51 of the 59. On the other 8, all at 100 variables, CausalNex's mean SHD differs by at
 most 1.05, and its interval against the empty window lies at least 125 below 0, so no floor decision
 changes. These intervals draw their own 10,000 bootstrap resamples, from NumPy's `default_rng(0)`;
-the seed of the lane's other intervals is not recorded.
+the seed of the lane's other intervals is not recorded. Andrey's own fits on the second machine
+differ from the recorded ones in 16 of the 59, all at 10 variables or more, with mean SHD within
+0.6. The tables keep the recorded fits. On the second machine's fits, the one worse setting
+(exponential noise, 100 variables, 50 steps) would be a tie on seeds 0 to 19, D in [-0.20, +5.55],
+and one tie (exponential noise of mean 1, 100 variables, 500 steps, seeds 20 to 39) would be
+better, D in [-2.55, -0.05]; the recorded verdicts are the less favorable to Andrey.
 
 At 500 steps, the paper's settings for 500 steps and Andrey's defaults, every setting with noise of
 mean 0 is a tie, with an F1 of at least 0.968 for both packages. Where the graphs differ, CausalNex
