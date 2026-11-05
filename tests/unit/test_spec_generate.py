@@ -18,6 +18,22 @@ from andrey.spec import (
 
 _SPEC_NAMES = sorted(REGISTRY)
 
+#: The JSON Schema type of each parameter type.
+JSON_TYPE = {
+    "float": "number",
+    "int": "integer",
+    "str": "string",
+    "bool": "boolean",
+    "int_pair": "array",
+    "str_list": "array",
+    "knowledge": "object",
+    "targets": "object",
+}
+
+
+def types_of(schema: dict) -> set[str]:
+    return set(schema["type"]) if isinstance(schema["type"], list) else {schema["type"]}
+
 
 def test_help_schema_is_json_serializable_and_complete():
     ctx = help_schema()
@@ -49,12 +65,11 @@ def test_method_schema_matches_spec(name):
 
     for p in spec.params:
         entry = props[p.name]
-        assert "default" in entry and "description" in entry
+        assert entry["default"] == json.loads(json.dumps(p.default)) and "description" in entry
+        assert types_of(entry) == {JSON_TYPE[p.type], *(["null"] if p.nullable else [])}
         if p.choices:
             expected = [*p.choices, None] if p.nullable else list(p.choices)
             assert entry["enum"] == expected
-        if p.nullable and isinstance(entry["type"], list):
-            assert "null" in entry["type"]
 
     assert schema["status"] == spec.status
 

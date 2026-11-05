@@ -558,30 +558,25 @@ def _bracket_items(value: str, key: str) -> list[str]:
     return [_unquote(item.strip())[0] for item in inner.split(",")] if inner else []
 
 
-def _check_choice(value: str, param: ParamSpec) -> str:
-    """A string value must be one of the param's choices, when it enumerates any; a former value
-    maps to its current one."""
-    value = dict(param.choice_aliases).get(value, value)
-    if param.choices and value not in param.choices:
-        raise CliError(
-            "unsupported_value",
-            f"{param.name} must be one of: {', '.join(param.choices)}",
-            EXIT_USAGE,
-            valid_options=list(param.choices),
-        )
-    return value
+def _current_choice(value: str, param: ParamSpec) -> str:
+    """A former value of a choice maps to its current one."""
+    return dict(param.choice_aliases).get(value, value)
 
 
-def _check_range(value: float, param: ParamSpec) -> float:
-    """A number must lie within the param's bounds."""
-    reason = param.out_of_range(value)
-    if reason is not None:
-        raise CliError("bad_value", reason, EXIT_USAGE)
+def _checked(value: object, param: ParamSpec, method: str) -> object:
+    """Return a parsed ``value`` that :meth:`~andrey.spec.models.ParamSpec.check` accepts, as the
+    method checks it; a value it rejects is a usage error, which lists the choices when the param
+    has them."""
+    try:
+        param.check(value, method)
+    except (TypeError, ValueError) as exc:
+        options = {"valid_options": list(param.choices)} if param.choices else {}
+        raise CliError("bad_value", str(exc), EXIT_USAGE, **options) from None
     return value
 
 
 def _coerce(raw: str, param: ParamSpec) -> object:
-    """Coerce a raw CLI string against a ParamSpec type -- the spec drives the parse (no sniff)."""
+    """Parse a raw CLI string as a ParamSpec type -- the spec drives the parse (no sniff)."""
     if param.type == "knowledge":
         return _knowledge_value(raw, param.name)
     if param.type == "targets":
@@ -592,7 +587,7 @@ def _coerce(raw: str, param: ParamSpec) -> object:
             raise CliError(
                 "bad_value", f"{param.name} is a {param.type}, not a quoted string", EXIT_USAGE
             )
-        return _check_choice(value, param)
+        return _current_choice(value, param)
     if param.nullable and value.lower() == "null":
         return None
     if value == "":
@@ -611,14 +606,14 @@ def _coerce(raw: str, param: ParamSpec) -> object:
         )
     if kind == "int":
         try:
-            return _check_range(int(value), param)
+            return int(value)
         except ValueError:
             raise CliError(
                 "bad_value", f"{param.name} expects an integer, got {value!r}", EXIT_USAGE
             ) from None
     if kind == "float":
         try:
-            return _check_range(float(value), param)
+            return float(value)
         except ValueError:
             raise CliError(
                 "bad_value", f"{param.name} expects a number, got {value!r}", EXIT_USAGE
@@ -641,7 +636,7 @@ def _coerce(raw: str, param: ParamSpec) -> object:
         return pair
     if kind == "str_list":
         return tuple(_bracket_items(value, param.name))
-    return _check_choice(value, param)
+    return _current_choice(value, param)
 
 
 def _knowledge_value(raw: str, name: str) -> dict | None:
@@ -711,8 +706,9 @@ def _targets_object(value: object, name: str) -> dict:
 
 
 def _validate_config_value(value: object, param: ParamSpec) -> object:
-    """A `--config` value is already typed (YAML/JSON): validate against the spec, do not coerce a
-    string. Returns tuples for int_pair / str_list."""
+    """A `--config` value is already typed (YAML/JSON): take it as the param's type without parsing
+    a string, for :func:`_checked` to check. A str or str_list must hold strings, which
+    ``ParamSpec.check`` leaves to the method. Returns tuples for int_pair / str_list."""
     if value is None:
         if param.nullable:
             return None
@@ -725,27 +721,16 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         if isinstance(value, str):
             return _targets_value(value, param.name)
         return _targets_object(value, param.name)
-    ok = {
-        "bool": isinstance(value, bool),
-        "int": isinstance(value, int) and not isinstance(value, bool),
-        "float": isinstance(value, (int, float)) and not isinstance(value, bool),
-        "str": isinstance(value, str),
-        "int_pair": isinstance(value, (list, tuple))
-        and len(value) == 2
-        and all(isinstance(i, int) and not isinstance(i, bool) for i in value),
-        "str_list": isinstance(value, (list, tuple)) and all(isinstance(i, str) for i in value),
-    }[param.type]
-    if not ok:
+    if param.type == "str" and isinstance(value, str):
+        return _current_choice(value, param)
+    strings = isinstance(value, (list, tuple)) and all(isinstance(i, str) for i in value)
+    if param.type == "str_list" and strings:
+        return tuple(value)
+    if param.type in ("str", "str_list"):
         raise CliError(
             "bad_value", f"{param.name} in --config is not a valid {param.type}", EXIT_USAGE
         )
-    if param.type == "str":
-        return _check_choice(value, param)  # ty: ignore[invalid-argument-type]  # a str above
-    if param.type in ("int", "float"):
-        return _check_range(value, param)  # ty: ignore[invalid-argument-type]  # a number above
-    if param.type in ("int_pair", "str_list"):
-        return tuple(value)  # ty: ignore[invalid-argument-type]  # validated list/tuple above
-    return value
+    return tuple(value) if param.type == "int_pair" and isinstance(value, list) else value
 
 
 def _with_hint(message: str, hint: str | None) -> str:
@@ -869,9 +854,10 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
             return
         try:
             if from_config:
-                fkwargs[key] = _validate_config_value(value, param)
+                parsed = _validate_config_value(value, param)
             else:
-                fkwargs[key] = _coerce(value, param)  # ty: ignore[invalid-argument-type]
+                parsed = _coerce(value, param)  # ty: ignore[invalid-argument-type]
+            fkwargs[key] = _checked(parsed, param, spec.name)
         except CliError as exc:
             message = _with_hint(exc.message, removal_hint(spec.name, key, value))
             errors.append({"param": key, "message": message, **exc.extra})

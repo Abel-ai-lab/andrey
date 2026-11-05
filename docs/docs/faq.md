@@ -149,11 +149,10 @@ see [Are the classic methods accurate on very large graphs?](#are-the-classic-me
 
 ### Can it use more CPU cores?
 
-GES and GFCI (in its GES phase) can spread each pass over worker processes: set
-`ANDREY_N_JOBS` above 1. GES's parallel result is identical to its serial one. PC, FCI, GFCI,
-and CD-NOD spread the larger passes of their skeleton search over worker processes with the
-`fisherz` and `student_t` tests, from the same setting, and return the same graph as with one
-worker. A script that does this must put its entry point under `if __name__ == "__main__":`,
+GES, GFCI, and the skeleton search of PC and the methods built on it can spread their larger
+passes over worker processes: set `ANDREY_N_JOBS` above 1. They return the same graph as with one
+worker; [Configuration](configuration.md#parallel-search) lists the methods and tests that use
+them. A script that does this must put its entry point under `if __name__ == "__main__":`,
 because starting the workers re-imports the script;
 [Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass uses the
 workers only above a work cutoff. The defaults suit one fit per process; for a process that runs

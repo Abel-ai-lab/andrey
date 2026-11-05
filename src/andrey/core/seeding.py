@@ -26,8 +26,9 @@ _DEFAULT_SEED = 0
 def resolve_seed(seed: int | None = None) -> int:
     """The effective seed: an explicit ``seed`` if given, else ``ANDREY_SEED`` (default ``0``).
 
-    Adapters whose engine takes its own ``random_state`` call this to pick the number to pass down;
-    adapters that rely on a global RNG call :func:`seed_all` (which resolves through here).
+    The method wrapper calls it for every seeded method and passes the result on as an int, and
+    :func:`andrey.bootstrap` calls it for the seed its resamples derive from; :func:`seed_all`
+    resolves through it too.
     """
     if seed is not None:
         return int(seed)

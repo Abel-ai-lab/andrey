@@ -559,10 +559,9 @@ VARMA-LiNGAM and Granger, fill in the missing steps first.
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
 `ANDREY_BACKEND` and `ANDREY_N_JOBS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
-worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
-serially. PC, FCI, GFCI, and CD-NOD run the larger passes of their skeleton search in worker
-processes with the `fisherz` and `student_t` tests on complete data, and return the same graph as
-with one worker.
+worker, GES, GFCI, and the skeleton search of PC and the methods built on it run their larger
+passes in worker processes and return the same graph as with one worker;
+[Parallel search](../configuration.md#parallel-search) lists the methods and tests that use them.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_N_JOBS` above 1, or `-1` for every core) must put its entry

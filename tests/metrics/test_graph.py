@@ -119,10 +119,10 @@ def test_standalone_metrics_reject_digraph_vs_pag():
     marks = np.array([[0, 2], [2, 0]], dtype=np.int8)
     digraph = GraphStructure.from_numpy(marks, kind="digraph")
     pag = GraphStructure.from_numpy(marks, kind="pag")
-    for metric in (shd, orientation_scores, confounder_pair_scores):
-        with pytest.raises(ValueError, match="digraph to a PAG"):
+    for metric in (shd, orientation_scores, confounder_pair_scores, markov_equivalent):
+        with pytest.raises(ValueError, match="digraph"):
             metric(digraph, pag)
-        with pytest.raises(ValueError, match="digraph to a PAG"):
+        with pytest.raises(ValueError, match="digraph"):
             metric(pag, digraph)  # rejected from either side
     # the skeleton is kind-agnostic (both share the 0-1 edge), so it stays answerable
     assert skeleton_scores(digraph, pag)["f1"] == 1.0
@@ -190,6 +190,20 @@ def test_markov_equivalent_accepts_cpdag_structures():
     assert markov_equivalent(marks, VSTRUCT)
     same = GraphStructure.from_numpy(marks.to_numpy(), kind="cpdag")
     assert markov_equivalent(marks, same)
+
+
+def test_markov_equivalent_rejects_a_directed_cycle():
+    # A cycle has no equivalence class, though a 3-cycle and its reverse share a skeleton and have
+    # no collider; a raw cyclic array reads as a digraph too.
+    from andrey.core import ARROW, TAIL, GraphStructure
+
+    cycle = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])  # 0 -> 1 -> 2 -> 0
+    marks = (TAIL * cycle + ARROW * cycle.T).astype(np.int8)
+    digraph = GraphStructure.from_numpy(marks, kind="digraph")
+    reverse = GraphStructure.from_numpy(marks.T, kind="digraph")
+    for a, b in ((digraph, reverse), (cycle, cycle.T)):
+        with pytest.raises(ValueError, match="digraph"):
+            markov_equivalent(a, b)
 
 
 def test_markov_equivalent_rejects_node_count_mismatch():

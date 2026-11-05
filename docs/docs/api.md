@@ -938,8 +938,9 @@ datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(we
 from what the two structures carry (their kind, latent nodes, lags, an ordering, weights) and
 returns them in one dictionary, with the choice under `family`. The other functions compute one
 metric each. Both arguments can be a `StructureOutput`, a structure, or a directed adjacency
-matrix, where a nonzero `A[i, j]` means `i -> j`, over the same variables in the same order. Wrap
-a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
+matrix, where a nonzero `A[i, j]` means `i -> j`, over the same variables in the same order. A
+matrix whose directed edges form a cycle reads as a `digraph`. Wrap a matrix of endpoint marks with
+`GraphStructure.from_numpy(M, kind=...)` first.
 
 | `family` | When | `score` returns |
 |---|---|---|

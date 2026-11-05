@@ -680,6 +680,11 @@ def test_a_named_test_or_score_is_the_one_recorded_and_built(method):
     assert {key: recorded for key, (recorded, _) in found.items()} == named
 
 
+def test_every_method_that_takes_a_test_or_a_score_records_the_one_it_used():
+    takes = {m for m in REGISTRY if wanted_settings(m)}
+    assert set(CONCEPTS["chosen_settings"].suitable) == takes
+
+
 def test_a_registered_test_is_recorded_by_its_registered_name(monkeypatch):
     monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
     out = andrey.pc(*inputs("pc", codes=False), indep_test="fisherz_copy")
@@ -1274,10 +1279,13 @@ def test_schema_carries_bounds_aliases_and_concepts():
             assert entry["concept"] == p.concept
             assert entry["aliases"] == list(p.aliases)
             assert entry["choice_aliases"] == dict(p.choice_aliases)
+            # JSON Schema bounds a number only, so a pair's bounds are on each of its items.
+            number = entry["items"] if p.type == "int_pair" else entry
             low = "exclusiveMinimum" if p.exclusive_minimum else "minimum"
-            assert entry.get(low) == p.minimum
+            assert number.get(low) == p.minimum
             high = "exclusiveMaximum" if p.exclusive_maximum else "maximum"
-            assert entry.get(high) == p.maximum
+            assert number.get(high) == p.maximum
+            assert number is entry or not {low, high} & set(entry)
     for key, concept in schema["concepts"].items():
         assert concept["methods"] == {
             m: p.name for m in REGISTRY for p in REGISTRY[m].params if p.concept == key

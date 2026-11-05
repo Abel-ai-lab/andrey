@@ -95,10 +95,13 @@ def _param_schema(p: ParamSpec) -> dict:
     if p.nullable and isinstance(schema.get("type"), str):
         schema["type"] = [schema["type"], "null"]
     schema["default"] = list(p.default) if isinstance(p.default, tuple) else p.default
+    number = schema  # JSON Schema applies a bound to a number only, so a pair's go on its items
+    if p.type == "int_pair":
+        number = schema["items"] = dict(schema["items"])
     if p.minimum is not None:
-        schema["exclusiveMinimum" if p.exclusive_minimum else "minimum"] = p.minimum
+        number["exclusiveMinimum" if p.exclusive_minimum else "minimum"] = p.minimum
     if p.maximum is not None:
-        schema["exclusiveMaximum" if p.exclusive_maximum else "maximum"] = p.maximum
+        number["exclusiveMaximum" if p.exclusive_maximum else "maximum"] = p.maximum
     schema["description"] = p.doc
     schema["concept"] = p.concept
     schema["aliases"] = list(p.aliases)
@@ -342,6 +345,7 @@ def cli_meta() -> dict:
                 "code": "machine-readable error code",
                 "message": "one-line human explanation",
                 "valid_options": "enumerated when a value was out of range",
+                "did_you_mean": "the key=value form, when a parameter was given as a --flag",
                 "next": "runnable follow-up commands, when there is an obvious fix",
             }
         },
@@ -469,8 +473,8 @@ def render_skill() -> str:
         "`andrey run <method> --help` lists its params; adding `--json` returns its versioned "
         "contract without reading data or running the method. `andrey --help --json` returns "
         "all contracts. On failure the exit code is non-zero and a JSON error envelope goes to "
-        "stderr: `valid_options` lists the accepted values, `did_you_mean` suggests a close name, "
-        "and `next` lists runnable follow-up commands."
+        "stderr: `valid_options` lists the accepted values, `did_you_mean` gives the `key=value` "
+        "form of a parameter given as a `--flag`, and `next` lists runnable follow-up commands."
     )
     a("")
     a("## Reading the result")
@@ -478,9 +482,10 @@ def render_skill() -> str:
     a(
         "A run's envelope holds `structure` (or `results`, one per group): its `kind` (`dag`, "
         "`cpdag`, `pag`, or temporal), `labels`, `n_edges`, an `edge_types` count, and `edges`. "
-        "Each edge has a `source` and a `target`, indexes into `labels`, a `type`, and, from the "
-        "LiNGAM methods, a `weight`. A causal order is in `structure.ordering`, scores and "
-        "p-values in `metadata`, and the resolved call (params, seed, versions) in `run`. A large "
+        "Each edge has a `source` and a `target`, indexes into `labels`, a `type`, and, from a "
+        "method with weights (`output.weighted` in its contract), a `weight`. A causal order is "
+        "in `structure.ordering`, scores and p-values in `metadata`, and the resolved call "
+        "(params, seed, versions) in `run`. A large "
         "graph's inline `edges` are capped (`edges_truncated: true`); `--full` or `-o <file>` "
         f'keeps every edge. Every envelope carries `schema_version` ("{SCHEMA_VERSION}"): check it '
         "before reading the fields."

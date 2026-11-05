@@ -143,6 +143,8 @@ _LINGAM = (
 _RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl")
 #: The searches that take n_starts.
 _STARTS = ("boss", "grasp", "hc", "tabu", "igsp", "ut_igsp")
+#: The methods that take a conditional-independence test.
+_TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
@@ -294,7 +296,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="conditional-independence test",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp"),
+        suitable=_TESTED,
         exempt=(
             *_exempt(
                 "It tests the independence of residuals as part of its own model.",
@@ -1205,9 +1207,7 @@ _CONCEPTS = (
         "registered test records its registered name. A score search records the penalties its "
         "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
         "equivalent_sample_size for bdeu.",
-        suitable=tuple(
-            m for m in ALL_METHODS if m in (*CI_SEARCHES, *SCORE_SEARCHES, *PCMCI_FAMILY)
-        ),
+        suitable=tuple(m for m in ALL_METHODS if m in (*_TESTED, *SCORE_SEARCHES)),
         others_exempt="Neither a conditional-independence test nor a score to choose.",
     ),
     Concept(

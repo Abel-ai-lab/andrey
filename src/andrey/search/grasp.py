@@ -631,9 +631,8 @@ def grasp(
     """
     X = np.asarray(data, dtype=np.float64)
     n_features = X.shape[1]
-    if n_features <= 1:  # no candidate parents -- the CPDAG is the edgeless graph
-        empty = np.zeros((n_features, n_features), dtype=np.int8)
-        return to_structure(empty, kind="cpdag"), 0.0
+    if n_features == 0:
+        return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(

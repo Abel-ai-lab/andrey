@@ -43,12 +43,12 @@ requested backend uses `auto`, without a warning.
 
 ## Parallel search
 
-- `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the
-  two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
-  also use the worker processes for their skeleton search with the `fisherz`, `student_t`, and
-  `rcot` tests, and send a conditioning-set size to them only when it has enough tests to repay
-  them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap` fits
-  its resamples on them, one fit per worker, with the same result at any number. `1` (the
+- `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the two
+  directions of `pnl`. PC, FCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the worker
+  processes for their skeleton search with the `fisherz`, `student_t`, `normal_scores`, and `rcot`
+  tests on complete data, and send a conditioning-set size to them only when it has enough tests to
+  repay them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap`
+  fits its resamples on them, one fit per worker, with the same result at any number. `1` (the
   default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
   threads unlimited and with several limits each thread to one, so on a machine with several cores
   its p-values and statistics can differ in the last digits between one worker and several. Each
@@ -58,9 +58,9 @@ requested backend uses `auto`, without a warning.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
-  GFCI, and CD-NOD uses the workers only when it holds at least this many conditional-independence
-  tests. The default is `500000`, measured on an AMD EPYC 9534 server running Linux; `0` always uses
-  them.
+  GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` uses the workers only when it holds at least this
+  many conditional-independence tests. The default is `500000`, measured on an AMD EPYC 9534 server
+  running Linux; `0` always uses them.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher-z test and its cost grows with the rows. The default is `2000000`, measured
@@ -105,12 +105,12 @@ already running in the process, so a CPU fit never pays to start a GPU.
 
 ## Reproducibility
 
-- `ANDREY_SEED`: the seed of every method that draws random numbers (BOSS, GRaSP, ICA-LiNGAM, CALM,
-  hill climbing and tabu search with `n_starts` above 1, and the searches that test independence,
-  with the `rcot`, `cmiknn`, and `gpdc` tests) when the call gives no `seed=`. The default is `0`;
-  it takes any integer from `0` to `2**32 - 1`. So `seed=None` is this configured seed, not a fresh
-  random one, and a call repeats. A call that gives `seed=` does not depend on it. Deterministic
-  methods ignore it.
+- `ANDREY_SEED`: the seed of every method that draws random numbers when the call gives no `seed=`:
+  BOSS, GRaSP, ICA-LiNGAM, CALM, IGSP and UT-IGSP with `n_starts` above 1 (the default), hill
+  climbing and tabu search with `n_starts` above 1, and the searches that test independence, with
+  the `rcot`, `cmiknn`, and `gpdc` tests. The default is `0`; it takes any integer from `0` to
+  `2**32 - 1`. So `seed=None` is this configured seed, not a fresh random one, and a call repeats. A
+  call that gives `seed=` does not depend on it. Deterministic methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from the data, which a row shuffle, a change of units, or a sign flip
   leaves in place, so reordering the columns relabels the result. `position` orders them by column
