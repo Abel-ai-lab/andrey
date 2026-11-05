@@ -2601,7 +2601,8 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 # custom tests or scores do not count as implementations. Features only on a development branch
 # do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
 # benchmarks use each package's README, documentation, and release notes. A real-data feature is
-# a yes when the package's main learners have it, and partly when only some do.
+# a yes when the package's main learners have it, and partly when only some do. Interventional
+# data is a yes when a method takes each row's environment or the intervention targets.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -2626,6 +2627,17 @@ COMPARISON = (
         },
     ),
     ("Coverage", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Coverage",
+        "Interventional data",
+        ("yes", "part", "part", "yes", "part"),
+        {
+            "causal-learn": "CD-NOD only, for data from several domains, with no targets.",
+            "Tetrad": "Intervention variables tagged in a metadata file join the first knowledge "
+            "tier as ordinary variables; no method takes the targets.",
+            "bnlearn": "The mbde score only, for categorical data in its score-based searches.",
+        },
+    ),
     (
         "Real data",
         "Missing values",

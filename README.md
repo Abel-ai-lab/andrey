@@ -26,7 +26,7 @@ learns graphs from experiments with known targets, GnIES and UT-IGSP from experi
 they are not told, and ICP finds the causes of one variable, all as accurately as their authors'
 code. CAM-UV and DYNOTEARS are supported too.
 
-**[Read the post](https://andrey.abel.ai/blog/20261104-andrey-0-14-0.html)** ·
+**[Read the post](https://andrey.abel.ai/blog/20261105-andrey-0-14-0.html)** ·
 **[See the release card](https://andrey.abel.ai/docs/benchmarks/0.14.0.html)**
 
 ---
