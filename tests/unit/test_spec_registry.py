@@ -44,7 +44,7 @@ _RESERVED_PARAM_NAMES = frozenset(
 
 # The inputs whose facade default, None, stands for data given as each environment's rows apart,
 # which one data file cannot give, so the CLI needs them.
-APART_DEFAULTS = {("cdnod", "env")}
+APART_DEFAULTS = {("cdnod", "env"), ("icp", "env")}
 
 _SPEC_NAMES = sorted(REGISTRY)
 

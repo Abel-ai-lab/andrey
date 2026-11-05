@@ -139,6 +139,30 @@ def test_a_dataframe_names_the_outputs_and_an_env_column_leaves_the_data():
     assert out.metadata["p_values"] == by_position["p_values"]
 
 
+@pytest.mark.parametrize("form", ["a list of arrays", "a mapping of DataFrames"])
+def test_environments_apart_fit_what_their_stacked_rows_fit(form):
+    X, env = _data((60, 50, 70))
+    if form == "a list of arrays":
+        apart = andrey.icp([X[env == k] for k in range(3)], target=2)
+        stacked = fit(X, env, target=2)
+    else:
+        frame = pd.DataFrame(X, columns=["a", "b", "y", "c"])
+        labels = np.array(["obs", "hit", "other"])[env]
+        targets = {"obs": [], "hit": ["y"]}
+        tables = {k: frame[labels == k] for k in ("obs", "hit", "other")}
+        apart = andrey.icp(tables, target="y", targets=targets)
+        stacked = fit(frame, labels, target="y", targets=targets)
+    assert np.array_equal(apart.structure.to_numpy(), stacked.structure.to_numpy())
+    assert apart.structure.labels == stacked.structure.labels
+    assert apart.metadata == stacked.metadata
+
+
+def test_one_table_without_env_raises():
+    X, _ = _data((60, 60))
+    with pytest.raises(ValueError):
+        andrey.icp(X, target=2)
+
+
 def _one_row_env():
     X, env = _data((60, 60))
     return X, np.r_[env[:-2], 2, 2]

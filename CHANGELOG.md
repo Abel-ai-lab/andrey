@@ -81,13 +81,14 @@ names its pull request.
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
-- `cdnod`, `gies`, `gnies`, `igsp`, and `ut_igsp` also take their data as each environment's rows
-  apart, as gnies, the GnIES authors' package, and the UT-IGSP authors' library do: a list of
+- `cdnod`, `gies`, `gnies`, `icp`, `igsp`, and `ut_igsp` also take their data as each environment's
+  rows apart, as gnies, the GnIES authors' package, and the UT-IGSP authors' library do: a list of
   DataFrames or 2-D arrays, each labeled by its position, or a dict from each label to its table,
   with `env` left out and `targets` a mapping from those labels. The rows are stacked in that order,
   so the fit is that of the stacked table with `env`, and `andrey.bootstrap` resamples within each
-  environment, `cdnod`'s domains included. In Python, `cdnod`'s `env` is optional for this, and one
-  table without it raises `TypeError`; the command line still needs `--env`. ([#676])
+  environment, `cdnod`'s domains included. In Python, `cdnod`'s and `icp`'s `env` is optional for
+  this; one table without it raises `TypeError` in `cdnod` and `ValueError` in `icp`, which needs
+  two environments. The command line still needs `--env`. ([#676], [#702])
 - `StructureOutput` metadata takes `int`, `float`, and `bool` keys in a nested mapping, such as the
   labels of `env` that key `ut_igsp`'s `metadata["targets"]`; `save` writes them as their JSON
   text, `"1"` for `1`. A nested mapping that mixes text and number keys, or a NumPy, tuple, or
@@ -1833,3 +1834,4 @@ First alpha release.
 [#690]: https://github.com/Abel-ai-lab/andrey/pull/690
 [#692]: https://github.com/Abel-ai-lab/andrey/pull/692
 [#694]: https://github.com/Abel-ai-lab/andrey/pull/694
+[#702]: https://github.com/Abel-ai-lab/andrey/pull/702
