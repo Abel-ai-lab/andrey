@@ -501,6 +501,25 @@ def test_a_row_aligned_input_is_resampled_with_the_rows():
     assert bootstrap("gies", data, n_resamples=2).n_resamples == 2
 
 
+@pytest.mark.parametrize("method", ["icp", "cdnod"])
+def test_an_input_that_names_a_column_gives_the_bootstrap_of_its_values(method):
+    """``env="env"`` resamples as the column's values do, and the column is not a node."""
+    rng = np.random.default_rng(0)
+    env = np.repeat([0, 1], 150)
+    x0 = rng.standard_normal(300) * (1.0 + env)
+    x1 = 0.6 * x0 + rng.standard_normal(300) + 0.8 * env
+    y = 0.5 * x0 - 0.7 * x1 + rng.standard_normal(300)
+    data = pd.DataFrame({"x0": x0, "x1": x1, "y": y})
+    kwargs = {"target": "y"} if method == "icp" else {}
+    given = bootstrap(method, data, env=env, n_resamples=4, seed=0, keep_fits=True, **kwargs)
+    named = bootstrap(
+        method, data.assign(env=env), env="env", n_resamples=4, seed=0, keep_fits=True, **kwargs
+    )
+    assert named.structure.labels == ("x0", "x1", "y")
+    assert named.fits == given.fits and named.table() == given.table()
+    assert named.structure == given.structure
+
+
 def test_a_method_with_a_group_per_dataset_returns_one_result_per_group():
     groups = [lingam_data(150, seed) for seed in range(3)]
     out = bootstrap("multi_group_direct_lingam", groups, n_resamples=3, seed=1, keep_fits=True)
@@ -593,14 +612,28 @@ def test_a_bootstrap_resample_is_n_rows_drawn_with_replacement_from_the_seed():
         assert np.array_equal(_draw(job, b)[0], rng.integers(0, 80, size=80))
 
 
+#: Each method's row-aligned arguments for 150 rows: none, a domain index, and a targets matrix.
+ROW_ALIGNED = {
+    "hc": {},
+    "cdnod": {"env": np.repeat([0, 1, 2], 50)},
+    "gies": {"targets": (np.random.default_rng(1).random((150, 4)) < 0.1).astype(int)},
+}
+
+
 @pytest.mark.parametrize("resampling", ["bootstrap", "subsample"])
-def test_each_fit_is_the_method_on_the_rows_its_resample_draws(resampling):
-    data = lingam_data(150)
-    out = bootstrap("hc", data, n_resamples=4, seed=5, resampling=resampling, keep_fits=True)
-    job = job_of("hc", data, "rows", resampling, seed=5)
+@pytest.mark.parametrize("method", list(ROW_ALIGNED))
+def test_each_fit_is_the_method_on_the_rows_its_resample_draws(method, resampling):
+    """Each fit is the method on its resample's rows, with those rows' environments or targets."""
+    data, aligned = lingam_data(150), ROW_ALIGNED[method]
+    out = bootstrap(
+        method, data, n_resamples=4, seed=5, resampling=resampling, keep_fits=True, **aligned
+    )
+    job = job_of(method, data, "rows", resampling, seed=5)
     assert out.fits is not None
     for b, fit in enumerate(out.fits):
-        assert fit == andrey.hc(data.iloc[_draw(job, b)[0]].reset_index(drop=True))
+        idx = _draw(job, b)[0]
+        rows = {key: value[idx] for key, value in aligned.items()}
+        assert fit == getattr(andrey, method)(data.iloc[idx].reset_index(drop=True), **rows)
     if resampling == "bootstrap":  # the scheme of every release before sample_fraction
         for b in range(4):
             rng = np.random.default_rng(np.random.SeedSequence(5, spawn_key=(b, 0)))

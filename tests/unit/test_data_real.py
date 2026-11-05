@@ -9,7 +9,9 @@ from __future__ import annotations
 import dataclasses
 import gzip
 import hashlib
+import threading
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -79,6 +81,26 @@ def test_a_changed_cached_file_is_downloaded_again(offline_datasets, tmp_path):
     target.write_text("raf\tmek\n1\t2\n")
     assert load_dataset("sachs").data.shape == (853, 11)
     assert len(offline_datasets) == 1 and target.read_bytes() != b"raf\tmek\n1\t2\n"
+
+
+def test_two_first_loads_at_once_both_get_the_dataset(offline_datasets, monkeypatch, tmp_path):
+    serve = real.fetch
+    both = threading.Barrier(2, timeout=60)
+
+    def fetch(url):
+        raw = serve(url)
+        both.wait()  # each load holds the bytes before either writes them
+        return raw
+
+    monkeypatch.setattr(real, "fetch", fetch)
+    for attempt in range(5):  # the two writes collide on most attempts when they share a file
+        home = tmp_path / f"attempt-{attempt}"
+        with ThreadPoolExecutor(2) as pool:
+            shapes = list(
+                pool.map(lambda _: load_dataset("sachs", data_home=home).data.shape, "ab")
+            )
+        assert shapes == [(853, 11), (853, 11)]
+        assert [p.name for p in (home / "sachs").iterdir()] == ["sachs.2005.continuous.txt"]
 
 
 def test_wrong_bytes_are_refused_with_every_url_tried(offline_datasets, monkeypatch, tmp_path):

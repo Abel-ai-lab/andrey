@@ -41,10 +41,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES, GFCI (its GES phase), and the skeleton searches of PC, "
-            "FCI, GFCI, and CD-NOD with `fisherz`, `student_t`, or `rcot`, and worker threads for "
-            "the two directions of `pnl`; `0` or `1` runs "
-            "serially. "
+            "Worker processes for GES, GFCI (its GES phase), the fits of `andrey.bootstrap`, and "
+            "the skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2 "
+            '(`restrict="pc"`) with `fisherz`, `student_t`, or `rcot`, and worker threads for the '
+            "two directions of `pnl`; `0` or `1` runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -177,9 +177,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values=f"integer from 0 to {SEED_MAX} (2**32 - 1)",
         default="0",
         effect=(
-            "Global default seed for every method that draws random numbers (BOSS, GRaSP, "
-            "ICA-LiNGAM, CALM, HC and tabu search with n_starts above 1, and the searches that "
-            "test independence, with the rcot, cmiknn, and gpdc tests). An explicit `seed=` "
+            "Global default seed for every method that draws random numbers: BOSS, GRaSP, "
+            "ICA-LiNGAM, CALM, IGSP and UT-IGSP with n_starts above 1 (the default), HC and tabu "
+            "search with n_starts above 1, and the searches that test independence, with the "
+            "rcot, cmiknn, and gpdc tests. An explicit `seed=` "
             "overrides it. Deterministic methods (GES, DirectLiNGAM, ...) and the other tests "
             "ignore it."
         ),

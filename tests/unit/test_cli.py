@@ -286,7 +286,7 @@ def test_nan_data_is_data_error(capsys, tmp_path):
 
 
 def test_coerce_scalars_and_choices():
-    from andrey.cli import CliError, _coerce
+    from andrey.cli import CliError, _checked, _coerce
     from andrey.spec import get_spec
 
     pc = {p.name: p for p in get_spec("pc").params}
@@ -294,8 +294,9 @@ def test_coerce_scalars_and_choices():
     assert _coerce("1e-3", pc["alpha"]) == 0.001  # scientific notation
     assert _coerce("fisherz", pc["indep_test"]) == "fisherz"
     assert _coerce("kci", pc["indep_test"]) == "kci"
-    with pytest.raises(CliError):  # bad choice
-        _coerce("no_such_test", pc["indep_test"])
+    with pytest.raises(CliError) as bad:  # bad choice, answered with the choices
+        _checked(_coerce("no_such_test", pc["indep_test"]), pc["indep_test"], "pc")
+    assert bad.value.extra["valid_options"] == list(pc["indep_test"].choices)
     with pytest.raises(CliError):  # not a number
         _coerce("abc", pc["alpha"])
 
@@ -381,6 +382,31 @@ def test_out_of_range_value_is_a_usage_error(capsys, tmp_path, csv_path, layer):
     code, _out, err = _run(["run", "pc", "--data", str(csv_path), *argv], capsys)
     payload = json.loads(err)["error"]
     assert code == 2 and payload["code"] == "invalid_params"
+
+
+@pytest.mark.parametrize(
+    ("method", "setting", "layer"),
+    [
+        ("pc", "alpha=nan", "cli"),
+        ("pc", "alpha=inf", "cli"),
+        ("pc", "alpha: .nan", "config"),
+        ("varma_lingam", "order=[-1,1]", "cli"),
+        ("varma_lingam", "order: [-1, 1]", "config"),
+    ],
+)
+def test_a_value_the_method_rejects_is_a_usage_error(
+    capsys, tmp_path, csv_path, method, setting, layer
+):
+    """A value the method's own check rejects exits 2 before the fit, from either layer."""
+    argv = [setting]
+    if layer == "config":
+        cfg = tmp_path / "params.yaml"
+        cfg.write_text(setting + "\n")
+        argv = ["--config", str(cfg)]
+    code, _out, err = _run(["run", method, "--data", str(csv_path), *argv], capsys)
+    payload = json.loads(err)["error"]
+    assert code == 2 and payload["code"] == "invalid_params"
+    assert [d["param"] for d in payload["details"]] == [setting.split("=")[0].split(":")[0]]
 
 
 def test_former_names_and_values_map_to_current_ones():

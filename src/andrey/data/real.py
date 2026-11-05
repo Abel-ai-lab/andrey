@@ -25,6 +25,7 @@ import numbers
 import os
 import re
 import urllib.request
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -445,9 +446,13 @@ def _download(remote: Remote, target: Path, cached: bool) -> bytes:
             tried.append(f"  {url}: SHA-256 {digest}, not {remote.sha256}")
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        partial = target.with_name(target.name + ".part")
-        partial.write_bytes(raw)
-        partial.replace(target)
+        # A file of its own per download, so loads at the same time do not move each other's.
+        partial = target.with_name(f"{target.name}.{uuid.uuid4().hex}.part")
+        try:
+            partial.write_bytes(raw)
+            partial.replace(target)
+        finally:
+            partial.unlink(missing_ok=True)
         return raw
     stale = (
         f"\nThe cached file at {target} does not match the SHA-256 and was left in place; "

@@ -19,6 +19,7 @@ from andrey.core import warning_policy
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.data import sample_scm
 from andrey.spec import REGISTRY
+from andrey.spec.concepts import SCORE_SEARCHES
 
 
 def test_direct_lingam_rejects_non_2d():
@@ -164,6 +165,17 @@ def test_one_column_gives_a_one_node_graph(method):
 @pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges"])
 def test_no_columns_give_an_empty_graph(method):
     assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
+
+
+#: The score searches that report their DAG's score, which ``exact_search`` and ``gfci`` do not.
+SCORED = [m for m in SCORE_SEARCHES if "score" in REGISTRY[m].output.metadata]
+
+
+@pytest.mark.parametrize("d", [0, 1])
+def test_the_score_searches_agree_on_the_score_of_no_column_or_one(d):
+    """The empty graph's score: 0 with no column, the column's local score with one."""
+    scores = {m: getattr(andrey, m)(_data(d=d)).metadata["score"] for m in SCORED}
+    assert np.allclose(list(scores.values()), scores["ges"]), scores
 
 
 BIC = ["ges", "gies", "gfci", "xges", "hc", "tabu", "boss", "grasp", "exact_search"]

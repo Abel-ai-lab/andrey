@@ -210,7 +210,8 @@ class BootstrapOutput:
         """``from_fits``, for fits made under the knowledge ``constraints`` (``None``: none).
 
         ``ranks`` holds each node's :func:`~andrey.search.hc.tie_ranks` rank on the data the fits
-        ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data.
+        ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data or the
+        fits' kind is not ``dag``.
         """
         fits = tuple(fits)
         if not fits:
@@ -1190,7 +1191,7 @@ def bootstrap(
     job = _job(spec, data, method_kwargs, block_length, root, resampling, sample_fraction)
     workers = min(_backend.worker_count(None), n_resamples)
     results = _fit_all(job, n_resamples, workers)
-    ranks = _column_ranks(job.data, job.unit == "groups")
+    ranks = _column_ranks(spec, job) if spec.output.graph_kind == "dag" else None
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
     metadata: dict[str, JSONValue] = {
@@ -1218,13 +1219,20 @@ def bootstrap(
     return outs if spec.output.multi else outs[0]
 
 
-def _column_ranks(data: Any, groups: bool) -> np.ndarray:
-    """Return the columns' :func:`~andrey.search.hc.tie_ranks` on all of ``data``.
+def _column_ranks(spec: MethodSpec, job: _Job) -> np.ndarray:
+    """Return the variables' :func:`~andrey.search.hc.tie_ranks` on all of the job's data.
 
-    ``data`` is a table or an array, or, for ``groups``, a list of them stacked as the methods
-    over groups stack them. A column that does not hold numbers is numbered by its sorted values,
-    as the fits read its categories.
+    The variables are the columns the fit reads: a column that a row-aligned argument names, such
+    as ``env="env"``, is taken out, as the method takes it out. The data are a table or an array,
+    or, for a method over groups, a list of them stacked as the methods over groups stack them. A
+    column that does not hold numbers is numbered by its sorted values, as the fits read its
+    categories.
     """
+    entries = (*spec.data.inputs[1:], *(p for p in spec.params if p.type == "targets"))
+    keys = [key for entry in entries for key in (entry.name, *entry.aliases)]
+    named = {key: job.kwargs[key] for key in keys if isinstance(job.kwargs.get(key), str)}
+    data = environments.take_columns(job.data, named, spec.name)[0]
+    groups = job.unit == "groups"
     stacked = np.vstack([_numbers(table) for table in (data if groups else [data])])
     return tie_ranks(stacked)
 

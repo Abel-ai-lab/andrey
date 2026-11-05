@@ -128,13 +128,17 @@ def test_latent_single_observed_scores_are_json_safe():
 
 
 def test_cyclic_input_keeps_directed_scores_and_omits_mec():
-    # a thresholded cyclic estimate has no CPDAG: score() still returns the directed metrics.
+    # A cycle has no CPDAG: score() returns the directed metrics alone. A raw cyclic array reads
+    # as a digraph; a structure that declares a cyclic graph a dag, which from_numpy does not
+    # check, scores as a dag without the MEC pair.
     cycle = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])  # 0 -> 1 -> 2 -> 0
-    result = score(cycle, cycle)
-    assert result["family"] == "dag"
-    assert result["shd"] == 0
-    assert result["skeleton_f1"] == 1.0
-    assert "mec_shd" not in result  # canonicalization skipped, not crashed
+    declared = GraphStructure.from_numpy(cycle + ARROW * cycle.T, kind="dag")
+    for graph, family in ((cycle, "digraph"), (declared, "dag")):
+        result = score(graph, graph)
+        assert result["family"] == family
+        assert result["shd"] == 0
+        assert result["skeleton_f1"] == 1.0
+        assert "mec_shd" not in result  # canonicalization skipped, not crashed
 
 
 def test_result_is_json_safe(dag_of):

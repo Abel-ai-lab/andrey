@@ -227,12 +227,20 @@ def markov_equivalent(estimated: object, true: object) -> bool:
     as endpoint marks (a :class:`~andrey.core.GraphStructure`, a :class:`StructureOutput`, or a raw
     directed adjacency), so a raw DAG and its essential-graph CPDAG compare equal.
 
+    Raises
+    ------
+    ValueError
+        If the graphs differ in size or labels, or either is a ``digraph`` (directed, cyclic) or
+        ``undirected``, which has no equivalence class.
+
     Examples
     --------
     >>> markov_equivalent([[0, 1, 0], [0, 0, 1], [0, 0, 0]], [[0, 0, 0], [1, 0, 1], [0, 0, 0]])
     True
     """
     m_est, k_est, m_true, k_true = two_marks(estimated, true)  # fails loud on node-count mismatch
+    if "digraph" in (k_est, k_true):
+        raise ValueError("a digraph (directed, cyclic) has no Markov equivalence class")
     reject_undirected(k_est, k_true, "equivalence class")
     same_skeleton = np.array_equal(m_est != 0, m_true != 0)
     return bool(same_skeleton) and _vstructures(m_est) == _vstructures(m_true)
