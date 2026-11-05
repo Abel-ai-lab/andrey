@@ -77,10 +77,9 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for a draw whose columns are not such copies, which a
-    column order cannot move alike: ICP's and IGSP's draws hold each row's environment in one
-    column, and ICP's target is the last variable. ``alpha`` is the significance level of a CI-test
-    method.
+    the same way. ``shuffled`` is ``False`` for ICP and IGSP, whose draws a column order does not
+    apply to: each row's environment is a column of the draw, and ICP's target is the last variable.
+    ``alpha`` is the significance level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
@@ -92,6 +91,7 @@ class Fit:
 _CDNOD = qg.AndreyCDNOD().params()
 _GROUPS = qg.AndreyMultiGroupDirectLiNGAM().params()["n_groups"]
 _VARMA = qg.AndreyVarmaLiNGAM().params()
+_DYNOTEARS = qg.DYNOTEARS.params()
 
 
 def _domains(x: np.ndarray) -> Any:
@@ -189,7 +189,7 @@ FITS: dict[str, Fit] = {
     "ICP": Fit(qg.icp_fit, shuffled=False),
     "IGSP": Fit(qg.igsp_fit, shuffled=False),
     "CAM-UV": Fit(andrey.camuv),
-    "DYNOTEARS": Fit(andrey.dynotears),
+    "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
