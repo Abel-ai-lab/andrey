@@ -1241,18 +1241,25 @@ def test_a_row_its_release_card_does_not_count_better_is_never_a_win():
 
     def judged(verdict):
         methods = [
-            {**m, "rows": [{**r, "card_verdict": verdict} for r in m["rows"]]}
+            {
+                **m,
+                "rows": [
+                    {**r, "card_verdict": verdict(i) if callable(verdict) else verdict}
+                    for i, r in enumerate(m["rows"])
+                ],
+            }
             if m["method"] == best["name"]
             else m
             for m in SUMMARY["methods"]
         ]
         return [r["name"] for r in build.family_wins([{**SUMMARY, "methods": methods}])]
 
-    # A comparison with a row the card counts better stays a win; one of ties, or of rows the
-    # card did not judge, drops out.
+    # A comparison with a row the card counts better and none worse stays a win; one of ties,
+    # of rows the card did not judge, or with a worse row, drops out.
     assert best["name"] in judged("better")
     assert best["name"] not in judged("tie")
     assert best["name"] not in judged(None)
+    assert best["name"] not in judged(lambda i: "worse" if i == 0 else "better")
 
 
 def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):

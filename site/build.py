@@ -1152,28 +1152,39 @@ def accuracy_rows(summaries: list[dict]) -> list[dict]:
     packages' errors summed over the sizes where both have a graph.
 
     Where a summary records the release card's verdicts (``card_verdict`` in
-    :func:`comparisons`), the sums leave out the rows the card did not judge, and a comparison
-    with no row the card counts better is left out, so a comparison the card calls a tie never
-    reads as a win. Its ties stay in the sums, as every row does in the older summaries."""
+    :func:`comparisons`), the sums leave out the rows the card did not judge, and a method is
+    left out against a package unless the card counts one of its rows there better and none
+    worse, over every setting the homepage shows. So a comparison the card calls a tie, or worse
+    anywhere, never reads as a win. Its ties stay in the sums, as every row does in the older
+    summaries.
+    """
+    groups = time_groups(summaries)
+    verdicts: dict[tuple[str, str], set] = {}
+    for _, methods in groups:
+        for m in methods:
+            key = (m["spec"], m["comparator"])
+            verdicts.setdefault(key, set()).update(r["card_verdict"] for r in m["rows"])
+
+    def counted(key: tuple[str, str]) -> bool:
+        seen = verdicts[key] - {None}
+        return seen == {"unrecorded"} or ("better" in seen and "worse" not in seen)
+
     rows = []
-    for name, methods in time_groups(summaries):
+    for name, methods in groups:
         by: dict[str, dict] = {}
         for c in error_comparisons(methods):
-            verdict = c["row"]["card_verdict"]
-            if verdict is None:
+            if c["row"]["card_verdict"] is None or not counted(
+                (c["method"]["spec"], c["method"]["comparator"])
+            ):
                 continue
             row = by.setdefault(
                 c["method"]["comparator"],
                 {"name": name, "spec": c["method"]["spec"], "family": c["method"]["family"],
-                 "comparator": c["method"]["comparator"], "ours": 0.0, "theirs": 0.0,
-                 "verdicts": set()},
+                 "comparator": c["method"]["comparator"], "ours": 0.0, "theirs": 0.0},
             )  # fmt: skip
             row["ours"] += c["row"]["andrey_errors"]
             row["theirs"] += c["row"]["comparator_errors"]
-            row["verdicts"].add(verdict)
-        rows += [
-            r for r in by.values() if "better" in r["verdicts"] or r["verdicts"] == {"unrecorded"}
-        ]
+        rows += by.values()
     return rows
 
 
