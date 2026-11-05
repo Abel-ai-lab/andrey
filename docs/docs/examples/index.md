@@ -49,8 +49,9 @@ Recover a three-variable chain with GES.
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, CD-NOD on data from
-several domains, and ICP's parents of one variable from several environments.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, and
+MMPC, which join each variable's local structure into a graph; CD-NOD on data from several domains;
+and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -74,8 +75,9 @@ variables it is told in part or not at all.
 :img-top: /_generated/thumbs/score_search.svg
 :img-alt: The true graph of this notebook's data
 
-XGES, hill climbing, Tabu search, and exact search look for the graph with the best BIC score;
-GIES also learns from interventions, and GnIES from environments whose changes it is not told.
+XGES, hill climbing, Tabu search, and exact search look for the graph with the best score, by
+default the extended BIC; MMHC and RSMAX2 restrict the search with tests first; GIES also learns
+from interventions, and GnIES from environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
