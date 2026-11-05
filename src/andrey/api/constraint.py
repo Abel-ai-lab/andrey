@@ -1437,7 +1437,7 @@ def cdnod(
 @method_spec("icp")
 def icp(
     data: npt.ArrayLike,
-    env: npt.ArrayLike | str,
+    env: npt.ArrayLike | str | None = None,
     *,
     target: str | int | None = None,
     targets: Mapping | npt.ArrayLike | str | None = None,
@@ -1455,16 +1455,23 @@ def icp(
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
         variable: it leaves the data before the fit, and ``target``, ``targets``, and the result's
         positions count the other columns.
-    env : array-like of shape (n_samples,) or (n_samples, 1), or str
+        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
+        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
+        order, ``env`` stays ``None``, and ``targets``, when given, maps those labels to their
+        variables.
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
         The environment of each row: one label per row, strings or numbers, not both, or the name
         of a column of the DataFrame ``data`` that holds them. Every distinct label is one
         environment, and at least two are needed. Which variables an environment changed, and how,
-        does not matter, as long as it left the target's mechanism alone.
+        does not matter, as long as it left the target's mechanism alone. ``None`` takes the
+        environments from ``data`` given as each environment's rows apart, or else from
+        ``targets`` given as a column or a 0/1 matrix: rows with the same targets are one
+        environment.
     target : str or int
         Required. The variable whose parents to find: a column label (a string) or a 0-based
         position (an integer). ``None`` raises ``ValueError``.
@@ -1520,11 +1527,14 @@ def icp(
         is ``None`` or names a column ``data`` lacks; if ``data`` is not a 2-D numeric matrix with
         at least two rows, no ``NaN`` or ``inf``, and no constant column; if a column repeats
         another up to scale and shift or, with more rows than columns, is a linear function of
-        other columns, one message naming every group of copies; if ``env`` does not hold one label
+        other columns, one message naming every group of copies; if ``data`` holds each
+        environment's rows apart with ``env`` or with ``targets`` other than a mapping, or its
+        tables differ in kind or columns, or one has no rows; if ``env`` does not hold one label
         per row, misses a label, mixes strings and numbers, or names a column ``data`` lacks; if
         ``targets`` names a variable or an environment ``data`` or ``env`` lacks, or gives two rows
         of one environment different targets; if fewer than two environments remain once those
-        that intervened on ``target`` are left out, or one has fewer than 3 rows; if a column is
+        that intervened on ``target`` are left out, as with one table and neither ``env`` nor
+        ``targets``, or one has fewer than 3 rows; if a column is
         constant on the rows that remain; or if a regression has as many coefficients as rows: under
         ``"exact"``, on the rows outside each environment, where a variable constant there also
         raises.
