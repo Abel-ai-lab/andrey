@@ -38,10 +38,10 @@ def score(output: object, truth: object) -> dict[str, object]:
     """Score an estimated result against ground truth with the family-appropriate metrics.
 
     ``output`` and ``truth`` may each be a StructureOutput, a Structure, or a raw adjacency, and
-    must index the same variables in the same order (a label or node-count mismatch raises). A
-    latent structure is scored on its clustering alone, since latent node indices are not aligned
-    across the two graphs; CDNOD's appended domain node and similar extra variables must be dropped
-    by the caller first.
+    must index the same variables in the same order (a label or node-count mismatch raises). A raw
+    adjacency whose directed edges form a cycle reads as a ``digraph``. A latent structure is scored
+    on its clustering alone, since latent node indices are not aligned across the two graphs;
+    CDNOD's appended domain node and similar extra variables must be dropped by the caller first.
 
     Returns
     -------

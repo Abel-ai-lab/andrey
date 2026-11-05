@@ -560,7 +560,19 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
 def job_of(name, data, unit, resampling, fraction=0.5, *, seed=0, block_length=None):
     """The job a worker draws a resample from, without the call that builds it."""
     return _Job(
-        name, data, {}, {}, seed, unit, block_length, False, "auto", "rank", resampling, fraction
+        name,
+        data,
+        {},
+        {},
+        {},
+        seed,
+        unit,
+        block_length,
+        False,
+        "auto",
+        "rank",
+        resampling,
+        fraction,
     )
 
 

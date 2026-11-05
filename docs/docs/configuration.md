@@ -43,12 +43,12 @@ requested backend uses `auto`, without a warning.
 
 ## Parallel search
 
-- `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the
-  two directions of `pnl`. PC, FCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the
-  worker processes for their skeleton search with the `fisherz`, `student_t`, and `rcot` tests on
-  complete data, and send a conditioning-set size to them only when it has enough tests to repay
-  them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap` fits
-  its resamples on them, one fit per worker, with the same result at any number. `1` (the
+- `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the two
+  directions of `pnl`. PC, FCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the worker
+  processes for their skeleton search with the `fisherz`, `student_t`, `normal_scores`, and `rcot`
+  tests on complete data, and send a conditioning-set size to them only when it has enough tests to
+  repay them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap`
+  fits its resamples on them, one fit per worker, with the same result at any number. `1` (the
   default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
   threads unlimited and with several limits each thread to one, so on a machine with several cores
   its p-values and statistics can differ in the last digits between one worker and several. Each

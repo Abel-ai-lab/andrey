@@ -9,7 +9,7 @@ in the serial scan's order with the same separating sets and largest separating 
 that fails raises the exception of its first failing chunk in that order, the exception the serial
 scan meets first.
 
-Only the FisherZ and StudentT tests run on the pool
+Only the FisherZ, StudentT, and NormalScores tests run on the pool
 (:func:`~andrey.constraint._skeleton.canonical_capable`), and only a pass of at least
 :data:`MIN_POOL_QUERIES` tests, or the ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it; any
 other pass scans in the caller's process. Workers are seeded once with the parent's exact
@@ -321,9 +321,10 @@ class RCoTWorkerPool:
 
 
 def skeleton_pool(test: CITest, workers: int) -> SkeletonWorkerPool | RCoTWorkerPool | None:
-    """The worker pool for ``test``'s skeleton passes with ``workers`` processes: a FisherZ or
-    StudentT test's (:class:`SkeletonWorkerPool`), an RCoT test's (:class:`RCoTWorkerPool`), or
-    ``None`` with one worker or another test, whose passes scan in the caller's process."""
+    """The worker pool for ``test``'s skeleton passes with ``workers`` processes: a FisherZ,
+    StudentT, or NormalScores test's (:class:`SkeletonWorkerPool`), an RCoT test's
+    (:class:`RCoTWorkerPool`), or ``None`` with one worker or another test, whose passes scan in
+    the caller's process."""
     if workers <= 1:
         return None
     if canonical_capable(test):

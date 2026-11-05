@@ -473,8 +473,8 @@ def render_skill() -> str:
         "`andrey run <method> --help` lists its params; adding `--json` returns its versioned "
         "contract without reading data or running the method. `andrey --help --json` returns "
         "all contracts. On failure the exit code is non-zero and a JSON error envelope goes to "
-        "stderr: `valid_options` lists the accepted values, `did_you_mean` suggests a close name, "
-        "and `next` lists runnable follow-up commands."
+        "stderr: `valid_options` lists the accepted values, `did_you_mean` gives the `key=value` "
+        "form of a parameter given as a `--flag`, and `next` lists runnable follow-up commands."
     )
     a("")
     a("## Reading the result")
