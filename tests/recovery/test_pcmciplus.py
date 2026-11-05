@@ -11,7 +11,7 @@ from andrey.data import functional, graphs, noise, temporal
 from andrey.data.scm import SCM
 from andrey.metrics import temporal_scores
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 # B0[effect, cause]: X0 -> X1 -> X2 <- X3 within each step.
 B0 = np.zeros((5, 5))

@@ -39,7 +39,6 @@ PAIRS = ["anm", "pnl"]
 @pytest.fixture(autouse=True)
 def _quiet():
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.DataTypeWarning)
         yield
 

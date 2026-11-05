@@ -11,8 +11,6 @@ order on one fixed case.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -20,15 +18,9 @@ import andrey
 from andrey.data import sample_scm
 from andrey.metrics import shd
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 N = 400
-
-
-def _fit(X, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.resit(X, **kwargs)
 
 
 def _edges(out: andrey.StructureOutput) -> set[tuple[int, int]]:
@@ -50,7 +42,7 @@ def _collider(seed: int) -> np.ndarray:
 
 
 def test_independent_columns_give_no_edges():
-    out = _fit(np.random.default_rng(0).standard_normal((N, 4)))
+    out = andrey.resit(np.random.default_rng(0).standard_normal((N, 4)))
     assert out.structure.oriented_edges() == []
     assert sorted(out.ordering) == [0, 1, 2, 3]
 
@@ -58,14 +50,14 @@ def test_independent_columns_give_no_edges():
 @pytest.mark.parametrize("reverse", [False, True], ids=["cause first", "effect first"])
 def test_a_nonlinear_cause_points_to_its_effect(reverse):
     X = _pair(1)
-    out = _fit(X[:, ::-1] if reverse else X)
+    out = andrey.resit(X[:, ::-1] if reverse else X)
     cause, effect = (1, 0) if reverse else (0, 1)
     assert _edges(out) == {(cause, effect)}
     assert out.ordering == (cause, effect)
 
 
 def test_a_collider_of_two_nonlinear_causes_is_found():
-    out = _fit(_collider(2))
+    out = andrey.resit(_collider(2))
     assert _edges(out) == {(0, 2), (1, 2)}
     assert out.ordering[-1] == 2
 
@@ -77,7 +69,7 @@ def additive_fits():
         sample_scm(functional="additive_noise", d=6, n=N, seed=seed, density=2, scale="rescale")
         for seed in range(5)
     ]
-    return [(case, _fit(case.data)) for case in cases]
+    return [(case, andrey.resit(case.data)) for case in cases]
 
 
 def test_additive_noise_graphs_are_recovered(additive_fits):
@@ -91,11 +83,11 @@ def test_additive_noise_graphs_are_recovered(additive_fits):
 
 def test_a_fit_repeats(additive_fits):
     case, out = additive_fits[0]
-    again = _fit(case.data)
+    again = andrey.resit(case.data)
     assert again.structure == out.structure
     assert again.ordering == out.ordering
 
 
 def test_the_recorded_output_repeats():
-    out = _fit(datagen.generate("nonmonotone_4v"))
+    out = andrey.resit(datagen.generate("nonmonotone_4v"))
     assert_recorded_output(out, "RESIT", case="nonmonotone_4v")

@@ -7,13 +7,7 @@ import andrey
 from andrey.irregular.anm import anm
 from andrey.irregular.pnl import pnl
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-
+from tests.recovery.helpers.harness import assert_recorded_output
 
 # PNL draws no random state, so a fixed input pins its output. The tolerance is loose on purpose:
 # these are p-values from a kernel statistic, and holding them to the last bit would gate on the

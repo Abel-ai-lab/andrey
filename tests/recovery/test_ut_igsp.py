@@ -20,7 +20,7 @@ from andrey.core import ARROW, TAIL
 from andrey.data.interventions import hard, soft
 from andrey.search.gies import cut_pairs, replace_unprotected
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 P, K = 20, 5
 INTERVENTIONS = {"shift": soft(shift=1.0), "perfect": hard(1.0, sd=0.1**0.5)}

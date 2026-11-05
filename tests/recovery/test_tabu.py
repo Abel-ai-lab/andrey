@@ -20,17 +20,12 @@ from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.harness import assert_recorded_output
 from tests.recovery.helpers.moves import class_gain, grid
 from tests.recovery.helpers.project import found_dag
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 # The extended-BIC weight that tabu search and exact search score with by default.
 _EBIC_GAMMA = 1.0
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
 
 
 def _er_sample(d: int, seed: int):

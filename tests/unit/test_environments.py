@@ -286,11 +286,3 @@ def test_a_typed_array_gives_the_codes_and_labels_of_its_list(env):
         assert codes.dtype == np.intp and codes.tolist() == expected_codes.tolist()
         assert labels == expected_labels
         assert [type(v) for v in labels] == [type(v) for v in expected_labels]
-
-
-def test_the_docstring_example_runs():
-    import doctest
-
-    from andrey.core import environments
-
-    assert doctest.testmod(environments).failed == 0

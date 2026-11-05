@@ -12,7 +12,7 @@ from andrey.api import _adapt
 from andrey.api._temporal import _adapt_var_lingam, _adapt_varma_lingam
 from andrey.api.lingam import _canonical_weights
 from tests.recovery.helpers import harness
-from tests.recovery.helpers.slice_fixture import assert_recorded_output, project_output
+from tests.recovery.helpers.project import project_output
 
 
 def _graph_out(baseline_graph: object, kind: str, **meta: object):
@@ -24,13 +24,13 @@ def _graph_out(baseline_graph: object, kind: str, **meta: object):
 def test_pc_roundtrip():
     doc = harness.load_baseline("PC", "gauss_5v")
     out = _graph_out(doc["output"]["graph"], "cpdag")
-    assert_recorded_output(out, "PC", case="gauss_5v")  # must not raise
+    harness.assert_recorded_output(out, "PC", case="gauss_5v")  # must not raise
 
 
 def test_ges_roundtrip_graph_and_score():
     doc = harness.load_baseline("GES", "gauss_5v")
     out = _graph_out(doc["output"]["graph"], "cpdag", score=doc["output"]["score"])
-    assert_recorded_output(out, "GES", case="gauss_5v")
+    harness.assert_recorded_output(out, "GES", case="gauss_5v")
 
 
 def test_direct_lingam_roundtrip():
@@ -41,7 +41,7 @@ def test_direct_lingam_roundtrip():
     out = _adapt.structure_output(
         gs, ordering=doc["output"]["causal_order"], weighted_adjacency=native_w
     )
-    assert_recorded_output(out, "DirectLiNGAM", case="lingam_5v_uniform")
+    harness.assert_recorded_output(out, "DirectLiNGAM", case="lingam_5v_uniform")
 
 
 # --- temporal / multi-group / pairwise: build a native output through the PRODUCTION encode path
@@ -56,7 +56,7 @@ def test_var_lingam_roundtrip():
         causal_order_=doc["output"]["causal_order"],
     )
     out = _adapt_var_lingam(model)
-    assert_recorded_output(out, "VARLiNGAM", case="var_4v_stable")
+    harness.assert_recorded_output(out, "VARLiNGAM", case="var_4v_stable")
 
 
 def test_varma_lingam_roundtrip():
@@ -69,7 +69,7 @@ def test_varma_lingam_roundtrip():
         causal_order_=doc["output"]["causal_order"],
     )
     out = _adapt_varma_lingam(model)
-    assert_recorded_output(out, "VARMALiNGAM", case="varma_3v")
+    harness.assert_recorded_output(out, "VARMALiNGAM", case="varma_3v")
 
 
 def test_multi_group_roundtrip():
@@ -80,14 +80,14 @@ def test_multi_group_roundtrip():
         native_w = _canonical_weights(baseline_b)
         gs = _adapt.dag_from_adjacency(native_w)
         outs.append(_adapt.structure_output(gs, ordering=order, weighted_adjacency=native_w))
-    assert_recorded_output(outs, "MultiGroupDirectLiNGAM", case="mgdl_2groups")
+    harness.assert_recorded_output(outs, "MultiGroupDirectLiNGAM", case="mgdl_2groups")
 
 
 def test_score_mismatch_fails():
     doc = harness.load_baseline("GES", "gauss_5v")
     bad = _graph_out(doc["output"]["graph"], "cpdag", score=float(doc["output"]["score"]) + 1.0)
     with pytest.raises(AssertionError):
-        assert_recorded_output(bad, "GES", case="gauss_5v")
+        harness.assert_recorded_output(bad, "GES", case="gauss_5v")
 
 
 def test_structural_mismatch_fails():
@@ -99,7 +99,7 @@ def test_structural_mismatch_fails():
     g[j, i] = 0
     out = _graph_out(g, "cpdag")
     with pytest.raises(AssertionError):
-        assert_recorded_output(out, "PC", case="gauss_5v")
+        harness.assert_recorded_output(out, "PC", case="gauss_5v")
 
 
 def test_unregistered_algorithm_raises():

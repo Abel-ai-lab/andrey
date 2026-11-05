@@ -6,23 +6,19 @@ fields (compared within ``atol``/``rtol``). Tolerances are provisional defaults.
 
 from __future__ import annotations
 
+#: The graph alone, exactly.
+GRAPH_ONLY = {"structural": ["graph"], "numeric": {}}
+#: The graph exactly and the objective score within rounding.
+GRAPH_SCORE = {"structural": ["graph"], "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}}}
+
 SPEC: dict[str, dict] = {
     "DirectLiNGAM": {
         "structural": ["causal_order"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
     },
-    "PC": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "GES": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "GIES": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
+    "PC": GRAPH_ONLY,
+    "GES": GRAPH_SCORE,
+    "GIES": GRAPH_SCORE,
     "GnIES": {
         "structural": ["graph", "targets"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
@@ -32,78 +28,33 @@ SPEC: dict[str, dict] = {
         "structural": ["graph", "score", "n_contradicting"],
         "numeric": {},
     },
-    "XGES": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "HC": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "Tabu": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "IAMB": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "InterIAMB": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "MMPC": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "MMHC": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "RSMAX2": {
-        "structural": ["graph"],
-        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "ExactSearch": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "FCI": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "GFCI": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
+    "XGES": GRAPH_SCORE,
+    "HC": GRAPH_SCORE,
+    "Tabu": GRAPH_SCORE,
+    "IAMB": GRAPH_ONLY,
+    "InterIAMB": GRAPH_ONLY,
+    "MMPC": GRAPH_ONLY,
+    "MMHC": GRAPH_SCORE,
+    "RSMAX2": GRAPH_SCORE,
+    "ExactSearch": GRAPH_ONLY,
+    "FCI": GRAPH_ONLY,
+    "GFCI": GRAPH_ONLY,
     # CAM records no weights: its DAG and its causal order.
     "CAM": {
         "structural": ["graph", "causal_order"],
         "numeric": {},
     },
     # CALM's weights come from a torch optimizer, so only the graph is recorded.
-    "CALM": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "CDNOD": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
+    "CALM": GRAPH_ONLY,
+    "CDNOD": GRAPH_ONLY,
     # ICP: the DAG into the target and the accepted sets exactly; the p-values, NaN at the target,
     # within rounding.
     "ICP": {
         "structural": ["graph", "accepted_sets"],
         "numeric": {"p_values": {"atol": 1e-8, "rtol": 1e-6}},
     },
-    "BOSS": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
-    "GRaSP": {
-        "structural": ["graph"],
-        "numeric": {},
-    },
+    "BOSS": GRAPH_ONLY,
+    "GRaSP": GRAPH_ONLY,
     "UT-IGSP": {
         "structural": ["graph", "score", "targets"],
         "numeric": {},

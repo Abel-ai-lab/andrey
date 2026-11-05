@@ -18,7 +18,7 @@ import andrey
 from andrey.data import sample_scm
 from andrey.metrics import shd
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 N = 1000
 

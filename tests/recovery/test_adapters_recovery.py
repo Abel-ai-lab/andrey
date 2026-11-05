@@ -5,7 +5,7 @@ import numpy as np
 import andrey
 from andrey.core import ARROW, TAIL
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output, assert_recorded_output_mec
+from tests.recovery.helpers.harness import assert_recorded_class, assert_recorded_output
 
 # --- LiNGAM family (causal order + weighted adjacency) --------------------------
 #
@@ -76,7 +76,7 @@ def test_hc_recovery():
 def test_exact_search_recovery():
     # The optimal DAG is Markov-equivalence-class-identified, so compare at the CPDAG level.
     out = andrey.exact_search(datagen.generate("gauss_5v"))
-    assert_recorded_output_mec(out, "ExactSearch", case="gauss_5v")
+    assert_recorded_class("ExactSearch", out.structure.to_numpy(), case="gauss_5v")
 
 
 # --- permutation-based ---------------------------------------------------------

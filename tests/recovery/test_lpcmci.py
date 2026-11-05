@@ -8,7 +8,7 @@ import pytest
 import andrey
 from andrey.data import temporal
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 # Six variables; X5 is white noise and hidden. B0[effect, cause] within one step:
 # X5 -> X1, X5 -> X2, X2 -> X3. A1[effect, cause] at lag 1: memory in X0..X4, X0 -> X1, X3 -> X4.

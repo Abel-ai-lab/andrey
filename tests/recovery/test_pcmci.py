@@ -11,7 +11,7 @@ from andrey.data import functional, graphs, noise, temporal
 from andrey.data.scm import SCM
 from andrey.metrics import temporal_scores
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 # A_k[effect, cause]: every series depends on its own past; five cross links at lags 1 and 2.
 LAG_1 = np.array(

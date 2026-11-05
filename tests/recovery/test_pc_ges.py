@@ -10,15 +10,7 @@ from andrey.core import ARROW
 from andrey.search.ges import ges as search_ges
 from andrey.search.operators import max_parents_in_class
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The BIC/Fisher-Z primitives route through core.stats; pin the numpy oracle so an ambient
-    # ANDREY_DEVICE=cpu cannot compare torch numerics against the numpy baselines.
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-
+from tests.recovery.helpers.harness import assert_recorded_output
 
 _BASELINE_LAMBDA = 2.0
 

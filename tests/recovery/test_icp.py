@@ -19,7 +19,7 @@ import pytest
 
 import andrey
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 COLUMNS = ["a", "b", "y", "c", "d"]
 #: ``WEIGHTS[j][i]`` is the weight of ``COLUMNS[i] -> COLUMNS[j]``, in causal order.

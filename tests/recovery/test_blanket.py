@@ -9,7 +9,6 @@ to the true ones, and on one recorded case each structure is the graph bnlearn r
 from __future__ import annotations
 
 import functools
-import warnings
 
 import networkx as nx
 import numpy as np
@@ -31,13 +30,6 @@ STRUCTURES = {
     m: next(p.choices for p in REGISTRY[m].params if p.name == "structure") for m in METHODS
 }
 CELLS = [(m, o) for m in METHODS for o in STRUCTURES[m]]
-
-
-@pytest.fixture(autouse=True)
-def _quiet():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def _er_sample(d: int, seed: int, n: int = 2000):
