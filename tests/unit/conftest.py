@@ -8,9 +8,9 @@ import pytest
 def serve_datasets_offline(monkeypatch, cache):
     """Serve dataset downloads from fixtures/, into the empty directory ``cache``, with no network.
 
-    Sachs is the 853-row file, under its own SHA-256; ASIA, CHILD, and INSURANCE are the published
-    BIFs, under the recorded ones. Returns the list of URLs fetched, so a test can tell a download
-    from a cache hit.
+    Sachs is the 853-row file, under its own SHA-256; Sachs's nine conditions are the published
+    experimental file, and ASIA, CHILD, and INSURANCE the published BIFs, under the recorded
+    SHA-256s. Returns the list of URLs fetched, so a test can tell a download from a cache hit.
     """
     import dataclasses
     import gzip
@@ -41,6 +41,10 @@ def serve_datasets_offline(monkeypatch, cache):
         sha256=hashlib.sha256(sachs).hexdigest(),
     )
     monkeypatch.setitem(real.DATASETS, "sachs", remote)
+    served |= dict.fromkeys(
+        real.SACHS_CONDITIONS_FILE.sources,
+        gzip.decompress((fixtures / "sachs-experimental.txt.gz").read_bytes()),
+    )
     monkeypatch.setattr(real, "fetch", fetch)
     monkeypatch.setenv("ANDREY_DATA_DIR", str(cache))
     return fetched

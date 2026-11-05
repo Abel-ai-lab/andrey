@@ -793,7 +793,7 @@ name.
 
 | Name | Variables | Edges | Data |
 |---|---|---|---|
-| `sachs` | 11 | 17 | Measured: 853 observational cells (Sachs et al., 2005) |
+| `sachs` | 11 | 17 | Measured: 853 observational cells, or 7,466 in nine conditions (Sachs et al., 2005) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
 | `child` | 20 | 25 | Simulated on the published network (bnlearn) |
 | `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
@@ -812,6 +812,25 @@ its SHA-256, and caches it; later loads need no network. The cache directory is 
 argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andrey` when
 `XDG_CACHE_HOME` is unset). Without network access, the error names the path to put the file at.
 [Getting started](guides/getting-started.md) learns and scores the Sachs data end to end.
+
+`load_dataset("sachs", conditions=True)` loads all nine of Sachs's conditions instead, 7,466 cells:
+the 853 observational cells and eight conditions in which a reagent stimulated or inhibited the
+network. `env` gives each cell's condition as a code and `conditions` their names, and `targets`
+the measured variables each reagent acts on, `None` for PMA and b2cAMP, whose targets are unknown.
+They are the inputs of the methods that take `env`: `cdnod`, `gies`, `gnies`, `icp`, `igsp`, and
+`ut_igsp`. `gies` and `igsp` need every condition's targets, so you pass them the rows of the
+seven conditions whose targets are known; `ut_igsp` takes all nine and learns each condition's
+targets beyond the declared ones:
+
+```python
+pooled = load_dataset("sachs", conditions=True)
+andrey.cdnod(pooled.data, env=pooled.env)
+andrey.ut_igsp(pooled.data, pooled.env, targets=pooled.targets)
+
+known = {k: cols for k, cols in pooled.targets.items() if cols is not None}
+rows = np.isin(pooled.env, list(known))
+andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
+```
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
