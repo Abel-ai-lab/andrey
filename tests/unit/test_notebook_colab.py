@@ -1,4 +1,5 @@
-"""Colab setup installs into its runtime while ordinary notebook execution stays local."""
+"""The notebooks outside the docs site: Colab setup installs into its runtime while ordinary
+notebook execution stays local, and every link opens from Colab, GitHub, or a download."""
 
 from __future__ import annotations
 
@@ -82,3 +83,13 @@ def test_colab_installs_the_release_from_pypi(notebook, monkeypatch):
     assert f"andrey-core[viz]=={andrey.__version__}" in words
     assert not any(".whl" in word or " @ " in word for word in words)  # PyPI, not a file
     assert ("causal-learn==0.1.4.8" in words) == (notebook.stem == "speed_on_your_machine")
+
+
+@pytest.mark.parametrize("notebook", NOTEBOOKS, ids=lambda path: path.stem)
+def test_every_link_opens_outside_the_site(notebook):
+    # GitHub, Colab, and a downloaded copy resolve a relative link against the notebook's own
+    # location, where no page of the site exists.
+    cells = json.loads(notebook.read_text())["cells"]
+    text = "".join("".join(c["source"]) for c in cells if c["cell_type"] == "markdown")
+    targets = re.findall(r"\]\(\s*([^)\s]+)", text)
+    assert [t for t in targets if not t.startswith("https://")] == []

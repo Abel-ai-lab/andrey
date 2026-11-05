@@ -200,10 +200,15 @@ def test_load_validates_ordering_permutation(tmp_path):
 
 
 def test_npz_load_is_allow_pickle_free(tmp_path):
-    # A crafted object-array npz must raise on load, never execute a pickle.
-    p = tmp_path / "evil.npz"
-    np.savez(p, _json=np.array({"payload": 1}, dtype=object))
-    with pytest.raises((ValueError, KeyError)):
+    # A valid result whose JSON text is stored as an object array, which only a pickle can read:
+    # the load refuses it rather than unpickle it, so a pickle-enabled load would return a result.
+    p = tmp_path / "pickled.npz"
+    lingam_output().save(p, fmt="npz")
+    with np.load(p) as npz:
+        arrays = dict(npz)
+    arrays["_json"] = np.array(str(arrays["_json"]), dtype=object)
+    np.savez(p, **arrays)
+    with pytest.raises(ValueError):
         StructureOutput.load(p)
 
 

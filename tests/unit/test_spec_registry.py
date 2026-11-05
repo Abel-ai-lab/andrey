@@ -28,17 +28,10 @@ from andrey.spec.models import Status
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
 _INPUT_FLAGS = ("data", "env")
 
-# The former input flags, which the CLI still takes for one release: the inputs' former names and
-# gies's former intervention matrix, now a form of targets.
-_FORMER_INPUT_FLAGS = (
-    *sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases}),
-    "interventions",
-)
-
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
     {"method", "config", "output", "json", "full", "help", "version", "debug"}
-    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
+    | set(_INPUT_FLAGS)
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
@@ -258,13 +251,26 @@ def test_public_core_methods_document_their_parameters(cls_name):
             )
 
 
+@pytest.mark.parametrize("cls_name", ["SCM", "CausalDataset"])
+def test_public_data_classes_document_every_field(cls_name):
+    """A simulated model or dataset is built from its fields, so its ``Parameters`` section names
+    each one, in order."""
+    import dataclasses
+
+    import andrey.data as data
+
+    cls = getattr(data, cls_name)
+    fields = [f.name for f in dataclasses.fields(cls)]
+    assert _docstring_param_names(inspect.getdoc(cls) or "") == fields
+
+
 def test_cmd_run_wires_every_input_flag():
     """Every `_INPUT_FLAGS` entry is an actual `cmd_run` option, so an input added to the registry
     and `_INPUT_FLAGS` but not to `cmd_run` fails here instead of being unreachable at runtime."""
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
+    missing = set(_INPUT_FLAGS) - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
 
 

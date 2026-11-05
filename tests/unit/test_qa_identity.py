@@ -17,6 +17,7 @@ from andrey import GraphStructure, StructureOutput
 from andrey.core import ci, score_delta
 from andrey.core.ci import make_indep_test
 from qa import identity
+from qa import quality_gate as qg
 
 
 @pytest.fixture(scope="module")
@@ -232,6 +233,11 @@ def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
         "score_queries": 4,
         "score_sets": {"1": 3, "2": 1},
     }
+
+
+def test_every_supported_method_is_fitted_on_its_datasets() -> None:
+    assert set(identity.FITS) == set(qg.SUPPORTED)
+    assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in identity.FITS)
 
 
 def test_pnl_is_refitted_on_workers_and_gives_the_same_bits() -> None:

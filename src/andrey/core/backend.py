@@ -98,14 +98,6 @@ def _warn_once(message: str) -> None:
     warning_policy.warn_once(message, warning_policy.BackendFallbackWarning)
 
 
-def _warn_former(old: str, new: str) -> None:
-    """Warn once that the setting ``old`` is now ``new``."""
-    warning_policy.warn_once(
-        f"{old} is now {new}; the former name stops working in the next release",
-        warning_policy.DeprecatedArgumentWarning,
-    )
-
-
 # ---- optional accelerators ----------------------------------------------------------------------
 
 
@@ -163,7 +155,8 @@ class _Config:
 
     Assigning ``andrey.config.backend``, ``andrey.config.n_jobs``, or
     ``andrey.config.tie_break`` changes the default for later calls; assigning ``None`` returns to
-    ``ANDREY_BACKEND``, ``ANDREY_N_JOBS``, and ``ANDREY_TIE_BREAK``.
+    ``ANDREY_BACKEND``, ``ANDREY_N_JOBS``, and ``ANDREY_TIE_BREAK``; assigning any other name
+    raises ``AttributeError``.
     ``with andrey.config(backend=..., n_jobs=..., tie_break=...):`` changes them inside the
     block only, and does not reach threads started inside it. The order, most specific first:
     ``with`` block, these attributes, the environment variables, the defaults.
@@ -172,10 +165,11 @@ class _Config:
     runtime-startup requirements and a compatible GPU is available; otherwise it uses ``"numpy"``.
     ``"numpy"`` uses NumPy on the CPU in float64. The ``torch`` extra provides ``"cpu"`` for
     PyTorch on the CPU, ``"cuda"`` for a CUDA-compatible GPU, and ``"mps"`` for an Apple GPU in
-    unvalidated float32. ``"none"`` means ``"cpu"`` and ``"metal"`` means ``"mps"``. An explicit
-    choice bypasses the size and startup requirements. An operation without the requested backend
-    uses ``"auto"``; a supported but unavailable backend also warns once with
-    ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise ``ValueError``.
+    float32; Apple GPUs are not supported in the alpha. ``"none"`` means ``"cpu"`` and ``"metal"``
+    means ``"mps"``. An explicit choice bypasses the size and startup requirements. An operation
+    without the requested backend uses ``"auto"``; a supported but unavailable backend also warns
+    once with ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise
+    ``ValueError``.
 
     ``n_jobs`` counts worker processes (threads for ``pnl``): ``-1`` uses every usable
     core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
@@ -196,9 +190,12 @@ class _Config:
     it reaches.
     """
 
-    _backend: str | None = None
-    _n_jobs: int | None = None
-    _tie_break: str | None = None
+    __slots__ = ("_backend", "_n_jobs", "_tie_break")
+
+    def __init__(self) -> None:
+        self._backend: str | None = None
+        self._n_jobs: int | None = None
+        self._tie_break: str | None = None
 
     @property
     def backend(self) -> str:
@@ -219,17 +216,6 @@ class _Config:
         self._n_jobs = None if value is None else env.parse_n_jobs(value, "config.n_jobs")
 
     @property
-    def num_workers(self) -> int:
-        """The former name of :attr:`n_jobs`, kept for one release with a warning."""
-        _warn_former("andrey.config.num_workers", "andrey.config.n_jobs")
-        return self.n_jobs
-
-    @num_workers.setter
-    def num_workers(self, value: int | None) -> None:
-        _warn_former("andrey.config.num_workers", "andrey.config.n_jobs")
-        self.n_jobs = value
-
-    @property
     def tie_break(self) -> str:
         """The tie-break rule in effect; assigning an unknown name raises ``ValueError``."""
         return _resolve_tie_break()
@@ -244,7 +230,7 @@ class _Config:
         backend: str | None = None,
         n_jobs: int | None = None,
         tie_break: str | None = None,
-        num_workers: int | None = None,
+        **unknown: object,
     ):
         """Return a context manager that sets the given settings for a ``with`` block.
 
@@ -256,9 +242,6 @@ class _Config:
             Worker count for the block, ``-1`` or more; ``None`` keeps the current one.
         tie_break : {"rank", "position"} or None, default=None
             Tie-break rule for the block; ``None`` keeps the current one.
-        num_workers : int or None, default=None
-            The former name of ``n_jobs``, kept for one release with a
-            :class:`~andrey.DeprecatedArgumentWarning`.
 
         Returns
         -------
@@ -270,13 +253,15 @@ class _Config:
         ValueError
             On entering the block, if ``backend`` or ``tie_break`` is not a known name or
             ``n_jobs`` is not an integer of at least ``-1``; the message lists the accepted
-            values. At once, if the call passes both ``n_jobs`` and ``num_workers``.
+            values.
+        TypeError
+            At once, for any other keyword; for ``num_workers``, the message gives ``n_jobs``, its
+            name since 0.12.0.
         """
-        if num_workers is not None:
-            if n_jobs is not None:
-                raise ValueError("num_workers is the former name of n_jobs; pass only n_jobs")
-            _warn_former("andrey.config(num_workers=...)", "andrey.config(n_jobs=...)")
-            n_jobs = num_workers
+        if unknown:
+            key = next(iter(unknown))
+            hint = "; it was renamed `n_jobs` in 0.12.0" if key == "num_workers" else ""
+            raise TypeError(f"andrey.config() got an unexpected keyword argument {key!r}{hint}")
         return _scope(backend, n_jobs, tie_break)
 
 
@@ -327,10 +312,6 @@ def _resolve_n_jobs(kwarg: int | None) -> int:
     if config._n_jobs is not None:
         return config._n_jobs
     n = env.N_JOBS.read()
-    if n is None:
-        n = env.NUM_WORKERS.read()
-        if n is not None:
-            _warn_former("ANDREY_NUM_WORKERS", "ANDREY_N_JOBS")
     return 1 if n is None else n
 
 

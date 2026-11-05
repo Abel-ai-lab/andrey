@@ -96,6 +96,16 @@ def test_longer_searches_never_score_worse():
     assert andrey.tabu(x).metadata["score"] <= short
 
 
+def test_a_one_dag_tabu_list_stops_where_hill_climbing_stops():
+    """With ``tabu_length=1``, and so ``max_tabu=1``, the one non-improving move is undone by the
+    next, and the search ends at hill climbing's local optimum; the default list of 10 leaves it for
+    a better score."""
+    x = _er_sample(10, 9).data
+    short = andrey.tabu(x, tabu_length=1)
+    assert short.structure == andrey.hc(x).structure
+    assert andrey.tabu(x).metadata["score"] < short.metadata["score"]
+
+
 def test_tabu_is_deterministic_across_runs_and_worker_counts():
     """Repeated fits, and fits under different worker counts, agree exactly, non-improving moves
     included."""

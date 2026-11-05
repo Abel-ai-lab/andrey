@@ -57,7 +57,7 @@ def adjusted_rand_index(labels_a: object, labels_b: object) -> float:
     if a.shape != b.shape:
         raise ValueError(f"label-length mismatch: {a.shape} vs {b.shape}")
     n = a.shape[0]
-    if n < 2:  # 0 or 1 elements: the partition is trivially perfect (matches sklearn)
+    if n < 2:  # 0 or 1 elements: the partition is trivially perfect
         return 1.0
     _, ai = np.unique(a, return_inverse=True)
     _, bi = np.unique(b, return_inverse=True)

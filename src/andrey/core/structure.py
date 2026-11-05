@@ -608,9 +608,11 @@ class GraphStructure(Structure):
 
         A ``pag`` or ``mag`` is written as pcalg's ``amat.pag``: ``amat[a, b]`` is the mark at the
         column node ``b`` on the edge between ``a`` and ``b``, ``0`` no edge, ``1`` circle, ``2``
-        arrowhead, ``3`` tail. A ``dag`` or ``cpdag`` is written as ``amat.cpdag``: ``a -> b`` is
-        ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's row, and ``a -- b`` is ``1`` in
-        both cells. ``from_pcalg`` reads the result back. Each call builds a new array.
+        arrowhead, ``3`` tail. A ``dag``, ``cpdag``, or ``undirected`` graph is written as
+        ``amat.cpdag``: ``a -> b`` is ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's
+        row, and ``a -- b`` is ``1`` in both cells. ``from_pcalg`` reads the result back with the
+        graph's ``kind``; it has no ``"undirected"`` kind, so an undirected graph reads back with
+        ``kind="cpdag"``, as a CPDAG. Each call builds a new array.
 
         Returns
         -------

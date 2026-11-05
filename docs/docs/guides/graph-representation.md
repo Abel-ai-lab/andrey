@@ -100,7 +100,10 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   also reports every link with all its marks as `links`, plus `p_values`, `statistics`, and its
   preliminary `parents`. An order that is not a total order of the variables has its own key:
   BottomUpParceLiNGAM's `partial_order` nests the unordered variables in a list, and GIN's
-  `cluster_order` orders its latent clusters.
+  `cluster_order` orders its latent clusters. CD-NOD and GnIES list the variables whose mechanism
+  changes across the environments as `changing_variables`, and CD-NOD also the environment index's
+  edges into them as `index_edges`, `[variable, "directed"]` pairs; UT-IGSP reports the targets it
+  learns for each environment as `targets`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results
@@ -174,7 +177,7 @@ mixes numbers with text is an error.
 | `oriented_edges()` | list of `(source, target, type)`, named by `labels` when set |
 | `to_edges()` | structured array with fields `i`, `j`, `mark_i`, `mark_j` |
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
-| `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
+| `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, `mag`, `pag`, or `undirected` graph |
 | `to_dot()` | Graphviz DOT text, named by `labels` when set |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes, by index |
 
@@ -197,7 +200,8 @@ the graph's kind. `amat.pag` (`fit@amat` from `fci` or `rfci`; `kind="pag"`, a M
 mark at the column node, coded `1` circle, `2` arrowhead, `3` tail, so the methods transpose it and
 swap pcalg's codes for circle and tail. `amat.cpdag` (`as(fit, "amat")` from `pc`; `kind="cpdag"`
 or `"dag"`) writes `i -> j` at `[j, i]`, the child's row, and an undirected edge as `1` in both
-cells, so the methods transpose it too. A `digraph` has no pcalg matrix.
+cells, so the methods transpose it too. An `undirected` graph is written as `amat.cpdag` and reads
+back as a `cpdag`, since `from_pcalg` has no `undirected` kind. A `digraph` has no pcalg matrix.
 
 Andrey has no converters for other packages' objects. Build their matrices into a `GraphStructure`
 with `from_numpy`:

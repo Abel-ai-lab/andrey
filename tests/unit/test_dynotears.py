@@ -100,6 +100,11 @@ def test_a_zero_lag_threshold_keeps_no_lagged_link_of_weight_zero(series):
     assert len(lagged) < 16
 
 
+def test_the_dual_steps_end_once_the_acyclicity_falls_to_h_tol(series, default_fit):
+    loose = fit(series, h_tol=1e-2)
+    assert default_fit.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
+
+
 def test_tau_max_sets_the_lags_and_the_weights(series):
     out = fit(series, tau_max=3)
     assert out.structure.lags == (0, 1, 2, 3)

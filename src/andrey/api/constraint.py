@@ -83,10 +83,7 @@ def pc(
         picks from the declared column types: ``"gsq"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. See Notes. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values.
+        values. See **Categorical data.** and **Mixed data.** in Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
@@ -152,11 +149,13 @@ def pc(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         too few samples for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``,
         if ``data`` holds a value that is not a whole number; or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
@@ -474,11 +473,7 @@ def fci(
         ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None`` picks from
         the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
-        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -544,11 +539,13 @@ def fci(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         too few samples for a test or a singular correlation matrix, or if ``data`` or
         ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
         ``"student_t"``, also if a column repeats another up to scale and shift, before any test
@@ -802,7 +799,8 @@ def gfci(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -891,11 +889,13 @@ def gfci(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if
         ``score_func`` and ``indep_test`` read different data (continuous, categorical, or mixed),
         or if ``data`` or ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the
         BIC score, also if a column repeats another up to scale and shift given more than two rows
@@ -1197,7 +1197,15 @@ def cdnod(
         leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
         can identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
         :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
-        against the graph CD-NOD can identify instead.
+        against the graph CD-NOD can identify instead. ``metadata["index_edges"]`` lists the
+        index's edges, each ``env -> variable``, as ``[variable, "directed"]`` pairs, and
+        ``metadata["changing_variables"]`` the same variables, by name or 0-based position, in
+        column order: the variables whose causal module, the distribution given their causes,
+        changes across the environments, under CD-NOD's assumption that the index is only a cause
+        and no hidden common cause varies apart from it [1]_. Their descendants change in
+        distribution too, through them, and are not listed. Both are empty for a single
+        environment. With ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, only a change in a
+        variable's mean that follows the index's values is found.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
@@ -1211,11 +1219,13 @@ def cdnod(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``env``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``env``
         is given with each domain's rows apart; if those rows' tables differ in kind or columns,
         or one has no rows or holds ``inf``; if ``env`` does not hold one value per row
         of ``data``, holds ``NaN`` / ``inf`` or a missing label, mixes strings and numbers, or
@@ -1256,16 +1266,17 @@ def cdnod(
     environment, not which variables changed in it; when every environment's intervened variables
     are known, :func:`~andrey.gies` uses them.
 
-    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
-    find a change in a variable's mean that follows the index's values. With two domains the coding
-    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result. A change in a variable's noise
-    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
-    unchanged, so the index keeps no edge to that variable. The paper uses a kernel
-    conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
-    ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they
-    find a shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the
-    index is categorical, so every data column may be continuous.
+    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
+    correlation, so they find a change in a variable's mean that follows the index's values. With
+    two domains the coding does not matter. With three domains coded ``0, 1, 2``, a shift in domain
+    ``1`` alone can go undetected, and recoding the domains can change the result. A change in a
+    variable's noise variance alone, or in the size of an effect whose cause has mean zero, leaves
+    the mean unchanged, so the index keeps no edge to that variable. ``"kci"``, the kernel
+    conditional-independence test the paper uses [1]_ [2]_, detects such changes, at a far higher
+    cost per test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index
+    value as a category, so they find a shift in any domain, whatever the coding. With
+    ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so every data column may be
+    continuous.
 
     With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
     between two variables that both keep an edge to the index. For a candidate direction
@@ -1406,6 +1417,7 @@ def cdnod(
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
+    index_edges: list[int] = []
     with (
         copies_named(labels, lambda j: "env" if j == d else column(j)),
         rows_tested() as rows,
@@ -1425,9 +1437,13 @@ def cdnod(
             seed=seed,
             _ambiguous=ambiguous,
             _conflicts=conflicts,
+            _index_edges=index_edges,
         )
+    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
     metadata = {
         "conflicts": [list(edge) for edge in sorted(conflicts)],
+        "index_edges": [[variable(j), "directed"] for j in index_edges],
+        "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),
@@ -1521,10 +1537,12 @@ def icp(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target``
         is ``None`` or names a column ``data`` lacks; if ``data`` is not a 2-D numeric matrix with
         at least two rows, no ``NaN`` or ``inf``, and no constant column; if a column repeats
         another up to scale and shift or, with more rows than columns, is a linear function of

@@ -271,7 +271,6 @@ _add(
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
                     "1, ... in sorted order.",
-                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
@@ -281,7 +280,10 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            doc="metadata['index_edges'] lists the index's edges as [variable, 'directed'] "
+            "pairs and metadata['changing_variables'] the same variables, whose causal module "
+            "changes across the environments, in column order; metadata['categorical'] lists "
+            "the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
@@ -568,7 +570,6 @@ _add(
                 "observational environment. Every environment needs an entry. null, with no env, "
                 "is observational data.",
                 nullable=True,
-                aliases=("interventions",),
             ),
             concept_param(
                 "score_func",
@@ -1347,7 +1348,6 @@ _add(
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
                 "search more chains and run longer.",
-                aliases=("depth",),
             ),
             _SEED,
             _N_STARTS,
@@ -1883,7 +1883,6 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
-                aliases=("pc_alpha",),
             ),
             concept_param(
                 "alpha",
@@ -1964,8 +1963,8 @@ _add(
                 default="majority",
                 doc="How a same-step collider is judged: sepsets = the middle is not in the one "
                 "separating set found; majority = fewer than half of the separating subsets hold "
-                "the middle; conservative = none does. The default majority is tigramite's.",
-                choice_aliases=(("none", "sepsets"),),
+                "the middle; conservative = none does. The default majority does not depend on the "
+                "order of the variables.",
             ),
             _INDEP_TEST,
             _CATEGORICAL,
@@ -1973,8 +1972,8 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a skeleton or collider test takes beyond the default "
-                "conditions, the lagged parents of both ends, at least 0 (tigramite's name); "
-                "max_depth caps the lagged phase. null sets no limit. A cap bounds the number of "
+                "conditions, the lagged parents of both ends, at least 0; max_depth caps the "
+                "lagged phase. null sets no limit. A cap bounds the number of "
                 "tests and can keep links that a larger conditioning set would remove.",
             ),
             concept_param(
@@ -2041,7 +2040,7 @@ _add(
             concept_param(
                 "max_p_global",
                 doc="The most conditions a test takes beyond the default conditions, the parents "
-                "of both ends, at least 0 (tigramite's name); max_depth elsewhere counts the whole "
+                "of both ends, at least 0; max_depth elsewhere counts the whole "
                 "conditioning set. null sets no limit. A cap bounds the number of tests and can "
                 "keep links that a larger conditioning set would remove.",
             ),
@@ -2090,7 +2089,6 @@ _add(
                 "link is kept when its adjusted p-value is at most alpha.",
             ),
         ),
-        dropped_args=("cv",),
         references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
@@ -2642,19 +2640,10 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
         )
 
 
-# Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type. igsp and ut_igsp came later and never took it.
-for _name in CONCEPTS["categorical"].suitable:
-    if _name in ("igsp", "ut_igsp"):
-        continue
-    _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
-    REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
-
-
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
-    "cdnod": ("conflicts",),
+    "cdnod": ("conflicts", "index_edges", "changing_variables"),
     "icp": (
         "target",
         "parents",

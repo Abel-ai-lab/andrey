@@ -734,14 +734,13 @@ def perturb(
     """Make ``changes`` random edge changes to the DAG in place, in at most ``3 * changes`` draws.
 
     Each draw takes an operation uniformly from add, remove, and reverse, then one of the edges it
-    can apply to uniformly, as bnlearn's restarts do. An add joins two non-adjacent nodes. No add or
-    reverse makes an edge ``u -> v`` that ``forbidden[v, u]`` bars or gives a node more than
-    ``max_parents`` parents, and no remove or reverse touches an edge that ``required[v, u]`` holds;
-    a draw whose add or reverse would close a cycle changes nothing. Nodes are indexed by their
-    place in the order of ``ranks`` (:func:`tie_ranks`), so the draws move with the columns. A draw
-    tries up to ``_TRIES`` uniform candidates and lists the legal ones only when all of them fail,
-    which keeps the pick uniform and its cost independent of the number of nodes while most
-    candidates are legal.
+    can apply to uniformly. An add joins two non-adjacent nodes. No add or reverse makes an edge
+    ``u -> v`` that ``forbidden[v, u]`` bars or gives a node more than ``max_parents`` parents, and
+    no remove or reverse touches an edge that ``required[v, u]`` holds; a draw whose add or reverse
+    would close a cycle changes nothing. Nodes are indexed by their place in the order of ``ranks``
+    (:func:`tie_ranks`), so the draws move with the columns. A draw tries up to ``_TRIES`` uniform
+    candidates and lists the legal ones only when all of them fail, which keeps the pick uniform and
+    its cost independent of the number of nodes while most candidates are legal.
     """
     d = len(adj_int)
     by_rank = np.argsort(ranks, kind="stable")  # place -> column
