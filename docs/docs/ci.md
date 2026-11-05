@@ -26,12 +26,12 @@ does not.
 The quality gate also reads the published benchmarks and flags any row where the reference package
 makes significantly fewer errors: the paired 95% interval of the difference in errors, over at
 least 10 datasets, lies above 0. A row is exempt when a cited source shows that Andrey follows the
-method's paper or that the reference has a defect. A flag does not fail the gate, as a failed fit
-does; the release checklist reviews every flag.
+method's paper or that the reference has a defect. A flag does not fail the gate, as a method that
+does not pass does; the release checklist reviews every flag.
 
 | Platform | What is tested |
 |---|---|
-| Linux x86_64 | everything above, on every pull request |
+| Linux x86_64 | everything above |
 | macOS arm64 | on demand: install, import, the command line, PC and GES fits, worker processes, and the unit tests with PyTorch on the CPU |
 | Windows x86_64 | on demand: install, import, the command line, PC and GES fits, and worker processes, on the CPU |
 

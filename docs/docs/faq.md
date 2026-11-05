@@ -180,10 +180,11 @@ data, with continuous and categorical columns, the same methods take `indep_test
 the score from the column types you declare, with `categorical` or a DataFrame's `category`, `bool`,
 or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when some are. A
 column of a few whole numbers that you have not declared reads as numbers, with a warning. The
-[release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
-Tetrad, bnlearn, and pgmpy; GIES, XGES, IGSP, UT-IGSP, PCMCI, PCMCI+, and LPCMCI are not benchmarked
-on those data yet. [Data types](guides/getting-started.md#data-types) explains the settings. The
-LiNGAM methods assume continuous non-Gaussian noise.
+[release cards](benchmarks.md) benchmark PC, FCI, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, GES, hill
+climbing, BOSS, and GRaSP on categorical data, and PC, GES, and hill climbing on mixed data, against
+causal-learn, Tetrad, bnlearn, pgmpy, or an earlier Andrey release; the other methods are not
+benchmarked on those data yet. [Data types](guides/getting-started.md#data-types) explains the
+settings. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Does it handle missing values?
 
