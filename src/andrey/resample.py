@@ -11,6 +11,7 @@ the same at any worker count, and the first ``k`` resamples of a longer run are 
 
 from __future__ import annotations
 
+import inspect
 import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
@@ -24,6 +25,7 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range
+from andrey.api._method import removed_name_error
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
@@ -38,7 +40,7 @@ from andrey.core.structure import (
     TemporalStructure,
     is_ancestral_kind,
 )
-from andrey.core.warning_policy import AndreyWarning, DeprecatedArgumentWarning, warn_once
+from andrey.core.warning_policy import AndreyWarning, warn_once
 from andrey.search._parallel import pick_context
 from andrey.search.hc import tie_ranks
 
@@ -280,16 +282,6 @@ class BootstrapOutput:
     @property
     def n_resamples(self) -> int:
         """The number of fits counted."""
-        return self._n_resamples
-
-    @property
-    def n_boot(self) -> int:
-        """The former name of ``n_resamples``, which stops working in the next release."""
-        warn_once(
-            "andrey.BootstrapOutput.n_boot is now n_resamples; the former name stops working in "
-            "the next release",
-            DeprecatedArgumentWarning,
-        )
         return self._n_resamples
 
     @property
@@ -904,14 +896,11 @@ def _fit_all(job: _Job, n_resamples: int, workers: int) -> list[tuple[Any, list]
 # ---- the public function ------------------------------------------------------------------------
 
 
-_N_RESAMPLES_DEFAULT = 100
-
-
 def bootstrap(
     method: str | Callable[..., Any],
     data: npt.ArrayLike | Sequence[npt.ArrayLike],
     *,
-    n_resamples: int = _N_RESAMPLES_DEFAULT,
+    n_resamples: int = 100,
     seed: int | None = None,
     threshold: float = 0.5,
     strict: bool = False,
@@ -951,8 +940,7 @@ def bootstrap(
         each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
         and resampled within each environment, ``cdnod``'s domains included.
     n_resamples : int, default=100
-        The number of resamples and fits. ``n_boot``, the former name, works with a
-        ``DeprecatedArgumentWarning`` for one more release.
+        The number of resamples and fits.
     seed : int or None, default=None
         The seed of the resamples, a non-negative integer. ``None`` uses ``ANDREY_SEED``, or 0 when
         it is unset. Resample ``b`` depends on ``seed`` and ``b`` alone. A method that takes a
@@ -1007,6 +995,9 @@ def bootstrap(
         has a different number of rows from ``data``, ``block_length`` is given for a resampling
         that does not use blocks, ``strict=True`` and the vote has no valid graph of the method's
         kind, or a fit raises it: the error then names the resample in a note.
+    TypeError
+        Before any fit, for ``n_boot`` or an argument name that a release removed from the method;
+        the message gives its current name.
     NotImplementedError
         For ``gin``, whose number of latent nodes varies from fit to fit.
     RuntimeError
@@ -1166,17 +1157,14 @@ def bootstrap(
     from andrey.core.seeding import resolve_seed
 
     if "n_boot" in method_kwargs:
-        if n_resamples != _N_RESAMPLES_DEFAULT:
-            raise ValueError(
-                "bootstrap: n_boot is the former name of n_resamples; pass only n_resamples"
-            )
-        n_resamples = method_kwargs.pop("n_boot")
-        warn_once(
-            "andrey.bootstrap: n_boot is now n_resamples; the former name stops working in the "
-            "next release",
-            DeprecatedArgumentWarning,
+        raise TypeError(
+            "bootstrap() got an unexpected keyword argument 'n_boot'; it was renamed "
+            "`n_resamples` in 0.12.0"
         )
     spec = _method_spec(method)
+    signature = inspect.signature(getattr(api, spec.name))
+    if (error := removed_name_error(spec.name, signature, method_kwargs)) is not None:
+        raise error
     n_resamples = int_in_range(n_resamples, "n_resamples", 1)
     threshold = _check_threshold(threshold)
     strict = _check_strict(strict)

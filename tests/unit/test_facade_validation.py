@@ -767,14 +767,10 @@ def test_a_mixed_setting_without_categorical_columns_warns_and_runs(setting):
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
 def test_a_mixed_setting_never_reads_a_column_as_categorical_from_its_values(setting):
     """Whole-number columns that nothing declares are continuous: the setting runs as its
-    linear-Gaussian form, and max_categories is ignored with a warning."""
+    linear-Gaussian form."""
     with pytest.warns(andrey.DataTypeWarning, match="found no categorical column"):
         out = MIXED[setting](_mixed_data())
     assert out.metadata["categorical"] == []
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="max_categories is ignored"):
-        ignored = MIXED[setting](_mixed_data(), max_categories=3)
-    assert ignored.structure == out.structure
 
 
 def test_the_category_code_warning_reads_every_row():

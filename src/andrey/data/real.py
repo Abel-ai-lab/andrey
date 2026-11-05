@@ -60,12 +60,24 @@ class RealDataset:
     description : str
         What the data are, whether they are measured or simulated, where they come from, and how
         to cite them.
+    env : numpy.ndarray of shape (n_samples,) or None
+        For data from several environments, each row's environment as the integer codes ``0, 1,
+        ...``, in the order of ``conditions``; ``None`` for data from one environment.
+    targets : dict of int to list of int or None, or None
+        Each environment's declared intervention targets, as column positions: ``[]`` for an
+        environment without an intervention on a measured variable, ``None`` for one whose targets
+        are unknown. ``None`` for data from one environment.
+    conditions : tuple of str or None
+        The environments' names, one per code of ``env``; ``None`` for data from one environment.
     """
 
     data: Any
     graph: GraphStructure
     feature_names: tuple[str, ...]
     description: str
+    env: np.ndarray | None = None
+    targets: dict[int, list[int] | None] | None = None
+    conditions: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +88,8 @@ class Contents:
     arcs: tuple[tuple[str, str], ...]
     #: The measurements, or ``None`` for a published structure whose data are simulated.
     values: np.ndarray | None
+    #: Each row's environment code, for measurements from several environments.
+    env: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -129,12 +143,86 @@ networks derived from multiparameter single-cell data. Science 308(5721):523-529
 """
 
 
+#: The experimental file's nine conditions, in its row order: each one's name (the file's indicator
+#: column for its reagent), its rows' 0/1 pattern over the nine indicator columns, and the measured
+#: variables its reagent acts on, as Mooij, Magliacane, and Claassen (2020, Table 3) read Sachs et
+#: al. (2005). Every condition but PMA and b2cAMP includes the CD3/CD28 stimulation of the first,
+#: so their targets, against that baseline, are unknown (``None``).
+SACHS_CONDITIONS: tuple[tuple[str, tuple[int, ...], tuple[str, ...] | None], ...] = (
+    ("cd3_cd28", (1, 0, 0, 0, 0, 0, 0, 0, 0), ()),
+    ("icam2", (1, 1, 0, 0, 0, 0, 0, 0, 0), ()),
+    ("aktinhib", (1, 0, 1, 0, 0, 0, 0, 0, 0), ("akt",)),
+    ("g0076", (1, 0, 0, 1, 0, 0, 0, 0, 0), ("pkc",)),
+    ("psitect", (1, 0, 0, 0, 1, 0, 0, 0, 0), ("pip2",)),
+    ("u0126", (1, 0, 0, 0, 0, 1, 0, 0, 0), ("mek",)),
+    ("ly", (1, 0, 0, 0, 0, 0, 1, 0, 0), ("pip2", "pip3")),
+    ("pma", (0, 0, 0, 0, 0, 0, 0, 1, 0), None),
+    ("b2camp", (0, 0, 0, 0, 0, 0, 0, 0, 1), None),
+)
+
+_SACHS_CONDITIONS_DESCRIPTION = """\
+Sachs et al. (2005): flow cytometry of 11 phosphorylated proteins and phospholipids in single human
+immune-system cells, in all nine conditions: 7,466 cells. The first condition is the 853
+observational cells; in each other one a reagent stimulated or inhibited the network. ``env``
+gives each cell's condition as a code, in the order of ``conditions``, and ``targets`` the measured
+variables each reagent acts on, as Mooij, Magliacane, and Claassen (2020, Table 3) read the
+reagents: akt for the AKT inhibitor, pkc for G0076, pip2 for psitectorigenin, mek for U0126, and
+pip2 and pip3 for LY294002. ICAM-2, which Table 3 calls a global activator like CD3/CD28, has no
+measured target, so its targets, like the first condition's, are ``[]``, which the methods that
+take ``targets`` read as observational. PMA and b2cAMP leave out the CD3/CD28 stimulation, so their
+targets are unknown (``None``). The AKT inhibitor, G0076, and U0126 inhibit an enzyme's activity
+rather than its measured abundance, so they change the mechanisms of their targets' children more
+than the targets themselves (Mooij and Heskes 2013). The graph is the 17-arc consensus network;
+Mooij, Magliacane, and Claassen (2020) note it is contested, with evidence of feedback from mek to
+raf and of mek independent of erk.
+
+Source: cmu-phil/example-causal-datasets (CC0-1.0),
+real/sachs/data/sachs.2005.with.jittered.experimental.continuous.txt, whose jittered 0/1 indicator
+columns give each cell's condition.
+Cite: K. Sachs, O. Perez, D. Pe'er, D. A. Lauffenburger, G. P. Nolan. Causal protein-signaling
+networks derived from multiparameter single-cell data. Science 308(5721):523-529, 2005.
+"""
+
+
 def _read_sachs(raw: bytes) -> Contents:
     lines = raw.decode("utf-8").splitlines()
     if tuple(lines[0].split()) != SACHS_NODES:
         raise ValueError(f"the Sachs columns {lines[0].split()} are not {SACHS_NODES}")
     values = np.loadtxt(lines[1 : SACHS_ROWS + 1], dtype=np.float64)
     return Contents(SACHS_NODES, SACHS_ARCS, values)
+
+
+def _read_sachs_conditions(raw: bytes) -> Contents:
+    """Read the 11 measurements and the condition each row's rounded indicators name."""
+    lines = raw.decode("utf-8").splitlines()
+    names = tuple(name for name, _, _ in SACHS_CONDITIONS)
+    if tuple(lines[0].split()) != SACHS_NODES + names:
+        raise ValueError(f"the Sachs columns {lines[0].split()} are not {SACHS_NODES + names}")
+    table = np.loadtxt(lines[1:], dtype=np.float64, ndmin=2)
+    patterns = np.rint(table[:, len(SACHS_NODES) :]).astype(np.int64)
+    index = np.full(len(table), -1, dtype=np.int64)
+    for k, (_, pattern, _) in enumerate(SACHS_CONDITIONS):
+        index[(patterns == pattern).all(axis=1)] = k
+    if (index < 0).any():
+        row = int(np.flatnonzero(index < 0)[0]) + 1
+        raise ValueError(f"the Sachs indicators on data row {row} name no known condition")
+    values = np.ascontiguousarray(table[:, : len(SACHS_NODES)])
+    return Contents(SACHS_NODES, SACHS_ARCS, values, index)
+
+
+#: The experimental Sachs file, read by ``load_dataset("sachs", conditions=True)``.
+SACHS_CONDITIONS_FILE = Remote(
+    filename="sachs.2005.with.jittered.experimental.continuous.txt",
+    sources=(
+        "https://raw.githubusercontent.com/cmu-phil/example-causal-datasets/"
+        "4ba0565b8164b46063daf0f6fba6b94e5a99baf6/real/sachs/data/"
+        "sachs.2005.with.jittered.experimental.continuous.txt",
+    ),
+    sha256="f02ea69c335519ba59f442f47ff5d5130b60a63edec9ffb88f179c48f951e293",
+    read=_read_sachs_conditions,
+    description=_SACHS_CONDITIONS_DESCRIPTION,
+    measured=True,
+)
 
 
 _BIF_VARIABLE = re.compile(r"^\s*variable\s+([^\s{]+)\s*\{", re.MULTILINE)
@@ -472,6 +560,7 @@ def load_dataset(
     n: int | None = None,
     seed: int | None = None,
     discrete: bool = False,
+    conditions: bool = False,
     shuffle: bool = True,
     as_frame: bool = True,
     data_home: str | os.PathLike[str] | None = None,
@@ -508,6 +597,14 @@ def load_dataset(
         categories, in causal order. A DataFrame column holds the network's category names as a
         pandas ``category``, in the file's order; an array holds the codes ``0..r-1`` in that
         order. Measured data take no ``discrete``.
+    conditions : bool, default=False
+        With ``"sachs"``, load all nine conditions, 7,466 cells, instead of the 853 observational
+        ones, with each cell's condition in ``env``, the reagents' declared targets in
+        ``targets``, and the conditions' names in ``conditions``: data from several environments,
+        for :func:`~andrey.cdnod`, :func:`~andrey.gnies`, :func:`~andrey.icp`, and
+        :func:`~andrey.ut_igsp`, and, on the rows of the seven conditions whose targets are known,
+        for :func:`~andrey.gies` and :func:`~andrey.igsp`, which need every condition's targets.
+        The other datasets take no ``conditions``.
     shuffle : bool, default=True
         List a published network's variables in an order drawn from the seed, with
         ``feature_names`` and the graph's labels in the same order. A network file lists its
@@ -526,14 +623,15 @@ def load_dataset(
     -------
     RealDataset
         ``data``, ``graph`` (the reference DAG over the same names), ``feature_names``, and
-        ``description``, which gives the source and the citation.
+        ``description``, which gives the source and the citation. With ``conditions=True``, also
+        ``env``, ``targets``, and ``conditions``; otherwise all three are ``None``.
 
     Raises
     ------
     ValueError
         If ``name`` is not a dataset, ``n``, ``seed``, or ``discrete`` is given for measured data,
-        ``n`` is not an integer of at least 2, or ``seed`` is not a non-negative integer. These are
-        checked before any download.
+        ``conditions`` is given for a dataset other than ``"sachs"``, ``n`` is not an integer of at
+        least 2, or ``seed`` is not a non-negative integer. These are checked before any download.
     OSError
         If no source gives the file with its recorded SHA-256, for example without network
         access. The message lists each URL tried and the path to put the file at by hand, and
@@ -564,13 +662,18 @@ def load_dataset(
     >>> alarm = load_dataset("alarm", n=2000, seed=1)  # doctest: +SKIP
     >>> alarm.data.shape, len(alarm.graph.oriented_edges())  # doctest: +SKIP
     ((2000, 37), 46)
+    >>> pooled = load_dataset("sachs", conditions=True)  # doctest: +SKIP
+    >>> pooled.data.shape, pooled.conditions[5], pooled.targets[5]  # doctest: +SKIP
+    ((7466, 11), 'u0126', [1])
     >>> asia = load_dataset("asia", n=5000, discrete=True)  # doctest: +SKIP
     >>> asia.data["either"].cat.categories.tolist()  # doctest: +SKIP
     ['yes', 'no']
     """
     if name not in DATASETS:
         raise ValueError(f"unknown dataset {name!r}; choose one of {list_datasets()}")
-    remote = DATASETS[name]
+    if conditions and name != "sachs":
+        raise ValueError(f"conditions applies to 'sachs' only, not {name!r}")
+    remote = SACHS_CONDITIONS_FILE if conditions else DATASETS[name]
     if remote.measured and (n is not None or seed is not None or discrete):
         raise ValueError(
             f"{name!r} is measured data: n, seed, and discrete apply to simulated datasets"
@@ -631,7 +734,16 @@ def load_dataset(
             for j, column in enumerate(contents.nodes):
                 codes = values[:, j].astype(np.int64)
                 data[column] = pd.Categorical.from_codes(codes, categories=states[j])
-    return RealDataset(data, _graph(contents), contents.nodes, description)
+    if not conditions:
+        return RealDataset(data, _graph(contents), contents.nodes, description)
+    targets = {
+        k: None if acted is None else [SACHS_NODES.index(t) for t in acted]
+        for k, (_, _, acted) in enumerate(SACHS_CONDITIONS)
+    }
+    names = tuple(name for name, _, _ in SACHS_CONDITIONS)
+    return RealDataset(
+        data, _graph(contents), contents.nodes, description, contents.env, targets, names
+    )
 
 
 def _is_int(value: object) -> bool:

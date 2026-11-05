@@ -88,6 +88,7 @@ def cdnod(
     seed: int | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
     _conflicts: set[tuple[int, int]] | None = None,
+    _index_edges: list[int] | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -119,7 +120,9 @@ def cdnod(
     ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
     ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``, and the private
     ``_conflicts`` sink the edges between variables that colliders ask to orient both ways
-    (:func:`~andrey.constraint.pc.collider_conflicts`).
+    (:func:`~andrey.constraint.pc.collider_conflicts`), and the private ``_index_edges`` sink the
+    data variables the context keeps an edge to, in column order: each such edge is
+    ``context -> variable``, and with a single domain there are none.
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -183,6 +186,8 @@ def cdnod(
             seed=seed,
         )
         ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
+        if _index_edges is not None:
+            _index_edges.extend(np.flatnonzero(skeleton[d] != NULL).tolist())
         if collider_rule != "sepsets":
             test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()

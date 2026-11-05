@@ -11,7 +11,7 @@ from tests.recovery.helpers import datagen
 from tests.recovery.helpers.tolerances import SPEC
 
 # Temporal / irregular cases, with their expected (n_samples, d) shape.
-NEW_CASES = {
+SHAPES = {
     "var_4v_stable": (500, 4),
     "svar_4v_gauss": (500, 4),
     "varma_3v": (500, 3),
@@ -21,8 +21,8 @@ NEW_CASES = {
 }
 
 
-@pytest.mark.parametrize(("case_id", "shape"), NEW_CASES.items(), ids=list(NEW_CASES))
-def test_new_case_shape(case_id, shape):
+@pytest.mark.parametrize(("case_id", "shape"), SHAPES.items(), ids=list(SHAPES))
+def test_a_case_has_its_shape(case_id, shape):
     X = datagen.generate(case_id)
     assert X.shape == shape
     assert X.dtype == np.float64

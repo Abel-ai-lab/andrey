@@ -1,10 +1,12 @@
-"""GPU device-parity: the real CUDA/MPS kernels match the CPU float64 oracle and are deterministic.
+"""GPU device parity: the CUDA and MPS paths match the NumPy float64 result and run on the device.
 
-The one check the free hosted runners cannot run. numpy float64 is the oracle; the
-on-device torch path (``cov`` / ``corrcoef`` / ``entropy``) must agree with it. Tolerance is
-per-device: ``cuda`` computes in float64 (tight, ~1e-9), ``mps`` in float32 (the GPU tier,
-``atol 1e-3``). The device is pinned via ``andrey.config`` (higher precedence than any env), and a
-dispatch + hardware canary guards against a silent numpy fallback passing trivially.
+The one check the free hosted runners cannot run. NumPy float64 is the reference. The kernels
+(``cov``, ``corrcoef``, ``entropy``) and the methods that read them (PC with Fisher-Z, GES with
+BIC, DirectLiNGAM) run on ``cuda`` or ``mps``; KCI, CMIknn, and PNL run on ``cuda`` only. Tolerance
+is per device: ``cuda`` computes in float64 (tight, ~1e-9), ``mps`` in float32 (the GPU tier,
+``atol 1e-3``). The device is pinned via ``andrey.config`` (higher precedence than any env), each
+test reads the dispatch counts of its device calls, and a hardware canary checks the device, so a
+silent numpy fallback fails.
 """
 
 from __future__ import annotations
@@ -53,6 +55,7 @@ def test_pinned_device_actually_runs_on_hardware(device):
 
 def test_cov_corrcoef_match_oracle(device, data):
     tol = _TOL[device]
+    backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         assert np.allclose(stats.cov(data), np.cov(data), **tol)
         assert np.allclose(stats.corrcoef(data), np.corrcoef(data), **tol)
@@ -62,21 +65,26 @@ def test_cov_corrcoef_match_oracle(device, data):
         assert np.allclose(
             stats.corrcoef(data.T, rowvar=False), np.corrcoef(data.T, rowvar=False), **tol
         )
+    assert backend.dispatch_stats() == {("cov", device): 3, ("corrcoef", device): 2}
 
 
 def test_entropy_matches_oracle(device, standardized):
     ref = stats._entropy_numpy(standardized)  # the numpy reference the torch path must match
+    backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         got = stats.entropy(standardized)
+    assert backend.dispatch_stats() == {("entropy", device): 1}
     assert got.shape == ref.shape
     assert np.allclose(got, ref, **_TOL[device])
 
 
 def test_on_device_determinism(device, standardized, data):
     """Same input -> bit-identical output across repeats (these ops consume no RNG)."""
+    backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         e1, e2 = stats.entropy(standardized), stats.entropy(standardized)
         c1, c2 = stats.cov(data), stats.cov(data)
+    assert backend.dispatch_stats() == {("entropy", device): 2, ("cov", device): 2}
     if device == "cuda":
         # float64 + use_deterministic_algorithms(True) + CUBLAS_WORKSPACE_CONFIG -> bit-identical.
         assert np.array_equal(e1, e2) and np.array_equal(c1, c2)
@@ -85,6 +93,41 @@ def test_on_device_determinism(device, standardized, data):
         # docs/docs/ci.md).
         assert np.allclose(e1, e2, rtol=1e-5, atol=1e-6)
         assert np.allclose(c1, c2, rtol=1e-5, atol=1e-6)
+
+
+@pytest.fixture
+def linear():
+    """A linear model with uniform noise whose columns hold ``x3, x0, x4, x1, x2``:
+    ``x0 -> x1 -> x2 -> x3 -> x4`` and ``x1 -> x4``. Its tests, scores, and causal order decide
+    by margins wider than float32 rounding, so a difference on ``mps`` is a fault of the path."""
+    rng = np.random.default_rng(0)
+    u = rng.uniform(-1, 1, (2000, 5))
+    x = np.zeros((2000, 5))
+    x[:, 0] = u[:, 0]
+    x[:, 1] = 0.9 * x[:, 0] + u[:, 1]
+    x[:, 2] = -0.8 * x[:, 1] + u[:, 2]
+    x[:, 3] = 0.7 * x[:, 2] + u[:, 3]
+    x[:, 4] = 0.8 * x[:, 3] - 0.6 * x[:, 1] + u[:, 4]
+    return x[:, [3, 0, 4, 1, 2]]
+
+
+@pytest.mark.parametrize(
+    ("method", "op"), [("pc", "corrcoef"), ("ges", "cov"), ("direct_lingam", "entropy")]
+)
+def test_a_method_finds_the_same_graph_and_order_on_the_device(device, linear, method, op):
+    """PC's Fisher-Z correlations, GES's BIC covariance, and DirectLiNGAM's entropies run on the
+    device, and the method finds the graph and causal order it finds on NumPy."""
+    fit = getattr(andrey, method)
+    backend._dispatch_counts.clear()
+    with andrey.config(backend="numpy"):
+        cpu = fit(linear)
+    assert {key for key in backend.dispatch_stats() if key[0] == op} == {(op, "numpy")}
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device):
+        got = fit(linear)
+    assert {key for key in backend.dispatch_stats() if key[0] == op} == {(op, device)}
+    assert got.structure.oriented_edges() == cpu.structure.oriented_edges()
+    assert got.ordering == cpu.ordering
 
 
 @pytest.fixture
@@ -105,15 +148,18 @@ def test_kci_and_cmiknn_match_the_cpu(device, nonlinear):
         pytest.skip("KCI and CMIknn have no mps backend")
     queries = [(0, 1, (2,)), (0, 1, (2, 3)), (1, 4, (0,)), (0, 4, (1, 2, 3))]
     kci, cmiknn = KCI(nonlinear), CMIknn(nonlinear, n_permutations=100)
-    cpu_kci = [kci(*q) for q in queries]
-    cpu_cmiknn = [cmiknn(*q) for q in queries]
-    cpu_graphs = [andrey.pc(nonlinear, indep_test=t).structure for t in ("kci", "cmiknn")]
+    backend._dispatch_counts.clear()
+    with andrey.config(backend="numpy"):
+        cpu_kci = [kci(*q) for q in queries]
+        cpu_cmiknn = [cmiknn(*q) for q in queries]
+        cpu_graphs = [andrey.pc(nonlinear, indep_test=t).structure for t in ("kci", "cmiknn")]
+    assert set(backend.dispatch_stats()) == {("kci", "numpy"), ("cmiknn", "numpy")}
     backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         got_kci = [kci(*q) for q in queries]
         got_cmiknn = [cmiknn(*q) for q in queries]
         graphs = [andrey.pc(nonlinear, indep_test=t).structure for t in ("kci", "cmiknn")]
-    assert {("kci", "cuda"), ("cmiknn", "cuda")} <= backend.dispatch_stats().keys()
+    assert set(backend.dispatch_stats()) == {("kci", "cuda"), ("cmiknn", "cuda")}
     assert np.allclose(got_kci, cpu_kci, rtol=0, atol=1e-9)
     assert got_cmiknn == cpu_cmiknn
     assert [g.oriented_edges() for g in graphs] == [g.oriented_edges() for g in cpu_graphs]

@@ -70,7 +70,7 @@ def test_the_conservative_rule_recovers_the_planted_links(planted):
     assert _same_step(out) == {(0, 1, "->"), (1, 2, "->"), (3, 2, "->")}
 
 
-def test_the_none_rule_finds_the_same_links(planted):
+def test_the_sepsets_rule_finds_the_same_links(planted):
     out = andrey.pcmciplus(planted, tau_max=2, collider_rule="sepsets")
     assert {(i, j) for i, j, _ in _same_step(out)} == {(0, 1), (1, 2), (2, 3)}
     assert _lagged(out) == _lagged(andrey.pcmciplus(planted, tau_max=2))
