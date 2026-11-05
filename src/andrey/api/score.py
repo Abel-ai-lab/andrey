@@ -34,7 +34,6 @@ from andrey.api._adapt import (
 from andrey.api._method import method_spec
 from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
-from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -633,17 +632,10 @@ def gies(
     from andrey.search.gies import intervention_mask
 
     if env is not None and np.ndim(env) == 2 and np.shape(env)[1] > 1:
-        if targets is not None:
-            raise ValueError(
-                "gies: the second argument is env, one label per row; pass the 0/1 matrix as "
-                "targets alone"
-            )
-        warn_once(
-            "andrey.gies: a 0/1 matrix as the second argument is now targets=; the former form "
-            "stops working in the next release",
-            DeprecatedArgumentWarning,
+        raise ValueError(
+            "gies: the second argument is env, one label per row; a 0/1 matrix of the intervened "
+            "variables goes in targets since 0.14.0"
         )
-        env, targets = None, env
     data, codes, _, by_code = normalize_env_targets(
         data, env, targets, require_known_targets=True, method="gies"
     )

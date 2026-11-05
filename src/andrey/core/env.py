@@ -109,8 +109,6 @@ class Setting(Generic[T]):
 BACKEND = Setting("ANDREY_BACKEND", parse_backend)
 DEVICE = Setting("ANDREY_DEVICE", parse_backend)
 N_JOBS = Setting("ANDREY_N_JOBS", parse_n_jobs)
-#: The former name of ``ANDREY_N_JOBS``, read for one release when it is unset.
-NUM_WORKERS = Setting("ANDREY_NUM_WORKERS", parse_n_jobs)
 GES_PARALLEL_MIN_WORK = Setting("ANDREY_GES_PARALLEL_MIN_WORK", parse_int)
 SKELETON_PARALLEL_MIN_WORK = Setting("ANDREY_SKELETON_PARALLEL_MIN_WORK", parse_int)
 RCOT_PARALLEL_MIN_WORK = Setting("ANDREY_RCOT_PARALLEL_MIN_WORK", parse_int)
@@ -131,7 +129,6 @@ SETTINGS: dict[str, Setting] = {
         BACKEND,
         DEVICE,
         N_JOBS,
-        NUM_WORKERS,
         GES_PARALLEL_MIN_WORK,
         SKELETON_PARALLEL_MIN_WORK,
         RCOT_PARALLEL_MIN_WORK,

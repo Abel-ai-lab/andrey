@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 from scipy import stats
@@ -99,16 +97,6 @@ def test_the_edges_and_p_values_do_not_depend_on_the_units():
     )
     for k in (1, 2):
         assert plain.structure.lag(k).oriented_edges() == rescaled.structure.lag(k).oriented_edges()
-
-
-def test_cv_is_ignored_with_a_warning():
-    x = var_series()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="cv"):
-        out = andrey.granger(x, cv=5)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        same = andrey.granger(x)
-    np.testing.assert_array_equal(out.metadata["p_values"], same.metadata["p_values"])
 
 
 @pytest.mark.parametrize("alpha", [0, 1, -0.1, 1.5])

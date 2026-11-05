@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core import backend, stats, warning_policy
+from andrey.core import backend, stats
 from andrey.core.env import BACKENDS
 
 
@@ -145,24 +145,17 @@ def test_n_jobs_resolution(monkeypatch):
         andrey.config.n_jobs = -2
 
 
-def test_the_former_worker_names_set_n_jobs_for_one_release_with_one_warning(monkeypatch):
-    """``num_workers`` on ``andrey.config`` and ``ANDREY_NUM_WORKERS`` set ``n_jobs``, each with
-    a ``DeprecatedArgumentWarning``; ``ANDREY_N_JOBS`` wins over the former variable."""
+def test_the_former_worker_names_set_nothing(monkeypatch):
+    """``num_workers``, the former name of ``n_jobs``, raises as an argument of ``andrey.config``
+    and as a setting, and ``ANDREY_NUM_WORKERS`` is not read."""
     monkeypatch.delenv("ANDREY_N_JOBS", raising=False)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="ANDREY_NUM_WORKERS is now"):
-        assert andrey.config.n_jobs == 3
-    monkeypatch.setenv("ANDREY_N_JOBS", "2")
-    assert andrey.config.n_jobs == 2
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match=r"config\(num_workers=...\) is now"):
-        with andrey.config(num_workers=5):
-            assert andrey.config.n_jobs == 5
-    with pytest.raises(ValueError, match="pass only n_jobs"):
-        andrey.config(n_jobs=2, num_workers=2)
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="config.num_workers is now"):
+    assert andrey.config.n_jobs == 1
+    with pytest.raises(TypeError, match="num_workers"):
+        andrey.config(num_workers=5)
+    with pytest.raises(AttributeError, match="num_workers"):
         andrey.config.num_workers = 4
-    assert andrey.config.n_jobs == andrey.config.num_workers == 4
+    assert andrey.config.n_jobs == 1
 
 
 def test_bad_backend_value_raises():

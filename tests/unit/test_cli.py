@@ -427,13 +427,14 @@ def test_former_names_and_values_map_to_current_ones():
     assert both.value.code == "invalid_params"
 
 
-def test_a_dropped_argument_is_ignored_with_a_warning(capsys, csv_path):
-    """A removed argument still runs for one release: the fit warns and the run's params omit it."""
-    code, out, _ = _run(["run", "granger", "--data", str(csv_path), "cv=3"], capsys)
-    env = json.loads(out)
-    assert code == 0 and "cv" not in env["run"]["params"]
-    assert any("cv" in w["message"] for w in env["run"]["warnings"])
-    assert "cv" in get_spec("granger").dropped_args
+def test_a_dropped_argument_reaches_the_facade_and_not_the_run_params():
+    """A dropped argument still runs for one release: the facade drops it with a warning, and the
+    run's params omit it."""
+    from andrey.cli import _resolve_params
+
+    spec = get_spec("pc").model_copy(update={"dropped_args": ("former",)})
+    fkwargs, resolved = _resolve_params(spec, {}, ["former=3"])
+    assert "former" in fkwargs and "former" not in resolved
 
 
 @pytest.mark.parametrize(
@@ -559,10 +560,10 @@ def test_run_enum_rejects_bad_value(capsys, csv_path):
 
 def test_run_unsupported_value_is_usage_error(capsys, csv_path, monkeypatch):
     def unsupported(*_args, **_kwargs):
-        raise NotImplementedError("GRaSP supports depth=3, not 2")
+        raise NotImplementedError("GRaSP supports grasp_depth=3, not 2")
 
     monkeypatch.setattr(andrey, "grasp", unsupported)
-    code, _out, err = _run(["run", "grasp", "--data", str(csv_path), "depth=2"], capsys)
+    code, _out, err = _run(["run", "grasp", "--data", str(csv_path), "grasp_depth=2"], capsys)
     assert code == 2
     assert json.loads(err)["error"]["code"] == "unsupported_value"
 

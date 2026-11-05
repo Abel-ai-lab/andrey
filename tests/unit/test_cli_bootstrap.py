@@ -148,17 +148,9 @@ def test_a_flag_out_of_range_is_a_usage_error(csv_path, capsys, flags):
     assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
 
 
-def test_the_former_n_boot_flag_sets_the_resamples_with_a_warning(csv_path, capsys):
-    base = ["bootstrap", "hc", "--data", str(csv_path), "--seed", "1", "--json"]
-    code, out, _ = _run([*base, "--n-resamples", "3"], capsys)
-    current = json.loads(out)
-    code_former, out, _ = _run([*base, "--n-boot", "3"], capsys)
-    former = json.loads(out)
-    assert code == code_former == 0 and former["bootstrap"]["n_resamples"] == 3
-    assert former["frequencies"] == current["frequencies"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in former["run"]["warnings"]}
-    code, _out, err = _run([*base, "--n-boot", "3", "--n-resamples", "4"], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
+def test_the_former_n_boot_flag_is_a_usage_error(csv_path, capsys):
+    code, _out, err = _run(["bootstrap", "hc", "--data", str(csv_path), "--n-boot", "3"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "usage_error"
 
 
 def test_a_method_that_cannot_be_bootstrapped_is_an_unsupported_value(csv_path, capsys):
