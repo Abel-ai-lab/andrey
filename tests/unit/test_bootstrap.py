@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import warnings
 
 import numpy as np
@@ -10,7 +9,7 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey import BootstrapOutput, bootstrap
+from andrey import BootstrapOutput, bootstrap, resample
 from andrey.constraint.fci import _fci_orient
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
@@ -784,13 +783,34 @@ def test_each_warning_of_the_fits_is_raised_once():
         assert len(kinds) == 1, workers
 
 
-def test_the_workers_follow_the_configured_count_and_never_nest():
-    data = lingam_data()
-    with andrey.config(n_jobs=2):
-        configured = bootstrap("pc", data, n_resamples=4, seed=0, keep_fits=True)
-    serial = with_workers(1, "pc", data, n_resamples=4, seed=0, keep_fits=True)
-    assert configured.fits == serial.fits
-    assert andrey.config.n_jobs == 1 or "ANDREY_N_JOBS" in os.environ
+@pytest.mark.parametrize(("n_jobs", "n_resamples", "workers"), [(1, 3, 0), (2, 3, 2), (4, 2, 2)])
+def test_the_workers_follow_the_configured_count_and_never_nest(
+    monkeypatch, n_jobs, n_resamples, workers
+):
+    """The fits run in this process at one job, else on ``min(n_jobs, n_resamples)`` worker
+    processes, and each worker fits with one job on one BLAS thread whatever ``ANDREY_N_JOBS``
+    it inherits, so a method never starts workers of its own."""
+    pools = []
+
+    class Pool(resample.ProcessPoolExecutor):
+        def __init__(self, **kwargs):
+            pools.append(kwargs)
+            super().__init__(**kwargs)
+
+    monkeypatch.setattr(resample, "ProcessPoolExecutor", Pool)
+    with_workers(n_jobs, "pc", lingam_data(), n_resamples=n_resamples, seed=0)
+    assert [pool["max_workers"] for pool in pools] == ([workers] if workers else [])
+    if not workers:
+        return
+    limits = []
+    monkeypatch.setattr("threadpoolctl.threadpool_limits", lambda **kw: limits.append(kw))
+    monkeypatch.setattr(resample, "_JOB", None)
+    monkeypatch.setattr(resample, "_BLAS", None)
+    monkeypatch.setenv("ANDREY_N_JOBS", "4")
+    assert andrey.config.n_jobs == 4
+    pools[0]["initializer"](*pools[0]["initargs"])  # what each worker runs before its fits
+    assert andrey.config.n_jobs == 1
+    assert limits == [{"limits": 1}]
 
 
 def test_knowledge_travels_to_the_workers():

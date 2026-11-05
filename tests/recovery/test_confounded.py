@@ -169,13 +169,8 @@ def _confounded_sem(seed: int, n: int = 250, d: int = 5) -> np.ndarray:
 # --- general-input behavior -----------------------------------------------------------------------
 #
 # Random models check execution, repeatability, shape, and relabel invariance. RCD is invariant
-# bit-for-bit. BottomUpParceLiNGAM preserves its causal order and non-identifiable mask exactly, but
-# column-mean reduction introduces roundoff in its weights, so those use a tolerance.
-
-
-def _stable(adjacency: np.ndarray) -> np.ndarray:
-    """Replace non-identifiable ``NaN`` entries with a stable comparison value."""
-    return np.nan_to_num(np.asarray(adjacency, dtype=np.float64), nan=-9.0)
+# bit-for-bit. BottomUpParceLiNGAM preserves its non-identifiable mask exactly, but column-mean
+# reduction introduces roundoff in its weights, so those use a tolerance.
 
 
 def test_rcd_is_deterministic_and_order_invariant():
@@ -184,14 +179,15 @@ def test_rcd_is_deterministic_and_order_invariant():
 
     for seed in range(6):
         x = _confounded_sem(seed)
-        first = _stable(fit_rcd(x).adjacency_matrix_)
+        first = fit_rcd(x).adjacency_matrix_
         assert first.shape == (x.shape[1], x.shape[1])
-        assert np.array_equal(_stable(fit_rcd(x).adjacency_matrix_), first), "not deterministic"
+        again = fit_rcd(x).adjacency_matrix_
+        assert np.array_equal(again, first, equal_nan=True), "not deterministic"
 
         order = np.random.default_rng(seed).permutation(x.shape[1])
         back = np.argsort(order)
-        permuted = _stable(fit_rcd(x[:, order]).adjacency_matrix_)
-        assert np.array_equal(permuted[np.ix_(back, back)], first), "depends on column order"
+        permuted = fit_rcd(x[:, order]).adjacency_matrix_[np.ix_(back, back)]
+        assert np.array_equal(permuted, first, equal_nan=True), "depends on column order"
 
 
 def test_bottom_up_parce_is_deterministic_and_order_invariant():
@@ -201,18 +197,17 @@ def test_bottom_up_parce_is_deterministic_and_order_invariant():
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam
 
-    for seed in range(6):
+    for seed in (0, 1, 2, 3, 4, 5, 20):  # draw 20 leaves one pair unordered
         x = _confounded_sem(seed)
-        first = _stable(bottom_up_parce_lingam(x).adjacency_matrix_)
+        first = bottom_up_parce_lingam(x).adjacency_matrix_
         assert first.shape == (x.shape[1], x.shape[1])
-        assert np.array_equal(_stable(bottom_up_parce_lingam(x).adjacency_matrix_), first), (
-            "not deterministic"
-        )
+        again = bottom_up_parce_lingam(x).adjacency_matrix_
+        assert np.array_equal(again, first, equal_nan=True), "not deterministic"
 
         order = np.random.default_rng(seed).permutation(x.shape[1])
         back = np.argsort(order)
-        permuted = _stable(bottom_up_parce_lingam(x[:, order]).adjacency_matrix_)[
-            np.ix_(back, back)
-        ]
+        permuted = bottom_up_parce_lingam(x[:, order]).adjacency_matrix_[np.ix_(back, back)]
         assert np.array_equal(np.isnan(permuted), np.isnan(first)), "non-identifiable mask moved"
-        assert np.allclose(permuted, first, atol=1e-8), "answer depends on column order"
+        assert np.allclose(permuted, first, atol=1e-8, equal_nan=True), (
+            "answer depends on column order"
+        )

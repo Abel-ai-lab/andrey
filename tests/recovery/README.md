@@ -11,8 +11,9 @@ Ground-truth tests establish whether the recovered structure is correct.
   generated case lists its variables in a column order drawn from its seed, so the column order
   says nothing about the causal order; the truth helpers and each baseline's `column_order` give
   the variable in each column.
-- `test_quality_gate.py` self-checks the pre-publish gate of `qa/quality_gate.py` without fitting
-  a method: the gate covers the supported methods and rejects wrong answers. The gate itself
+- `test_quality_gate.py` self-checks the pre-publish gate of `qa/quality_gate.py`: the gate covers
+  the supported methods, rejects wrong answers, and returns the same results in the same order with
+  one job or two, which one test shows by fitting three PC and GES cells. The gate itself
   measures method quality and runs with `uv run python -m qa.quality_gate` and on the release pull
   request into `main`, not on other pull requests.
 

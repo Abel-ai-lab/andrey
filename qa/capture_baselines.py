@@ -1,6 +1,7 @@
 """Record Andrey outputs as regression baselines in ``tests/recovery/baselines/``.
 
-Each runner mirrors its regression test and uses the shared output projection.
+``tests/recovery/test_regression_baselines.py`` fits each recorded output with its runner here,
+which uses the shared output projection.
 Capture runs on demand; committed fixtures are checked in CI.
 
 Recapturing rewrites committed values, so a diff is the point: read it before committing. Numeric
@@ -31,7 +32,7 @@ from tests.recovery.helpers.project import project_output
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-# --- Runners mirror the Andrey calls made by the regression tests ------------------
+# --- Runners --------------------------------------------------------------------------------------
 
 
 def _facade(name: str, **kwargs):

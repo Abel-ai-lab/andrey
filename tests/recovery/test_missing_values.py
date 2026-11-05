@@ -209,26 +209,19 @@ def test_a_pair_keeps_its_direction_with_missing_values(name, rate):
 # --- ground truth ---------------------------------------------------------------------------------
 
 
-def _target(name: str, truth: GraphStructure) -> np.ndarray:
-    """The adjacencies a method estimates: the moral graph for a Markov blanket, else the
-    skeleton."""
+def _skeleton(truth: GraphStructure) -> np.ndarray:
+    """The true adjacencies, which every method's default output estimates."""
     parents = truth.to_numpy() == ARROW  # [child, parent]
-    target = parents | parents.T
-    if name in ("iamb", "inter_iamb"):
-        for child in range(parents.shape[0]):
-            spouses = np.flatnonzero(parents[child])
-            target[np.ix_(spouses, spouses)] = True
-        np.fill_diagonal(target, False)
-    return target
+    return parents | parents.T
 
 
 def _errors(name: str, out, truth: GraphStructure) -> int:
-    """PC's errors against the true CPDAG; every other method's against its adjacencies."""
+    """PC's errors against the true CPDAG; every other method's against the true skeleton."""
     if name == "pc":
         return shd(out.structure, to_cpdag(truth))
     adjacent = out.structure.to_numpy() != 0
     adjacent = adjacent | adjacent.T
-    return int(np.triu(adjacent ^ _target(name, truth), 1).sum())
+    return int(np.triu(adjacent ^ _skeleton(truth), 1).sum())
 
 
 @pytest.fixture(scope="module")
@@ -247,7 +240,7 @@ def _bound(complete: int, edges: int, out, rows: int) -> int:
 @pytest.mark.parametrize("name", IID)
 def test_missing_values_cost_a_bounded_number_of_errors(sample, name, rate):
     truth = sample.observed_graph
-    edges = int(np.triu(_target(name, truth), 1).sum())
+    edges = int(np.triu(_skeleton(truth), 1).sum())
     complete = _errors(name, _fit(name, sample.data), truth)
     out = _fit(name, _gaps(sample.data, rate))
     bound = _bound(complete, edges, out, len(sample.data))
@@ -258,7 +251,7 @@ def test_missing_values_cost_a_bounded_number_of_errors(sample, name, rate):
 def test_missing_categories_cost_a_bounded_number_of_errors(rate):
     sample = data.sample_discrete(d=10, n=3000, seed=1, density=2.0)
     truth = sample.observed_graph
-    edges = int(np.triu(_target("pc", truth), 1).sum())
+    edges = int(np.triu(_skeleton(truth), 1).sum())
     complete = _errors("pc", andrey.pc(sample.data, indep_test="chisq"), truth)
     out = andrey.pc(_gaps(sample.data, rate), indep_test="chisq")
     bound = _bound(complete, edges, out, len(sample.data))
