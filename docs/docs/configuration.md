@@ -47,20 +47,25 @@ requested backend uses `auto`, without a warning.
   directions of `pnl`. PC, FCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the worker
   processes for their skeleton search with the `fisherz`, `student_t`, `normal_scores`, and `rcot`
   tests on complete data, and send a conditioning-set size to them only when it has enough tests to
-  repay them; with `rcot` the p-values are the same with any number of workers. `andrey.bootstrap`
-  fits its resamples on them, one fit per worker, with the same result at any number. `1` (the
-  default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
-  threads unlimited and with several limits each thread to one, so on a machine with several cores
-  its p-values and statistics can differ in the last digits between one worker and several. Each
-  `pnl` thread holds three n x n float64 matrices; when the threads you ask for would hold more than
-  4 GiB, fewer run, with a `PerformanceWarning`. `ANDREY_NUM_WORKERS`, its former name, is still
-  read when `ANDREY_N_JOBS` is unset, with a `DeprecatedArgumentWarning`, until the next release.
+  repay them; with `rcot` the p-values are the same with any number of workers. FCI and GFCI also
+  send the larger conditioning-set sizes of each possible-d-separation search to them with the
+  `fisherz`, `student_t`, and `normal_scores` tests on complete data; the pairs are still searched
+  one at a time, in the serial order, and every graph is the serial one. `andrey.bootstrap` fits its
+  resamples on them, one fit per worker, with the same result at any number. `1` (the default) and
+  `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads
+  unlimited and with several limits each thread to one, so on a machine with several cores its
+  p-values and statistics can differ in the last digits between one worker and several. Each `pnl`
+  thread holds three n x n float64 matrices; when the threads you ask for would hold more than 4
+  GiB, fewer run, with a `PerformanceWarning`. `ANDREY_NUM_WORKERS`, its former name, is still read
+  when `ANDREY_N_JOBS` is unset, with a `DeprecatedArgumentWarning`, until the next release.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
   GFCI, CD-NOD, and RSMAX2 with `restrict="pc"` uses the workers only when it holds at least this
-  many conditional-independence tests. The default is `500000`, measured on an AMD EPYC 9534 server
-  running Linux; `0` always uses them.
+  many conditional-independence tests, and a possible-d-separation search of FCI or GFCI sends its
+  sizes to them from the first size at which its candidate conditioning sets, counted from size
+  one, reach this many. The default is `500000`, measured on the skeleton search on an AMD EPYC 9534
+  server running Linux; `0` always uses them.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher-z test and its cost grows with the rows. The default is `2000000`, measured

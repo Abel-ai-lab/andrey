@@ -81,11 +81,13 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, CD-NOD, "
             'and RSMAX2 (`restrict="pc"`) with `fisherz`, `student_t`, or `normal_scores`: a '
             "conditioning-size pass fans out to the worker pool only when it holds at least this "
-            "many CI tests, else in-process. `0` sends every pass to the pool. The default was "
-            "measured on an AMD EPYC 9534 server running Linux. No effect unless the worker count "
-            "(`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once "
-            "on the default when a pass reaches a tenth of it; `andrey calibrate --method "
-            "skeleton` measures a value for your machine."
+            "many CI tests, else in-process. A possible-d-sep search of FCI or GFCI sends its "
+            "sizes to the pool from the first at which its candidate sets, counted from size one, "
+            "reach this many. `0` sends every pass and search to the pool. The default was "
+            "measured on the skeleton search on an AMD EPYC 9534 server running Linux. No effect "
+            "unless the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more "
+            "than one worker warns once on the default when a pass reaches a tenth of it; "
+            "`andrey calibrate --method skeleton` measures a value for your machine."
         ),
         group="backend",
     ),

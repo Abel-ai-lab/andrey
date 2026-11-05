@@ -263,6 +263,10 @@ class PartialCorrelationTest:
         :meth:`__call__`; queries are grouped by set size so each size is evaluated in one
         vectorized shot, and the p-values match :meth:`__call__` exactly. A single-set
         batch takes the scalar path. Nothing is retained once the list is returned.
+
+        A batch of sets of one size is sorted as one array instead of one set at a time, and goes
+        to :meth:`statistic_pvalues` whole; a batch with mixed sizes, a repeated member, or ``x``
+        or ``y`` in a set takes the per-set path, which canonicalizes it or raises.
         """
         condition_sets = list(condition_sets)
         n = len(condition_sets)
@@ -272,6 +276,19 @@ class PartialCorrelationTest:
             return [self(x, y, condition_sets[0])]
 
         x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
+        try:
+            same_size = np.sort(np.array(condition_sets, dtype=np.intp), axis=1)
+        except (TypeError, ValueError):  # sets of mixed sizes, or members that are not numbers
+            same_size = None
+        if (
+            same_size is not None
+            and same_size.ndim == 2
+            and not (same_size[:, 1:] == same_size[:, :-1]).any()
+            and not ((same_size == x_int) | (same_size == y_int)).any()
+        ):
+            xs = np.full(n, x_int, dtype=np.intp)
+            return self.statistic_pvalues(xs, np.full_like(xs, y_int), same_size)[1].tolist()
+
         results: list[float | None] = [None] * n
         groups: dict[int, list[tuple[int, list[int]]]] = {}
         for i, condition_set in enumerate(condition_sets):

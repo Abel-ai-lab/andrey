@@ -154,7 +154,8 @@ def test_facades_run_the_configured_workers_on_the_pool(pools: list[int], method
     serial = fit(x)
     with andrey.config(n_jobs=2):
         pooled = fit(x)
-    assert pools == [2]
+    # FCI and GFCI start a second pool for their possible-d-sep searches.
+    assert pools == ([2, 2] if method in ("fci", "gfci") else [2])
     assert _same_output(pooled, serial)
 
 
@@ -166,7 +167,7 @@ def test_the_environment_sets_the_workers(
     serial = andrey.fci(x)
     monkeypatch.setenv("ANDREY_N_JOBS", "3")
     pooled = andrey.fci(x)
-    assert pools == [3]
+    assert pools == [3, 3]  # the skeleton's pool, then the possible-d-sep step's
     assert _same_output(pooled, serial)
 
 

@@ -19,6 +19,11 @@ same closed forms and the skeleton is bit-identical to the serial oracle. A work
 start-of-size neighborhood from the adjacency snapshot the task carries and delegates to the shared
 :func:`~andrey.constraint._skeleton.scan_pairs`.
 
+The same workers search one pair's possible-d-sep subsets for FCI
+(:meth:`SkeletonWorkerPool.first_separating`). Each task covers a contiguous run of the subsets in
+the serial order and returns the first that separates the pair, and the caller reads the tasks in
+that order, so the subset found is the serial one.
+
 An RCoT test runs on a pool of its own (:class:`RCoTWorkerPool`), with its own cutoff in RCoT tests
 times rows, :data:`MIN_POOL_RCOT_WORK` or the ``ANDREY_RCOT_PARALLEL_MIN_WORK`` that overrides it,
 since a test's cost grows with the rows and is about a thousand times a Fisher-z test's. The
@@ -31,8 +36,12 @@ in-process p-value bit for bit, whichever worker computes it.
 
 from __future__ import annotations
 
-from concurrent.futures import ProcessPoolExecutor
+from collections import deque
+from collections.abc import Iterable, Iterator, Sequence
+from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from itertools import chain, combinations, groupby, islice
+from math import comb
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
@@ -61,6 +70,11 @@ if TYPE_CHECKING:
 #: (0 sends every pass to the pool), and a fit with workers warns once on the default when a pass
 #: nears it; ``andrey calibrate --method skeleton`` measures the value for a machine.
 MIN_POOL_QUERIES: int = 500_000
+
+#: The most candidate subsets one task of a possible-d-sep search holds, and the most a worker
+#: tests in one batched call.
+DSEP_TASK_SUBSETS: int = 8192
+_DSEP_BATCH: int = 4096
 
 # Per-worker state installed once by _init_worker and reused across every task and size pass.
 _WORKER_TEST: PartialCorrelationTest | None = None
@@ -100,6 +114,89 @@ def _scan_task(payload: tuple) -> list[Removal]:
     d = adj_mask.shape[0]
     neighbors = [np.flatnonzero(adj_mask[i]) for i in range(d)]
     return scan_pairs(_WORKER_TEST, pairs, neighbors, size, alpha, record_pvalues=record_pvalues)
+
+
+# A block ``(prefix, rest)`` of a size holds every subset of the candidates that starts with the
+# candidates at the positions ``prefix`` and takes its ``rest`` other members from the positions
+# after the last of them, in ``combinations`` order.
+Block = tuple[tuple[int, ...], int]
+
+
+def _block_subsets(n: int, block: Block) -> int:
+    prefix, rest = block
+    return comb(n - (prefix[-1] + 1 if prefix else 0), rest)
+
+
+def _blocks(n: int, size: int, most: int) -> Iterator[Block]:
+    """``combinations(range(n), size)`` cut into contiguous blocks of at most ``most`` subsets, in
+    order: a block too large is split by the position its next member takes."""
+
+    def split(prefix: tuple[int, ...], start: int, rest: int) -> Iterator[Block]:
+        if comb(n - start, rest) <= most:
+            yield prefix, rest
+            return
+        for i in range(start, n - rest + 1):
+            yield from split((*prefix, i), i + 1, rest - 1)
+
+    return split((), 0, size)
+
+
+def _dsep_tasks(n: int, sizes: Iterable[int], most: int) -> Iterator[list[Block]]:
+    """The blocks of ``n`` candidates at each of ``sizes``, in order, grouped into tasks of at most
+    ``most`` subsets."""
+    task: list[Block] = []
+    held = 0
+    for size in sizes:
+        for block in _blocks(n, size, most):
+            count = _block_subsets(n, block)
+            if task and held + count > most:
+                yield task
+                task, held = [], 0
+            task.append(block)
+            held += count
+    if task:
+        yield task
+
+
+def _subsets(
+    candidates: Sequence[int], block: Block, skip: Sequence[frozenset[int]]
+) -> Iterator[tuple[int, ...]]:
+    """The subsets of ``block``, in order, without those inside a set of ``skip``."""
+    prefix, rest = block
+    head = tuple(candidates[i] for i in prefix)
+    tails = combinations(candidates[prefix[-1] + 1 if prefix else 0 :], rest)
+    subsets = (head + tail for tail in tails)
+    if any(inside.issuperset(head) for inside in skip):
+        return (s for s in subsets if not any(inside.issuperset(s) for inside in skip))
+    return subsets  # a head outside every set of skip keeps every subset outside it
+
+
+def _separating_task(payload: tuple) -> tuple[tuple[int, ...] | None, int]:
+    """Worker side of one possible-d-sep task: the first of its subsets that separates the pair,
+    or ``None``, and the tests run.
+
+    Each size's subsets are tested in batched calls of up to ``_DSEP_BATCH``; a batch the batched
+    call raises ``ValueError`` on is tested one subset at a time, so the first subset whose test
+    raises before one separates raises here, as in the caller's process.
+    """
+    x, y, candidates, skip, blocks, alpha, run_token = payload
+    if run_token != _WORKER_TOKEN:
+        raise RuntimeError("skeleton worker pool reused across runs (corr/token mismatch)")
+    test = _WORKER_TEST
+    assert test is not None  # _init_worker runs before any task
+    tested = 0
+    for _, same_size in groupby(blocks, key=lambda block: len(block[0]) + block[1]):
+        subsets = chain.from_iterable(_subsets(candidates, block, skip) for block in same_size)
+        while batch := list(islice(subsets, _DSEP_BATCH)):
+            try:
+                pvalues: list[float] | None = test.batched_call(x, y, batch)
+            except ValueError:  # a singular submatrix or too few samples for some subset
+                pvalues = None
+            for i, cond in enumerate(batch):
+                if (test(x, y, cond) if pvalues is None else pvalues[i]) > alpha:
+                    return cond, tested + (i + 1 if pvalues is None else len(batch))
+            tested += len(batch)
+    return None, tested
 
 
 class SkeletonWorkerPool:
@@ -176,6 +273,50 @@ class SkeletonWorkerPool:
             for chunk in _balanced_chunks(weights, self._workers)
         ]
         return [removal for chunk in _collect(futures, ordered=True) for removal in chunk]
+
+    @property
+    def min_queries(self) -> int:
+        """The cutoff: :data:`MIN_POOL_QUERIES`, or the ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that
+        overrides it."""
+        return self._min_queries
+
+    def first_separating(
+        self,
+        x: int,
+        y: int,
+        candidates: Sequence[int],
+        skip: Sequence[Iterable[int]],
+        sizes: Iterable[int],
+        alpha: float,
+    ) -> tuple[int, ...] | None:
+        """The first subset of ``candidates`` that separates ``x`` and ``y`` (``p > alpha``), or
+        ``None``, from each of ``sizes`` in turn in ``combinations`` order, leaving out a subset
+        inside a set of ``skip``.
+
+        The subsets go to the workers in tasks of up to :data:`DSEP_TASK_SUBSETS`, at most two per
+        worker at a time, and the tasks are read in order: the first that finds a subset decides,
+        and the queued tasks after it are cancelled, though a running one finishes. A task whose
+        test raises raises here when no task before it found a subset, the error the serial order
+        meets first. The pool starts on the first task.
+        """
+        members = tuple(candidates)
+        within = tuple(frozenset(inside) for inside in skip)
+        tasks = _dsep_tasks(len(members), sizes, DSEP_TASK_SUBSETS)
+        pending: deque[Future] = deque()
+        try:
+            while True:
+                while len(pending) < 2 * self._workers and (task := next(tasks, None)):
+                    pool, token = self._ensure()
+                    payload = (x, y, members, within, task, alpha, token)
+                    pending.append(pool.submit(_separating_task, payload))
+                if not pending:
+                    return None
+                found, _ = _collect([pending.popleft()])[0]
+                if found is not None:
+                    return found
+        finally:
+            for future in pending:
+                future.cancel()
 
     def close(self) -> None:
         if self._pool is not None:

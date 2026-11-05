@@ -20,9 +20,9 @@ compare names every row where one changed and fails on any change, a fall as wel
 
 ``--shuffle K`` refits each draw on ``K`` seeded column orders and maps each answer back to the
 original columns before hashing it; ``--workers N`` refits the methods that run worker processes
-or threads (:data:`WORKER_METHODS`) on ``N`` workers, with every GES pass and every skeleton pass of
-conditioning size two or more sent to the pool. Both report each refit whose answer differs from
-the first fit.
+or threads (:data:`WORKER_METHODS`) on ``N`` workers, with every GES pass, every skeleton pass of
+conditioning size two or more, and every possible-d-sep search sent to the pool. Both report each
+refit whose answer differs from the first fit.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
@@ -184,9 +184,9 @@ FITS: dict[str, Fit] = {
     "GnIES": Fit(_gnies, blocks=2),
 }
 
-#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
-#: skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase in worker processes, and PNL's
-#: two directions on threads.
+#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
+#: searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep searches of FCI
+#: and GFCI in worker processes, and PNL's two directions on threads.
 WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
@@ -707,7 +707,8 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
             **{name: os.environ.get(name) for name in THREAD_VARIABLES},
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
-        # A refit on more workers sends every GES pass and every skeleton pass to the worker pool.
+        # A refit on more workers sends every GES pass, every skeleton pass, and every
+        # possible-d-sep search to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
         "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
     }
@@ -765,8 +766,8 @@ def run(
     Each draw is fitted once with its queries counted. ``shuffle`` refits it on that many column
     orders, the k-th drawn from ``(seed, k)``, and hashes each answer mapped back
     (:func:`unpermute`). ``workers`` above 1 refits :data:`WORKER_METHODS` on that many workers,
-    with every GES pass and every skeleton pass of conditioning size two or more sent to the worker
-    pool. A refit differs when one of its :func:`parts`
+    with every GES pass, every skeleton pass of conditioning size two or more, and every
+    possible-d-sep search sent to the worker pool. A refit differs when one of its :func:`parts`
     differs from the first fit's, mapped back the same way for a column order; each difference is
     reported as ``("graph" | "bits", description)``, naming the parts that changed.
     """
