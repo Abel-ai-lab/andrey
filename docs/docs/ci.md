@@ -26,8 +26,8 @@ does not.
 The quality gate also reads the published benchmarks and flags any row where the reference package
 makes significantly fewer errors: the paired 95% interval of the difference in errors, over at
 least 10 datasets, lies above 0. A row is exempt when a cited source shows that Andrey follows the
-method's paper or that the reference has a defect. A flag does not fail the gate, as a method that
-does not pass does; the release checklist reviews every flag.
+method's paper or that the reference has a defect. Unlike a method that does not pass, a flag does
+not fail the gate; the release checklist reviews every flag.
 
 | Platform | What is tested |
 |---|---|
