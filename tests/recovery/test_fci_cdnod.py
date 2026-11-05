@@ -597,3 +597,33 @@ def test_constraint_family_is_deterministic_and_well_formed(learner, kind):
                 assert np.array_equal(permuted, first.to_numpy()), (
                     f"{learner} changes when the columns are reordered"
                 )
+
+
+# --- real data ------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def sachs_conditions(tmp_path_factory):
+    """The Sachs cells of all nine conditions, log-transformed as Mooij et al. (2020) use them."""
+    import pandas as pd
+
+    from andrey.data import load_dataset
+    from tests.unit.conftest import serve_datasets_offline
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        serve_datasets_offline(monkeypatch, tmp_path_factory.mktemp("cache"))
+        pooled = load_dataset("sachs", conditions=True)
+    logged = pd.DataFrame(np.log(pooled.data.to_numpy()), columns=list(pooled.feature_names))
+    return logged, pooled.env, pooled.graph
+
+
+def test_the_sachs_conditions_env_removes_the_adjacencies_pooling_adds(sachs_conditions):
+    """Pooled across the nine conditions, PC keeps adjacencies under half of which are in the
+    consensus network; with the condition as a categorical ``env``, CD-NOD keeps 9, 8 of them in it.
+    """
+    from andrey.metrics import skeleton_scores
+
+    data, env, consensus = sachs_conditions
+    assert skeleton_scores(andrey.pc(data).structure, consensus)["precision"] < 0.5
+    out = andrey.cdnod(data, env=env, indep_test="cond_gauss", categorical=[])
+    assert skeleton_scores(out.structure, consensus)["precision"] > 0.85
