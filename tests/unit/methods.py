@@ -1,7 +1,7 @@
 """What the package-wide tests pass a method besides its data and its own settings.
 
-Each table here holds the facts every package-wide test needs to fit a method; a test keeps beside
-it only what is particular to that test, such as the targets that name its own columns.
+Several package-wide tests share these tables and contexts to fit a method; a test keeps beside them
+only what is particular to that test, such as the targets that name its own columns.
 """
 
 from __future__ import annotations

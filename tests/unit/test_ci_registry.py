@@ -16,6 +16,7 @@ import pytest
 import andrey
 from andrey.core import ci
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.unit.methods import domains
 
 
 @pytest.fixture
@@ -93,8 +94,7 @@ def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(fac
     """Each constraint facade accepts the test by name and returns a valid graph."""
     x = _chain_data()
     if facade == "cdnod":
-        c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        out = andrey.cdnod(x, c, indep_test=indep_test)
+        out = andrey.cdnod(x, domains(len(x)), indep_test=indep_test)
     else:
         out = getattr(andrey, facade)(x, indep_test=indep_test)
     out.structure.validate()
