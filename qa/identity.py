@@ -18,11 +18,11 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw on ``K`` seeded column orders and maps each answer back to the
-original columns before hashing it; ``--workers N`` refits the methods that run worker processes
-or threads (:data:`WORKER_METHODS`) on ``N`` workers, with every GES pass and every skeleton pass of
-conditioning size two or more sent to the pool. Both report each refit whose answer differs from
-the first fit.
+``--shuffle K`` refits each draw but ICP's and IGSP's (:class:`Fit`) on ``K`` seeded column
+orders and maps each answer back to the original columns before hashing it; ``--workers N`` refits
+the methods that run worker processes or threads (:data:`WORKER_METHODS`) on ``N`` workers, with
+every GES pass and every skeleton pass of conditioning size two or more sent to the pool. Both
+report each refit whose answer differs from the first fit.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
@@ -77,17 +77,21 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``alpha`` is the significance level of a CI-test method.
+    the same way. ``shuffled`` is ``False`` for ICP and IGSP, whose draws a column order does not
+    apply to: each row's environment is a column of the draw, and ICP's target is the last variable.
+    ``alpha`` is the significance level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
     blocks: int = 1
+    shuffled: bool = True
     alpha: float | None = None
 
 
 _CDNOD = qg.AndreyCDNOD().params()
 _GROUPS = qg.AndreyMultiGroupDirectLiNGAM().params()["n_groups"]
 _VARMA = qg.AndreyVarmaLiNGAM().params()
+_DYNOTEARS = qg.DYNOTEARS.params()
 
 
 def _domains(x: np.ndarray) -> Any:
@@ -182,6 +186,10 @@ FITS: dict[str, Fit] = {
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
     "UT-IGSP": Fit(_ut_igsp, blocks=2),
     "GnIES": Fit(_gnies, blocks=2),
+    "ICP": Fit(qg.icp_fit, shuffled=False),
+    "IGSP": Fit(qg.igsp_fit, shuffled=False),
+    "CAM-UV": Fit(andrey.camuv),
+    "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
@@ -219,6 +227,14 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
         qg.panel_draws, 10, 20, 500, scale=PANEL_SCALE
     ),
     "var2_lagged_d10_n1000": functools.partial(qg.granger_draws, 10, 1000),
+    "icp_do_d16": functools.partial(qg.invariance_draws, 16, 200),
+    "known_targets_ten_settings_gauss_er_d50": functools.partial(
+        qg.known_target_draws, "O1_perfect_k10_p50_n1000"
+    ),
+    "latent_anm_er_tenth_d33_n1000": functools.partial(
+        qg.hidden_cause_draws, "latent_anm_er_tenth", 33, 1000
+    ),
+    "dynotears_paper_d40_n1000": functools.partial(qg.series_draws, "dynotears_paper", 40, 1000),
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(
@@ -257,6 +273,10 @@ LARGER: dict[str, str] = {
     "VARMA-LiNGAM": "varma_lingam_paper_d8_n300",
     "LongitudinalLiNGAM": "longitudinal_lingam_stable_d10_n20_m500",
     "Granger": "var2_lagged_d10_n1000",
+    "ICP": "icp_do_d16",
+    "IGSP": "known_targets_ten_settings_gauss_er_d50",
+    "CAM-UV": "latent_anm_er_tenth_d33_n1000",
+    "DYNOTEARS": "dynotears_paper_d40_n1000",
 }
 
 
@@ -394,8 +414,10 @@ NODE_LISTS = (
     "clusters",
     "confounded_pairs",
     "conflicts",
+    "cycle_edges",
     "dag",
     "index_edges",
+    "latent_pairs",
     "parents",
     "partial_order",
     "unordered",
@@ -765,12 +787,12 @@ def run(
     """Fit ``methods`` on the corpus; return the manifest's rows and the refits that differ.
 
     Each draw is fitted once with its queries counted. ``shuffle`` refits it on that many column
-    orders, the k-th drawn from ``(seed, k)``, and hashes each answer mapped back
-    (:func:`unpermute`). ``workers`` above 1 refits :data:`WORKER_METHODS` on that many workers,
-    with every GES pass and every skeleton pass of conditioning size two or more sent to the worker
-    pool. A refit differs when one of its :func:`parts`
-    differs from the first fit's, mapped back the same way for a column order; each difference is
-    reported as ``("graph" | "bits", description)``, naming the parts that changed.
+    orders, the k-th drawn from ``(seed, k)``, unless its :class:`Fit` is not ``shuffled``, and
+    hashes each answer mapped back (:func:`unpermute`). ``workers`` above 1 refits
+    :data:`WORKER_METHODS` on that many workers, with every GES pass and every skeleton pass of
+    conditioning size two or more sent to the worker pool. A refit differs when one of its
+    :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
+    difference is reported as ``("graph" | "bits", description)``, naming the parts that changed.
     """
     rows, findings = [], []
     with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
@@ -782,7 +804,7 @@ def run(
             print(f"{method:24s} {dataset:40s} seed {seed}  {_brief(rows[-1])}", flush=True)
             refits = []  # (permutation, workers, the first fit hashed as the refit is, the refit)
             n_vars = x.shape[-1] // fit.blocks
-            for k in range(1, shuffle + 1):
+            for k in range(1, shuffle + 1 if fit.shuffled else 1):
                 order = np.random.default_rng([seed, k]).permutation(n_vars)
                 refit = unpermute(fit.call(permuted(x, order, fit.blocks)), order)
                 refits.append((k, 1, unpermute(out, np.arange(n_vars)), refit))

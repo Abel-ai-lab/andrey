@@ -114,6 +114,31 @@ def test_robust_recovers_a_chain_and_takes_a_path_step(name, chain) -> None:
     assert out.metadata["path_steps"] >= 1
 
 
+@pytest.mark.filterwarnings("ignore:dagma stopped at its limit of max_iter")
+@pytest.mark.parametrize("name", NAMES)
+def test_max_path_caps_the_accepted_steps_and_warns(name, chain) -> None:
+    """The path accepts its first step whatever its likelihood, so a cap of one is reached."""
+    with pytest.warns(andrey.SearchLimitWarning, match="max_path=1"):
+        capped = _fit(name, chain, robust=True, max_path=1, **QUICK[name])
+    assert capped.metadata["path_steps"] == 1
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_an_mcp_wider_than_every_weight_empties_the_path(name, chain) -> None:
+    """With ``mcp_delta`` above every weight, the quasi-MCP's slope reaches each one, and at
+    ``mcp_lambda=5`` it pulls them all to zero. The path accepts its first step whatever its
+    likelihood, so it returns the empty graph, and the next step does not lower the likelihood."""
+    out = _quick_fit(name, chain, robust=True, mcp_lambda=5.0, mcp_delta=2.0)
+    assert not out.weighted_adjacency.any()
+    assert out.metadata["path_steps"] == 1
+
+
+def test_h_tol_ends_the_dual_steps(tree) -> None:
+    """The dual steps end once the acyclicity function falls to ``h_tol``."""
+    tight, loose = _fit("notears", tree), _fit("notears", tree, h_tol=1e-2)
+    assert tight.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
+
+
 def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_variances() -> None:
     """Here least squares is one edit from the CPDAG, and the likelihood path reaches it."""
     X, adjacency = _unequal_variances(8)
