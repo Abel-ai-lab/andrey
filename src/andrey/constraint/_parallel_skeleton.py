@@ -19,7 +19,8 @@ same closed forms and the skeleton is bit-identical to the serial oracle. A work
 start-of-size neighborhood from the adjacency snapshot the task carries and delegates to the shared
 :func:`~andrey.constraint._skeleton.scan_pairs`.
 
-The same workers search one pair's possible-d-sep subsets for FCI
+FCI's and GFCI's possible-d-sep step searches a pair's subsets on a second
+:class:`SkeletonWorkerPool`, started after the skeleton search's pool has closed
 (:meth:`SkeletonWorkerPool.first_separating`). Each task covers a contiguous run of the subsets in
 the serial order and returns the first that separates the pair, and the caller reads the tasks in
 that order, so the subset found is the serial one.
@@ -171,32 +172,30 @@ def _subsets(
     return subsets  # a head outside every set of skip keeps every subset outside it
 
 
-def _separating_task(payload: tuple) -> tuple[tuple[int, ...] | None, int]:
+def _separating_task(payload: tuple) -> tuple[int, ...] | None:
     """Worker side of one possible-d-sep task: the first of its subsets that separates the pair,
-    or ``None``, and the tests run.
+    or ``None``.
 
     Each size's subsets are tested in batched calls of up to ``_DSEP_BATCH``; a batch the batched
-    call raises ``ValueError`` on is tested one subset at a time, so the first subset whose test
-    raises before one separates raises here, as in the caller's process.
+    call raises on is tested one subset at a time, so the first subset whose test raises before one
+    separates raises here, as in the caller's process.
     """
     x, y, candidates, skip, blocks, alpha, run_token = payload
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("skeleton worker pool reused across runs (corr/token mismatch)")
     test = _WORKER_TEST
     assert test is not None  # _init_worker runs before any task
-    tested = 0
     for _, same_size in groupby(blocks, key=lambda block: len(block[0]) + block[1]):
         subsets = chain.from_iterable(_subsets(candidates, block, skip) for block in same_size)
         while batch := list(islice(subsets, _DSEP_BATCH)):
             try:
                 pvalues: list[float] | None = test.batched_call(x, y, batch)
-            except ValueError:  # a singular submatrix or too few samples for some subset
+            except Exception:  # e.g. a singular submatrix or too few samples for some subset
                 pvalues = None
             for i, cond in enumerate(batch):
                 if (test(x, y, cond) if pvalues is None else pvalues[i]) > alpha:
-                    return cond, tested + (i + 1 if pvalues is None else len(batch))
-            tested += len(batch)
-    return None, tested
+                    return cond
+    return None
 
 
 class SkeletonWorkerPool:
@@ -295,7 +294,7 @@ class SkeletonWorkerPool:
 
         The subsets go to the workers in tasks of up to :data:`DSEP_TASK_SUBSETS`, at most two per
         worker at a time, and the tasks are read in order: the first that finds a subset decides,
-        and the queued tasks after it are cancelled, though a running one finishes. A task whose
+        and the queued tasks after it are canceled, though a running one finishes. A task whose
         test raises raises here when no task before it found a subset, the error the serial order
         meets first. The pool starts on the first task.
         """
@@ -311,7 +310,7 @@ class SkeletonWorkerPool:
                     pending.append(pool.submit(_separating_task, payload))
                 if not pending:
                     return None
-                found, _ = _collect([pending.popleft()])[0]
+                found = _collect([pending.popleft()])[0]
                 if found is not None:
                     return found
         finally:

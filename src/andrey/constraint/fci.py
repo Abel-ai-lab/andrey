@@ -632,12 +632,7 @@ def _pooled_search(
         if subsets >= pool.min_queries:
             pooled = size
             break
-    here = (
-        c
-        for size in range(1, pooled)
-        for c in combinations(dsep, size)
-        if _outside(c, adj_a, adj_b)
-    )
+    here = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth=pooled - 1)
     with backend.one_blas_thread():
         found = _first_separating(test, x, y, here, alpha)
     if found is not None:

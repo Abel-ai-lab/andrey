@@ -99,18 +99,28 @@ def _before_the_step(draw: dict, ranked: bool):
 
 
 @pytest.mark.usefixtures("open_gate")
-@pytest.mark.parametrize("most", [1, 7, _parallel_skeleton.DSEP_TASK_SUBSETS])
+@pytest.mark.parametrize(
+    ("most", "max_depth"),
+    [(1, None), (7, None), (_parallel_skeleton.DSEP_TASK_SUBSETS, None), (7, 2)],
+)
 @pytest.mark.parametrize("ranked", [False, True], ids=["fast", "order_free"])
 @pytest.mark.parametrize("draw", DRAWS)
 def test_a_pooled_step_removes_the_serial_pairs(
-    pools: list[int], monkeypatch: pytest.MonkeyPatch, draw: dict, ranked: bool, most: int
+    pools: list[int],
+    monkeypatch: pytest.MonkeyPatch,
+    draw: dict,
+    ranked: bool,
+    most: int,
+    max_depth: int | None,
 ) -> None:
     marks, sepsets, test, by_rank = _before_the_step(draw, ranked)
     serial, serial_sepsets = marks.copy(), dict(sepsets)
-    fci._remove_by_possible_dsep(serial, test, 0.05, serial_sepsets, by_rank)
+    fci._remove_by_possible_dsep(serial, test, 0.05, serial_sepsets, by_rank, max_depth=max_depth)
     monkeypatch.setattr(_parallel_skeleton, "DSEP_TASK_SUBSETS", most)
     pooled, pooled_sepsets = marks.copy(), dict(sepsets)
-    fci._remove_by_possible_dsep(pooled, test, 0.05, pooled_sepsets, by_rank, workers=3)
+    fci._remove_by_possible_dsep(
+        pooled, test, 0.05, pooled_sepsets, by_rank, max_depth=max_depth, workers=3
+    )
 
     assert np.count_nonzero(serial) < np.count_nonzero(marks), "the draw must remove edges"
     np.testing.assert_array_equal(pooled, serial)
@@ -129,11 +139,13 @@ def test_a_search_below_the_cutoff_runs_in_process(pools: list[int]) -> None:
     assert list(gated_sepsets.items()) == list(serial_sepsets.items())
 
 
-@pytest.mark.parametrize("cutoff", [0, 6, 7, 21, 22, 63, 64])
+@pytest.mark.parametrize("max_depth", [None, 4])
+@pytest.mark.parametrize("cutoff", [0, 6, 7, 21, 22, 56, 57, 63, 64])
 def test_the_sizes_from_the_cutoff_go_to_the_pool(
-    pools: list[int], monkeypatch: pytest.MonkeyPatch, cutoff: int
+    pools: list[int], monkeypatch: pytest.MonkeyPatch, cutoff: int, max_depth: int | None
 ) -> None:
-    """Six candidates hold 6, 21, 41, 56, 62, and 63 subsets through sizes one to six."""
+    """Six candidates hold 6, 21, 41, 56, 62, and 63 subsets through sizes one to six; a
+    ``max_depth`` stops both the count and the sizes at it."""
     monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", str(cutoff))
     pooled_sizes: list[range] = []
     real = _parallel_skeleton.SkeletonWorkerPool.first_separating
@@ -151,16 +163,17 @@ def test_the_sizes_from_the_cutoff_go_to_the_pool(
     pool = _parallel_skeleton.SkeletonWorkerPool(test, 2)
     try:
         removed = fci._try_remove_by_dsep(
-            marks, 0, 1, [7, 6, 5, 4, 3, 2], set(), set(), test, 0.05, {}, pool=pool
+            marks, 0, 1, [7, 6, 5, 4, 3, 2], set(), set(), test, 0.05, {}, max_depth, pool
         )
     finally:
         pool.close()
 
-    held = [6, 21, 41, 56, 62, 63]
-    first = next((size for size in range(1, 7) if held[size - 1] >= cutoff), 7)
+    top = 6 if max_depth is None else max_depth
+    held = [6, 21, 41, 56, 62, 63][:top]
+    first = next((size for size in range(1, top + 1) if held[size - 1] >= cutoff), top + 1)
     assert not removed
-    assert pooled_sizes == [range(first, 7)]
-    assert pools == ([2] if first < 7 else [])
+    assert pooled_sizes == [range(first, top + 1)]
+    assert pools == ([2] if first <= top else [])
 
 
 @pytest.mark.usefixtures("open_gate")
