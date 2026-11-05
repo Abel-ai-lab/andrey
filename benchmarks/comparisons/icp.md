@@ -180,14 +180,14 @@ A scenario's FWER is over its 1,000 datasets in cell A, 200 in C and D, and 50 i
 counts an empty estimate for a target without parents, which most of D40's successes are: with
 `max_parents=3` on 40 variables, it found almost none of the parents.
 
-The paired fits also give a floor in each of their 47 rows, one test at one setting and number of
-variables: Andrey's and R's mean errors minus those of the empty estimate, which names no parents,
-each with its 95% interval. The floor applies where R beats the empty estimate, its interval wholly
-below 0, which it does in 20 rows, and Andrey beats the empty estimate in all 20; in the other 27
-the floor is reported, not judged. [`icp.json`](../published/0.14.0/icp.json) lists each row's
-floor under `floors`. We refitted every paired fit on a second machine, an AMD EPYC 7713 with
-R 4.6.1 and InvariantCausalPrediction 0.8, and the refit reproduces every published row and
-interval.
+The paired fits also give a floor in each of their 47 rows, in and out of the claim, one test at one
+setting and number of variables: Andrey's and R's mean errors minus those of the empty estimate,
+which names no parents, each with its 95% interval. The floor applies where R beats the empty
+estimate, its interval wholly below 0, which it does in 20 rows, 19 of them in the claim, and Andrey
+beats the empty estimate in all 20; in the other 27 the floor is reported, not judged.
+[`icp.json`](../published/0.14.0/icp.json) lists each row's floor under `floors`. We refitted every
+paired fit on a second machine, an AMD EPYC 7713 with R 4.6.1 and InvariantCausalPrediction 0.8, and
+the refit reproduces every published row and interval.
 
 ### Out of the claim
 

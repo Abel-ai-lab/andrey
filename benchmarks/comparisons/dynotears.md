@@ -89,6 +89,21 @@ one out of claim 10 (seeds 0 to 9), each fitted once with a 3,600 s cap; no fit 
 F1 are means over the series, CPU s the median CPU time of a fit. D is Andrey's SHD minus
 CausalNex's, split into its same-step and lagged parts.
 
+For every setting and replication, `dynotears.json` holds Andrey's and CausalNex's SHD minus that of
+the empty window, which has no edge, each a mean over the paired series with its 95% interval. The
+floor applies where CausalNex beats the empty window, its interval wholly below 0: in all 38
+settings in claim and their 10 replications, and in 9 of the 11 out of claim. Andrey beats the empty
+window in all 57. In the other 2, the defaults at 50 steps at 20 and 50 variables, neither package
+beats it, and the floor is reported, not judged.
+
+CausalNex's intervals against the empty window come from a refit of every series on a second
+machine, an AMD EPYC 9534 with CausalNex 0.12.2 on Python 3.10 and OpenBLAS's SKYLAKEX kernel. The
+refit reproduces the empty window's SHD on every setting and replication, and CausalNex's mean
+errors on 51 of the 59. On the other 8, all at 100 variables, CausalNex's mean SHD differs by at
+most 1.05, and its interval against the empty window lies at least 125 below 0, so no floor decision
+changes. These intervals draw their own 10,000 bootstrap resamples, from NumPy's `default_rng(0)`;
+the seed of the lane's other intervals is not recorded.
+
 At 500 steps, the paper's settings for 500 steps and Andrey's defaults, every setting with noise of
 mean 0 is a tie, with an F1 of at least 0.968 for both packages. Where the graphs differ, CausalNex
 on centered columns, fitted afterward on those series alone, returns Andrey's graph on 29 of 34; the
