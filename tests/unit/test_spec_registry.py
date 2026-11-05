@@ -436,7 +436,7 @@ def test_supported_method_has_a_benchmarks_section(name):
     sections = {
         names.get(_normalized(part), _normalized(part))
         for page in reports
-        for heading in re.findall(r"^### (.+)$", page.read_text(), re.MULTILINE)
+        for heading in re.findall(r"^#{2,3} (.+)$", page.read_text(), re.MULTILINE)
         for part in re.split(r",| and ", heading)
     }
     missing = f"{name}: no section in a report under docs/docs/benchmarks/; {GRADUATE}"
