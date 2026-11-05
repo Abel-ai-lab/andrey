@@ -158,11 +158,11 @@ class PartialCorrelationTest:
     visited. Later queries are recomputed.
 
     The scalar path, :meth:`batched_call`, :meth:`statistic_pvalues`, :meth:`marginal_pvalues`,
-    :meth:`first_order_pvalues`, and ``_canonical_pvalues``, which the skeleton search and GFCI's
-    separating-set search call with queries canonical as built, use identical partial-correlation,
-    clip, and p-value arithmetic.
-    Their p-values match exactly, so repeated queries take the same ``p > alpha`` decision across
-    call paths, including at the threshold.
+    :meth:`first_order_pvalues`, and ``_canonical_pvalues``, which the skeleton search, GFCI's
+    separating-set search, and :meth:`batched_call` call with queries canonical as built, use
+    identical partial-correlation, clip, and p-value arithmetic. Their p-values match exactly, so
+    repeated queries take the same ``p > alpha`` decision across call paths, including at the
+    threshold.
     """
 
     # The data's groups of copies, set by the first singular inversion.
@@ -265,8 +265,8 @@ class PartialCorrelationTest:
         batch takes the scalar path. Nothing is retained once the list is returned.
 
         A batch of sets of one size is sorted as one array instead of one set at a time, and goes
-        to :meth:`statistic_pvalues` whole; a batch with mixed sizes, a repeated member, or ``x``
-        or ``y`` in a set takes the per-set path, which canonicalizes it or raises.
+        to ``_canonical_pvalues`` whole; a batch with mixed sizes, a repeated member, or ``x`` or
+        ``y`` in a set takes the per-set path, which canonicalizes it or raises.
         """
         condition_sets = list(condition_sets)
         n = len(condition_sets)
@@ -287,7 +287,7 @@ class PartialCorrelationTest:
             and not ((same_size == x_int) | (same_size == y_int)).any()
         ):
             xs = np.full(n, x_int, dtype=np.intp)
-            return self.statistic_pvalues(xs, np.full_like(xs, y_int), same_size)[1].tolist()
+            return self._canonical_pvalues(xs, np.full_like(xs, y_int), same_size).tolist()
 
         results: list[float | None] = [None] * n
         groups: dict[int, list[tuple[int, list[int]]]] = {}
