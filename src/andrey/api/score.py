@@ -86,7 +86,8 @@ def ges(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -128,11 +129,13 @@ def ges(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if a given
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if a given
         ``max_parents`` is below the parents some graph of the required edges of ``knowledge`` gives
         a node; with a categorical score, if ``data`` holds a number that is not whole; or, with a
         mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
@@ -418,7 +421,8 @@ def gies(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -460,11 +464,13 @@ def gies(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
         column; if ``data`` holds each environment's rows apart with ``env`` or with ``targets``
         other than a mapping, or its tables differ in kind or columns, or one has no rows; if a
@@ -723,7 +729,7 @@ def gnies(
         Weight on the extended-BIC term: each variable's score adds ``2 * ebic_gamma * log
         C(n_variables - 1, n_parents)``, which grows with the number of parent sets a variable can
         choose from. Larger values give sparser graphs; ``0.0`` is the standard BIC. The term
-        charges parents only, not targets. Must be finite and non-negative. See Notes.
+        charges parents only, not targets. Must be from 0 to 1. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: no DAG the returned graph represents gives a
         node more than ``max_parents`` parents. Each search over graphs skips a step that would
@@ -756,10 +762,12 @@ def gnies(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and no constant
         column; if a column is declared categorical by a DataFrame's ``category``, ``bool``, or
         text type; if the rows come from fewer than two environments, an environment has fewer
@@ -847,30 +855,24 @@ def gnies(
     **Limitations.** Measured with the targets unknown on simulated data from the model above:
     Erdos-Renyi graphs of 10 variables at mean degree 2.7 or 4, two to ten environments with 10 to
     1,000 rows each, with or without an observational one, one or three targets per environment, 20
-    datasets per setting, one core per fit. Against the paper's reference implementation, the 95%
-    interval of the mean difference in errors lay above 0 in none of the 21 settings, on the SHD
-    against the interventional essential graph or on the targets learned wrongly or missed, and
-    below 0 on the SHD in 2 settings with 10 rows per environment and on the targets in 1 of them,
-    on 20 more datasets too; at the standard BIC the two returned the same graph and targets on 412
-    of the 420 datasets. With 100 or more rows per environment its errors were below the empty
-    graph's on both counts in every setting. With 10 rows per environment its target errors were
-    1.85 to 3 with 3 true targets and 4.35 and 7.7 with 9, and its SHD was not reliably below the
-    empty graph's at mean degree 4 (20 against 20) or with the targets' noise variances set to 3 to
-    4 instead of 5 to 10 (11.9 against 14; the 95% interval of the difference reached above 0 on
-    both sets of 20 datasets). Outside its model, with 1,000 rows per environment: after hard
-    interventions, which replace a target's mechanism, its mean SHD was 3.75 against the empty
-    graph's 14; a shifted mean alone is invisible to it, so it learned almost no targets (3.1 target
-    errors with 3 true targets) and returned close to the observational class (SHD 2.55 against it);
-    after a target's incoming weights were halved it beat the empty graph on neither count (SHD 11.6
-    against 14, 3.05 target errors with 3 true targets); with Laplace noise its SHD was 1.65, and
-    with additive nonlinear relations 7.55. With 1,000 rows in each of four environments, three of
-    them with one target, its median SHD at 20, 30, 50, and 100 variables was 0, 0, 1, and 2.5,
-    against the empty graph's 27, 40, 68, and 135, and its median fit took 3.5, 9.0, 30, and 176 s.
-    At 10 variables its median fit took 0.3 to 1.3 s per setting, a median 0.03 times the paper's
-    reference implementation's time on the same core; at 20 variables the reference implementation
-    took a median 388 s, and at 30 it finished 2 of 3 fits, in 2,735 and 3,327 s, within a cap of
-    3,600 s. Each set of targets it visits costs one search over graphs from the empty graph: each
-    forward step scores every variable not yet a target, and each backward step every target, about
+    datasets per setting, one core per fit; errors count the SHD against the interventional
+    essential graph and the targets learned wrongly or missed. With 100 or more rows per environment
+    its errors were below the empty graph's on both counts in every setting. With 10 rows per
+    environment its target errors were 1.85 to 3 with 3 true targets and 4.35 and 7.7 with 9, and
+    its SHD was not reliably below the empty graph's at mean degree 4 (20 against 20) or with the
+    targets' noise variances set to 3 to 4 instead of 5 to 10 (11.9 against 14; the 95% interval of
+    the difference reached above 0 on both sets of 20 datasets). Outside its model, with 1,000 rows
+    per environment: after hard interventions, which replace a target's mechanism, its mean SHD was
+    3.75 against the empty graph's 14; a shifted mean alone is invisible to it, so it learned almost
+    no targets (3.1 target errors with 3 true targets) and returned close to the observational class
+    (SHD 2.55 against it); after a target's incoming weights were halved it beat the empty graph on
+    neither count (SHD 11.6 against 14, 3.05 target errors with 3 true targets); with Laplace noise
+    its SHD was 1.65, and with additive nonlinear relations 7.55. With 1,000 rows in each of four
+    environments, three of them with one target, its median SHD at 20, 30, 50, and 100 variables was
+    0, 0, 1, and 2.5, against the empty graph's 27, 40, 68, and 135, and its median fit took 3.5,
+    9.0, 30, and 176 s. At 10 variables its median fit took 0.3 to 1.3 s per setting. Each set of
+    targets it visits costs one search over graphs from the empty graph: each forward step scores
+    every variable not yet a target, and each backward step every target, about
     ``(n_targets + 1) * n_variables - n_targets * (n_targets - 1) / 2`` searches per fit, with
     ``n_targets`` the targets it returns. Given every environment's targets, one search over graphs
     runs, and it can stop at a graph that scores worse than one the target search reaches: with the
@@ -1030,7 +1032,8 @@ def xges(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1072,11 +1075,13 @@ def xges(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is
         constant; with a categorical score, if ``data`` holds a number that is not whole; or, with a
         mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
@@ -1262,8 +1267,8 @@ def hc(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See
-        Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1321,11 +1326,13 @@ def hc(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if the required
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if the required
         edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
         ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
@@ -1385,9 +1392,8 @@ def hc(
     keeps the best score: hill climbing with random restarts, which changes many edges at each
     restart [1]_ [4]_. No change breaks the knowledge, ``max_parents``, the rule of the mixed-data
     scores, or acyclicity: a draw that would close a cycle changes nothing, and at most
-    ``3 * n_perturbations`` draws are made. bnlearn's ``hc`` [2]_ makes one change per restart by
-    default, which the next climb most often undoes, so ``n_perturbations`` defaults to the number
-    of variables.
+    ``3 * n_perturbations`` draws are made. The next climb most often undoes a single change, so
+    ``n_perturbations`` defaults to the number of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
     defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 161.6 to 93.5 and took a
@@ -1527,8 +1533,8 @@ def tabu(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See
-        Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1583,17 +1589,20 @@ def tabu(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open. With ``n_starts`` above ``1``,
-        ``metadata["seed"]`` is the seed used and ``metadata["n_perturbations"]`` the number of
-        changes before each later search.
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. With ``n_starts`` above ``1``, ``metadata["seed"]`` is the seed used and
+        ``metadata["n_perturbations"]`` the number of changes before each later search.
 
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``max_tabu``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``max_tabu``
         is greater than ``tabu_length``; if the required edges of ``knowledge`` give a node more
         than ``max_parents`` parents; or, with a categorical score, if ``data`` holds a number
         that is not whole. With the BIC score, also if a column repeats another up to scale and
@@ -1629,7 +1638,9 @@ def tabu(
     list. Without one, it stops if ``max_tabu`` non-improving moves have occurred since the best
     score last improved; otherwise it takes the best non-improving move, leaving the score unchanged
     or worse. It also stops when every legal move leads into the list, or after ``max_iter`` moves
-    when set; with ``n_starts``, each search stops so.
+    when set; with ``n_starts``, each search stops so. Under a mixed-data score, no move gives a
+    categorical column a continuous parent, so the DAG found is a conditional linear Gaussian
+    network.
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
     so with the same ``max_iter`` and one start its score is never worse than hill climbing's. Ties
@@ -1652,9 +1663,8 @@ def tabu(
     keeps the best score: tabu search with the random restarts of hill climbing, which change many
     edges at each restart [5]_ [6]_. No change breaks the knowledge, ``max_parents``, the rule of
     the mixed-data scores, or acyclicity: a draw that would close a cycle changes nothing, and at
-    most ``3 * n_perturbations`` draws are made. bnlearn's ``hc`` [3]_ makes one change per restart
-    by default, which the next search most often undoes, so ``n_perturbations`` defaults to the
-    number of variables.
+    most ``3 * n_perturbations`` draws are made. The next search most often undoes a single change,
+    so ``n_perturbations`` defaults to the number of variables.
 
     On simulated linear-Gaussian data with 100 variables at mean degree 4 and 1,000 rows, at the
     defaults, 8 starts lowered the mean errors (SHD) over 20 datasets from 136.1 to 75.6 and took a
@@ -1779,12 +1789,10 @@ def exact_search(
         Local score: ``"bic"``, the linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers; or
         ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed
-        data, as for :func:`~andrey.ges`. Each BIC uses the penalty of ``penalty_discount=1``, and
-        the linear-Gaussian BIC adds the extended-BIC term that ``ebic_gamma`` weighs. ``None``
-        picks from the declared column types: ``"bdeu"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
+        data, as for :func:`~andrey.ges`. ``None`` picks from the declared column types:
+        ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
@@ -1796,7 +1804,8 @@ def exact_search(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1834,11 +1843,13 @@ def exact_search(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if the required
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if the required
         edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
         ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
@@ -2084,10 +2095,12 @@ def calm(
     ImportError
         If the ``[torch]`` extra is not installed.
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if the fit's
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if the fit's
         loss or weights stop being finite, for example when the data's scale overflows its
         covariance; ``standardize=True`` rescales the columns. Also if ``knowledge`` names a column
         ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.

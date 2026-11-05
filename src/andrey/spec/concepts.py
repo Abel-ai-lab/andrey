@@ -25,6 +25,7 @@ from pydantic import model_validator
 
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
 from andrey.core.score import SCORES
@@ -43,8 +44,6 @@ BLANKET_STRUCTURES: dict[str, Kind] = {
     "skeleton": "undirected",
     "moral": "undirected",
 }
-#: The largest seed NumPy and torch accept.
-SEED_MAX = 2**32 - 1
 
 
 class Exemption(Spec):
@@ -263,11 +262,9 @@ _CONCEPTS = (
                 reason="None is one over the number of observational rows, for both tests, as for "
                 "ut_igsp. On simulated data in the settings of Wang et al. (2017) and Yang, "
                 "Katcoff and Uhler (2018), 1e-3 had the fewest errors of the levels its authors "
-                "swept, 1e-4 to 0.05; then, on fresh datasets, against the authors' reference "
-                "implementation at 1e-3, one over the observational rows and 1e-3 were each worse "
-                "in none of 114 comparisons and had fewer errors in 17, with interval ends "
-                "that are floating-point residue of 0 read as 0, a tie that a rule written before "
-                "the run gives to one over the observational rows.",
+                "swept, 1e-4 to 0.05. The default equals 1e-3 at 1,000 observational rows, and in "
+                "the 50 groups at 10,000 and 100,000 rows per setting it had fewer SHD errors "
+                "than 1e-3 in 1, by 0.28 edges, and more in none.",
             ),
             Deviation(
                 method="ut_igsp",
@@ -275,12 +272,11 @@ _CONCEPTS = (
                 default=None,
                 fixed_in=None,
                 reason="None is one over the number of observational rows, for both tests. On "
-                "simulated data in the paper's setting, against the paper's reference "
-                "implementation at its level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), it "
-                "was worse in none of 112 comparisons and better in 1 on fresh datasets, and lower "
-                "in 17 more on the datasets that chose it. In the run that chose it, "
-                "on datasets of its own, it had fewer errors in 20 and more in none, where 0.001 "
-                "had fewer in 15 and more in 3, none of which repeated on a rerun.",
+                "simulated data in the paper's setting, with 5 starts, 0.001 had fewer SHD errors "
+                "than the paper's level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), in 7 of "
+                "15 groups and more in 2, those by about 0.3 edges at 3,000 rows per setting; on "
+                "56 further groups, the default had fewer SHD errors than 0.001 in 4 comparisons, "
+                "all at 5,000 rows per setting, and more in none.",
             ),
         ),
     ),
@@ -461,8 +457,8 @@ _CONCEPTS = (
     ),
     Concept(
         key="fdr_method",
-        summary="The correction of the lagged links' p-values for the number of links tested "
-        "(tigramite's name): fdr_bh, the default, replaces them with their Benjamini-Hochberg "
+        summary="The correction of the lagged links' p-values for the number of links tested: "
+        "fdr_bh, the default, replaces them with their Benjamini-Hochberg "
         "adjusted values over all the lagged links together, and none leaves them as tested. A "
         "method whose graph is thresholded on those p-values (pcmci, granger) thresholds the "
         "adjusted ones; a method that decides its links before it reports them (pcmciplus) "
@@ -479,7 +475,6 @@ _CONCEPTS = (
         fragment="benjamini-hochberg",
         suitable=("pcmci", "pcmciplus", "granger"),
         exempt=_exempt(
-            "tigramite's LPCMCI has no fdr_method; only its run_pcmci and run_pcmciplus take it. "
             "The marks come from the removal phases and the orientation rules at alpha, not from "
             "a threshold on the p-values the method reports.",
             "lpcmci",
@@ -560,9 +555,9 @@ _CONCEPTS = (
                     default=None,
                     fixed_in=None,
                     fragment="pc1",
-                    reason="It caps the PC1 step that selects the lagged parents, as tigramite's "
-                    "max_conds_dim does; the later tests condition on those parents, however "
-                    "many, which max_p_global caps in pcmciplus.",
+                    reason="It caps the PC1 step that selects the lagged parents; the later tests "
+                    "condition on those parents, however many, which max_p_global caps in "
+                    "pcmciplus.",
                 )
                 for m in ("pcmci", "pcmciplus")
             ),
@@ -571,7 +566,7 @@ _CONCEPTS = (
     Concept(
         key="max_p_global",
         summary="The largest number of conditions beyond the default conditions every test "
-        "includes (tigramite's LPCMCI name).",
+        "includes.",
         param=_template(
             "max_p_global",
             "int",
@@ -1074,12 +1069,11 @@ _CONCEPTS = (
     ),
     Concept(
         key="structure",
-        summary="The graph a Markov-blanket search returns without a target. The default follows "
-        "bnlearn's default for the method: iamb and inter_iamb return the CPDAG (cpdag), as "
-        "bnlearn's iamb and inter.iamb do (undirected=FALSE); mmpc returns the skeleton, as "
-        "bnlearn's mmpc does (undirected=TRUE). cpdag is the CPDAG of the Grow-Shrink structure "
-        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
-        "Markov blankets.",
+        summary="The graph a Markov-blanket search returns without a target: iamb and inter_iamb "
+        "return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its sets of "
+        "parents and children give. cpdag is the CPDAG of the Grow-Shrink structure learner "
+        "(Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the Markov "
+        "blankets.",
         param=_template(
             "structure",
             "str",
@@ -1100,8 +1094,8 @@ _CONCEPTS = (
                 default="skeleton",
                 choices=("skeleton", "cpdag"),
                 fixed_in=None,
-                reason="bnlearn's mmpc returns the skeleton (undirected=TRUE), which is the graph "
-                "MMPC's sets give; cpdag stays available. MMPC learns parents and children, which "
+                reason="The skeleton is the graph MMPC's sets give (Tsamardinos, Brown and "
+                "Aliferis 2006); cpdag stays available. MMPC learns parents and children, which "
                 "hold no child's other parents, so it has no moral graph to return.",
             ),
         ),
@@ -1164,10 +1158,9 @@ _CONCEPTS = (
                 default="majority",
                 choices=COLLIDER_RULES,
                 fixed_in=None,
-                reason="majority is tigramite's default (contemp_collider_rule) and orients the "
-                "same-step links without regard to the order of the variables, where sepsets reads "
-                "the one separating set the skeleton phase stored, which can change with it "
-                "(Runge 2020).",
+                reason="majority orients the same-step links without regard to the order of the "
+                "variables, where sepsets reads the one separating set the skeleton phase stored, "
+                "which can change with it (Runge 2020).",
             ),
         ),
     ),

@@ -93,9 +93,12 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Raises
     ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data``
         does not have 2 columns.
 
     Notes
@@ -232,9 +235,12 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Raises
     ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data``
         does not have 2 columns.
 
     Notes
@@ -409,10 +415,12 @@ def rcd(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         fewer than 6 rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts
         itself, as :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle
         with the parents the search found.
@@ -523,10 +531,12 @@ def bottom_up_parce_lingam(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         fewer than 6 rows or no more rows than columns. Also if ``knowledge`` names a column
         ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 

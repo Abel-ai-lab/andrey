@@ -152,7 +152,8 @@ def mmhc(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -196,11 +197,13 @@ def mmhc(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if
         ``score_func`` and ``indep_test`` read different kinds of data, or if ``data`` or
         ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
         :func:`~andrey.hc`. Also if the required edges of ``knowledge`` give a node more than
@@ -376,7 +379,8 @@ def rsmax2(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -426,11 +430,13 @@ def rsmax2(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if
         ``score_func`` is not a score ``maximize`` takes, if ``score_func`` and ``indep_test`` read
         different kinds of data, if ``max_tabu`` is greater than ``tabu_length``, or if ``data`` or
         ``categorical`` does not suit the test or score, as for :func:`~andrey.pc` and
