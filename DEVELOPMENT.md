@@ -150,7 +150,7 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    `tests/unit/test_missing_values.py` checks both against the spec. Its
    `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
    [column-order guide](docs/docs/guides/column-order.md): break ties with
-   `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
+   `andrey.core.ties.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
    `tests/unit/test_column_labels.py` checks both fields on every method.
    List the method in `src/andrey/spec/concepts.py` under each concept, as suitable (taking the
    template with `concept_param`, or a recorded deviation) or exempt with the reason;

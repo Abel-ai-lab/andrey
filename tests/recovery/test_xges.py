@@ -21,9 +21,9 @@ from andrey.api._adapt import dag_from_adjacency
 from andrey.core import ARROW, TAIL
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.core.score import BICScore
+from andrey.core.ties import tie_ranks
 from andrey.metrics import shd, to_cpdag
 from andrey.search.ges import _recompute_objective
-from andrey.search.hc import tie_ranks
 from andrey.search.xges import (
     _UNDIRECTED,
     _edge_key,

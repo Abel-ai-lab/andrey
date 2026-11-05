@@ -298,8 +298,8 @@ def cam(
     >>> out.structure.kind, out.ordering
     ('dag', (0, 1))
     """
+    from andrey.core.ties import tie_ranks
     from andrey.fcm.cam import cam as _cam
-    from andrey.search.hc import tie_ranks
 
     X = data_matrix(data, method="cam")
     labels = column_labels(data)
@@ -533,8 +533,8 @@ def resit(
     >>> out.structure.kind, out.ordering
     ('dag', (0, 1))
     """
+    from andrey.core.ties import tie_ranks
     from andrey.fcm.resit import resit as _resit
-    from andrey.search.hc import tie_ranks
 
     X = data_matrix(data, method="resit", min_rows=MIN_ROWS)
     labels = column_labels(data)
@@ -799,8 +799,8 @@ def camuv(
     >>> out.structure.kind, out.structure.oriented_edges()
     ('pag', [(0, 1, 'directed')])
     """
+    from andrey.core.ties import tie_ranks
     from andrey.fcm.camuv import camuv as _camuv
-    from andrey.search.hc import tie_ranks
 
     X = data_matrix(data, method="camuv", min_rows=MIN_ROWS)
     labels = column_labels(data)

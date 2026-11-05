@@ -969,9 +969,8 @@ def make_score(
     ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask.
     ``ebic_gamma`` weighs the extended-BIC term of the linear-Gaussian BIC; the other scores leave
     it out but still check its range, as BDeu does ``penalty_discount``'s.
-    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. A search
-    checks ``score_func`` against the names it takes before calling this. Raises
-    :class:`NotImplementedError` for any other name.
+    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. Raises
+    :class:`NotImplementedError` for a name outside :data:`SCORES`.
     """
     if score_func in LINEAR_SCORES:
         return BICScore(

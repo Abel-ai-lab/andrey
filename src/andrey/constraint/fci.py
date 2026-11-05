@@ -30,7 +30,7 @@ from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -67,7 +67,7 @@ def fci(
     ambiguous.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
-    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
     of in order-free rounds (:func:`_fci_orient`).
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
@@ -625,7 +625,7 @@ def _remove_by_possible_dsep(
 def _test_in_rank_order(
     X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None = None
 ) -> tuple[np.ndarray, CITest]:
-    """The column order that sorts ``X`` by :func:`~andrey.search.hc.tie_ranks`, and the
+    """The column order that sorts ``X`` by :func:`~andrey.core.ties.tie_ranks`, and the
     ``indep_test`` test, seeded by ``seed``, over ``X``'s columns in that order.
 
     Each rank moves with its column, so every column order of ``X`` gives the same test.

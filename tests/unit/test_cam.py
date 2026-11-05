@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.core.ties import tie_ranks
 from andrey.fcm.cam import boosting_counts, neighbors, order_search
 from andrey.fcm.gam import BasisCache
-from andrey.search.hc import tie_ranks
 
 N = 400
 

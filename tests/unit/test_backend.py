@@ -106,7 +106,7 @@ def test_andrey_device_is_alias_of_andrey_backend(monkeypatch):
 
 def test_tie_break_precedence_context_over_config_over_env(monkeypatch):
     """Every layer reaches the ranks a fit reads: position ranks are the column positions."""
-    from andrey.search.hc import tie_ranks
+    from andrey.core.ties import tie_ranks
 
     monkeypatch.delenv("ANDREY_TIE_BREAK", raising=False)
     x = np.random.default_rng(0).standard_normal((50, 4))

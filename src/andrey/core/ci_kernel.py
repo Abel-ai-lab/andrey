@@ -16,7 +16,7 @@ from scipy.spatial.distance import pdist, squareform
 from scipy.special import gammaincc, ndtri
 from scipy.stats import qmc
 
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 from . import backend, env
 from .ci import _canonical_ranked, _checked_data, per_query
@@ -147,7 +147,7 @@ class KCI:
     conditioning variables, the kernels of ``xs``, ``y``, and ``S`` share
     ``w = c sqrt(k)``, ``c`` 1.2 below 200 rows, 0.7 below 1,200, and 0.4 beyond, and ``S``
     enters ``xs`` at half scale. ``x`` joins the conditioning set and ``y`` does not, so of the
-    two variables the one with the lower :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    two variables the one with the lower :func:`~andrey.core.ties.tie_ranks` rank, a rank
     computed from the data, takes the role of ``x``, and the conditioning set's
     columns enter its kernels in rank order: the p-value depends on neither the argument order
     nor the column order.
@@ -459,7 +459,7 @@ class RCoT:
 
     The features of ``x`` and of ``y`` are sampled for each conditioning set, from generators
     seeded by ``seed``, the variable, and the set, and those of the conditioning set from one
-    seeded by ``seed`` and the set; each column enters by its :func:`~andrey.search.hc.tie_ranks`
+    seeded by ``seed`` and the set; each column enters by its :func:`~andrey.core.ties.tie_ranks`
     rank, computed from the data. The queries of one pair with different
     conditioning sets therefore use independent features, as in [1]_, where every test samples its
     own. PC removes an edge when any conditioning set gives a p-value above ``alpha``, and features

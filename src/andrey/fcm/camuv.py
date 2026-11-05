@@ -51,7 +51,7 @@ Where the steps here differ from the paper's:
   identifies a sink only with each candidate set outside ``K``. Without the skip, line 18 resets
   ``t`` whenever a known sink is found again, and the search need not end.
 - p-values are compared as their logarithms, computed directly so that a p-value below the
-  smallest double keeps its place, rounded to ``_KEY_DP`` decimal places, as :func:`andrey.hc`
+  smallest double keeps its place, rounded to ``KEY_DP`` decimal places, as :func:`andrey.hc`
   compares its score changes; a tie goes to the earlier column. The sets
   run in lexicographic order and the candidates are tried in column order; :func:`andrey.camuv`
   passes the columns in their rank order, so each order follows the ranks.
@@ -84,10 +84,10 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
-from andrey.core.independence import gamma_gram, hsic_gamma_log_p
+from andrey.core.independence import hsic_gram, hsic_log_p
+from andrey.core.ties import tie_key
 from andrey.core.units import unit_factors
 from andrey.fcm.gam import BasisCache, fit_gam
-from andrey.search._parallel import _KEY_DP
 
 _log = logging.getLogger(__name__)
 
@@ -108,11 +108,6 @@ Side = tuple[Term, ...]
 #: One side's kernel: its centered gram, its raw kernel's off-diagonal mean, and the centered gram's
 #: sum of squares.
 Gram = tuple[np.ndarray, float, float]
-
-
-def _key(log_p: float) -> float:
-    """``log_p`` rounded to ``_KEY_DP`` decimal places."""
-    return round(log_p, _KEY_DP)
 
 
 def _running(variables: tuple[int, ...], candidates: list[set[int]]) -> Side:
@@ -153,29 +148,10 @@ class _Tests:
 
     @staticmethod
     def _gram(residuals: list[np.ndarray]) -> Gram:
-        """The HSIC kernel of the residuals, centered and read jointly, its bandwidth's median over
-        every row, with the centered gram's sum of squares, which the product-form variance reads.
-        """
+        """The :func:`~andrey.core.independence.hsic_gram` of the residuals, centered and read
+        jointly."""
         side = np.column_stack(residuals)
-        centered, mu = gamma_gram(side - side.mean(axis=0), median_rows=None)
-        return centered, mu, float(np.sum(centered * centered))
-
-    @staticmethod
-    def _hsic(x: Gram, y: Gram) -> float:
-        """The log HSIC p-value of two sides' kernels, the null variance in its product form.
-
-        Raises
-        ------
-        FloatingPointError
-            If the test's value is not finite, so that no choice rests on it.
-        """
-        log_p = hsic_gamma_log_p(x, y, x[0].shape[0], variance="product")
-        if not math.isfinite(log_p):
-            raise FloatingPointError(
-                "camuv: an HSIC test gave a non-finite p-value; the kernels could not be computed "
-                "from these data"
-            )
-        return log_p
+        return hsic_gram(side - side.mean(axis=0))
 
     def _side_gram(self, side: Side) -> Gram:
         found = self._grams.pop(side, None)
@@ -192,7 +168,7 @@ class _Tests:
         key = (min(x, y), max(x, y))
         found = self._log_p.get(key)
         if found is None:
-            found = self._log_p[key] = self._hsic(*(self._side_gram(side) for side in key))
+            found = self._log_p[key] = hsic_log_p(*(self._side_gram(side) for side in key), "camuv")
         return found
 
     def log_p_fresh(self, child: int, regressors: set[int], y: Side) -> float:
@@ -207,7 +183,7 @@ class _Tests:
             residual = self._residuals.get(x[0])
             fresh = self._gram([self._fit(x[0]) if residual is None else residual])
             grams = {x: fresh, y: self._side_gram(y)}
-            found = self._log_p[key] = self._hsic(*(grams[side] for side in key))
+            found = self._log_p[key] = hsic_log_p(*(grams[side] for side in key), "camuv")
         return found
 
 
@@ -263,7 +239,7 @@ def find_candidates(
                     continue
                 regressors = candidates[child] | set(rest)
                 log_p = tests.log_p_fresh(child, regressors, _running(rest, candidates))
-                scored.append((-_key(log_p), child, log_p, rest))
+                scored.append((-tie_key(log_p), child, log_p, rest))
             if not scored:
                 continue
             _, sink, log_p, rest = min(scored)

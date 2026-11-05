@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 

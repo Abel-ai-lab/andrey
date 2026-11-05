@@ -23,8 +23,8 @@ import scipy.optimize
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import warn_search_limit
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -123,7 +123,7 @@ class Canonical:
     """The data in the order the solvers see it.
 
     ``cov`` is the covariance of the columns taken in order of their
-    :func:`~andrey.search.hc.tie_ranks`: fit column ``k`` is the data's column ``order[k]``. A
+    :func:`~andrey.core.ties.tie_ranks`: fit column ``k`` is the data's column ``order[k]``. A
     matrix ``fit`` in that order maps back to the data's order with ``fit[np.ix_(back, back)]``.
     ``forbidden[i, j]`` fixes ``W[i, j]`` at zero and ``required[i, j]`` keeps edge ``i -> j``
     without a penalty or a threshold; both are in the fit's column order.

@@ -18,22 +18,12 @@ import numpy.typing as npt
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import (
-    DISCRETE_SCORES,
-    MIXED_SCORES,
-    SCORES,
-    BICScore,
-    LocalScore,
-    make_score,
-)
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.score import MIXED_SCORES, LocalScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, make_delta
 from andrey.core.seeding import start_rng
-from andrey.search.hc import tie_ranks
-
-#: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
-PERMUTATION_SCORES: tuple[str, ...] = SCORES
+from andrey.core.ties import tie_mask, tie_ranks
+from andrey.search.operators import check_parent_cap
 
 # Fixed absolute score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
@@ -48,7 +38,7 @@ def ranked_score(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
 ) -> tuple[LocalScore, np.ndarray]:
-    """The local score over the columns of ``x`` sorted by :func:`~andrey.search.hc.tie_ranks`.
+    """The local score over the columns of ``x`` sorted by :func:`~andrey.core.ties.tie_ranks`.
 
     A permutation search over this score makes every choice that goes by variable index by each
     column's data instead of its position: its starting order, the orders its seed shuffles, and
@@ -65,10 +55,7 @@ def ranked_score(
     dependent columns, names the columns of ``x``.
     """
     mixed = score_func in MIXED_SCORES
-    if mixed:
-        mask = column_mask(categorical, x.shape[1])
-    else:
-        mask = np.full(x.shape[1], score_func in DISCRETE_SCORES)
+    mask = tie_mask(score_func, categorical, x.shape[1])
     ranks = tie_ranks(x, mask)
     by_rank = np.argsort(ranks)
     try:
@@ -804,7 +791,7 @@ def _search_state(
     score, ranks = ranked_score(
         X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
     )
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
         gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
@@ -899,7 +886,7 @@ def boss(
         an order its own RNG shuffles. The returned order is the best-scoring one; a later start
         replaces an earlier one only when it scores better by more than ``_SCORE_EPS``.
     score_func : str
-        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC
+        Local score, one of :data:`~andrey.core.score.SCORES`: the linear-Gaussian BIC
         (``"bic"``), BDeu or the multinomial BIC on
         category codes (:class:`~andrey.core.score.BDeuScore`,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC
@@ -937,18 +924,9 @@ def boss(
     if p == 0:
         return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
-    if score_func not in PERMUTATION_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
-        )
-    if (
-        max_parents is not None
-        and constraints is not None
-        and (constraints.required.sum(axis=0) > max_parents).any()
-    ):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents"
-        )
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
     best: tuple[dict[int, list[int]], float] | None = None
     for start in range(n_starts):
         # Each start builds its own score, caches, and trees, so a search of many starts holds
