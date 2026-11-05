@@ -3,7 +3,9 @@
 Every mark is drawn by shape -- an arrowhead (``ARROW``), a hollow circle (``CIRCLE``), or a plain
 tail (nothing) -- so the grammar is colorblind-safe and the emitted string is self-contained. A
 2-cycle is drawn as two parallel curved edges (feedback), distinct from a single double-headed
-bidirected edge (a latent confounder). An edge that would cross another node bends around it.
+bidirected edge (a latent confounder). An edge that would cross another node bends around it. An
+intervened node is a square, and a bar crosses each arrowhead into it, the edge an intervention
+cuts.
 """
 
 from __future__ import annotations
@@ -24,6 +26,10 @@ SW = 2.0  # stroke width
 PAD = 32.0  # canvas padding
 GLOW_W = 4.0 * SW  # the soft accent stroke under a highlighted endpoint's half of the edge
 CLEAR = NODE_R + 4.0  # minimum distance from an edge to a node it does not join
+HALF = 11.5  # half the side of an intervened node's square, about a node circle's area
+BAR = AW + 2.0  # half the length of the bar across an edge into an intervened node
+BAR_GAP = 4.0  # from an arrowhead's base to the bar
+STUB = ALEN + 9.0  # the length of the stub into an intervened node that no edge points into
 _BEND_STEP = NODE_R
 _BEND_STEPS = 8
 _SAMPLES = 16  # line segments approximating an arc for the clearance check
@@ -99,6 +105,37 @@ def _head(px: float, py: float, dx: float, dy: float, glyph: str, color: str, su
     return ""
 
 
+def _reach(ux: float, uy: float, square: bool) -> float:
+    """From a node's center to its boundary along ``(ux, uy)``: a circle's radius, or a square's."""
+    if not square:
+        return NODE_R
+    return HALF / max(abs(ux), abs(uy), 1e-9)
+
+
+def _bar(px: float, py: float, ux: float, uy: float, color: str) -> str:
+    """Draw the bar across an edge into an intervened node, ``(px, py)`` on its boundary."""
+    cx, cy = px + ux * (ALEN + BAR_GAP), py + uy * (ALEN + BAR_GAP)
+    nx, ny = -uy * BAR, ux * BAR
+    return (
+        f'<line class="intervention" x1="{_f(cx + nx)}" y1="{_f(cy + ny)}" '
+        f'x2="{_f(cx - nx)}" y2="{_f(cy - ny)}" stroke="{color}" stroke-width="{SW}" '
+        'stroke-linecap="round"/>'
+    )
+
+
+def _stub(x: float, y: float, ux: float, uy: float, palette: Palette) -> str:
+    """Draw a short arrow from outside into an intervened node no edge points into, with the bar.
+
+    ``(ux, uy)`` points from the node out to where the stub starts.
+    """
+    r = _reach(ux, uy, True)
+    px, py = x + ux * r, y + uy * r
+    color = palette.edge_directed
+    line = _line(px + ux * ALEN, py + uy * ALEN, px + ux * STUB, py + uy * STUB, color)
+    head = _head(px, py, ux, uy, "arrow", color, palette.surface)
+    return f'<g class="intervention">{line}{head}</g>' + _bar(px, py, ux, uy, color)
+
+
 def _glyph(mark: int) -> str:
     return {ARROW: "arrow", CIRCLE: "circle"}.get(mark, "tail")
 
@@ -145,19 +182,22 @@ def _edge(
     *,
     bend: float = 0.0,
     halo: tuple[bool, bool] = (False, False),
+    square: tuple[bool, bool] = (False, False),
 ) -> str:
     """Draw marks ``ma`` at A and ``mb`` at B on a line, or on a quadratic arc when ``bend`` is set.
 
     A highlighted end lights its half of the edge: a soft, wide accent stroke under the edge, the
     half itself in the accent color and a little heavier, and the mark in the accent color. Every
-    width scales with the drawing, so the highlight keeps its proportions at any size.
+    width scales with the drawing, so the highlight keeps its proportions at any size. An end at
+    an intervened node (``square``) meets its square, and an arrowhead there gets the bar.
     """
     mx, my = _control(ax, ay, bx, by, bend)
     ends = []
-    for x, y, mark, lit in ((ax, ay, ma, halo[0]), (bx, by, mb, halo[1])):
+    for x, y, mark, lit, sq in ((ax, ay, ma, halo[0], square[0]), (bx, by, mb, halo[1], square[1])):
         length = math.hypot(mx - x, my - y) or 1.0
         ux, uy = (mx - x) / length, (my - y) / length
-        ends.append((x + ux * NODE_R, y + uy * NODE_R, ux, uy, mark, lit))
+        r = _reach(ux, uy, sq)
+        ends.append((x + ux * r, y + uy * r, ux, uy, mark, lit))
     (sax, say), (sbx, sby) = (_stop(px, py, ux, uy, mark) for px, py, ux, uy, mark, _ in ends)
     halves = []
     for (px, py, *_, lit), (qx, qy, *_) in ((ends[0], ends[1]), (ends[1], ends[0])):
@@ -177,9 +217,11 @@ def _edge(
         'stroke-linecap="round"/>'
         for tag, geometry in halves
     ]
-    for px, py, ux, uy, mark, lit in ends:
+    for (px, py, ux, uy, mark, lit), sq in zip(ends, square):
         fill = palette.accent if lit else color
         parts.append(_head(px, py, ux, uy, _glyph(mark), fill, palette.surface))
+        if sq and mark == ARROW:
+            parts.append(_bar(px, py, ux, uy, color))
     return "".join(parts)
 
 
@@ -255,13 +297,31 @@ def _self_loop(x: float, y: float, color: str) -> str:
     return _path(d, color) + _poly(tri, color)
 
 
+def _square(x: float, y: float, fill: str, stroke: str, dash: str | None = None) -> str:
+    s = (
+        f'<rect class="intervened" x="{_f(x - HALF)}" y="{_f(y - HALF)}" width="{_f(2 * HALF)}" '
+        f'height="{_f(2 * HALF)}" rx="2" fill="{fill}" stroke="{stroke}" stroke-width="1.8"'
+    )
+    if dash:
+        s += f' stroke-dasharray="{dash}"'
+    return s + "/>"
+
+
 def _node(
-    x: float, y: float, label: str, palette: Palette, latent: bool, *, label_inside: bool
+    x: float,
+    y: float,
+    label: str,
+    palette: Palette,
+    latent: bool,
+    *,
+    label_inside: bool,
+    intervened: bool = False,
 ) -> str:
+    shape = _square if intervened else (lambda cx, cy, *a, **k: _circle(cx, cy, NODE_R, *a, **k))
     if latent:
-        node = _circle(x, y, NODE_R, palette.paper, palette.muted, dash="3 3")
+        node = shape(x, y, palette.paper, palette.muted, dash="3 3")
     else:
-        node = _circle(x, y, NODE_R, palette.surface, palette.ink)
+        node = shape(x, y, palette.surface, palette.ink)
     if not label:
         return node
     if label_inside:
@@ -282,10 +342,13 @@ def render(
     palette: Palette,
     background: bool = True,
     highlight: frozenset[tuple[int, int]] = frozenset(),
+    targets: frozenset[int] = frozenset(),
 ) -> str:
     """Emit the full SVG string. Optional background, then edges, then nodes on top.
 
     ``highlight`` holds ``(node, neighbor)`` pairs: the mark at ``node`` on that edge is lit.
+    ``targets`` holds the intervened nodes: squares, with a bar across each arrowhead into them,
+    or a barred stub from outside when no arrowhead points into one.
     """
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
@@ -304,19 +367,71 @@ def render(
         others = [pos[k] for k in range(n) if k != i and k != j]
         if et == "twocycle":
             curv = _widen(ax, ay, bx, by, max(12.0, 0.14 * math.hypot(bx - ax, by - ay)), others)
-            for (x1, y1, x2, y2), lit in (((ax, ay, bx, by), at_j), ((bx, by, ax, ay), at_i)):
+            pair = (((ax, ay, bx, by), at_j, i, j), ((bx, by, ax, ay), at_i, j, i))
+            for (x1, y1, x2, y2), lit, a, b in pair:
                 parts.append(
-                    _edge(x1, y1, x2, y2, TAIL, ARROW, color, palette, bend=curv, halo=(False, lit))
+                    _edge(
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        TAIL,
+                        ARROW,
+                        color,
+                        palette,
+                        bend=curv,
+                        halo=(False, lit),
+                        square=(a in targets, b in targets),
+                    )  # fmt: skip
                 )
         else:
             bend = _route(ax, ay, bx, by, others)
             parts.append(
-                _edge(ax, ay, bx, by, mi, mj, color, palette, bend=bend, halo=(at_i, at_j))
+                _edge(
+                    ax,
+                    ay,
+                    bx,
+                    by,
+                    mi,
+                    mj,
+                    color,
+                    palette,
+                    bend=bend,
+                    halo=(at_i, at_j),
+                    square=(i in targets, j in targets),
+                )  # fmt: skip
             )
+    for k in sorted(targets):
+        if any(
+            (i == k and mi == ARROW) or (j == k and mj == ARROW)
+            for i, j, mi, mj, _ in edges
+            if i != j
+        ):
+            continue
+        # The stub comes from the side away from the node's neighbors, or from the left.
+        x, y = pos[k]
+        dx = dy = 0.0
+        for m in {j if i == k else i for i, j, *_ in edges if k in (i, j) and i != j}:
+            ox, oy = x - pos[m][0], y - pos[m][1]
+            d = math.hypot(ox, oy) or 1.0
+            dx, dy = dx + ox / d, dy + oy / d
+        norm = math.hypot(dx, dy)
+        ux, uy = (dx / norm, dy / norm) if norm > 1e-9 else (-1.0, 0.0)
+        parts.append(_stub(x, y, ux, uy, palette))
     # Use one placement for the figure; short labels fit clear of endpoint marks inside nodes.
     labels_inside = all(len(label) <= 2 for label in labels)
     for k in range(n):
         x, y = pos[k]
-        parts.append(_node(x, y, labels[k], palette, k in latent, label_inside=labels_inside))
+        parts.append(
+            _node(
+                x,
+                y,
+                labels[k],
+                palette,
+                k in latent,
+                label_inside=labels_inside,
+                intervened=k in targets,
+            )  # fmt: skip
+        )
     parts.append("</svg>")
     return "".join(parts)

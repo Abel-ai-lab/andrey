@@ -981,7 +981,10 @@ a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
 
 `andrey.viz` renders a `GraphStructure` to a self-contained SVG on the package palette; for a
 temporal result, draw one lag's graph or its `summary_graph()`. Graphviz places
-the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout otherwise.
+the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout otherwise. Latent
+variables are hollow, dashed circles. `draw(structure, targets=["x"])` marks the variables an
+experiment set: each is a square, and a bar crosses each edge into it, the edges the intervention
+cuts.
 
 ```{eval-rst}
 .. currentmodule:: andrey.viz
