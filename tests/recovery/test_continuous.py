@@ -53,7 +53,8 @@ def _fit(name: str, X: np.ndarray, **kwargs) -> andrey.StructureOutput:
 def _quick_fit(name: str, X: np.ndarray, **kwargs) -> andrey.StructureOutput:
     """Fit ``name`` on the ``QUICK`` schedule, which can stop DAGMA at its iteration limit."""
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.SearchLimitWarning)
+        if name == "dagma":
+            warnings.simplefilter("ignore", andrey.SearchLimitWarning)
         return _fit(name, X, **kwargs, **QUICK[name])
 
 

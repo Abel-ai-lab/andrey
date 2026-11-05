@@ -24,12 +24,15 @@ from andrey.core import backend, env  # noqa: E402
 
 
 def accelerator() -> str | None:
-    """The device to validate: a ``cuda`` or ``mps`` pin if it is available, else whichever
-    accelerator is available, else ``None``. The pin is ``ANDREY_BACKEND``, else ``ANDREY_DEVICE``,
-    read as the package reads them, so an unknown value raises ``ValueError``; a ``cpu`` or
-    ``numpy`` pin gives ``None``, which skips device parity rather than override the pin.
+    """The device to validate, or ``None`` to skip device parity.
+
+    The pin is ``ANDREY_BACKEND``, else ``ANDREY_DEVICE``. Both are read as the package reads
+    them, so an unknown value in either raises ``ValueError``. A ``cuda`` or ``mps`` pin gives that
+    device, or ``None`` when it is unavailable; a ``cpu`` or ``numpy`` pin gives ``None`` rather
+    than override the pin. With no pin, the result is whichever accelerator is available.
     """
-    requested = env.BACKEND.read() or env.DEVICE.read()
+    backend_pin, device_pin = env.BACKEND.read(), env.DEVICE.read()
+    requested = backend_pin or device_pin
     if requested in ("cuda", "mps"):
         return requested if backend._is_available(requested) else None
     if requested in ("cpu", "numpy"):

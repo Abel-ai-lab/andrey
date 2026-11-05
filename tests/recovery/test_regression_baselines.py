@@ -101,10 +101,19 @@ def test_forbidden_regex_catches_leaks():
 RUNNERS = capture.ALGORITHMS | capture.GROUP_ALGORITHMS
 
 
-def test_fits_run_on_numpy_whatever_the_environment(monkeypatch):
+@pytest.fixture(scope="module")
+def module_fixture_backend():
+    """The backend a module fixture fits on while ``ANDREY_BACKEND`` pins the CPU."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("ANDREY_BACKEND", "cpu")
+        return andrey.config.backend
+
+
+def test_fits_run_on_numpy_whatever_the_environment(monkeypatch, module_fixture_backend):
     """The baselines record NumPy numerics, so the suite's NumPy pin outranks ``ANDREY_BACKEND``."""
     monkeypatch.setenv("ANDREY_BACKEND", "cpu")
     assert andrey.config.backend == "numpy"
+    assert module_fixture_backend == "numpy"
 
 
 @pytest.mark.parametrize(("algorithm", "case"), BASELINES, ids=IDS)
