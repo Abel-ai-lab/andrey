@@ -407,16 +407,15 @@ def test_a_seed_gives_the_same_resamples_whatever_the_number_of_fits():
     assert short.fits is not None and bootstrap("hc", data, n_resamples=2).fits is None
 
 
-def test_the_former_n_boot_still_sets_the_number_of_resamples_with_a_warning():
+def test_a_former_name_is_refused_with_its_current_name_before_any_fit():
+    """The bootstrap's ``n_boot`` and a method's former input name raise, each with what it is
+    called now, and a result no longer has ``n_boot``."""
     data = lingam_data()
-    current = bootstrap("hc", data, n_resamples=3, seed=1)
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="n_boot is now n_resamples"):
-        former = bootstrap("hc", data, n_boot=3, seed=1)
-    assert former.n_resamples == 3 and former.table() == current.table()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="BootstrapOutput.n_boot is now"):
-        assert former.n_boot == former.n_resamples
-    with pytest.raises(ValueError, match="n_boot is the former name of n_resamples"):
-        bootstrap("hc", data, n_boot=3, n_resamples=4)
+    with pytest.raises(TypeError, match=r"'n_boot'.*`n_resamples` in 0\.12\.0"):
+        bootstrap("hc", data, n_boot=3)
+    with pytest.raises(TypeError, match=r"'domain_index'.*`env` in 0\.14\.0"):
+        bootstrap("cdnod", data, domain_index=np.arange(len(data)) % 2)
+    assert not hasattr(BootstrapOutput, "n_boot")
 
 
 def test_the_default_seed_follows_andrey_seed(monkeypatch):

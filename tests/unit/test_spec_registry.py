@@ -28,17 +28,10 @@ from andrey.spec.models import Status
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
 _INPUT_FLAGS = ("data", "env")
 
-# The former input flags, which the CLI still takes for one release: the inputs' former names and
-# gies's former intervention matrix, now a form of targets.
-_FORMER_INPUT_FLAGS = (
-    *sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases}),
-    "interventions",
-)
-
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
     {"method", "config", "output", "json", "full", "help", "version", "debug"}
-    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
+    | set(_INPUT_FLAGS)
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
 
@@ -264,7 +257,7 @@ def test_cmd_run_wires_every_input_flag():
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
+    missing = set(_INPUT_FLAGS) - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
 
 

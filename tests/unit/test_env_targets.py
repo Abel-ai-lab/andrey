@@ -19,7 +19,6 @@ import pytest
 import andrey
 from andrey.cli import main
 from andrey.constraint.cdnod import cdnod as cdnod_engine
-from andrey.core import warning_policy
 from andrey.resample import _job
 from andrey.spec import get_spec
 
@@ -124,20 +123,9 @@ def test_one_observational_environment_is_observational_data():
     assert none.structure == andrey.gies(DATA).structure
 
 
-@pytest.mark.parametrize(
-    "call",
-    [
-        pytest.param(lambda: andrey.gies(DATA, interventions=MASK), id="interventions="),
-        pytest.param(lambda: andrey.gies(DATA, MASK), id="the matrix as the second argument"),
-    ],
-)
-def test_a_former_form_warns_once_and_fits_the_same(call, reference):
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        assert _same(call(), reference)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        call()  # the message warns once
+def test_the_matrix_as_the_second_argument_is_refused_with_its_place_now():
+    with pytest.raises(ValueError, match=r"matrix .* goes in targets since 0\.14\.0"):
+        andrey.gies(DATA, MASK)
 
 
 GIES_ERRORS = {
@@ -177,7 +165,6 @@ GIES_ERRORS = {
     "the matrix as the second argument and targets": lambda: andrey.gies(
         DATA, MASK, targets=TARGETS
     ),
-    "interventions and targets": lambda: andrey.gies(DATA, interventions=MASK, targets=MASK),
 }
 
 
@@ -205,14 +192,6 @@ def test_a_bootstrap_resample_keeps_every_environment():
         "gies", DATA, n_resamples=20, env=env, targets={**TARGETS, "one row": []}
     )
     assert out.n_resamples == 20
-
-
-def test_bootstrap_resamples_a_targets_matrix_without_env_with_the_rows():
-    matrix = andrey.bootstrap("gies", DATA, n_resamples=2, targets=MASK)
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        former = andrey.bootstrap("gies", DATA, n_resamples=2, interventions=MASK)
-    assert np.array_equal(former.frequency("->"), matrix.frequency("->"))
 
 
 # --- cdnod: env as numbers, labels, and a column -----------------------------------------------
@@ -278,17 +257,6 @@ def test_cdnod_with_one_domain_is_pc():
     assert np.array_equal(one.structure.to_numpy(), andrey.pc(X).structure.to_numpy())
 
 
-def test_the_former_domain_index_warns_once_and_fits_the_same():
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        assert _same(andrey.cdnod(X, domain_index=DOMAIN), andrey.cdnod(X, DOMAIN))
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        andrey.cdnod(X, domain_index=DOMAIN)  # the message warns once
-    with pytest.raises(ValueError):
-        andrey.cdnod(X, env=DOMAIN, domain_index=DOMAIN)
-
-
 @pytest.mark.parametrize(
     "env",
     [
@@ -315,15 +283,8 @@ def test_bootstrap_carries_a_column_of_env_with_its_rows():
     assert np.array_equal(by_column.frequency("->"), by_values.frequency("->"))
 
 
-def test_bootstrap_draws_cdnod_rows_whole_for_numbers_and_within_domains_for_text():
-    """A numeric index, which cdnod reads as numbers, draws rows as a whole, as under its former
-    name; text labels draw within each domain."""
+def test_bootstrap_draws_cdnod_rows_within_domains_for_text():
     frame = pd.DataFrame(X, columns=["x", "y"])
-    numbers = andrey.bootstrap("cdnod", frame, n_resamples=4, env=DOMAIN)
-    warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning):
-        former = andrey.bootstrap("cdnod", frame, n_resamples=4, domain_index=DOMAIN)
-    assert np.array_equal(numbers.frequency("->"), former.frequency("->"))
     one_row = np.array(["a", "b", "c"])[DOMAIN.astype(int)]
     one_row[0] = "d"  # a domain of one row stays in every subsample
     assert andrey.bootstrap("cdnod", frame, n_resamples=4, env=one_row).n_resamples == 4
@@ -486,13 +447,6 @@ def test_categories_join_across_environments():
     assert _same(apart, pooled)
 
 
-def test_the_former_targets_name_meets_the_same_refusal_in_bootstrap():
-    """``interventions``, gies's former name of ``targets``, as a column of data apart."""
-    apart = {k: t.assign(t="") for k, t in APART.items()}
-    with pytest.raises(ValueError, match="targets maps each environment"):
-        andrey.bootstrap("gies", apart, n_resamples=2, interventions="t")
-
-
 def test_bootstrap_resamples_environments_apart_as_their_stacked_rows():
     apart = andrey.bootstrap("gies", APART, n_resamples=2, targets=TARGETS)
     pooled = andrey.bootstrap("gies", DATA, n_resamples=2, env=ENV, targets=TARGETS)
@@ -528,14 +482,13 @@ def _run(argv, capsys):
 
 @pytest.fixture
 def files(tmp_path):
-    """The chain's data with its environment as a numeric column, the environment alone, its
-    targets as JSON, and its intervention matrix."""
+    """The chain's data with its environment as a numeric column, the environment alone, and its
+    targets as JSON."""
     codes = pd.factorize(ENV)[0]
-    paths = {name: tmp_path / name for name in ("data.csv", "env.csv", "t.json", "mask.csv")}
+    paths = {name: tmp_path / name for name in ("data.csv", "env.csv", "t.json")}
     DATA.assign(e=codes).to_csv(paths["data.csv"], index=False)
     pd.DataFrame({"e": codes}).to_csv(paths["env.csv"], index=False)
     paths["t.json"].write_text(json.dumps({"0": [], "1": ["x1"], "2": ["x2"]}))
-    np.savetxt(paths["mask.csv"], MASK.astype(int), delimiter=",")
     DATA.to_csv(tmp_path / "plain.csv", index=False)
     paths["plain.csv"] = tmp_path / "plain.csv"
     return paths
@@ -570,23 +523,18 @@ def test_cli_env_column_file_and_config_targets_fit_alike(files, tmp_path, capsy
     assert found[0] == [(0, 1, "directed"), (1, 2, "directed")]
 
 
-def test_cli_former_flags_warn_and_fit_alike(files, capsys):
-    new = ["--data", str(files["plain.csv"]), "--env", str(files["env.csv"])]
-    _, out, _ = _run(["run", "gies", *new, f"targets={files['t.json']}", "--json"], capsys)
-    warning_policy._warned.clear()
-    former = ["--data", str(files["plain.csv"]), "--interventions", str(files["mask.csv"])]
-    code, out_former, _ = _run(["run", "gies", *former, "--json"], capsys)
-    assert code == 0 and _edges(out_former) == _edges(out)
-    warned = json.loads(out_former)["run"]["warnings"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in warned}
-
-    _, out, _ = _run(["run", "cdnod", *new, "--json"], capsys)
-    warning_policy._warned.clear()
-    former = ["--data", str(files["plain.csv"]), "--domain-index", str(files["env.csv"])]
-    code, out_former, _ = _run(["run", "cdnod", *former, "--json"], capsys)
-    assert code == 0 and _edges(out_former) == _edges(out)
-    warned = json.loads(out_former)["run"]["warnings"]
-    assert "DeprecatedArgumentWarning" in {w["category"] for w in warned}
+@pytest.mark.parametrize(
+    ("method", "flag", "now"),
+    [
+        ("gies", "--interventions", "`--env` with `targets=`"),
+        ("cdnod", "--domain-index", "`--env`"),
+    ],
+)
+def test_cli_former_flags_are_refused_with_their_current_names(files, capsys, method, flag, now):
+    argv = ["run", method, "--data", str(files["plain.csv"]), flag, str(files["env.csv"])]
+    code, _, err = _run(argv, capsys)
+    message = json.loads(err)["error"]["message"]
+    assert code == 2 and f"{now} in 0.14.0" in message
 
 
 def test_cli_cdnod_needs_env(files, capsys):
@@ -612,16 +560,6 @@ def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkey
     usage = [
         ["run", "gies", "--data", data, "--env", "e", f"targets={files['t.json']}"],
         ["run", "gies", "--data", data, "--env", "missing.csv", f"targets={files['t.json']}"],
-        [
-            "run",
-            "gies",
-            "--data",
-            data,
-            "--interventions",
-            str(files["mask.csv"]),
-            f"targets={files['t.json']}",
-        ],
-        ["run", "cdnod", "--data", data, "--env", env, "--domain-index", env],
         ["run", "gies", "--data", data, "--env", env, "targets=[1, 2]"],
         ["run", "pc", "--data", data, "--domain-index", env],
     ]

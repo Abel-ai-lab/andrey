@@ -271,7 +271,6 @@ _add(
                     "(n_samples, 1), or a column of the data file, which is then not a variable. "
                     "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
                     "1, ... in sorted order.",
-                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
@@ -568,7 +567,6 @@ _add(
                 "observational environment. Every environment needs an entry. null, with no env, "
                 "is observational data.",
                 nullable=True,
-                aliases=("interventions",),
             ),
             concept_param(
                 "score_func",
@@ -1347,7 +1345,6 @@ _add(
                 default=3,
                 doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
                 "search more chains and run longer.",
-                aliases=("depth",),
             ),
             _SEED,
             _N_STARTS,
@@ -1883,7 +1880,6 @@ _add(
                 maximum=1,
                 exclusive_minimum=True,
                 exclusive_maximum=True,
-                aliases=("pc_alpha",),
             ),
             concept_param(
                 "alpha",
@@ -1965,7 +1961,6 @@ _add(
                 doc="How a same-step collider is judged: sepsets = the middle is not in the one "
                 "separating set found; majority = fewer than half of the separating subsets hold "
                 "the middle; conservative = none does. The default majority is tigramite's.",
-                choice_aliases=(("none", "sepsets"),),
             ),
             _INDEP_TEST,
             _CATEGORICAL,
@@ -2090,7 +2085,6 @@ _add(
                 "link is kept when its adjusted p-value is at most alpha.",
             ),
         ),
-        dropped_args=("cv",),
         references=("Granger 1969", "Lutkepohl 2005"),
     )
 )
@@ -2640,15 +2634,6 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
         REGISTRY[_name] = REGISTRY[_name].model_copy(
             update={"params": (*_params[:_cut], _cap, *_params[_cut:])}
         )
-
-
-# Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type. igsp and ut_igsp came later and never took it.
-for _name in CONCEPTS["categorical"].suitable:
-    if _name in ("igsp", "ut_igsp"):
-        continue
-    _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
-    REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
 
 
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
