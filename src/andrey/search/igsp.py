@@ -59,13 +59,12 @@ from typing import Any
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, make_indep_test
+from andrey.core.ci import MIXED_INDEP_TESTS, make_indep_test
 from andrey.core.invariance import InvarianceTest, make_invariance_test
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import to_structure
 from andrey.core.seeding import start_rng
-from andrey.core.ties import tie_ranks
+from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search.gies import cut_pairs, replace_unprotected
 
 __all__ = [
@@ -501,7 +500,7 @@ def _prepared(
     """
     d = X.shape[1]
     mixed = indep_test in MIXED_INDEP_TESTS
-    mask = column_mask(categorical, d) if mixed else np.full(d, indep_test in DISCRETE_INDEP_TESTS)
+    mask = tie_mask(indep_test, categorical, d)
     ranks = tie_ranks(X, mask)
     by_rank = np.argsort(ranks)
     sorted_x = np.ascontiguousarray(X[:, by_rank])

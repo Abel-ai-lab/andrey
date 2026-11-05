@@ -56,7 +56,7 @@ _Z_TOL = 1e-12
 def stable_key(delta: float, n: int) -> float:
     """Scale-invariant, chunk-invariant reduce key component: ``round(delta / n, KEY_DP)``.
 
-    ``n`` is the caller's scale factor (see :data:`KEY_DP`): HC's sample count, GES's variable
+    ``n`` is the caller's scale factor (see :data:`KEY_DP`); GES and GnIES pass the variable
     count. Two deltas that differ only in their last bits quantize to one bucket, so the reduce
     breaks the resulting tie on the deterministic remainder of the caller's key rather than on
     unstable low-order bits. Serial and parallel runs therefore select byte-identical moves however

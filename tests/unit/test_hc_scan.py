@@ -202,6 +202,13 @@ def test_tie_ranks_move_with_the_columns() -> None:
         np.testing.assert_array_equal(tie_ranks(data[:, order]), tie_ranks(data)[order])
 
 
+def test_tie_ranks_stay_importable_from_hc() -> None:
+    """Code written against earlier builds imports ``tie_ranks`` from ``andrey.search.hc``."""
+    from andrey.search.hc import tie_ranks as from_hc
+
+    assert from_hc is tie_ranks
+
+
 _COPIED = np.r_[0, np.random.default_rng(10).integers(-10, 11, 127), 0].astype(np.float64)
 
 

@@ -7,10 +7,6 @@ worker across passes, so its score caches survive. :func:`even_chunks` and
 key, :func:`collect` raises worker failures, :func:`pick_context` chooses the start method, and
 :func:`min_work` reads the crossover gate. Each learner supplies a picklable module-level worker
 initializer and task function.
-
-GES and HC select moves by :data:`~andrey.core.ties.EPS_IMPROVE` and
-:func:`~andrey.core.ties.stable_key`, so the chosen move does not depend on rounding in the Schur
-delta-BIC. The final objective is recomputed from the CPDAG.
 """
 
 from __future__ import annotations
