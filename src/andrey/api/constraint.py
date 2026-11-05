@@ -1203,8 +1203,8 @@ def cdnod(
         changes across the environments, under CD-NOD's assumption that the index is only a cause
         and no hidden common cause varies apart from it [1]_. Their descendants change in
         distribution too, through them, and are not listed. Both are empty for a single
-        environment. With ``"fisherz"`` or ``"student_t"``, only a change in a variable's mean
-        that follows the index's values is found.
+        environment. With ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, only a change in a
+        variable's mean that follows the index's values is found.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
@@ -1263,16 +1263,17 @@ def cdnod(
     environment, not which variables changed in it; when every environment's intervened variables
     are known, :func:`~andrey.gies` uses them.
 
-    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
-    find a change in a variable's mean that follows the index's values. With two domains the coding
-    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result. A change in a variable's noise
-    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
-    unchanged, so the index keeps no edge to that variable. The paper uses a kernel
-    conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
-    ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they
-    find a shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the
-    index is categorical, so every data column may be continuous.
+    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
+    correlation, so they find a change in a variable's mean that follows the index's values. With
+    two domains the coding does not matter. With three domains coded ``0, 1, 2``, a shift in domain
+    ``1`` alone can go undetected, and recoding the domains can change the result. A change in a
+    variable's noise variance alone, or in the size of an effect whose cause has mean zero, leaves
+    the mean unchanged, so the index keeps no edge to that variable. ``"kci"``, the kernel
+    conditional-independence test the paper uses [1]_ [2]_, detects such changes, at a far higher
+    cost per test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index
+    value as a category, so they find a shift in any domain, whatever the coding. With
+    ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so every data column may be
+    continuous.
 
     With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
     between two variables that both keep an edge to the index. For a candidate direction
