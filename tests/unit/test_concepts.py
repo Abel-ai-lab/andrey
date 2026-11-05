@@ -1132,12 +1132,14 @@ def test_a_dropped_argument_is_ignored_with_one_warning(monkeypatch):
 
 
 def test_a_former_value_maps_to_the_current_one_with_one_warning(monkeypatch):
-    renamed(monkeypatch, "pc", "indep_test", choice_aliases=(("fisher", "fisherz"),))
+    renamed(monkeypatch, "pc", "indep_test", choice_aliases=(("student", "student_t"),))
     data = inputs("pc", codes=False)
+    expected = andrey.pc(*data, indep_test="student_t")
+    assert expected != andrey.pc(*data)  # the value tells a forwarded value from an ignored one
     warning_policy._warned.clear()
-    with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='fisher' is now"):
-        out = andrey.pc(*data, indep_test="fisher")
-    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='student' is now"):
+        out = andrey.pc(*data, indep_test="student")
+    assert out == expected
 
 
 def test_an_indep_test_takes_the_registered_tests(monkeypatch):

@@ -148,9 +148,11 @@ def test_a_flag_out_of_range_is_a_usage_error(csv_path, capsys, flags):
     assert code == 2 and json.loads(err)["error"]["code"] == "bad_value"
 
 
-def test_the_former_n_boot_flag_is_a_usage_error(csv_path, capsys):
+def test_the_former_n_boot_flag_is_a_usage_error_with_its_current_name(csv_path, capsys):
     code, _out, err = _run(["bootstrap", "hc", "--data", str(csv_path), "--n-boot", "3"], capsys)
-    assert code == 2 and json.loads(err)["error"]["code"] == "usage_error"
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "usage_error"
+    assert "`--n-resamples` in 0.12.0" in error["message"]
 
 
 def test_a_method_that_cannot_be_bootstrapped_is_an_unsupported_value(csv_path, capsys):

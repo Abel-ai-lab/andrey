@@ -11,6 +11,7 @@ the same at any worker count, and the first ``k`` resamples of a longer run are 
 
 from __future__ import annotations
 
+import inspect
 import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
@@ -24,6 +25,7 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range
+from andrey.api._method import removed_name_error
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
@@ -993,6 +995,9 @@ def bootstrap(
         has a different number of rows from ``data``, ``block_length`` is given for a resampling
         that does not use blocks, ``strict=True`` and the vote has no valid graph of the method's
         kind, or a fit raises it: the error then names the resample in a note.
+    TypeError
+        Before any fit, for ``n_boot`` or an argument name that a release removed from the method;
+        the message gives its current name.
     NotImplementedError
         For ``gin``, whose number of latent nodes varies from fit to fit.
     RuntimeError
@@ -1157,6 +1162,9 @@ def bootstrap(
             "`n_resamples` in 0.12.0"
         )
     spec = _method_spec(method)
+    signature = inspect.signature(getattr(api, spec.name))
+    if (error := removed_name_error(spec.name, signature, method_kwargs)) is not None:
+        raise error
     n_resamples = int_in_range(n_resamples, "n_resamples", 1)
     threshold = _check_threshold(threshold)
     strict = _check_strict(strict)

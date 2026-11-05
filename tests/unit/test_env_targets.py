@@ -525,13 +525,16 @@ def test_cli_env_column_file_and_config_targets_fit_alike(files, tmp_path, capsy
 
 @pytest.mark.parametrize(
     ("method", "flag", "now"),
-    [("gies", "--interventions", "`targets`"), ("cdnod", "--domain-index", "`--env`")],
+    [
+        ("gies", "--interventions", "`--env` with `targets=`"),
+        ("cdnod", "--domain-index", "`--env`"),
+    ],
 )
 def test_cli_former_flags_are_refused_with_their_current_names(files, capsys, method, flag, now):
     argv = ["run", method, "--data", str(files["plain.csv"]), flag, str(files["env.csv"])]
     code, _, err = _run(argv, capsys)
     message = json.loads(err)["error"]["message"]
-    assert code == 2 and f"renamed {now} in 0.14.0" in message
+    assert code == 2 and f"{now} in 0.14.0" in message
 
 
 def test_cli_cdnod_needs_env(files, capsys):
@@ -558,6 +561,7 @@ def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkey
         ["run", "gies", "--data", data, "--env", "e", f"targets={files['t.json']}"],
         ["run", "gies", "--data", data, "--env", "missing.csv", f"targets={files['t.json']}"],
         ["run", "gies", "--data", data, "--env", env, "targets=[1, 2]"],
+        ["run", "pc", "--data", data, "--domain-index", env],
     ]
     for argv in usage:
         code, _, err = _run(argv, capsys)

@@ -146,13 +146,16 @@ def test_n_jobs_resolution(monkeypatch):
 
 
 def test_the_former_worker_names_set_nothing(monkeypatch):
-    """``num_workers``, the former name of ``n_jobs``, raises as an argument of ``andrey.config``
-    and as a setting, and ``ANDREY_NUM_WORKERS`` is not read."""
+    """``num_workers``, the former name of ``n_jobs``, raises as an argument of ``andrey.config``,
+    with its current name, and as a setting; ``ANDREY_NUM_WORKERS`` is not read, and any other
+    unknown argument raises too."""
     monkeypatch.delenv("ANDREY_N_JOBS", raising=False)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
     assert andrey.config.n_jobs == 1
-    with pytest.raises(TypeError, match="num_workers"):
+    with pytest.raises(TypeError, match=r"'num_workers'.*`n_jobs` in 0\.12\.0"):
         andrey.config(num_workers=5)
+    with pytest.raises(TypeError, match="'njobs'"):
+        andrey.config(njobs=5)
     with pytest.raises(AttributeError, match="num_workers"):
         andrey.config.num_workers = 4
     assert andrey.config.n_jobs == 1

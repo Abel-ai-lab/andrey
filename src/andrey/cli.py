@@ -737,6 +737,22 @@ def _with_hint(message: str, hint: str | None) -> str:
     return message if hint is None else f"{message}; {hint}"
 
 
+def _former_flag_hint(command: str, method: str, key: str) -> str | None:
+    """What the former flag ``--key`` of ``andrey <command> <method>`` is called now, if anything.
+
+    ``--n-boot`` of ``bootstrap`` is ``--n-resamples``, and ``gies``'s ``--interventions``, a 0/1
+    matrix, became ``--env`` with ``targets=``; another flag gets the hint of the method argument
+    of its name (:func:`~andrey.core.removed.removal_hint`), spelled as a flag when the method
+    takes it as one.
+    """
+    if command == "bootstrap" and key == "n_boot":
+        return "it was renamed `--n-resamples` in 0.12.0"
+    if method == "gies" and key == "interventions":
+        return "it was replaced by `--env` with `targets=` in 0.14.0"
+    flags = {i.name for i in REGISTRY[method].data.inputs} if method else set()
+    return removal_hint(method, key, flags=flags)
+
+
 def _flag_hint(token: str) -> dict:
     """A structured error for a stale `--flag` token, with a did_you_mean when it names a param."""
     name = token.lstrip("-").replace("-", "_")
@@ -2156,8 +2172,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if key in {p.name for s in REGISTRY.values() for p in s.params}:
                     extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
                 method = next((a for a in args if a in REGISTRY), "")
-                flags = {i.name for i in REGISTRY[method].data.inputs} if method else set()
-                msg = _with_hint(msg, removal_hint(method, key, flags=flags))
+                ctx = getattr(exc, "ctx", None)
+                name = ctx.info_name if ctx is not None else ""
+                msg = _with_hint(msg, _former_flag_hint(name, method, key))
             return emit_error(CliError("usage_error", msg, EXIT_USAGE, **extra))
         return emit_error(CliError("internal", f"{type(exc).__name__}: {exc}", EXIT_INTERNAL))
 

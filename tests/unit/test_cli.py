@@ -428,8 +428,7 @@ def test_former_names_and_values_map_to_current_ones():
 
 
 def test_a_dropped_argument_reaches_the_facade_and_not_the_run_params():
-    """A dropped argument still runs for one release: the facade drops it with a warning, and the
-    run's params omit it."""
+    """A dropped argument goes on to the facade, which ignores it, and the run's params omit it."""
     from andrey.cli import _resolve_params
 
     spec = get_spec("pc").model_copy(update={"dropped_args": ("former",)})

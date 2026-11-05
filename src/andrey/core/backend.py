@@ -194,6 +194,7 @@ class _Config:
         backend: str | None = None,
         n_jobs: int | None = None,
         tie_break: str | None = None,
+        **unknown: object,
     ):
         """Return a context manager that sets the given settings for a ``with`` block.
 
@@ -217,7 +218,14 @@ class _Config:
             On entering the block, if ``backend`` or ``tie_break`` is not a known name or
             ``n_jobs`` is not an integer of at least ``-1``; the message lists the accepted
             values.
+        TypeError
+            At once, for any other keyword; for ``num_workers``, the message gives ``n_jobs``, its
+            name since 0.12.0.
         """
+        if unknown:
+            key = next(iter(unknown))
+            hint = "; it was renamed `n_jobs` in 0.12.0" if key == "num_workers" else ""
+            raise TypeError(f"andrey.config() got an unexpected keyword argument {key!r}{hint}")
         return _scope(backend, n_jobs, tie_break)
 
 
