@@ -2,7 +2,8 @@
 
 :func:`draw` renders a :class:`~andrey.core.structure.GraphStructure` as a self-contained SVG.
 Marks are drawn by shape (arrowhead, hollow circle, tail), and color is kept for uncertain edges
-and latent nodes, so a drawing reads without color. Graphviz places the nodes when pygraphviz (the
+and latent nodes, so a drawing reads without color. Intervened nodes are squares, with a bar across
+each edge the intervention cuts. Graphviz places the nodes when pygraphviz (the
 ``viz`` extra) is installed, and a built-in layering otherwise; edges bend around nodes.
 
 Examples
@@ -260,6 +261,7 @@ def draw(
     engine: str = "auto",
     engine_options: Mapping[str, object] | None = None,
     highlight: Iterable[tuple[int, int]] = (),
+    targets: Iterable[int | str] = (),
 ) -> SVG:
     """Render a causal structure to an SVG string.
 
@@ -298,6 +300,12 @@ def draw(
         ``i`` on the edge between nodes ``i`` and ``j``, and that half of the edge, with a soft
         glow under it (class ``highlight``, for a page to style or animate); add ``(j, i)`` to
         light both ends. The default lights nothing.
+    targets : iterable of int or str, default=()
+        The intervened variables, named by label or by 0-based position: the variables an
+        experiment set from outside, such as the targets of ``do(x)`` or of a soft intervention.
+        Each is drawn as a square, and a bar crosses each arrowhead into it, the edge the
+        intervention cuts. A target no arrowhead points into gets a short barred arrow from
+        outside. A latent target keeps its dashed ring on the square. The default marks none.
 
     Returns
     -------
@@ -312,8 +320,8 @@ def draw(
         If ``structure`` is not a ``GraphStructure``, such as a ``TemporalStructure``.
     ValueError
         If ``positions`` misses a node or places one outside the unit square, ``engine`` is
-        unknown, or ``highlight`` names a pair ``(i, j)`` with ``i == j`` or no edge between
-        ``i`` and ``j``.
+        unknown, ``highlight`` names a pair ``(i, j)`` with ``i == j`` or no edge between
+        ``i`` and ``j``, or ``targets`` names a variable the structure does not have.
     ImportError
         If a Graphviz engine is named and pygraphviz is not installed.
 
@@ -328,6 +336,8 @@ def draw(
     >>> out = andrey.pc(np.column_stack([x, y]))
     >>> svg = andrey.viz.draw(out.structure, dark=True)
     >>> svg.startswith("<svg")
+    True
+    >>> 'class="intervened"' in andrey.viz.draw(out.structure, targets=[0])
     True
     """
     _require_graph(structure)
@@ -356,6 +366,8 @@ def draw(
         raise ValueError(
             f"highlight names no endpoint of an edge between two nodes: {sorted(rings - ends)}."
         )
+
+    marked = frozenset(_target(t, labels) for t in targets)
 
     inside = all(len(label) <= 2 for label in labels)
     widths = [_svg.footprint(label, inside)[0] for label in labels]
@@ -398,5 +410,17 @@ def draw(
             palette=resolved,
             background=background,
             highlight=rings,
+            targets=marked,
         )
     )
+
+
+def _target(name: int | str, labels: list[str]) -> int:
+    """Return the position of a target named by label or by 0-based position."""
+    if isinstance(name, str):
+        if name in labels:
+            return labels.index(name)
+    elif isinstance(name, (int, np.integer)) and not isinstance(name, bool):
+        if 0 <= int(name) < len(labels):
+            return int(name)
+    raise ValueError(f"targets names {name!r}, which is not a variable's label or position.")

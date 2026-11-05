@@ -121,6 +121,10 @@ post or a release card gets the tint and the bold at build time (`_comparison_ta
 `andrey.viz.draw` follows these rules for every kind of graph (DAG, CPDAG, PAG, digraph):
 
 - A latent node is hollow and dashed.
+- An intervened node (`targets=`) is a square, the shape of a regime or decision node in
+  influence diagrams, and a bar crosses each arrowhead into it: the edges an intervention cuts. A
+  target no arrowhead points into gets a short barred arrow from outside. Shape alone carries the
+  mark, so it reads without color, and a latent target keeps its dashed ring.
 - A 2-cycle is two parallel curved edges, distinct from one bidirected edge.
 - An edge that would cross a node it does not join bends around it, so a drawing never suggests an
   edge the graph lacks.

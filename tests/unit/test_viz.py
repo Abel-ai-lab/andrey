@@ -516,3 +516,68 @@ def test_a_temporal_structure_is_drawn_one_graph_at_a_time(render):
     temporal = TemporalStructure.from_lag_graphs([empty, empty])
     with pytest.raises(TypeError, match=r"lag\(k\).*summary_graph\(\)"):
         render(temporal)
+
+
+def _intervention_bars(svg: str) -> list[tuple[float, float]]:
+    """The midpoints of the bars across edges into intervened nodes."""
+    return [
+        ((float(a) + float(c)) / 2, (float(b) + float(d)) / 2)
+        for a, b, c, d in re.findall(
+            r'<line class="intervention" x1="([\d.-]+)" y1="([\d.-]+)" '
+            r'x2="([\d.-]+)" y2="([\d.-]+)"',
+            svg,
+        )
+    ]
+
+
+def test_an_intervened_node_is_a_square_with_a_bar_on_each_arrowhead_into_it() -> None:
+    # x -> y <- w, y -> z: intervening on y cuts both edges into it, not the edge out of it.
+    g = _from(
+        {(0, 1): (TAIL, ARROW), (3, 1): (TAIL, ARROW), (1, 2): (TAIL, ARROW)},
+        4,
+        "dag",
+        labels=["x", "y", "z", "w"],
+    )
+    positions = {0: (0.0, 0.0), 1: (0.5, 0.5), 2: (1.0, 0.5), 3: (0.0, 1.0)}
+    svg = viz.draw(g, targets=["y"], positions=positions, engine="builtin")
+    minidom.parseString(svg)
+    assert svg.count('class="intervened"') == 1
+    bars = _intervention_bars(svg)
+    assert len(bars) == 2
+    square = re.search(r'<rect class="intervened" x="([\d.]+)" y="([\d.]+)"', svg)
+    cx, cy = float(square[1]) + 11.5, float(square[2]) + 11.5
+    # Each bar sits just outside the square, on the side of the parent it cuts off.
+    for bx, by in bars:
+        assert 15 < np.hypot(bx - cx, by - cy) < 35 and bx < cx
+
+
+def test_a_target_no_arrowhead_points_into_gets_a_barred_stub() -> None:
+    g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", labels=["x", "y"])
+    svg = viz.draw(g, targets=[0], engine="builtin")
+    minidom.parseString(svg)
+    assert svg.count('<g class="intervention">') == 1 and len(_intervention_bars(svg)) == 1
+    # A target with an edge into it gets no stub.
+    assert '<g class="intervention">' not in viz.draw(g, targets=[1], engine="builtin")
+
+
+def test_without_targets_the_drawing_is_unchanged() -> None:
+    g = _from({(0, 1): (TAIL, ARROW), (1, 2): (TAIL, TAIL)}, 3, "cpdag", labels=["a", "b", "c"])
+    plain = viz.draw(g, engine="builtin")
+    assert viz.draw(g, targets=(), engine="builtin") == plain
+    assert "intervention" not in plain and "intervened" not in plain
+    # Marking one node leaves the others' circles as they were.
+    assert (
+        viz.draw(g, targets=["c"], engine="builtin").count("<circle") == plain.count("<circle") - 1
+    )
+
+
+def test_a_latent_target_keeps_its_dashed_ring() -> None:
+    g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", node_types=np.array([0, LATENT]))
+    assert re.search(r'<rect class="intervened"[^>]*stroke-dasharray', viz.draw(g, targets=[1]))
+
+
+@pytest.mark.parametrize("target", ["q", 2, -1, True])
+def test_targets_must_name_a_variable(target) -> None:
+    g = _from({(0, 1): (TAIL, ARROW)}, 2, "dag", labels=["x", "y"])
+    with pytest.raises(ValueError, match="targets names"):
+        viz.draw(g, targets=[target])
