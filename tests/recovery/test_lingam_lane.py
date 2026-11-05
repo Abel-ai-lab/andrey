@@ -7,7 +7,7 @@ import pytest
 
 import andrey
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 
 def _linear_sem_group(seed: int, n: int, B: np.ndarray) -> np.ndarray:

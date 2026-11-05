@@ -12,12 +12,7 @@ from andrey.core import TAIL, GraphStructure
 from andrey.core.orient import meek, pdag2dag
 from andrey.search.hc import tie_ranks
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
+from tests.recovery.helpers.harness import assert_recorded_output
 
 
 def test_fci_recovery():

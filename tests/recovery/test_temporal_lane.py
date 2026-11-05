@@ -9,12 +9,7 @@ import pytest
 from andrey.lingam.var import var_lingam
 from andrey.temporal.granger import granger_f_test
 from tests.recovery.helpers import datagen, harness
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
+from tests.recovery.helpers.harness import assert_recorded_output
 
 
 def _panel(seed: int, t_points: int = 4, n: int = 600, p: int = 4) -> list[np.ndarray]:

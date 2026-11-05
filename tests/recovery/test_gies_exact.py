@@ -15,13 +15,7 @@ from andrey.search import exact as exact_module
 from andrey.search import gies as gies_search
 from andrey.search.gies import cut_pairs, replace_unprotected
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output, assert_recorded_output_mec
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-
+from tests.recovery.helpers.harness import assert_recorded_class, assert_recorded_output
 
 _BASELINE_LAMBDA = 2.0
 
@@ -360,11 +354,8 @@ def test_exact_search_recovers_the_planted_class(search_method):
 
 
 def test_exact_search_recovery():
-    assert_recorded_output_mec(
-        andrey.exact_search(datagen.generate("gauss_5v")),
-        "ExactSearch",
-        case="gauss_5v",
-    )
+    out = andrey.exact_search(datagen.generate("gauss_5v"))
+    assert_recorded_class("ExactSearch", out.structure.to_numpy(), case="gauss_5v")
 
 
 def test_gies_output_contract():

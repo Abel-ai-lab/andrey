@@ -23,6 +23,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+import andrey
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import BASELINES_DIR, SCHEMA_VERSION
 from tests.recovery.helpers.project import project_output
@@ -195,48 +196,51 @@ def capture(args: argparse.Namespace) -> None:
 
     out_root = Path(args.out_dir) if args.out_dir else BASELINES_DIR
     algorithms = args.algorithms or (list(ALGORITHMS) + list(GROUP_ALGORITHMS))
-    for name in algorithms:
-        # Branch so each runner is called with its concrete input type (one matrix vs a list).
-        if name in GROUP_ALGORITHMS:
-            group_runner, case = GROUP_ALGORITHMS[name]
-            groups = datagen.generate_groups(case)
-            spec = datagen.GROUP_CASES[case]
-            seeds = [g["seed"] for g in spec["groups"]] if "groups" in spec else [spec["seed"]]
-            input_block = {
-                "case": case,
-                "seeds": seeds,
-                "column_order": datagen.column_order(case).tolist(),
-                "shapes": [list(X.shape) for X in groups],
-                "sha256": datagen.input_sha256(case),
-            }
-            output = group_runner(groups, name)
-        else:
-            runner, case = ALGORITHMS[name]
-            X = datagen.generate(case)
-            input_block = {
-                "case": case,
-                "seed": datagen.CASES[case]["seed"],
-                "column_order": datagen.column_order(case).tolist(),
-                "shape": list(X.shape),
-                "sha256": datagen.input_sha256(case),
-            }
-            output = runner(X, name)
+    # Baselines record NumPy numerics whatever the ANDREY_* variables pin; the recovery suite
+    # compares under the same pin (tests/recovery/conftest.py).
+    with andrey.config(backend="numpy"):
+        for name in algorithms:
+            # Branch so each runner is called with its concrete input type (one matrix vs a list).
+            if name in GROUP_ALGORITHMS:
+                group_runner, case = GROUP_ALGORITHMS[name]
+                groups = datagen.generate_groups(case)
+                spec = datagen.GROUP_CASES[case]
+                seeds = [g["seed"] for g in spec["groups"]] if "groups" in spec else [spec["seed"]]
+                input_block = {
+                    "case": case,
+                    "seeds": seeds,
+                    "column_order": datagen.column_order(case).tolist(),
+                    "shapes": [list(X.shape) for X in groups],
+                    "sha256": datagen.input_sha256(case),
+                }
+                output = group_runner(groups, name)
+            else:
+                runner, case = ALGORITHMS[name]
+                X = datagen.generate(case)
+                input_block = {
+                    "case": case,
+                    "seed": datagen.CASES[case]["seed"],
+                    "column_order": datagen.column_order(case).tolist(),
+                    "shape": list(X.shape),
+                    "sha256": datagen.input_sha256(case),
+                }
+                output = runner(X, name)
 
-        doc = {
-            "schema_version": SCHEMA_VERSION,
-            "algorithm": name,
-            "case": case,
-            "input": input_block,
-            "output": _jsonable(output),
-        }
+            doc = {
+                "schema_version": SCHEMA_VERSION,
+                "algorithm": name,
+                "case": case,
+                "input": input_block,
+                "output": _jsonable(output),
+            }
 
-        out_path = out_root / name / f"{case}.json"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_path, "w") as fh:
-            json.dump(doc, fh, indent=2, sort_keys=True)
-            fh.write("\n")
-        rel = out_path.relative_to(_REPO_ROOT) if out_root is BASELINES_DIR else out_path
-        print(f"  wrote {rel}")
+            out_path = out_root / name / f"{case}.json"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_path, "w") as fh:
+                json.dump(doc, fh, indent=2, sort_keys=True)
+                fh.write("\n")
+            rel = out_path.relative_to(_REPO_ROOT) if out_root is BASELINES_DIR else out_path
+            print(f"  wrote {rel}")
 
 
 def main() -> None:

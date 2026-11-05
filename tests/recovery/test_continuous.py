@@ -44,9 +44,17 @@ def _sample(
 
 
 def _fit(name: str, X: np.ndarray, **kwargs) -> andrey.StructureOutput:
+    """Fit ``name``, which is experimental, so its ``ExperimentalWarning`` is expected."""
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         return FITS[name](X, **kwargs)
+
+
+def _quick_fit(name: str, X: np.ndarray, **kwargs) -> andrey.StructureOutput:
+    """Fit ``name`` on the ``QUICK`` schedule, which can stop DAGMA at its iteration limit."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.SearchLimitWarning)
+        return _fit(name, X, **kwargs, **QUICK[name])
 
 
 def _edges(out: andrey.StructureOutput) -> set[tuple[int, int]]:
@@ -100,7 +108,7 @@ def test_independent_columns_have_no_edges(name) -> None:
 
 @pytest.mark.parametrize("name", NAMES)
 def test_robust_recovers_a_chain_and_takes_a_path_step(name, chain) -> None:
-    out = _fit(name, chain, robust=True, **QUICK[name])
+    out = _quick_fit(name, chain, robust=True)
     assert _edges(out) == set(CHAIN)
     assert out.metadata["path_steps"] >= 1
 
@@ -121,8 +129,8 @@ def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_varia
 @pytest.mark.parametrize("robust", [False, True])
 @pytest.mark.parametrize("name", NAMES)
 def test_a_repeated_fit_is_identical(name, robust, chain) -> None:
-    first = _fit(name, chain, robust=robust, **QUICK[name])
-    second = _fit(name, chain, robust=robust, **QUICK[name])
+    first = _quick_fit(name, chain, robust=robust)
+    second = _quick_fit(name, chain, robust=robust)
     np.testing.assert_array_equal(first.weighted_adjacency, second.weighted_adjacency)
 
 
@@ -131,6 +139,6 @@ def test_a_repeated_fit_is_identical(name, robust, chain) -> None:
 def test_reordering_the_columns_only_reorders_the_weights(name, robust, chain) -> None:
     """The columns are fit in the order of their ranks, so the order they arrive in is lost."""
     order = np.array([2, 0, 1])
-    base = _fit(name, chain, robust=robust, **QUICK[name]).weighted_adjacency
-    moved = _fit(name, chain[:, order], robust=robust, **QUICK[name]).weighted_adjacency
+    base = _quick_fit(name, chain, robust=robust).weighted_adjacency
+    moved = _quick_fit(name, chain[:, order], robust=robust).weighted_adjacency
     np.testing.assert_allclose(moved, base[np.ix_(order, order)], atol=1e-6)

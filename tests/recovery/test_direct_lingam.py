@@ -7,7 +7,7 @@ import andrey
 from andrey.core import stats
 from andrey.lingam import pwling
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 
 
 def _random_linear_sem(seed: int, n: int, d: int, noise: str) -> np.ndarray:

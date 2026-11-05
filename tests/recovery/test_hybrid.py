@@ -8,8 +8,6 @@ class.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -21,18 +19,10 @@ from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, shd, to_cpdag
 from andrey.search.hybrid import candidate_graph
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.harness import assert_recorded_output
 from tests.recovery.helpers.moves import class_gain, grid
 from tests.recovery.helpers.oracle import DSeparation
 from tests.recovery.helpers.project import found_dag
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
-
-
-@pytest.fixture(autouse=True)
-def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 def _er_sample(d: int, seed: int, n: int = 2000):

@@ -20,19 +20,20 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 import pytest  # noqa: E402
 
-from andrey.core import backend, env, warning_policy  # noqa: E402
+from andrey.core import backend, env  # noqa: E402
 
 
 def accelerator() -> str | None:
-    """The device to validate: an explicit ``ANDREY_DEVICE`` (cuda/mps) if present, else whichever
-    accelerator is available, else ``None`` (also ``None`` if a requested device is unavailable).
+    """The device to validate: a ``cuda`` or ``mps`` pin if it is available, else whichever
+    accelerator is available, else ``None``. The pin is ``ANDREY_BACKEND``, else ``ANDREY_DEVICE``,
+    read as the package reads them, so an unknown value raises ``ValueError``; a ``cpu`` or
+    ``numpy`` pin gives ``None``, which skips device parity rather than override the pin.
     """
-    requested = os.environ.get("ANDREY_DEVICE", "").strip().lower()
-    requested = {"metal": "mps"}.get(requested, requested)
-    if requested in ("cpu", "numpy", "none"):
-        return None  # an explicit non-accelerator pin: skip device-parity rather than override it
+    requested = env.BACKEND.read() or env.DEVICE.read()
     if requested in ("cuda", "mps"):
         return requested if backend._is_available(requested) else None
+    if requested in ("cpu", "numpy"):
+        return None
     for dev in ("cuda", "mps"):
         if backend._is_available(dev):
             return dev
@@ -42,10 +43,10 @@ def accelerator() -> str | None:
 def pytest_configure(config) -> None:
     """Fail the whole session (not skip) when a GPU is required but none is present."""
     try:
-        require = env.REQUIRE_GPU.read()
+        missing = env.REQUIRE_GPU.read() and accelerator() is None
     except ValueError as exc:
         raise pytest.UsageError(str(exc)) from exc
-    if require and accelerator() is None:
+    if missing:
         raise pytest.UsageError(
             "ANDREY_REQUIRE_GPU is set but no CUDA/MPS accelerator is available "
             "(torch missing, or torch.cuda.is_available() is False)"
@@ -61,13 +62,11 @@ def device() -> str:
 
 
 @pytest.fixture(autouse=True)
-def _deterministic_and_isolated():
-    """Deterministic torch kernels for the on-device checks; isolate process-level backend state.
+def _deterministic():
+    """Deterministic torch kernels for the on-device checks.
 
     ``use_deterministic_algorithms`` is process-global, so its prior value is saved and restored
-    (a full local ``pytest`` run must not leak it into the ``tests/unit`` torch tests). The backend
-    reset mirrors ``tests/unit/conftest.py`` -- that autouse reset is dir-scoped, and ``tests/gpu``
-    sorts first, so without this a pinned backend or warn-once entry would leak into later lanes.
+    (a full local ``pytest`` run must not leak it into the ``tests/unit`` torch tests).
     """
     torch = backend.torch()
     prev = torch.are_deterministic_algorithms_enabled() if torch is not None else None
@@ -76,6 +75,3 @@ def _deterministic_and_isolated():
     yield
     if torch is not None:
         torch.use_deterministic_algorithms(prev)
-    backend.config._backend = None
-    backend.config._n_jobs = None
-    warning_policy._warned.clear()

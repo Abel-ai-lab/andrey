@@ -33,13 +33,8 @@ from andrey.search.xges import (
 )
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
-from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.harness import assert_recorded_output
 from tests.recovery.helpers.xges_rescan import _marks_total, _sets, xges_rescan
-
-
-@pytest.fixture(autouse=True)
-def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANDREY_DEVICE", "numpy")
 
 
 def _er_sample(d: int, avg_degree: float, n: int, seed: int) -> data.CausalDataset:
