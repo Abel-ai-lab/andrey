@@ -696,9 +696,8 @@ def comparisons(summary: dict) -> list[dict]:
     - ``andrey_s`` and ``comparator_s``: the median fit times, ``None`` past a time cap;
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`;
-    - ``win``: whether the row may count as Andrey's accuracy win: its summary records no card
-      verdict, or the release card counts it better (``card_verdict``). A row the card did not
-      judge records a null verdict and never counts.
+    - ``card_verdict``: the release card's verdict on the row, "better", "tie", or "worse"; null
+      where the card did not judge it, and "unrecorded" where the summary predates the field.
 
     Rows are those :func:`shown_rows` keeps. The summary's ``reach`` rows are excluded: they cover
     sizes the other package did not finish or run, so they have no paired time.
@@ -722,7 +721,7 @@ def comparisons(summary: dict) -> list[dict]:
                     "at_least": at_least,
                     "andrey_errors": row[ours],
                     "comparator_errors": row[theirs],
-                    "win": "card_verdict" not in row or row["card_verdict"] == "better",
+                    "card_verdict": row.get("card_verdict", "unrecorded"),
                     # The empty graph's error count; in pairwise comparisons, it gets every
                     # pair wrong.
                     "empty_errors": row["paired"] if pairs else row.get(empty) if empty else None,
@@ -1150,23 +1149,31 @@ def accuracy_cards(summaries: list[dict]) -> list[str]:
 
 def accuracy_rows(summaries: list[dict]) -> list[dict]:
     """Per method and package compared: the method's name and spec, the package, and both
-    packages' errors summed over the sizes where both have a graph, counting only the rows that
-    may be a win (``win`` in :func:`comparisons`), so a comparison its release card calls a tie
-    never reads as one."""
+    packages' errors summed over the sizes where both have a graph.
+
+    Where a summary records the release card's verdicts (``card_verdict`` in
+    :func:`comparisons`), the sums leave out the rows the card did not judge, and a comparison
+    with no row the card counts better is left out, so a comparison the card calls a tie never
+    reads as a win. Its ties stay in the sums, as every row does in the older summaries."""
     rows = []
     for name, methods in time_groups(summaries):
         by: dict[str, dict] = {}
         for c in error_comparisons(methods):
-            if not c["row"]["win"]:
+            verdict = c["row"]["card_verdict"]
+            if verdict is None:
                 continue
             row = by.setdefault(
                 c["method"]["comparator"],
                 {"name": name, "spec": c["method"]["spec"], "family": c["method"]["family"],
-                 "comparator": c["method"]["comparator"], "ours": 0.0, "theirs": 0.0},
+                 "comparator": c["method"]["comparator"], "ours": 0.0, "theirs": 0.0,
+                 "verdicts": set()},
             )  # fmt: skip
             row["ours"] += c["row"]["andrey_errors"]
             row["theirs"] += c["row"]["comparator_errors"]
-        rows += by.values()
+            row["verdicts"].add(verdict)
+        rows += [
+            r for r in by.values() if "better" in r["verdicts"] or r["verdicts"] == {"unrecorded"}
+        ]
     return rows
 
 

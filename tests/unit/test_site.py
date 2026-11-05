@@ -1248,7 +1248,8 @@ def test_a_row_its_release_card_does_not_count_better_is_never_a_win():
         ]
         return [r["name"] for r in build.family_wins([{**SUMMARY, "methods": methods}])]
 
-    # Rows the card counts better stay wins; ties, and rows it did not judge, drop out.
+    # A comparison with a row the card counts better stays a win; one of ties, or of rows the
+    # card did not judge, drops out.
     assert best["name"] in judged("better")
     assert best["name"] not in judged("tie")
     assert best["name"] not in judged(None)
