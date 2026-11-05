@@ -10,6 +10,43 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `gnies` is supported and joins the quality gate. Against gnies 0.3.3, the authors' package, on
+  simulated data in the paper's settings and the settings it claims, 10 variables, 10 to 1,000
+  rows per environment, and the targets unknown, `gnies` is worse in none of the 21 settings, on
+  the graph or on the targets, and makes fewer errors on the graph in 2 with 10 rows per
+  environment and on the targets in 1 of them, on fresh datasets too. It fits about 34 times
+  faster on one core (median). ([#665], [#694])
+- `ut_igsp` is supported and joins the quality gate, which also checks the targets it learns.
+  Against graphical-model-learning 0.1a8, the authors' library, in the paper's setting with every
+  kind of intervention it claims, `ut_igsp` at its defaults is worse in none of the 112
+  comparisons, on the graph or the targets, and better in 1 on fresh datasets; 17 more were lower
+  on the first datasets and on those that chose the default, which count as ties. ([#668],
+  [#694])
+- `icp` is supported and joins the quality gate, scored by the errors in the target's parents.
+  Against InvariantCausalPrediction 0.8 it accepts the same sets on all 5,220 paired fits with two
+  environments, and every comparison ties; with three or more environments Andrey corrects the
+  approximate test by the number of environments, as the paper does (an allowlisted
+  correct-by-paper difference). ([#677], [#694])
+- `camuv` is supported and joins the quality gate, scored by its directed edges against the edges
+  it can identify as direct. Against lingam 1.13.0 and causal-learn 0.1.4.8 it ties all three
+  references in each of the 9 judged settings, two of them after a rerun on fresh datasets, and
+  fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
+  core (median). With one node in five hidden and 12 observed variables or fewer, no
+  implementation makes fewer errors than the empty graph: at 8 observed and 2 hidden, `camuv` makes
+  1.50 more errors than it on seeds 0 to 19 and 1.20 more on seeds 20 to 40, and the references
+  1.85 to 1.90 and 1.20 to 1.30 more. ([#675], [#694])
+- `dynotears` is supported and joins the quality gate. Against CausalNex 0.12.2, the authors'
+  implementation, it ties in 32 of the 38 judged settings, makes fewer errors in 5, each replicated
+  on fresh seeds, all with noise of mean 1, and more in one, exponential noise of mean 0 with 100
+  variables and 50 time steps, the cost of centering the columns, the default because it fits the
+  intercept the paper's loss leaves out (an allowlisted trade-off). ([#682], [#694])
+- `igsp` is supported and joins the quality gate. Against graphical-model-learning 0.1a8, the
+  authors' library, in the settings of its papers with every target given, `igsp` at its default
+  level, one over the observational rows, is worse in none of the 114 comparisons and better in 2,
+  on fresh datasets too. ([#692], [#694])
+
 ### Breaking
 
 - These arguments have new names, so that one name, `env`, gives each row's environment in both
@@ -31,43 +68,80 @@ names its pull request.
   and a `SoftIntervention`. A sample of several environments comes pooled with `env`, each row's
   environment, and `targets`, each environment's intervened columns, for the linear, nonlinear,
   location-scale, and discrete models. ([#659], [#674])
+- `andrey.data` takes options for the simulations of interventional benchmarks, each off by default,
+  so every sample at the defaults is unchanged: `soft(weights="redraw")` draws each parent weight
+  anew from the functional's `weight_range`, `soft(noise_scale=(low, high))` multiplies the noise of
+  each row by its own draw from `U[low, high]`, `model_seed=` on `SCM.sample` and `sample_discrete`
+  keeps one model across datasets while `seed` draws the rows, `functional.linear(positive=True)`
+  makes every weight positive, and `variance_range=` on the noise families draws each noise variance
+  from a range. The provenance of a sample names `positive`, `variance_range`, and
+  `heteroscedastic` when they are set. ([#690])
 - `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
   0/1 matrix, with `--env` and `targets=` in `andrey run` and `andrey bootstrap`, whose resamples
   for `gies` or text labels keep the same share of every environment's rows. ([#663])
-- `ut_igsp`, experimental, learns from an observational environment and settings whose
-  intervention targets are known in part or not at all (UT-IGSP, Squires, Wang, and Uhler 2020):
-  it returns the interventional essential graph and, in `metadata["targets"]`, each setting's
-  targets, known and learned. It takes `env` and `targets` as `gies` does, with `None` in the
-  mapping for a setting whose targets are unknown, and `invariance_test`, `"gaussian"` or
-  `"indicator"`, the test of whether a variable's distribution given others changes. Against
-  graphical-model-learning 0.1a8, the authors' library, on simulated data in the paper's setting
-  with every kind of intervention it claims (20 variables, 5 settings, 1,000 to 5,000 rows per
-  setting, up to 3 unknown targets per setting), `ut_igsp` at its defaults, alpha one over the
-  observational rows and 10 starts, is worse in none of the 112 comparisons, on the graph or the
-  targets, and better in 18, its errors lower on two sets of datasets (for 17 of the 18 the second
-  set is the one its default was chosen on); at the paper's alpha `1e-5` it is worse in none and
-  better in none. A median fit on 20 variables takes 0.24 s, about 1.7 times the library's time
-  on one core. ([#668])
-- `andrey.gnies`, experimental, learns from linear-Gaussian data pooled from two or more
-  environments that differ in the noise variances of variables it is not told: it returns those
-  variables, the targets, in `metadata["index_edges"]`, with the interventional essential graph
-  they orient (Gamella et al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the
-  authors' package, on simulated data in the paper's settings and the settings it claims, 10
-  variables, 10 to 1,000 rows per environment, and the targets unknown, `gnies` is worse in none of
-  the 21 settings, on the graph or on the targets, and makes fewer errors on the graph in 2 with 10
-  rows per environment and on the targets in 1 of them, on fresh datasets too; at the standard BIC
-  the two return the same graph and targets on 412 of 420 datasets. It fits about 34 times faster
-  on one core (median) and reaches 100 variables, with a median SHD of 2.5 against the empty
-  graph's 135 in a median 176 s. ([#665])
-- `andrey.icp`, experimental, finds the causal parents of one `target` from continuous data pooled
-  from several environments that leave the target's mechanism alone (Peters, Buhlmann and
-  Meinshausen 2016), by the paper's approximate or exact test, with each variable's p-value and
-  confidence interval. Against InvariantCausalPrediction 0.8, the authors' package, on simulated
-  data in the paper's settings, it accepts the same sets on all 5,220 paired fits with two
-  environments, and it names a variable outside the true parents in at most 1.23% of fits at
-  `alpha=0.05` in the settings it claims. ([#677])
+- `cdnod`, `gies`, `gnies`, `igsp`, and `ut_igsp` also take their data as each environment's rows
+  apart, as gnies, the GnIES authors' package, and the UT-IGSP authors' library do: a list of
+  DataFrames or 2-D arrays, each labeled by its position, or a dict from each label to its table,
+  with `env` left out and `targets` a mapping from those labels. The rows are stacked in that order,
+  so the fit is that of the stacked table with `env`, and `andrey.bootstrap` resamples within each
+  environment, `cdnod`'s domains included. In Python, `cdnod`'s `env` is optional for this, and one
+  table without it raises `TypeError`; the command line still needs `--env`. ([#676])
+- `StructureOutput` metadata takes `int`, `float`, and `bool` keys in a nested mapping, such as the
+  labels of `env` that key `ut_igsp`'s `metadata["targets"]`; `save` writes them as their JSON
+  text, `"1"` for `1`. A nested mapping that mixes text and number keys, or a NumPy, tuple, or
+  `None` key, raises `TypeError`. ([#680])
+- `ut_igsp` learns from an observational environment and settings whose intervention targets are
+  known in part or not at all (UT-IGSP, Squires, Wang, and Uhler 2020): it returns the
+  interventional essential graph and, in `metadata["targets"]`, each setting's targets, known and
+  learned, keyed by the labels of `env`, so they pass back as `targets`. It takes `env` and
+  `targets` as `gies` does, with `None` in the mapping for a setting whose targets are unknown, and
+  `invariance_test`, `"gaussian"` or `"indicator"`, the test of whether a variable's distribution
+  given others changes. Against graphical-model-learning 0.1a8, the authors' library, on simulated
+  data in the paper's setting with every kind of intervention it claims (20 variables, 5 settings,
+  1,000 to 5,000 rows per setting, up to 3 unknown targets per setting), `ut_igsp` at its defaults,
+  alpha one over the observational rows and 10 starts, is worse in none of the 112 comparisons, on
+  the graph or the targets, and better in 1, its errors lower on the first datasets and on fresh
+  ones; in 17 more they were lower on the first datasets and on those its default was chosen on,
+  which are not fresh, so these count as ties. At the paper's alpha `1e-5` it is worse in none and
+  better in none. A median fit on 20 variables takes 0.24 s, about 1.7 times the library's time on
+  one core. ([#668], [#694])
+- `igsp` learns the interventional essential graph from an observational environment and settings
+  whose targets are all known (IGSP, Wang et al. 2017; Yang, Katcoff, and Uhler 2018), the same
+  inputs as `gies`: it searches variable orders for the DAG with the fewest edges, then the fewest
+  edges that the settings' invariance tests contradict. It takes the arguments of `ut_igsp`, with
+  the same default `alpha=None`, one over the number of observational rows, and returns the level
+  used in `metadata["alpha"]`. Against graphical-model-learning 0.1a8, the authors' library, on
+  simulated data in the papers' settings (7 to 20 variables, perfect, inhibiting, and imperfect
+  interventions, 1,000 to 100,000 rows per setting), `igsp` at its defaults, with the library at
+  alpha `1e-3`, is worse in none of the 114 comparisons and better in 2, its errors lower on two
+  sets of datasets; in 15 more they were lower on one set only, which count as ties. Alpha `1e-3`
+  also has fewer errors in 17 on that set, as many as the default, and a rule written before the run
+  gives that tie to one over the observational rows. At alpha `1e-3` with 10 starts, with the
+  library at the same level, `igsp` is worse in none and better in 10, its errors lower on two sets
+  of datasets, all in settings of two or more targets, where the library's test departs from the
+  paper; against a copy of the library corrected to the paper it is worse in none and better in
+  none. Interval ends that are floating-point residue of 0 are read as 0. A median fit takes 1.8
+  times the library's time on one core at 1,000 rows per setting and 4.3 times at 10,000. ([#692])
+- `andrey.gnies` learns from linear-Gaussian data pooled from two or more environments that differ
+  in the noise variances of variables it is not told: it returns those variables, the targets, in
+  `metadata["changing_variables"]`, with the interventional essential graph they orient (Gamella et
+  al. 2022). Known targets go in `targets`. Against gnies 0.3.3, the authors' package, on simulated
+  data in the paper's settings and the settings it claims, 10 variables, 10 to 1,000 rows per
+  environment, and the targets unknown, `gnies` is worse in none of the 21 settings, on the graph
+  or on the targets, and makes fewer errors on the graph in 2 with 10 rows per environment and on
+  the targets in 1 of them, on fresh datasets too; at the standard BIC the two return the same graph
+  and targets on 412 of 420 datasets. It fits about 34 times faster on one core (median) and
+  reaches 100 variables, with a median SHD of 2.5 against the empty graph's 135 in a median 176 s.
+  ([#665])
+- `andrey.icp` finds the causal parents of one `target` from continuous data pooled from several
+  environments that leave the target's mechanism alone (Peters, Buhlmann and Meinshausen 2016), by
+  the paper's approximate or exact test, with each variable's p-value and confidence interval.
+  Against InvariantCausalPrediction 0.8, the authors' package, on simulated data in the paper's
+  settings, it accepts the same sets on all 5,220 paired fits with two environments, and it names a
+  variable outside the true parents in at most 1.23% of fits at `alpha=0.05` in the settings it
+  claims. ([#677])
 
 ### Changed
 
@@ -75,29 +149,45 @@ names its pull request.
   data, most of all `mmpc`'s default CPDAG search, with bit-identical outputs. ([#662])
 - `andrey --help --json` lists a data input's former names under `aliases` again, such as
   `cdnod`'s `domain_index`. ([#663])
+- `targets=` reads a text key that spells a number as the label of `env` it spells, in Python as on
+  the command line, so a mapping read back from JSON passes as it is: `"1"` names the label `1`.
+  Two keys that name one label, such as `1` and `"1"`, raise `ValueError` instead of the last one
+  winning. ([#680])
+- `andrey run` and `andrey bootstrap` read an `--env` of whole numbers as integers, so the labels in
+  their output and messages read `1`, not `1.0`; the graphs do not change. ([#680])
 - `gies` and `ut_igsp` prepare their rows faster, with bit-identical outputs. On one core, with 20
-
   variables, an observational environment, and 5 settings that each intervene on one variable,
   `gies` fits about 3 times as fast at 10,000 rows per environment and 1.8 to 2.2 times as fast at
   100,000, and `ut_igsp` about 1.2 times as fast. The ranks that break ties, which most methods
   compute, take about a quarter less time. ([#679])
-
 - `camuv`'s Limitations report its benchmark against three references: lingam 1.13.0 and
-
   causal-learn 0.1.4.8, each run with sets of up to 3 variables, the paper's setting, and lingam at
   its default of 2, on simulated nonlinear additive data with and without hidden variables, 4 to 50
-  observed variables and 500 to 2,000 rows, and on the paper's simulation. `camuv` is worse in none
-  of the 9 judged settings against any of the three, two of them after a rerun on fresh datasets,
-  and fits 2.1 to 3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one
-  core (median). With one node in five hidden and 12 observed variables or fewer, no implementation
-  makes fewer errors than the empty graph. `camuv` stays experimental. ([#675])
+  observed variables and 500 to 2,000 rows, and on the paper's simulation. `camuv` ties all three
+  in each of the 9 judged settings, two of them after a rerun on fresh datasets, and fits 2.1 to
+  3.1 times faster than lingam and 7.4 to 13.5 times faster than causal-learn on one core
+  (median). With one node in five hidden and 12 observed variables or fewer, no implementation
+  makes fewer errors than the empty graph. ([#675])
 - `dynotears`'s Limitations report its benchmark against CausalNex 0.12.2, the authors'
   implementation, on the structural vector autoregressions of the paper's design, with 5 to 100
-  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it makes no
-  more errors in 37 of the 38 judged settings, fewer in 6, all with noise of mean 1, whose mean its
+  variables, 500 and 50 time steps, and Gaussian and exponential noise of mean 0 and 1: it ties in
+  32 of the 38 judged settings, makes fewer errors in 5, all with noise of mean 1, whose mean its
   centering absorbs, and more in one, exponential noise of mean 0 with 100 variables and 50 time
-  steps, where the centering costs about one time step of data. `dynotears` stays experimental.
-  ([#682])
+  steps, where the centering costs about one time step of data. ([#682])
+- The Limitations of `cam` and `resit` and the subsampling evidence in `bootstrap` count a setting
+  whose paired interval contains 0 as a tie instead of saying the method made no more errors there.
+  ([#687])
+- For contributors, `qa/reference_parity.py` reads `"direct_errors"` as an entry's `metric`, the
+  directed edges against the edges between observed variables that no hidden path joins, and the
+  parity allowlist takes the cause `trade-off`: the row is the cost of a default chosen for what it
+  gains on other rows. The check also judges a row's `floor` record, Andrey's and the reference's
+  error minus the empty estimate's, on the first seeds: the floor applies only where the
+  reference's interval lies wholly below 0, and there Andrey's must too; elsewhere it is printed
+  and not judged. The record's `applies` and `pass` must agree with its intervals, a floor without
+  the reference's interval is an error, and on a row with a replication a floor failure counts only
+  if the replication's floor, where it records one, fails too. A tie-break's evidence reverses the
+  column order or, for a method whose result does not depend on it, the tie ranks
+  (`"tie_ranks": "reversed"`). ([#694])
 
 ### Fixed
 
@@ -1734,6 +1824,12 @@ First alpha release.
 [#668]: https://github.com/Abel-ai-lab/andrey/pull/668
 [#674]: https://github.com/Abel-ai-lab/andrey/pull/674
 [#675]: https://github.com/Abel-ai-lab/andrey/pull/675
+[#676]: https://github.com/Abel-ai-lab/andrey/pull/676
 [#677]: https://github.com/Abel-ai-lab/andrey/pull/677
 [#679]: https://github.com/Abel-ai-lab/andrey/pull/679
+[#680]: https://github.com/Abel-ai-lab/andrey/pull/680
 [#682]: https://github.com/Abel-ai-lab/andrey/pull/682
+[#687]: https://github.com/Abel-ai-lab/andrey/pull/687
+[#690]: https://github.com/Abel-ai-lab/andrey/pull/690
+[#692]: https://github.com/Abel-ai-lab/andrey/pull/692
+[#694]: https://github.com/Abel-ai-lab/andrey/pull/694
