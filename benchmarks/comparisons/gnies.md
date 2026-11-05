@@ -134,7 +134,8 @@ the CRC-32 of the cell, metric, and comparison names. Andrey must also beat the 
 wherever the reference does: on each error, where the interval of the reference's error minus the
 empty estimate's (the empty graph's SHD, or the target error of no targets, the true targets'
 count) lies entirely below 0, Andrey's must lie entirely below 0 too. Elsewhere the floor does not
-apply and is reported with its numbers.
+apply and is reported with its numbers. The floor is judged on seeds 0 to 19; the rerun's floor only
+confirms a failure there, as the rerun does for a worse cell.
 
 Run it with the reference's environment built as above:
 
@@ -230,13 +231,13 @@ sets and in F10 on seeds 0 to 19, where the reference's target error was below t
 count, and Andrey passed it: its target error minus that count was -4.65 [-5.2, -4.15] and -5.1
 [-5.6, -4.65] in C10 and -1.3 [-1.65, -0.95] in F10.
 
-D10 failed it on seeds 20 to 39 only. On seeds 0 to 19 the reference's SHD minus the empty graph's
-was 0.3 [-1.65, 2.35], so the floor did not apply there; Andrey's was -2.1 [-4.35, 0.2]. On seeds
-20 to 39 the reference's was -2.16 [-3.95, -0.42] over its 19 finished fits, so the floor applied,
-and Andrey's was -2.05 [-4.15, 0.1], whose interval reaches above 0: a fail. On those seeds
-Andrey's SHD ties the reference's (D -0.42 [-2.05, 1.05]), and the reference's target error was
-above the empty set's, 0.84 [0.42, 1.26] more errors than the true targets' count, where Andrey's
-was 0.15 [-0.2, 0.5].
+D10 failed it on seeds 20 to 39 only, and that does not count: the floor is judged on seeds 0 to 19.
+On seeds 0 to 19 the reference's SHD minus the empty graph's was 0.3 [-1.65, 2.35], so the floor did
+not apply there; Andrey's was -2.1 [-4.35, 0.2]. On seeds 20 to 39 the reference's was -2.16
+[-3.95, -0.42] over its 19 finished fits, so the floor applied, and Andrey's was -2.05 [-4.15, 0.1],
+whose interval reaches above 0. On those seeds Andrey's SHD ties the reference's (D -0.42
+[-2.05, 1.05]), and the reference's target error was above the empty set's, 0.84 [0.42, 1.26] more
+errors than the true targets' count, where Andrey's was 0.15 [-0.2, 0.5].
 
 With 10 rows per environment, a target with 9 parents can fit one environment's rows exactly once
 their mean is taken out, and its likelihood then has no maximum. Andrey makes a target with more

@@ -440,11 +440,11 @@ distribution given its parents differs from the observational one. Its default l
 conditional-independence and invariance tests, `alpha=None`, is one over the number of observational
 rows, `0.001` at 1,000 rows: on simulated data in the paper's setting, against the paper's reference
 implementation at the paper's `1e-5`, it was worse in none of 112 comparisons and better in 1 on
-fresh datasets, and lower in 17 more on the datasets that chose it. It
-returns the interventional essential graph with each setting's targets in `metadata["targets"]`,
-keyed by the labels of `env`, and the level used in `metadata["alpha"]`. The targets pass back as
-`targets`, where they are known: `ut_igsp` may learn more, and `gies` refits the graph under exactly
-these. A setting where it found no target maps to `[]`, which `targets` reads as observational. The
+fresh datasets, and lower in 17 more on the datasets that chose it. It returns the interventional
+essential graph with each setting's targets in `metadata["targets"]`, keyed by the labels of `env`,
+and the level used in `metadata["alpha"]`. The targets pass back as `targets`, where they are known:
+`ut_igsp` may learn more, and `gies` refits the graph under exactly these. A setting where it found
+no target maps to `[]`, which `targets` reads as observational. The
 [0.14.0](benchmarks/0.14.0.md#ut-igsp) release card measures it against graphical-model-learning,
 the authors' library.
 
