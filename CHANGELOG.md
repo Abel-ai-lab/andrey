@@ -78,6 +78,11 @@ names its pull request.
   makes every weight positive, and `variance_range=` on the noise families draws each noise variance
   from a range. The provenance of a sample names `positive`, `variance_range`, and
   `heteroscedastic` when they are set. ([#690])
+- `andrey.viz.draw(structure, targets=)` marks the intervened variables, named by label or by
+  position: each is drawn as a square, and a bar crosses each arrowhead into it, the edges the
+  intervention cuts; a target no arrowhead points into gets a short barred arrow from outside. The
+  mark is drawn by shape, so it reads without color, and a latent target keeps its dashed ring.
+  ([#707])
 - `gies(data, env, targets=)` and `cdnod(data, env)` take each row's environment as labels, text
   or numbers, or as the name of a DataFrame column, and `gies`'s `targets` takes each
   environment's intervened variables as a mapping from the labels of `env`, as a column, or as the
@@ -1838,3 +1843,4 @@ First alpha release.
 [#692]: https://github.com/Abel-ai-lab/andrey/pull/692
 [#694]: https://github.com/Abel-ai-lab/andrey/pull/694
 [#702]: https://github.com/Abel-ai-lab/andrey/pull/702
+[#707]: https://github.com/Abel-ai-lab/andrey/pull/707
