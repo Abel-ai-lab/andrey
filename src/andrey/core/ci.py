@@ -788,8 +788,6 @@ _MEANS_FILLED = np.zeros((_MEANS_N + 1, _MEANS_N + 1), dtype=bool)  # by n and c
 # A block of tests counted by :meth:`ChiSquare._given`: the positions of its tests in the scan,
 # their table bounds, their statistics, and the margins of their tables.
 _Counted = tuple[np.ndarray, np.ndarray, np.ndarray, _Margins]
-# The batched chi-square path takes a test whose conditioning set's configurations times its table
-# cells are at most max(DENSE_ROWS * n, DENSE_MIN), and the scalar path above.
 
 
 def _segment_sums(values: np.ndarray, cuts: np.ndarray) -> np.ndarray:

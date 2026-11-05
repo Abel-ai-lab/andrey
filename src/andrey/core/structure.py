@@ -952,8 +952,8 @@ class GraphStructure(Structure):
         -------
         np.ndarray of int32
             The adjacent node indices, ascending and read-only; includes ``i`` if it has a
-            self-loop. Unlike :meth:`parents` and the other graph queries, which return labels,
-            it returns positions.
+            self-loop. They are positions even when the graph has labels, by which
+            :meth:`parents` and the other graph queries name their nodes.
         """
         from . import _queries
 

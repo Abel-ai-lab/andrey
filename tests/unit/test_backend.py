@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import subprocess
 import sys
 
@@ -10,7 +11,12 @@ import pytest
 
 import andrey
 from andrey.core import backend, stats, warning_policy
-from andrey.core.env import BACKENDS
+from andrey.core.env import (
+    BACKENDS,
+    CMIKNN_GPU_THRESHOLD,
+    KCI_GPU_THRESHOLD,
+    PNL_GPU_THRESHOLD,
+)
 
 
 def test_auto_dispatch_stays_on_numpy_below_threshold(monkeypatch):
@@ -411,6 +417,28 @@ def test_pinned_mps_is_selected(fake_mps, monkeypatch, var, value):
     monkeypatch.setattr(backend, "_is_live", lambda b: False)
     monkeypatch.setenv(var, value)
     assert backend.resolve(1, 10**9) == "mps"
+
+
+@pytest.mark.parametrize(
+    ("op", "setting"),
+    [("kci", KCI_GPU_THRESHOLD), ("cmiknn", CMIKNN_GPU_THRESHOLD), ("pnl", PNL_GPU_THRESHOLD)],
+)
+def test_select_by_size_reads_the_op_cutoff_and_never_chooses_mps(monkeypatch, op, setting):
+    # A metric of rows squared crosses at the op's cutoff, or at its variable when set.
+    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", setting.name):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
+
+    def choose(n):
+        return backend.select_by_size(op, setting, n * n, amortized=True)
+
+    first = math.isqrt(backend.GPU_THRESHOLDS[op]["cuda"] - 1) + 1  # the fewest rows reaching it
+    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
+    monkeypatch.setenv(setting.name, "100")
+    assert (choose(9), choose(10)) == ("numpy", "cuda")
+    with andrey.config(backend="mps"):
+        assert choose(10) == "cuda"  # float32 mps is not a backend of these ops
+    assert backend.GPU_THRESHOLDS[op]["mps"] is None
 
 
 def test_fork_reset_frees_a_held_dispatch_lock():

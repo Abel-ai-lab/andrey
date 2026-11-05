@@ -60,10 +60,10 @@ def data_matrix(
 ) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
-    Raises ``ValueError``, naming ``name``, when two columns share a name (:func:`column_labels`),
-    the values are not numeric, the array is not 2-D, it has fewer than ``min_rows`` rows, it holds
-    ``inf``, or a column is constant: no method can estimate a variance or a dependence from such
-    data. The message names every constant column.
+    Raises ``ValueError``, naming ``name``, when two columns share a name
+    (:func:`~andrey.core.structure.column_labels`), the values are not numeric, the array is not
+    2-D, it has fewer than ``min_rows`` rows, it holds ``inf``, or a column is constant: no method
+    can estimate a variance or a dependence from such data. The message names every constant column.
 
     ``NaN``, or pandas' ``NA``, marks a missing value. With ``missing``, for a method whose tests
     delete rows per test, the matrix keeps them, as one bit pattern ``NaN``, in a copy; a column
@@ -365,10 +365,11 @@ def checked_data(
     unless the data are mixed. ``index_categorical`` passes to :func:`mixed_matrix`, and ``method``
     and ``missing`` to :func:`data_matrix`: ``missing`` keeps ``NaN`` as a missing value.
 
-    Raises ``ValueError`` when two columns share a name (:func:`column_labels`), when
-    ``categorical`` lists a column ``data`` lacks, and, for a continuous setting, when a column is
-    declared categorical (:func:`declared_columns`): by ``categorical``, or, when it is ``None``, by
-    a DataFrame's ``category``, ``bool``, or text type. ``[]`` declares none.
+    Raises ``ValueError`` when two columns share a name
+    (:func:`~andrey.core.structure.column_labels`), when ``categorical`` lists a column ``data``
+    lacks, and, for a continuous setting, when a column is declared categorical
+    (:func:`declared_columns`): by ``categorical``, or, when it is ``None``, by a DataFrame's
+    ``category``, ``bool``, or text type. ``[]`` declares none.
     """
     column_labels(data)
     setting = f"{option}={value!r}"
@@ -739,11 +740,7 @@ def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
 
 
 def label_of(labels: tuple[str, ...] | None) -> Callable[[int], str | int]:
-    """Name a column position as metadata names nodes: by its label, or by its number.
-
-    Each position takes its label in ``labels``; without ``labels``, every position keeps its
-    number.
-    """
+    """Name a column position as metadata names nodes: by its label, or by its number."""
     if labels is None:
         return int
     return lambda j: labels[j]

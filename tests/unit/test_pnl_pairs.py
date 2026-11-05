@@ -4,7 +4,6 @@ torch path matches NumPy's to rounding."""
 from __future__ import annotations
 
 import importlib
-import math
 import warnings
 from unittest import mock
 
@@ -119,35 +118,29 @@ def test_pairs_default_to_every_column_pair_and_are_checked():
 
 
 def test_device_dispatch_gates_on_rows_squared(monkeypatch):
-    """A pair asks for a device by rows squared without starting one; a table may start one."""
+    """A pair asks for a device by rows squared without starting one, a table may start one, and
+    both read PNL's own cutoff variable."""
+    monkeypatch.delenv(env.PNL_GPU_THRESHOLD.name, raising=False)
     seen = []
 
     def spy(pinnable, auto_order, *, metric=None, thresholds=None, amortized=True, op=None):
-        seen.append((metric, amortized, op, "mps" in pinnable))
+        seen.append((metric, amortized, op, "mps" in pinnable, thresholds["cuda"]))
         return "numpy"
 
     monkeypatch.setattr(_pnl.backend, "select", spy)
     X = _table(60)
     _pnl.pnl(X[:, 0], X[:, 1])
     _pnl.pnl_pairs(X)
-    assert seen == [(60 * 60, False, "pnl", False), (60 * 60, True, "pnl", False)]
-
-
-def test_device_cutoff_reads_its_variable_and_never_chooses_mps(monkeypatch):
-    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", "ANDREY_PNL_GPU_THRESHOLD"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
-    first = math.isqrt(backend.GPU_THRESHOLDS["pnl"]["cuda"] - 1) + 1  # fewest rows reaching it
-
-    def choose(n):
-        return backend.select_by_size("pnl", env.PNL_GPU_THRESHOLD, n * n, amortized=True)
-
-    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
-    monkeypatch.setenv("ANDREY_PNL_GPU_THRESHOLD", "100")
-    assert (choose(9), choose(10)) == ("numpy", "cuda")
-    with andrey.config(backend="mps"):
-        assert choose(10) == "cuda"  # float32 mps is not a PNL backend
-    assert backend.GPU_THRESHOLDS["pnl"]["mps"] is None
+    monkeypatch.setenv(env.PNL_GPU_THRESHOLD.name, "100")
+    _pnl.pnl(X[:, 0], X[:, 1])
+    _pnl.pnl_pairs(X)
+    cutoff = backend.GPU_THRESHOLDS["pnl"]["cuda"]
+    assert seen == [
+        (60 * 60, False, "pnl", False, cutoff),
+        (60 * 60, True, "pnl", False, cutoff),
+        (60 * 60, False, "pnl", False, 100),
+        (60 * 60, True, "pnl", False, 100),
+    ]
 
 
 def _decisions(rows: np.ndarray) -> np.ndarray:

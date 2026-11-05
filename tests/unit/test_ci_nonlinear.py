@@ -11,7 +11,6 @@ rejection rates over many draws are a measurement, made by ``qa/ci_calibration.p
 from __future__ import annotations
 
 import importlib
-import math
 import subprocess
 import sys
 import warnings
@@ -797,29 +796,6 @@ def test_device_dispatch_gates_on_rows_squared(name, module, monkeypatch):
     _build(name, data)(0, 1, [2])
     cutoff = backend.GPU_THRESHOLDS[name]["cuda"]
     assert set(seen) == {(60 * 60, True, name, False, cutoff), (60 * 60, True, name, False, 100)}
-
-
-@pytest.mark.parametrize("op", ["kci", "cmiknn"])
-def test_device_cutoff_is_rows_squared_and_reads_its_variable(op, monkeypatch):
-    setting = _GPU_SETTINGS[op]
-    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", setting.name):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
-
-    def choose(n):
-        return backend.select_by_size(op, setting, n * n, amortized=True)
-
-    first = math.isqrt(backend.GPU_THRESHOLDS[op]["cuda"] - 1) + 1  # the fewest rows reaching it
-    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
-    monkeypatch.setenv(setting.name, "100")
-    assert (choose(9), choose(10)) == ("numpy", "cuda")
-    with andrey.config(backend="mps"):
-        assert choose(10) == "cuda"  # float32 mps is not a backend of these tests
-
-
-def test_device_cutoffs_never_choose_mps():
-    assert backend.GPU_THRESHOLDS["kci"]["mps"] is None
-    assert backend.GPU_THRESHOLDS["cmiknn"]["mps"] is None
 
 
 @pytest.mark.parametrize("n_cond", [0, 1, 2])
