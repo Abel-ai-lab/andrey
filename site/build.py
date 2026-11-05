@@ -1325,6 +1325,8 @@ def returns_text(spec) -> str:  # noqa: ANN001 -- an andrey.spec MethodSpec
         return "Two-node DAG"
     if spec.output.structure_type == "temporal":
         return "Temporal graph"
+    if spec.output.graph_kind == "undirected":
+        return "Undirected graph"
     return spec.output.graph_kind.upper()
 
 

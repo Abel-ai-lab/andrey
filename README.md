@@ -54,9 +54,10 @@ pip install andrey-core
 
 You install andrey-core and then `import andrey`.
 
-- **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
-  layouts
-- **Development version**: `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"`
+- **Optional extras**: `andrey-core[torch]` for GPUs and CALM, `andrey-core[viz]` for charts and
+  graph layouts
+- **From GitHub**, the latest release:
+  `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"`
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
 
@@ -70,8 +71,8 @@ You install andrey-core and then `import andrey`.
     <img alt="Andrey: accelerated, accurate, agentic. 40 supported methods. Data types: continuous,
       categorical, mixed, time series, nonlinear. Real data processing: missing values,
       background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
-      confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA, MPS). Portability:
-      NetworkX, pcalg, Graphviz DOT, NumPy. Interface: Python, CLI, skill."
+      confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA). Portability: NetworkX,
+      pcalg, Graphviz DOT, NumPy. Interface: Python, CLI, skill."
       src=".github/readme/package-card-light.svg" width="100%">
   </picture>
 </p>
@@ -87,7 +88,7 @@ You install andrey-core and then `import andrey`.
 
 | Family | Methods | Returns |
 |---|---|---|
-| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, UNDIRECTED |
+| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, Undirected graph |
 | Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`gnies`](https://andrey.abel.ai/docs/api/andrey.gnies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html)\*, [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html)\*, [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html), [`igsp`](https://andrey.abel.ai/docs/api/andrey.igsp.html), [`ut_igsp`](https://andrey.abel.ai/docs/api/andrey.ut_igsp.html) | CPDAG |
 | Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html) | DAG |
@@ -140,7 +141,8 @@ pc  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
 
 PC finds 8 edges, all among the known network's 17. The structural Hamming distance (SHD) counts
 the edges to add, remove, or reorient to reach the known network: 11 here (9 edges are missing, and
-2 are oriented that the known network leaves undirected), and 17 for a graph with no edges.
+2 are oriented where the known network's CPDAG leaves them undirected), and 17 for a graph with no
+edges.
 
 <!-- QUICKSTART:END -->
 
@@ -171,9 +173,9 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
   [changelog](https://andrey.abel.ai/docs/changelog.html).
 - [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, stage by stage.
 
-Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is fully
-tested; macOS and Windows install and run on the CPU, but the full test suite and the GPU speedups
-(CUDA / MPS) are not tested there yet.
+Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is
+supported; macOS and Windows install and run on the CPU, with no guarantee yet
+([Testing](https://andrey.abel.ai/docs/ci.html)). Apple GPUs are not supported in the alpha.
 
 ## Citing, license, contributing
 

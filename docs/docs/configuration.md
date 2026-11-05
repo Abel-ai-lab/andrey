@@ -27,10 +27,10 @@ setting wins:
 
 - `ANDREY_BACKEND`: your preferred implementation for numeric operations. `auto` (the default)
   considers `cuda` when it is available and the input meets the operation's size threshold, subject
-  to the startup rule under [GPU dispatch](#gpu-dispatch); otherwise it uses `numpy`. It never
-  picks `cpu` or `mps`. `numpy` uses NumPy on the CPU in float64, which we use as the reference.
-  `cpu` uses PyTorch on the CPU, `cuda` uses PyTorch on a CUDA-compatible GPU, and `mps` uses
-  PyTorch on an Apple GPU in float32, which we have not validated. `none` and `metal` are aliases
+  to the startup rule under [GPU dispatch](#gpu-dispatch); otherwise it uses `numpy`. It never picks
+  `cpu` or `mps`. `numpy` uses NumPy on the CPU in float64, which we use as the reference. `cpu`
+  uses PyTorch on the CPU, `cuda` uses PyTorch on a CUDA-compatible GPU, and `mps` uses PyTorch on
+  an Apple GPU in float32; Apple GPUs are not supported in the alpha. `none` and `metal` are aliases
   for `cpu` and `mps`. An explicit choice bypasses the size threshold and startup rule. If an
   operation supports your choice but the machine cannot run it, Andrey warns once with
   `andrey.BackendFallbackWarning` and uses `auto` for that operation.

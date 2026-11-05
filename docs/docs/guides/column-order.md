@@ -52,7 +52,7 @@ step.
 The CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves them out.
 They seed their random draws and order their variables by the same rank, so a p-value depends on
 neither the argument order nor the column order, and `tie_break="position"` ranks their columns by
-position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
+position instead. Every method that takes `indep_test` follows the setting through them when
 `indep_test` names one.
 
 `bootstrap` is not a method either. Its resamples draw the same rows whatever the column order, so
@@ -63,10 +63,11 @@ tie gives the same graph.
 
 Identical columns, copies of a column in other units, and categorical columns that group the rows
 alike are the exception for every method: they rank the same, so position decides which comes first,
-and the graph is the same up to swapping them. The score-based searches with the BIC score, and
-`pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy another up to
-scale and shift, with a `ValueError` that names each group of copies; the LiNGAM causal-order search
-keeps one column per group and places the other copies right after it.
+and the graph is the same up to swapping them. The methods with a partial-correlation test
+(`fisherz`, `student_t`) or the BIC score, and `icp`, `cam`, `resit`, `camuv`, and `dynotears`,
+reject columns that copy another up to scale and shift, with a `ValueError` that names each group of
+copies; the LiNGAM causal-order search keeps one column per group and places the other copies right
+after it.
 
 ## Across machines
 

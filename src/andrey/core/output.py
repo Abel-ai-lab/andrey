@@ -146,8 +146,8 @@ class StructureOutput:
     def ordering(self) -> tuple[int, ...] | None:
         """Causal order as node indices, causes first; ``None`` unless the method finds one.
 
-        Set by ``direct_lingam``, ``ica_lingam``, ``multi_group_direct_lingam``, and
-        ``varma_lingam`` (the order within one time step).
+        Set by ``direct_lingam``, ``ica_lingam``, ``multi_group_direct_lingam``, ``cam``,
+        ``resit``, and ``varma_lingam`` (the order within one time step).
         """
         return self._ordering
 
@@ -161,9 +161,9 @@ class StructureOutput:
         """Edge weights as a new dense ``(n_nodes, n_nodes)`` array, or ``None`` without weights.
 
         ``W[i, j]`` is the weight of ``i -> j``, so rows are causes: the transpose of ``B`` in
-        ``x = Bx + e``. Set by ``calm``, ``direct_lingam``, ``ica_lingam``, and
-        ``multi_group_direct_lingam``; a time-series result keeps its weights in
-        ``structure.lag_weights``.
+        ``x = Bx + e``. Set by ``calm``, ``notears``, ``dagma``, ``direct_lingam``, ``ica_lingam``,
+        ``multi_group_direct_lingam``, ``rcd``, and ``bottom_up_parce_lingam``; a time-series result
+        keeps its weights in ``structure.lag_weights``.
         """
         if self._w_indptr is None or self._w_indices is None or self._w_data is None:
             return None

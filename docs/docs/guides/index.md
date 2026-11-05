@@ -20,8 +20,8 @@ Practical guides for using Andrey.
   or change machines, and the `tie_break` setting.
 - [Upgrading](upgrading.md): what to change in your code for a new release, with the common calls
   before and after.
-- [Contributing](contributing.md): set up a development environment, run the checks, and add a
-  method.
+- [Contributing](contributing.md): report a problem, set up a development environment, and run the
+  checks before a pull request.
 
 ```{toctree}
 :hidden:

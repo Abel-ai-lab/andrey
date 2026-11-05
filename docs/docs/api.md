@@ -92,32 +92,32 @@ least-squares scores of `notears`, `dagma`, and `dynotears` read the units, as t
 The categorical
 settings, `indep_test="chisq"` or `"gsq"` and `score_func="bdeu"` or `"discrete_bic"`, read text,
 boolean, and `category` columns as categories and need whole numbers in a column of numbers, each
-distinct value of a column one category. Every method defaults to `indep_test=None` and
-`score_func=None`, which pick from the column types you declare, with `categorical` or a DataFrame's
-`category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is categorical,
-`"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC, `"bic"`; the
-result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the score the fit
-used. Values never decide: a column of a few whole numbers reads as numbers, with a
-`DataTypeWarning` that it may hold category codes, from every method that reads columns as
-numbers, as [Data types](guides/getting-started.md#data-types) describes. The mixed-data settings,
+distinct value of a column one category. Every method that takes `indep_test` or `score_func`
+defaults it to `None`, which picks from the column types you declare, with `categorical` or a
+DataFrame's `category`, `bool`, or text columns: `"gsq"` and `"bdeu"` when every column is
+categorical, `"cond_gauss"` when some are, and otherwise `"fisherz"` and the linear-Gaussian BIC,
+`"bic"`; the result's `metadata["indep_test"]` and `metadata["score_func"]` name the test and the
+score the fit used. Values never decide: a column of a few whole numbers reads as numbers, with a
+`DataTypeWarning` that it may hold category codes, from every method that reads columns as numbers,
+as [Data types](guides/getting-started.md#data-types) describes. The mixed-data settings,
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`, read
 the categorical columns that `categorical` lists, or a DataFrame's `category`, `bool`, and text
 columns, and never a column by its values; a categorical column of numbers needs whole numbers. A
-test or score for continuous data, such as `"fisherz"` or `"bic"`, raises a `ValueError` on a
-column declared categorical, by `categorical` or by its type. Methods that score with BIC also
-reject a column that repeats another up to scale and shift or, given more rows than columns, is a
-linear function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
+test or score for continuous data, such as `"fisherz"` or `"bic"`, raises a `ValueError` on a column
+declared categorical, by `categorical` or by its type. Methods that score with BIC also reject a
+column that repeats another up to scale and shift or, given more rows than columns, is a linear
+function of other columns. Copies of one variable cannot be told apart, so one `ValueError` names
 every group of copies, such as `x2` and `x7` repeating `x1`, and asks you to keep one column per
-group and read its edges as the group's; no option drops or merges the copies for you. `pc`, `fci`,
-`gfci`, and `cdnod` with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the
-same way before any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci` with those tests, which
-also reject a series that repeats another up to `2 * tau_max` steps back and name its lagged value,
-such as `'a' at lag 1 repeats 'd'`. `cam`, `resit`, and `camuv` reject copies the same way, and a
-column of fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit;
-`resit` and `camuv` also need at least twice as many rows as columns, and `camuv` rejects a column
-that is a linear function of other columns, such as a total, as the BIC methods do. Other data
-raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
-column gives a one-node graph.
+group and read its edges as the group's; no option drops or merges the copies for you. Every method
+that takes `indep_test`, with a partial-correlation test, `"fisherz"` or `"student_t"`, rejects
+copies the same way before any test runs, and so do `icp` and `dynotears`. `pcmci`, `pcmciplus`, and
+`lpcmci` with those tests also reject a series that repeats another up to `2 * tau_max` steps back
+and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`, `resit`, and `camuv` reject
+copies the same way, and a column of fewer than 3 distinct values, such as a binary one, on which no
+smooth term can be fit; `resit` and `camuv` also need at least twice as many rows as columns, and
+`camuv` rejects a column that is a linear function of other columns, such as a total, as the BIC
+methods do. Other data raises a `ValueError` that names the argument and, for a bad cell, its row
+and column. A single column gives a one-node graph.
 
 % concept: missing
 `pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
@@ -508,8 +508,8 @@ A method becomes supported once it has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, and RSMAX2 take their conditional-independence
-test as `indep_test`:
+PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2, IGSP, UT-IGSP, PCMCI, PCMCI+, and
+LPCMCI take their conditional-independence test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|
@@ -619,11 +619,12 @@ draws as many rows as `data` has, with replacement, instead. The generator depen
 resample's number alone, so a seed gives the same result at any `n_jobs`, and a longer run begins
 with the shorter run's fits. A method that takes a row-aligned input (`env`, or `targets` as a 0/1
 matrix) resamples it with the rows, and a column that `env` or `targets` names travels with its
-rows. When `env` holds text labels, or for the methods that take `targets` (`gies`, `igsp`, and
-`ut_igsp`), each resample takes the same share of every environment's rows, at least one, so no
-resample drops an environment; `cdnod`'s numeric index, such as a time step, resamples the rows as a
-whole. For the methods that take `targets`, the averaged graph is made a CPDAG without the targets,
-so an edge that only the interventions orient is undirected there; the edge frequencies keep its
+rows. When `env` holds text labels, or for the methods that take `targets` (`gies`, `gnies`,
+`igsp`, `ut_igsp`, and `icp`), each resample takes the same share of every environment's rows, at
+least one, so no resample drops an environment; `cdnod`'s numeric index, such as a time step,
+resamples the rows as a whole. For the methods that take `targets` and return a CPDAG (`gies`,
+`gnies`, `igsp`, and `ut_igsp`), the averaged graph is made a CPDAG without the targets, so an edge
+that only the interventions orient is undirected there; the edge frequencies keep its
 direction. `multi_group_direct_lingam` resamples each dataset on its own and returns one result per
 dataset; `longitudinal_lingam` resamples the units, the same rows of every dataset. A time-series
 method on one series subsamples one stretch of consecutive rows; with `resampling="bootstrap"` it
@@ -1039,7 +1040,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured GES and skeleton worker-pool cutoffs for this machine, as settings to export |
+| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT) for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or
