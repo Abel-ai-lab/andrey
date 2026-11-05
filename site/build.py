@@ -65,6 +65,7 @@ RELEASES = (
     "0.11.0",
     "0.12.0",
     "0.13.0",
+    "0.14.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -143,6 +144,258 @@ REGIMES = {
     "the method's claim",
     "fcm_linear_gauss_er_raw": "linear-Gaussian data from Erdos-Renyi graphs, not standardized, "
     "outside the method's claim",
+    "icp_appendix_g": "linear-Gaussian data in two environments, with noise interventions on "
+    "variables other than the target",
+    "icp_appendix_g_target": "linear-Gaussian data in two environments, with noise interventions "
+    "that can hit the target, outside the method's claim",
+    "icp_do": "linear-Gaussian data from observation and do-interventions on two or three "
+    "variables other than the target",
+    "icp_appendix_g_capped": "linear-Gaussian data in two environments with 16 or 21 variables, "
+    "the target's parents capped at three",
+    "icp_speed": "linear-Gaussian data in two environments with 9 to 15 variables",
+    "gnies_a": "linear-Gaussian data from Erdos-Renyi graphs, observation and three noise "
+    "interventions of one target each",
+    "gnies_b": "linear-Gaussian data from Erdos-Renyi graphs at mean degree 4, observation and "
+    "three noise interventions of one target each",
+    "gnies_c": "linear-Gaussian data from Erdos-Renyi graphs, observation and three noise "
+    "interventions of three targets each",
+    "gnies_d": "linear-Gaussian data from Erdos-Renyi graphs, observation and three weaker noise "
+    "interventions of one target each",
+    "gnies_e": "linear-Gaussian data from Erdos-Renyi graphs, four noise interventions of one "
+    "target each and no observation",
+    "gnies_f": "linear-Gaussian data from Erdos-Renyi graphs, observation and nine noise "
+    "interventions of one target each",
+    "gnies_g": "linear-Gaussian data from Erdos-Renyi graphs, 1,000 observed rows and three noise "
+    "interventions of 100 rows, one target each",
+    "gnies_h1": "linear-Gaussian data from Erdos-Renyi graphs, observation and one noise "
+    "intervention of one target",
+    "gnies_h2": "linear-Gaussian data from Erdos-Renyi graphs, observation and two noise "
+    "interventions of one target each",
+    "gnies_s": "linear-Gaussian data from Erdos-Renyi graphs with signed weights and unit noise, "
+    "observation and three noise interventions of one target each",
+    "gnies_hard": "linear-Gaussian data from Erdos-Renyi graphs, observation and three hard "
+    "interventions of one target each, outside the method's claim",
+    "gnies_mean_shift": "linear-Gaussian data from Erdos-Renyi graphs, observation and three mean "
+    "shifts of one target each, outside the method's claim",
+    "gnies_weights_halved": "linear-Gaussian data from Erdos-Renyi graphs, observation and three "
+    "interventions that halve one target's incoming weights, outside the method's claim",
+    "gnies_laplace": "linear data with Laplace noise from Erdos-Renyi graphs, observation and "
+    "three noise interventions of one target each, outside the method's claim",
+    "gnies_nonlinear": "additive nonlinear data from Erdos-Renyi graphs, observation and three "
+    "noise interventions of one target each, outside the method's claim",
+    "gnies_variables": "linear-Gaussian data from Erdos-Renyi graphs with 20 to 100 variables, "
+    "observation and three noise interventions of one target each, outside the method's claim",
+    "ut_igsp_g1_shift_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with no off-targets",
+    "ut_igsp_g1_shift_l1": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with one off-target each",
+    "ut_igsp_g1_shift_l2": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with two off-targets each",
+    "ut_igsp_g1_shift_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with three off-targets each",
+    "ut_igsp_g2_perfect_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that cut one target from its causes, with no off-targets",
+    "ut_igsp_g2_perfect_l1": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that cut one target from its causes, with one off-target each",
+    "ut_igsp_g2_perfect_l2": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that cut one target from its causes, with two off-targets each",
+    "ut_igsp_g2_perfect_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that cut one target from its causes, with three off-targets each",
+    "ut_igsp_g3_perfect_code_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and "
+    "five interventions that cut one target from its causes and nearly fix it, with no off-targets",
+    "ut_igsp_g3_perfect_code_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and "
+    "five interventions that cut one target from its causes and nearly fix it, with three "
+    "off-targets each",
+    "ut_igsp_g3_shift2_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 2, with no off-targets",
+    "ut_igsp_g3_shift2_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 2, with three off-targets each",
+    "ut_igsp_g4_variance_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that double one target's noise, with no off-targets",
+    "ut_igsp_g4_variance_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that double one target's noise, with three off-targets each",
+    "ut_igsp_g5_shift_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with no off-targets, and no targets given",
+    "ut_igsp_g5_shift_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with three off-targets each, and no targets "
+    "given",
+    "ut_igsp_g6_weight_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that halve the weights into one target, with no off-targets",
+    "ut_igsp_g6_weight_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that halve the weights into one target, with three off-targets each",
+    "ut_igsp_o1_shift_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with no off-targets, few rows per "
+    "intervention, outside the method's claim",
+    "ut_igsp_o1_shift_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with three off-targets each, few rows per "
+    "intervention, outside the method's claim",
+    "ut_igsp_o2_weak0p25_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 0.25, with no off-targets, outside the method's "
+    "claim",
+    "ut_igsp_o2_weak0p25_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 0.25, with three off-targets each, outside the "
+    "method's claim",
+    "ut_igsp_o2_weak0p5_l0": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 0.5, with no off-targets, outside the method's "
+    "claim",
+    "ut_igsp_o2_weak0p5_l3": "linear-Gaussian data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 0.5, with three off-targets each, outside the "
+    "method's claim",
+    "ut_igsp_o3_perfect_l0_deg5_k3": "linear-Gaussian data from Erdos-Renyi graphs with 50 "
+    "variables at mean degree 5, observation and three interventions that cut one target from its "
+    "causes, outside the method's claim",
+    "ut_igsp_o4_shift_l3": "linear-Gaussian data from Erdos-Renyi graphs with 50 and 100 "
+    "variables, observation and five interventions that shift one target's mean by 1, with three "
+    "off-targets each, outside the method's claim",
+    "ut_igsp_o5_shift_l0": "additive nonlinear data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with no off-targets, Gaussian tests, outside "
+    "the method's claim",
+    "ut_igsp_o5_shift_l3": "additive nonlinear data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with three off-targets each, Gaussian tests, "
+    "outside the method's claim",
+    "ut_igsp_o6_shift_l0": "additive nonlinear data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with no off-targets, kernel tests, outside "
+    "the method's claim",
+    "ut_igsp_o6_shift_l3": "additive nonlinear data from Erdos-Renyi graphs, observation and five "
+    "interventions that shift one target's mean by 1, with three off-targets each, kernel tests, "
+    "outside the method's claim",
+    "ut_igsp_o8_shift_l0_k1": "linear-Gaussian data from Erdos-Renyi graphs, observation and one "
+    "intervention that shifts one target's mean by 1, with no off-targets, outside the method's "
+    "claim",
+    "ut_igsp_o8_shift_l0_k2": "linear-Gaussian data from Erdos-Renyi graphs, observation and two "
+    "interventions that shift one target's mean by 1, with no off-targets, outside the method's "
+    "claim",
+    "ut_igsp_o8_shift_l3_k1": "linear-Gaussian data from Erdos-Renyi graphs, observation and one "
+    "intervention that shifts one target's mean by 1, with three off-targets each, outside the "
+    "method's claim",
+    "ut_igsp_o8_shift_l3_k2": "linear-Gaussian data from Erdos-Renyi graphs, observation and two "
+    "interventions that shift one target's mean by 1, with three off-targets each, outside the "
+    "method's claim",
+    "ut_igsp_o9_shift_l0_obs2000": "linear-Gaussian data from Erdos-Renyi graphs, 2,000 observed "
+    "rows and five interventions of 300 rows that shift one target's mean by 1, with no "
+    "off-targets, outside the method's claim",
+    "ut_igsp_o9_shift_l3_obs2000": "linear-Gaussian data from Erdos-Renyi graphs, 2,000 observed "
+    "rows and five interventions of 300 rows that shift one target's mean by 1, with three "
+    "off-targets each, outside the method's claim",
+    "igsp_s_family45_c0p1": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.1 in size, observation and one intervention on variables 4 and 5",
+    "igsp_s_family45_c0p25": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.25 in size, observation and one intervention on variables 4 and 5",
+    "igsp_s_family45_c0p5": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.5 in size, observation and one intervention on variables 4 and 5",
+    "igsp_s_family4_c0p1": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.1 in size, observation and one intervention on variable 4",
+    "igsp_s_family4_c0p25": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.25 in size, observation and one intervention on variable 4",
+    "igsp_s_family4_c0p5": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.5 in size, observation and one intervention on variable 4",
+    "igsp_s_family5_c0p1": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.1 in size, observation and one intervention on variable 5",
+    "igsp_s_family5_c0p25": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.25 in size, observation and one intervention on variable 5",
+    "igsp_s_family5_c0p5": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "weights at least 0.5 in size, observation and one intervention on variable 5",
+    "igsp_w_k1": "linear-Gaussian data from Erdos-Renyi graphs, observation and one intervention "
+    "on five variables, ten at 20 variables",
+    "igsp_w_k2": "linear-Gaussian data from Erdos-Renyi graphs, observation and two interventions "
+    "on four variables each, eight at 20 variables",
+    "igsp_y5_imperfect": "linear-Gaussian data from Erdos-Renyi graphs with 20 variables, "
+    "observation and one intervention per variable, each cutting it from its causes on half the "
+    "rows",
+    "igsp_y5_inhibiting": "linear-Gaussian data from Erdos-Renyi graphs with 20 variables, "
+    "observation and one intervention per variable, each dividing the weights into it by 10",
+    "igsp_y5_perfect": "linear-Gaussian data from Erdos-Renyi graphs with 20 variables, "
+    "observation and one intervention per variable, each cutting it from its causes",
+    "igsp_y6_imperfect_k1": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention of one target, each cutting it from its causes on half the "
+    "rows",
+    "igsp_y6_imperfect_k10": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention per variable, each cutting it from its causes on half the "
+    "rows",
+    "igsp_y6_imperfect_k2": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and two interventions of one target, each cutting it from its causes on half the "
+    "rows",
+    "igsp_y6_imperfect_k4": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and four interventions of one target, each cutting it from its causes on half the "
+    "rows",
+    "igsp_y6_imperfect_k6": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and six interventions of one target, each cutting it from its causes on half the "
+    "rows",
+    "igsp_y6_imperfect_k8": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and eight interventions of one target, each cutting it from its causes on half "
+    "the rows",
+    "igsp_y6_inhibiting_k1": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention of one target, each dividing the weights into it by 10",
+    "igsp_y6_inhibiting_k10": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention per variable, each dividing the weights into it by 10",
+    "igsp_y6_inhibiting_k2": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and two interventions of one target, each dividing the weights into it by 10",
+    "igsp_y6_inhibiting_k4": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and four interventions of one target, each dividing the weights into it by 10",
+    "igsp_y6_inhibiting_k6": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and six interventions of one target, each dividing the weights into it by 10",
+    "igsp_y6_inhibiting_k8": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and eight interventions of one target, each dividing the weights into it by 10",
+    "igsp_y6_perfect_k1": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention of one target, each cutting it from its causes",
+    "igsp_y6_perfect_k10": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention per variable, each cutting it from its causes",
+    "igsp_y6_perfect_k2": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and two interventions of one target, each cutting it from its causes",
+    "igsp_y6_perfect_k4": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and four interventions of one target, each cutting it from its causes",
+    "igsp_y6_perfect_k6": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and six interventions of one target, each cutting it from its causes",
+    "igsp_y6_perfect_k8": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and eight interventions of one target, each cutting it from its causes",
+    "igsp_y8_imperfect": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention per pair of variables, each cutting both from their causes "
+    "on half the rows",
+    "igsp_y8_inhibiting": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention per pair of variables, each dividing the weights into both "
+    "by 10",
+    "igsp_y8_perfect": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and one intervention per pair of variables, each cutting both from their causes",
+    "igsp_k_kci_k4": "additive nonlinear data from Erdos-Renyi graphs, observation and four "
+    "interventions, kernel tests, outside the method's claim",
+    "igsp_o1_perfect_k10": "linear-Gaussian data from Erdos-Renyi graphs with 50 and 100 "
+    "variables, observation and ten interventions, outside the method's claim",
+    "igsp_o2_perfect_k4": "linear-Gaussian data from Erdos-Renyi graphs with 10 variables, "
+    "observation and four interventions, few rows each, outside the method's claim",
+    "igsp_o2_perfect_k8": "linear-Gaussian data from Erdos-Renyi graphs with 20 variables, "
+    "observation and eight interventions, few rows each, outside the method's claim",
+    "igsp_o3_perfect_k8": "linear-Gaussian data from Erdos-Renyi graphs at mean degree 3, "
+    "observation and eight interventions, outside the method's claim",
+    "igsp_o8_wang_k4_laplace": "linear data with Laplace noise from Erdos-Renyi graphs, "
+    "observation and four interventions, outside the method's claim",
+    "igsp_o8_wang_k4_uniform": "linear data with uniform noise from Erdos-Renyi graphs, "
+    "observation and four interventions, outside the method's claim",
+    "igsp_o9_family45_c0p25": "linear-Gaussian data on the seven-variable graph of the IGSP paper, "
+    "more observed rows than each intervention's, interventions on variables 4 and 5, outside the "
+    "method's claim",
+    "igsp_o9_family45_c0p25_c10": "linear-Gaussian data on the seven-variable graph of the IGSP "
+    "paper, ten times as many observed rows as each intervention's, interventions on variables 4 "
+    "and 5, outside the method's claim",
+    "igsp_o9_family45_c0p25_c3": "linear-Gaussian data on the seven-variable graph of the IGSP "
+    "paper, three times as many observed rows as each intervention's, interventions on variables 4 "
+    "and 5, outside the method's claim",
+    "igsp_o9_perfect_k4_c10": "linear-Gaussian data from Erdos-Renyi graphs, ten times as many "
+    "observed rows as each of four interventions', outside the method's claim",
+    "igsp_o9_perfect_k4_c3": "linear-Gaussian data from Erdos-Renyi graphs, three times as many "
+    "observed rows as each of four interventions', outside the method's claim",
+    "dynotears_paper": "linear time series with Gaussian noise, same-step and lag-1 links",
+    "dynotears_paper_exponential": "linear time series with centered exponential noise",
+    "dynotears_paper_ba_sbm": "linear time series from Barabasi-Albert and two-block graphs",
+    "dynotears_paper_uncentered": "linear time series with exponential noise not centered, as in "
+    "the paper's simulations",
+    "dynotears_paper_standardized": "linear time series with Gaussian noise, standardized, outside "
+    "the method's claim",
+    "dynotears_sin_tanh": "time series with sine and tanh effects, outside the method's claim",
+    "latent_anm_er": "additive-noise data from Erdos-Renyi graphs with one variable in five hidden",
+    "latent_anm_er_tenth": "additive-noise data from Erdos-Renyi graphs with one variable in ten "
+    "hidden",
+    "camuv_paper": "nonlinear data from the CAM-UV paper's simulation, with hidden common causes "
+    "and hidden intermediates",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
@@ -172,6 +425,17 @@ ERRORS = {
         ("andrey_latents_missed", "comparator_latents_missed", "empty_latents_missed"),
         "a latent variable whose indicators the learned model does not group as one cluster",
     ),
+    "direct": (
+        ("andrey_direct_errors_mean", "comparator_direct_errors_mean", "empty_direct_errors_mean"),
+        "on data with hidden variables, an edge between two observed variables that no hidden "
+        "variable joins, missing, added, or reversed, a reversed edge counting twice",
+    ),
+    # Last: the summaries of the other kinds give these keys too, beside their own.
+    "window": (
+        ("andrey_shd_mean", "comparator_shd_mean", "empty_shd_mean"),
+        "in a time series, a same-step edge or a lag-1 link that the learned and true graphs do "
+        "not share, or a same-step edge they orient differently",
+    ),
 }
 # The density the homepage shows. A summary that measures more than one mean degree at a size
 # gives the panel, the charts, and the counts its rows at mean degree 2, the density of the other
@@ -184,6 +448,19 @@ NOT_COUNTED = {"earlier-build", "second-machine timing"}
 # partial correlation still detects, and the diabetes network, a single size with only a lower
 # bound.
 NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
+# Lanes the homepage omits: settings swept around a method's default, which its release card
+# reports. IGSP at other levels and starts, and UT-IGSP at its paper's level.
+NOT_SHOWN_LANES = {
+    "igsp.alpha_1e-2_starts_5",
+    "igsp.alpha_1e-2_starts_10",
+    "igsp.alpha_1e-3_starts_5",
+    "igsp.alpha_1e-4_starts_5",
+    "igsp.alpha_1e-4_starts_10",
+    "ut_igsp.paper_level",
+}
+# Packages the homepage omits: a reference patched to follow its paper where the package does
+# not, which the release card reports beside the package itself.
+NOT_SHOWN_COMPARATORS = {"graphical-model-learning 0.1a8, patched to Definition 4.2"}
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear"}
 # A method's line uses its shortest-named comparison by default. These settings override that
@@ -216,7 +493,8 @@ TOKEN_PALETTE = andrey.viz.Palette(
 # ---- the summaries ---------------------------------------------------------------------------
 def load_summary(path: Path, *, placeholder: bool = False) -> dict:
     """Read a release's benchmark summary and check its layout; refuse unpublished files for
-    release. Comparisons in ``NOT_COUNTED`` and regimes in ``NOT_SHOWN`` are excluded."""
+    release. Comparisons in ``NOT_COUNTED``, regimes in ``NOT_SHOWN``, lanes in
+    ``NOT_SHOWN_LANES``, and packages in ``NOT_SHOWN_COMPARATORS`` are excluded."""
     if not placeholder and not path.resolve().is_relative_to(PUBLISHED):
         raise ValueError(
             f"{path} is not under benchmarks/published/; preview it with -D andrey_placeholder=1"
@@ -233,7 +511,8 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
         raise ValueError(f"summary lacks {sorted(missing)}")
     # Earlier-build comparisons measure Andrey's progress; second-machine timings repeat a
     # comparison. Both appear on the release card and are excluded from page counts.
-    # Regimes in ``NOT_SHOWN`` are also excluded.
+    # Regimes in ``NOT_SHOWN``, lanes in ``NOT_SHOWN_LANES``, and packages in
+    # ``NOT_SHOWN_COMPARATORS`` are also excluded.
     summary = {
         **summary,
         "methods": [
@@ -241,6 +520,8 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
             for m in summary["methods"]
             if m.get("comparison") not in NOT_COUNTED
             and (m.get("lane"), m.get("regime")) not in NOT_SHOWN
+            and m.get("lane") not in NOT_SHOWN_LANES
+            and m.get("comparator") not in NOT_SHOWN_COMPARATORS
         ],
     }
     for method in summary["methods"]:
@@ -325,7 +606,8 @@ def registry_name(method: dict) -> str:
 
 
 def error_kind(method: dict) -> str:
-    """How a comparison counts a graph's errors: the kind in ``ERRORS`` whose keys its rows give.
+    """How a comparison counts a graph's errors: the first kind in ``ERRORS`` whose keys its rows
+    give.
 
     The accuracy comparison sets Andrey's count against the other package's on the same datasets
     at each size, in the measure the summary records for both:
@@ -343,6 +625,13 @@ def error_kind(method: dict) -> str:
       the lagged or cross-link edges missed plus those added (the 0.5.0 summary).
     - ``latents``: for a method that finds latent variables from their indicators, the true
       latents whose indicators it does not return as one cluster (GIN in the 0.7.0 summary).
+    - ``direct``: on data with hidden variables, the edges between observed variables that no
+      hidden variable joins, missing or added, a reversed edge counting twice; means over the
+      paired datasets (CAM-UV in the 0.14.0 summary).
+    - ``window``: in a time series, the SHD over lags 0 and 1, a same-step pair whose edge differs
+      or a lag-1 link in one graph and not the other; means over the paired series (DYNOTEARS in
+      the 0.14.0 summary). Other summaries give these keys beside their own kind's, so it comes
+      last.
 
     Fewer is better in each. A comparison whose rows give none of them fails, rather than drop out
     of the count.
@@ -352,7 +641,7 @@ def error_kind(method: dict) -> str:
         for kind, ((ours, _, _), _) in ERRORS.items()
         if all(ours in row for row in method["rows"])
     ]
-    if len(kinds) != 1:
+    if not kinds:
         raise ValueError(f"{method.get('method', '?')}: name how its rows count errors in ERRORS")
     return kinds[0]
 
@@ -406,7 +695,9 @@ def comparisons(summary: dict) -> list[dict]:
       hidden variables, or a cause-effect pair's rows, since every pair has two variables;
     - ``andrey_s`` and ``comparator_s``: the median fit times, ``None`` past a time cap;
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
-    - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`.
+    - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`;
+    - ``card_verdict``: the release card's verdict on the row, "better", "tie", or "worse"; null
+      where the card did not judge it, and "unrecorded" where the summary predates the field.
 
     Rows are those :func:`shown_rows` keeps. The summary's ``reach`` rows are excluded: they cover
     sizes the other package did not finish or run, so they have no paired time.
@@ -430,6 +721,7 @@ def comparisons(summary: dict) -> list[dict]:
                     "at_least": at_least,
                     "andrey_errors": row[ours],
                     "comparator_errors": row[theirs],
+                    "card_verdict": row.get("card_verdict", "unrecorded"),
                     # The empty graph's error count; in pairwise comparisons, it gets every
                     # pair wrong.
                     "empty_errors": row["paired"] if pairs else row.get(empty) if empty else None,
@@ -857,11 +1149,34 @@ def accuracy_cards(summaries: list[dict]) -> list[str]:
 
 def accuracy_rows(summaries: list[dict]) -> list[dict]:
     """Per method and package compared: the method's name and spec, the package, and both
-    packages' errors summed over the sizes where both have a graph."""
+    packages' errors summed over the sizes where both have a graph.
+
+    Where a summary records the release card's verdicts (``card_verdict`` in
+    :func:`comparisons`), the sums leave out the rows the card did not judge, and a method is
+    left out against a package unless the card counts one of its rows there better and none
+    worse, over every setting the homepage shows. So a comparison the card calls a tie, or worse
+    anywhere, never reads as a win. Its ties stay in the sums, as every row does in the older
+    summaries.
+    """
+    groups = time_groups(summaries)
+    verdicts: dict[tuple[str, str], set] = {}
+    for _, methods in groups:
+        for m in methods:
+            key = (m["spec"], m["comparator"])
+            verdicts.setdefault(key, set()).update(r["card_verdict"] for r in m["rows"])
+
+    def counted(key: tuple[str, str]) -> bool:
+        seen = verdicts[key] - {None}
+        return seen == {"unrecorded"} or ("better" in seen and "worse" not in seen)
+
     rows = []
-    for name, methods in time_groups(summaries):
+    for name, methods in groups:
         by: dict[str, dict] = {}
         for c in error_comparisons(methods):
+            if c["row"]["card_verdict"] is None or not counted(
+                (c["method"]["spec"], c["method"]["comparator"])
+            ):
+                continue
             row = by.setdefault(
                 c["method"]["comparator"],
                 {"name": name, "spec": c["method"]["spec"], "family": c["method"]["family"],
@@ -2286,7 +2601,8 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 # custom tests or scores do not count as implementations. Features only on a development branch
 # do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
 # benchmarks use each package's README, documentation, and release notes. A real-data feature is
-# a yes when the package's main learners have it, and partly when only some do.
+# a yes when the package's main learners have it, and partly when only some do. Interventional
+# data is a yes when a method takes each row's environment or the intervention targets.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -2311,6 +2627,17 @@ COMPARISON = (
         },
     ),
     ("Coverage", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Coverage",
+        "Interventional data",
+        ("yes", "part", "part", "yes", "part"),
+        {
+            "causal-learn": "CD-NOD only, for data from several domains, with no targets.",
+            "Tetrad": "Intervention variables tagged in a metadata file join the first knowledge "
+            "tier as ordinary variables; no method takes the targets.",
+            "bnlearn": "The mbde score only, for categorical data in its score-based searches.",
+        },
+    ),
     (
         "Real data",
         "Missing values",

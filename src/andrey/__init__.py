@@ -33,11 +33,14 @@ from .api import (
     gfci,
     gies,
     gin,
+    gnies,
     granger,
     grasp,
     hc,
     iamb,
     ica_lingam,
+    icp,
+    igsp,
     inter_iamb,
     longitudinal_lingam,
     lpcmci,
@@ -53,6 +56,7 @@ from .api import (
     resit,
     rsmax2,
     tabu,
+    ut_igsp,
     varma_lingam,
     xges,
 )
@@ -74,7 +78,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 __all__ = [
     "__version__",
@@ -111,11 +115,13 @@ __all__ = [
     "fci",
     "gfci",
     "cdnod",
+    "icp",
     "iamb",
     "inter_iamb",
     "mmpc",
     "ges",
     "gies",
+    "gnies",
     "xges",
     "hc",
     "tabu",
@@ -127,6 +133,8 @@ __all__ = [
     "rsmax2",
     "boss",
     "grasp",
+    "igsp",
+    "ut_igsp",
     "direct_lingam",
     "ica_lingam",
     "cam",

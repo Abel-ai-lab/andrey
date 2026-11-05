@@ -28,11 +28,12 @@ ColumnOrder = Literal["relabels", "relabels_if_converged", "can_change"]
 InputKind = Literal[
     "matrix",  # one (n_samples, n_variables) 2-D array
     "panel",  # a sequence of 2-D arrays, one per group/time point (repeated flag)
-    "context",  # an auxiliary (n_samples, k) matrix aligned to the data rows (cdnod)
+    "context",  # an auxiliary input aligned to the data rows: one value per row (env)
 ]
 # Hyperparameter value types -- map to a JSON-schema type and a CLI option.
 # knowledge: an object with required/forbidden/allowed edge lists and tiers (andrey.Knowledge).
-ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge"]
+# targets: an object mapping each environment's label to its intervened variables (gies).
+ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge", "targets"]
 # The parts of an andrey.Knowledge a method honors.
 KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 
@@ -54,6 +55,8 @@ class InputSpec(Spec):
     kind: InputKind
     doc: str
     required: bool = True
+    # Former names, accepted for one release after a rename.
+    aliases: tuple[str, ...] = ()
 
     @property
     def flag(self) -> str:
@@ -123,16 +126,18 @@ class ParamSpec(Spec):
         Checks the type, the bounds, and the choices: an int is an ``int`` or a NumPy integer, not
         a ``bool``; a float is any real number but ``NaN`` and infinity; a bool is ``True`` or
         ``False``. ``None`` passes when the parameter is nullable. Column labels or positions,
-        which only the data can check, pass unchanged: a ``str_list``, a ``knowledge``, and a
-        ``str`` without choices. ``choices`` replaces the spec's choices when the accepted values
-        change at run time. The message names ``method``, the parameter, what it accepts
-        (:meth:`accepted`), and the value.
+        which only the data can check, pass unchanged: a ``str_list``, a ``knowledge``, a
+        ``targets``, and a ``str`` without choices. ``choices`` replaces the spec's choices when
+        the accepted values change at run time. The message names ``method``, the parameter, what
+        it accepts (:meth:`accepted`), and the value.
         """
         if choices is not None:
             return self.model_copy(update={"choices": choices}).check(value, method)
         if value is None and self.nullable:
             return None
-        if self.type in ("str_list", "knowledge") or (self.type == "str" and not self.choices):
+        if self.type in ("str_list", "knowledge", "targets") or (
+            self.type == "str" and not self.choices
+        ):
             return value
         typed = _typed(self.type, value)
         message = f"{method}: {self.name} must be {self.accepted()}, got {reprlib.repr(value)}"

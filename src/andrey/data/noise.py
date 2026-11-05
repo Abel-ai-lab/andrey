@@ -24,13 +24,39 @@ class Noise:
     ----------
     heteroscedastic : bool, default=False
         If ``True``, draw per-node scales from ``U[0.5, 2.0]``; otherwise every scale is ``1.0``.
+    variance_range : tuple of float or None, default=None
+        The bounds ``(lo, hi)`` of the per-node noise variances: each node draws its variance from
+        ``U[lo, hi]``, and its scale is the square root. Takes ``0 < lo <= hi`` and
+        ``heteroscedastic=False``.
+
+    Raises
+    ------
+    ValueError
+        If ``variance_range`` is not a finite pair with ``0 < lo <= hi``, or is given with
+        ``heteroscedastic=True``.
     """
 
     name: str
     heteroscedastic: bool = False
+    variance_range: tuple[float, float] | None = None
+
+    def __post_init__(self) -> None:
+        """Check the variance range and store it as a pair of floats."""
+        if self.variance_range is None:
+            return
+        bounds = tuple(float(v) for v in self.variance_range)
+        if len(bounds) != 2 or not (np.all(np.isfinite(bounds)) and 0 < bounds[0] <= bounds[1]):
+            raise ValueError(
+                f"variance_range must be finite with 0 < lo <= hi, got {self.variance_range!r}"
+            )
+        if self.heteroscedastic:
+            raise ValueError("noise takes heteroscedastic=True or a variance_range, not both")
+        object.__setattr__(self, "variance_range", bounds)
 
     def draw_scales(self, d: int, rng: np.random.Generator) -> np.ndarray:
         """Per-node noise standard deviations, shape ``(d,)``."""
+        if self.variance_range is not None:
+            return np.sqrt(rng.uniform(*self.variance_range, size=d))
         if self.heteroscedastic:
             return rng.uniform(0.5, 2.0, size=d)
         return np.ones(d, dtype=np.float64)
@@ -94,26 +120,39 @@ class Gumbel(Noise):
         return (rng.gumbel(0.0, 1.0, size=shape) - _EULER_GAMMA) / _GUMBEL_STD  # mean 0, var 1
 
 
-def gaussian(heteroscedastic: bool = False) -> Gaussian:
-    """Build a Gaussian noise spec; ``heteroscedastic`` randomizes per-node scales."""
-    return Gaussian(heteroscedastic=heteroscedastic)
+def gaussian(
+    heteroscedastic: bool = False, variance_range: tuple[float, float] | None = None
+) -> Gaussian:
+    """Build a Gaussian noise spec; ``heteroscedastic`` and ``variance_range`` set the scales.
+
+    See :class:`Noise` for the two scale arguments.
+    """
+    return Gaussian(heteroscedastic=heteroscedastic, variance_range=variance_range)
 
 
-def uniform(heteroscedastic: bool = False) -> Uniform:
+def uniform(
+    heteroscedastic: bool = False, variance_range: tuple[float, float] | None = None
+) -> Uniform:
     """Build a uniform (non-Gaussian) noise spec."""
-    return Uniform(heteroscedastic=heteroscedastic)
+    return Uniform(heteroscedastic=heteroscedastic, variance_range=variance_range)
 
 
-def laplace(heteroscedastic: bool = False) -> Laplace:
+def laplace(
+    heteroscedastic: bool = False, variance_range: tuple[float, float] | None = None
+) -> Laplace:
     """Build a Laplace (non-Gaussian) noise spec."""
-    return Laplace(heteroscedastic=heteroscedastic)
+    return Laplace(heteroscedastic=heteroscedastic, variance_range=variance_range)
 
 
-def exponential(heteroscedastic: bool = False) -> Exponential:
+def exponential(
+    heteroscedastic: bool = False, variance_range: tuple[float, float] | None = None
+) -> Exponential:
     """Build a centered-exponential (non-Gaussian) noise spec."""
-    return Exponential(heteroscedastic=heteroscedastic)
+    return Exponential(heteroscedastic=heteroscedastic, variance_range=variance_range)
 
 
-def gumbel(heteroscedastic: bool = False) -> Gumbel:
+def gumbel(
+    heteroscedastic: bool = False, variance_range: tuple[float, float] | None = None
+) -> Gumbel:
     """Build a centered-Gumbel (non-Gaussian) noise spec."""
-    return Gumbel(heteroscedastic=heteroscedastic)
+    return Gumbel(heteroscedastic=heteroscedastic, variance_range=variance_range)

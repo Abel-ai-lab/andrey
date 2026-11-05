@@ -228,10 +228,18 @@ def test_a_max_p_global_above_every_search_returns_the_uncapped_pcmciplus_graph(
 # --- max_parents: the returned graph -----------------------------------------------------------
 
 
+def fitter(method: str):
+    """``method``'s fit on data alone; gnies gets two environments, the even and the odd rows."""
+    fit = getattr(andrey, method)
+    if method == "gnies":
+        return lambda data, **kw: fit(data, np.arange(len(data)) % 2, **kw)
+    return fit
+
+
 def capped_graph(method: str, monkeypatch):
     """A function that fits ``method`` and returns the marks of the graph its cap bounds: gfci's
     GES CPDAG, recorded before the tests prune and orient it, else the returned graph."""
-    fit = getattr(andrey, method)
+    fit = fitter(method)
     if method != "gfci":
         return lambda data, **kw: fit(data, **kw).structure.to_numpy()
     found = []
@@ -253,7 +261,8 @@ def capped_graph(method: str, monkeypatch):
     return graph
 
 
-@pytest.mark.parametrize("method", methods_with("max_parents"))
+# ICP's cap bounds the sets it tests, which tests/unit/test_icp.py checks on data from environments.
+@pytest.mark.parametrize("method", [m for m in methods_with("max_parents") if m != "icp"])
 def test_max_parents_caps_every_dag_the_result_represents(method, monkeypatch):
     data = linear_data(1, d=7, n=500)
     graph = capped_graph(method, monkeypatch)
@@ -288,10 +297,10 @@ def test_max_parents_caps_the_interventional_essential_graph():
     data[400:, 2] = np.random.default_rng(4).standard_normal(200)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        uncapped = andrey.gies(data, interventions).structure.to_numpy()
+        uncapped = andrey.gies(data, targets=interventions).structure.to_numpy()
         assert max_parents_in_class(uncapped).max() > max(CAPS)
         for cap in CAPS:
-            marks = andrey.gies(data, interventions, max_parents=cap).structure.to_numpy()
+            marks = andrey.gies(data, targets=interventions, max_parents=cap).structure.to_numpy()
             assert max_parents_in_class(marks).max() <= cap, cap
 
 
@@ -304,12 +313,14 @@ def test_a_cap_no_graph_can_reach_returns_the_uncapped_graph(method):
         assert fit(data, max_parents=6).structure == fit(data).structure
 
 
-@pytest.mark.parametrize("method", methods_with("max_parents"))
+@pytest.mark.parametrize(
+    "method", sorted(set(methods_with("max_parents")) & set(methods_with("knowledge")))
+)
 def test_required_edges_above_the_parent_cap_are_refused(method):
     data = pd.DataFrame(linear_data(2, d=4, n=200), columns=["x0", "x1", "x2", "x3"])
     knowledge = andrey.Knowledge(required=[("x0", "x3"), ("x1", "x3")])
     with pytest.raises(ValueError, match="max_parents"):
-        getattr(andrey, method)(data, max_parents=1, knowledge=knowledge)
+        fitter(method)(data, max_parents=1, knowledge=knowledge)
 
 
 # --- iteration caps --------------------------------------------------------------------------

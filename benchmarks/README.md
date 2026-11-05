@@ -24,6 +24,8 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [InvariantCausalPrediction](https://cran.r-project.org/package=InvariantCausalPrediction) (R) -
+  see [ICP](comparisons/icp.md)
 - [CAM](https://cran.r-project.org/src/contrib/Archive/CAM/) 1.0 (R, archived on CRAN) - see
   [CAM and RESIT](comparisons/cam-resit.md)
 - the authors' R code for RESIT, read from disk and never copied - see
@@ -33,8 +35,14 @@ Packages:
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md), and
   [Tetrad on continuous data](comparisons/tetrad-continuous.md)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
+- [gnies](https://github.com/juangamella/gnies) - uses a separate environment; see below and
+  [GnIES](comparisons/gnies.md)
+- [graphical-model-learning](https://github.com/uhlerlab/graphical_model_learning) - uses a
+  separate environment; see below and [UT-IGSP](comparisons/ut-igsp.md)
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
+- [CausalNex](https://github.com/mckinsey/causalnex) - uses a separate environment; see below and
+  [DYNOTEARS](comparisons/dynotears.md)
 
 ## Setup
 
@@ -87,11 +95,43 @@ export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
 Its adapter calls the package's public API only.
 
 lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
-lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
+lingam's MultiGroupDirectLiNGAM and CAM-UV, and causal-learn's CAM-UV, which fits with pygam too,
+run in a third environment, on Python 3.12 (see [CAM-UV](comparisons/camuv.md)):
 
 ```shell
 benchmarks/start_lingam.sh
 export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
+```
+
+CausalNex 0.12.2, the reference for DYNOTEARS, pins Python below 3.11, NumPy below 1.24, and pandas
+below 2, so its fits run in an environment on Python 3.10:
+
+```shell
+benchmarks/start_causalnex.sh
+export ANDREY_BENCH_CAUSALNEX_PYTHON=$PWD/benchmarks/.venv-causalnex/bin/python
+```
+
+The authors' UT-IGSP library, graphical-model-learning 0.1a8 with its pinned dependencies, has an
+environment of its own as well, built from the lock file `requirements-utigsp.txt`:
+
+```shell
+benchmarks/start_utigsp.sh
+export ANDREY_BENCH_UTIGSP_PYTHON=$PWD/benchmarks/.venv-utigsp/bin/python
+export ANDREY_BENCH_GML_DEF42_PYTHON=$PWD/benchmarks/.venv-gml-def42/bin/python
+```
+
+Its lanes, `ut_igsp_cpu.py` and `igsp_cpu.py`, start one child process per package and dataset
+rather than one per fit, since each child fits several draws;
+[UT-IGSP's page](comparisons/ut-igsp.md) and [IGSP's](comparisons/igsp.md) describe them. The
+second interpreter is the same environment with `patches/gml-igsp-def42.patch` applied, the IGSP
+lane's second reference.
+
+gnies 0.3.3, the reference for GnIES, fits in an environment of its own on Python 3.12, so its pins
+stay exact and the module `ges` it imports stays out of bench-env:
+
+```shell
+benchmarks/start_gnies.sh
+export ANDREY_BENCH_GNIES_PYTHON=$PWD/benchmarks/.venv-gnies/bin/python
 ```
 
 An adapter selects another environment by setting `python_env` to the name of the variable that
@@ -192,6 +232,8 @@ has neither. A solution's fit receives the data matrix alone.
 
 `latent_gauss_er` hides one node in ten, at least one, from an Erdos-Renyi linear-Gaussian graph.
 Hidden nodes are chosen among nodes with two or more children, so hiding one confounds its children.
+`latent_lingam_er` and `latent_anm_er` hide one node in five, and `latent_anm_er_tenth` one in ten,
+the last two with nonlinear additive effects ([CAM-UV](comparisons/camuv.md)).
 Set `latents` on the `DatasetKey` with `datasets.latents_for`, as `fci_latent.py` does. `d` includes
 hidden nodes: the data has `d - latents` columns; the stored truth keeps all `d` nodes.
 

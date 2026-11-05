@@ -6,6 +6,8 @@ fields on every method.
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -29,10 +31,13 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix."""
+    """The method's required positional inputs, gnies's env, and the environments of a method in
+    ``CONTEXT``, with a DataFrame wherever it takes a data matrix."""
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not inp.required and (spec.name, inp.name) != ("gnies", "env"):
+            if spec.name in CONTEXT and inp.kind == "context":
+                args.append(np.arange(N) * 3 // N)
             continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"
@@ -56,8 +61,26 @@ TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
-#: Settings that shorten a slow fit; the labels come from the same facade path.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Settings that shorten a slow fit, and the target ICP needs; the labels come from the same
+#: facade path.
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "icp": {"target": 2}}
+#: The targets of a method that reads three environments: observational, one with the known
+#: target z, and one whose targets are unknown (ut_igsp) or z again (igsp).
+CONTEXT = {
+    "igsp": {"targets": {0: [], 1: ["z"], 2: ["z"]}},
+    "ut_igsp": {"targets": {0: [], 1: ["z"], 2: None}},
+}
+
+
+@functools.cache
+def labeled_fit(name: str) -> list:
+    """The method's results on frames whose column names are integers that are also positions,
+    beside a string."""
+    spec = next(spec for spec in TABLE_SPECS if spec.name == name)
+    frames = [frame(seed).set_axis([1, 0, "z"], axis=1) for seed in range(3)]
+    settings = {**SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {})}
+    out = getattr(andrey, spec.name)(*inputs(spec, frames), **settings)
+    return out if isinstance(out, list) else [out]
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
@@ -65,14 +88,33 @@ def test_dataframe_columns_become_labels_as_text(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")
     # Integer names that are also positions, beside a string: every label is the name as text.
-    frames = [frame(seed).set_axis([1, 0, "z"], axis=1) for seed in range(3)]
-    out = getattr(andrey, spec.name)(*inputs(spec, frames), **SHORT.get(spec.name, {}))
-    for result in out if isinstance(out, list) else [out]:
+    for result in labeled_fit(spec.name):
         for graph in graphs(result.structure):
             # GIN appends its latents after the observed columns; a pairwise test takes two.
             labels = ("1", "0", "z")[: 2 if spec.family == "pairwise" else 3]
             assert graph.labels[: len(labels)] == labels
             assert graph.labels == result.structure.labels
+
+
+def number_keys(value, path: str = "") -> list[str]:
+    """The path of every mapping in ``value`` whose keys are numbers."""
+    if isinstance(value, dict):
+        found = [path] if any(not isinstance(key, str) for key in value) else []
+        return found + [p for k, v in value.items() for p in number_keys(v, f"{path}.{k}")]
+    if isinstance(value, list):
+        return [p for item in value for p in number_keys(item, path)]
+    return []
+
+
+@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+def test_metadata_keys_are_text_but_the_environment_labels(spec):
+    """Only ``ut_igsp``'s ``targets`` is keyed by numbers, the labels of ``env``; every other
+    mapping in every method's metadata is keyed by text."""
+    if spec.name == "calm":
+        pytest.importorskip("torch")
+    for result in labeled_fit(spec.name):
+        want = [".targets"] if spec.name == "ut_igsp" else []
+        assert number_keys(dict(result.metadata)) == want
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
@@ -111,7 +153,7 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
     def fit(columns: list[str], **given):
         frames = [frame(seed)[columns] for seed in range(3)]
         return getattr(andrey, spec.name)(
-            *inputs(spec, frames), **SHORT.get(spec.name, {}), **given
+            *inputs(spec, frames), **SHORT.get(spec.name, {}), **CONTEXT.get(spec.name, {}), **given
         )
 
     want = named_marks(fit(COLUMNS))

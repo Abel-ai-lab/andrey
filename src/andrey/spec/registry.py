@@ -265,14 +265,17 @@ _add(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="domain_index",
+                    name="env",
                     kind="context",
-                    doc="Domain / context index, (n_samples,) or (n_samples, 1), aligned to the "
-                    "data rows.",
+                    doc="The environment (domain) of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Numbers, such as a time step, are read as numbers; text labels are coded 0, "
+                    "1, ... in sorted order.",
+                    aliases=("domain_index",),
                 ),
             ),
             layout=_MATRIX_LAYOUT,
-            notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
+            notes="env becomes a trailing pseudo-node, then projected out of the result.",
             missing=True,
         ),
         output=OutputSpec(
@@ -314,6 +317,86 @@ _add(
             _TEST_SEED,
         ),
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
+    )
+)
+_add(
+    MethodSpec(
+        name="icp",
+        family="constraint",
+        summary="Invariant causal prediction: the causal parents of one target from continuous "
+        "data pooled from several environments, such as observation and experiments, that leave "
+        "the target's mechanism alone. Tests every set of the other variables for a regression "
+        "that is the same in every environment; the variables in every accepted set are parents "
+        "with probability at least 1 - alpha. Returns a DAG of edges into the target, with "
+        "per-variable p-values and confidence intervals.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "At least two environments.",
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="edges into the target from its estimated parents; metadata['parents'], "
+            "metadata['p_values'] and metadata['confidence_intervals'] per column, "
+            "metadata['accepted_sets'], metadata['model_rejected']",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        order_note="The listing order of `metadata['accepted_sets']` follows the column order.",
+        params=(
+            ParamSpec(
+                name="target",
+                type="str",
+                default=None,
+                doc="Required: the variable whose parents to find, a column name from the data "
+                "file's header or a 0-based position.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env, as for gies: a JSON "
+                "object mapping each label of env to a list of variables. An environment that "
+                "intervened on target is left out; one without an entry is kept. null keeps every "
+                "environment.",
+                nullable=True,
+            ),
+            concept_param(
+                "alpha",
+                doc="The significance level of every set's invariance test: the estimated parents "
+                "are a subset of the true parents with probability at least 1 - alpha.",
+            ),
+            ParamSpec(
+                name="invariance_test",
+                type="str",
+                default="approximate",
+                choices=("approximate", "exact"),
+                concept="invariance_test",
+                doc="approximate = one regression on every row, each environment's residuals "
+                "against the others' by Welch's t-test and the F-test of their variances; exact = "
+                "the regression on the other rows predicts each environment's rows, by Chow's "
+                "F-test, exact for Gaussian noise.",
+            ),
+            concept_param(
+                "max_parents",
+                doc="A cap on the target's parents, at least 0: only sets of at most max_parents "
+                "variables are tested, and the guarantee holds when the target has at most that "
+                "many parents. null tests every set.",
+            ),
+        ),
+        references=("Peters, Buhlmann & Meinshausen 2016", "Chow 1960"),
     )
 )
 
@@ -453,11 +536,11 @@ _add(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="interventions",
+                    name="env",
                     kind="context",
-                    doc="(n_samples, n_variables) 0/1 matrix aligned to the data: 1 where the "
-                    "row's value of the variable was set by an intervention. Omit it for "
-                    "observational data.",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets. Omit both for observational data.",
                     required=False,
                 ),
             ),
@@ -475,6 +558,18 @@ _add(
         column_order="relabels",
         tie_break=True,
         params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"]}; [] marks an '
+                "observational environment. Every environment needs an entry. null, with no env, "
+                "is observational data.",
+                nullable=True,
+                aliases=("interventions",),
+            ),
             concept_param(
                 "score_func",
                 doc=_SCORE_DOC + " Each variable is scored on the rows without an intervention "
@@ -486,6 +581,71 @@ _add(
             _CATEGORICAL,
         ),
         references=("Hauser & Buhlmann 2012", "Cooper & Yoo 1999"),
+    )
+)
+_add(
+    MethodSpec(
+        name="gnies",
+        family="score",
+        summary="Greedy noise-interventional equivalence search: learns the variables whose noise "
+        "variance changes between environments (unknown targets) together with the graph, for "
+        "linear-Gaussian data from two or more environments that share one set of weights. "
+        "Returns the interventional essential graph + score; the learned targets are "
+        "metadata['changing_variables'].",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Two or more environments of 2+ rows each. null takes the environments from "
+                    "targets given as a column or a 0/1 matrix.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; the targets, known and learned, in "
+            "metadata['changing_variables']: the variables whose noise variance differs between "
+            "some two environments, in column order; with env, its labels in "
+            "metadata['environments']",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables known to be intervened on: a JSON object mapping labels of env "
+                "to lists of variables, by the data file's header or 0-based position, such as "
+                '{"0": [], "1": ["x"]}; null, or a label left out, marks an environment whose '
+                "targets are unknown, and the search may add targets there. null for the whole "
+                "argument (the default) learns every target.",
+                nullable=True,
+            ),
+            concept_param(
+                "penalty_discount",
+                doc="Multiplier on the BIC penalty of log(n_samples) per parent and per extra "
+                "noise variance of a target. Larger values give sparser graphs and fewer targets; "
+                "1.0 with ebic_gamma=0.0 is the standard BIC.",
+            ),
+            concept_param(
+                "ebic_gamma",
+                doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, "
+                "n_parents) added per variable, on parents only, from 0 to 1. Larger values give "
+                "sparser graphs; 0.0 is the standard BIC, the paper's score.",
+            ),
+        ),
+        references=("Gamella et al. 2022", "Hauser & Buhlmann 2012"),
     )
 )
 _add(
@@ -1196,6 +1356,188 @@ _add(
         references=("Lam, Andrews & Ramsey 2022",),
     )
 )
+_add(
+    MethodSpec(
+        name="igsp",
+        family="permutation",
+        summary="Interventional greedy sparsest permutation: a permutation search over minimal "
+        "I-MAPs for data from an observational environment and settings whose intervention "
+        "targets are known, minimizing the edges, then the edges the settings contradict. Fisher "
+        "z and Gaussian invariance tests by default. Returns the interventional essential graph.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets that map every label, at least one to [], the observational "
+                    "rows.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['score'] is the edges of the DAG found; metadata['n_contradicting'] its "
+            "I-contradicting edges; metadata['invariance_test'] names the invariance test; "
+            "metadata['alpha'] is the level of the conditional-independence tests",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        seeded=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The variables intervened on in each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"]}; [] marks an observational '
+                "environment. Every environment needs an entry.",
+                nullable=True,
+            ),
+            concept_param(
+                "alpha",
+                default=None,
+                nullable=True,
+                doc="Significance level of the conditional-independence tests, and of the "
+                "invariance tests when invariance_alpha is null; null uses one over the number "
+                "of observational rows.",
+            ),
+            ParamSpec(
+                name="invariance_alpha",
+                type="float",
+                default=None,
+                doc="Significance level of the invariance tests: a variable's distribution "
+                "differs between a setting and the observational rows when the test rejects at "
+                "it. null uses alpha.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                nullable=True,
+            ),
+            _INDEP_TEST,
+            concept_param("invariance_test"),
+            concept_param(
+                "n_starts",
+                default=10,
+                doc="Number of searches, at least 1, each from a minimum-degree order: the first "
+                "breaks ties by column rank, each later one draws them from seed and its index; "
+                "returns the best-scoring search.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the searches after the first and the "
+                "randomized tests.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=(
+            "Wang, Solus, Yang & Uhler 2017",
+            "Yang, Katcoff & Uhler 2018",
+            "Hauser & Buhlmann 2012",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="ut_igsp",
+        family="permutation",
+        summary="Unknown-target interventional greedy sparsest permutation: a permutation search "
+        "over minimal I-MAPs for data from an observational environment and settings whose "
+        "intervention targets are known in part or not at all, minimizing the edges plus the "
+        "targets. Fisher z and Gaussian invariance tests by default. Returns the interventional "
+        "essential graph + each setting's targets.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="env",
+                    kind="context",
+                    doc="The environment of each row: one label per row, (n_samples,) or "
+                    "(n_samples, 1), or a column of the data file, which is then not a variable. "
+                    "Needs targets that map at least one label to [], the observational rows.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['targets'] maps each label of env to its targets, known and learned, "
+            "and passes back as targets=; "
+            "metadata['score'] is the edges plus the targets of the DAG found; "
+            "metadata['invariance_test'] names the invariance test; metadata['alpha'] is the "
+            "level of the conditional-independence tests",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
+        seeded=True,
+        params=(
+            ParamSpec(
+                name="targets",
+                type="targets",
+                default=None,
+                doc="The known intervention targets of each environment of env: a JSON object "
+                "mapping each label of env to a list of variables, by the data file's header or "
+                'by 0-based position, such as {"0": [], "1": ["x"], "2": null}; [] marks an '
+                "observational environment, and null, or a label left out, a setting whose "
+                "targets are all unknown.",
+                nullable=True,
+            ),
+            concept_param(
+                "alpha",
+                default=None,
+                nullable=True,
+                doc="Significance level of the conditional-independence tests, and of the "
+                "invariance tests when invariance_alpha is null; null uses one over the number "
+                "of observational rows.",
+            ),
+            ParamSpec(
+                name="invariance_alpha",
+                type="float",
+                default=None,
+                doc="Significance level of the invariance tests: a variable is a target of a "
+                "setting when the test rejects at it. null uses alpha.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                nullable=True,
+            ),
+            _INDEP_TEST,
+            concept_param("invariance_test"),
+            concept_param(
+                "n_starts",
+                default=10,
+                doc="Number of searches, at least 1, each from a minimum-degree order: the first "
+                "breaks ties by column rank, each later one draws them from seed and its index; "
+                "returns the best-scoring search.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the searches after the first and the "
+                "randomized tests.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Squires, Wang & Uhler 2020", "Yang, Katcoff & Uhler 2018"),
+    )
+)
 
 # --- functional causal models (Glymour, Zhang & Spirtes 2019) -------------------------------------
 # Linear effects with non-Gaussian noise (LiNGAM).
@@ -1776,7 +2118,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -2111,7 +2453,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         references=("Maeda & Shimizu 2021", "Gretton et al. 2007"),
@@ -2186,6 +2528,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
+    "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
@@ -2193,6 +2536,12 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    **dict.fromkeys(
+        ("igsp", "ut_igsp"),
+        "Every DAG the search visits keeps the required edges and holds no forbidden one. "
+        + _ORDER_RULE
+        + _CLASS_RULE,
+    ),
     "exact_search": _PARENT_RULE,
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
@@ -2294,8 +2643,10 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 
 
 # Every method with categorical columns ignores max_categories, with a warning, for one release:
-# values no longer declare a column's type.
+# values no longer declare a column's type. igsp and ut_igsp came later and never took it.
 for _name in CONCEPTS["categorical"].suitable:
+    if _name in ("igsp", "ut_igsp"):
+        continue
     _dropped = (*REGISTRY[_name].dropped_args, "max_categories")
     REGISTRY[_name] = REGISTRY[_name].model_copy(update={"dropped_args": _dropped})
 
@@ -2304,13 +2655,26 @@ for _name in CONCEPTS["categorical"].suitable:
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
     "cdnod": ("conflicts",),
+    "icp": (
+        "target",
+        "parents",
+        "p_values",
+        "confidence_intervals",
+        "accepted_sets",
+        "best_p_value",
+        "model_rejected",
+        "environments_left_out",
+    ),
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
     **dict.fromkeys(
         ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp", "mmhc", "rsmax2"), ("score",)
     ),
+    "gnies": ("score", "changing_variables", "environments"),
     "exact_search": ("dag",),
+    "igsp": ("score", "n_contradicting", "invariance_test", "alpha"),
+    "ut_igsp": ("targets", "score", "invariance_test", "alpha"),
     "calm": ("h_final", "objective"),
     **dict.fromkeys(("notears", "dagma"), ("h_final", "edges_removed", "path_steps")),
     "multi_group_direct_lingam": ("group_index",),

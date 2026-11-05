@@ -156,23 +156,62 @@ def test_run_writes_output_file(capsys, tmp_path, csv_path):
     assert json.loads(dest.read_text())["method"] == "pc"
 
 
-def test_run_gies_with_and_without_interventions(capsys, tmp_path):
-    """The optional input orients x -> y; omitted, the facade's default leaves the edge open."""
+def test_run_gies_with_and_without_targets(capsys, tmp_path):
+    """The environments and their targets orient x -> y; omitted, the edge stays open."""
     rng = np.random.default_rng(0)
     x = rng.standard_normal(600)
     y = x + 0.5 * rng.standard_normal(600)
     y[400:] = rng.standard_normal(200)
-    mask = np.zeros((600, 2))
-    mask[400:, 1] = 1
-    data_path, mask_path = tmp_path / "xy.csv", tmp_path / "mask.csv"
+    data_path, env_path = tmp_path / "xy.csv", tmp_path / "env.csv"
     np.savetxt(data_path, np.column_stack([x, y]), delimiter=",")
-    np.savetxt(mask_path, mask, delimiter=",")
+    np.savetxt(env_path, np.repeat([0, 1], [400, 200]), delimiter=",")
     types = {}
-    for argv in (["--interventions", str(mask_path)], []):
+    for argv in (["--env", str(env_path), 'targets={"0": [], "1": [1]}'], []):
         code, out, _ = _run(["run", "gies", "--data", str(data_path), *argv], capsys)
         assert code == 0
         types[bool(argv)] = [e["type"] for e in json.loads(out)["structure"]["edges"]]
     assert types == {True: ["directed"], False: ["undirected"]}
+
+
+@pytest.fixture
+def three_environments(tmp_path):
+    """x shifted in environment 1, y in 2: the data file, the env file of whole numbers, and both
+    as arrays."""
+    rng = np.random.default_rng(0)
+    env = np.repeat([0, 1, 2], 600)
+    x = rng.standard_normal(1800) + 2.0 * (env == 1)
+    y = x + rng.standard_normal(1800) * np.where(env == 2, 3.0, 1.0)
+    X = np.column_stack([x, y])
+    data_path, env_path = tmp_path / "xy.csv", tmp_path / "env.csv"
+    np.savetxt(data_path, X, delimiter=",")
+    np.savetxt(env_path, env, delimiter=",")  # written as 0.000000000000000000e+00, ...
+    return data_path, env_path, X, env
+
+
+def test_an_env_of_whole_numbers_gives_integer_keys_that_pass_back(capsys, three_environments):
+    """The labels read 0, not 0.0, so ut_igsp's --json keys are "0", "1", "2", and its targets
+    passed back as targets= give the result Python gives for the same mapping."""
+    data_path, env_path, X, env = three_environments
+    run = ["run", "ut_igsp", "--data", str(data_path), "--env", str(env_path)]
+    code, out, _ = _run([*run, 'targets={"0": [], "1": [0]}'], capsys)
+    targets = json.loads(out)["metadata"]["targets"]
+    assert code == 0 and list(targets) == ["0", "1", "2"]
+    code, again, _ = _run([*run, f"targets={json.dumps(targets)}"], capsys)
+    python = andrey.ut_igsp(X, env, targets={int(k): v for k, v in targets.items()})
+    assert code == 0
+    assert json.loads(again)["metadata"]["targets"] == {
+        str(k): v for k, v in python.metadata["targets"].items()
+    }
+    code, out, _ = _run(["run", "gnies", "--data", str(data_path), "--env", str(env_path)], capsys)
+    assert code == 0 and json.loads(out)["metadata"]["environments"] == [0, 1, 2]
+
+
+def test_an_env_of_whole_numbers_leaves_cdnod_as_float_labels_do(capsys, three_environments):
+    data_path, env_path, X, env = three_environments
+    code, out, _ = _run(["run", "cdnod", "--data", str(data_path), "--env", str(env_path)], capsys)
+    edges = [(e["source"], e["target"], e["type"]) for e in json.loads(out)["structure"]["edges"]]
+    assert code == 0
+    assert edges == andrey.cdnod(X, env.astype(float)).structure.oriented_edges(index=True)
 
 
 def test_run_multi_group(capsys, nongaussian_path):
@@ -390,7 +429,7 @@ def test_missing_input_error(capsys):
 
 
 def test_unexpected_input_error(capsys, csv_path):
-    argv = ["run", "pc", "--data", str(csv_path), "--domain-index", str(csv_path)]
+    argv = ["run", "pc", "--data", str(csv_path), "--env", str(csv_path)]
     code, _out, err = _run(argv, capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
 

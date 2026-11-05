@@ -24,6 +24,35 @@ import andrey
 warnings.simplefilter("error", andrey.DeprecatedArgumentWarning)
 ```
 
+## From 0.13 to 0.14
+
+Andrey 0.14.0 names each row's environment `env` in both `cdnod` and `gies`, and `gies` takes the
+variables intervened on in each environment as `targets`. A former name in the table still works
+in 0.14, with an `andrey.DeprecatedArgumentWarning`, and stops working in the release after:
+
+| Method | Former name | Name now |
+| --- | --- | --- |
+| `cdnod` | `domain_index` (`--domain-index`) | `env` (`--env`) |
+| `gies` | `interventions` (`--interventions`), or the 0/1 matrix as the second argument | `targets`, with `env` (`--env` and `targets=`) |
+
+```python
+# 0.13
+out = andrey.cdnod(data, domain_index=index)
+out = andrey.gies(data, intervened)  # a 0/1 matrix shaped like data
+out = andrey.gies(data, interventions=intervened)
+
+# 0.14
+out = andrey.cdnod(data, env=index)
+out = andrey.gies(data, targets=intervened)  # the same matrix, now one form of targets
+out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
+```
+
+`env` holds one label per row, text or numbers, or names a column of a DataFrame `data`, which is
+then not a variable. `targets` maps each label of `env` to its intervened variables, `[]` for an
+observational environment, or names a column that gives each row's variables. On the command
+line, `--env` names a column of `--data` or a file, and `targets=` takes a JSON object, inline or
+as a file, such as `targets='{"0": [], "1": ["x"]}'`.
+
 ## From 0.11 to 0.12
 
 Andrey 0.12.0 renames the arguments below, reads a column's type only from what you declare, and

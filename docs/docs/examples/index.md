@@ -49,8 +49,8 @@ Recover a three-variable chain with GES.
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, and CD-NOD on data
-from several domains.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, CD-NOD on data from
+several domains, and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -61,7 +61,9 @@ from several domains.
 :img-top: /_generated/thumbs/permutation_based.svg
 :img-alt: The graph BOSS or GRaSP recovers in this notebook
 
-BOSS and GRaSP search over orderings of the variables for the best-scoring graph.
+BOSS and GRaSP search over orderings of the variables for the best-scoring graph; IGSP does
+too, on settings whose changed variables it is told, and UT-IGSP on settings whose changed
+variables it is told in part or not at all.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -73,7 +75,7 @@ BOSS and GRaSP search over orderings of the variables for the best-scoring graph
 :img-alt: The true graph of this notebook's data
 
 XGES, hill climbing, Tabu search, and exact search look for the graph with the best BIC score;
-GIES also learns from interventions.
+GIES also learns from interventions, and GnIES from environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -101,14 +103,14 @@ fits several datasets, and GIN finds latent variables.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
-:::{grid-item-card} Nonlinear additive-noise models: CAM and RESIT
+:::{grid-item-card} Nonlinear additive-noise models: CAM, RESIT, and CAM-UV
 :link: functional
 :link-type: doc
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
 CAM and RESIT learn a DAG, with every edge oriented, when each variable is a nonlinear function of
-its parents plus independent noise.
+its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they join.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -152,7 +154,8 @@ ANM and PNL test which of two variables causes the other.
 :img-top: /_generated/thumbs/time_series.svg
 :img-alt: The true graph of this notebook's series, its lags merged
 
-PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, and longitudinal LiNGAM on data over time.
+PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, DYNOTEARS, and longitudinal LiNGAM on data over
+time.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

@@ -216,12 +216,15 @@ that makes the same mistake on every resample gives it a frequency of 1.
 
 ### Time series and several datasets?
 
-Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and `granger` learn
-graphs over time lags; `lpcmci` also allows hidden common causes. The [release cards](benchmarks.md)
-benchmark them against tigramite, lingam, and causal-learn. `multi_group_direct_lingam` fits
-several datasets that share one causal order, `cdnod` takes data from several domains, and `gies`
-takes data that mixes observation with interventions. All are supported. `dynotears`, which fits a
-linear structural vector autoregression by continuous optimization, is experimental.
+Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, and
+`dynotears` learn graphs over time lags; `lpcmci` also allows hidden common causes, and `dynotears`
+fits a linear structural vector autoregression by continuous optimization. The
+[release cards](benchmarks.md) benchmark them against tigramite, lingam, causal-learn, and
+CausalNex. `multi_group_direct_lingam` fits several datasets that share one causal order, `cdnod`
+takes data from several domains, and `gies`, `gnies`, `igsp`, `ut_igsp`, and `icp` take data from
+several environments: `gies` and `igsp` with known interventions, `gnies` learning the variables
+whose noise variance changed, `ut_igsp` learning the targets it is not given, and `icp` the parents
+of one target. All are supported.
 
 ## Command line and agents
 
@@ -302,7 +305,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.13.0},
+  version = {0.14.0},
   url = {https://andrey.abel.ai},
 }
 ```

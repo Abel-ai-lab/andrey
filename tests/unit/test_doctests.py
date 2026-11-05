@@ -31,6 +31,8 @@ def _facade_modules() -> list[str]:
 # The other modules whose examples the API reference shows: the simulators, the bootstrap, and the
 # graph structures.
 SIMULATORS = [
+    "andrey.data.scm",
+    "andrey.data.interventions",
     "andrey.data.discrete",
     "andrey.data.mixed",
     "andrey.resample",

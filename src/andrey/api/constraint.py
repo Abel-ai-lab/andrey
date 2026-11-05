@@ -4,7 +4,8 @@ The underlying searches use :mod:`andrey.core` for the conditional-independence 
 Student-t on continuous data, chi-square and G-square on categorical data, degenerate and
 conditional Gaussian likelihood ratios on mixed data, and the nonlinear tests) and orientation.
 ``pc`` and ``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a
-BIC, BDeu, or mixed-data score.
+BIC, BDeu, or mixed-data score. ``icp`` tests the invariance of one target's regressions across
+environments and returns its estimated parents.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     import numpy.typing as npt
 
@@ -1082,7 +1083,7 @@ def gfci(
 @method_spec("cdnod")
 def cdnod(
     data: npt.ArrayLike,
-    domain_index: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -1096,22 +1097,31 @@ def cdnod(
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
-    CDNOD [1]_ adds a domain/context index as an extra causal parent, so distribution shifts
-    across regimes are modeled, then runs PC-style discovery. It applies to samples pooled across
-    domains, regimes, or time blocks. The index is appended as a trailing pseudo-node and removed
-    from the result.
+    CDNOD [1]_ adds the environment of each row, its domain, as an extra causal parent, so
+    distribution shifts across environments are modeled, then runs PC-style discovery. It applies
+    to samples pooled across domains, regimes, or time blocks. The environment index is appended as
+    a trailing pseudo-node and removed from the result.
 
     Parameters
     ----------
-    data : array-like of shape (n_samples, n_variables)
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    domain_index : array-like of shape (n_samples,) or (n_samples, 1)
-        Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
-        the time step for data that drift over time. Coerced to ``float64``; whole numbers with
-        ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. See Notes for more than two
-        domains. When every row has the same value, the data come from one domain, and the result
-        equals :func:`~andrey.pc`'s.
+        become the structure's ``labels``. A column that ``env`` names is not a variable: it leaves
+        the data before the fit, and ``categorical``, ``knowledge``, and the result's positions
+        count the other columns. A list of DataFrames or 2-D arrays gives each domain's rows
+        apart, labeled by position ``0, 1, ...``, and a mapping labels each by its key: the rows
+        are stacked in that order, and ``env`` stays ``None``. A position is the domain's number,
+        so with ``"fisherz"`` or ``"student_t"`` and three or more domains, the order of the list
+        can change the result (see Notes).
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment (domain) of each row of ``data``, such as ``0`` and ``1`` for two domains,
+        or the time step for data that drift over time, or the name of a column of the DataFrame
+        ``data`` that holds them. Numbers are coerced to ``float64`` and read as numbers; whole
+        numbers with ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. String labels
+        are coded ``0, 1, ...`` in sorted order, whatever the row order; a label is a string or a
+        number, not both. See Notes for more than two domains. When every row has the same value,
+        the data come from one domain, and the result equals :func:`~andrey.pc`'s. ``None``
+        needs ``data`` as each domain's rows apart.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
@@ -1174,7 +1184,7 @@ def cdnod(
         reads its unshielded triples as colliders or non-colliders. The result directs every edge
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
-        a directed cycle raises ``ValueError``. The domain index is unconstrained.
+        a directed cycle raises ``ValueError``. The environment index is unconstrained.
 
     Returns
     -------
@@ -1200,19 +1210,22 @@ def cdnod(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If ``categorical`` is not a list of column names and positions, ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
     ValueError
         If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
-        ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
-        ``data`` has too few rows for a test, if ``data`` or ``categorical`` does not suit the test,
-        as for :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index``
-        holds a value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a
-        column of ``data``, or ``domain_index`` with more than one domain, repeats another up to
-        scale and shift, before any test runs; one message names every group of copies and says to
-        keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        message names the method, the argument, what it accepts, and the value. Also if ``env``
+        is given with each domain's rows apart; if those rows' tables differ in kind or columns,
+        or one has no rows or holds ``inf``; if ``env`` does not hold one value per row
+        of ``data``, holds ``NaN`` / ``inf`` or a missing label, mixes strings and numbers, or
+        names a column ``data`` lacks; if ``data`` has too few rows
+        for a test, if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`, or, with a categorical or mixed-data test, if a numeric ``env`` holds a
+        value that is not a whole number. With ``"fisherz"`` or ``"student_t"``, also if a column of
+        ``data``, or ``env`` with more than one domain, repeats another up to scale and shift,
+        before any test runs; one message names every group of copies and says to keep one column
+        per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1224,8 +1237,8 @@ def cdnod(
     Notes
     -----
     **When to use.** CD-NOD suits data pooled from several domains or regimes, or data whose
-    distribution drifts over time, in which the causal mechanisms may change with
-    ``domain_index``, any unmeasured common cause is a function of that index, and every
+    distribution drifts over time, in which the causal mechanisms may change with ``env``, any
+    unmeasured common cause is a function of that index, and every
     independence follows from the graph with the index added (faithfulness) [1]_. Its default
     Fisher-Z test assumes continuous data with linear effects and Gaussian noise and detects only a
     change in a variable's mean that follows the index's values; ``"chisq"``, ``"gsq"``,
@@ -1238,7 +1251,9 @@ def cdnod(
 
     The index is added as a variable that can only be a cause. When a variable's distribution
     changes with the index, the edge from the index into it is directed, and Meek's rules can then
-    orient edges that PC leaves undirected on the same data.
+    orient edges that PC leaves undirected on the same data. CD-NOD needs only each row's
+    environment, not which variables changed in it; when every environment's intervened variables
+    are known, :func:`~andrey.gies` uses them.
 
     ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
     find a change in a variable's mean that follows the index's values. With two domains the coding
@@ -1278,7 +1293,7 @@ def cdnod(
     on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
     where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows. ``domain_index`` must be
+    other tests, or when a continuous column is constant on its rows. ``env`` must be
     complete, and ``dependence_threshold``, whose kernel measures read every row, raises
     ``ValueError`` on data with missing values. With missing values, the skeleton search runs in one
     process.
@@ -1338,15 +1353,30 @@ def cdnod(
     >>> import numpy as np
     >>> from andrey import cdnod
     >>> rng = np.random.default_rng(0)
-    >>> domain_index = np.repeat([0.0, 1.0], 300)
-    >>> x = 2.0 * domain_index + rng.standard_normal(600)
+    >>> env = np.repeat([0.0, 1.0], 300)
+    >>> x = 2.0 * env + rng.standard_normal(600)
     >>> y = x + 0.5 * rng.standard_normal(600)
-    >>> cdnod(np.column_stack([x, y]), domain_index).structure.oriented_edges()
+    >>> cdnod(np.column_stack([x, y]), env).structure.oriented_edges()
     [(0, 1, 'directed')]
+
+    The environments can be a column of a DataFrame, with labels of any kind:
+
+    >>> import pandas as pd
+    >>> data = pd.DataFrame({"x": x, "y": y, "site": np.repeat(["north", "south"], 300)})
+    >>> cdnod(data, "site").structure.oriented_edges()
+    [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
     from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
+    from andrey.core.environments import normalize_env_targets
 
+    if env is None:
+        raise TypeError(
+            "cdnod needs env, the environment of each row, or data as each environment's rows apart"
+        )
+    data, codes, env_labels, _ = normalize_env_targets(
+        data, env, None, require_known_targets=False, method="cdnod"
+    )
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -1360,9 +1390,11 @@ def cdnod(
     )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
-    c = np.asarray(domain_index, dtype=np.float64)
+    # Numbers reach the search as given, such as a time step; text labels as their codes.
+    text = any(isinstance(label, str) for label in env_labels)
+    c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
-        check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
+        check_categories(c, None, f"indep_test={indep_test!r}", name="env")
     if dependence_threshold is not None and np.isnan(X).any():
         raise ValueError(
             "cdnod's dependence_threshold step compares kernel measures over every row, so it "
@@ -1374,7 +1406,7 @@ def cdnod(
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
     with (
-        copies_named(labels, lambda j: "domain_index" if j == d else column(j)),
+        copies_named(labels, lambda j: "env" if j == d else column(j)),
         rows_tested() as rows,
     ):
         cpdag = _cdnod(
@@ -1400,3 +1432,330 @@ def cdnod(
         **rows_metadata(rows),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+@method_spec("icp")
+def icp(
+    data: npt.ArrayLike,
+    env: npt.ArrayLike | str | None = None,
+    *,
+    target: str | int | None = None,
+    targets: Mapping | npt.ArrayLike | str | None = None,
+    alpha: float = 0.05,
+    invariance_test: str = "approximate",
+    max_parents: int | None = None,
+) -> StructureOutput:
+    """Learn one variable's causal parents from data in several environments with ICP.
+
+    Invariant causal prediction [1]_ tests, for every set of the other variables, whether the
+    regression of the target on that set stays the same in every environment. The target's causal
+    parents pass that test whenever the environments leave the target's own mechanism alone, so the
+    variables in every accepted set are causal parents with high probability. The result is a DAG
+    with an edge into the target from each such variable.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables), or a list or mapping of them
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``. A column that ``env`` or ``targets`` names is not a
+        variable: it leaves the data before the fit, and ``target``, ``targets``, and the result's
+        positions count the other columns.
+        A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
+        position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
+        order, ``env`` stays ``None``, and ``targets``, when given, maps those labels to their
+        variables.
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name
+        of a column of the DataFrame ``data`` that holds them. Every distinct label is one
+        environment, and at least two are needed. Which variables an environment changed, and how,
+        does not matter, as long as it left the target's mechanism alone. ``None`` takes the
+        environments from ``data`` given as each environment's rows apart, or else from
+        ``targets`` given as a column or a 0/1 matrix: rows with the same targets are one
+        environment.
+    target : str or int
+        Required. The variable whose parents to find: a column label (a string) or a 0-based
+        position (an integer). ``None`` raises ``ValueError``.
+    targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
+        The variables intervened on in each environment, as for :func:`~andrey.gies`, by column
+        label or 0-based position: a mapping ``{label: [variables]}`` from labels of ``env``, with
+        ``[]`` for an observational environment and ``None`` or a missing label for unknown
+        targets; the name of a column whose cells give each row's targets; or a 0/1 matrix. ICP
+        reads only whether an environment intervened on ``target``: the rows of such an
+        environment are left out of the fit, and an environment whose targets are unknown is kept.
+        ``None`` keeps every environment.
+    alpha : float, default=0.05
+        The significance level of every set's invariance test, in ``(0, 1)``: the estimated parents
+        are a subset of the true parents with probability at least ``1 - alpha``. Smaller values
+        accept more sets and give fewer parents.
+    invariance_test : {"approximate", "exact"}, default="approximate"
+        The invariance test of each set. ``"approximate"`` fits one regression on every row and
+        compares each environment's residuals with the other rows' by Welch's t-test of their means
+        and the F-test of their variances. ``"exact"`` fits the regression on the other rows,
+        predicts each environment's rows, and tests the prediction errors with Chow's F-test, exact
+        for Gaussian noise. See Notes.
+    max_parents : int or None, default=None
+        A cap on the target's parents, at least ``0``: only sets of at most ``max_parents``
+        variables are tested, so no estimate gives the target more than ``max_parents`` parents.
+        The guarantee then holds when the target has at most ``max_parents`` parents. ``None``
+        tests every set, ``2^(n_variables - 1)`` of them.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every column, with an edge
+        ``x -> target`` from each estimated parent ``x`` and no other edge; an absent edge says
+        nothing about the pair. ``metadata["algorithm"]`` is ``"icp"``; ``metadata["target"]``
+        names the target and ``metadata["parents"]`` the estimated parents, the variables in every
+        accepted set, by column label or 0-based position. ``metadata["p_values"]`` gives one value
+        per column, ``None`` at the target: the largest p-value of the tested sets without the
+        column, so a variable is a parent exactly when its value is at most ``alpha``, and every
+        value is 1 when no set is accepted. ``metadata["confidence_intervals"]`` gives
+        ``[low, high]`` per column, ``None`` at the target, for its coefficient in the target's
+        equation; ``None`` when no set is accepted. ``metadata["accepted_sets"]`` lists the
+        accepted sets, by size then by position; ``metadata["best_p_value"]`` is the largest
+        p-value of any tested set; ``metadata["model_rejected"]`` is ``True`` when no set is
+        accepted; and ``metadata["environments_left_out"]`` lists the labels of the environments
+        whose ``targets`` hold ``target``.
+
+    Raises
+    ------
+    TypeError
+        If ``target`` is neither a column label nor a position.
+    ValueError
+        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
+        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        is ``None`` or names a column ``data`` lacks; if ``data`` is not a 2-D numeric matrix with
+        at least two rows, no ``NaN`` or ``inf``, and no constant column; if a column repeats
+        another up to scale and shift or, with more rows than columns, is a linear function of
+        other columns, one message naming every group of copies; if ``data`` holds each
+        environment's rows apart with ``env`` or with ``targets`` other than a mapping, or its
+        tables differ in kind or columns, or one has no rows; if ``env`` does not hold one label
+        per row, misses a label, mixes strings and numbers, or names a column ``data`` lacks; if
+        ``targets`` names a variable or an environment ``data`` or ``env`` lacks, or gives two rows
+        of one environment different targets; if fewer than two environments remain once those
+        that intervened on ``target`` are left out, as with one table and neither ``env`` nor
+        ``targets``, or one has fewer than 3 rows; if a column is
+        constant on the rows that remain; or if a regression has as many coefficients as rows: under
+        ``"exact"``, on the rows outside each environment, where a variable constant there also
+        raises.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes,
+        which the fit reads as numbers. Each message warns once per process.
+
+    See Also
+    --------
+    andrey.gies : The whole graph from environments whose intervened variables are known.
+    andrey.cdnod : The whole graph from environments whose changes are unknown.
+
+    Notes
+    -----
+    **When to use.** ICP suits continuous data pooled from several environments, such as
+    observation and experiments, when you want the causal parents of one target with an error
+    guarantee. Its claim [1]_: when the target is a linear function of its parents plus noise
+    whose distribution is the same in every environment, so that the environments change the other
+    variables in any way but leave the target's mechanism alone, the estimated parents are a subset
+    of the true parents with probability at least ``1 - alpha``, without faithfulness or any
+    condition on how strong the changes are; the exact test needs Gaussian noise. Weak or few
+    changes give fewer parents, not wrong ones. It tests every set of the other variables, so it
+    suits about 15 of them, or more with ``max_parents``. For the whole graph from interventional
+    data, use :func:`~andrey.gies` when every environment's intervened variables are known and
+    :func:`~andrey.cdnod` when they are not.
+
+    **How it works.** For every set ``S`` of the other variables, of at most ``max_parents`` of
+    them, the null hypothesis is that the target's regression on ``S``, with an intercept, has the
+    same coefficients and the same residual distribution in every environment [1]_. A set is
+    accepted when its p-value exceeds ``alpha``, and the estimate is the intersection of the
+    accepted sets. When no set is accepted, the model is rejected and the estimate is empty: an
+    intervention on the target, a hidden common cause of the target and a variable, or a nonlinear
+    effect can leave no set invariant.
+
+    **Tests.** Under ``"approximate"`` (the paper's Method II), each environment's residuals of
+    the regression on every row are compared with the other rows' residuals by Welch's t-test and
+    the two-sided F-test of the variances; the environment's p-value is twice the smaller of the
+    two. Under ``"exact"`` (Method I), the regression on the other rows predicts the environment's
+    rows, and Chow's statistic [2]_ is ``(RSS_all - RSS_out) / n_e`` over
+    ``RSS_out / (n_out - |S| - 1)``, which is ``F(n_e, n_out - |S| - 1)`` under the null with
+    Gaussian noise, where ``RSS_all`` and ``RSS_out`` are the residual sums of squares of the
+    regressions on every row and on the ``n_out`` rows outside the environment's ``n_e``. A set's
+    p-value is the smallest environment's times the number of environments, the Bonferroni
+    correction, capped at 1; with two environments the approximate test's two comparisons are one
+    test, so its factor is 1. Every set's regression reads the environments' Gram matrices,
+    computed once, so a set costs the same at any number of rows and neither test subsamples.
+
+    **Intervals.** For an accepted set of ``s`` variables, each coefficient's interval is the
+    pooled estimate plus or minus ``t_{1 - alpha/(2s), n - s - 1}`` standard errors, and a variable
+    outside the set has the interval ``[0, 0]``; ``metadata["confidence_intervals"]`` is the union
+    over the accepted sets. Together the intervals hold every coefficient of the target's equation
+    with probability at least ``1 - 2 alpha`` [1]_.
+
+    **Limitations.** Measured on simulated linear Gaussian data drawn as in the paper's simulation
+    study [1]_: two environments of 100 to 500 rows each, 5 to 12 variables, and noise interventions
+    on one or more of them, with 200 datasets per scenario. When those interventions could also hit
+    the target and ``targets`` did not name them, the estimate held a variable outside the true
+    parents in 18% of the fits under ``"approximate"`` and 11% under ``"exact"``, over the 55
+    scenarios that hit it, against under 1% in the scenarios that left it alone. An intervention
+    that changes the target's noise makes the regression on its parents differ across environments,
+    so their set is rejected, while a set with a child of the target, whose own equation does not
+    change, stays close to invariant and is accepted: 88% and 87% of those fits held a child.
+    ``targets`` leaves such environments out. A hidden common cause of the target and one other
+    variable raised the share to 1.2% and 1.8% over 20 scenarios, and to 14.5% in one of them under
+    ``"exact"``. A ``tanh`` effect of one parent on the target kept it at 1.0% at most, but the
+    estimate equaled the true parents in under 0.5% of the fits. With ``max_parents=3`` on 40
+    variables, it found 0.2% of the true parents under ``"exact"``. Without ``max_parents`` it tests
+    ``2^(n_variables - 1)`` sets: the median fit of the approximate test took 0.24 s on one core at
+    15 variables and 1,000 rows. The guarantee does not cover noise that is not Gaussian under
+    ``"exact"``. The numbers are a reference, not a hard limit: they change with the data generator,
+    the settings, and the machine.
+
+    References
+    ----------
+    .. [1] Peters, J., Buhlmann, P., and Meinshausen, N. (2016). Causal inference by using
+       invariant prediction: identification and confidence intervals. Journal of the Royal
+       Statistical Society Series B 78(5), 947-1012.
+    .. [2] Chow, G. C. (1960). Tests of equality between sets of coefficients in two linear
+       regressions. Econometrica 28(3), 591-605.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import icp
+    >>> rng = np.random.default_rng(0)
+    >>> env = np.repeat(["observed", "shifted"], 500)
+    >>> x = rng.standard_normal(1000) + 2.0 * (env == "shifted")  # the shift moves x only
+    >>> y = x + rng.standard_normal(1000)
+    >>> z = y + rng.standard_normal(1000)
+    >>> data = pd.DataFrame({"x": x, "y": y, "z": z})
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = icp(data, env, target="y")
+    >>> out.metadata["parents"], out.structure.oriented_edges()
+    (['x'], [('x', 'y', 'directed')])
+    """
+    from andrey.api._adapt import dag_from_adjacency, data_matrix
+    from andrey.constraint.icp import icp as _icp
+    from andrey.core.environments import normalize_env_targets
+    from andrey.core.knowledge import _node, column_position
+    from andrey.core.score import check_columns
+
+    data, codes, env_labels, by_code = normalize_env_targets(
+        data, env, targets, require_known_targets=False, method="icp"
+    )
+    X = data_matrix(data, method="icp")
+    labels = column_labels(data)
+    d = X.shape[1]
+    if target is None:
+        raise ValueError(
+            "icp: pass target, the variable whose parents to find, as a column label or a 0-based "
+            "position"
+        )
+    t = column_position(_node(target, "target"), labels, d, "icp: target")
+    name = column_namer(labels)
+    left_out = [k for k, hit in by_code.items() if hit is not None and t in hit]
+    keep = ~np.isin(codes, left_out)
+    kept = [k for k in range(len(env_labels)) if k not in left_out]
+    if len(kept) < 2:
+        why = (
+            f"targets intervenes on target {name(t)} in environments "
+            f"{[env_labels[k] for k in left_out]}, whose rows are left out, so "
+            if left_out
+            else ""
+        )
+        raise ValueError(
+            f"icp: {why}{len(kept)} environment remains; ICP compares the target's regression "
+            "across environments, so it needs at least two"
+        )
+    X, codes = X[keep], np.searchsorted(kept, codes[keep])
+    environments = [env_labels[k] for k in kept]
+    sizes = np.bincount(codes, minlength=len(kept))
+    if sizes.min() < 3:
+        small = int(np.argmin(sizes))
+        raise ValueError(
+            f"icp: environment {environments[small]!r} has {sizes[small]} rows; every environment "
+            "needs at least 3, and ideally dozens"
+        )
+    constant = [name(j) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    if constant:
+        raise ValueError(
+            f"icp: data columns {', '.join(constant)} are constant on the rows of the environments "
+            "that remain; drop them before the fit"
+        )
+    with copies_named(labels):
+        check_columns(np.atleast_2d(np.cov(X, rowvar=False)), len(X), name)
+    largest = d - 1 if max_parents is None else min(max_parents, d - 1)
+    _check_rows(X, codes, t, largest, invariance_test, environments, name)
+    result = _icp(
+        X,
+        codes,
+        t,
+        alpha=alpha,
+        invariance_test=invariance_test,
+        max_parents=max_parents,
+        environments=environments,
+    )
+    node = (lambda j: labels[j]) if labels is not None else int
+    adjacency = np.zeros((d, d), dtype=np.int8)
+    adjacency[list(result.parents), t] = 1
+    p_values = [None if j == t else float(v) for j, v in enumerate(result.p_values)]
+    intervals = None
+    if result.intervals is not None:
+        intervals = [
+            None if j == t else [float(a), float(b)] for j, (a, b) in enumerate(result.intervals)
+        ]
+    metadata = {
+        "target": node(t),
+        "parents": [node(j) for j in result.parents],
+        "p_values": p_values,
+        "confidence_intervals": intervals,
+        "accepted_sets": [[node(j) for j in s] for s in result.accepted],
+        "best_p_value": result.best_p_value,
+        "model_rejected": not result.accepted,
+        "environments_left_out": [env_labels[k] for k in left_out],
+    }
+    return structure_output(dag_from_adjacency(adjacency), labels=labels, metadata=metadata)
+
+
+def _check_rows(
+    X: np.ndarray,
+    codes: np.ndarray,
+    target: int,
+    largest: int,
+    invariance_test: str,
+    environments: list,
+    name: Callable[[int], str],
+) -> None:
+    """Raise ``ValueError`` when a regression of ICP has too few rows for its coefficients.
+
+    A set of ``largest`` variables has ``largest + 1`` coefficients with the intercept, and its
+    residual variance needs one more row: on every row, and under ``"exact"`` on the rows outside
+    each environment, where every variable must also vary.
+    """
+    need = largest + 2
+    if len(X) < need:
+        raise ValueError(
+            f"icp: sets of {largest} variables need at least {need} rows, and data has {len(X)}; "
+            "lower max_parents or give more rows"
+        )
+    if invariance_test != "exact":
+        return
+    for e, label in enumerate(environments):
+        outside = X[codes != e]
+        if len(outside) < need:
+            raise ValueError(
+                f"icp: the exact test fits sets of {largest} variables on the rows outside each "
+                f"environment, which needs {need} rows, and the rows outside {label!r} are "
+                f"{len(outside)}; lower max_parents or use invariance_test='approximate'"
+            )
+        flat = [
+            name(j) for j in np.flatnonzero(np.ptp(outside, axis=0) == 0).tolist() if j != target
+        ]
+        if flat:
+            raise ValueError(
+                f"icp: the exact test fits each set on the rows outside each environment, and "
+                f"columns {', '.join(flat)} are constant on the rows outside {label!r}; use "
+                "invariance_test='approximate'"
+            )

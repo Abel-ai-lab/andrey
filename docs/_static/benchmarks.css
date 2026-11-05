@@ -154,6 +154,12 @@ html[data-theme="dark"] .release-cover {
     var(--andrey-ground-navy);
 }
 
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-14-0 {
+  background:
+    url("release-cards/0.14.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
+}
+
 .bd-content .sd-card.release-cover .sd-card-body {
   padding: 1.2rem 1.7rem 1.9rem 2.05rem;
 }
@@ -678,4 +684,52 @@ html[data-theme="dark"] .release-tile {
   .release-actions a {
     transition: none;
   }
+}
+
+/* A comparison table with grouped columns: each error's label spans its columns, and a rule
+   starts each group. */
+.ct-table.ct-nested thead th[scope="colgroup"] {
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.ct-table.ct-nested .ct-start {
+  border-left: 1px solid var(--andrey-line);
+}
+
+.ct-table.ct-nested .ct-section th {
+  padding: 0.6rem 0.9rem 0.4rem;
+  border-top: 2px solid var(--andrey-line);
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.ct-table.ct-nested tbody tr:first-child.ct-section th {
+  border-top: 0;
+}
+
+.ct-table.ct-nested .ct-verdict {
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+.ct-table.ct-nested th,
+.ct-table.ct-nested td {
+  padding: 0.45rem 0.5rem;
+}
+
+.ct-table.ct-nested tbody th[scope="row"] {
+  padding-left: 0.9rem;
+  white-space: normal;
+}
+
+.ct-table.ct-nested tbody th[scope="row"] {
+  min-width: 8.5rem;
+}
+
+.ct-table.ct-nested td small {
+  white-space: normal;
 }

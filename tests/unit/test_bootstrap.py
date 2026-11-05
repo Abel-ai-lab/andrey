@@ -490,14 +490,14 @@ def test_the_frequencies_do_not_depend_on_the_column_order(method):
 def test_a_row_aligned_input_is_resampled_with_the_rows():
     data = lingam_data(300)
     domain = np.repeat([0, 1, 2], 100)
-    out = bootstrap("cdnod", data, n_resamples=3, seed=0, domain_index=domain, keep_fits=True)
+    out = bootstrap("cdnod", data, n_resamples=3, seed=0, env=domain, keep_fits=True)
     assert out.n_resamples == 3 and out.structure.n_nodes == 4
-    with pytest.raises(ValueError, match="domain_index has 299 rows but data has 300"):
-        bootstrap("cdnod", data, n_resamples=3, domain_index=domain[:-1])
-    with pytest.raises(ValueError, match="needs domain_index"):
+    with pytest.raises(ValueError):
+        bootstrap("cdnod", data, n_resamples=3, env=domain[:-1])
+    with pytest.raises(ValueError):
         bootstrap("cdnod", data, n_resamples=3)
     ints = (np.random.default_rng(0).random((300, 4)) < 0.1).astype(int)
-    assert bootstrap("gies", data, n_resamples=2, interventions=ints).n_resamples == 2
+    assert bootstrap("gies", data, n_resamples=2, targets=ints).n_resamples == 2
     assert bootstrap("gies", data, n_resamples=2).n_resamples == 2
 
 

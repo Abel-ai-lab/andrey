@@ -30,9 +30,9 @@ its column, so reordering the columns relabels the result and changes nothing el
 arbitrary with respect to the causal structure.
 
 Some columns are ones the data cannot tell apart in any row order, unit, or sign: a copy of another
-column in other units or the other sign, or two columns whose rows also appear with the two
-swapped. These rank by their values in row order instead, so for them a row shuffle can change
-which ranks first, while reordering the columns still relabels the result.
+column in the other sign, or two columns whose rows also appear with the two swapped. These rank by
+their values in row order instead, so for them a row shuffle can change which ranks first, while
+reordering the columns still relabels the result.
 
 Scores are compared at a fixed precision, so candidates whose scores differ only in their last
 bits count as tied and go to the rank.
@@ -61,11 +61,12 @@ when the fits split evenly between the two directions of an edge, the columns' r
 their positions under `tie_break="position"`. A CPDAG or a PAG needs no rank, as every order of the
 tie gives the same graph.
 
-Identical columns are the exception for every method: they rank the same, so position decides which
-comes first, and the graph is the same up to swapping them. The score-based searches with the BIC
-score, and `pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy
-another up to scale and shift, with a `ValueError` that names each group of copies; the LiNGAM
-causal-order search keeps one column per group and places the other copies right after it.
+Identical columns, copies of a column in other units, and categorical columns that group the rows
+alike are the exception for every method: they rank the same, so position decides which comes first,
+and the graph is the same up to swapping them. The score-based searches with the BIC score, and
+`pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy another up to
+scale and shift, with a `ValueError` that names each group of copies; the LiNGAM causal-order search
+keeps one column per group and places the other copies right after it.
 
 ## Across machines
 
@@ -78,11 +79,12 @@ two tied scores round to different values.
 The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`,
 and the tests of `iamb`, `inter_iamb`, `mmpc`, and the restrict phases of `mmhc` and `rsmax2`, with
 the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000 rows,
-the scores of `ges` (and so of `gfci`'s first phase), `gies`, `xges`, `hc`, `tabu`, `mmhc`, and
-`rsmax2`, the fits of `notears`, `dagma`, `dynotears`, `cam`, `resit`, and `camuv`, and the tests
-of `pcmci`, `pcmciplus`, and `lpcmci` run on one BLAS thread, and so do their worker processes, so
-the host's thread count cannot change their results. From 2,000 rows, KCI runs on every BLAS
-thread, where its kernel products run faster; its p-values then repeat for a fixed thread count.
+the scores of `ges` (and so of `gfci`'s first phase), `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`,
+and `rsmax2`, the fits of `notears`, `dagma`, `dynotears`, `cam`, `resit`, and `camuv`, and the
+tests of `pcmci`, `pcmciplus`, and `lpcmci` run on one BLAS thread, and so do their worker
+processes, so the host's thread count cannot change their results. From 2,000 rows, KCI runs on
+every BLAS thread, where its kernel products run faster; its p-values then repeat for a fixed
+thread count.
 
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
 with one torch version, and another platform can give another graph. When the likelihood fit of

@@ -175,8 +175,9 @@ when they differ. A new enumerated value goes in `ParamSpec.choices`, so the sch
 implements a concept changes in `src/andrey/spec/concepts.py`: bringing a method to the template
 deletes its deviation, and `tests/unit/test_concepts.py` fails until it does. A parameter or a
 choice renamed after a release keeps its former name in `ParamSpec.aliases` or
-`ParamSpec.choice_aliases` for one release, which `method_spec` maps with a
-`DeprecatedArgumentWarning`; the deviation's `aliases` lists the names that shipped. A parameter
+`ParamSpec.choice_aliases` for one release, and a data input in `InputSpec.aliases`, which
+`method_spec` maps with a `DeprecatedArgumentWarning`; the deviation's `aliases` lists the names
+that shipped. A parameter
 removed after a release goes in `MethodSpec.dropped_args` for one release: the wrapper drops it
 with the same warning. Bounds go in the `ParamSpec`, which the wrapper checks; a facade checks only
 what depends on the data or on another parameter.

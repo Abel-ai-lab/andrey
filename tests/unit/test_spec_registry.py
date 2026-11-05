@@ -26,14 +26,25 @@ from andrey.spec.models import Status
 
 # Input names are a closed set (the InputSpec names in the registry), each a `cmd_run` option.
 # Everything else is a hyperparameter, passed as `key=value` or via `--config`.
-_INPUT_FLAGS = ("data", "domain_index", "interventions")
+_INPUT_FLAGS = ("data", "env")
+
+# The former input flags, which the CLI still takes for one release: the inputs' former names and
+# gies's former intervention matrix, now a form of targets.
+_FORMER_INPUT_FLAGS = (
+    *sorted({a for spec in REGISTRY.values() for i in spec.data.inputs for a in i.aliases}),
+    "interventions",
+)
 
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
 _RESERVED_PARAM_NAMES = frozenset(
     {"method", "config", "output", "json", "full", "help", "version", "debug"}
-    | {*_INPUT_FLAGS}
+    | {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS}
     | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
 )
+
+# The inputs whose facade default, None, stands for data given as each environment's rows apart,
+# which one data file cannot give, so the CLI needs them.
+APART_DEFAULTS = {("cdnod", "env"), ("icp", "env")}
 
 _SPEC_NAMES = sorted(REGISTRY)
 
@@ -62,9 +73,10 @@ def test_signature_agreement(name):
     # Array inputs: same names, same order.
     assert [i.name for i in spec.data.inputs] == data_names
     # An input is optional exactly when the facade gives it a default, so the CLI can leave a
-    # missing one to that default.
+    # missing one to that default; an input in APART_DEFAULTS has one too, though the CLI needs it.
     defaults = [p.default is not p.empty for p in params if p.kind is p.POSITIONAL_OR_KEYWORD]
-    assert [not i.required for i in spec.data.inputs] == defaults
+    optional = [not i.required or (name, i.name) in APART_DEFAULTS for i in spec.data.inputs]
+    assert optional == defaults
 
     # Keyword hyperparameters: same set, and each default matches the signature exactly.
     spec_params = {p.name: p for p in spec.params}
@@ -252,7 +264,7 @@ def test_cmd_run_wires_every_input_flag():
     from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
-    missing = {*_INPUT_FLAGS} - params
+    missing = {*_INPUT_FLAGS, *_FORMER_INPUT_FLAGS} - params
     assert not missing, f"input flags with no cmd_run option: {missing}"
 
 
@@ -424,7 +436,7 @@ def test_supported_method_has_a_benchmarks_section(name):
     sections = {
         names.get(_normalized(part), _normalized(part))
         for page in reports
-        for heading in re.findall(r"^### (.+)$", page.read_text(), re.MULTILINE)
+        for heading in re.findall(r"^#{2,3} (.+)$", page.read_text(), re.MULTILINE)
         for part in re.split(r",| and ", heading)
     }
     missing = f"{name}: no section in a report under docs/docs/benchmarks/; {GRADUATE}"

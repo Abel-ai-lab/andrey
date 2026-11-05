@@ -24,7 +24,7 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range
-from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput
+from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
 from andrey.core.knowledge import mpdag
@@ -773,7 +773,7 @@ class _Job:
 
     name: str  # the facade, by name
     data: Any  # the first input: an array or table, or a list of them for a panel
-    aligned: dict[str, Any]  # row-aligned inputs by keyword (cdnod's domain_index)
+    aligned: dict[str, Any]  # row-aligned arguments by keyword (env, a targets matrix)
     kwargs: dict[str, Any]
     seed: int
     unit: str  # "rows", "blocks", "units" (one draw for every array), or "groups" (one each)
@@ -783,6 +783,7 @@ class _Job:
     tie_break: str
     resampling: str  # "subsample" or "bootstrap", resolved
     sample_fraction: float  # a subsample's share of the rows
+    strata: tuple[np.ndarray, ...] | None = None  # each environment's rows, drawn on their own
 
 
 def _take(x: Any, idx: np.ndarray) -> Any:
@@ -800,6 +801,19 @@ def _kept(n: int, sample_fraction: float) -> int:
 def _draw(job: _Job, b: int) -> list[np.ndarray]:
     """Draw resample ``b``'s row indices, one array per data array."""
     rng = np.random.default_rng(np.random.SeedSequence(job.seed, spawn_key=(b, 0)))
+    if job.strata is not None:  # the same share of each environment's rows, at least one
+        if job.resampling == "subsample":
+            picks = [
+                rows[
+                    rng.choice(
+                        len(rows), size=max(1, _kept(len(rows), job.sample_fraction)), replace=False
+                    )
+                ]
+                for rows in job.strata
+            ]
+        else:
+            picks = [rows[rng.integers(0, len(rows), size=len(rows))] for rows in job.strata]
+        return [np.sort(np.concatenate(picks))]
     sizes = [len(x) for x in job.data] if job.unit in ("units", "groups") else [len(job.data)]
     if job.resampling == "subsample":
         kept = [_kept(n, job.sample_fraction) for n in sizes]
@@ -912,11 +926,18 @@ def bootstrap(
     ``method`` is fitted on it. The result counts, for every pair of variables, the fits that give
     each endpoint-mark pair (``->``, ``<-``, ``--``, ``<->``, ``o->``, ...) and builds the averaged
     graph: the vote of the fits, made a valid graph of the method's kind [1]_ [2]_ [3]_. A method
-    with a row-aligned input
-    (``cdnod``'s ``domain_index``, ``gies``'s ``interventions``) resamples that input with the
-    rows. A time-series method on one series subsamples one stretch of consecutive rows (and
-    bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units, and
-    ``multi_group_direct_lingam`` resamples each dataset on its own.
+    with a row-aligned input (``env``, or ``targets`` as a 0/1 matrix) resamples that input with the
+    rows, and a column that ``env`` or ``targets`` names travels with the rows of ``data``. When
+    ``env`` holds text labels, or the method takes ``targets`` (``gies``, ``igsp``, and
+    ``ut_igsp``), a resample is drawn within each environment of ``env``: of an environment's ``m``
+    rows, a subsample keeps ``round(sample_fraction * m)``, at least one, and a bootstrap resample
+    draws ``m`` with replacement, so every resample keeps every environment. A numeric ``env`` of
+    ``cdnod``, which reads it as numbers, such as a domain number or a time step, resamples the rows
+    as a whole. For a method that takes ``targets``, the averaged graph is made a CPDAG without the
+    targets, so an edge that only the interventions orient is undirected there; the edge frequencies
+    keep its direction. A time-series method on one series subsamples one stretch of consecutive
+    rows (and bootstraps blocks of consecutive rows), ``longitudinal_lingam`` resamples whole units,
+    and ``multi_group_direct_lingam`` resamples each dataset on its own.
 
     Parameters
     ----------
@@ -924,7 +945,9 @@ def bootstrap(
         A method's name, such as ``"pc"``, or the callable itself, such as ``andrey.pc``.
     data : array-like of shape (n_samples, n_variables), or a sequence of them
         The data, as the method takes it. ``multi_group_direct_lingam`` and
-        ``longitudinal_lingam`` take a sequence of arrays.
+        ``longitudinal_lingam`` take a sequence of arrays. A method that takes ``env`` also takes
+        each environment's rows apart, as a list or a mapping, pooled into one table and ``env``
+        and resampled within each environment, ``cdnod``'s domains included.
     n_resamples : int, default=100
         The number of resamples and fits. ``n_boot``, the former name, works with a
         ``DeprecatedArgumentWarning`` for one more release.
@@ -950,8 +973,8 @@ def bootstrap(
     sample_fraction : float, default=0.5
         The share of the rows in a subsample, in ``(0, 1]``, so that ``round(sample_fraction *
         n_samples)`` is at least 2; for ``longitudinal_lingam``, the share of the units, and for
-        ``multi_group_direct_lingam``, the share of each dataset's rows. Not used by
-        ``"bootstrap"``.
+        ``multi_group_direct_lingam``, the share of each dataset's rows, and for a resample drawn
+        within environments, the share of each environment's rows. Not used by ``"bootstrap"``.
     block_length : int or None, default=None
         For ``resampling="bootstrap"`` of a time-series method on one series, the number of
         consecutive rows in a block, from 1 to ``n_samples``. ``None`` uses
@@ -963,7 +986,7 @@ def bootstrap(
         Keep every fit in the ``fits`` property.
     **method_kwargs
         The method's other arguments: its keyword parameters, and a row-aligned input such as
-        ``domain_index=``.
+        ``env=``.
 
     Returns
     -------
@@ -1008,24 +1031,24 @@ def bootstrap(
     does [4]_, and it changes only the draw, so it means the same for every method.
 
     On linear data with 20 and 50 variables and 1,000 and 5,000 rows (``pc``, ``ges``, and
-    ``direct_lingam``; 10 datasets per cell), the averaged graph of half-size subsamples had no more
-    errors (SHD) than the bootstrap's in any of the 10 cells, and fewer in 5; for ``ges`` with 50
-    variables and 1,000 rows, 5.0 fewer on average (95% interval 2.7 to 7.9). For ``ges`` with 20
-    variables and 1,000 rows, the averaged graph had 18 wrong edge types instead of 32, and 9 of
-    the 10 averaged graphs were valid CPDAGs instead of 3. The adjacency frequencies had a lower
+    ``direct_lingam``; 10 datasets per cell), the averaged graph of half-size subsamples had fewer
+    errors (SHD) than the bootstrap's in 5 of the 10 cells and tied in the other 5; for ``ges`` with
+    50 variables and 1,000 rows, 5.0 fewer on average (95% interval 2.7 to 7.9). For ``ges`` with 20
+    variables and 1,000 rows, the averaged graph had 18 wrong edge types instead of 32, and 9 of the
+    10 averaged graphs were valid CPDAGs instead of 3. The adjacency frequencies had a lower
     calibration error in 9 of the 10 cells, and a fit took 0.56 to 0.95 of the time, since it has
     half the rows. The one cell where the point estimate was worse, ``pc`` with 20 variables and
     1,000 rows, was 0.43 errors above the bootstrap's over 30 datasets (interval -0.23 to 1.13). A
-    larger ``sample_fraction`` gives fits closer to the fit on ``data``, so the resamples agree
-    more and the frequencies say less about how much the fit varies.
+    larger ``sample_fraction`` gives fits closer to the fit on ``data``, so the resamples agree more
+    and the frequencies say less about how much the fit varies.
 
     For a time-series method on one series, a subsample is one stretch of consecutive rows, which
     keeps the lags inside it [5]_. With ``pcmci``, ``pcmciplus``, ``lpcmci``, and ``varma_lingam``
     on simulated series with 5 and 10 variables and 500 and 1,000 rows (10 series per cell, 14
     cells; 30 series per cell, 12 cells, for the first three), a stretch of half of the series had
-    no more errors (SHD) than the block bootstrap in any cell, and fewer, by an interval below 0, in
-    9 of the 14 cells of 10 series. Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter
-    than ten times the longest lag.
+    fewer errors (SHD) than the block bootstrap, by an interval below 0, in 9 of the 14 cells of 10
+    series and tied in the other 5, and in 10 of the 12 cells of 30 series and tied in the other 2.
+    Those blocks were ``ceil(n_samples ** (1/3))`` rows, shorter than ten times the longest lag.
 
     **The averaged graph.** Each pair of variables takes its most frequent state in the fits, no
     edge counted as one of the states: the pair gets its most frequent edge when more fits have
@@ -1266,8 +1289,29 @@ def _job(
     resampling: str,
     sample_fraction: float,
 ) -> _Job:
-    """Check the call against ``spec`` and bundle it for the workers."""
+    """Check the call against ``spec`` and bundle it for the workers.
+
+    Data given as each environment's rows apart become one table and ``env`` first
+    (:func:`~andrey.core.environments.pool_environments`), so the resamples draw from its rows,
+    within each environment.
+    """
     kwargs = dict(kwargs)
+    entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
+    apart = False
+    if entry is not None:
+        key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
+        targets = next((p for p in spec.params if p.type == "targets"), None)
+        names = () if targets is None else (targets.name, *targets.aliases)
+        given = kwargs.get(key)
+        data, env = environments.pool_environments(
+            data,
+            given,
+            next((kwargs[k] for k in names if k in kwargs), None),
+            spec.name,
+            missing=spec.data.missing,
+        )
+        if given is None and env is not None:
+            kwargs[key], apart = env, True
     panel = spec.data.inputs[0].kind == "panel"
     temporal = spec.family == "temporal"
     if panel:
@@ -1295,15 +1339,19 @@ def _job(
     elif block_length is not None:
         raise ValueError("block_length is for resampling='bootstrap', not resampling='subsample'")
     aligned = {}
-    for entry in spec.data.inputs[1:]:
-        value = kwargs.pop(entry.name, None)
+    for entry in (*spec.data.inputs[1:], *(p for p in spec.params if p.type == "targets")):
+        key = next((k for k in (entry.name, *entry.aliases) if k in kwargs), entry.name)
+        value = kwargs.get(key)
         if value is None:
-            if entry.required:
+            if getattr(entry, "required", False):
                 raise ValueError(f"{spec.name} needs {entry.name}")
             continue
+        if isinstance(value, (str, Mapping)):  # a column of data, or one entry per environment
+            continue
         if len(value) != sizes[0]:
-            raise ValueError(f"{entry.name} has {len(value)} rows but data has {sizes[0]}")
-        aligned[entry.name] = value
+            raise ValueError(f"{key} has {len(value)} rows but data has {sizes[0]}")
+        aligned[key] = kwargs.pop(key)
+    strata = _strata(spec, data, aligned, kwargs, apart=apart) if unit == "rows" else None
     return _Job(
         name=spec.name,
         data=data,
@@ -1317,4 +1365,44 @@ def _job(
         tie_break=_backend.config.tie_break,
         resampling=resampling,
         sample_fraction=sample_fraction,
+        strata=strata,
     )
+
+
+def _strata(
+    spec: MethodSpec,
+    data: Any,
+    aligned: dict[str, Any],
+    kwargs: dict[str, Any],
+    *,
+    apart: bool = False,
+) -> tuple[np.ndarray, ...] | None:
+    """Return the rows of each environment when a resample is drawn within environments.
+
+    ``None`` when it is not. A resample is drawn within environments when the call gives ``env`` (or
+    its former name) as one label per row or as a column of ``data``, and ``env`` holds text labels,
+    the method takes ``targets``, or ``apart``: the data came as each environment's rows apart. A
+    numeric ``env`` of a method without ``targets`` in one table, such as ``cdnod``'s domain or time
+    index, which the method reads as numbers, leaves the rows drawn as a whole. The environments
+    are in the order of their codes (:func:`~andrey.core.environments.env_codes`); labels the
+    method cannot read leave the rows drawn as a whole, and the fit raises on them.
+    """
+    entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
+    if entry is None:
+        return None
+    key = next((k for k in (entry.name, *entry.aliases) if k in aligned or k in kwargs), None)
+    value = aligned.get(key, kwargs.get(key)) if key is not None else None
+    if isinstance(value, str):
+        value = data[value].to_numpy() if value in list(getattr(data, "columns", ())) else None
+    if value is None:
+        return None
+    values = np.asarray(value, dtype=object)
+    values = values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
+    text = values.ndim == 1 and any(isinstance(v, str) for v in values)
+    if values.ndim != 1 or not (apart or text or any(p.type == "targets" for p in spec.params)):
+        return None
+    try:
+        codes, labels = environments.env_codes(values, len(values))
+    except ValueError:
+        return None
+    return tuple(np.flatnonzero(codes == k) for k in range(len(labels)))

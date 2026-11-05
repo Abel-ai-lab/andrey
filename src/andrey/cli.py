@@ -584,6 +584,8 @@ def _coerce(raw: str, param: ParamSpec) -> object:
     """Coerce a raw CLI string against a ParamSpec type -- the spec drives the parse (no sniff)."""
     if param.type == "knowledge":
         return _knowledge_value(raw, param.name)
+    if param.type == "targets":
+        return _targets_value(raw, param.name)
     value, quoted = _unquote(raw)
     if quoted:  # a quoted value is a literal string -- only a str param can accept one
         if param.type != "str":
@@ -645,6 +647,19 @@ def _coerce(raw: str, param: ParamSpec) -> object:
 def _knowledge_value(raw: str, name: str) -> dict | None:
     """Read a `knowledge=` value: inline JSON (`{...}`), `null`, or the path of a JSON file, bare
     or in one pair of single or double quotes."""
+    value = _json_value(raw, name)
+    return None if value is None else _knowledge_object(value, name)
+
+
+def _targets_value(raw: str, name: str) -> dict | None:
+    """Read a `targets=` value as `knowledge=` is read (:func:`_json_value`)."""
+    value = _json_value(raw, name)
+    return None if value is None else _targets_object(value, name)
+
+
+def _json_value(raw: str, name: str) -> object:
+    """Read a JSON value: inline (`{...}`), `null`, or the path of a JSON file, bare or in one pair
+    of single or double quotes."""
     text = raw.strip()
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"":
         text = text[1:-1].strip()
@@ -661,10 +676,9 @@ def _knowledge_value(raw: str, name: str) -> dict | None:
                 EXIT_USAGE,
             ) from None
     try:
-        value = json.loads(text)
+        return json.loads(text)
     except json.JSONDecodeError as exc:
         raise CliError("bad_value", f"{name} is not valid JSON: {exc}", EXIT_USAGE) from None
-    return _knowledge_object(value, name)
 
 
 def _knowledge_object(value: object, name: str) -> dict:
@@ -681,6 +695,21 @@ def _knowledge_object(value: object, name: str) -> dict:
     return value
 
 
+def _targets_object(value: object, name: str) -> dict:
+    """Check that a targets object maps each environment to a list of variables or null; the
+    facade checks the labels and the variables."""
+    if not isinstance(value, dict) or not all(
+        v is None or isinstance(v, list) for v in value.values()
+    ):
+        raise CliError(
+            "bad_value",
+            f"{name} must be a JSON object mapping each label of --env to a list of variables, "
+            'such as {"0": [], "1": ["x"]}',
+            EXIT_USAGE,
+        )
+    return value
+
+
 def _validate_config_value(value: object, param: ParamSpec) -> object:
     """A `--config` value is already typed (YAML/JSON): validate against the spec, do not coerce a
     string. Returns tuples for int_pair / str_list."""
@@ -692,6 +721,10 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         if isinstance(value, str):  # a path or inline JSON, as on the command line
             return _knowledge_value(value, param.name)
         return _knowledge_object(value, param.name)
+    if param.type == "targets":
+        if isinstance(value, str):
+            return _targets_value(value, param.name)
+        return _targets_object(value, param.name)
     ok = {
         "bool": isinstance(value, bool),
         "int": isinstance(value, int) and not isinstance(value, bool),
@@ -864,13 +897,58 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
     return fkwargs, resolved
 
 
+def _former_flags(
+    spec: MethodSpec, provided: dict[str, list[str] | None], fkwargs: dict, command: str
+) -> list[str]:
+    """Map the former `--domain-index` flag onto `--env` and the former `--interventions` matrix
+    onto `targets=`, and return the warning each one gives.
+
+    A method that never took the flag keeps it in ``provided``, where :func:`_load_method_inputs`
+    refuses it. Raises ``CliError`` when a call passes a former flag with its replacement.
+    """
+    messages = []
+    env = next((i for i in spec.data.inputs if i.name == "env"), None)
+    if provided.get("domain_index") and env is not None and "domain_index" in env.aliases:
+        if provided.get("env"):
+            raise CliError(
+                "bad_input",
+                "--domain-index is the former name of --env; pass only --env",
+                EXIT_USAGE,
+            )
+        provided["env"] = provided.pop("domain_index")
+        messages.append(
+            f"andrey {command}: --domain-index is now --env; the former flag stops working in the "
+            "next release"
+        )
+    targets = next((p for p in spec.params if p.type == "targets"), None)
+    paths = provided.get("interventions")
+    if paths and targets is not None and "interventions" in targets.aliases:
+        if fkwargs.get("targets") is not None:
+            raise CliError(
+                "bad_input",
+                "--interventions is the former form of targets=; pass only targets=",
+                EXIT_USAGE,
+            )
+        if len(paths) != 1:
+            raise CliError("bad_input", "--interventions takes a single path", EXIT_USAGE)
+        provided.pop("interventions")
+        fkwargs["targets"] = load(paths[0])[0]
+        messages.append(
+            f"andrey {command}: --interventions is now --env with targets=; the former flag stops "
+            "working in the next release"
+        )
+    return messages
+
+
 def _load_method_inputs(
     spec: MethodSpec, provided: dict[str, list[str] | None]
 ) -> tuple[list, tuple[str, ...] | None]:
     """Load a method's array inputs from their `--flag` value(s).
 
-    Errors on a missing required input or an unexpected input flag. Also returns the first input's
-    header, whose column names name the nodes.
+    A row-aligned input that names a column of the first input's header is taken out of it: the
+    column becomes the input, and the data and the header lose it. Errors on a missing required
+    input, an unexpected input flag, or a row-aligned value that names both a column and a file.
+    Also returns the first input's header, whose column names name the nodes.
     """
     used = {i.name for i in spec.data.inputs}
     extra = [name for name, val in provided.items() if val and name not in used]
@@ -891,10 +969,40 @@ def _load_method_inputs(
             )
         if inp.kind != "panel" and len(vals) != 1:
             raise CliError("bad_input", f"{inp.flag} takes a single path", EXIT_USAGE)
+        if inp.kind == "context" and headers[0] is not None and vals[0] in headers[0]:
+            if Path(vals[0]).exists():
+                raise CliError(
+                    "bad_input",
+                    f"{inp.flag} {vals[0]!r} names both a column of --data and a file; rename one",
+                    EXIT_USAGE,
+                )
+            import numpy as np
+
+            j = headers[0].index(vals[0])
+            column = positional[0][:, j]
+            positional.append(_env_labels(column) if inp.name == "env" else column)
+            positional[0] = np.delete(positional[0], j, axis=1)
+            headers[0] = headers[0][:j] + headers[0][j + 1 :]
+            continue
         arr, labels = load_input(inp, vals)
-        positional.append(arr)
+        positional.append(_env_labels(arr) if inp.name == "env" else arr)
         headers.append(labels)
     return positional, headers[0]
+
+
+def _env_labels(values: np.ndarray | list[np.ndarray]) -> np.ndarray:
+    """Return an ``--env`` of whole numbers as integers, so its labels read ``0``, not ``0.0``.
+
+    Every input loads as float64. Fractional labels stay floats, and so do ``NaN`` and infinity,
+    which the method's own check names. A label of ``2**53`` or more stays a float too: float64
+    cannot tell such integers apart, so their integer form would not be exact.
+    """
+    import numpy as np
+
+    values = np.asarray(values)
+    if not np.isfinite(values).all() or (np.abs(values) >= 2.0**53).any():
+        return values
+    return values.astype(np.int64) if (values == np.round(values)).all() else values
 
 
 def column_positions(
@@ -929,10 +1037,11 @@ def _prepare_call(
 ) -> tuple[list, dict, dict, tuple[str, ...] | None]:
     """Shape the loaded inputs and coerced params into what the facade takes.
 
-    ``categorical=`` names become positions and ``knowledge=`` becomes an ``andrey.Knowledge``. A
-    method that reads column types or knowledge, or whose graph adds latent nodes (GIN), gets the
-    data as a DataFrame, so its warnings and its graph name the header's columns. Returns the
-    inputs, params, resolved params, and the labels still to apply to the result.
+    ``categorical=`` names become positions, and ``knowledge=`` becomes an ``andrey.Knowledge``;
+    the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
+    it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
+    (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
+    Returns the inputs, params, resolved params, and the labels still to apply to the result.
     """
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
@@ -1029,10 +1138,12 @@ def execute_run(
     output: str | None,
     as_json: bool,
     full: bool,
+    former: Sequence[str] = (),
 ) -> None:
     """Call the facade on the loaded inputs + coerced params, then emit the result (shell-aware).
 
-    ``labels`` (the data's header) name the result's nodes.
+    ``labels`` (the data's header) name the result's nodes. Each message of ``former``, one per
+    former flag the call passed, warns with the fit's warnings.
     """
     import time
 
@@ -1045,6 +1156,8 @@ def execute_run(
         # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            for message in former:
+                warn_once(message, DeprecatedArgumentWarning)
             out = fn(*positional, **fkwargs)
     elapsed = time.perf_counter() - start
     if isinstance(out, list):
@@ -1095,11 +1208,13 @@ def execute_bootstrap(
     output: str | None,
     as_json: bool,
     full: bool,
+    former: Sequence[str] = (),
 ) -> None:
     """Refit the method on resamples of the rows, then emit the edge frequencies (shell-aware).
 
     The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
-    ``n_boot`` is the former ``--n-boot`` flag, which replaces ``n_resamples`` and warns.
+    ``n_boot`` is the former ``--n-boot`` flag, which replaces ``n_resamples`` and warns, as each
+    message of ``former`` does.
     """
     import time
 
@@ -1154,6 +1269,8 @@ def execute_bootstrap(
                     "working in the next release",
                     DeprecatedArgumentWarning,
                 )
+            for message in former:
+                warn_once(message, DeprecatedArgumentWarning)
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
@@ -1850,21 +1967,26 @@ _DataOption = Annotated[
         "(a panel) needs the flag once per dataset.",
     ),
 ]
-_DomainIndexOption = Annotated[
+_EnvOption = Annotated[
     Optional[list[str]],
     typer.Option(
-        "--domain-index",
-        metavar="PATH",
-        help="cdnod only: the domain index, one value per row of --data.",
+        "--env",
+        metavar="COLUMN|PATH",
+        help="cdnod, icp, gies, gnies, igsp, ut_igsp only: the environment of each row, a column "
+        "of --data's header (then not a variable) or a file with one value per row of --data.",
     ),
+]
+_DomainIndexOption = Annotated[
+    Optional[list[str]],
+    typer.Option("--domain-index", metavar="PATH", hidden=True, help="Former name of --env."),
 ]
 _InterventionsOption = Annotated[
     Optional[list[str]],
     typer.Option(
         "--interventions",
         metavar="PATH",
-        help="gies only: a 0/1 matrix shaped like --data, 1 where the row's value of the variable "
-        "was set by an intervention.",
+        hidden=True,
+        help="Former 0/1 matrix of gies; use --env with targets=.",
     ),
 ]
 _ConfigOption = Annotated[
@@ -1906,6 +2028,7 @@ def cmd_run(
         None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
     ),
     data: _DataOption = None,
+    env: _EnvOption = None,
     domain_index: _DomainIndexOption = None,
     interventions: _InterventionsOption = None,
     config: _ConfigOption = None,
@@ -1925,12 +2048,14 @@ def cmd_run(
         return
     provided = {
         "data": data,
+        "env": env,
         "domain_index": domain_index,
         "interventions": interventions,
     }
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
+    former = _former_flags(spec, provided, fkwargs, "run")
     positional, labels = _load_method_inputs(spec, provided)
     execute_run(
         spec,
@@ -1941,6 +2066,7 @@ def cmd_run(
         output=output,
         as_json=as_json,
         full=full,
+        former=former,
     )
 
 
@@ -1954,6 +2080,7 @@ def cmd_bootstrap(
         None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
     ),
     data: _DataOption = None,
+    env: _EnvOption = None,
     domain_index: _DomainIndexOption = None,
     interventions: _InterventionsOption = None,
     n_resamples: Optional[int] = typer.Option(
@@ -2017,6 +2144,7 @@ def cmd_bootstrap(
         return
     provided = {
         "data": data,
+        "env": env,
         "domain_index": domain_index,
         "interventions": interventions,
     }
@@ -2029,6 +2157,7 @@ def cmd_bootstrap(
     check_environment()
     cfg = _load_config(config) if config else {}
     fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
+    former = _former_flags(spec, provided, fkwargs, "bootstrap")
     positional, labels = _load_method_inputs(spec, provided)
     execute_bootstrap(
         spec,
@@ -2047,6 +2176,7 @@ def cmd_bootstrap(
         output=output,
         as_json=as_json,
         full=full,
+        former=former,
     )
 
 

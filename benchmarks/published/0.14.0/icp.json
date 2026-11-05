@@ -1,0 +1,2460 @@
+{
+ "release": "0.14.0",
+ "generated": "2026-11-03",
+ "theme": "ICP against InvariantCausalPrediction, in and out of the claim",
+ "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+ "regimes": {
+  "icp_appendix_g": "linear Gaussian SEMs drawn as in Peters, Buhlmann and Meinshausen (2016, Appendix G): 5 to 12 nodes, two environments of 100 to 500 rows, noise interventions per row on one or more variables but the target, new weights a third of the time; one SEM per scenario",
+  "icp_appendix_g_target": "the icp_appendix_g scenarios with Appendix G's intervened set, which can hold the target (out of the claim)",
+  "icp_do": "observation and 2 or 3 single-variable do-interventions N(2, 0.2^2) on other variables than the target, 6 or 10 nodes, 200 rows per environment, drawn by andrey.data",
+  "icp_appendix_g_capped": "icp_appendix_g at 16, 21, or 40 nodes, targets with at most 3 parents, max_parents=3",
+  "icp_hidden": "icp_appendix_g with a hidden parent of the target and of one other variable (out of the claim)",
+  "icp_nonlinear": "icp_appendix_g with tanh of one parent in the target's equation (out of the claim)",
+  "icp_speed": "icp_appendix_g weights at 9, 12, and 15 nodes with 500 + 500 rows, and 12 nodes with 5000 + 5000 rows"
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "D = error(Andrey) - error(InvariantCausalPrediction) per paired fit; worse when the paired 95% percentile-bootstrap interval of the mean D lies entirely above 0, better when entirely below, a tie otherwise",
+ "fit_protocol": "every fit on 1 core, 4 at a time, no wall cap; Andrey's speed rows are the median of 3 timed fits after one untimed one, the others one fit; R's time covers its ICP() call alone",
+ "error_metric": "each entry's own, in its error_metric",
+ "packages": {
+  "InvariantCausalPrediction": "0.8",
+  "R": "4.6.1"
+ },
+ "hardware": {
+  "cpu_models": [
+   "Intel(R) Core(TM) i7-7820X CPU @ 3.60GHz"
+  ],
+  "hosts": 1,
+  "cores_per_fit": 1
+ },
+ "complete": true,
+ "complete_definition": "true when every planned fit finished; no fit timed out",
+ "seeds_note": "scenario seeds [658, cell, scenario] and dataset seeds [658, cell, scenario, dataset], as benchmarks/icp_cpu.py draws them",
+ "coverage": {
+  "A": {
+   "scenarios": 100,
+   "andrey_fits_per_test": 100000
+  },
+  "B": {
+   "scenarios": 100,
+   "andrey_fits_per_test": 20000
+  },
+  "C": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "D": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "D40": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 1000
+  },
+  "E-hidden": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "E-nonlinear": {
+   "scenarios": 20,
+   "andrey_fits_per_test": 4000
+  },
+  "speed-9": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  },
+  "speed-12": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  },
+  "speed-12-large": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  },
+  "speed-15": {
+   "scenarios": 5,
+   "andrey_fits_per_test": 5
+  }
+ },
+ "pending_fits": 0,
+ "incomplete": [],
+ "methods": [
+  {
+   "method": "ICP, approximate test",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.normal",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "regime": "icp_appendix_g, icp_do, icp_appendix_g_capped, icp_speed",
+   "claim": "in",
+   "lane": "icp.approximate",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "A",
+     "test": "approximate",
+     "scenarios": 100,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 5000,
+     "andrey_ok": 5000,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5000,
+     "comparator_timeouts": 0,
+     "paired": 5000,
+     "andrey_s": 0.00826034415513277,
+     "comparator_s": 0.4075000000000005,
+     "ratio": 50.16425587985391,
+     "same_graph": 5000,
+     "same_accepted_sets": 5000,
+     "andrey_fwer": 0.008,
+     "comparator_fwer": 0.008,
+     "andrey_fwer_95": [
+      0.005721,
+      0.010878
+     ],
+     "comparator_fwer_95": [
+      0.005721,
+      0.010878
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.9644,
+     "comparator_shd_mean": 0.9644,
+     "empty_shd_mean": 1.07,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "C",
+     "test": "approximate",
+     "scenarios": 20,
+     "environments": [
+      3,
+      4
+     ],
+     "nodes": [
+      6,
+      10
+     ],
+     "fits": 1000,
+     "andrey_ok": 1000,
+     "andrey_timeouts": 0,
+     "comparator_ok": 1000,
+     "comparator_timeouts": 0,
+     "paired": 1000,
+     "andrey_s": 0.010221374221146107,
+     "comparator_s": 0.6795000000000005,
+     "ratio": 41.36645540422523,
+     "same_graph": 975,
+     "same_accepted_sets": 584,
+     "andrey_fwer": 0.009,
+     "comparator_fwer": 0.015,
+     "andrey_fwer_95": [
+      0.004123,
+      0.017016
+     ],
+     "comparator_fwer_95": [
+      0.008419,
+      0.02462
+     ],
+     "andrey_fewer_errors": 7,
+     "comparator_fewer_errors": 18,
+     "andrey_shd": 1.0,
+     "comparator_shd": 0.5,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.006,
+     "comparator_shd_mean": 1.001,
+     "empty_shd_mean": 1.25,
+     "mean_D": 0.005,
+     "bootstrap_95": [
+      -0.011024999999999998,
+      0.02
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "D",
+     "test": "approximate",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      16,
+      21
+     ],
+     "fits": 200,
+     "andrey_ok": 200,
+     "andrey_timeouts": 0,
+     "comparator_ok": 200,
+     "comparator_timeouts": 0,
+     "paired": 200,
+     "andrey_s": 0.009614200331270695,
+     "comparator_s": 6.967999999999995,
+     "ratio": 463.7750366397012,
+     "same_graph": 200,
+     "same_accepted_sets": 200,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.001213,
+      0.035655
+     ],
+     "comparator_fwer_95": [
+      0.001213,
+      0.035655
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.875,
+     "comparator_shd_mean": 0.875,
+     "empty_shd_mean": 1.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-9",
+     "test": "approximate",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      9,
+      9
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.010155722498893738,
+     "comparator_s": 0.723,
+     "ratio": 71.90139531630432,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-12",
+     "test": "approximate",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      12,
+      12
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.03521771356463432,
+     "comparator_s": 6.149,
+     "ratio": 169.48857253453497,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 2,
+     "andrey_shd_mean": 1.2,
+     "comparator_shd_mean": 1.2,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-15",
+     "test": "approximate",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      15,
+      15
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.24291394650936127,
+     "comparator_s": 58.015,
+     "ratio": 240.56294492925494,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 0.8,
+     "comparator_shd_mean": 0.8,
+     "empty_shd_mean": 0.8,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-12-large",
+     "test": "approximate",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      12,
+      12
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.04874303936958313,
+     "comparator_s": 31.995,
+     "ratio": 656.4014147210869,
+     "same_graph": 5,
+     "same_accepted_sets": 5,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 0,
+     "comparator_shd": 0,
+     "empty_shd": 0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "empty_shd_mean": 0.2,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, approximate test, every fit",
+   "family": "constraint",
+   "solution": "andrey.icp.approximate",
+   "setting": "invariance_test='approximate', alpha=0.05",
+   "comparator": null,
+   "regime": "icp_appendix_g, icp_appendix_g_target, icp_do, icp_appendix_g_capped, icp_hidden, icp_nonlinear, icp_speed",
+   "lane": "icp.approximate.claim",
+   "output": "parent set of one target",
+   "error_metric": "andrey_fwer: the share of fits whose estimate is not a subset of the true parents, with its 95% Clopper-Pearson interval; andrey_largest_scenario_fwer over the scenarios' datasets; success: the estimate equals the true parents; share_found: the share of the true parents found, over targets with parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "A",
+     "test": "approximate",
+     "claim": "in",
+     "scenarios": 100,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 100000,
+     "andrey_fwer": 0.007,
+     "andrey_fwer_95": [
+      0.006493,
+      0.007536
+     ],
+     "andrey_largest_scenario_fwer": 0.049,
+     "andrey_success": 0.47703,
+     "andrey_share_found": 0.11816517857142857,
+     "andrey_model_rejected": 0.00985,
+     "andrey_s": 0.008141212165355682,
+     "complete": true
+    },
+    {
+     "cell": "C",
+     "test": "approximate",
+     "claim": "in",
+     "scenarios": 20,
+     "environments": [
+      3,
+      4
+     ],
+     "nodes": [
+      6,
+      10
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.0095,
+     "andrey_fwer_95": [
+      0.006731,
+      0.013016
+     ],
+     "andrey_largest_scenario_fwer": 0.025,
+     "andrey_success": 0.49775,
+     "andrey_share_found": 0.29438461538461536,
+     "andrey_model_rejected": 0.0045,
+     "andrey_s": 0.009746164083480835,
+     "complete": true
+    },
+    {
+     "cell": "D",
+     "test": "approximate",
+     "claim": "in",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      16,
+      21
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.0075,
+     "andrey_fwer_95": [
+      0.005066,
+      0.01069
+     ],
+     "andrey_largest_scenario_fwer": 0.03,
+     "andrey_success": 0.4945,
+     "andrey_share_found": 0.1496969696969697,
+     "andrey_model_rejected": 0.006,
+     "andrey_s": 0.00969244446605444,
+     "complete": true
+    },
+    {
+     "cell": "D40",
+     "test": "approximate",
+     "claim": "in",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      40,
+      40
+     ],
+     "fits": 1000,
+     "andrey_fwer": 0.003,
+     "andrey_fwer_95": [
+      0.000619,
+      0.008742
+     ],
+     "andrey_largest_scenario_fwer": 0.04,
+     "andrey_success": 0.497,
+     "andrey_share_found": 0.0,
+     "andrey_model_rejected": 0.01,
+     "andrey_s": 0.09770109970122576,
+     "complete": true
+    },
+    {
+     "cell": "B",
+     "test": "approximate",
+     "claim": "out",
+     "scenarios": 100,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 20000,
+     "andrey_fwer": 0.1049,
+     "andrey_fwer_95": [
+      0.100686,
+      0.109229
+     ],
+     "andrey_largest_scenario_fwer": 0.995,
+     "andrey_success": 0.45195,
+     "andrey_share_found": 0.11166666666666668,
+     "andrey_model_rejected": 0.322,
+     "andrey_s": 0.007933149114251137,
+     "complete": true
+    },
+    {
+     "cell": "B, target intervened",
+     "test": "approximate",
+     "claim": "out",
+     "scenarios": 55,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 11000,
+     "andrey_fwer": 0.18427272727272728,
+     "andrey_fwer_95": [
+      0.177066,
+      0.191647
+     ],
+     "andrey_largest_scenario_fwer": 0.995,
+     "andrey_success": 0.4077272727272727,
+     "andrey_share_found": 0.025666666666666667,
+     "andrey_model_rejected": 0.5758181818181818,
+     "andrey_s": 0.006550470367074013,
+     "complete": true
+    },
+    {
+     "cell": "B, target not intervened",
+     "test": "approximate",
+     "claim": "out",
+     "scenarios": 45,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 9000,
+     "andrey_fwer": 0.00788888888888889,
+     "andrey_fwer_95": [
+      0.006166,
+      0.00994
+     ],
+     "andrey_largest_scenario_fwer": 0.05,
+     "andrey_success": 0.506,
+     "andrey_share_found": 0.21089743589743593,
+     "andrey_model_rejected": 0.011777777777777778,
+     "andrey_s": 0.009553341194987297,
+     "complete": true
+    },
+    {
+     "cell": "E-hidden",
+     "test": "approximate",
+     "claim": "out",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.01175,
+     "andrey_fwer_95": [
+      0.008646,
+      0.015595
+     ],
+     "andrey_largest_scenario_fwer": 0.045,
+     "andrey_success": 0.5415,
+     "andrey_share_found": 0.2554166666666667,
+     "andrey_model_rejected": 0.01,
+     "andrey_s": 0.00799973588436842,
+     "complete": true
+    },
+    {
+     "cell": "E-nonlinear",
+     "test": "approximate",
+     "claim": "out",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.003,
+     "andrey_fwer_95": [
+      0.001551,
+      0.005235
+     ],
+     "andrey_largest_scenario_fwer": 0.03,
+     "andrey_success": 0.004,
+     "andrey_share_found": 0.03810416666666666,
+     "andrey_model_rejected": 0.00575,
+     "andrey_s": 0.00744545366615057,
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "comparator_solution": "invariantcausalprediction.icp.exact",
+   "comparator_setting": "ICP(selection='all', or 'lasso' with every variable kept and maxNoVariablesSimult=3 under max_parents=3; maxNoObs above every environment's rows; stopIfEmpty=FALSE; alpha=0.05)",
+   "regime": "icp_appendix_g, icp_do, icp_appendix_g_capped, icp_speed",
+   "claim": "in",
+   "lane": "icp.exact",
+   "output": "parent set of one target",
+   "error_metric": "the parents' symmetric difference with the true parents (the SHD of the target's parent edges), medians over the paired fits, means in the _mean fields; andrey_fwer and comparator_fwer are the shares of fits whose estimate is not a subset of the true parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time; Andrey and R fit the same datasets in the same worker",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "same_graph_test": "equal estimated parent sets; same_accepted_sets counts equal accepted sets",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "A",
+     "test": "exact",
+     "scenarios": 100,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 5000,
+     "andrey_ok": 5000,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5000,
+     "comparator_timeouts": 0,
+     "paired": 5000,
+     "andrey_s": 0.007249005138874054,
+     "comparator_s": 1.278500000000005,
+     "ratio": 168.6906258530278,
+     "same_graph": 4964,
+     "same_accepted_sets": 3568,
+     "andrey_fwer": 0.0064,
+     "comparator_fwer": 0.0056,
+     "andrey_fwer_95": [
+      0.004382,
+      0.009023
+     ],
+     "comparator_fwer_95": [
+      0.003724,
+      0.008083
+     ],
+     "andrey_fewer_errors": 24,
+     "comparator_fewer_errors": 12,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.8894,
+     "comparator_shd_mean": 0.8924,
+     "empty_shd_mean": 1.07,
+     "mean_D": -0.003,
+     "bootstrap_95": [
+      -0.0062,
+      0.0002
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "C",
+     "test": "exact",
+     "scenarios": 20,
+     "environments": [
+      3,
+      4
+     ],
+     "nodes": [
+      6,
+      10
+     ],
+     "fits": 1000,
+     "andrey_ok": 1000,
+     "andrey_timeouts": 0,
+     "comparator_ok": 1000,
+     "comparator_timeouts": 0,
+     "paired": 1000,
+     "andrey_s": 0.009856745600700378,
+     "comparator_s": 1.3940000000000055,
+     "ratio": 95.64129004434112,
+     "same_graph": 991,
+     "same_accepted_sets": 813,
+     "andrey_fwer": 0.014,
+     "comparator_fwer": 0.011,
+     "andrey_fwer_95": [
+      0.007675,
+      0.023378
+     ],
+     "comparator_fwer_95": [
+      0.005504,
+      0.019597
+     ],
+     "andrey_fewer_errors": 6,
+     "comparator_fewer_errors": 3,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.175,
+     "comparator_shd_mean": 1.177,
+     "empty_shd_mean": 1.25,
+     "mean_D": -0.002,
+     "bootstrap_95": [
+      -0.009,
+      0.005
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "D",
+     "test": "exact",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      16,
+      21
+     ],
+     "fits": 200,
+     "andrey_ok": 200,
+     "andrey_timeouts": 0,
+     "comparator_ok": 200,
+     "comparator_timeouts": 0,
+     "paired": 200,
+     "andrey_s": 0.008192576467990875,
+     "comparator_s": 9.5595,
+     "ratio": 760.3648422605951,
+     "same_graph": 200,
+     "same_accepted_sets": 131,
+     "andrey_fwer": 0.01,
+     "comparator_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.001213,
+      0.035655
+     ],
+     "comparator_fwer_95": [
+      0.001213,
+      0.035655
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 0.835,
+     "comparator_shd_mean": 0.835,
+     "empty_shd_mean": 1.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-9",
+     "test": "exact",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      9,
+      9
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.009077971801161766,
+     "comparator_s": 4.161,
+     "ratio": 458.3622962419304,
+     "same_graph": 5,
+     "same_accepted_sets": 4,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-12",
+     "test": "exact",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      12,
+      12
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.029468148946762085,
+     "comparator_s": 34.157,
+     "ratio": 1159.1159004153574,
+     "same_graph": 5,
+     "same_accepted_sets": 2,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 2,
+     "andrey_shd_mean": 1.2,
+     "comparator_shd_mean": 1.2,
+     "empty_shd_mean": 1.4,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    },
+    {
+     "cell": "speed-15",
+     "test": "exact",
+     "scenarios": 5,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      15,
+      15
+     ],
+     "fits": 5,
+     "andrey_ok": 5,
+     "andrey_timeouts": 0,
+     "comparator_ok": 5,
+     "comparator_timeouts": 0,
+     "paired": 5,
+     "andrey_s": 0.17346196621656418,
+     "comparator_s": 272.516,
+     "ratio": 1554.1735510101485,
+     "same_graph": 5,
+     "same_accepted_sets": 1,
+     "andrey_fwer": 0.0,
+     "comparator_fwer": 0.0,
+     "andrey_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "comparator_fwer_95": [
+      0.0,
+      0.521824
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1,
+     "comparator_shd": 1,
+     "empty_shd": 1,
+     "andrey_shd_mean": 0.8,
+     "comparator_shd_mean": 0.8,
+     "empty_shd_mean": 0.8,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, exact test, every fit",
+   "family": "constraint",
+   "solution": "andrey.icp.exact",
+   "setting": "invariance_test='exact', alpha=0.05",
+   "comparator": null,
+   "regime": "icp_appendix_g, icp_appendix_g_target, icp_do, icp_appendix_g_capped, icp_hidden, icp_nonlinear, icp_speed",
+   "lane": "icp.exact.claim",
+   "output": "parent set of one target",
+   "error_metric": "andrey_fwer: the share of fits whose estimate is not a subset of the true parents, with its 95% Clopper-Pearson interval; andrey_largest_scenario_fwer over the scenarios' datasets; success: the estimate equals the true parents; share_found: the share of the true parents found, over targets with parents",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "A",
+     "test": "exact",
+     "claim": "in",
+     "scenarios": 100,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 100000,
+     "andrey_fwer": 0.00631,
+     "andrey_fwer_95": [
+      0.005829,
+      0.00682
+     ],
+     "andrey_largest_scenario_fwer": 0.053,
+     "andrey_success": 0.49438,
+     "andrey_share_found": 0.17191964285714287,
+     "andrey_model_rejected": 0.01067,
+     "andrey_s": 0.0071671828627586365,
+     "complete": true
+    },
+    {
+     "cell": "C",
+     "test": "exact",
+     "claim": "in",
+     "scenarios": 20,
+     "environments": [
+      3,
+      4
+     ],
+     "nodes": [
+      6,
+      10
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.01225,
+     "andrey_fwer_95": [
+      0.009076,
+      0.016163
+     ],
+     "andrey_largest_scenario_fwer": 0.055,
+     "andrey_success": 0.42175,
+     "andrey_share_found": 0.1328653846153846,
+     "andrey_model_rejected": 0.00575,
+     "andrey_s": 0.00997752882540226,
+     "complete": true
+    },
+    {
+     "cell": "D",
+     "test": "exact",
+     "claim": "in",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      16,
+      21
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.0065,
+     "andrey_fwer_95": [
+      0.00425,
+      0.00951
+     ],
+     "andrey_largest_scenario_fwer": 0.02,
+     "andrey_success": 0.544,
+     "andrey_share_found": 0.26083333333333336,
+     "andrey_model_rejected": 0.00825,
+     "andrey_s": 0.008358368650078773,
+     "complete": true
+    },
+    {
+     "cell": "D40",
+     "test": "exact",
+     "claim": "in",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      40,
+      40
+     ],
+     "fits": 1000,
+     "andrey_fwer": 0.001,
+     "andrey_fwer_95": [
+      2.5e-05,
+      0.005559
+     ],
+     "andrey_largest_scenario_fwer": 0.02,
+     "andrey_success": 0.5,
+     "andrey_share_found": 0.002,
+     "andrey_model_rejected": 0.007,
+     "andrey_s": 0.07905273418873549,
+     "complete": true
+    },
+    {
+     "cell": "B",
+     "test": "exact",
+     "claim": "out",
+     "scenarios": 100,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 20000,
+     "andrey_fwer": 0.0665,
+     "andrey_fwer_95": [
+      0.063085,
+      0.070041
+     ],
+     "andrey_largest_scenario_fwer": 0.925,
+     "andrey_success": 0.47755,
+     "andrey_share_found": 0.1612202380952381,
+     "andrey_model_rejected": 0.4074,
+     "andrey_s": 0.006922701373696327,
+     "complete": true
+    },
+    {
+     "cell": "B, target intervened",
+     "test": "exact",
+     "claim": "out",
+     "scenarios": 55,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 11000,
+     "andrey_fwer": 0.11463636363636363,
+     "andrey_fwer_95": [
+      0.10874,
+      0.120738
+     ],
+     "andrey_largest_scenario_fwer": 0.925,
+     "andrey_success": 0.4329090909090909,
+     "andrey_share_found": 0.06366666666666666,
+     "andrey_model_rejected": 0.7312727272727273,
+     "andrey_s": 0.005658443085849285,
+     "complete": true
+    },
+    {
+     "cell": "B, target not intervened",
+     "test": "exact",
+     "claim": "out",
+     "scenarios": 45,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 9000,
+     "andrey_fwer": 0.007666666666666666,
+     "andrey_fwer_95": [
+      0.00597,
+      0.009693
+     ],
+     "andrey_largest_scenario_fwer": 0.055,
+     "andrey_success": 0.5321111111111111,
+     "andrey_share_found": 0.2737820512820513,
+     "andrey_model_rejected": 0.011555555555555555,
+     "andrey_s": 0.007874862290918827,
+     "complete": true
+    },
+    {
+     "cell": "E-hidden",
+     "test": "exact",
+     "claim": "out",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.01825,
+     "andrey_fwer_95": [
+      0.014332,
+      0.022893
+     ],
+     "andrey_largest_scenario_fwer": 0.145,
+     "andrey_success": 0.56525,
+     "andrey_share_found": 0.300625,
+     "andrey_model_rejected": 0.027,
+     "andrey_s": 0.007039545103907585,
+     "complete": true
+    },
+    {
+     "cell": "E-nonlinear",
+     "test": "exact",
+     "claim": "out",
+     "scenarios": 20,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 4000,
+     "andrey_fwer": 0.01,
+     "andrey_fwer_95": [
+      0.007153,
+      0.013593
+     ],
+     "andrey_largest_scenario_fwer": 0.075,
+     "andrey_success": 0.002,
+     "andrey_share_found": 0.04275,
+     "andrey_model_rejected": 0.004,
+     "andrey_s": 0.006528413854539394,
+     "complete": true
+    }
+   ]
+  },
+  {
+   "method": "ICP, cell B paired",
+   "family": "constraint",
+   "solution": "andrey.icp",
+   "comparator": "InvariantCausalPrediction 0.8",
+   "regime": "icp_appendix_g_target",
+   "claim": "out",
+   "lane": "icp.target_hit",
+   "output": "parent set of one target",
+   "error_metric": "as the in-claim entries",
+   "hardware": "Intel Core i7-7820X, 1 core per fit, 4 fits at a time",
+   "cores": 1,
+   "build": "pre-release Andrey 0.14.0 build, 3 November 2026",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "B, target intervened, first 20 datasets",
+     "test": "approximate",
+     "scenarios": 55,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 1100,
+     "andrey_ok": 1100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 1100,
+     "comparator_timeouts": 0,
+     "paired": 1100,
+     "andrey_s": 0.006273300386965275,
+     "comparator_s": 0.332000000000001,
+     "ratio": 53.866007966086784,
+     "same_graph": 1100,
+     "same_accepted_sets": 1100,
+     "andrey_fwer": 0.19363636363636363,
+     "comparator_fwer": 0.19363636363636363,
+     "andrey_fwer_95": [
+      0.170675,
+      0.218249
+     ],
+     "comparator_fwer_95": [
+      0.170675,
+      0.218249
+     ],
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.339090909090909,
+     "comparator_shd_mean": 1.339090909090909,
+     "empty_shd_mean": 1.018181818181818,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true,
+     "claim": "out"
+    },
+    {
+     "cell": "B, target intervened, first 20 datasets",
+     "test": "exact",
+     "scenarios": 55,
+     "environments": [
+      2
+     ],
+     "nodes": [
+      5,
+      12
+     ],
+     "fits": 1100,
+     "andrey_ok": 1100,
+     "andrey_timeouts": 0,
+     "comparator_ok": 1100,
+     "comparator_timeouts": 0,
+     "paired": 1100,
+     "andrey_s": 0.005419425666332245,
+     "comparator_s": 1.2814999999999999,
+     "ratio": 238.02807728832119,
+     "same_graph": 1094,
+     "same_accepted_sets": 996,
+     "andrey_fwer": 0.12272727272727273,
+     "comparator_fwer": 0.12272727272727273,
+     "andrey_fwer_95": [
+      0.103911,
+      0.143587
+     ],
+     "comparator_fwer_95": [
+      0.103911,
+      0.143587
+     ],
+     "andrey_fewer_errors": 1,
+     "comparator_fewer_errors": 5,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 1.0,
+     "andrey_shd_mean": 1.1663636363636363,
+     "comparator_shd_mean": 1.1645454545454546,
+     "empty_shd_mean": 1.018181818181818,
+     "mean_D": 0.0018181818181818182,
+     "bootstrap_95": [
+      -0.005454545454545455,
+      0.007272727272727273
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "complete": true,
+     "claim": "out"
+    }
+   ]
+  }
+ ],
+ "floors": {
+  "about": "The empty-estimate floor of each per-size row of the summary, keyed by lane, regime, d, and n where the row has one. The empty estimate names no parents, so its error is the number of the target's true parents. andrey_minus_empty and reference_minus_empty hold the mean over the row's paired fits of Andrey's and R's error minus the empty estimate's, with its percentile-bootstrap 95% interval: 2,000 resamples of the paired fits in scenario and dataset order, NumPy's default_rng(0), percentiles 2.5 and 97.5, as the rows' bootstrap_95. applies and pass follow the summary's floor rule. The paired fits were refitted on a second machine (AMD EPYC 7713, R 4.6.1, InvariantCausalPrediction 0.8), which reproduces every row's paired count, same graphs, same accepted sets, error means, and bootstrap_95.",
+  "rows": [
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 5,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 450,
+     "mean": -0.29555555555555557,
+     "bootstrap_95": [
+      -0.36,
+      -0.23555555555555555
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 450,
+     "mean": -0.29555555555555557,
+     "bootstrap_95": [
+      -0.36,
+      -0.23555555555555555
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 6,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 550,
+     "mean": -0.26545454545454544,
+     "bootstrap_95": [
+      -0.3054545454545455,
+      -0.22363636363636363
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 550,
+     "mean": -0.26545454545454544,
+     "bootstrap_95": [
+      -0.3054545454545455,
+      -0.22363636363636363
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 7,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 700,
+     "mean": -0.07142857142857142,
+     "bootstrap_95": [
+      -0.09571428571428571,
+      -0.04857142857142857
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 700,
+     "mean": -0.07142857142857142,
+     "bootstrap_95": [
+      -0.09571428571428571,
+      -0.04857142857142857
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 8,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 850,
+     "mean": -0.05764705882352941,
+     "bootstrap_95": [
+      -0.07532352941176469,
+      -0.041176470588235294
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 850,
+     "mean": -0.05764705882352941,
+     "bootstrap_95": [
+      -0.07532352941176469,
+      -0.041176470588235294
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 9,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 600,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 600,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 10,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 550,
+     "mean": -0.07818181818181819,
+     "bootstrap_95": [
+      -0.10727272727272727,
+      -0.04727272727272727
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 550,
+     "mean": -0.07818181818181819,
+     "bootstrap_95": [
+      -0.10727272727272727,
+      -0.04727272727272727
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 11,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 850,
+     "mean": -0.13176470588235295,
+     "bootstrap_95": [
+      -0.16,
+      -0.10588235294117647
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 850,
+     "mean": -0.13176470588235295,
+     "bootstrap_95": [
+      -0.16,
+      -0.10588235294117647
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g",
+    "d": 12,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 450,
+     "mean": 0.011111111111111112,
+     "bootstrap_95": [
+      0.0,
+      0.028888888888888888
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 450,
+     "mean": 0.011111111111111112,
+     "bootstrap_95": [
+      0.0,
+      0.028888888888888888
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_do",
+    "d": 6,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 500,
+     "mean": -0.194,
+     "bootstrap_95": [
+      -0.234,
+      -0.156
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 500,
+     "mean": -0.218,
+     "bootstrap_95": [
+      -0.262,
+      -0.176
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_do",
+    "d": 10,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 500,
+     "mean": -0.294,
+     "bootstrap_95": [
+      -0.336,
+      -0.252
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 500,
+     "mean": -0.28,
+     "bootstrap_95": [
+      -0.33,
+      -0.226
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g_capped",
+    "d": 16,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_appendix_g_capped",
+    "d": 21,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.45,
+     "bootstrap_95": [
+      -0.57,
+      -0.34
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.45,
+     "bootstrap_95": [
+      -0.57,
+      -0.34
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_speed",
+    "d": 9,
+    "n": 1000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": -0.4,
+     "bootstrap_95": [
+      -1.2,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": -0.4,
+     "bootstrap_95": [
+      -1.2,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_speed",
+    "d": 12,
+    "n": 1000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.6,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.6,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_speed",
+    "d": 12,
+    "n": 10000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.6,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.6,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate",
+    "regime": "icp_speed",
+    "d": 15,
+    "n": 1000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 5,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.23,
+     "bootstrap_95": [
+      0.15,
+      0.32
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.23,
+     "bootstrap_95": [
+      0.15,
+      0.32
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 6,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 120,
+     "mean": 0.39166666666666666,
+     "bootstrap_95": [
+      0.25,
+      0.5418749999999988
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 120,
+     "mean": 0.39166666666666666,
+     "bootstrap_95": [
+      0.25,
+      0.5418749999999988
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 7,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 220,
+     "mean": 0.4,
+     "bootstrap_95": [
+      0.3,
+      0.509090909090909
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 220,
+     "mean": 0.4,
+     "bootstrap_95": [
+      0.3,
+      0.509090909090909
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 8,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 160,
+     "mean": 0.6,
+     "bootstrap_95": [
+      0.3875,
+      0.8314062499999992
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 160,
+     "mean": 0.6,
+     "bootstrap_95": [
+      0.3875,
+      0.8314062499999992
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 9,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.07,
+     "bootstrap_95": [
+      0.02,
+      0.14
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.07,
+     "bootstrap_95": [
+      0.02,
+      0.14
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 10,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 40,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 40,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 11,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 220,
+     "mean": 0.37727272727272726,
+     "bootstrap_95": [
+      0.2590909090909091,
+      0.509090909090909
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 220,
+     "mean": 0.37727272727272726,
+     "bootstrap_95": [
+      0.2590909090909091,
+      0.509090909090909
+     ]
+    }
+   },
+   {
+    "lane": "icp.approximate.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 12,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 140,
+     "mean": 0.06428571428571428,
+     "bootstrap_95": [
+      0.02857142857142857,
+      0.10714285714285714
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 140,
+     "mean": 0.06428571428571428,
+     "bootstrap_95": [
+      0.02857142857142857,
+      0.10714285714285714
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 5,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 450,
+     "mean": -0.29777777777777775,
+     "bootstrap_95": [
+      -0.3622222222222222,
+      -0.23555555555555555
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 450,
+     "mean": -0.3022222222222222,
+     "bootstrap_95": [
+      -0.36666666666666664,
+      -0.24
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 6,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 550,
+     "mean": -0.4763636363636364,
+     "bootstrap_95": [
+      -0.5272727272727272,
+      -0.42727272727272725
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 550,
+     "mean": -0.4727272727272727,
+     "bootstrap_95": [
+      -0.5236363636363637,
+      -0.42363636363636364
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 7,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 700,
+     "mean": -0.18,
+     "bootstrap_95": [
+      -0.23714285714285716,
+      -0.12571428571428572
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 700,
+     "mean": -0.1742857142857143,
+     "bootstrap_95": [
+      -0.23142857142857143,
+      -0.12428571428571429
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 8,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 850,
+     "mean": -0.1,
+     "bootstrap_95": [
+      -0.12470588235294118,
+      -0.07764705882352942
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 850,
+     "mean": -0.0988235294117647,
+     "bootstrap_95": [
+      -0.12352941176470589,
+      -0.07647058823529412
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 9,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 600,
+     "mean": -0.07833333333333334,
+     "bootstrap_95": [
+      -0.10666666666666667,
+      -0.05333333333333334
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 600,
+     "mean": -0.06666666666666667,
+     "bootstrap_95": [
+      -0.09,
+      -0.043333333333333335
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 10,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 550,
+     "mean": -0.15636363636363637,
+     "bootstrap_95": [
+      -0.19090909090909092,
+      -0.12545454545454546
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 550,
+     "mean": -0.15272727272727274,
+     "bootstrap_95": [
+      -0.18727272727272729,
+      -0.12181818181818181
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 11,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 850,
+     "mean": -0.19411764705882353,
+     "bootstrap_95": [
+      -0.23529411764705882,
+      -0.15764705882352942
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 850,
+     "mean": -0.19176470588235295,
+     "bootstrap_95": [
+      -0.23297058823529412,
+      -0.15529411764705883
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g",
+    "d": 12,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 450,
+     "mean": 0.0044444444444444444,
+     "bootstrap_95": [
+      -0.008888888888888889,
+      0.02
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 450,
+     "mean": 0.0022222222222222222,
+     "bootstrap_95": [
+      -0.011111111111111112,
+      0.02
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_do",
+    "d": 6,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 500,
+     "mean": -0.05,
+     "bootstrap_95": [
+      -0.078,
+      -0.022
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 500,
+     "mean": -0.046,
+     "bootstrap_95": [
+      -0.074,
+      -0.018
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_do",
+    "d": 10,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 500,
+     "mean": -0.1,
+     "bootstrap_95": [
+      -0.132,
+      -0.066
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 500,
+     "mean": -0.1,
+     "bootstrap_95": [
+      -0.132,
+      -0.068
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g_capped",
+    "d": 16,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.03,
+     "bootstrap_95": [
+      0.0,
+      0.09
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.03,
+     "bootstrap_95": [
+      0.0,
+      0.09
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_appendix_g_capped",
+    "d": 21,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": -0.56,
+     "bootstrap_95": [
+      -0.71,
+      -0.42
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": -0.56,
+     "bootstrap_95": [
+      -0.71,
+      -0.42
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_speed",
+    "d": 9,
+    "n": 1000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": -0.4,
+     "bootstrap_95": [
+      -1.2,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": -0.4,
+     "bootstrap_95": [
+      -1.2,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_speed",
+    "d": 12,
+    "n": 1000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.6,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.6,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact",
+    "regime": "icp_speed",
+    "d": 15,
+    "n": 1000,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 5,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 5,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 5,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.3,
+     "bootstrap_95": [
+      0.21,
+      0.39
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.29,
+     "bootstrap_95": [
+      0.2,
+      0.38
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 6,
+    "applies": true,
+    "pass": true,
+    "andrey_minus_empty": {
+     "paired": 120,
+     "mean": -0.125,
+     "bootstrap_95": [
+      -0.19166666666666668,
+      -0.06666666666666667
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 120,
+     "mean": -0.125,
+     "bootstrap_95": [
+      -0.19166666666666668,
+      -0.06666666666666667
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 7,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 220,
+     "mean": 0.09090909090909091,
+     "bootstrap_95": [
+      -0.02727272727272727,
+      0.21818181818181817
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 220,
+     "mean": 0.09545454545454546,
+     "bootstrap_95": [
+      -0.022727272727272728,
+      0.22272727272727272
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 8,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 160,
+     "mean": 0.30625,
+     "bootstrap_95": [
+      0.19984375000000001,
+      0.41875
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 160,
+     "mean": 0.3,
+     "bootstrap_95": [
+      0.19359375,
+      0.4125
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 9,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 100,
+     "mean": 0.04,
+     "bootstrap_95": [
+      0.0,
+      0.1
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 100,
+     "mean": 0.04,
+     "bootstrap_95": [
+      0.0,
+      0.1
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 10,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 40,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 40,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 11,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 220,
+     "mean": 0.2772727272727273,
+     "bootstrap_95": [
+      0.15,
+      0.42272727272727273
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 220,
+     "mean": 0.2727272727272727,
+     "bootstrap_95": [
+      0.14545454545454545,
+      0.41818181818181815
+     ]
+    }
+   },
+   {
+    "lane": "icp.exact.target_hit",
+    "regime": "icp_appendix_g_target",
+    "d": 12,
+    "applies": false,
+    "pass": null,
+    "andrey_minus_empty": {
+     "paired": 140,
+     "mean": 0.1,
+     "bootstrap_95": [
+      0.02142857142857143,
+      0.2
+     ]
+    },
+    "reference_minus_empty": {
+     "paired": 140,
+     "mean": 0.1,
+     "bootstrap_95": [
+      0.02142857142857143,
+      0.2
+     ]
+    }
+   }
+  ]
+ }
+}

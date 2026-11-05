@@ -107,8 +107,14 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
         kwargs = {**SHORT_CALM, **kwargs}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if name == "cdnod":
-            return andrey.cdnod(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
+        if name in ("cdnod", "gnies"):
+            return getattr(andrey, name)(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
+        if name == "ut_igsp":  # an observational environment and a setting of unknown targets
+            env = np.repeat([0, 1], len(data) // 2)
+            return andrey.ut_igsp(data, env, targets={0: []}, **kwargs)
+        if name == "igsp":  # an observational environment and a setting that targets column 0
+            env = np.repeat([0, 1], len(data) // 2)
+            return andrey.igsp(data, env, targets={0: [], 1: [0]}, **kwargs)
         if name == "exact_search":
             return andrey.exact_search(data, **kwargs)
         if REGISTRY[name].output.multi:  # the first of two groups, the halves of the rows

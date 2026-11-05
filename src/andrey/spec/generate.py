@@ -68,6 +68,13 @@ _JSON_TYPES: dict[str, dict] = {
         },
         "additionalProperties": False,
     },
+    "targets": {
+        "type": "object",
+        "additionalProperties": {
+            "type": ["array", "null"],
+            "items": {"type": ["string", "integer"]},
+        },
+    },
 }
 
 #: How `knowledge=` reads on the command line, in the skill and in each method's help.
@@ -151,6 +158,8 @@ def grammar_example(p: ParamSpec) -> str:
         return "[a,b]"
     if p.type == "knowledge":
         return "knowledge.json"
+    if p.type == "targets":
+        return "targets.json"
     if p.default is None and p.type in ("int", "float"):
         return "1" if p.type == "int" else "0.05"
     return grammar_default(p)
@@ -196,6 +205,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
                     "flag": inp.flag,
                     "kind": inp.kind,
                     "required": inp.required,
+                    "aliases": list(inp.aliases),
                     "description": inp.doc,
                 }
                 for inp in spec.data.inputs
@@ -245,8 +255,7 @@ def cli_meta() -> dict:
             "hyperparameters are `key=value` after the method (or a `--config <file>` YAML/JSON "
             "base; overrides win). Types / choices are in each method's `params` schema below -- "
             "for example, alpha=0.05, indep_test=fisherz, 'order=[1,1]', criterion=null. "
-            "Data arrays stay --flags (--data, --domain-index, "
-            "--interventions), never key=value."
+            "Data arrays stay --flags (--data, --env), never key=value."
         ),
         "introspection": {
             "list": "andrey list -- enumerate every method with its status and a one-line summary",

@@ -204,12 +204,41 @@ def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
     return data
 
 
+#: What a method reads besides its data and its parameters: the environments of igsp and ut_igsp,
+#: an observational one, one with the known target x, and one whose targets are unknown (ut_igsp)
+#: or y (igsp).
+CONTEXT = {
+    "igsp": {"targets": {0: [], 1: [0], 2: [1]}},
+    "ut_igsp": {"targets": {0: [], 1: [0], 2: None}},
+}
+
+
+def environments(n: int) -> np.ndarray:
+    """Three environments of about ``n / 3`` rows each, in row order."""
+    return np.arange(n) * 3 // n
+
+
+def facade(method: str):
+    """The method's facade, with the settings ``CONTEXT`` and ``REQUIRED`` give it."""
+    return functools.partial(
+        getattr(andrey, method), **CONTEXT.get(method, {}), **REQUIRED.get(method, {})
+    )
+
+
+def needed(method: str, inp) -> bool:
+    """Whether a fit of ``method`` here takes the input ``inp``: a required one, or gnies's
+    ``env``, which every fit on data alone needs."""
+    return inp.required or (method, inp.name) == ("gnies", "env")
+
+
 def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
     frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
-        if not inp.required:
+        if not needed(method, inp):
+            if method in CONTEXT and inp.kind == "context":
+                args.append(environments(N))
             continue
         if inp.kind == "matrix":
             args.append(frames[0].iloc[:, :2] if spec.family == "pairwise" else frames[0])
@@ -222,6 +251,8 @@ def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
 
 #: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: The arguments a method needs beyond its inputs: ICP's target, by position.
+REQUIRED = {"icp": {"target": 2}}
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
@@ -231,7 +262,7 @@ def fit(method: str, *, codes: bool, gaps: bool = False, **kwargs):
     warning_policy._warned.clear()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        out = getattr(andrey, method)(*inputs(method, codes=codes, gaps=gaps), **kwargs)
+        out = facade(method)(*inputs(method, codes=codes, gaps=gaps), **kwargs)
     return (out[0] if isinstance(out, list) else out), [w.category for w in caught]
 
 
@@ -254,7 +285,7 @@ def non_value_errors(method: str) -> str:
         if not param.choices:
             continue
         try:
-            getattr(andrey, method)(*inputs(method, codes=False), **{param.name: "unknown"})
+            facade(method)(*inputs(method, codes=False), **{param.name: "unknown"})
         except ValueError:
             continue
         except Exception:  # noqa: BLE001 - the kind of error is the observation
@@ -270,7 +301,8 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
-            *("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+            *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
+            *("igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),
@@ -290,6 +322,7 @@ UNIT_CASES = {
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "camuv": "nonmonotone_4v",
+    "icp": "gauss_5v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
@@ -303,7 +336,7 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
     factors = np.ldexp(1.0, exponents)
     args = []
     for inp in REGISTRY[method].data.inputs:
-        if not inp.required:
+        if not needed(method, inp):
             continue
         if inp.kind == "panel":
             groups = datagen.generate_groups(case)
@@ -313,6 +346,8 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
             args.append(x * factors[: x.shape[1]])
         else:
             args.append(datagen.domain_index(case)[:UNIT_ROWS])
+    if method in CONTEXT:
+        args.append(environments(UNIT_ROWS))
     return args
 
 
@@ -336,7 +371,7 @@ def unit_free(method: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for exponents in [np.zeros(16, dtype=int), *UNIT_EXPONENTS]:
-            out = getattr(andrey, method)(*unit_inputs(method, exponents))
+            out = facade(method)(*unit_inputs(method, exponents))
             fits.append(graphs_and_orders(out))
     return all(fit == fits[0] for fit in fits[1:])
 
@@ -390,12 +425,13 @@ def typed_frame(kind: str, n: int = N) -> pd.DataFrame:
 
 def args_for(method: str, tables: list[pd.DataFrame]) -> list:
     """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
-    domain column for CD-NOD."""
-    kinds = (i.kind for i in REGISTRY[method].data.inputs if i.required)
+    domain column for CD-NOD and GnIES."""
+    kinds = (i.kind for i in REGISTRY[method].data.inputs if needed(method, i))
     domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
-    return [
+    args = [
         tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
     ]
+    return [*args, environments(len(tables[0]))] if method in CONTEXT else args
 
 
 def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
@@ -434,7 +470,7 @@ def used_settings(method: str, table: pd.DataFrame, **kwargs) -> dict[str, tuple
         warning_policy._warned.clear()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            out = getattr(andrey, method)(*args_for(method, [table] * 3), **kwargs)
+            out = facade(method)(*args_for(method, [table] * 3), **kwargs)
     keys = [k for k in ("indep_test", "score_func") if k in out.metadata]
     return {k: (out.metadata[k], set(names[k])) for k in keys}
 
@@ -492,7 +528,7 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
     tables = [unsupported_data(kind, rng) for _ in range(3)]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        out = getattr(andrey, method)(
+        out = facade(method)(
             *args_for(method, tables), knowledge=knowledge, **SERIES_SETTINGS.get(method, {})
         )
     out = out[0] if isinstance(out, list) else out
@@ -506,9 +542,10 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
 
 def keeps_the_required_edge(method: str) -> bool:
     """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
-    a constant column and CAM, RESIT, and CAM-UV, which need three distinct values per column, on
-    data where its weight is exactly 0."""
-    flat = () if method in (*PCMCI_FAMILY, "cam", "resit", "camuv") else ("flat",)
+    a constant column, CAM, RESIT, and CAM-UV, which need three distinct values per column, and
+    GnIES, which needs every column to vary within each environment, on data where its weight is
+    exactly 0."""
+    flat = () if method in (*PCMCI_FAMILY, "cam", "resit", "camuv", "gnies") else ("flat",)
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 
 
@@ -597,7 +634,7 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
     """Every parameter of every method refuses a bad value with one message: the method, the
     parameter, what it accepts, and the value."""
     with pytest.raises(error, match=rf"^{method}: {param.name} must be .+, got "):
-        getattr(andrey, method)(*inputs(method, codes=False), **{param.name: value})
+        facade(method)(*inputs(method, codes=False), **{param.name: value})
 
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
@@ -673,7 +710,7 @@ def test_a_score_search_records_the_penalties_its_score_used(method):
         (categorical, {"equivalent_sample_size": 7.0}, "bdeu"),
     ]
     for args, given, score in cases:
-        out = getattr(andrey, method)(*args, **given)
+        out = facade(method)(*args, **given)
         assert out.metadata["score_func"] == score
         recorded = {k for k in PENALTY_CONCEPTS if k in out.metadata}
         assert recorded == {k for k in PENALTY_CONCEPTS if score in PENALTIES[k]}
@@ -687,11 +724,11 @@ def test_ebic_gamma_with_a_score_that_does_not_use_it_raises(method):
     or picked from the declared column types, raises before the fit."""
     categorical = args_for(method, [typed_frame("categorical")] * 3)
     with pytest.raises(ValueError, match="ebic_gamma weighs the extended-BIC term"):
-        getattr(andrey, method)(*categorical, ebic_gamma=0.5)
+        facade(method)(*categorical, ebic_gamma=0.5)
     with pytest.raises(ValueError, match="score_func='discrete_bic'"):
-        getattr(andrey, method)(*categorical, score_func="discrete_bic", ebic_gamma=0.0)
+        facade(method)(*categorical, score_func="discrete_bic", ebic_gamma=0.0)
     continuous = args_for(method, [typed_frame("continuous")] * 3)
-    assert getattr(andrey, method)(*continuous, ebic_gamma=0.5).metadata["ebic_gamma"] == 0.5
+    assert facade(method)(*continuous, ebic_gamma=0.5).metadata["ebic_gamma"] == 0.5
 
 
 @pytest.mark.parametrize("method", PENALIZED)
@@ -700,11 +737,11 @@ def test_equivalent_sample_size_with_a_score_that_does_not_use_it_raises(method)
     or picked from the declared column types, raises before the fit."""
     continuous = args_for(method, [typed_frame("continuous")] * 3)
     with pytest.raises(ValueError, match="equivalent_sample_size weighs the Dirichlet prior"):
-        getattr(andrey, method)(*continuous, equivalent_sample_size=2.0)
+        facade(method)(*continuous, equivalent_sample_size=2.0)
     categorical = args_for(method, [typed_frame("categorical")] * 3)
     with pytest.raises(ValueError, match="score_func='discrete_bic'"):
-        getattr(andrey, method)(*categorical, score_func="discrete_bic", equivalent_sample_size=2.0)
-    out = getattr(andrey, method)(*categorical, equivalent_sample_size=2.0)
+        facade(method)(*categorical, score_func="discrete_bic", equivalent_sample_size=2.0)
+    out = facade(method)(*categorical, equivalent_sample_size=2.0)
     assert out.metadata["equivalent_sample_size"] == 2.0
 
 
@@ -721,16 +758,16 @@ def test_the_equivalent_sample_size_reaches_the_bdeu_score_of_a_fit(method, monk
 
     monkeypatch.setattr(score_module, "BDeuScore", Recording)
     args = args_for(method, [typed_frame("categorical")] * 3)
-    default = getattr(andrey, method)(*args)
+    default = facade(method)(*args)
     assert built and set(built) == {1.0} and default.metadata["equivalent_sample_size"] == 1.0
     built.clear()
-    other = getattr(andrey, method)(*args, equivalent_sample_size=50.0)
+    other = facade(method)(*args, equivalent_sample_size=50.0)
     assert built and set(built) == {50.0}
     if "score" in default.metadata:
         assert other.metadata["score"] != default.metadata["score"]
     for bad in (0.0, -1.0, float("inf")):
         with pytest.raises(ValueError, match="equivalent_sample_size"):
-            getattr(andrey, method)(*args, equivalent_sample_size=bad)
+            facade(method)(*args, equivalent_sample_size=bad)
 
 
 #: The methods whose result andrey.config's tie_break can change.
@@ -890,21 +927,21 @@ def test_a_dropped_argument_is_ignored_with_one_warning(method, arg):
     assert all(p.name != arg for p in REGISTRY[method].params)
     data = inputs(method, codes=False)
     first = lambda out: out[0] if isinstance(out, list) else out  # noqa: E731
-    expected = first(getattr(andrey, method)(*data))
+    expected = first(facade(method)(*data))
     warning_policy._warned.clear()
     with pytest.warns(andrey.DeprecatedArgumentWarning, match=f"{arg} is ignored"):
-        out = first(getattr(andrey, method)(*data, **{arg: 3}))
+        out = first(facade(method)(*data, **{arg: 3}))
     assert out.ordering == expected.ordering
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        getattr(andrey, method)(*data, **{arg: 3})  # the message warns once
+        facade(method)(*data, **{arg: 3})  # the message warns once
 
 
 ALIASED = [
-    pytest.param(m, p.name, old, id=f"{m}-{old}")
+    pytest.param(m, a.name, old, id=f"{m}-{old}")
     for m, spec in REGISTRY.items()
-    for p in spec.params
-    for old in p.aliases
+    for a in (*spec.data.inputs, *spec.params)
+    for old in a.aliases
 ]
 
 
@@ -913,13 +950,17 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
     method, name, old
 ):
     spec = REGISTRY[method]
-    argument = next(p for p in spec.params if p.name == name)
+    argument = next(a for a in (*spec.data.inputs, *spec.params) if a.name == name)
     data = inputs(method, codes=False)
     settings = dict(SHORT.get(method, {}))
-    value = settings.pop(name, argument.default)
+    if argument in spec.data.inputs:  # the inputs before it stay positional
+        position = spec.data.inputs.index(argument)
+        value, data = data[position], data[:position]
+    else:
+        value = settings.pop(name, argument.default)
 
     def call(**named):
-        out = getattr(andrey, method)(*data, **settings, **named)
+        out = facade(method)(*data, **settings, **named)
         return [o.structure for o in (out if isinstance(out, list) else [out])]
 
     expected = call(**{name: value})
@@ -937,10 +978,10 @@ def test_each_former_name_in_the_registry_maps_to_the_current_one_with_one_warni
 #: each argument it drops.
 FORMER = [
     *(
-        pytest.param(m, {old}, {p.name}, id=f"{m}-{old}")
+        pytest.param(m, {old}, {a.name}, id=f"{m}-{old}")
         for m, spec in REGISTRY.items()
-        for p in spec.params
-        for old in p.aliases
+        for a in (*spec.data.inputs, *spec.params)
+        for old in a.aliases
     ),
     *(
         pytest.param(m, {p.name, old}, {p.name, new}, id=f"{m}-{old}")
@@ -1002,7 +1043,7 @@ SCORE_SEARCHES = [
 
 
 def call_with(method: str, **named):
-    return getattr(andrey, method)(*inputs(method, codes=False), **named)
+    return facade(method)(*inputs(method, codes=False), **named)
 
 
 @pytest.mark.parametrize(("method", "row"), REMOVED_NAMES)

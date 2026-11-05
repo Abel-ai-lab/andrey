@@ -12,7 +12,8 @@ import hashlib
 import random
 from collections import Counter
 from collections.abc import Collection
-from itertools import compress
+from functools import cmp_to_key
+from itertools import compress, groupby
 from operator import ne
 
 import numpy as np
@@ -55,6 +56,12 @@ HC_SCORES: tuple[str, ...] = SCORES
 #: A later start replaces the best DAG so far only when its total score is lower by more than this.
 START_EPS = 1e-6
 
+# Standardized values enter a column's tie-break key rounded to _Z_DP decimal places, so copies of
+# one column in other units, which differ in their last bits, share it; two columns sharing it are
+# ordered by the first row where they differ by more than _Z_TOL.
+_Z_DP = 6
+_Z_TOL = 1e-12
+
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
 # ``(u, v)`` with a remove.
@@ -84,9 +91,13 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     categorical column's category counts. Where keys are still equal, each of them adds its pattern
     in row order: a continuous column's rise, fall, or tie from each row to the next, or a
     categorical column's categories numbered in order of first appearance; and where they are equal
-    after that, its values. Columns are ordered by a hash of their keys, so the rank is arbitrary
-    with respect to causal structure, and identical columns, whose keys stay equal, are ordered by
-    position. A missing value (NaN) takes the middle rank of its continuous column and forms a
+    after that, a continuous column adds its standardized values, its values minus their mean over
+    their root mean square, rounded to 6 decimal places. Columns are ordered by a hash of their
+    keys, so the rank is arbitrary with respect to causal structure. Continuous columns whose keys
+    stay equal are ordered by their standardized values at the first row where these differ by more
+    than ``1e-12``, the lower first, and columns left equal are ordered by position: identical
+    columns, copies of one column in other units, and categorical columns that group the rows
+    alike. A missing value (NaN) takes the middle rank of its continuous column and forms a
     category of its own in a categorical column.
 
     The ranks stay the same when the rows are shuffled, when a column's units change to
@@ -96,17 +107,20 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     - A change of units can round two distinct values to one, which changes the column's ranks.
     - The marginal is rounded, so in rare cases a change of units or a sign flip moves it across a
       rounding boundary.
-    - Columns that no row order, unit, or sign tells apart rank by their pattern in row order, so a
-      row shuffle can change which of them ranks first, while a new column order still relabels
-      them. These are copies of one column in other units or the other sign, two columns whose rows
-      also appear with the two swapped, and columns that share their ranks and whose marginals
-      agree to 9 decimal places, such as a copy nudged in its last digits. Where their patterns
-      agree too, as for a copy in other units, their values decide, so a change of units can change
-      which of them ranks first.
-    - Identical columns rank by position, so a new column order changes which of them ranks first.
-    - The relations are exact integers and agree on every machine. The marginal comes from
-      floating-point sums, and the values in row order from the data's bits, so in rare cases they
-      differ between machines.
+    - Columns that no row order, unit, or sign tells apart rank by their pattern in row order, then
+      by their standardized values in row order, so a row shuffle can change which of them ranks
+      first, while a new column order still relabels them. These are copies of one column in the
+      other sign, two columns whose rows also appear with the two swapped, and columns that share
+      their ranks and whose marginals agree to 9 decimal places, such as a copy whose standardized
+      values are nudged by more than ``1e-12``.
+    - Identical columns, copies of one column in other units, and categorical columns that group
+      the rows alike rank by position, so a new column order changes which of them ranks first. A
+      copy whose offset is large next to its spread keeps fewer bits of the column, so in rare cases
+      its standardized values differ by more than ``1e-12`` or round to a different sixth decimal,
+      and it ranks by them instead.
+    - The relations are exact integers and agree on every machine. The marginal and the
+      standardized values come from floating-point sums, so in rare cases they differ between
+      machines.
 
     Under ``tie_break="position"`` (:data:`andrey.config`, ``ANDREY_TIE_BREAK``), each column's
     rank is its position, so the methods that order ties by these ranks order them by column
@@ -140,7 +154,14 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
             for key, col, is_categorical in zip(keys, x.T, mask.tolist(), strict=True)
         ]
     digests = [hashlib.blake2b(key, digest_size=8).digest() for key in keys]
-    order = sorted(range(len(digests)), key=digests.__getitem__)
+    by_digest = sorted(range(len(digests)), key=digests.__getitem__)
+    order = []
+    for _, run in groupby(by_digest, digests.__getitem__):
+        tied = list(run)
+        if len(tied) > 1 and not mask[tied[0]]:  # equal digests: the standardized values decide
+            z = {j: _standardized(x[:, j]) for j in tied}
+            tied.sort(key=cmp_to_key(lambda i, j: _first_difference(z[i], z[j])))
+        order.extend(tied)
     ranks = np.empty(len(order), dtype=np.intp)
     ranks[order] = np.arange(len(order))
     return ranks
@@ -231,13 +252,20 @@ def _categorical_relations(
 def _centered_ranks(x: np.ndarray) -> np.ndarray:
     """Each column's doubled average ranks minus ``m + 1``, ``m`` its count of values that are not
     NaN: integers summing to zero, which a sign flip negates. A NaN takes 0, the middle."""
-    out = np.zeros(x.shape)
-    for j, col in enumerate(x.T):
+    n, d = x.shape
+    out = np.zeros((d, n))
+    for col, ranks in zip(np.ascontiguousarray(x.T), out, strict=True):
         present = ~np.isnan(col)
+        if n > 1 and present.all():  # without NaN or ties, a value's rank is its sorted place
+            order = np.argsort(col)
+            ordered = col[order]
+            if (ordered[1:] != ordered[:-1]).all():
+                ranks[order] = 2 * np.arange(1, n + 1) - (n + 1)
+                continue
         _, inverse, counts = np.unique(col[present], return_inverse=True, return_counts=True)
         doubled = 2 * np.cumsum(counts) - counts + 1  # a value's first plus last place, from 1
-        out[present, j] = doubled[inverse.reshape(-1)] - (counts.sum() + 1)
-    return out
+        ranks[present] = doubled[inverse.reshape(-1)] - (counts.sum() + 1)
+    return np.ascontiguousarray(out.T)
 
 
 def _abs_products(ranks: np.ndarray) -> np.ndarray:
@@ -272,17 +300,49 @@ def _row_pattern(col: np.ndarray, is_categorical: bool) -> bytes:
     """A column's pattern in row order, which tells apart columns with equal relations and marginals
     (:func:`tie_ranks`)."""
     if is_categorical:
-        _, first, codes = np.unique(col, return_index=True, return_inverse=True)
-        seen = np.empty(first.size, dtype=np.int64)
-        seen[np.argsort(first)] = np.arange(first.size)
-        return b"R" + seen[codes.reshape(-1)].astype("<i8").tobytes()
+        return b"R" + _first_appearance(col).astype("<i8").tobytes()
     steps = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
     return b"R" + steps.tobytes()
 
 
 def _values(col: np.ndarray, is_categorical: bool) -> bytes:
-    """A column's values, which tell apart columns with equal relations, marginals, and patterns."""
-    return b"X" + col.astype("<f8").tobytes()
+    """A continuous column's standardized values rounded to ``_Z_DP`` decimal places, which tell
+    apart columns with equal relations, marginals, and patterns, or a categorical column's
+    categories numbered in order of first appearance, which its pattern already holds
+    (:func:`tie_ranks`)."""
+    if is_categorical:
+        return b"X" + _first_appearance(col).astype("<f8").tobytes()
+    return b"X" + (np.round(_standardized(col), _Z_DP) + 0.0).astype("<f8").tobytes()
+
+
+def _first_appearance(col: np.ndarray) -> np.ndarray:
+    """A categorical column's categories numbered from zero in order of first appearance."""
+    _, first, codes = np.unique(col, return_index=True, return_inverse=True)
+    seen = np.empty(first.size, dtype=np.int64)
+    seen[np.argsort(first)] = np.arange(first.size)
+    return seen[codes.reshape(-1)]
+
+
+def _standardized(col: np.ndarray) -> np.ndarray:
+    """A continuous column minus its mean over its root mean square, zero where all its values are
+    equal; a NaN stays NaN."""
+    present = ~np.isnan(col)
+    values = col[present]
+    z = np.full(col.shape, np.nan)
+    z[present] = 0.0
+    if values.size and values.min() != values.max():
+        centered = values - values.mean()
+        z[present] = centered / np.sqrt(np.mean(centered**2))
+    return z
+
+
+def _first_difference(a: np.ndarray, b: np.ndarray) -> int:
+    """-1 or 1 as standardized column ``a`` or ``b`` is lower at the first row where they differ by
+    more than ``_Z_TOL``, or 0 where no row does (:func:`tie_ranks`)."""
+    far = np.flatnonzero(np.abs(a - b) > _Z_TOL)
+    if not far.size:
+        return 0
+    return -1 if a[far[0]] < b[far[0]] else 1
 
 
 def _digest(tag: bytes, ints: np.ndarray) -> bytes:

@@ -11,8 +11,6 @@ and the recorded output is the marks of a nonlinear hidden fork.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -23,12 +21,6 @@ from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 N = 1000
-
-
-def _fit(X, **kwargs) -> andrey.StructureOutput:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        return andrey.camuv(X, **kwargs)
 
 
 def _edges(out: andrey.StructureOutput, kind: str = "directed") -> set[tuple[int, int]]:
@@ -48,7 +40,7 @@ def _fork(seed: int) -> np.ndarray:
 
 
 def test_independent_columns_give_no_edges():
-    out = _fit(np.random.default_rng(0).standard_normal((N, 4)))
+    out = andrey.camuv(np.random.default_rng(0).standard_normal((N, 4)))
     assert out.structure.oriented_edges() == []
     assert out.metadata["latent_pairs"] == []
 
@@ -58,20 +50,20 @@ def test_a_nonlinear_cause_points_to_its_effect(reverse):
     rng = np.random.default_rng(1)
     x = rng.uniform(-2, 2, N)
     X = np.column_stack([x, np.sin(2 * x) + x + rng.uniform(-0.5, 0.5, N)])
-    out = _fit(X[:, ::-1] if reverse else X)
+    out = andrey.camuv(X[:, ::-1] if reverse else X)
     assert _edges(out) == ({(1, 0)} if reverse else {(0, 1)})
     assert out.metadata["latent_pairs"] == []
 
 
 def test_a_hidden_common_cause_marks_its_pair():
-    out = _fit(_fork(2)[:, :4])
+    out = andrey.camuv(_fork(2)[:, :4])
     assert _edges(out) == {(0, 3), (1, 2)}
     assert _edges(out, "circle") == {(0, 1)}
     assert out.metadata["latent_pairs"] == [[0, 1]]
 
 
 def test_the_observed_common_cause_marks_no_pair():
-    out = _fit(_fork(2))
+    out = andrey.camuv(_fork(2))
     assert _edges(out) == {(0, 3), (1, 2), (4, 0), (4, 1)}
     assert out.metadata["latent_pairs"] == []
 
@@ -82,7 +74,7 @@ def test_a_hidden_variable_on_a_causal_path_marks_its_pair():
     rng = np.random.default_rng(3)
     x0, *noise = rng.uniform(-1, 1, (3, N))
     h = x0 + 0.5 * noise[0]
-    out = _fit(np.column_stack([x0, h**2 + 0.1 * noise[1]]))
+    out = andrey.camuv(np.column_stack([x0, h**2 + 0.1 * noise[1]]))
     assert _edges(out) == set()
     assert out.metadata["latent_pairs"] == [[0, 1]]
 
@@ -94,7 +86,7 @@ def additive_fits():
         sample_scm(functional="additive_noise", d=6, n=N, seed=seed, density=2, scale="rescale")
         for seed in range(5)
     ]
-    return [(case, _fit(case.data)) for case in cases]
+    return [(case, andrey.camuv(case.data)) for case in cases]
 
 
 def test_additive_noise_graphs_are_recovered(additive_fits):
@@ -106,11 +98,11 @@ def test_additive_noise_graphs_are_recovered(additive_fits):
 
 def test_a_fit_repeats(additive_fits):
     case, out = additive_fits[0]
-    again = _fit(case.data)
+    again = andrey.camuv(case.data)
     assert again.structure == out.structure
     assert again.metadata == out.metadata
 
 
 def test_camuv_matches_the_recorded_output():
-    out = _fit(datagen.generate("nonlinear_fork_4v"))
+    out = andrey.camuv(datagen.generate("nonlinear_fork_4v"))
     assert_recorded_output(out, "CAMUV", case="nonlinear_fork_4v")

@@ -12,6 +12,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `profiler.py` | Time one method's fit and show where it spends its time. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
+| `gnies_order.py` | Count how often a column or row order changes GnIES's result, and why. |
 | `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
 
@@ -91,6 +92,25 @@ measurement with no passing threshold.
 uv run python -m qa.column_order
 ```
 
+## GnIES order
+
+`gnies_order.py` measures how often reordering the columns or shuffling the rows changes GnIES's
+graph or learned targets. It draws the GnIES lane's A design (`benchmarks/gnies_cpu.py`) at 6, 8,
+10, and 12 variables, 100 and 1000 rows per environment, seeds 0-9 (80 models), fits each at the
+defaults, refits it on three seeded column orders and three seeded row shuffles that keep each
+row's environment, and maps the answers back. A tie the tie ranks decide is logged at DEBUG level
+(`andrey.search.gies` for a step of the inner search, `andrey.search.gnies` for an outer step); the
+summary counts the changes, those with such a record in one of the two fits, and those without. A
+change without one points at an order dependence the tie ranks do not cover. With `--reference`,
+gnies 0.3.3 is refitted on the same column orders, which shows whether its result depends on the
+column order.
+
+```shell
+uv run python -m qa.gnies_order -o order.json
+ANDREY_BENCH_GNIES_PYTHON=... uv run python -m qa.gnies_order --reference -o order.json
+uv run python -m qa.gnies_order --summarize order-*.json
+```
+
 ## CI test calibration
 
 A conditional-independence test is calibrated when it rejects a true independence at the rate
@@ -132,11 +152,12 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, XGES, HC, Tabu, MMHC,
-RSMAX2, exact search, CALM, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD,
-BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and
-Granger on the datasets whose assumptions each method needs, and PC with each supported nonlinear
-conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
+The gate checks PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP, XGES,
+HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, GRaSP, UT-IGSP, DirectLiNGAM, ICA-LiNGAM,
+MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, CAM-UV, GIN, ANM, PNL, PCMCI, PCMCI+, LPCMCI,
+VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each
+method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn,
+and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -145,11 +166,16 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
+| `noise_interventional_gauss_er` at `d = 10, 20`, four environments of `n = 1000` | 10 seeds each | GnIES |
+| `unknown_target_shift_gauss_er`, `unknown_target_variance_gauss_er` at `d = 20`, six environments of `n = 1000` | 10 seeds each | UT-IGSP, its graph and its targets |
+| `icp_do` at `d = 6, 10`, `n = 200` per environment, every other variable intervened | 10 seeds each | ICP |
+| `known_targets_one_setting_gauss_er`, `known_targets_two_settings_gauss_er` at `d = 20`, `n = 1000` per environment | 10 seeds each | IGSP |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
+| `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
@@ -158,6 +184,7 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 | `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
+| `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
 | ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
 | Sachs, measured | 1 | PC, FCI, GFCI, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
@@ -169,6 +196,12 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Hidden variables, nonlinear.** CAM-UV's published regimes, drawn by its benchmark driver
+  (`benchmarks/camuv_cpu.py`) at two cells in its claim where its errors are below the empty
+  graph's: `camuv_paper`, the paper's simulation, 10 observed variables, two hidden common causes,
+  and two hidden intermediates; and `latent_anm_er_tenth`, `anm_er`'s additive noise with one node
+  in ten hidden, 20 observed. Both have 1,000 rows, and `d` counts the hidden nodes. A seed whose
+  graph cannot hide its nodes is skipped and the next one taken, as the driver does.
 - **Nonlinear regimes.** `anm_er` adds to each variable a weighted sum of `z + sin(z)` over its
   parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
   partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
@@ -178,17 +211,35 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
-- **Interventions, domains, groups, and indicators.** The published regimes of GIES, CD-NOD,
-  MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and
-  GIES's benchmark driver): `interventional_gauss_er` at `n = 50d`, with intervention targets on
-  four variables in ten and the rows split evenly between no intervention and each target;
-  `domain_shift_er`, 2,000 rows from four domains, in which one variable in three shifts its mean;
-  `multi_group_er`, three groups of 1,000 rows over one graph with weights drawn for each group;
-  and `latent_measurement`, latents that each cause every later one, with three indicators each,
-  where `d` counts the latents and the indicators. CD-NOD and MultiGroupDirectLiNGAM run through
-  their benchmark adapters, which build the domain index and split the groups. GIN's number of
-  tests grows combinatorially with the indicator count, so it runs at the two smaller sizes. A test
-  keeps the domain, group, and measurement draws in step with the harness.
+- **Interventions, domains, groups, and indicators.** The published regimes of GIES, GnIES, CD-NOD,
+  MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and the
+  benchmark drivers of GIES and GnIES): `interventional_gauss_er` at `n = 50d`, with intervention
+  targets on four variables in ten and the rows split evenly between no intervention and each
+  target; `noise_interventional_gauss_er`, the comparison's cell A1000 at 10 variables and its first
+  ladder rung at 20, an observational environment and three that each multiply the noise variance of
+  one variable, 1,000 rows each, with each row's environment beside the samples and the targets left
+  for GnIES to learn; `domain_shift_er`, 2,000 rows from four domains, in which one variable in
+  three shifts its mean; `multi_group_er`, three groups of 1,000 rows over one graph with weights
+  drawn for each group; and `latent_measurement`, latents that each cause every later one, with
+  three indicators each, where `d` counts the latents and the indicators. CD-NOD and
+  MultiGroupDirectLiNGAM run through their benchmark adapters, which build the domain index and
+  split the groups. GIN's number of tests grows combinatorially with the indicator count, so it runs
+  at the two smaller sizes. A test keeps the domain, group, and measurement draws in step with the
+  harness.
+- **Unknown targets.** UT-IGSP's published regime, drawn by its benchmark driver
+  (`benchmarks/ut_igsp_cpu.py`) as two of its comparison's cells: 20 variables at mean degree 1.5,
+  an observational environment and five settings of 1,000 rows, each setting with one target it is
+  given and more it is not, a mean shift with one more per setting (`unknown_target_shift_gauss_er`)
+  and a doubled noise standard deviation with three (`unknown_target_variance_gauss_er`). Each row's
+  environment and the targets its setting is given sit beside the samples.
+- **Known targets.** IGSP's published regime, drawn by its benchmark driver
+  (`benchmarks/igsp_cpu.py`) as two of its comparison's cells, Wang et al. (2017), Figure 2, at 20
+  variables: an observational environment and one setting of 10 targets
+  (`known_targets_one_setting_gauss_er`) or two disjoint settings of 8
+  (`known_targets_two_settings_gauss_er`), 1,000 rows each, every target cut from its causes and
+  given. Each row's environment and its setting's targets sit beside the samples. IGSP runs at its
+  defaults, where alpha, one over the observational rows, is `1e-3`, the level of the comparison's
+  rows in these cells.
 - **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
@@ -200,8 +251,17 @@ conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data:
   as its fit takes seconds. `longitudinal_lingam_paper` draws `m` units at `n` time points.
   Granger's published median error is above the empty graph's at every published size, so its
   gate draws 5 variables, where it is below. PCMCI and Granger run at their default
-  `fdr_method`, `"fdr_bh"`. A test keeps the Granger draws in step with the benchmark driver and
-  the regime names with the harness.
+  `fdr_method`, `"fdr_bh"`. DYNOTEARS runs at its defaults, the paper's settings for 500 steps. A
+  test keeps the Granger draws in step with the benchmark driver and the regime names with the
+  harness.
+- **Environments.** `icp_do` follows ICP's published regime of that name: an observational
+  environment and environments of do-interventions `N(2, 0.2^2)`, at 6 or 10 variables and 200
+  rows each. The data are `andrey.data`'s linear-Gaussian Erdos-Renyi graphs of mean degree 2,
+  standardized, as in the regimes above. The published regime intervenes on 2 or 3 variables
+  other than the target, where ICP's median error equals the empty set's; the gate intervenes on
+  every variable but the target, which identifies the target's parents (Peters, Buhlmann and
+  Meinshausen 2016, Theorem 2), so the check has power. Each seed draws its target among the
+  variables with parents, and ICP runs at its defaults.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -215,16 +275,24 @@ SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, 
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
 ANM, and PNL against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by
 endpoint SHD against the PAG of the observed variables. GIES is scored against the interventional
-essential graph of the true DAG under the rows' targets, and CD-NOD against the CPDAG in which the
-domain index orients the edges it reaches. GIN's errors are the latents it misses: the true latents
-whose indicators it does not return as one cluster. RCD and BottomUpParceLiNGAM are scored by
-endpoint SHD against the latent projection, the edges and pairs their benchmark scores: `i -> j` for
-a directed path from `i` to `j` through hidden nodes only, and `i <-> j` for a pair that one hidden
-node reaches through hidden nodes only. The time-series methods are scored in their summaries'
-units: PCMCI by the lag-resolved SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by
-endpoint SHD against the true PAG of the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the
-missing and extra cross-links, and Granger by the missing and extra lagged edges. On each dataset, a
-method passes when its median SHD over the draws is:
+essential graph of the true DAG under the rows' targets, IGSP against the one under the settings'
+targets, GnIES and UT-IGSP against the one under the true targets, and CD-NOD against the CPDAG in
+which the domain index orients the edges it reaches. UT-IGSP's targets are scored apart, as
+`UT-IGSP targets`, by the target error: the false plus the missed targets over the settings,
+against the given targets alone in place of the empty graph. GIN's
+errors are the latents it misses: the true latents whose indicators it does not return as one
+cluster. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection, the
+edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
+nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. The
+time-series methods are scored in their summaries' units: PCMCI by the lag-resolved SHD, PCMCI+ by
+endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of the observed
+series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, Granger by the
+missing and extra lagged edges, and DYNOTEARS by the edge SHD over the window of lags. CAM-UV is
+scored by its directed edges against the edges between observed variables that no hidden causal or
+backdoor path joins, the edges it can identify as direct: an edge in one set and not the other
+counts 1, a reversed one 2. A method that estimates a set of variables is scored by the set's false
+members plus its missed ones, where the empty set makes as many errors as the true set has members:
+ICP by the target's parents. On each dataset, a method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
@@ -235,7 +303,8 @@ intended change is recorded by a recapture. Every fit runs on the numpy backend 
 one BLAS thread, so the host's accelerators and core count do not enter the result; the tolerances
 absorb rounding differences between CPUs. On every pull request,
 `tests/recovery/test_quality_gate.py` feeds each method the empty graph and a column-shifted true
-graph, and the gate rejects both.
+graph, and UT-IGSP's targets check the given targets alone and the true targets moved one variable,
+and the gate rejects both.
 
 ```shell
 uv run python -m qa.quality_gate PC FCI
@@ -282,6 +351,30 @@ row or on its entry: the gate prints it with its numbers and does not fail it, w
 interval. A row with `"claim": "in"` or no `claim` is in claim and is judged as above, and a row's
 own `claim` overrides its entry's. Any other value of `claim` is an error.
 
+An entry's `metric` names the error its rows pair: `"shd"`, the default; `"target_error"`, the
+number of intervention targets a method learned wrongly or missed (the size of the symmetric
+difference of its targets and the true ones), for a method that learns its targets; or
+`"direct_errors"`, the directed edges a method with hidden variables returns, against the edges
+between observed variables that no unobserved causal or backdoor path joins. Its rows hold
+`andrey_<metric>_mean` and `comparator_<metric>_mean`, or `andrey_shd_mean` and
+`comparator_shd_mean` holding that error's means. Such a method has one entry per metric, each
+judged by the rules here, and a row's key names its `metric`; any other value of `metric` is an
+error. An entry with `"role": "context"` pairs Andrey with a comparator it is reported against and never
+judged by: its rows are printed with their numbers and not gated. Two more fields gate an in-claim
+row whatever its interval. Its `coverage` holds `andrey_short`, the datasets the reference finished
+and Andrey did not under the time cap: above 0, the row fails at any number of paired datasets,
+since a timeout never becomes a smaller mean, and so does a replication's. Its `floor` record
+holds two bootstrap 95% intervals: `andrey_minus_empty`, of the mean of Andrey's error minus the
+empty estimate's (the empty graph's error, or the target error of the targets the method was given
+alone, or of no targets), and `reference_minus_empty`, of the reference's error minus the same. The
+floor applies only where the reference's interval lies wholly below 0, where the reference itself
+beats the empty estimate; there the row fails when Andrey's interval's upper end is not below 0.
+Elsewhere the floor is printed with the row's numbers, as `FLOOR NOT APPLIED` where the row is
+gated, and is not judged. The record's `applies` and `pass`, where given, must agree with the two
+intervals, `pass` empty where the floor does not apply; a floor without both intervals, or a
+`floor_95` or `target_floor_95` interval alone, is an error. A floor failure on a row with a
+replication that records a floor counts only if the replication's floor fails too.
+
 A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer
@@ -303,9 +396,12 @@ with a reason and a citation:
 - `correct-by-paper`: Andrey follows the method's paper and the reference does not.
 - `reference-defect`: the reference has a defect.
 - `tie-break`: the two packages end at different local optima after an exact score tie that Andrey
-  breaks by column order. Its `evidence` holds the row's two error values with the columns in
-  reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
-  row must pass.
+  breaks by column order, or by its tie ranks. Its `evidence` holds the row's two error values with
+  the columns in reversed order (`"column_order": "reversed"`), or, for a method whose result does
+  not depend on the column order, with its tie ranks reversed (`"tie_ranks": "reversed"`), beside
+  `andrey_errors` and `comparator_errors`, where the row must pass.
+- `trade-off`: the row is the cost of a default chosen for what it gains on other rows; the reason
+  gives both.
 
 Each entry pins the row's two error values (its two series counts, where the row has them, or each
 side's mean SHD over the paired datasets under the paired bootstrap), so a re-run that changes the

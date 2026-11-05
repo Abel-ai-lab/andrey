@@ -67,13 +67,24 @@ def test_is_a_user_warning():
 
 #: Settings that shorten a slow fit; the facade path stays the same.
 SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Arguments a method needs beyond its required inputs: each row's environment, two of equal size,
+#: where it is optional, IGSP's targets for every environment, UT-IGSP's with the observational
+#: environment's known, and the variable whose parents ICP finds.
+TWO = np.repeat([0, 1], 500)
+NEEDS = {
+    "gnies": {"env": TWO},
+    "igsp": {"env": TWO, "targets": {0: [], 1: [1]}},
+    "ut_igsp": {"env": TWO, "targets": {0: [], 1: None}},
+    "icp": {"target": 2},
+}
 
 
 @pytest.mark.parametrize("name", sorted(n for n, s in REGISTRY.items() if s.status == "supported"))
 def test_supported_methods_do_not_warn_experimental(name, chain):
     """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status. A
     pairwise direction test takes the pair ``x -> y``, a panel method three time points or groups,
-    and a required context, such as CD-NOD's domain index, two domains of equal size."""
+    a required context, such as CD-NOD's domain index, two domains of equal size, and a method in
+    ``NEEDS`` its arguments."""
     spec = REGISTRY[name]
     if spec.accel == "torch":
         pytest.importorskip("torch")
@@ -87,4 +98,4 @@ def test_supported_methods_do_not_warn_experimental(name, chain):
     ]
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
-        getattr(andrey, name)(data, *contexts, **SHORT.get(name, {}))
+        getattr(andrey, name)(data, *contexts, **SHORT.get(name, {}), **NEEDS.get(name, {}))

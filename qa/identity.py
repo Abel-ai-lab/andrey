@@ -1,8 +1,9 @@
 """Check that a change returns the same answers, bit for bit, by hashing each method's full output.
 
 Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on the first draws of
-its gate datasets and of one larger dataset (:data:`LARGER`), on the numpy backend with one worker
-and one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the causal
+its gate datasets and of one larger dataset (:data:`LARGER`), and UT-IGSP and GnIES on the gate's
+smaller interventional dataset (:data:`UNKNOWN_TARGETS`), on the numpy backend with one worker and
+one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the causal
 order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats enter as
 their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so equal
 hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each part of
@@ -94,6 +95,30 @@ def _domains(x: np.ndarray) -> Any:
     return andrey.cdnod(x, index, alpha=_CDNOD["alpha"], indep_test=_CDNOD["indep_test"])
 
 
+def _environments(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
+    """The samples of a GIES draw, each row's environment, and the observational one's label.
+
+    An environment is the rows of one target set, labeled ``0, 1, ...`` in the order of its first
+    row, so the labels do not depend on the column order.
+    """
+    samples, mask = qg.unstack(x)
+    _, first, inverse = np.unique(mask, axis=0, return_index=True, return_inverse=True)
+    env = np.argsort(np.argsort(first))[inverse.reshape(-1)]
+    return samples, env, int(env[np.flatnonzero(~mask.any(axis=1))[0]])
+
+
+def _ut_igsp(x: np.ndarray) -> StructureOutput:
+    """UT-IGSP with the observational environment known and every setting's targets unknown."""
+    samples, env, observational = _environments(x)
+    return andrey.ut_igsp(samples, env, targets={observational: []}, seed=0)
+
+
+def _gnies(x: np.ndarray) -> StructureOutput:
+    """GnIES with every environment's targets unknown."""
+    samples, env, _ = _environments(x)
+    return andrey.gnies(samples, env)
+
+
 def _pcmci(x: np.ndarray) -> StructureOutput:
     """PCMCI with the gate adapter's settings; the adapter names the PC1 level ``pc_alpha``, as
     tigramite does."""
@@ -117,7 +142,7 @@ FITS: dict[str, Fit] = {
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
     "GES": Fit(andrey.ges),
-    "GIES": Fit(lambda x: andrey.gies(*qg.unstack(x)), blocks=2),
+    "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
     "HC": Fit(andrey.hc),
     "Tabu": Fit(andrey.tabu),
@@ -155,6 +180,8 @@ FITS: dict[str, Fit] = {
     ),
     "LongitudinalLiNGAM": Fit(_longitudinal),
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
+    "UT-IGSP": Fit(_ut_igsp, blocks=2),
+    "GnIES": Fit(_gnies, blocks=2),
 }
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, and the
@@ -233,6 +260,20 @@ LARGER: dict[str, str] = {
 }
 
 
+#: The methods that learn unknown targets, outside the gate, with their datasets: the gate's smaller
+#: interventional dataset, whose environments are its target sets.
+UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
+    ("UT-IGSP", "GnIES"), qg.INTERVENTION_DATA[:1]
+)
+
+
+def datasets(method: str) -> tuple[str, ...]:
+    """Return the datasets ``method`` is fitted on: its gate datasets, then its larger dataset."""
+    if method in UNKNOWN_TARGETS:
+        return UNKNOWN_TARGETS[method]
+    return (*qg.SUPPORTED[method].datasets, LARGER[method])
+
+
 @functools.cache
 def draws(dataset: str) -> tuple[qg.Draw, ...]:
     """Return the draws of a gate or larger dataset, generated once per process."""
@@ -242,7 +283,7 @@ def draws(dataset: str) -> tuple[qg.Draw, ...]:
 def corpus(methods: Iterable[str], seeds: int) -> Iterator[tuple[str, str, int, np.ndarray]]:
     """Yield ``(method, dataset, seed, data)`` for the first ``seeds`` draws of each dataset."""
     for method in methods:
-        for dataset in (*qg.SUPPORTED[method].datasets, LARGER[method]):
+        for dataset in datasets(method):
             for seed, draw in enumerate(draws(dataset)[:seeds]):
                 yield method, dataset, seed, np.ascontiguousarray(draw.data)
 

@@ -50,6 +50,9 @@ _PAIRWISE_FIELDS = {
 # PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
 # and the test p-values and statistics.
 _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
+# ICP: candidate = the DAG into the target, the accepted sets, and each column's p-value, ``None``
+# at the target.
+_INVARIANT = frozenset({"ICP"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS"})
 
@@ -67,11 +70,24 @@ def project_output(out: Any, algorithm: str) -> dict:
     """Project a ``StructureOutput`` (or a list for multi-group) to the baseline field layout."""
     if algorithm == "ExactSearch":  # the recorded graph is the DAG the search found
         return {"graph": found_dag(out).to_numpy()}
+    if algorithm == "IGSP":  # the graph and both parts of its objective
+        md = out.metadata
+        return {
+            "graph": out.structure.to_numpy(),
+            "score": md["score"],
+            "n_contradicting": md["n_contradicting"],
+        }
     if algorithm in _GRAPH:
         candidate: dict = {"graph": out.structure.to_numpy()}
         if algorithm in _SCORE_GRAPH:
             candidate["score"] = out.metadata["score"]
         return candidate
+    if algorithm == "GnIES":  # the graph, its score, and the learned targets
+        return {
+            "graph": out.structure.to_numpy(),
+            "score": out.metadata["score"],
+            "targets": list(out.metadata["changing_variables"]),
+        }
     if algorithm in _LINGAM:
         return {
             "causal_order": np.asarray(out.ordering),
@@ -90,6 +106,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
+    if algorithm in _INVARIANT:
+        return {
+            "graph": out.structure.to_numpy(),
+            "accepted_sets": out.metadata["accepted_sets"],
+            "p_values": out.metadata["p_values"],
+        }
     if algorithm in _PAIRWISE:
         md = out.metadata
         return {"graph": out.structure.to_numpy()} | {
@@ -97,6 +119,13 @@ def project_output(out: Any, algorithm: str) -> dict:
         }
     if algorithm == "GIN":  # the graph over indicators and latents, and the clusters in order
         return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["cluster_order"]}
+    if algorithm == "UT-IGSP":  # the graph, its objective, and each environment's targets
+        targets = out.metadata["targets"]
+        return {
+            "graph": out.structure.to_numpy(),
+            "score": out.metadata["score"],
+            "targets": [targets[key] for key in sorted(targets)],
+        }
     if algorithm in _PCMCI:
         s = out.structure
         candidate = {

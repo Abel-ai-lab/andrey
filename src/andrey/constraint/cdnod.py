@@ -73,7 +73,7 @@ _RIDGE = 0.1
 
 def cdnod(
     data: np.ndarray,
-    domain_index: np.ndarray,
+    env: np.ndarray,
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
@@ -91,8 +91,8 @@ def cdnod(
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
-    ``data`` is an ``(n_samples, n_features)`` array; ``domain_index`` is the ``(n_samples,)`` or
-    ``(n_samples, 1)`` domain/context index (one label per row); ``alpha`` is the independence-test
+    ``data`` is an ``(n_samples, n_features)`` array; ``env`` is the ``(n_samples,)`` or
+    ``(n_samples, 1)`` environment index (one number per row); ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
     ``indep_test`` selects the CI test. ``collider_order`` orders the colliders, and
     ``collider_rule`` decides the unshielded triples, as in :func:`~andrey.constraint.pc.pc`; the
@@ -124,15 +124,15 @@ def cdnod(
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
     X = np.asarray(data, dtype=np.float64)
-    context = np.asarray(domain_index, dtype=np.float64)
+    context = np.asarray(env, dtype=np.float64)
     # One value per row: a wider index reshaped to a column would pair rows with the wrong values.
     if context.shape not in ((X.shape[0],), (X.shape[0], 1)):
         raise ValueError(
-            f"domain_index must hold one value per row of data, as shape ({X.shape[0]},) or "
+            f"env must hold one value per row of data, as shape ({X.shape[0]},) or "
             f"({X.shape[0]}, 1); got shape {context.shape}"
         )
     if not np.isfinite(context).all():
-        raise ValueError("domain_index contains NaN or inf")
+        raise ValueError("env contains NaN or inf")
     context = context.reshape(-1, 1)
     d = X.shape[1]
     ranked = collider_order == "p_value"
