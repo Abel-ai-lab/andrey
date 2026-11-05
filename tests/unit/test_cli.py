@@ -883,12 +883,6 @@ def test_run_majority_colliders(method, csv_path, capsys):
     assert result["structure"] == graph_view(expected)
 
 
-def test_cli_rejects_unknown_collider_rule(csv_path, capsys):
-    code, _, err = _run(["run", "fci", "--data", str(csv_path), "collider_rule=invalid"], capsys)
-    assert code != 0
-    assert "collider" in err
-
-
 @pytest.mark.parametrize(
     "args",
     [

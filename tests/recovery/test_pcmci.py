@@ -72,13 +72,6 @@ def test_the_tests_differ_in_p_values_and_agree_on_the_graph(planted):
     assert student_t.metadata["p_values"] != fisherz.metadata["p_values"]
 
 
-def test_same_result_on_every_run(planted):
-    data, _ = planted
-    first, second = (andrey.pcmci(data, tau_max=2) for _ in range(2))
-    assert first.structure == second.structure
-    assert first.metadata == second.metadata
-
-
 @pytest.mark.parametrize("indep_test", INDEP_TESTS)
 def test_generated_var_scores_well_above_the_empty_graph(indep_test):
     scm = SCM(

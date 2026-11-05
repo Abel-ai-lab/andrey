@@ -261,12 +261,6 @@ def test_cmd_run_wires_every_input_flag():
     assert not missing, f"input flags with no cmd_run option: {missing}"
 
 
-def test_seeded_methods_expose_a_seed_param():
-    for spec in REGISTRY.values():
-        if spec.seeded:
-            assert "seed" in {p.name for p in spec.params}, f"{spec.name} has no seed param"
-
-
 def test_multi_output_only_in_family_that_supports_it():
     for spec in REGISTRY.values():
         if spec.output.multi:

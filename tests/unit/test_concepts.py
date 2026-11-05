@@ -36,6 +36,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.unit.methods import REQUIRED, SHORT, domains, environments
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -201,11 +202,6 @@ CONTEXT = {
 }
 
 
-def environments(n: int) -> np.ndarray:
-    """Three environments of about ``n / 3`` rows each, in row order."""
-    return np.arange(n) * 3 // n
-
-
 def facade(method: str):
     """The method's facade, with the settings ``CONTEXT`` and ``REQUIRED`` give it."""
     return functools.partial(
@@ -233,14 +229,11 @@ def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
         elif inp.kind == "panel":
             args.append(frames)
         else:
-            args.append(np.repeat([0.0, 1.0], N // 2).reshape(-1, 1))
+            args.append(domains(N))
     return args
 
 
-#: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
-#: The arguments a method needs beyond its inputs: ICP's target, by position.
-REQUIRED = {"icp": {"target": 2}}
+#: The settings that stop each loop at its cap.
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
@@ -415,7 +408,7 @@ def args_for(method: str, tables: list[pd.DataFrame]) -> list:
     """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
     domain column for CD-NOD and GnIES."""
     kinds = (i.kind for i in REGISTRY[method].data.inputs if needed(method, i))
-    domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
+    domain = domains(len(tables[0]))
     args = [
         tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
     ]
@@ -860,10 +853,12 @@ def test_every_search_with_a_ci_test_has_cases():
 def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings, gaps, monkeypatch):
     """A test registered with the single-query call alone runs every search that takes
     ``indep_test``, on complete data and, where the method takes missing values, on data with gaps,
-    and gives the graph of Fisher's z-test it wraps."""
+    is the test the search asks, and gives the graph of Fisher's z-test it wraps."""
     expected, _ = fit(method, codes=False, gaps=gaps, **settings)
     monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    monkeypatch.setattr(PValueOnly, "queries", 0)
     out, _ = fit(method, codes=False, gaps=gaps, indep_test="p_value_only", **settings)
+    assert PValueOnly.queries > 0
     assert out.structure == expected.structure
 
 
@@ -1128,13 +1123,6 @@ def test_a_former_value_maps_to_the_current_one_with_one_warning(monkeypatch):
     with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='student' is now"):
         out = andrey.pc(*data, indep_test="student")
     assert out == expected
-
-
-def test_an_indep_test_takes_the_registered_tests(monkeypatch):
-    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
-    data = inputs("pc", codes=False)
-    out = andrey.pc(*data, indep_test="fisherz_copy")
-    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
 
 
 # --- surfaces -------------------------------------------------------------------------------------

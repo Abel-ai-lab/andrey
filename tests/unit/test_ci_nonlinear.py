@@ -125,6 +125,29 @@ def test_independent_discrete_columns_stay_independent(name):
     assert _build(name, data)(0, 1) > ALPHA
 
 
+def test_hsic_gamma_separates_dependence_from_independence():
+    """Check gamma HSIC on seeded independent and nonlinear dependent samples.
+
+    Repeated calls on the same input must return the same result.
+    """
+    from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+
+    def hsic_gamma_test(x, y):
+        return hsic_gamma_from_grams(gamma_gram(x), gamma_gram(y), len(x))
+
+    rng = np.random.default_rng(0)
+    for _ in range(6):
+        a = rng.standard_normal(200)
+        independent = rng.standard_normal(200)
+        dependent = a**2 + 0.3 * rng.standard_normal(200)
+        _stat, p_independent = hsic_gamma_test(a, independent)
+        _stat, p_dependent = hsic_gamma_test(a, dependent)
+        # One seeded null p-value falls below 0.05; the dependent p-values are zero.
+        assert p_independent > 0.01, f"independent draws rejected at p={p_independent}"
+        assert p_dependent < 0.01, f"quadratic dependence missed at p={p_dependent}"
+    assert hsic_gamma_test(a, dependent) == hsic_gamma_test(a, dependent)
+
+
 # ---- reference values --------------------------------------------------------------------------
 
 

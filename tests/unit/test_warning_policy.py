@@ -140,6 +140,18 @@ def test_an_error_filter_on_the_category_fails_every_call(name, monkeypatch):
                 call()
 
 
+def test_each_experimental_method_warns_on_its_own_first_call():
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        warn_experimental("first_method")
+        warn_experimental("second_method")
+        warn_experimental("first_method")
+    assert [str(w.message).split()[0] for w in _andrey_warnings(caught)] == [
+        "andrey.first_method",
+        "andrey.second_method",
+    ]
+
+
 def test_ignoring_the_base_class_silences_every_warning(monkeypatch):
     calls = [make(monkeypatch) for make, _ in TRIGGERS.values()]
     with warnings.catch_warnings(record=True) as caught:

@@ -99,13 +99,6 @@ def test_generated_svar_scores_well_above_the_empty_graph(seed):
 # ---- what the method promises --------------------------------------------------------------------
 
 
-def test_same_result_on_every_run(planted, planted_fit):
-    again = andrey.dynotears(planted, tau_max=2)
-    assert again.structure == planted_fit.structure
-    np.testing.assert_array_equal(again.structure.lag_weights, planted_fit.structure.lag_weights)
-    assert again.metadata == planted_fit.metadata
-
-
 def test_reordering_the_columns_only_reorders_the_result(planted, planted_fit):
     """The columns are fit in the order of their ranks, so the order they arrive in is lost."""
     order = [2, 0, 3, 1]

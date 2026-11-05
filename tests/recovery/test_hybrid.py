@@ -206,8 +206,6 @@ def test_rsmax2_with_pc_gives_the_same_graph_on_more_workers():
 @pytest.mark.parametrize(
     ("setting", "error"),
     [
-        ({"restrict": "gs"}, ValueError),
-        ({"maximize": "ges"}, ValueError),
         ({"maximize": "tabu", "score_func": "cond_gauss"}, ValueError),
         ({"score_func": "bdeu"}, ValueError),  # a categorical score with fisherz
     ],

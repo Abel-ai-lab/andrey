@@ -9,7 +9,7 @@ import numpy as np
 from andrey import data
 from andrey.core import ARROW, CIRCLE, TAIL
 from andrey.data.latent import marginal
-from qa import quality_gate as qg
+from andrey.data.real import SACHS_ARCS, SACHS_NODES
 
 fci = importlib.import_module("andrey.constraint.fci")
 
@@ -95,8 +95,8 @@ def test_r5_finishes_on_a_layered_graph():
 
 def test_the_sachs_truth_pag_has_no_undirected_edges():
     """Without selection variables the true PAG has no tail-tail edge; Sachs's is all circles."""
-    parents, children = qg.arc_indices(qg.SACHS_NODES, qg.SACHS_ARCS)
-    dag = data.graphs.dag_truth(parents, children, len(qg.SACHS_NODES))
-    pag = np.asarray(marginal(dag, "pag", max_nodes=len(qg.SACHS_NODES)).to_numpy())
+    sachs = data.graphs.FixedDAG(nodes=SACHS_NODES, arcs=SACHS_ARCS)
+    dag, _ = sachs.materialize(np.random.default_rng(0))
+    pag = np.asarray(marginal(dag, "pag", max_nodes=len(SACHS_NODES)).to_numpy())
     assert _undirected(pag) == 0
     assert set(np.unique(pag)) <= {0, CIRCLE}

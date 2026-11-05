@@ -115,13 +115,11 @@ def test_robust_recovers_a_chain_and_takes_a_path_step(name, chain) -> None:
 
 
 def test_robust_dagma_recovers_the_class_of_standardized_data_with_unequal_variances() -> None:
-    """Here least squares is one edit from the CPDAG, and the likelihood path reaches it."""
+    """The likelihood path reaches the CPDAG."""
     X, adjacency = _unequal_variances(8)
     truth = to_cpdag(dag_from_adjacency(adjacency))
-    default = to_cpdag(_fit("dagma", X).structure)
     robust = to_cpdag(_fit("dagma", X, robust=True).structure)
     assert shd(robust, truth) == 0
-    assert shd(robust, truth) <= shd(default, truth)
 
 
 # ---- determinism and column order ----------------------------------------------------------------

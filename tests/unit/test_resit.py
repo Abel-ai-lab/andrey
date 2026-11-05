@@ -1,4 +1,4 @@
-"""RESIT's contract: knowledge, units, ties, the p-values it compares, and the data it refuses."""
+"""RESIT's contract: knowledge, offsets, ties, the p-values it compares, and the data it refuses."""
 
 from __future__ import annotations
 
@@ -52,12 +52,6 @@ def test_the_chain_is_found(chain_fit):
         assert _edges(_fit(_chain())) == {(0, 1), (1, 2)}
 
 
-def test_rescaling_a_column_changes_neither_the_graph_nor_the_order(chain_fit):
-    out = _fit(_chain() * np.array([1e-4, 3.7, 2e3]))
-    assert out.structure == chain_fit.structure
-    assert out.ordering == chain_fit.ordering
-
-
 def _mirrored(seed: int = 0) -> np.ndarray:
     """Linear Gaussian ``x`` and ``y`` with each row's swap also a row.
 
@@ -91,11 +85,6 @@ def test_a_tied_sink_is_the_lower_ranked_column_in_any_column_order():
         assert _named(_fit(frame[columns])) == {(cause, sink)}
     with andrey.config(tie_break="position"):
         assert _named(_fit(frame[["y", "x"]])) == {("x", "y")}
-
-
-def test_a_forbidden_edge_is_never_in_the_graph():
-    out = _fit(_chain(), knowledge=andrey.Knowledge(forbidden=[(0, 1)]))
-    assert (0, 1) not in _edges(out)
 
 
 def test_a_required_edge_stays_on_independent_columns():

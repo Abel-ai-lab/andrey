@@ -43,21 +43,9 @@ _LIGHT, _HEAVY = 0.5, 16.0
 _GFCI_HEAVY = 32.0
 
 
-def _cpdag(result):
-    if isinstance(result, tuple):
-        return result[0]
-    return getattr(result, "structure", result)
-
-
 @pytest.mark.parametrize(
     "name,run,weight",
     [
-        ("ges", ges, _HEAVY),
-        ("hc", hc, _HEAVY),
-        ("boss", boss, _HEAVY),
-        ("grasp", grasp, _HEAVY),
-        ("gies", gies, _HEAVY),
-        ("gfci", gfci, _GFCI_HEAVY),
         ("andrey.ges", andrey.ges, _HEAVY),
         ("andrey.hc", andrey.hc, _HEAVY),
         ("andrey.boss", andrey.boss, _HEAVY),
@@ -67,8 +55,8 @@ def _cpdag(result):
     ],
 )
 def test_penalty_moves_the_answer(name, run, weight):
-    heavy = _marks(_cpdag(run(_SENSITIVE, penalty_discount=weight)))
-    light = _marks(_cpdag(run(_SENSITIVE, penalty_discount=_LIGHT)))
+    heavy = _marks(run(_SENSITIVE, penalty_discount=weight).structure)
+    light = _marks(run(_SENSITIVE, penalty_discount=_LIGHT).structure)
     assert heavy < light, f"{name}: penalty_discount did not change the graph ({light} -> {heavy})"
 
 

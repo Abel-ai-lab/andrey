@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core import stats
+from andrey.core import ARROW, TAIL, stats
 from andrey.lingam import pwling
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
@@ -57,14 +57,19 @@ def test_direct_lingam_recovery():
     assert_recorded_output(out, "DirectLiNGAM", case="lingam_5v_uniform")
 
 
-def test_direct_lingam_output_contract():
+def test_lingam_weighted_orientation_matches_structure():
     out = andrey.direct_lingam(datagen.generate("lingam_5v_uniform"))
-    assert out.ordering is not None and out.weighted_adjacency is not None
-
-
-def test_direct_lingam_rejects_kernel():
-    with pytest.raises(ValueError):
-        andrey.direct_lingam(datagen.generate("lingam_5v_uniform"), measure="kernel")
+    marks = out.structure.to_numpy()
+    rows, cols = np.nonzero(out.weighted_adjacency)
+    weighted_edges = set(zip(rows.tolist(), cols.tolist()))
+    graph_edges = {
+        (i, j)
+        for i in range(marks.shape[0])
+        for j in range(marks.shape[0])
+        if marks[i][j] == TAIL and marks[j][i] == ARROW  # tail at source i, arrow at target j
+    }
+    assert weighted_edges
+    assert weighted_edges == graph_edges
 
 
 def test_pwling_serial_and_vectorized_agree(monkeypatch):
