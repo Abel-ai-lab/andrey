@@ -22,7 +22,7 @@ With [uv](https://docs.astral.sh/uv/), add it to your project (`uv init` creates
 
 ```shell
 uv add andrey-core            # base (pure NumPy)
-uv add "andrey-core[torch]"   # torch backend: GPU primitives
+uv add "andrey-core[torch]"   # torch backend: GPU primitives and CALM
 uv add "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 uv add "andrey-core[all]"     # every extra
 ```
@@ -31,7 +31,7 @@ With pip:
 
 ```shell
 pip install andrey-core            # base (pure NumPy)
-pip install "andrey-core[torch]"   # torch backend: GPU primitives
+pip install "andrey-core[torch]"   # torch backend: GPU primitives and CALM
 pip install "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 pip install "andrey-core[all]"     # every extra
 ```
@@ -52,9 +52,9 @@ pip install "andrey-core[torch]"
 For ROCm, install the matching PyTorch build yourself, then `andrey-core`. Andrey has no backend
 for Intel GPUs.
 
-### The development version
+### From GitHub
 
-The latest `main` from GitHub, ahead of the next release:
+The `main` branch on GitHub holds the latest release:
 
 ```shell
 uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
@@ -410,8 +410,11 @@ The result honors every part: a required edge is there and directed, a forbidden
 pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
 Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
 of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
-graphs: a required edge is there without a direction, and tiers and edges forbidden one way, which
-constrain orientation, do not change them. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
+graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and with
+`structure="moral"`, a choice of `iamb` and `inter_iamb`: a required edge is there without a
+direction, and tiers and edges forbidden one way, which constrain orientation, do not change them.
+With `structure="cpdag"`, the default of `iamb` and `inter_iamb`, they direct the edges the
+knowledge decides, as in any CPDAG. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
 and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
 earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
 directions close a cycle over the edges the search kept raises one after the adjacency search.
@@ -420,12 +423,11 @@ label is the column name as text: name a column called `1` with `"1"`, as the in
 second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
-PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
-lagged variables. A third entry
-gives an edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`,
-and lag `0` is the same step. A forbidden pair without a lag holds at every lag, and a required
-link names its lag. Tiers and `allowed` hold at every lag, and a variable's links to its own past
-stay allowed:
+The time-series methods read the knowledge as links between lagged variables. A third entry gives an
+edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`, and lag `0`
+is the same step, except in PCMCI and Granger, which learn no same-step links. A forbidden pair
+without a lag holds at every lag, and a required link names its lag. Tiers and `allowed` hold at
+every lag, and a variable's links to its own past stay allowed:
 
 ```python
 from andrey import Knowledge, pcmciplus
@@ -448,12 +450,11 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
-`ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, and
-`exact_search` take every score; `gies` scores each variable on the rows without an intervention on
-it. `gfci`, `mmhc`, and `rsmax2` take a score and a test
-that read the same kind of data, such as
-`andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`,
+`pcmci`, `pcmciplus`, and `lpcmci` take the tests; `ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`,
+`mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score; `gies` scores each variable
+on the rows without an intervention on it. `gfci`, `mmhc`, and `rsmax2` take a score and a test that
+read the same kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
 numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
@@ -475,8 +476,8 @@ turns each categorical column into indicator columns and treats every column as 
 suits effects that are linear and add up across categories. The conditional Gaussian
 (`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
 variable's spread as well as its mean; it needs several rows for each combination of categories it
-conditions on. Both are experimental. With either score, `hc` gives no categorical column a
-continuous parent.
+conditions on. Both are experimental. With either score, `hc` and `tabu`, and so the score phase
+of `mmhc` and `rsmax2`, give no categorical column a continuous parent.
 
 **Marking the categorical columns.** Name them with `categorical`, by label (the column name as
 text) or 0-based position:
@@ -552,7 +553,7 @@ Every other method raises a `ValueError` that names it: its score or loss reads 
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
 `data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
 methods above. A time series cannot lose a step without joining the steps around it, so for
-VARMA-LiNGAM and Granger, fill in the missing steps first.
+VARMA-LiNGAM, Granger, and DYNOTEARS, fill in the missing steps first.
 
 ## Backends and parallelism
 

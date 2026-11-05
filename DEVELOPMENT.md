@@ -12,7 +12,7 @@ repository's conventions.
 - `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
-- `apps/`: the interactive examples.
+- `apps/`: the demos.
 - `docs/` and `site/`: the website, one Sphinx project in `docs/` (the documentation in
   `docs/docs/`), with the homepage's template and content generators in `site/`.
 
@@ -45,7 +45,7 @@ or which ones a family holds, computes it from the registry when it is built; no
 A typed count goes stale without failing anything when a method is added or promoted.
 
 - `docs/conf.py` gives the documentation pages substitutions (`{{ method_count }}`,
-  `{{ n_supported }}`) from `_methods_text`.
+  `{{ n_supported }}`, `{{ supported_methods }}`) from `_methods_text`.
 - `site/build.py` computes the homepage's counts, including the comparison table's distinct
   methods (`COUNTED_WITH` names the methods that count with the one they extend).
 - `apps/build_launch.py` writes the README's and `ROADMAP.md`'s generated blocks between their
@@ -61,7 +61,7 @@ was read.
 the command-line loop, reading a result (every edge type and its symbol), choosing a method (one
 line per method), the `ANDREY_*` variables, and the exit codes. `render_skill` builds it from the
 specs, so a new method or variable reaches it without an edit. To install it for an agent:
-`andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
+`mkdir -p ~/.claude/skills/andrey && andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
 
 An agent that has only run `pip install andrey-core` finds it from `help(andrey)`, whose docstring
 (`src/andrey/__init__.py`) holds a quick start and names `andrey --skill` and
@@ -101,8 +101,9 @@ repository.
 ## Docstring standard
 
 Public `andrey.api` facades carry a NumPy-style docstring (`ruff.toml` pins `convention = "numpy"`
-and enforces the `D` rules on `src/andrey/api/**`). Autodoc renders it; machine-readable metadata
-lives in the registry. Every facade docstring has, in order:
+and enforces the `D` rules on `src/andrey/api/**` and the other public modules: `data`, `viz`,
+`resample.py`, and `markov.py`). Autodoc renders it; machine-readable metadata lives in the
+registry. Every facade docstring has, in order:
 
 - **Summary**: one imperative line naming what it learns and the graph kind ("Learn a CPDAG ...").
 - **Extended summary**: a sentence or two on the method, where it helps.
@@ -356,8 +357,9 @@ from the Typer app. A change keeps this contract:
   (`SCHEMA_VERSION`), versioned apart from a saved graph's `format_version`; changes within a
   version are additive, and consumers check it first. Help and configuration reports carry
   `andrey_version`; results carry it under `run.versions.andrey`.
-- A non-interactive stdout (a pipe, an agent, CI) gets JSON on success, a terminal a human summary,
-  and `--json` forces JSON; diagnostics and the error envelope go to stderr.
+- `run`, `list`, `bootstrap`, `markov-check`, and `calibrate` give a non-interactive stdout (a pipe,
+  an agent, CI) JSON on success and a terminal a human summary; `--json` forces JSON, also from
+  `config`. Diagnostics and the error envelope go to stderr.
 - A large graph's inline `edges` are capped (`edges_truncated`); `n_edges` and the `edge_types`
   breakdown stay complete, and `--full` or `-o <file>` keep every edge.
 - Result envelope: `{schema_version, method, status, structure|results, metadata, run}`, where `run`

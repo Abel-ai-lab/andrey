@@ -14,11 +14,12 @@ include = [
 
 [lint]
 select = ["E", "F", "I", "D"]
-# D (NumPy docstrings) is enforced on the public method surface -- the `andrey.api` facades. The
-# internal packages, the recovery helpers, tests, and benchmarks keep their lighter docstring conventions
-# (see per-file-ignores). The public core API (andrey.core classes) is instead pinned by a pytest
-# drift guard (test_public_core_methods_document_their_parameters) -- ruff's D cannot check
-# Parameters-against-signature. Widening D to the rest of the public surface is a follow-up.
+# D (NumPy docstrings) is enforced on the `andrey.api` facades and the other public modules: `data`,
+# `viz`, `resample.py`, and `markov.py`. The internal packages, the recovery helpers, tests, and
+# benchmarks keep their lighter docstring conventions (see per-file-ignores). The public core API
+# (andrey.core classes) is instead pinned by a pytest drift guard
+# (test_public_core_methods_document_their_parameters) -- ruff's D cannot check
+# Parameters-against-signature.
 
 [lint.isort]
 # First-party: the shipped `andrey`, the recovery helper package, the
@@ -26,8 +27,9 @@ select = ["E", "F", "I", "D"]
 known-first-party = ["andrey", "tests", "qa", "andrey_bench"]
 
 [lint.per-file-ignores]
-# D applies to the `andrey.api` facades only. Everything else keeps its existing docstring style:
-# the top-level modules (cli, __init__), the internal packages, the recovery helpers, tests, and benchmarks.
+# D applies to the `andrey.api` facades, `data`, `viz`, `resample.py`, and `markov.py`. Everything
+# else keeps its existing docstring style: `cli.py`, `__init__.py`, the internal packages, the
+# recovery helpers, tests, and benchmarks.
 "tests/**" = ["D"]
 "qa/**" = ["D"]
 # benchmarks/ additionally waives E501: the harness is deliberately heavy on long prose docstrings,

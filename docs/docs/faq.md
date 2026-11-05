@@ -17,7 +17,8 @@ which {{ n_supported }} are supported and benchmarked and the rest experimental,
 categorical, and mixed data; independent samples and time series; linear and nonlinear
 relationships; data with hidden common causes; and data from interventions or several domains.
 Most take background knowledge: edges that must or cannot exist, and the order of tiers in time.
-The constraint-based methods accept missing values, and `andrey.bootstrap` gives each edge's
+Most methods that test conditional independence accept
+[missing values](#does-it-handle-missing-values), and `andrey.bootstrap` gives each edge's
 frequency over refits on resampled data. The methods include PC, FCI, GFCI, GES, XGES, BOSS,
 GRaSP, the LiNGAM family, PCMCI, and LPCMCI. Many methods spread their work over CPU cores, and
 some run on a GPU. A command line that answers in JSON and an agent skill make it usable by AI
@@ -36,8 +37,8 @@ uv add andrey-core
 pip install andrey-core
 ```
 
-[Getting started](guides/getting-started.md#install) covers the optional extras, the development
-version, and building from source.
+[Getting started](guides/getting-started.md#install) covers the optional extras, installing from
+GitHub, and building from source.
 
 ### Which operating systems does it support?
 
@@ -45,11 +46,11 @@ version, and building from source.
 |---|:---:|:---:|:---:|
 | Installs and runs on the CPU | ✓ | ✓ | ✓ |
 | Full test suite | ✓ | ✗ | ✗ |
-| GPU speedups (CUDA / MPS) | ✓ | ✗ | ✗ |
+| GPU speedups (CUDA) | ✓ | ✗ | ✗ |
 
-Linux is fully supported; macOS and Windows can run Andrey, with no guarantee yet. On macOS and
-Windows, CI checks the install, the command line, and small fits on the CPU, and on macOS the unit
-tests; the rest of the test suite there is planned.
+Linux is supported; macOS and Windows install and run on the CPU, with no guarantee yet
+([Testing](ci.md)). On demand, CI checks the install, the command line, and small fits on macOS and
+Windows on the CPU, and the unit tests on macOS; the rest of the test suite there is planned.
 
 The defaults of the speed cutoffs, such as how large a pass must be to use the worker processes, are
 measured on Linux servers. On another machine, run `andrey calibrate` once and set the values it
@@ -73,8 +74,7 @@ them with their status.
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
 method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process. Every method is supported now; a new method starts as
-experimental.
+first time it runs in a process. A new method starts as experimental.
 
 ### Which method should I start with?
 
@@ -127,9 +127,10 @@ work that cannot change the result, and uses GPU code where that helps.
 ### Do I need a GPU?
 
 No. The default install uses NumPy on the CPU. The `torch` extra adds a PyTorch backend, which
-CALM needs. With a CUDA GPU, DirectLiNGAM's entropy computations move to the GPU once they are
-large enough to repay the transfer; correlation matrices move too when you set
-`ANDREY_BACKEND=cuda`. Apple GPUs are not supported in the alpha.
+CALM needs. A CUDA GPU speeds up covariance and correlation, the entropy terms of DirectLiNGAM and
+the methods built on it, the KCI and CMIknn tests, and the tests of PNL;
+[Configuration](configuration.md#gpu-dispatch) says when each moves. Apple GPUs are not supported
+in the alpha.
 
 ### What do the optional extras add?
 
@@ -170,19 +171,19 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
-text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, and
-RSMAX2 test independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GIES,
-XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP, exact search, MMHC, and RSMAX2 score it with
-`score_func="bdeu"` or `"discrete_bic"`. For mixed data, with continuous and categorical columns,
-the same methods take `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and the score from
-the column types you declare, with `categorical` or a DataFrame's `category` columns: `gsq` and
-`bdeu` when every column is categorical, `cond_gauss` when some are. A column of a few whole
-numbers that you have not declared reads as numbers, with a warning. The
+text, booleans, or a pandas `category`. PC, FCI, GFCI, CDNOD, IAMB, Inter-IAMB, MMPC, MMHC, RSMAX2,
+IGSP, UT-IGSP, PCMCI, PCMCI+, and LPCMCI test independence on categorical data with
+`indep_test="chisq"` or `"gsq"`, and GES, GIES, XGES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
+exact search, MMHC, and RSMAX2 score it with `score_func="bdeu"` or `"discrete_bic"`. For mixed
+data, with continuous and categorical columns, the same methods take `indep_test="degen_gauss"` or
+`"cond_gauss"` and `score_func="degen_gauss"` or `"cond_gauss"`. By default they pick the test and
+the score from the column types you declare, with `categorical` or a DataFrame's `category`, `bool`,
+or text columns: `gsq` and `bdeu` when every column is categorical, `cond_gauss` when some are. A
+column of a few whole numbers that you have not declared reads as numbers, with a warning. The
 [release cards](benchmarks.md) benchmark them on categorical and mixed data against causal-learn,
-Tetrad, bnlearn, and pgmpy; GIES and XGES are not benchmarked on those data yet.
-[Data types](guides/getting-started.md#data-types) explains the settings. The LiNGAM methods
-assume continuous non-Gaussian noise.
+Tetrad, bnlearn, and pgmpy; GIES, XGES, IGSP, UT-IGSP, PCMCI, PCMCI+, and LPCMCI are not benchmarked
+on those data yet. [Data types](guides/getting-started.md#data-types) explains the settings. The
+LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Does it handle missing values?
 
@@ -200,7 +201,7 @@ against dropping incomplete samples, and
 
 Yes, with `andrey.Knowledge`: edges that must exist, edges that cannot, and tiers, where no edge
 points from a later tier into an earlier one, such as nothing causing a person's age. Every method
-takes it except ANM, PNL, and GIN.
+takes it except ICP, ANM, PNL, and GIN.
 
 ### How sure is each edge?
 

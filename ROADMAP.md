@@ -30,12 +30,11 @@ reference](https://andrey.abel.ai/docs/api.html) says which.
 
 ## 2. Interventional data
 
-Experiments reveal causal directions that observational data cannot. Methods that learn from
-interventional data, alone or mixed with observational data: GIES today, then UT-IGSP, on
-interventions simulated by `andrey.data` so every such method is benchmarked on data with a known
-answer. Then data pooled across domains: FCI-JCI, BOSS-FCI, GRaSP-FCI, J-PCMCI+ for time series, and
-a domain index for the score-based and permutation searches, with Sachs's nine conditions as a real
-test set.
+Experiments reveal causal directions that observational data cannot. GIES, GnIES, IGSP, UT-IGSP,
+and ICP learn from interventional data, alone or mixed with observational data, and are benchmarked
+on interventions simulated by `andrey.data`, data with a known answer. Next, data pooled across
+domains: FCI-JCI, BOSS-FCI, GRaSP-FCI, J-PCMCI+ for time series, and a domain index for the
+score-based and permutation searches, with Sachs's nine conditions as a real test set.
 
 ## 3. Local causal discovery
 
