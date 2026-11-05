@@ -490,6 +490,8 @@ SERIES_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "varma_lingam_paper": ((3, 300), (5, 300)),
     "dynotears_paper": ((10, 500), (20, 500)),
 }
+#: DYNOTEARS at the paper's settings for 500 steps, the benchmark driver's ``n500``.
+DYNOTEARS = AndreyDYNOTEARS("dynotears", lambda1=0.05, w_threshold=0.3, lag_threshold=0.1)
 #: ``(d, n, m)`` of the longitudinal LiNGAM panel: variables, time points, and units.
 PANEL_MODEL = "panel2013"
 PANEL_SIZES: tuple[tuple[int, int, int], ...] = ((3, 20, 200), (5, 20, 500))
@@ -815,7 +817,7 @@ SUPPORTED: dict[str, Method] = {
         _granger, "lagged_edges", tuple(f"var2_lagged_d{d}_n{n}" for d, n in GRANGER_SIZES)
     ),
     "DYNOTEARS": Method(
-        _adapted(AndreyDYNOTEARS("dynotears", lambda1=0.05, w_threshold=0.3, lag_threshold=0.1)),
+        _adapted(DYNOTEARS),
         "window_edges",
         _series("dynotears_paper"),
     ),

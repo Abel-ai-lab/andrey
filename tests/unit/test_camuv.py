@@ -43,6 +43,11 @@ def test_the_fork_is_found(fork_fit):
     assert _edges(fork_fit, "circle") == {(0, 1)}
 
 
+def test_a_larger_alpha_marks_more_pairs(fork_fit):
+    """A pair is marked when the test finds its residuals dependent at a p-value below ``alpha``."""
+    assert _edges(andrey.camuv(_fork(), alpha=0.3), "circle") > _edges(fork_fit, "circle")
+
+
 def test_rescaling_a_column_changes_nothing(fork_fit):
     out = andrey.camuv(_fork() * np.array([1e-4, 3.7, 2e3, 0.02]))
     assert out.structure == fork_fit.structure

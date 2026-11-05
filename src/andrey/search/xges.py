@@ -7,8 +7,7 @@ forbids re-inserting the deleted edge, reruns the base search, and keeps lower-s
 
 :class:`_Search` keeps candidates in a priority queue per operator type. A popped operator is
 dropped when it no longer applies to the current CPDAG. After a move, only the operators it can
-affect are rescored, and the CPDAG is completed locally. The update rules and the local completion
-follow the authors' reference implementation.
+affect are rescored, and the CPDAG is completed locally.
 
 Scores are deltas of the deviance the local score minimizes; a negative delta improves it. Insert
 deltas come from :func:`~andrey.core.score_delta.add_deltas` under the BIC, which scores every

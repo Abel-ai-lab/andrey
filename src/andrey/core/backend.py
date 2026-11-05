@@ -130,10 +130,11 @@ class _Config:
     runtime-startup requirements and a compatible GPU is available; otherwise it uses ``"numpy"``.
     ``"numpy"`` uses NumPy on the CPU in float64. The ``torch`` extra provides ``"cpu"`` for
     PyTorch on the CPU, ``"cuda"`` for a CUDA-compatible GPU, and ``"mps"`` for an Apple GPU in
-    unvalidated float32. ``"none"`` means ``"cpu"`` and ``"metal"`` means ``"mps"``. An explicit
-    choice bypasses the size and startup requirements. An operation without the requested backend
-    uses ``"auto"``; a supported but unavailable backend also warns once with
-    ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise ``ValueError``.
+    float32; Apple GPUs are not supported in the alpha. ``"none"`` means ``"cpu"`` and ``"metal"``
+    means ``"mps"``. An explicit choice bypasses the size and startup requirements. An operation
+    without the requested backend uses ``"auto"``; a supported but unavailable backend also warns
+    once with ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise
+    ``ValueError``.
 
     ``n_jobs`` counts worker processes (threads for ``pnl``): ``-1`` uses every usable
     core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many

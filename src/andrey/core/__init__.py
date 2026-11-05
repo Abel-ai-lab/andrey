@@ -2,8 +2,9 @@
 
 The method-agnostic building blocks shared across algorithm families: the first-class ``Structure``
 (an ABC with concrete ``GraphStructure`` / ``TemporalStructure`` subclasses) backed by one canonical
-compact CSR store, and the ``StructureOutput`` run envelope that every algorithm returns. The
-CI-test and score protocols live in ``andrey.core.ci`` and ``andrey.core.score``.
+compact CSR store, and the ``StructureOutput`` run envelope that every algorithm returns
+(``multi_group_direct_lingam``, one per group). The CI-test and score protocols live in
+``andrey.core.ci`` and ``andrey.core.score``.
 
 The statistical primitives (``cov`` / ``corrcoef`` / ``entropy``) live in ``andrey.core.stats``; the
 shared backend-selection layer they dispatch through is ``andrey.core.backend``. Both stay off

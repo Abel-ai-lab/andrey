@@ -99,8 +99,9 @@ def test_mpl_use_and_cmap_when_available() -> None:
     matplotlib = pytest.importorskip("matplotlib")
     from andrey.viz import mpl
 
-    mpl.use()
-    assert matplotlib.rcParams["axes.prop_cycle"].by_key()["color"][0] == "#3b5bdb"
+    with matplotlib.rc_context():
+        mpl.use()
+        assert matplotlib.rcParams["axes.prop_cycle"].by_key()["color"][0] == "#3b5bdb"
     assert mpl.cmap().name == "andrey"
     assert mpl.cmap(dark=True).name == "andrey-dark"
 
@@ -384,8 +385,10 @@ def test_mpl_context_scopes_the_style() -> None:
     matplotlib = pytest.importorskip("matplotlib")
     from andrey.viz import mpl
 
+    before = matplotlib.rcParams["axes.prop_cycle"]
     with mpl.context(dark=True):
         assert matplotlib.rcParams["axes.prop_cycle"].by_key()["color"][0] == "#6e86f5"
+    assert matplotlib.rcParams["axes.prop_cycle"] == before
 
 
 def _chain(n: int, **kw) -> GraphStructure:

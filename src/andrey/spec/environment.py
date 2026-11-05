@@ -23,9 +23,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         effect=(
             "Compute backend preference. `auto` uses `cuda` above an operation's size threshold, "
             "else numpy; it never selects `cpu` or `mps`. `numpy` forces plain NumPy in float64 "
-            "(the reference results); `cpu` runs torch on the CPU; `mps` runs unvalidated float32 "
-            "kernels on Apple Metal. An unavailable backend warns once and falls back. "
-            "`ANDREY_DEVICE` is an alias."
+            "(the reference results); `cpu` runs torch on the CPU; `mps` runs torch on an Apple "
+            "GPU in float32, and Apple GPUs are not supported in the alpha. An unavailable "
+            "backend warns once and falls back. `ANDREY_DEVICE` is an alias."
         ),
         group="backend",
     ),

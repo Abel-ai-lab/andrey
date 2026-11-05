@@ -240,6 +240,11 @@ def test_non_gaussian_noise_finite_and_centered(noise_name):
     assert np.all(np.isfinite(ds.data))
     # Every noise family is normalized to ~unit variance, so column spreads stay well-scaled.
     assert 0.5 < np.median(ds.data.std(axis=0)) < 20
+    # Unit-variance draws: a column's mean over n rows has standard error 1 / sqrt(n), and 5 of
+    # them is far below the means of uncentered exponential (1) or Gumbel (0.45) noise.
+    n = 4000
+    draws = getattr(data.noise, noise_name)().draw(n, np.ones(20), np.random.default_rng(0))
+    assert np.abs(draws.mean(axis=0)).max() < 5 / np.sqrt(n)
 
 
 def test_positive_weights_are_the_signed_weights_in_absolute_value():

@@ -58,6 +58,15 @@ def test_the_chain_is_found(chain_fit):
         assert _edges(_fit(_chain())) == {(0, 1), (1, 2)}
 
 
+def test_alpha_sets_which_parents_go_and_not_the_order(chain_fit):
+    """A parent goes when the residual without it tests independent at a p-value above ``alpha``,
+    so a smaller level drops more parents and a larger one keeps more; the order does not read
+    it."""
+    strict, loose = _fit(_chain(), alpha=1e-6), _fit(_chain(), alpha=0.9)
+    assert _edges(strict) < _edges(chain_fit) < _edges(loose)
+    assert strict.ordering == loose.ordering == chain_fit.ordering
+
+
 def test_rescaling_a_column_changes_neither_the_graph_nor_the_order(chain_fit):
     out = _fit(_chain() * np.array([1e-4, 3.7, 2e3]))
     assert out.structure == chain_fit.structure

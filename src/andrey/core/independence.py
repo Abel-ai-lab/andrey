@@ -310,11 +310,10 @@ def hsic_gamma_from_grams(
     gamma function, whose resolution ends near ``1e-16``. A larger p-value means more independent.
 
     ``variance="bias_corrected"`` estimates the variance from the joint products
-    ``(Kxc * Kyc / 6)^2``, less their diagonal, as the reference code of Gretton et al. (2007) does;
-    ``"product"`` uses the variance's product form in that paper,
-    ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's ``sum(Kc^2) / (n - 1)^2``,
-    the RESIT paper's; a gram that carries its sum of squares as a third element has it read rather
-    than summed again.
+    ``(Kxc * Kyc / 6)^2``, less their diagonal; ``"product"`` uses the variance's product form in
+    Gretton et al. (2007), ``2 (n - 4)(n - 5) / (n (n - 1)(n - 2)(n - 3))`` times each gram's
+    ``sum(Kc^2) / (n - 1)^2``, the RESIT paper's; a gram that carries its sum of squares as a third
+    element has it read rather than summed again.
     """
     statistic, shape, x = _gamma_arguments(gram_x, gram_y, n, variance)
     return float(statistic), float(1.0 - gammainc(shape, x))

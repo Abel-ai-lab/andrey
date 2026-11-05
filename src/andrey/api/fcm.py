@@ -124,10 +124,12 @@ def cam(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
         a column of fewer than 3 distinct values, or a column that repeats another up to scale and
         shift, each named in the message. Also if ``knowledge`` names a column ``data`` lacks or
@@ -199,37 +201,31 @@ def cam(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On additive-noise data with Gaussian or Gumbel noise, 10 to 100 variables, and
-    1,000 rows, standardized and not (the 0.13.0 release card), it tied the paper's reference
-    implementation on errors in 14 of 16 settings and made fewer in 2, returned the same graph on
-    278 of 320 datasets, and fit 6.5 to 14.7 times faster on one core. The reference implementation
-    caps a variable's parents at the smaller of the variables minus one and the rows over 20, 50 at
-    1,000 rows, which binds at 100 variables, where ``max_parents`` sets none by default. The
-    numbers below were measured on simulated data with 1,000 rows from Erdos-Renyi graphs of mean
-    degree 2 with standardized columns, ten graphs at 20 and at 100 variables, on one core. On
-    additive-noise data with Gaussian noise it oriented 88.5% to 95% of the true edges correctly at
-    20 variables, depending on the generator, and 97.5% at 100, with median errors (SHD) of 2 to 2.5
-    and 8 against the empty graph's 20 and 100; with Gumbel noise at 20 variables it reversed 22.5%
-    of them. Location-scale data, whose noise scale changes with the parents, break the model's
-    fixed noise variance: it reversed 42% of the true edges at 20 variables and 32% at 100, with
-    median errors of 11.5 and 55.5. Linear Gaussian data identify only the Markov equivalence class,
-    and there the two directions of an edge fit equally, their gains differing by less than
-    ``1e-6``, so the direction of an edge the class leaves undirected is arbitrary: it reversed 36%
-    of the true edges at 20 variables and 32% at 100, with median errors of 11 and 68. The model has
-    no hidden common causes: with 2 hidden variables among 22, over ten graphs of the Gaussian
-    additive-noise generator, its median errors were 12 against the empty graph's 16, mostly extra
-    edges, and it joined 42 of the 49 pairs of observed variables that share only a hidden cause.
-    Effects that interact are outside the model too: with ``x3`` the product of ``x1`` and ``x2``
-    plus noise, on 1,000 rows and standard normal causes, whose product has no additive part, it
-    found at most one of the two edges into ``x3`` and returned an edge out of ``x3`` in 6 of 10
-    fits; with causes uniform on ``(0, 2)`` it made ``x3`` the cause of both, and added an edge
-    between them, in 8 of 10. On the additive-noise data a fit took a median of 3 s at 20 variables
-    and 21 s at 100, about 40% of it in the neighbor preselection and 55% in the order search. The
-    smoothing of each fit is a local minimum of its GCV score, which can have several, so two edges
-    of nearly equal gain can be added in either order. Binary columns, and any column with fewer
-    than 3 distinct values, are not supported: a smooth term needs at least 3, so such a column
-    raises ``ValueError``. Categorical columns are not modeled: text labels raise ``ValueError``,
-    and integer codes are read as numbers, a smooth function of the code, with a
+    **Limitations.** The numbers below were measured on simulated data with 1,000 rows from
+    Erdos-Renyi graphs of mean degree 2 with standardized columns, ten graphs at 20 and at 100
+    variables, on one core. On additive-noise data with Gaussian noise it oriented 88.5% to 95% of
+    the true edges correctly at 20 variables, depending on the generator, and 97.5% at 100, with
+    median errors (SHD) of 2 to 2.5 and 8 against the empty graph's 20 and 100; with Gumbel noise at
+    20 variables it reversed 22.5% of them. Location-scale data, whose noise scale changes with the
+    parents, break the model's fixed noise variance: it reversed 42% of the true edges at 20
+    variables and 32% at 100, with median errors of 11.5 and 55.5. Linear Gaussian data identify
+    only the Markov equivalence class, and there the two directions of an edge fit equally, their
+    gains differing by less than ``1e-6``, so the direction of an edge the class leaves undirected
+    is arbitrary: it reversed 36% of the true edges at 20 variables and 32% at 100, with median
+    errors of 11 and 68. The model has no hidden common causes: with 2 hidden variables among 22,
+    over ten graphs of the Gaussian additive-noise generator, its median errors were 12 against the
+    empty graph's 16, mostly extra edges, and it joined 42 of the 49 pairs of observed variables
+    that share only a hidden cause. Effects that interact are outside the model too: with ``x3`` the
+    product of ``x1`` and ``x2`` plus noise, on 1,000 rows and standard normal causes, whose product
+    has no additive part, it found at most one of the two edges into ``x3`` and returned an edge out
+    of ``x3`` in 6 of 10 fits; with causes uniform on ``(0, 2)`` it made ``x3`` the cause of both,
+    and added an edge between them, in 8 of 10. On the additive-noise data a fit took a median of 3
+    s at 20 variables and 21 s at 100, about 40% of it in the neighbor preselection and 55% in the
+    order search. The smoothing of each fit is a local minimum of its GCV score, which can have
+    several, so two edges of nearly equal gain can be added in either order. Binary columns, and any
+    column with fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so
+    such a column raises ``ValueError``. Categorical columns are not modeled: text labels raise
+    ``ValueError``, and integer codes are read as numbers, a smooth function of the code, with a
     :class:`~andrey.DataTypeWarning`. The numbers are a reference, not a hard limit: they change
     with the data generator, the density, the method's settings, and the machine.
 
@@ -389,10 +385,12 @@ def resit(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or
         fewer than twice as many rows as columns, or with a constant column, a column of fewer than
         3 distinct values, or a column that repeats another up to scale and shift, each named in
@@ -458,55 +456,48 @@ def resit(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On additive-noise data with Gaussian or Gumbel noise, 5 to 20 variables, and
-    1,000 rows, standardized and not (the 0.13.0 release card), it tied the paper's reference
-    implementation on errors in 12 of 12 settings, one of them after a rerun on fresh datasets,
-    returned the same graph on 87 of 220 datasets, and fit 3.2 to 4.6 times faster on one core;
-    against an implementation that regresses with random forests it made fewer errors in 11 of 12
-    settings and tied in the other, and fit 2.1 to 2.9 times faster. The accuracy claim holds
-    up to 10 variables: at 20 variables, on Gaussian additive-noise data, no implementation clearly
-    beats the empty graph (mean errors of 19.4 for this fit and 20.2 for the reference
-    implementation against 20.0), so 20 variables is a range for speed. The edge removal tries a
-    variable's parents one at a time and the paper's algorithm fixes no order, so the order is
-    arbitrary and can move a graph by about one edge: over 40 datasets of 10 variables, 48 orders
-    moved the mean errors (SHD) from 0.8 below to 0.8 above the column order's, and returned its
-    graph on 9 to 17 of the 40. Binary columns, and any column with fewer than 3 distinct values,
-    are not supported: every regression fits a smooth term of each parent, and such a column raises
-    ``ValueError`` before the fit. Measured on simulated additive-noise data with 1,000 rows from
-    Erdos-Renyi graphs of mean degree 2 with standardized columns, on one core. It oriented 88% of
-    the true edges correctly at 5 variables and 80% at 10, with median errors (SHD) of 1 and 5
-    against the empty graph's 5 and 10. From 20 variables its median errors on these data come near
-    the empty graph's or exceed them, 18 against 20 at 20 variables, 31 against 30 at 30, and 91
-    against 50 at 50: each test of the causal order reads all the remaining variables at once and
-    loses power, and an early wrong sink carries through the rest of the order. At 20 variables,
-    over ten graphs per generator, it oriented 65.5% to 78% of the true edges correctly on four
-    additive-noise generators, the most with Gumbel noise, with median errors of 18 to 19.5 against
-    the empty graph's 20; it oriented 46% on linear Gaussian data and 28% on location-scale data,
-    whose noise scale changes with the parents. A fit took a median of 1.5 s at 5 variables, 45 s at
-    20, 3.3 minutes at 30, and 21 minutes at 50. The causal order fits about ``d^2 / 2`` additive
-    models of up to ``d - 1`` terms; their cost grows with the terms up to about 35, past which each
-    term's basis shrinks to keep three rows per basis function, so a fit's cost grows about as
-    ``d^3.3`` up to 50 variables and as ``d^2`` beyond. A fit passes about a minute near 20
-    variables, 10 minutes near 40, and an hour near 75; at 100 variables, a fit stopped after an
-    hour had run 3,565 of the 5,049 tests of its causal order, and the measured cost per test puts
-    the whole fit near two hours. Its accuracy ends sooner: over five graphs per size, its median
-    errors are at most half the empty graph's up to 10 variables and 73% or more of it from 12
-    variables. Each HSIC test builds matrices with one row and one column per sample, so time and
-    memory grow with the square of ``n_samples``: at 5 variables a fit took 1.7 s and peaked at 0.17
-    GB with 1,000 rows, 25 s and 0.75 GB with 4,000, and 107 s and 2.6 GB with 8,000; on Sachs's
-    7,466 rows and 11 variables it took 6.7 minutes and 2.3 GB, and kept all 55 possible edges, as
-    every removal test rejected. The edge removal tests each parent against all the variable's
-    predecessors at once, and many of those p-values lie near ``alpha``, so the order the parents
-    are tried in changes the result: trying them in the data's column order instead of by rank gave
-    the same causal orders at 20 variables but graphs a median of 10 to 19.5 edges apart, at about
-    the same accuracy. A cause with a long tail can reverse its edge: with a lognormal cause of
-    log-sd 3 and an effect of its logarithm plus noise, on 500 rows, the true order came out in 0 of
-    5 fits, against 5 of 5 at log-sd 1 and 2; replacing the cause by its ranks before the fit gave 5
-    of 5 at every log-sd, while its logarithm, which makes that pair linear and Gaussian, did not.
-    The smoothing of each fit is a local minimum of its GCV score, which can have several, so two
-    variables of nearly equal p-value can be taken as the sink in either order. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Its accuracy holds up to 10 variables: at 20 variables, on Gaussian
+    additive-noise data with 1,000 rows, its mean errors were 19.4 against the empty graph's 20.0,
+    not clearly fewer. The edge removal tries a variable's parents one at a time and the paper's
+    algorithm fixes no order, so the order is arbitrary and can move a graph by about one edge: over
+    40 datasets of 10 variables, 48 orders moved the mean errors (SHD) from 0.8 below to 0.8 above
+    the column order's, and returned its graph on 9 to 17 of the 40. Binary columns, and any column
+    with fewer than 3 distinct values, are not supported: every regression fits a smooth term of
+    each parent, and such a column raises ``ValueError`` before the fit. Measured on simulated
+    additive-noise data with 1,000 rows from Erdos-Renyi graphs of mean degree 2 with standardized
+    columns, on one core. It oriented 88% of the true edges correctly at 5 variables and 80% at 10,
+    with median errors (SHD) of 1 and 5 against the empty graph's 5 and 10. From 20 variables its
+    median errors on these data come near the empty graph's or exceed them, 18 against 20 at 20
+    variables, 31 against 30 at 30, and 91 against 50 at 50: each test of the causal order reads all
+    the remaining variables at once and loses power, and an early wrong sink carries through the
+    rest of the order. At 20 variables, over ten graphs per generator, it oriented 65.5% to 78% of
+    the true edges correctly on four additive-noise generators, the most with Gumbel noise, with
+    median errors of 18 to 19.5 against the empty graph's 20; it oriented 46% on linear Gaussian
+    data and 28% on location-scale data, whose noise scale changes with the parents. A fit took a
+    median of 1.5 s at 5 variables, 45 s at 20, 3.3 minutes at 30, and 21 minutes at 50. The causal
+    order fits about ``d^2 / 2`` additive models of up to ``d - 1`` terms; their cost grows with the
+    terms up to about 35, past which each term's basis shrinks to keep three rows per basis
+    function, so a fit's cost grows about as ``d^3.3`` up to 50 variables and as ``d^2`` beyond. A
+    fit passes about a minute near 20 variables, 10 minutes near 40, and an hour near 75; at 100
+    variables, a fit stopped after an hour had run 3,565 of the 5,049 tests of its causal order, and
+    the measured cost per test puts the whole fit near two hours. Its accuracy ends sooner: over
+    five graphs per size, its median errors are at most half the empty graph's up to 10 variables
+    and 73% or more of it from 12 variables. Each HSIC test builds matrices with one row and one
+    column per sample, so time and memory grow with the square of ``n_samples``: at 5 variables a
+    fit took 1.7 s and peaked at 0.17 GB with 1,000 rows, 25 s and 0.75 GB with 4,000, and 107 s and
+    2.6 GB with 8,000; on Sachs's 7,466 rows and 11 variables it took 6.7 minutes and 2.3 GB, and
+    kept all 55 possible edges, as every removal test rejected. The edge removal tests each parent
+    against all the variable's predecessors at once, and many of those p-values lie near ``alpha``,
+    so the order the parents are tried in changes the result: trying them in the data's column order
+    instead of by rank gave the same causal orders at 20 variables but graphs a median of 10 to 19.5
+    edges apart, at about the same accuracy. A cause with a long tail can reverse its edge: with a
+    lognormal cause of log-sd 3 and an effect of its logarithm plus noise, on 500 rows, the true
+    order came out in 0 of 5 fits, against 5 of 5 at log-sd 1 and 2; replacing the cause by its
+    ranks before the fit gave 5 of 5 at every log-sd, while its logarithm, which makes that pair
+    linear and Gaussian, did not. The smoothing of each fit is a local minimum of its GCV score,
+    which can have several, so two variables of nearly equal p-value can be taken as the sink in
+    either order. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -614,10 +605,12 @@ def camuv(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or
         fewer than twice as many rows as columns, or with a constant column, a column of fewer than
         3 distinct values, a column that repeats another up to scale and shift, or a column that is
@@ -644,16 +637,15 @@ def camuv(
     **When to use.** CAM-UV suits i.i.d. continuous observational data whose effects are nonlinear
     and additive in the causes, with independent noise of any distribution, where any number of
     causes may be unmeasured, none included [1]_; with none unmeasured every ``o-o`` pair it marks
-    is false. With one node in five hidden among 4 to 12 observed variables its directed edges, like
-    those of the reference implementations, were no better than the empty graph's (**Limitations**).
-    Its kernel independence tests compare every pair of rows, and its search tests sets of up to
-    ``max_depth + 1`` variables, so it suits a moderate number of variables and rows. It returns a
-    PAG: ``i -> j`` for a direct cause and ``i o-o j`` for a pair that shares a hidden common cause
-    or of which one causes the other through a hidden variable, which the method does not tell
-    apart. With linear effects, a path through a hidden variable can be regressed away and the pairs
-    are identified differently: use :func:`~andrey.rcd` for non-Gaussian noise and
-    :func:`~andrey.fci` for Gaussian noise. Without hidden variables, :func:`~andrey.cam` and
-    :func:`~andrey.resit` also give a causal order.
+    is false. With one node in five hidden among 4 to 12 observed variables its directed edges were
+    no better than the empty graph's (**Limitations**). Its kernel independence tests compare every
+    pair of rows, and its search tests sets of up to ``max_depth + 1`` variables, so it suits a
+    moderate number of variables and rows. It returns a PAG: ``i -> j`` for a direct cause and
+    ``i o-o j`` for a pair that shares a hidden common cause or of which one causes the other
+    through a hidden variable, which the method does not tell apart. With linear effects, a path
+    through a hidden variable can be regressed away and the pairs are identified differently: use
+    :func:`~andrey.rcd` for non-Gaussian noise and :func:`~andrey.fci` for Gaussian noise. Without
+    hidden variables, :func:`~andrey.cam` and :func:`~andrey.resit` also give a causal order.
 
     **The steps.** Every pair of variables is first tested for dependence; then come the paper's
     three steps, with its settings [1]_:
@@ -673,15 +665,15 @@ def camuv(
     3. *Hidden paths.* A dependent pair with no edge whose residuals, each on its parents, are
        dependent at a p-value below ``alpha`` is marked ``o-o``.
 
-    The two dependence screens come from the authors' implementation, not from the paper's
-    algorithm, which tests every member of a set and every pair. Under the model they add no
-    conclusion: two independent variables share no noise, so their residuals are independent too,
-    and neither a sink test nor step 3 would accept them. With tests at ``alpha`` they skip most
-    sink tests: on 40 simulated datasets of 20 observed variables and 1,000 rows from Erdos-Renyi
-    graphs of mean degree 2, ten each with nonlinear additive effects and 2, 4, or no hidden
-    variables and ten with linear Gaussian effects and none, a fit ran 12 times faster with them,
-    and its directed errors were lower on 34 of the 40 and higher on 1. A parent whose dependence
-    the test misses, such as a weak parent beside a strong one, is not found.
+    The two dependence screens are not part of the paper's algorithm, which tests every member of a
+    set and every pair. Under the model they add no conclusion: two independent variables share no
+    noise, so their residuals are independent too, and neither a sink test nor step 3 would accept
+    them. With tests at ``alpha`` they skip most sink tests: on 40 simulated datasets of 20 observed
+    variables and 1,000 rows from Erdos-Renyi graphs of mean degree 2, ten each with nonlinear
+    additive effects and 2, 4, or no hidden variables and ten with linear Gaussian effects and none,
+    a fit ran 12 times faster with them, and its directed errors were lower on 34 of the 40 and
+    higher on 1. A parent whose dependence the test misses, such as a weak parent beside a strong
+    one, is not found.
 
     The paper does not say what to do when the parents form a directed cycle, which its model rules
     out and failed tests can leave: every edge on a directed cycle is dropped, except a required
@@ -724,48 +716,37 @@ def camuv(
     **Limitations.** Binary columns, and any column with fewer than 3 distinct values, are not
     supported: every regression fits a smooth term of each regressor, and such a column raises
     ``ValueError`` before the fit. Integer category codes are read as numbers, with a
-    :class:`~andrey.DataTypeWarning`. Measured on one core against the two reference implementations
-    of CAM-UV, each run with sets of up to 3 variables, the paper's setting, and the one whose
-    default is 2 also at that default; 20 graphs per size, in 9 settings of the method's model
-    class: additive-noise data with effects ``w (z + sin z)`` and Gaussian noise from Erdos-Renyi
-    graphs of mean degree 2, with one node in five hidden, chosen among those with two or more
-    children, at 5 to 15 nodes and 2,000 rows; the same data with one hidden variable per ten
-    observed ones, at 10 to 50 observed variables and 1,000 rows; the same data with none hidden, at
-    20 variables and 1,000 rows; and the paper's simulation, 10 observed variables, 2 hidden common
-    causes, and 2 hidden intermediates, at 500 and 1,000 rows [1]_. Errors count the directed edges
-    against the edges between observed variables that no unobserved causal or backdoor path joins.
-    It ties the reference implementations in all 9 settings, each 95% interval of the paired
-    difference including zero once replicated, and ran 2.1 to 3.1 times faster than the faster of
-    the two and 7.4 to 13.5 times faster than the other with sets of up to 3, and 1.9 to 3.2 times
-    faster than the faster one at its default. With one node in five hidden, no implementation, this
-    one or the references, made fewer errors than the empty graph, a weakness of the method rather
-    than of one implementation: at 8 observed variables and 2 hidden this method made 1.50 more
-    errors per graph than the empty graph on seeds 0 to 19, the 95% interval from +0.30 to +2.75,
-    and 1.20 more on seeds 20 to 40 without 31, from -0.20 to +2.60, and the reference
-    implementations 1.85 to 1.90 and 1.20 to 1.30 more; over the 40 graphs it made 1.35 more, from
-    +0.40 to +2.30, and the reference implementations 1.53 to 1.58 more. With one hidden
-    variable per ten observed ones its errors were about the empty graph's at 10 observed variables
-    and 68% and 70% of them at 20 and 50; on the paper's simulation they were 59% to 79% of them. At
-    50 observed variables it marked more pairs ``o-o`` than the reference implementations, 336
-    against 237 and 228, finding more of the pairs a hidden variable joins, at a precision the 95%
-    interval does not tell apart from theirs. With none hidden, on 20 graphs of 20 variables, it
-    made 11.55 errors per graph against 10.25 and 10.85 and the empty graph's 20.0, each interval of
-    the difference from the reference implementations including zero, and marked 71 pairs against 64
-    and 68, each a false mark. With linear effects, Gaussian noise, and one hidden variable per ten
-    observed ones, on ten graphs of 20 observed variables, it made 21.9 errors per graph against the
-    empty graph's 14.8, the 95% interval of the difference from 5.5 to 9.1, and the reference
-    implementations 24.3 and 25.7. Separate checks, on fewer graphs: with one hidden variable per
-    ten observed ones, scored by the SHD against the true graph's edges between observed variables,
-    its errors rose back toward the empty graph's from 70 observed variables, to 96% of them at 300
-    over eight graphs and 317 against 315 at 400 on one graph. Each sink test reads the candidates
-    found before it, so the order the sets are visited in changes the result: on the 40 datasets of
-    **The steps**, visiting them in the data's column order instead of by rank gave graphs a median
-    of 6 to 16.5 pairs apart, at about the same accuracy. A cause with a long tail loses its edge:
-    with a lognormal cause of log-sd 2 or 3 and an effect of its logarithm plus noise, on 500 rows,
-    it marked the pair ``o-o`` in 10 of 10 fits, and replacing the cause by its ranks found the edge
-    in 9 of them. One value of 1e6 in the middle variable of a nonlinear chain of 800 rows turned
-    both of its edges into ``o-o`` marks in 5 of 5 fits. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    :class:`~andrey.DataTypeWarning`. Measured on one core with sets of up to 3 variables, the
+    paper's setting, 20 graphs per size, in 9 settings of the method's model class: additive-noise
+    data with effects ``w (z + sin z)`` and Gaussian noise from Erdos-Renyi graphs of mean degree 2,
+    with one node in five hidden, chosen among those with two or more children, at 5 to 15 nodes and
+    2,000 rows; the same data with one hidden variable per ten observed ones, at 10 to 50 observed
+    variables and 1,000 rows; the same data with none hidden, at 20 variables and 1,000 rows; and
+    the paper's simulation, 10 observed variables, 2 hidden common causes, and 2 hidden
+    intermediates, at 500 and 1,000 rows [1]_. Errors count the directed edges against the edges
+    between observed variables that no unobserved causal or backdoor path joins. With one node in
+    five hidden, it made no fewer errors than the empty graph: at 8 observed variables and 2 hidden
+    it made 1.50 more errors per graph than the empty graph on seeds 0 to 19, the 95% interval from
+    +0.30 to +2.75, and 1.20 more on seeds 20 to 40 without 31, from -0.20 to +2.60; over the 40
+    graphs it made 1.35 more, from +0.40 to +2.30. With one hidden variable per ten observed ones
+    its errors were about the empty graph's at 10 observed variables and 68% and 70% of them at 20
+    and 50; on the paper's simulation they were 59% to 79% of them. With none hidden, on 20 graphs
+    of 20 variables, it made 11.55 errors per graph against the empty graph's 20.0, and marked 71
+    pairs ``o-o``, each a false mark. With linear effects, Gaussian noise, and one hidden variable
+    per ten observed ones, on ten graphs of 20 observed variables, it made 21.9 errors per graph
+    against the empty graph's 14.8, the 95% interval of the difference from 5.5 to 9.1. Separate
+    checks, on fewer graphs: with one hidden variable per ten observed ones, scored by the SHD
+    against the true graph's edges between observed variables, its errors rose back toward the empty
+    graph's from 70 observed variables, to 96% of them at 300 over eight graphs and 317 against 315
+    at 400 on one graph. Each sink test reads the candidates found before it, so the order the sets
+    are visited in changes the result: on the 40 datasets of **The steps**, visiting them in the
+    data's column order instead of by rank gave graphs a median of 6 to 16.5 pairs apart, at about
+    the same accuracy. A cause with a long tail loses its edge: with a lognormal cause of log-sd 2
+    or 3 and an effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in 10 of
+    10 fits, and replacing the cause by its ranks found the edge in 9 of them. One value of 1e6 in
+    the middle variable of a nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks
+    in 5 of 5 fits. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     **Large graphs and many rows.** With one hidden variable per ten observed ones, a fit took 16 s
     at 20 observed variables and 91 s at 50, and its cost grows about as ``d^2``: in the separate

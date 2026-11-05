@@ -251,6 +251,19 @@ def test_public_core_methods_document_their_parameters(cls_name):
             )
 
 
+@pytest.mark.parametrize("cls_name", ["SCM", "CausalDataset"])
+def test_public_data_classes_document_every_field(cls_name):
+    """A simulated model or dataset is built from its fields, so its ``Parameters`` section names
+    each one, in order."""
+    import dataclasses
+
+    import andrey.data as data
+
+    cls = getattr(data, cls_name)
+    fields = [f.name for f in dataclasses.fields(cls)]
+    assert _docstring_param_names(inspect.getdoc(cls) or "") == fields
+
+
 def test_cmd_run_wires_every_input_flag():
     """Every `_INPUT_FLAGS` entry is an actual `cmd_run` option, so an input added to the registry
     and `_INPUT_FLAGS` but not to `cmd_run` fails here instead of being unreachable at runtime."""

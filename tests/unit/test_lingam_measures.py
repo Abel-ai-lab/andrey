@@ -160,14 +160,40 @@ def test_precedence_is_kept(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NEW)
 def test_every_ordering_method_takes_the_measure(name: str) -> None:
-    """DirectLiNGAM, its multi-group form, and the two temporal LiNGAMs run with the measure."""
+    """DirectLiNGAM and its multi-group form run with the measure."""
     x = _chain(_exponential, 4000, seed=10, d=3)
     assert andrey.direct_lingam(x, measure=name).ordering == (0, 1, 2)
     outs = andrey.multi_group_direct_lingam([x[:2000], x[2000:]], measure=name)
     assert all(o.ordering == (0, 1, 2) for o in outs)
-    assert andrey.varma_lingam(x[:1500], order=(1, 0), measure=name) is not None
-    panel = [x[k * 1000 : (k + 1) * 1000] for k in range(3)]
-    assert andrey.longitudinal_lingam(panel, tau_max=1, measure=name) is not None
+
+
+def _misread_pair(n: int, seed: int, row: int) -> np.ndarray:
+    """``x0 -> x1`` with uniform noise and one row at ``(0.8, 12)``, an outlier that the lag
+    regressions of the temporal LiNGAMs leave in the innovations.
+
+    Uniform noise is sub-Gaussian, which tanh reads backwards (Theorem 1). It is also symmetric, so
+    the skew statistic ``rho E{x0^2 x1 - x0 x1^2}`` is zero but for its sampling error, and the
+    outlier adds about ``-rho x0 x1^2 / n`` to it, so skew reads the pair backwards as well. The
+    nonlinearities of ``"pwling"``'s entropy approximation grow at most linearly, so one row moves
+    it little, and it finds ``x0`` first.
+    """
+    x = _chain(lambda r, s: r.uniform(-1, 1, s), n, seed=seed, d=2)
+    x[row] = (0.8, 12.0)
+    return x
+
+
+@pytest.mark.parametrize("name", _NEW)
+def test_the_temporal_lingams_order_their_innovations_with_the_measure(name: str) -> None:
+    """On a pair that ``"pwling"`` orders and the measure reads backwards, both temporal LiNGAMs
+    give the measure's order."""
+    series = _misread_pair(1500, seed=13, row=700)
+    assert andrey.varma_lingam(series, order=(1, 0)).ordering == (0, 1)
+    assert andrey.varma_lingam(series, order=(1, 0), measure=name).ordering == (1, 0)
+    panel = [_misread_pair(1000, seed=14 + t, row=100 + 200 * t) for t in range(3)]
+    orders = andrey.longitudinal_lingam(panel, tau_max=1).metadata["causal_orders"]
+    assert orders[1:] == [[0, 1], [0, 1]]
+    orders = andrey.longitudinal_lingam(panel, tau_max=1, measure=name).metadata["causal_orders"]
+    assert orders[1:] == [[1, 0], [1, 0]]
 
 
 @pytest.mark.parametrize("fit", [direct.direct_lingam, multi_group.multi_group_direct_lingam])

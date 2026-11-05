@@ -82,10 +82,7 @@ def pc(
         picks from the declared column types: ``"gsq"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. See Notes. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values.
+        values. See **Categorical data.** and **Mixed data.** in Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     collider_order : {"p_value", "column"} or None, default=None
@@ -151,11 +148,13 @@ def pc(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         too few samples for a test or a singular correlation matrix; with ``"chisq"`` or ``"gsq"``,
         if ``data`` holds a value that is not a whole number; or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
@@ -473,11 +472,7 @@ def fci(
         ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None`` picks from
         the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
         some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
-        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -543,11 +538,13 @@ def fci(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         too few samples for a test or a singular correlation matrix, or if ``data`` or
         ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
         ``"student_t"``, also if a column repeats another up to scale and shift, before any test
@@ -801,7 +798,8 @@ def gfci(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
+        raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -890,11 +888,13 @@ def gfci(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if
         ``score_func`` and ``indep_test`` read different data (continuous, categorical, or mixed),
         or if ``data`` or ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the
         BIC score, also if a column repeats another up to scale and shift given more than two rows
@@ -1218,11 +1218,13 @@ def cdnod(
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`, or ``env`` is ``None`` with one table.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``env``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``env``
         is given with each domain's rows apart; if those rows' tables differ in kind or columns,
         or one has no rows or holds ``inf``; if ``env`` does not hold one value per row
         of ``data``, holds ``NaN`` / ``inf`` or a missing label, mixes strings and numbers, or
@@ -1534,10 +1536,12 @@ def icp(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target``
         is ``None`` or names a column ``data`` lacks; if ``data`` is not a 2-D numeric matrix with
         at least two rows, no ``NaN`` or ``inf``, and no constant column; if a column repeats
         another up to scale and shift or, with more rows than columns, is a linear function of

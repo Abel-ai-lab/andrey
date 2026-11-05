@@ -109,8 +109,9 @@ registry. Every facade docstring has, in order:
 - **Extended summary**: a sentence or two on the method, where it helps.
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
-- **Returns**: always `StructureOutput`, naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
-  and the contents of `.metadata`, `.ordering`, and `.weighted_adjacency`.
+- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
+  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, `.ordering`, and
+  `.weighted_adjacency`.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
 - **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
   claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time

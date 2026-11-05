@@ -114,10 +114,12 @@ def direct_lingam(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` is
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is
         not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
         named in the message. Also if it has fewer than ``n_variables + 1`` rows, the fewest with
         which the pruning step can estimate the edge weights. Also if ``knowledge`` names a column
@@ -290,10 +292,12 @@ def ica_lingam(
     RuntimeError
         If no causal order can be read from the FastICA result.
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``data`` has
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has
         fewer than ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the
         edge weights. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
@@ -440,10 +444,12 @@ def multi_group_direct_lingam(
     Raises
     ------
     TypeError
-        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if fewer than
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if fewer than
         two groups are given, if the groups disagree on the variable count or on their column names,
         or if a group is not a usable 2-D matrix or has fewer than ``n_variables + 1`` rows, the
         fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``

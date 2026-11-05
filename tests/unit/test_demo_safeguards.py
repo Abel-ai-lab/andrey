@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import itertools
+import json
 import sys
 import time
 import xml.dom.minidom as minidom
@@ -377,19 +378,34 @@ def test_signed_endpoints_and_weighted_adjacency_preserve_edge_direction():
     )
 
 
-def test_worker_environment_pins_all_numeric_threads():
-    assert workers.THREAD_ENV["OMP_NUM_THREADS"] == "1"
-    assert workers.THREAD_ENV["ANDREY_N_JOBS"] == "1"
-    assert workers.THREAD_ENV["CUDA_VISIBLE_DEVICES"] == ""
-    assert all(
-        workers.THREAD_ENV[name] == "1"
-        for name in (
-            "OPENBLAS_NUM_THREADS",
-            "MKL_NUM_THREADS",
-            "NUMEXPR_NUM_THREADS",
-            "NUMBA_NUM_THREADS",
-        )
+def test_a_worker_runs_on_one_thread_of_the_cpu(monkeypatch):
+    """Whatever the server's environment sets, a worker sees every numerical thread count at 1,
+    Andrey on NumPy and the CPU, and no GPU."""
+    threads = (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+        "NUMBA_NUM_THREADS",
+        "ANDREY_N_JOBS",
     )
+    expected = dict.fromkeys(threads, "1")
+    expected.update(ANDREY_BACKEND="numpy", ANDREY_DEVICE="cpu", CUDA_VISIBLE_DEVICES="")
+    for name in expected:
+        monkeypatch.setenv(name, "8")
+    script = (
+        PROTOCOL
+        + f"seen={{name: os.environ.get(name) for name in {sorted(expected)!r}}}\n"
+        + "emit({'event':'ready','version':json.dumps(seen)})\n"
+        + "sys.stdin.readline()\n"
+    )
+    worker = workers.Worker("test", [sys.executable, "-u", "-c", script])
+    try:
+        worker.start()
+        assert json.loads(worker.version) == expected
+    finally:
+        worker.close()
 
 
 def test_calibration_names_why_the_first_size_failed(monkeypatch, tmp_path):
