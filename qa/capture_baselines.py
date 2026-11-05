@@ -32,7 +32,7 @@ from tests.recovery.helpers.project import project_output
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-# --- Runners mirror the Andrey calls made by the regression tests ------------------
+# --- Runners --------------------------------------------------------------------------------------
 
 
 def _facade(name: str, **kwargs):

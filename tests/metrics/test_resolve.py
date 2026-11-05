@@ -149,7 +149,8 @@ def test_result_is_json_safe(dag_of):
     rich = StructureOutput.new(
         GraphStructure.from_numpy(marks, kind="dag"), ordering=[0, 1], weighted_adjacency=w
     )
-    json.dumps(score(rich, rich), allow_nan=False)  # raises on a NumPy scalar, NaN, or infinity
+    # strict JSON: a NumPy integer or bool, NaN, or infinity raises
+    json.dumps(score(rich, rich), allow_nan=False)
 
 
 # ---- validation ---------------------------------------------------------------------------------

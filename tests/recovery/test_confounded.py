@@ -169,8 +169,8 @@ def _confounded_sem(seed: int, n: int = 250, d: int = 5) -> np.ndarray:
 # --- general-input behavior -----------------------------------------------------------------------
 #
 # Random models check execution, repeatability, shape, and relabel invariance. RCD is invariant
-# bit-for-bit. BottomUpParceLiNGAM preserves its causal order and non-identifiable mask exactly, but
-# column-mean reduction introduces roundoff in its weights, so those use a tolerance.
+# bit-for-bit. BottomUpParceLiNGAM preserves its non-identifiable mask exactly, but column-mean
+# reduction introduces roundoff in its weights, so those use a tolerance.
 
 
 def test_rcd_is_deterministic_and_order_invariant():
@@ -197,7 +197,7 @@ def test_bottom_up_parce_is_deterministic_and_order_invariant():
     """
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam
 
-    for seed in range(6):
+    for seed in (0, 1, 2, 3, 4, 5, 20):  # draw 20 leaves one pair unordered
         x = _confounded_sem(seed)
         first = bottom_up_parce_lingam(x).adjacency_matrix_
         assert first.shape == (x.shape[1], x.shape[1])
