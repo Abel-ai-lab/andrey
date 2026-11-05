@@ -110086,7 +110086,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 450,
+       "mean": -0.29555555555555557,
+       "bootstrap_95": [
+        -0.36,
+        -0.23555555555555555
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 450,
+       "mean": -0.29555555555555557,
+       "bootstrap_95": [
+        -0.36,
+        -0.23555555555555555
+       ]
+      }
+     }
     },
     {
      "d": 6,
@@ -110131,7 +110151,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 550,
+       "mean": -0.26545454545454544,
+       "bootstrap_95": [
+        -0.3054545454545455,
+        -0.22363636363636363
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 550,
+       "mean": -0.26545454545454544,
+       "bootstrap_95": [
+        -0.3054545454545455,
+        -0.22363636363636363
+       ]
+      }
+     }
     },
     {
      "d": 7,
@@ -110176,7 +110216,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 700,
+       "mean": -0.07142857142857142,
+       "bootstrap_95": [
+        -0.09571428571428571,
+        -0.04857142857142857
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 700,
+       "mean": -0.07142857142857142,
+       "bootstrap_95": [
+        -0.09571428571428571,
+        -0.04857142857142857
+       ]
+      }
+     }
     },
     {
      "d": 8,
@@ -110221,7 +110281,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 850,
+       "mean": -0.05764705882352941,
+       "bootstrap_95": [
+        -0.07532352941176469,
+        -0.041176470588235294
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 850,
+       "mean": -0.05764705882352941,
+       "bootstrap_95": [
+        -0.07532352941176469,
+        -0.041176470588235294
+       ]
+      }
+     }
     },
     {
      "d": 9,
@@ -110266,7 +110346,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 600,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 600,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 10,
@@ -110311,7 +110411,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 550,
+       "mean": -0.07818181818181819,
+       "bootstrap_95": [
+        -0.10727272727272727,
+        -0.04727272727272727
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 550,
+       "mean": -0.07818181818181819,
+       "bootstrap_95": [
+        -0.10727272727272727,
+        -0.04727272727272727
+       ]
+      }
+     }
     },
     {
      "d": 11,
@@ -110356,7 +110476,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 850,
+       "mean": -0.13176470588235295,
+       "bootstrap_95": [
+        -0.16,
+        -0.10588235294117647
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 850,
+       "mean": -0.13176470588235295,
+       "bootstrap_95": [
+        -0.16,
+        -0.10588235294117647
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -110401,7 +110541,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 450,
+       "mean": 0.011111111111111112,
+       "bootstrap_95": [
+        0.0,
+        0.028888888888888888
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 450,
+       "mean": 0.011111111111111112,
+       "bootstrap_95": [
+        0.0,
+        0.028888888888888888
+       ]
+      }
+     }
     }
    ]
   },
@@ -110468,7 +110628,27 @@
      ],
      "above_zero": true,
      "verdict": "worse",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 500,
+       "mean": -0.194,
+       "bootstrap_95": [
+        -0.234,
+        -0.156
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 500,
+       "mean": -0.218,
+       "bootstrap_95": [
+        -0.262,
+        -0.176
+       ]
+      }
+     }
     },
     {
      "d": 10,
@@ -110514,7 +110694,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 500,
+       "mean": -0.294,
+       "bootstrap_95": [
+        -0.336,
+        -0.252
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 500,
+       "mean": -0.28,
+       "bootstrap_95": [
+        -0.33,
+        -0.226
+       ]
+      }
+     }
     }
    ]
   },
@@ -110580,7 +110780,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 21,
@@ -110625,7 +110845,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.45,
+       "bootstrap_95": [
+        -0.57,
+        -0.34
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.45,
+       "bootstrap_95": [
+        -0.57,
+        -0.34
+       ]
+      }
+     }
     }
    ]
   },
@@ -110692,7 +110932,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -1.2,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -1.2,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -110738,7 +110998,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.6,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.6,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -110784,7 +111064,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.6,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.6,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 15,
@@ -110830,7 +111130,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     }
     }
    ]
   },
@@ -110896,7 +111216,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.23,
+       "bootstrap_95": [
+        0.15,
+        0.32
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.23,
+       "bootstrap_95": [
+        0.15,
+        0.32
+       ]
+      }
+     }
     },
     {
      "d": 6,
@@ -110941,7 +111281,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 120,
+       "mean": 0.39166666666666666,
+       "bootstrap_95": [
+        0.25,
+        0.5418749999999988
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 120,
+       "mean": 0.39166666666666666,
+       "bootstrap_95": [
+        0.25,
+        0.5418749999999988
+       ]
+      }
+     }
     },
     {
      "d": 7,
@@ -110986,7 +111346,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 220,
+       "mean": 0.4,
+       "bootstrap_95": [
+        0.3,
+        0.509090909090909
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 220,
+       "mean": 0.4,
+       "bootstrap_95": [
+        0.3,
+        0.509090909090909
+       ]
+      }
+     }
     },
     {
      "d": 8,
@@ -111031,7 +111411,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 160,
+       "mean": 0.6,
+       "bootstrap_95": [
+        0.3875,
+        0.8314062499999992
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 160,
+       "mean": 0.6,
+       "bootstrap_95": [
+        0.3875,
+        0.8314062499999992
+       ]
+      }
+     }
     },
     {
      "d": 9,
@@ -111076,7 +111476,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.07,
+       "bootstrap_95": [
+        0.02,
+        0.14
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.07,
+       "bootstrap_95": [
+        0.02,
+        0.14
+       ]
+      }
+     }
     },
     {
      "d": 10,
@@ -111121,7 +111541,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 40,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 40,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 11,
@@ -111166,7 +111606,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 220,
+       "mean": 0.37727272727272726,
+       "bootstrap_95": [
+        0.2590909090909091,
+        0.509090909090909
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 220,
+       "mean": 0.37727272727272726,
+       "bootstrap_95": [
+        0.2590909090909091,
+        0.509090909090909
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -111211,7 +111671,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 140,
+       "mean": 0.06428571428571428,
+       "bootstrap_95": [
+        0.02857142857142857,
+        0.10714285714285714
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 140,
+       "mean": 0.06428571428571428,
+       "bootstrap_95": [
+        0.02857142857142857,
+        0.10714285714285714
+       ]
+      }
+     }
     }
    ]
   },
@@ -111277,7 +111757,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 450,
+       "mean": -0.29777777777777775,
+       "bootstrap_95": [
+        -0.3622222222222222,
+        -0.23555555555555555
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 450,
+       "mean": -0.3022222222222222,
+       "bootstrap_95": [
+        -0.36666666666666664,
+        -0.24
+       ]
+      }
+     }
     },
     {
      "d": 6,
@@ -111322,7 +111822,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 550,
+       "mean": -0.4763636363636364,
+       "bootstrap_95": [
+        -0.5272727272727272,
+        -0.42727272727272725
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 550,
+       "mean": -0.4727272727272727,
+       "bootstrap_95": [
+        -0.5236363636363637,
+        -0.42363636363636364
+       ]
+      }
+     }
     },
     {
      "d": 7,
@@ -111367,7 +111887,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 700,
+       "mean": -0.18,
+       "bootstrap_95": [
+        -0.23714285714285716,
+        -0.12571428571428572
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 700,
+       "mean": -0.1742857142857143,
+       "bootstrap_95": [
+        -0.23142857142857143,
+        -0.12428571428571429
+       ]
+      }
+     }
     },
     {
      "d": 8,
@@ -111412,7 +111952,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 850,
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.12470588235294118,
+        -0.07764705882352942
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 850,
+       "mean": -0.0988235294117647,
+       "bootstrap_95": [
+        -0.12352941176470589,
+        -0.07647058823529412
+       ]
+      }
+     }
     },
     {
      "d": 9,
@@ -111457,7 +112017,27 @@
      ],
      "above_zero": false,
      "verdict": "better",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 600,
+       "mean": -0.07833333333333334,
+       "bootstrap_95": [
+        -0.10666666666666667,
+        -0.05333333333333334
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 600,
+       "mean": -0.06666666666666667,
+       "bootstrap_95": [
+        -0.09,
+        -0.043333333333333335
+       ]
+      }
+     }
     },
     {
      "d": 10,
@@ -111502,7 +112082,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 550,
+       "mean": -0.15636363636363637,
+       "bootstrap_95": [
+        -0.19090909090909092,
+        -0.12545454545454546
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 550,
+       "mean": -0.15272727272727274,
+       "bootstrap_95": [
+        -0.18727272727272729,
+        -0.12181818181818181
+       ]
+      }
+     }
     },
     {
      "d": 11,
@@ -111547,7 +112147,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 850,
+       "mean": -0.19411764705882353,
+       "bootstrap_95": [
+        -0.23529411764705882,
+        -0.15764705882352942
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 850,
+       "mean": -0.19176470588235295,
+       "bootstrap_95": [
+        -0.23297058823529412,
+        -0.15529411764705883
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -111592,7 +112212,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 450,
+       "mean": 0.0044444444444444444,
+       "bootstrap_95": [
+        -0.008888888888888889,
+        0.02
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 450,
+       "mean": 0.0022222222222222222,
+       "bootstrap_95": [
+        -0.011111111111111112,
+        0.02
+       ]
+      }
+     }
     }
    ]
   },
@@ -111659,7 +112299,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 500,
+       "mean": -0.05,
+       "bootstrap_95": [
+        -0.078,
+        -0.022
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 500,
+       "mean": -0.046,
+       "bootstrap_95": [
+        -0.074,
+        -0.018
+       ]
+      }
+     }
     },
     {
      "d": 10,
@@ -111705,7 +112365,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 500,
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.132,
+        -0.066
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 500,
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.132,
+        -0.068
+       ]
+      }
+     }
     }
    ]
   },
@@ -111771,7 +112451,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.03,
+       "bootstrap_95": [
+        0.0,
+        0.09
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.03,
+       "bootstrap_95": [
+        0.0,
+        0.09
+       ]
+      }
+     }
     },
     {
      "d": 21,
@@ -111816,7 +112516,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.56,
+       "bootstrap_95": [
+        -0.71,
+        -0.42
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.56,
+       "bootstrap_95": [
+        -0.71,
+        -0.42
+       ]
+      }
+     }
     }
    ]
   },
@@ -111883,7 +112603,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -1.2,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -1.2,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -111929,7 +112669,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.6,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.6,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 15,
@@ -111975,7 +112735,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 5,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 5,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     }
     }
    ]
   },
@@ -112041,7 +112821,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.3,
+       "bootstrap_95": [
+        0.21,
+        0.39
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.29,
+       "bootstrap_95": [
+        0.2,
+        0.38
+       ]
+      }
+     }
     },
     {
      "d": 6,
@@ -112086,7 +112886,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 120,
+       "mean": -0.125,
+       "bootstrap_95": [
+        -0.19166666666666668,
+        -0.06666666666666667
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 120,
+       "mean": -0.125,
+       "bootstrap_95": [
+        -0.19166666666666668,
+        -0.06666666666666667
+       ]
+      }
+     }
     },
     {
      "d": 7,
@@ -112131,7 +112951,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 220,
+       "mean": 0.09090909090909091,
+       "bootstrap_95": [
+        -0.02727272727272727,
+        0.21818181818181817
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 220,
+       "mean": 0.09545454545454546,
+       "bootstrap_95": [
+        -0.022727272727272728,
+        0.22272727272727272
+       ]
+      }
+     }
     },
     {
      "d": 8,
@@ -112176,7 +113016,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 160,
+       "mean": 0.30625,
+       "bootstrap_95": [
+        0.19984375000000001,
+        0.41875
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 160,
+       "mean": 0.3,
+       "bootstrap_95": [
+        0.19359375,
+        0.4125
+       ]
+      }
+     }
     },
     {
      "d": 9,
@@ -112221,7 +113081,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.04,
+       "bootstrap_95": [
+        0.0,
+        0.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.04,
+       "bootstrap_95": [
+        0.0,
+        0.1
+       ]
+      }
+     }
     },
     {
      "d": 10,
@@ -112266,7 +113146,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 40,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 40,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     }
     },
     {
      "d": 11,
@@ -112311,7 +113211,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 220,
+       "mean": 0.2772727272727273,
+       "bootstrap_95": [
+        0.15,
+        0.42272727272727273
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 220,
+       "mean": 0.2727272727272727,
+       "bootstrap_95": [
+        0.14545454545454545,
+        0.41818181818181815
+       ]
+      }
+     }
     },
     {
      "d": 12,
@@ -112356,7 +113276,27 @@
      ],
      "above_zero": false,
      "verdict": "tie",
-     "complete": true
+     "complete": true,
+     "floor": {
+      "applies": false,
+      "pass": null,
+      "andrey_minus_empty": {
+       "paired": 140,
+       "mean": 0.1,
+       "bootstrap_95": [
+        0.02142857142857143,
+        0.2
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 140,
+       "mean": 0.1,
+       "bootstrap_95": [
+        0.02142857142857143,
+        0.2
+       ]
+      }
+     }
     }
    ]
   },
