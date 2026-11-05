@@ -1164,7 +1164,6 @@ _CONCEPTS = (
                 default="majority",
                 choices=COLLIDER_RULES,
                 fixed_in=None,
-                aliases=("none",),
                 reason="majority is tigramite's default (contemp_collider_rule) and orients the "
                 "same-step links without regard to the order of the variables, where sepsets reads "
                 "the one separating set the skeleton phase stored, which can change with it "

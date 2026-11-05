@@ -50,16 +50,6 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         group="backend",
     ),
     EnvVarSpec(
-        name="ANDREY_NUM_WORKERS",
-        values="same as ANDREY_N_JOBS",
-        default="ANDREY_N_JOBS",
-        effect=(
-            "Former name of `ANDREY_N_JOBS`, read with a `DeprecatedArgumentWarning` when "
-            "`ANDREY_N_JOBS` is unset; it stops being read in the next release."
-        ),
-        group="backend",
-    ),
-    EnvVarSpec(
         name="ANDREY_GES_PARALLEL_MIN_WORK",
         values="integer (estimated candidate evaluations)",
         default=str(_GES_MIN_WORK),

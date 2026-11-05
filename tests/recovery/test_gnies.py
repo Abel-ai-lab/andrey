@@ -4,9 +4,9 @@ The fixed case has one certain answer: a cause whose effect's noise variance cha
 environments gives the directed edge, with the effect as the one target. The ground truth is
 linear-Gaussian data from ``andrey.data`` with an observational environment and three that each
 scale one variable's noise variance, at 10 variables and 10,000 rows per environment: the true
-class and targets on each of the first five seeds the shipped defaults recover (seeds 0-19
-recovered on 19 of 20). The recorded outputs are the marks and targets of three small draws, and
-the graph, score, and targets of the ``gauss_5v_noise_shift`` baseline.
+class and targets on seeds 0-3 and 5, five of the 19 seeds in 0-19 that the shipped defaults
+recover. The recorded outputs are the marks and targets of three small draws, and the graph,
+score, and targets of the ``gauss_5v_noise_shift`` baseline.
 """
 
 from __future__ import annotations
