@@ -5,7 +5,6 @@ The function's docstring describes the procedure and cites it.
 
 from __future__ import annotations
 
-import heapq
 import math
 import warnings
 from collections.abc import Mapping, Sequence
@@ -26,7 +25,7 @@ from .core.ci import make_indep_test
 from .core.ci_missing import rows_metadata, rows_tested
 from .core.output import StructureOutput
 from .core.seeding import resolve_seed
-from .core.structure import GraphStructure
+from .core.structure import GraphStructure, topological_order
 from .core.warning_policy import SampleSizeWarning
 
 #: The rows per table cell below which a categorical test is called sparse (Cochran 1954).
@@ -382,25 +381,10 @@ def _order(dag: GraphStructure, parents: list[list[int]]) -> list[int]:
 
     The columns' order does not change it, only the nodes' labels do.
     """
-    children: list[list[int]] = [[] for _ in parents]
-    waiting = [len(p) for p in parents]
+    adj = np.zeros((dag.n_nodes, dag.n_nodes), dtype=bool)
     for j, ps in enumerate(parents):
-        for i in ps:
-            children[i].append(j)
-    rank: list[Any] = list(dag.labels) if dag.labels is not None else list(range(dag.n_nodes))
-    ready = [(rank[v], v) for v, k in enumerate(waiting) if k == 0]
-    heapq.heapify(ready)
-    order: list[int] = []
-    while ready:
-        _, v = heapq.heappop(ready)
-        order.append(v)
-        for c in children[v]:
-            waiting[c] -= 1
-            if waiting[c] == 0:
-                heapq.heappush(ready, (rank[c], c))
-    if len(order) != dag.n_nodes:
-        raise ValueError("markov_check: the dag has a directed cycle")
-    return order
+        adj[ps, j] = True
+    return topological_order(adj, key=dag.labels, what="markov_check: the dag")
 
 
 def _facts(order: list[int], parents: list[list[int]]) -> list[Fact]:

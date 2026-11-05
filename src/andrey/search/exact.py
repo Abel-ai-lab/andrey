@@ -29,7 +29,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
@@ -45,6 +45,7 @@ from andrey.core.score import (
     make_score,
     penalty_weight,
 )
+from andrey.core.structure import endpoint_marks
 from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`exact_search` accepts.
@@ -490,11 +491,10 @@ def exact_search(
     else:
         structures = _dp_shortest_path(parent_graphs, n_vars, tables)
 
-    adj = np.zeros((n_vars, n_vars), dtype=np.int8)
+    dag = np.zeros((n_vars, n_vars), dtype=bool)
     for child, parents in enumerate(structures):
-        for parent in parents:
-            adj[parent, child] = TAIL  # tail at the parent
-            adj[child, parent] = ARROW  # arrowhead at the child
+        dag[list(parents), child] = True
+    adj = endpoint_marks(dag)
     mask = np.full(n_vars, score_func in DISCRETE_SCORES)
     if score_func in MIXED_SCORES:
         mask = column_mask(categorical, n_vars)

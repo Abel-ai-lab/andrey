@@ -1011,6 +1011,18 @@ def test_the_json_introspection_lists_the_skeleton_cutoff(args, capsys, monkeypa
     assert "andrey calibrate --method skeleton" in skeleton["effect"]
 
 
+def test_the_json_introspection_lists_the_gpu_cutoffs_auto_uses(capsys):
+    """Each GPU cutoff's listed default is the cutoff ``auto`` dispatches on."""
+    from andrey.core.backend import GPU_THRESHOLDS
+
+    code, out, err = _run(["config", "--help", "--json"], capsys)
+    assert code == 0 and not err
+    variables = {v["name"]: v for v in json.loads(out)["environment"]["variables"]}
+    for op, cutoffs in GPU_THRESHOLDS.items():
+        listed = variables[f"ANDREY_{op.upper()}_GPU_THRESHOLD"]["default"]
+        assert listed == f"cuda {cutoffs['cuda']}, mps never"
+
+
 def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     from andrey.core.backend import Backend
 

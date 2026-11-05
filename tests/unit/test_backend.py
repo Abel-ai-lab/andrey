@@ -331,10 +331,10 @@ def test_ges_fit_under_auto_never_imports_torch():
     env.pop("ANDREY_DEVICE", None)
     code = (
         "import sys; import numpy as np; import andrey; "
-        "from andrey.core.stats import _COV_GPU_THRESHOLDS; "
+        "from andrey.core.backend import GPU_THRESHOLDS; "
         # Derive the smallest matrix that clears the current covariance cutoff.
-        "d = 8; n = -(-_COV_GPU_THRESHOLDS['cuda'] // d) + 1; "
-        "assert n * d >= _COV_GPU_THRESHOLDS['cuda'], 'probe no longer clears the cov cutoff'; "
+        "d = 8; n = -(-GPU_THRESHOLDS['cov']['cuda'] // d) + 1; "
+        "assert n * d >= GPU_THRESHOLDS['cov']['cuda'], 'probe no longer clears the cov cutoff'; "
         "X = np.random.default_rng(0).standard_normal((n, d)); "
         "out = andrey.ges(X); "
         "assert out.structure.kind == 'cpdag'; "

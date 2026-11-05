@@ -39,7 +39,11 @@ def dag_extension(
     if not undirected:
         return GraphStructure.from_numpy(first, kind="dag", labels=structure.labels)
     if tie_break is None and seed is None:
-        names = [" -- ".join(map(str, _names(structure, [u, v]))) for u, v in undirected[:_LISTED]]
+        from ._queries import named
+
+        names = [
+            " -- ".join(map(str, named(structure, [u, v], False))) for u, v in undirected[:_LISTED]
+        ]
         more = f" and {len(undirected) - _LISTED} more" if len(undirected) > _LISTED else ""
         raise ValueError(
             f"the {structure.kind} has {len(undirected)} undirected edge(s), "
@@ -254,7 +258,11 @@ def _split(
     selected = _positions(structure, selection, "selection")
     shared = sorted(set(hidden) & set(selected))
     if shared:
-        raise ValueError(f"latent and selection share the node(s) {_names(structure, shared)}")
+        from ._queries import named
+
+        raise ValueError(
+            f"latent and selection share the node(s) {named(structure, shared, False)}"
+        )
     removed = set(hidden) | set(selected)
     observed = [k for k in range(structure.n_nodes) if k not in removed]
     return observed, selected
@@ -282,9 +290,3 @@ def _positions(structure: GraphStructure, nodes: Collection[str | int], what: st
     if len(set(found)) < len(found):
         raise ValueError(f"{what} names a node more than once")
     return found
-
-
-def _names(structure: GraphStructure, positions: list[int]) -> list[str | int]:
-    """Return the labels of ``positions``, or the positions when the graph has no labels."""
-    labels = structure.labels
-    return [labels[k] for k in positions] if labels is not None else list(positions)

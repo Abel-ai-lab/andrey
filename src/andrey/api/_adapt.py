@@ -12,9 +12,9 @@ import numpy as np
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
-from andrey.core.knowledge import column_position
+from andrey.core.knowledge import as_node, column_position
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
-from andrey.core.structure import node_labels, relabel
+from andrey.core.structure import column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
@@ -574,19 +574,7 @@ def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) ->
         )
     mask = np.zeros(d, dtype=bool)
     for item in categorical:
-        if isinstance(item, str) or (
-            isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_))
-        ):
-            mask[
-                column_position(
-                    item if isinstance(item, str) else int(item), labels, d, "categorical"
-                )
-            ] = True
-        else:
-            raise TypeError(
-                "categorical must list column names or 0-based positions, got "
-                f"{type(item).__name__}"
-            )
+        mask[column_position(as_node(item, "categorical"), labels, d, "categorical")] = True
     return mask
 
 
@@ -739,21 +727,6 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
-def column_labels(data: object) -> tuple[str, ...] | None:
-    """Return a DataFrame's column names as node labels; ``None`` for arrays.
-
-    Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
-    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
-    name becomes text, and ``ValueError`` names each label two columns share
-    (:func:`~andrey.core.structure.node_labels`).
-    """
-    columns = getattr(data, "columns", None)
-    if columns is None:
-        return None
-    names = list(columns)
-    return None if names == list(range(len(names))) else node_labels(names)
-
-
 def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     """Name a column position by its label in ``labels``, quoted, or by its number.
 
@@ -763,6 +736,17 @@ def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     if labels is None:
         return str
     return lambda j: repr(labels[j]) if j < len(labels) else str(j)
+
+
+def label_of(labels: tuple[str, ...] | None) -> Callable[[int], str | int]:
+    """Name a column position as metadata names nodes: by its label, or by its number.
+
+    Each position takes its label in ``labels``; without ``labels``, every position keeps its
+    number.
+    """
+    if labels is None:
+        return int
+    return lambda j: labels[j]
 
 
 @contextlib.contextmanager

@@ -9,16 +9,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.output import StructureOutput
-from andrey.core.structure import LATENT, GraphStructure
+from andrey.core.structure import LATENT, GraphStructure, directed_support
 
-from ._common import directed_adjacency
+from ._common import unwrap
 
 
 def _graph(x: object) -> GraphStructure:
     """Unwrap a StructureOutput to its GraphStructure (latent info is in ``node_types``)."""
-    if isinstance(x, StructureOutput):
-        x = x.structure
+    x = unwrap(x)
     if not isinstance(x, GraphStructure):
         raise TypeError("latent metrics need a GraphStructure with node_types")
     return x
@@ -34,7 +32,7 @@ def _clusters(g: GraphStructure) -> dict[int, object]:
     marks = g.to_numpy()
     types = g.node_types
     latent = types == LATENT if types is not None else np.zeros(g.n_nodes, dtype=bool)
-    parents_of = directed_adjacency(marks).T  # parents_of[o] = nodes pointing into o
+    parents_of = directed_support(marks).T  # parents_of[o] = nodes pointing into o
     clusters: dict[int, object] = {}
     for o in np.nonzero(~latent)[0]:
         latent_parents = np.nonzero(parents_of[o] & latent)[0]

@@ -128,7 +128,7 @@ def test_summary_scores_as_a_digraph_including_self_loops():
 
 
 def test_summary_matches_temporal_scores_offdiagonal_and_detects_a_miss():
-    from andrey.metrics._common import directed_adjacency
+    from andrey.core.structure import directed_support
 
     true_t = TemporalStructure.from_lag_graphs(
         [_digraph([(0, 1)], 3), _digraph([(1, 2)], 3)], lags=[1, 2]
@@ -142,10 +142,10 @@ def test_summary_matches_temporal_scores_offdiagonal_and_detects_a_miss():
     # support agrees (no lag-0 here, so no lag-0 delta between the two paths).
     off = ~np.eye(3, dtype=bool)
     for t in (est_t, true_t):
-        via_summary = directed_adjacency(t.summary_graph().to_numpy()) & off
+        via_summary = directed_support(t.summary_graph().to_numpy()) & off
         via_union = np.zeros((3, 3), dtype=bool)
         for lag in t.lags:
-            via_union |= directed_adjacency(t.lag(lag).to_numpy())
+            via_union |= directed_support(t.lag(lag).to_numpy())
         assert np.array_equal(via_summary, via_union & off)
 
 

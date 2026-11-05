@@ -21,8 +21,9 @@ import numpy as np
 import scipy.linalg
 import scipy.optimize
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.orient import to_structure
+from andrey.core.structure import endpoint_marks, has_cycle
 from andrey.core.warning_policy import warn_search_limit
 from andrey.search.hc import tie_ranks
 
@@ -455,24 +456,8 @@ def likelihood_path(
 
 
 # --------------------------------------------------------------------------------------------
-# Threshold, acyclicity repair, and endpoint marks
+# Threshold and acyclicity repair
 # --------------------------------------------------------------------------------------------
-
-
-def has_cycle(support: np.ndarray) -> bool:
-    """True if the directed graph ``support`` (``[i, j]`` is ``i -> j``) has a directed cycle."""
-    d = support.shape[0]
-    indeg = support.sum(axis=0).astype(int)
-    stack = [k for k in range(d) if indeg[k] == 0]
-    visited = 0
-    while stack:
-        node = stack.pop()
-        visited += 1
-        for nxt in np.nonzero(support[node])[0]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                stack.append(int(nxt))
-    return visited < d
 
 
 def break_cycles(
@@ -497,15 +482,6 @@ def break_cycles(
             break
         mask[i, j] = 0
     return mask
-
-
-def endpoint_marks(support: np.ndarray) -> np.ndarray:
-    """Endpoint-mark adjacency for a DAG mask (``support[i, j]`` set means ``i -> j``)."""
-    marks = np.zeros(support.shape, dtype=np.int8)
-    src, dst = np.nonzero(support)
-    marks[dst, src] = ARROW
-    marks[src, dst] = TAIL
-    return marks
 
 
 def residual_variances(weighted: np.ndarray, cov: np.ndarray) -> np.ndarray:

@@ -16,7 +16,7 @@ from collections.abc import Callable, Sequence
 import numpy as np
 import numpy.typing as npt
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
@@ -30,6 +30,7 @@ from andrey.core.score import (
 )
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.seeding import start_rng
+from andrey.core.structure import endpoint_marks
 from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
@@ -976,13 +977,11 @@ def boss(
     assert best is not None  # n_starts >= 1
     parents, total = best
 
-    adj = np.zeros((p, p), dtype=np.int8)
+    dag = np.zeros((p, p), dtype=bool)
     for child in range(p):
-        for parent in parents[child]:
-            adj[parent, child] = TAIL
-            adj[child, parent] = ARROW
+        dag[parents[child], child] = True
 
-    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
+    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), float(total)

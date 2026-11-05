@@ -89,6 +89,7 @@ import numpy.typing as npt
 from scipy.special import chdtrc, gammaln, ndtr, ndtri, stdtr
 
 from . import categorical, stats
+from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
 
@@ -169,13 +170,7 @@ class PartialCorrelationTest:
     _copies: tuple[tuple[int, ...], ...]
 
     def __init__(self, data: np.ndarray) -> None:
-        arr = np.asarray(data, dtype=np.float64)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot run a partial-correlation test")
+        arr = stats.checked_matrix(data, "run a partial-correlation test")
         self._n: int = arr.shape[0]
         self._corr: np.ndarray = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
 
@@ -794,11 +789,7 @@ _MEANS_FILLED = np.zeros((_MEANS_N + 1, _MEANS_N + 1), dtype=bool)  # by n and c
 # their table bounds, their statistics, and the margins of their tables.
 _Counted = tuple[np.ndarray, np.ndarray, np.ndarray, _Margins]
 # The batched chi-square path takes a test whose conditioning set's configurations times its table
-# cells are at most max(_TABLE_ROWS * n, _TABLE_MIN), and the scalar path above.
-_TABLE_ROWS = 4
-_TABLE_MIN = 1 << 16
-# The most row indices, table cells, or Gram-matrix entries one batched count holds.
-_BATCH_CELLS = 1 << 22
+# cells are at most max(DENSE_ROWS * n, DENSE_MIN), and the scalar path above.
 
 
 def _segment_sums(values: np.ndarray, cuts: np.ndarray) -> np.ndarray:
@@ -902,13 +893,7 @@ class ChiSquare:
     """
 
     def __init__(self, data: np.ndarray, *, g_square: bool = False) -> None:
-        arr = np.asarray(data)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
+        arr = stats.checked_matrix(data, "run a chi-square test", dtype=None)
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
         # Each column's codes as one contiguous row, for the batched counts and for numbering
@@ -982,10 +967,10 @@ class ChiSquare:
 
         Each pair is ordered as :meth:`__call__` orders it. The pairs whose tables over the
         configurations of ``cond`` have at most ``_DENSE_CELLS`` cells are counted together, in
-        blocks of at most ``_BATCH_CELLS`` row indices and table cells, a block per table shape;
+        blocks of at most ``BATCH_CELLS`` row indices and table cells, a block per table shape;
         the others, and a single pair, take the scalar path. The blocks of a scan are counted
         first, and their degrees of freedom are evaluated together (:func:`_null_means_batch`),
-        for as many blocks as hold ``_BATCH_CELLS`` table cells at once. Without ``cond``, the
+        for as many blocks as hold ``BATCH_CELLS`` table cells at once. Without ``cond``, the
         pairs answered before are read from the kept answers (:meth:`_marginal_memo`).
         """
         a, b = np.minimum(xs, ys), np.maximum(xs, ys)
@@ -1021,9 +1006,9 @@ class ChiSquare:
                 for i in members:
                     statistics[i], p_values[i] = self._statistic_pvalue(a[i], b[i], cond)
                 continue
-            step = max(1, _BATCH_CELLS // max(n, m * cells))
+            step = max(1, BATCH_CELLS // max(n, m * cells))
             # Each row's first cell in its configuration. A block's tables hold at most
-            # max(_BATCH_CELLS, _DENSE_CELLS) cells, so its indices are built in place in the
+            # max(BATCH_CELLS, _DENSE_CELLS) cells, so its indices are built in place in the
             # rows' dtype.
             dtype = self._rows.dtype
             first = (layer * cells).astype(dtype)
@@ -1040,7 +1025,7 @@ class ChiSquare:
                     (part, bounds, *self._table_sums(tables.reshape(-1, kx, ky), bounds))
                 )
                 held += tables.size
-                if held >= _BATCH_CELLS:
+                if held >= BATCH_CELLS:
                     self._refer(counted, statistics, p_values)
                     counted, held = [], 0
         self._refer(counted, statistics, p_values)
@@ -1164,12 +1149,12 @@ class ChiSquare:
         total = int(cards.sum())
         x = 0
         while x < d - 1:
-            if self._n == 0 or int(cards[x]) * total > _BATCH_CELLS:
+            if self._n == 0 or int(cards[x]) * total > BATCH_CELLS:
                 out[x, x + 1 :] = [self(x, y) for y in range(x + 1, d)]
                 x += 1
                 continue
             stop = x + 1
-            while stop < d - 1 and int(cards[x : stop + 1].sum()) * total <= _BATCH_CELLS:
+            while stop < d - 1 and int(cards[x : stop + 1].sum()) * total <= BATCH_CELLS:
                 stop += 1
             self._marginal_block(out, x, stop, offsets, total)
             x = stop
@@ -1183,7 +1168,7 @@ class ChiSquare:
         cards = self._cardinalities
         first = int(offsets[start])
         gram = np.zeros((int(offsets[stop - 1] + cards[stop - 1]) - first, total))
-        step = max(1, _BATCH_CELLS // total)
+        step = max(1, BATCH_CELLS // total)
         for row in range(0, n, step):
             codes = self._codes[row : row + step]
             indicators = np.zeros((len(codes), total))
@@ -1196,8 +1181,8 @@ class ChiSquare:
         for shape in np.unique(shapes):
             pairs = np.flatnonzero(shapes == shape)
             kx, ky = int(cards[xs[pairs[0]]]), int(cards[ys[pairs[0]]])
-            for at in range(0, pairs.size, max(1, _BATCH_CELLS // (kx * ky))):
-                part = pairs[at : at + max(1, _BATCH_CELLS // (kx * ky))]
+            for at in range(0, pairs.size, max(1, BATCH_CELLS // (kx * ky))):
+                part = pairs[at : at + max(1, BATCH_CELLS // (kx * ky))]
                 rows = offsets[xs[part], None, None] - first + np.arange(kx)[:, None]
                 cols = offsets[ys[part], None, None] + np.arange(ky)
                 tables = gram[rows, cols].astype(np.int64)
@@ -1217,7 +1202,7 @@ class ChiSquare:
         cards = self._cardinalities
         kx, ky = int(cards[x]), int(cards[y])
         cells = kx * ky
-        limit = max(_TABLE_ROWS * n, _TABLE_MIN)
+        limit = max(DENSE_ROWS * n, DENSE_MIN)
         by_size: dict[int, list[int]] = {}
         configurations = [math.prod(int(cards[c]) for c in cond) for cond in conds]
         for i, cond in enumerate(conds):
@@ -1228,14 +1213,14 @@ class ChiSquare:
         if not by_size:
             return statistics, p_values
         target = self._rows[x] * ky + self._rows[y]  # each row's (x, y) cell
-        rows_per_block = max(1, _BATCH_CELLS // n)
+        rows_per_block = max(1, BATCH_CELLS // n)
         for size, members in by_size.items():
             start = 0
             while start < len(members):
                 stop, held = start + 1, configurations[members[start]] * cells
                 while stop < len(members) and stop - start < rows_per_block:
                     held += configurations[members[stop]] * cells
-                    if held > _BATCH_CELLS:
+                    if held > BATCH_CELLS:
                         break
                     stop += 1
                 block = members[start:stop]
@@ -1855,19 +1840,6 @@ def _has_nan(data: np.ndarray) -> bool:
     """Whether ``data``, a float array, holds a ``NaN``; any other array holds none."""
     arr = np.asarray(data)
     return arr.dtype.kind == "f" and bool(np.isnan(arr).any())
-
-
-def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:
-    """``data`` as a float64 ``(n_samples, n_features)`` matrix; raises on NaN or infinity, or on
-    fewer than ``min_rows`` rows."""
-    arr = np.asarray(data, dtype=np.float64)
-    if arr.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
-    if arr.shape[0] < min_rows:
-        raise ValueError(f"{test_name} needs at least {min_rows} rows, got {arr.shape[0]}")
-    if not np.isfinite(arr).all():
-        raise ValueError(f"data contains NaN or Inf; cannot run {test_name} test")
-    return arr
 
 
 def pins_blas(test: CITest) -> bool:

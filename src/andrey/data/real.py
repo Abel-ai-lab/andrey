@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import heapq
 import numbers
 import os
 import re
@@ -34,6 +33,7 @@ from typing import Any
 import numpy as np
 
 from andrey.core import GraphStructure, env
+from andrey.core.structure import topological_order
 
 from . import functional, noise
 from .discrete import _forward_sample
@@ -268,24 +268,10 @@ def read_bif_tables(text: str) -> Tables:
 
 def _causal_order(parents: tuple[tuple[int, ...], ...]) -> list[int]:
     """Order the variables so each follows its parents, the lowest-numbered ready one first."""
-    waiting = [len(set(p)) for p in parents]
-    children: list[list[int]] = [[] for _ in parents]
+    adj = np.zeros((len(parents), len(parents)), dtype=bool)
     for child, ps in enumerate(parents):
-        for p in set(ps):
-            children[p].append(child)
-    ready = [j for j, k in enumerate(waiting) if k == 0]
-    heapq.heapify(ready)
-    order = []
-    while ready:
-        j = heapq.heappop(ready)
-        order.append(j)
-        for child in children[j]:
-            waiting[child] -= 1
-            if waiting[child] == 0:
-                heapq.heappush(ready, child)
-    if len(order) != len(parents):
-        raise ValueError("the BIF network has a directed cycle")
-    return order
+        adj[list(ps), child] = True
+    return topological_order(adj, what="the BIF network")
 
 
 def _read_bif_gz(raw: bytes) -> Contents:

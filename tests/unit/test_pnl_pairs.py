@@ -3,7 +3,6 @@ torch path matches NumPy's to rounding."""
 
 from __future__ import annotations
 
-import functools
 import importlib
 import math
 import warnings
@@ -14,7 +13,7 @@ import pytest
 from scipy.special import gammainc
 
 import andrey
-from andrey.core import backend, warning_policy
+from andrey.core import backend, env, warning_policy
 from andrey.core.independence import (
     _center_kernel,
     _empirical_bandwidth,
@@ -138,14 +137,17 @@ def test_device_cutoff_reads_its_variable_and_never_chooses_mps(monkeypatch):
     for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", "ANDREY_PNL_GPU_THRESHOLD"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
-    first = math.isqrt(_pnl._PNL_GPU_THRESHOLDS["cuda"] - 1) + 1  # fewest rows reaching it
-    choose = functools.partial(_pnl._pnl_backend, amortized=True)
+    first = math.isqrt(backend.GPU_THRESHOLDS["pnl"]["cuda"] - 1) + 1  # fewest rows reaching it
+
+    def choose(n):
+        return backend.select_by_size("pnl", env.PNL_GPU_THRESHOLD, n * n, amortized=True)
+
     assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
     monkeypatch.setenv("ANDREY_PNL_GPU_THRESHOLD", "100")
     assert (choose(9), choose(10)) == ("numpy", "cuda")
     with andrey.config(backend="mps"):
         assert choose(10) == "cuda"  # float32 mps is not a PNL backend
-    assert _pnl._PNL_GPU_THRESHOLDS["mps"] is None
+    assert backend.GPU_THRESHOLDS["pnl"]["mps"] is None
 
 
 def _decisions(rows: np.ndarray) -> np.ndarray:

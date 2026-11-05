@@ -24,6 +24,7 @@ from andrey.api._adapt import (
     data_kind,
     default_score,
     default_test,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -1639,7 +1640,7 @@ def icp(
     from andrey.api._adapt import dag_from_adjacency, data_matrix
     from andrey.constraint.icp import icp as _icp
     from andrey.core.environments import normalize_env_targets
-    from andrey.core.knowledge import _node, column_position
+    from andrey.core.knowledge import as_node, column_position
     from andrey.core.score import check_columns
 
     data, codes, env_labels, by_code = normalize_env_targets(
@@ -1653,7 +1654,7 @@ def icp(
             "icp: pass target, the variable whose parents to find, as a column label or a 0-based "
             "position"
         )
-    t = column_position(_node(target, "target"), labels, d, "icp: target")
+    t = column_position(as_node(target, "target"), labels, d, "icp: target")
     name = column_namer(labels)
     left_out = [k for k, hit in by_code.items() if hit is not None and t in hit]
     keep = ~np.isin(codes, left_out)
@@ -1697,7 +1698,7 @@ def icp(
         max_parents=max_parents,
         environments=environments,
     )
-    node = (lambda j: labels[j]) if labels is not None else int
+    node = label_of(labels)
     adjacency = np.zeros((d, d), dtype=np.int8)
     adjacency[list(result.parents), t] = 1
     p_values = [None if j == t else float(v) for j, v in enumerate(result.p_values)]

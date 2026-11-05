@@ -29,6 +29,7 @@ from andrey.api._adapt import (
     default_score,
     int_in_range,
     json_safe,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -935,7 +936,7 @@ def gnies(
     X = data_matrix(data, method="gnies")
     labels = column_labels(data)
     name = column_namer(labels)
-    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
+    variable = label_of(labels)
     # An environment taken from targets is named by its targets.
     shown = [[variable(j) for j in sorted(e)] if isinstance(e, frozenset) else e for e in envs]
     sizes = np.bincount(codes, minlength=len(envs))

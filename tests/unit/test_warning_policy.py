@@ -55,7 +55,7 @@ def _default_pool_cutoff(monkeypatch):
     from andrey.search import _parallel_ges
 
     monkeypatch.delenv("ANDREY_GES_PARALLEL_MIN_WORK", raising=False)
-    monkeypatch.setattr(_parallel_ges, "_DEFAULT_MIN_WORK", 300)  # six variables reach a tenth
+    monkeypatch.setattr(_parallel_ges, "MIN_POOL_GES_WORK", 300)  # six variables reach a tenth
     data = np.random.default_rng(0).standard_normal((60, 6))
 
     def fit():

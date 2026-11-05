@@ -180,9 +180,9 @@ def test_every_fast_path_returns_the_scalar_p_values(
     or several, and with tables over the size limit on the scalar path."""
     from andrey.core import ci
 
-    monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
-    monkeypatch.setattr(ci, "_TABLE_ROWS", rows)
-    monkeypatch.setattr(ci, "_TABLE_MIN", table)
+    monkeypatch.setattr(ci, "BATCH_CELLS", batch)
+    monkeypatch.setattr(ci, "DENSE_ROWS", rows)
+    monkeypatch.setattr(ci, "DENSE_MIN", table)
     x = _fast_path_data(case)
     d = x.shape[1]
     test = ChiSquare(x, g_square=g_square)
@@ -293,8 +293,8 @@ def test_batched_counts_equal_the_tables_of_every_configuration(monkeypatch, g_s
     dropping the empty ones, whatever the set's size."""
     from andrey.core import ci
 
-    monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
-    monkeypatch.setattr(ci, "_TABLE_MIN", 1 << 24)  # every set on the batched path
+    monkeypatch.setattr(ci, "BATCH_CELLS", batch)
+    monkeypatch.setattr(ci, "DENSE_MIN", 1 << 24)  # every set on the batched path
     recorded: list[tuple[np.ndarray, np.ndarray]] = []
 
     def recording_chdtrc(dof, statistic):
@@ -558,10 +558,10 @@ def test_batched_table_counts_equal_one_numbering_per_set(monkeypatch):
     sets = [(), (1,), (2, 1), (3, 4, 5), (1, 2, 3, 4, 5), (4,)]
     expected = [_configuration_counts(x, 0, s) for s in sets]
     for batch in (1 << 22, 1):  # every set in one bincount, then each in its own
-        monkeypatch.setattr(categorical, "_BATCH_CELLS", batch)
+        monkeypatch.setattr(categorical, "BATCH_CELLS", batch)
         for dense in (1 << 16, 0):  # counted over every configuration, then numbered
-            monkeypatch.setattr(categorical, "_DENSE_MIN", dense)
-            monkeypatch.setattr(categorical, "_DENSE_ROWS", 4 if dense else 0)
+            monkeypatch.setattr(categorical, "DENSE_MIN", dense)
+            monkeypatch.setattr(categorical, "DENSE_ROWS", 4 if dense else 0)
             got = categorical.table_counts(codes, cards, 0, sets)
             for a, b in zip(got, expected, strict=True):
                 np.testing.assert_array_equal(a, b)
@@ -661,7 +661,7 @@ def test_a_scan_of_candidates_equals_a_test_per_candidate(monkeypatch, g_square,
     together or, with a small batch, one at a time."""
     from andrey.core import ci
 
-    monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
+    monkeypatch.setattr(ci, "BATCH_CELLS", batch)
     monkeypatch.setattr(ci, "_DENSE_CELLS", table)
     rng = np.random.default_rng(0)
     for _ in range(20):
