@@ -124,7 +124,7 @@ def test_latent_single_observed_scores_are_json_safe():
     g = GraphStructure.from_numpy(marks, kind="dag", node_types=types)
     result = score(g, g)
     assert result["latent_cluster_ari"] == 1.0
-    json.dumps(result)  # nan would break strict JSON
+    json.dumps(result, allow_nan=False)  # strict JSON: NaN or infinity raises
 
 
 def test_cyclic_input_keeps_directed_scores_and_omits_mec():
@@ -149,7 +149,7 @@ def test_result_is_json_safe(dag_of):
     rich = StructureOutput.new(
         GraphStructure.from_numpy(marks, kind="dag"), ordering=[0, 1], weighted_adjacency=w
     )
-    json.dumps(score(rich, rich))  # raises if any value is a numpy scalar / non-serializable
+    json.dumps(score(rich, rich), allow_nan=False)  # raises on a NumPy scalar, NaN, or infinity
 
 
 # ---- validation ---------------------------------------------------------------------------------

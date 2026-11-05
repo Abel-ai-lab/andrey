@@ -43,9 +43,10 @@ _REQUIRED_KEYS = {
     "output",
 }
 # Clean-room: no host/hardware identifiers may leak into a committed fixture.
-# Defense-in-depth (the capture script also refuses to leak); high-signal tokens
-# only, word-boundaried so GPU names can't false-match inside a hex SHA, and
-# private-IP patterns that won't match a version string like "0.1.4.0".
+# The capture writes the case's inputs and the output's numbers and checks for
+# nothing, so this scan is the one guard; high-signal tokens only, word-boundaried
+# so GPU names can't false-match inside a hex SHA, and private-IP patterns that
+# won't match a version string like "0.1.4.0".
 _FORBIDDEN = re.compile(
     r"\b(?:a800|a100|h100|v100)\b"  # NVIDIA datacenter GPUs
     r"|\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b"  # MAC address
@@ -182,10 +183,10 @@ def test_compare_rejects_baseline_missing_spec_field():
 
 
 def test_compare_is_nan_aware_on_both_paths():
-    # No current baseline carries NaN, so exercise compare()'s equal_nan branch on a
-    # synthetic spec: a candidate reproducing a reference NaN must PASS (no false
-    # fail); a one-sided NaN must FAIL - on both the structural and numeric paths.
-    # Guards the NaN handling needed once NaN-bearing methods (p-values) are captured.
+    # ICP's baseline carries NaN only on the numeric path (its p-value at the target
+    # is a JSON null), so exercise compare()'s equal_nan branch on a synthetic spec:
+    # a candidate reproducing a reference NaN must PASS (no false fail); a one-sided
+    # NaN must FAIL - on both the structural and numeric paths.
     harness.SPEC["_tmp_nan"] = {
         "structural": ["g"],
         "numeric": {"v": {"atol": 1e-6, "rtol": 1e-6}},

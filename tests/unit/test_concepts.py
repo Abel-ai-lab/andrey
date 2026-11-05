@@ -119,25 +119,13 @@ def test_parameter_cell(concept, method):
         assert REGISTRY[method].knowledge == tuple(parts)
 
 
-@pytest.mark.parametrize(
-    ("concept", "deviation"),
-    [
-        pytest.param(c, d, id=f"{c.key}-{d.method}")
-        for c in CONCEPTS.values()
-        for d in c.deviations
-        if d.method in UTILITIES
-    ],
-)
-def test_utility_cell(concept, deviation):
-    live = signature(deviation.method)
-    assert deviation.name in live and live[deviation.name].default == deviation.default
-
-
 @pytest.mark.parametrize("key", list(BOOTSTRAP_PARAMS))
 def test_bootstrap_takes_each_of_its_concepts_as_its_spec_and_template_say(key):
     concept, spec = CONCEPTS[key], BOOTSTRAP_PARAMS[key]
-    deviation = concept.deviation("bootstrap")
-    assert spec.concept == key and signature("bootstrap")[key].default == spec.default
+    deviation, live = concept.deviation("bootstrap"), signature("bootstrap")
+    assert spec.concept == key and live[key].default == spec.default
+    if deviation is not None:
+        assert deviation.name in live and live[deviation.name].default == deviation.default
     assert spec.default == (concept.param.default if deviation is None else deviation.default)  # ty: ignore[possibly-missing-attribute]
     bounds = ("type", "minimum", "maximum", "exclusive_minimum", "exclusive_maximum")
     assert {f: getattr(spec, f) for f in bounds} == {f: getattr(concept.param, f) for f in bounds}
