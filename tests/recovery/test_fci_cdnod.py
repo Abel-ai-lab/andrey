@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import andrey
@@ -10,6 +11,7 @@ from andrey import data
 from andrey.constraint.pc import _discover_skeleton, _orient_colliders
 from andrey.core import TAIL, GraphStructure
 from andrey.core.orient import meek, pdag2dag
+from andrey.data.interventions import soft
 from andrey.search.hc import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
@@ -50,6 +52,75 @@ def test_cdnod_orients_the_planted_graph_from_a_domain_shift():
     assert andrey.cdnod(x, domain).structure.oriented_edges() == planted
     # Without the index the same data leave every edge open.
     assert {kind for *_, kind in andrey.pc(x).structure.oriented_edges()} == {"undirected"}
+
+
+def test_cdnod_lists_the_variables_the_index_changes():
+    """Only variable 0's mean shifts, so the index keeps one edge, into it."""
+    x, domain = _domain_shift_chain()
+    out = andrey.cdnod(x, domain)
+    assert out.metadata["index_edges"] == [[0, "directed"]]
+    assert out.metadata["changing_variables"] == [0]
+    frame = pd.DataFrame(x, columns=list("abcde"))
+    out = andrey.cdnod(frame, domain)
+    assert out.metadata["index_edges"] == [["a", "directed"]]
+    assert out.metadata["changing_variables"] == ["a"]
+    out = andrey.cdnod(x, np.zeros(len(x)))
+    assert out.metadata["index_edges"] == [] and out.metadata["changing_variables"] == []
+
+
+def test_cdnod_finds_the_shifted_variables_in_its_claimed_setting():
+    """Linear-Gaussian data on a random 10-variable DAG, from two environments of 1,000 rows, the
+    second shifting the mean of two variables: the changing variables are those two on most draws.
+    """
+    exact = 0
+    for seed in range(10):
+        scm = data.SCM(
+            graph=data.graphs.erdos_renyi(d=10, avg_degree=2.0),
+            functional=data.functional.linear(),
+            noise=data.noise.gaussian(),
+        )
+        shifted = np.random.default_rng(seed).choice(10, size=2, replace=False)
+        envs = [{}, {int(j): soft(shift=1.0) for j in shifted}]
+        ds = scm.sample(n=[1000, 1000], seed=seed, envs=envs)
+        out = andrey.cdnod(ds.data, ds.env)
+        assert out.metadata["changing_variables"] == [v for v, _ in out.metadata["index_edges"]]
+        exact += out.metadata["changing_variables"] == sorted(ds.targets[1])
+    assert exact >= 7
+
+
+def test_cdnod_changing_variables_follow_the_column_order():
+    """Reordering the columns reorders both lists and leaves the variables in them unchanged."""
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=6, avg_degree=2.0),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(),
+    )
+    ds = scm.sample(n=[1000, 1000], seed=0, envs=[{}, {1: soft(shift=1.0), 4: soft(shift=1.0)}])
+    frame = pd.DataFrame(ds.data, columns=[f"x{j}" for j in range(6)])
+    assert andrey.cdnod(frame, ds.env).metadata["changing_variables"] == ["x1", "x4"]
+    rng = np.random.default_rng(0)
+    for _ in range(10):
+        columns = list(rng.permutation(frame.columns))
+        out = andrey.cdnod(frame[columns], ds.env)
+        changing = [c for c in columns if c in ("x1", "x4")]
+        assert out.metadata["changing_variables"] == changing
+        assert out.metadata["index_edges"] == [[c, "directed"] for c in changing]
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_cdnod_and_gnies_name_the_same_changing_variable():
+    """In ``x0 -> x1 -> x2``, the second environment shifts both the mean and the noise scale of
+    ``x1``: CD-NOD's default test sees the mean shift and GnIES the noise change.
+    """
+    scm = data.SCM(
+        graph=data.graphs.FixedDAG(nodes=("x0", "x1", "x2"), arcs=(("x0", "x1"), ("x1", "x2"))),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(),
+    )
+    envs = [{}, {1: soft(shift=1.0, noise_scale=3.0)}]
+    ds = scm.sample(n=[1000, 1000], seed=0, envs=envs, shuffle=False)
+    assert andrey.cdnod(ds.data, ds.env).metadata["changing_variables"] == [1]
+    assert andrey.gnies(ds.data, ds.env).metadata["changing_variables"] == [1]
 
 
 def test_cdnod_finds_no_edge_between_independent_columns():

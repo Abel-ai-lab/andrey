@@ -45,6 +45,7 @@ unknown. `andrey run` takes a mapping as `targets=`, a JSON object inline or in 
 out = andrey.gies(data, env, targets={"observed": [], "knockout": ["x"]})
 out = andrey.gies(data, targets="target")  # a column naming each row's targets, "" if none
 out = andrey.cdnod(data, "site")  # a column of labels; numbers such as a time step stay numbers
+out.metadata["changing_variables"]  # the variables whose mechanism changes across the sites
 out = andrey.gnies(data, "site")  # targets unknown: learned, in metadata["changing_variables"]
 out = andrey.icp(data, env, target="y")  # the parents of y; its p-values in out.metadata
 ```

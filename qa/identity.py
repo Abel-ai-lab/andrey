@@ -389,11 +389,13 @@ LAG_MATRICES = ("p_values", "statistics", "links")
 NODE_LISTS = (
     "ambiguous_triples",
     "causal_orders",
+    "changing_variables",
     "cluster_order",
     "clusters",
     "confounded_pairs",
     "conflicts",
     "dag",
+    "index_edges",
     "parents",
     "partial_order",
     "unordered",

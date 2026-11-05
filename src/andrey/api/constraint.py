@@ -1196,7 +1196,15 @@ def cdnod(
         leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
         can identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
         :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
-        against the graph CD-NOD can identify instead.
+        against the graph CD-NOD can identify instead. ``metadata["index_edges"]`` lists the
+        index's edges, each ``env -> variable``, as ``[variable, "directed"]`` pairs, and
+        ``metadata["changing_variables"]`` the same variables, by name or 0-based position, in
+        column order: the variables whose causal module, the distribution given their causes,
+        changes across the environments, under CD-NOD's assumption that the index is only a cause
+        and no hidden common cause varies apart from it [1]_. Their descendants change in
+        distribution too, through them, and are not listed. Both are empty for a single
+        environment. With ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, only a change in a
+        variable's mean that follows the index's values is found.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule
@@ -1255,16 +1263,17 @@ def cdnod(
     environment, not which variables changed in it; when every environment's intervened variables
     are known, :func:`~andrey.gies` uses them.
 
-    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
-    find a change in a variable's mean that follows the index's values. With two domains the coding
-    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result. A change in a variable's noise
-    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
-    unchanged, so the index keeps no edge to that variable. The paper uses a kernel
-    conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
-    ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they
-    find a shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the
-    index is categorical, so every data column may be continuous.
+    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
+    correlation, so they find a change in a variable's mean that follows the index's values. With
+    two domains the coding does not matter. With three domains coded ``0, 1, 2``, a shift in domain
+    ``1`` alone can go undetected, and recoding the domains can change the result. A change in a
+    variable's noise variance alone, or in the size of an effect whose cause has mean zero, leaves
+    the mean unchanged, so the index keeps no edge to that variable. ``"kci"``, the kernel
+    conditional-independence test the paper uses [1]_ [2]_, detects such changes, at a far higher
+    cost per test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index
+    value as a category, so they find a shift in any domain, whatever the coding. With
+    ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so every data column may be
+    continuous.
 
     With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
     between two variables that both keep an edge to the index. For a candidate direction
@@ -1405,6 +1414,7 @@ def cdnod(
     d, column = X.shape[1], column_namer(labels)
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
+    index_edges: list[int] = []
     with (
         copies_named(labels, lambda j: "env" if j == d else column(j)),
         rows_tested() as rows,
@@ -1424,9 +1434,13 @@ def cdnod(
             seed=seed,
             _ambiguous=ambiguous,
             _conflicts=conflicts,
+            _index_edges=index_edges,
         )
+    variable = (lambda j: j) if labels is None else (lambda j: labels[j])
     metadata = {
         "conflicts": [list(edge) for edge in sorted(conflicts)],
+        "index_edges": [[variable(j), "directed"] for j in index_edges],
+        "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
         **rows_metadata(rows),

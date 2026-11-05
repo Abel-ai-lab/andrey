@@ -280,7 +280,10 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            doc="metadata['index_edges'] lists the index's edges as [variable, 'directed'] "
+            "pairs and metadata['changing_variables'] the same variables, whose causal module "
+            "changes across the environments, in column order; metadata['categorical'] lists "
+            "the categorical columns a mixed-data setting read; "
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
@@ -2639,7 +2642,7 @@ for _concept, _cap in (("max_depth", _MAX_DEPTH), ("max_parents", _MAX_PARENTS))
 #: Each method's own metadata keys; the loop below adds the keys that follow from its spec.
 _METADATA: dict[str, tuple[str, ...]] = {
     "pc": ("conflicts",),
-    "cdnod": ("conflicts",),
+    "cdnod": ("conflicts", "index_edges", "changing_variables"),
     "icp": (
         "target",
         "parents",
