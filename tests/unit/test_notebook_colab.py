@@ -1,4 +1,5 @@
-"""Colab setup installs into its runtime while ordinary notebook execution stays local."""
+"""The notebooks outside the docs site: Colab setup installs into its runtime while ordinary
+notebook execution stays local, and every link opens from Colab, GitHub, or a download."""
 
 from __future__ import annotations
 

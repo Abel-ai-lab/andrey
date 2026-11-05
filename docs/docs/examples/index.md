@@ -75,9 +75,9 @@ variables it is told in part or not at all.
 :img-top: /_generated/thumbs/score_search.svg
 :img-alt: The true graph of this notebook's data
 
-XGES, hill climbing, Tabu search, and exact search look for the graph with the best BIC score;
-MMHC and RSMAX2 restrict the search with tests first; GIES also learns from interventions, and GnIES
-from environments whose changes it is not told.
+XGES, hill climbing, Tabu search, and exact search look for the graph with the best score, by
+default the extended BIC; MMHC and RSMAX2 restrict the search with tests first; GIES also learns
+from interventions, and GnIES from environments whose changes it is not told.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
