@@ -1236,6 +1236,24 @@ def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
     assert '<a href="docs/benchmarks.html">Release cards</a>' in tiles
 
 
+def test_a_row_its_release_card_does_not_count_better_is_never_a_win():
+    best = build.family_wins([SUMMARY])[0]
+
+    def judged(verdict):
+        methods = [
+            {**m, "rows": [{**r, "card_verdict": verdict} for r in m["rows"]]}
+            if m["method"] == best["name"]
+            else m
+            for m in SUMMARY["methods"]
+        ]
+        return [r["name"] for r in build.family_wins([{**SUMMARY, "methods": methods}])]
+
+    # Rows the card counts better stay wins; ties, and rows it did not judge, drop out.
+    assert best["name"] in judged("better")
+    assert best["name"] not in judged("tie")
+    assert best["name"] not in judged(None)
+
+
 def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
     # The claim is the largest cut in errors, the chart's first row, not a count of methods.
     fewer = build.fewest_errors(placeholder_summaries())
