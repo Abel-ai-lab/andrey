@@ -79,18 +79,21 @@ class SCMParams:
 
 @dataclass(frozen=True, kw_only=True)
 class CausalDataset:
-    """Observational data paired with its ground-truth causal graph.
+    """Simulated data paired with its ground-truth causal graph.
 
     Parameters
     ----------
     data : np.ndarray of shape (n, n_obs)
-        Observational sample, ``float64`` by default (see ``SCM.sample(dtype=...)``). Columns
-        are the **observed** variables, indexed to match the observed nodes of ``graph``
-        (observed-first: for a causally-sufficient SCM ``n_obs == graph.n_nodes`` and column
-        ``j`` is node ``j``).
-    graph : GraphStructure
-        Ground-truth causal graph over all ``d`` nodes (``kind="dag"``); latent confounders, when
-        present, are flagged via ``graph.node_types`` and dropped from ``data``.
+        The sample, ``float64`` by default (see ``SCM.sample(dtype=...)``): observational rows,
+        each environment's rows when ``env`` is set, or one row per time step for a time-series
+        model. Columns are the **observed** variables, indexed to match the observed nodes of
+        ``graph`` (observed-first: for a causally-sufficient SCM ``n_obs == graph.n_nodes`` and
+        column ``j`` is node ``j``).
+    graph : GraphStructure or TemporalStructure
+        Ground-truth causal graph. For an i.i.d. model, a ``GraphStructure`` over all ``d`` nodes
+        (``kind="dag"``); latent confounders, when present, are flagged via ``graph.node_types``
+        and dropped from ``data``. For a time-series model, a ``TemporalStructure``, one graph per
+        lag.
     report : QAReport
         Honesty / QA diagnostics (fields are ``None`` until computed).
     provenance : dict
@@ -107,8 +110,8 @@ class CausalDataset:
 
     Notes
     -----
-    Use :attr:`observed_graph` -- never ``graph`` directly -- when scoring a discovery estimate, so
-    the graph's node set matches ``data``'s columns for latent SCMs.
+    For an i.i.d. model, use :attr:`observed_graph` -- never ``graph`` directly -- when scoring a
+    discovery estimate, so the graph's node set matches ``data``'s columns for latent SCMs.
     """
 
     data: np.ndarray

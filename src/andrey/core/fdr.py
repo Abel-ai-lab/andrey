@@ -1,8 +1,8 @@
 """Multiple-testing correction of a family of p-values.
 
 A method that reports one p-value per candidate link can correct the family for the number of links
-tested. ``fdr_method="fdr_bh"`` replaces each p-value with its Benjamini-Hochberg adjusted value,
-the name and procedure of tigramite's ``fdr_method``; ``"none"`` leaves the p-values as tested.
+tested. ``fdr_method="fdr_bh"`` replaces each p-value with its Benjamini-Hochberg adjusted value;
+``"none"`` leaves the p-values as tested.
 
 References
 ----------
@@ -47,9 +47,9 @@ def corrected_pvalues(
     """The ``p_values`` array corrected for the number of tests in it.
 
     ``"none"`` returns ``p_values`` itself. ``"fdr_bh"`` returns a copy whose entries are replaced
-    with their :func:`benjamini_hochberg` adjustment over all the entries together, as tigramite's
-    ``get_corrected_pvalues`` does. An entry ``excluded`` (a mask of the same shape) is no test:
-    it is not counted and keeps its value. Raises :class:`ValueError` for another ``fdr_method``.
+    with their :func:`benjamini_hochberg` adjustment over all the entries together. An entry
+    ``excluded`` (a mask of the same shape) is no test: it is not counted and keeps its value.
+    Raises :class:`ValueError` for another ``fdr_method``.
     """
     check_fdr_method(fdr_method)
     if fdr_method == "none":

@@ -1,4 +1,9 @@
-"""Keep package provenance mentions inside docstring References sections."""
+"""Keep mentions of other causal-discovery packages inside docstring References sections.
+
+``src/`` describes Andrey only: a docstring states the rule and cites the paper, and names no other
+package as a measured comparison or as the source of a design choice. The dataset registry is
+exempt, since it credits each dataset to the repository that publishes it.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +13,9 @@ from pathlib import Path
 
 import pytest
 
-_PACKAGE_NAME = re.compile(rb"causal[-_]?learn", re.IGNORECASE)
+_PACKAGE_NAME = re.compile(rb"causal[-_]?learn|tigramite|bnlearn|tetrad", re.IGNORECASE)
+#: Files that name a package as a data source, not as a comparison or a design source.
+_DATA_SOURCES = ("src/andrey/data/real.py",)
 _HEADING = re.compile(rb"([ \t]*)(\S[^\r\n]*?)[ \t]*\r?\n")
 
 
@@ -62,6 +69,8 @@ def test_package_mentions_only_in_references():
     for path in sorted((root / "src").rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
             continue
+        if path.relative_to(root).as_posix() in _DATA_SOURCES:
+            continue
         source = path.read_bytes()
         if not _PACKAGE_NAME.search(source):
             continue
@@ -72,7 +81,18 @@ def test_package_mentions_only_in_references():
     assert not violations, "Package provenance outside References:\n" + "\n".join(violations)
 
 
-@pytest.mark.parametrize("name", ["causal-learn", "causallearn", "causal_learn", "Causal-Learn"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "causal-learn",
+        "causallearn",
+        "causal_learn",
+        "Causal-Learn",
+        "tigramite",
+        "bnlearn",
+        "Tetrad",
+    ],
+)
 @pytest.mark.parametrize("template", ['"""Uses {name}."""', "# Uses {name}.", 'name = "{name}"'])
 def test_guard_rejects_mentions_outside_references(name, template):
     assert _violations(template.format(name=name).encode()) == [1]

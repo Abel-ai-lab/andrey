@@ -74,6 +74,55 @@ def test_varma_lingam_orders_innovations_by_least_squares():
     assert pwling.find_causal_order(innovations) == [0, 1, 2]
 
 
+def _varma_pair(seed: int, steps: int, *, moving_average: bool) -> np.ndarray:
+    """``x0 -> x1`` within a step, each series on its own past, and with ``moving_average`` each
+    step's innovations on the last step's: a VARMA(1, 1) series, else a VAR(1) one."""
+    rng = np.random.default_rng(seed)
+    inv = np.linalg.inv(np.eye(2) - np.array([[0.0, 0.0], [0.6, 0.0]]))
+    ar = np.diag([0.5, 0.4])
+    ma = np.array([[0.4, 0.0], [0.3, 0.3]]) if moving_average else np.zeros((2, 2))
+    e = rng.uniform(-1.0, 1.0, (steps + 50, 2))
+    x = np.zeros((steps + 50, 2))
+    for t in range(1, steps + 50):
+        x[t] = inv @ (ar @ x[t - 1] + e[t] + ma @ e[t - 1])
+    return x[50:]
+
+
+def test_varma_lingam_structural_ma_maps_the_moving_average_through_b0():
+    """``structural_ma=True`` turns the default's ``(I - B0) Theta_j`` into
+    ``(I - B0) Theta_j (I - B0)^-1`` and changes nothing else; ``prune=True`` re-estimates every
+    matrix and ignores it."""
+    from andrey.api.temporal import varma_lingam
+
+    x = _varma_pair(0, 200, moving_average=True)
+    plain, mapped = varma_lingam(x), varma_lingam(x, structural_ma=True)
+    assert mapped.ordering == plain.ordering
+    np.testing.assert_array_equal(mapped.structure.lag_weights, plain.structure.lag_weights)
+    # The stored blocks are transposed, [i, j] weighing i -> j, so (I - B0)^-1 multiplies them on
+    # the left as its transpose, inv(I - lag_weights[0]).
+    lag_0, ma = plain.structure.lag_weights[0], plain.structure.lag_weights_ma
+    expected = np.linalg.inv(np.eye(2) - lag_0) @ ma
+    np.testing.assert_allclose(mapped.structure.lag_weights_ma, expected, rtol=1e-12, atol=1e-15)
+    assert not np.allclose(mapped.structure.lag_weights_ma, ma)
+    assert varma_lingam(x, prune=True, structural_ma=True) == varma_lingam(x, prune=True)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
+def test_varma_lingam_criterion_selects_the_order_and_checks_required_lags_against_it():
+    """On a VAR(1) series, BIC over ``order=(2, 1)`` selects one autoregressive lag and no moving
+    average, so a link required at lag 2 lies beyond the selected order."""
+    from andrey import Knowledge
+    from andrey.api.temporal import varma_lingam
+    from andrey.core.knowledge import KnowledgeError
+
+    x = _varma_pair(1, 300, moving_average=False)
+    out = varma_lingam(x, order=(2, 1), criterion="bic")
+    assert out.structure.lag_weights.shape == (2, 2, 2)
+    assert out.structure.lag_weights_ma.shape == (0, 2, 2)
+    with pytest.raises(KnowledgeError, match="at lag 2, but criterion='bic' selected p=1"):
+        varma_lingam(x, order=(2, 1), criterion="bic", knowledge=Knowledge(required=[(0, 1, 2)]))
+
+
 def test_longitudinal_lingam_matches_the_recorded_output():
     from andrey.api.temporal import longitudinal_lingam
 

@@ -85,6 +85,26 @@ def test_rcd_matches_its_recorded_output():
     assert_recorded_output(out, "RCD", case=_FORK)
 
 
+def test_rcd_levels_change_the_pairs_and_the_parents():
+    """A larger HSIC ``alpha`` finds more pairs dependent and marks more of them; a larger
+    ``cor_alpha`` finds more residuals correlated and keeps more parents. At ``shapiro_alpha=1e-6``
+    the Shapiro-Wilk tests find no set of residuals non-Gaussian, so no ancestor is found and every
+    pair is marked."""
+    x = datagen.generate(_FORK)
+    base = andrey.rcd(x)
+
+    def pairs(out) -> set[tuple[int, int]]:
+        return {(i, j) for i, j, kind in out.structure.oriented_edges() if kind == "bidirected"}
+
+    def parents(out) -> set[tuple[int, int]]:
+        return {(i, j) for i, j, kind in out.structure.oriented_edges() if kind == "directed"}
+
+    assert pairs(andrey.rcd(x, alpha=0.5)) > pairs(base)
+    assert parents(andrey.rcd(x, cor_alpha=0.5)) > parents(base)
+    every = {(i, j) for i in range(4) for j in range(i + 1, 4)}
+    assert pairs(andrey.rcd(x, shapiro_alpha=1e-6)) == every
+
+
 def test_bottom_up_parce_lingam_matches_its_recorded_output():
     out = andrey.bottom_up_parce_lingam(datagen.generate(_FORK), alpha=0.01)
     assert_recorded_output(out, "BottomUpParceLiNGAM", case=_FORK)

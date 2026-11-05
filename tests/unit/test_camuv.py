@@ -42,6 +42,11 @@ def test_the_fork_is_found(fork_fit):
     assert _edges(fork_fit, "circle") == {(0, 1)}
 
 
+def test_a_larger_alpha_marks_more_pairs(fork_fit):
+    """A pair is marked when the test finds its residuals dependent at a p-value below ``alpha``."""
+    assert _edges(andrey.camuv(_fork(), alpha=0.3), "circle") > _edges(fork_fit, "circle")
+
+
 def _additive(seed: int = 0) -> np.ndarray:
     case = sample_scm(
         functional="additive_noise", d=6, n=400, seed=seed, density=2, scale="rescale"

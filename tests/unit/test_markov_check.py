@@ -149,12 +149,32 @@ def test_graphs_and_data_that_cannot_be_checked_raise():
         markov_check(sample.graph, sample.data[:6], sample_fraction=0.5)
 
 
+def _fisher_z(block: np.ndarray) -> float:
+    """The Fisher-Z p-value of the first two columns of ``block`` given the others."""
+    precision = np.linalg.inv(np.corrcoef(block, rowvar=False))
+    r = -precision[0, 1] / np.sqrt(precision[0, 0] * precision[1, 1])
+    z = np.sqrt(len(block) - (block.shape[1] - 2) - 3) * abs(np.arctanh(r))
+    return float(2 * stats.norm.sf(z))
+
+
 def test_missing_values_are_deleted_test_by_test():
+    """Each test reads the rows observed in its own columns, so its p-value is the Fisher-Z test
+    on those rows alone, and the row counts summarize the tests' rows."""
     sample = _sample(6, 400, 5)
     data = sample.data.copy()
-    data[np.random.default_rng(0).random(data.shape) < 0.05] = np.nan
-    check = markov_check(sample.graph, data)
-    assert check.n_tests > 0 and "rows_tested" in check.metadata
+    rng = np.random.default_rng(0)
+    for j in range(6):  # a different share missing in each column
+        data[rng.random(400) < 0.02 * (j + 1), j] = np.nan
+    check = markov_check(sample.graph, data, sample_fraction=1.0)
+    assert check.metadata["indep_test"] == "fisherz"
+    rows = []
+    for test in check.table(index=True):
+        columns = data[:, [test["x"], test["y"], *test["given"]]]
+        block = columns[~np.isnan(columns).any(axis=1)]
+        rows.append(len(block))
+        assert test["p_value"] == pytest.approx(_fisher_z(block), rel=1e-9)
+    assert len(set(rows)) > 1
+    assert check.metadata["rows_tested"] == {"min": min(rows), "median": float(np.median(rows))}
 
 
 def _categorical(n: int, levels: int, seed: int) -> tuple[GraphStructure, np.ndarray]:

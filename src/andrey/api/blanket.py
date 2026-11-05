@@ -183,12 +183,13 @@ def iamb(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
-        column names and positions, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position, ``categorical`` is not a list of column names and positions, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target``
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
@@ -419,12 +420,13 @@ def inter_iamb(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
-        column names and positions, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position, ``categorical`` is not a list of column names and positions, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target``
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
@@ -644,12 +646,13 @@ def mmpc(
     Raises
     ------
     TypeError
-        If ``target`` is neither a column label nor a position, ``categorical`` is not a list of
-        column names and positions, or ``knowledge`` is neither ``None`` nor a
-        :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target`` is neither a column
+        label nor a position, ``categorical`` is not a list of column names and positions, or
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if ``target``
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``target``
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
         another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
@@ -732,26 +735,24 @@ def mmpc(
     against 100, and the CPDAG with 78.1 against 100. The median skeleton fit took 0.01 to 1.6 s up
     to 100 variables and 0.3 to 3.3 s at 200 variables. The CPDAG fit took up to 30 s where it
     finished and reached the 600 s cap at 100 variables, mean degree 4: on 6 of 20 datasets at 1,000
-    rows and 19 of 20 at 5,000 on standardized data. At 200 variables and 5,000 rows, MMPC's
-    forward step often faces candidates whose dependence is too strong to rank by p-value, and it
-    admits the strongest, which is a true neighbor 99.7% of the time. Borderline false edges
-    between unrelated pairs, with a statistic just past the cutoff, then survive: about 2 more per
-    graph than with an arbitrary order, which happens to admit a strongly correlated non-neighbor
-    that removes them. At mean degree 2 the skeleton there makes 75.5 errors on average against 73.9
-    for bnlearn's, and 86.9 against 84.2 on 10 fresh datasets. The continuous benchmark does not
-    cover the categorical and mixed-data tests, which only the discrete-network lanes cover. Tested
-    with exact d-separation on 15 variables. It tests each candidate against the subsets of the
-    current members, up to the first size that separates it, so its cost grows exponentially with
-    the size of the set; the symmetry check runs the search once more for each member. The CPDAG
-    tests every subset of the smaller blanket for each unshielded triple, and a collider takes all
-    of them. These blankets reach two steps
-    from a variable, so they are larger than a Markov blanket, and a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m``
-    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
-    collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose smaller blanket
-    held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s. Missing values are
-    not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of the values
-    missing completely at random.
+    rows and 19 of 20 at 5,000 on standardized data. At 200 variables and 5,000 rows, MMPC's forward
+    step often faces candidates whose dependence is too strong to rank by p-value, and it admits the
+    strongest, which is a true neighbor 99.7% of the time. Borderline false edges between unrelated
+    pairs, with a statistic just past the cutoff, then survive: about 2 more per graph than with an
+    arbitrary order, which happens to admit a strongly correlated non-neighbor that removes them. At
+    mean degree 2 the skeleton there makes 75.5 errors on average, and 86.9 on 10 fresh datasets.
+    The continuous benchmark does not cover the categorical and mixed-data tests, which only the
+    discrete-network lanes cover. Tested with exact d-separation on 15 variables. It tests each
+    candidate against the subsets of the current members, up to the first size that separates it, so
+    its cost grows exponentially with the size of the set; the symmetry check runs the search once
+    more for each member. The CPDAG tests every subset of the smaller blanket for each unshielded
+    triple, and a collider takes all of them. These blankets reach two steps from a variable, so
+    they are larger than a Markov blanket, and a triple whose smaller blanket holds ``m`` variables
+    takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and
+    mean degree 4, the collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose
+    smaller blanket held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s.
+    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
+    fifth of the values missing completely at random.
 
     References
     ----------

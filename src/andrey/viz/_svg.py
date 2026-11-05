@@ -4,8 +4,8 @@ Every mark is drawn by shape -- an arrowhead (``ARROW``), a hollow circle (``CIR
 tail (nothing) -- so the grammar is colorblind-safe and the emitted string is self-contained. A
 2-cycle is drawn as two parallel curved edges (feedback), distinct from a single double-headed
 bidirected edge (a latent confounder). An edge that would cross another node bends around it. An
-intervened node is a square, and a bar crosses each arrowhead into it, the edge an intervention
-cuts.
+intervened node is a square, and a bar crosses each arrowhead into it, whether the intervention
+cuts that edge (hard) or keeps it (soft).
 """
 
 from __future__ import annotations

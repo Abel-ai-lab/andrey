@@ -128,6 +128,10 @@ class SCM:
         The structural-equation family (for example, ``andrey.data.functional.linear()``).
     noise : Noise
         The exogenous-noise family (for example, ``andrey.data.noise.gaussian()``).
+    latents : int, default=0
+        How many of the ``d`` nodes to hide as latent confounders, chosen among nodes with at least
+        two children: ``data`` drops them, and the true graph lists them last. Temporal
+        functionals take only ``0``.
     interventions : tuple of (int, HardIntervention or SoftIntervention) pairs, default=()
         The interventions :meth:`do` applied, by column, in column order.
 

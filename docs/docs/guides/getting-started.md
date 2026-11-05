@@ -323,10 +323,10 @@ holds and keep weak links more often than they do on the data.
 ### Checking a result against the data
 
 A graph implies independences: PC's graph has no link between p38 and jnk, so given the right
-variables the two must look independent in the data. `andrey.markov_check` tests every
-independence the graph implies and asks whether the p-values are uniform, as they are when all of
-them hold. The cells that learned the graph would flatter it, so learn on a random half of the
-cells and check on the other half:
+variables the two must look independent in the data. `andrey.markov_check` tests the ordered local
+Markov independences, each variable and each earlier non-parent given its parents, and asks whether
+the p-values are uniform, as they are when all of them hold. The cells that learned the graph would
+flatter it, so learn on a random half of the cells and check on the other half:
 
 ```{code-cell} ipython3
 cells = np.random.default_rng(0).permutation(len(sachs.data))
