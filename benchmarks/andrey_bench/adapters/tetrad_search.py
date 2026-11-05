@@ -401,9 +401,10 @@ class TetradBossFCI(TetradFCI):
 class TetradGraspFCI(TetradFCI):
     """Tetrad's GRaSP-FCI (``GraspFci``) with the Fisher z test and the BIC score.
 
-    GRaSP runs one start from the data's column order at depth 3. ``GraspFci.setDepth`` sets
-    GRaSP's depth and the cap on the FCI steps' separating sets alike, so those steps test sets of
-    at most three nodes.
+    GRaSP runs one start from the data's column order, its stages in order (``ordered``), as
+    Tetrad's algorithm interface runs it by default. ``GraspFci.setDepth`` sets GRaSP's tuck depth
+    and the cap on the FCI steps' separating sets alike, and that interface sets it from ``depth``,
+    -1 by default, so neither is capped.
     """
 
     name = "tetrad.grasp_fci.bic"
@@ -412,11 +413,11 @@ class TetradGraspFCI(TetradFCI):
     labels = {"indep_test": "fisherz", "score_func": "local_score_BIC"}
     defaults = {
         **_STAR_FCI,
-        "depth": 3,
+        "depth": -1,
         "seed": SEARCH_SEED,
         "singularDepth": 1,
         "nonSingularDepth": 1,
-        "ordered": False,
+        "ordered": True,
         "useScore": True,
         "useRaskuttiUhler": False,
         "useDataOrder": True,

@@ -117,10 +117,12 @@ The two releases differ:
   has no such setting and orients by knowledge with the rules in.
 - **Experimental BOSS-FCI.** causal-cmd lists `bfci` only under `--experimental`, which
   `TetradDriver.java` passes on to causal-cmd's parser.
-- **Starts.** GRaSP-FCI runs one start from the column order at depth 3; in 7.6.10,
-  `GraspFci.setDepth` also caps the FCI steps' separating sets at three nodes. tetrad-lib 7.6.10's
-  `BossFci` has no seed or column-order setting, so its BOSS starts as `PermutationSearch` does by
-  default.
+- **Starts and depth.** GRaSP-FCI runs one start from the column order. `GraspFci.setDepth` sets
+  GRaSP's tuck depth and the cap on the FCI steps' separating sets alike, and Tetrad's algorithm
+  interface sets it from `depth`, -1 by default, so neither adapter caps either: causal-cmd sets
+  `graspDepth` and then `depth`. tetrad-lib 7.6.10's GRaSP-FCI runs GRaSP's stages in order
+  (`ordered true`), that interface's default. tetrad-lib 7.6.10's `BossFci` has no seed or
+  column-order setting, so its BOSS starts as `PermutationSearch` does by default.
 
 Running a source file needs a `java` with the `jdk.compiler` module, as a JDK has; the adapters'
 setup checks for it, and `ANDREY_BENCH_JAVA` names `java` when it is not on `PATH`. The jar is the

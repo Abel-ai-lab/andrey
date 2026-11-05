@@ -23,8 +23,8 @@ conditioning sets or path lengths (``completeRuleSetUsed``, ``doDiscriminatingPa
 (``possibleMsepDone``); causal-cmd's ``bfci`` has no setting for it. The two score searches use
 the BIC with no structure prior and the standard penalty rule (``semBicStructurePrior 0``,
 ``semBicRule 1``), one start (``numStarts 1``), and the covariance matrix read once
-(``precomputeCovariances``); BOSS-FCI runs without BES, and GRaSP-FCI at GRaSP's depth 3 from the
-data's column order. A boolean setting that is off is left out: causal-cmd turns a boolean on
+(``precomputeCovariances``); BOSS-FCI runs without BES, and GRaSP-FCI from the data's column order,
+with ``depth -1`` as GRaSP's tuck depth too. A boolean setting that is off is left out: causal-cmd turns a boolean on
 whenever it is named, and each is off by default.
 
 FCI-JCI is FCI with the context variables in Tetrad's first knowledge tier, so no system variable
@@ -147,7 +147,11 @@ class TetradBFCI(_TetradPAG):
 
 
 class TetradCmdGraspFCI(_TetradPAG):
-    """Tetrad's GRaSP-FCI with Fisher-Z and the BIC, at GRaSP's depth 3 from the column order."""
+    """Tetrad's GRaSP-FCI with Fisher-Z and the BIC, one start from the column order.
+
+    causal-cmd sets GRaSP-FCI's depth from ``graspDepth`` and then from ``depth``, so ``depth``
+    (-1, no cap) is GRaSP's tuck depth and the FCI steps' cap alike.
+    """
 
     name = "tetrad.cmd.grasp_fci.bic"
     algorithm = "grasp_fci"
@@ -155,7 +159,6 @@ class TetradCmdGraspFCI(_TetradPAG):
     scored = True
     extra = {
         "possibleMsepDone": True,
-        "graspDepth": 3,
         "graspSingularDepth": 1,
         "graspNonSingularDepth": 1,
         "useDataOrder": True,
