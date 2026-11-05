@@ -1134,13 +1134,16 @@ def ut_igsp(
     rows per setting, 20 datasets each and 10 in the one at 50 variables, 10 starts made fewer SHD
     errors than 5 in 4 groups, by 0.17 to 0.42 edges, 2 of them outside the authors' setting at 300
     rows per setting or 50 variables, and more in none, at a median of 0.24 s per fit on 20
-    variables against 0.21 s; the target errors were higher in no group. The level was then chosen
-    on 56 further groups at 1,000 to 5,000 rows per setting, 20 datasets each, with mean shifts,
-    perfect interventions, and changes of the noise variance or of the weights, 0 to 3 unknown
-    targets per setting, and in 4 groups no known ones, among one over the number of observational
-    rows, ``alpha=0.001``, and the authors' level, ``alpha=1e-5`` [1]_. Against ``alpha=0.001`` the
-    default made fewer SHD errors in 4 comparisons, all at 5,000 rows, by 0.2 to 0.65 edges, and
-    more in none.
+    variables against 0.21 s. With 5 starts, ``alpha=0.001`` made fewer SHD errors than the
+    authors' level, ``alpha=1e-5`` [1]_, in 7 groups and more in 2, those by about 0.3 edges at
+    3,000 rows per setting with no unknown targets, and ``alpha=0.01`` made more in 10; at 1,000
+    rows or fewer and at 50 variables ``0.001`` lowered the mean SHD by 0.8 to 2.5 edges. Neither
+    change raised the target errors in any group. The level was then chosen on 56 further groups at
+    1,000 to 5,000 rows per setting, 20 datasets each, with mean shifts, perfect interventions, and
+    changes of the noise variance or of the weights, 0 to 3 unknown targets per setting, and in 4
+    groups no known ones, among one over the number of observational rows, ``alpha=0.001``, and
+    ``alpha=1e-5``. Against ``alpha=0.001`` the default made fewer SHD errors in 4 comparisons, all
+    at 5,000 rows, by 0.2 to 0.65 edges, and more in none.
 
     **How it works.** A variable order gives a DAG, its minimal I-MAP: ``i -> j`` for ``i`` before
     ``j`` unless the conditional-independence test finds them independent given every other

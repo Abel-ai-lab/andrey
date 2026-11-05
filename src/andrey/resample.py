@@ -637,10 +637,10 @@ def _nearest(s: _Slice, coded: list[np.ndarray], fits: Sequence[StructureOutput]
     """Return the valid fit nearest the others: the first with the highest agreement.
 
     It picks among the fits that are valid graphs of the slice's kind (``_is_valid``). A fit's
-    agreement sums, over the pairs, the number of fits that give the pair
-    the fit's own state, no edge included; the highest agreement is the least mean SHD to the
-    fits. ``coded`` holds each fit's codes, as ``_codes`` makes them. When no fit is valid, it
-    returns the fit with the highest agreement, marked invalid.
+    agreement sums, over the pairs, the number of fits that give the pair the fit's own state, no
+    edge included; the highest agreement is the least mean SHD to the fits. ``coded`` holds each
+    fit's codes, as ``_codes`` makes them. When no fit is valid, it returns the fit with the highest
+    agreement, marked invalid.
     """
     n_resamples = len(fits)
     pair = s.codes // _STATES

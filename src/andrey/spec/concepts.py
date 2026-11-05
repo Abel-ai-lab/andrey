@@ -262,11 +262,9 @@ _CONCEPTS = (
                 reason="None is one over the number of observational rows, for both tests, as for "
                 "ut_igsp. On simulated data in the settings of Wang et al. (2017) and Yang, "
                 "Katcoff and Uhler (2018), 1e-3 had the fewest errors of the levels its authors "
-                "swept, 1e-4 to 0.05; then, on fresh datasets, against the authors' reference "
-                "implementation at 1e-3, one over the observational rows and 1e-3 were each worse "
-                "in none of 114 comparisons and had fewer errors in 17, with interval ends "
-                "that are floating-point residue of 0 read as 0, a tie that a rule written before "
-                "the run gives to one over the observational rows.",
+                "swept, 1e-4 to 0.05. The default equals 1e-3 at 1,000 observational rows, and in "
+                "the 50 groups at 10,000 and 100,000 rows per setting it had fewer SHD errors "
+                "than 1e-3 in 1, by 0.28 edges, and more in none.",
             ),
             Deviation(
                 method="ut_igsp",
@@ -274,12 +272,11 @@ _CONCEPTS = (
                 default=None,
                 fixed_in=None,
                 reason="None is one over the number of observational rows, for both tests. On "
-                "simulated data in the paper's setting, against the paper's reference "
-                "implementation at its level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), it "
-                "was worse in none of 112 comparisons and better in 1 on fresh datasets, and lower "
-                "in 17 more on the datasets that chose it. In the run that chose it, "
-                "on datasets of its own, it had fewer errors in 20 and more in none, where 0.001 "
-                "had fewer in 15 and more in 3, none of which repeated on a rerun.",
+                "simulated data in the paper's setting, with 5 starts, 0.001 had fewer SHD errors "
+                "than the paper's level, 1e-5 (Squires, Wang and Uhler 2020, Section 5.1), in 7 of "
+                "15 groups and more in 2, those by about 0.3 edges at 3,000 rows per setting; on "
+                "56 further groups, the default had fewer SHD errors than 0.001 in 4 comparisons, "
+                "all at 5,000 rows per setting, and more in none.",
             ),
         ),
     ),

@@ -534,14 +534,15 @@ def render_skill() -> str:
     a(
         "`andrey markov-check <graph.json> <data.csv> [--indep-test T] [--alpha A] "
         "[--categorical COLUMN ...] [--sample-fraction F] [--seed S]` tests a DAG or CPDAG (the "
-        "JSON of `andrey run <method> -o`) against data: each independence the graph implies "
-        "gets a p-value, and the check asks whether those p-values are uniform. Its envelope "
-        "holds `markov_check`, with `passed` (false when the uniformity p-value is at most "
-        "`--alpha`), `verdict`, `uniformity_p_value`, and `tests`, each with its `x`, `y`, "
-        "`given` (0-based column indices), and `p_value`, plus `run`. Check on rows the graph "
-        "was not learned from. A pass does not show the edges are right: a graph with extra "
-        "edges also passes. A rejection says an implied independence fails in the data, so an "
-        "edge is missing or a collider is wrong."
+        "JSON of `andrey run <method> -o`) against data: each ordered local Markov independence, "
+        "a variable and an earlier non-parent given its parents, gets a p-value, and the check "
+        "asks whether those p-values are uniform. Its envelope holds `markov_check`, with "
+        "`passed` (false when the uniformity p-value is at most `--alpha`), `verdict`, "
+        "`uniformity_p_value`, and `tests`, each with its `x`, `y`, `given` (0-based column "
+        "indices), and `p_value`, plus `run`. Check on rows the graph was not learned from. A "
+        "pass does not show the edges are right: a graph with extra edges also passes. A "
+        "rejection says an implied independence fails in the data, so an edge is missing or a "
+        "collider is wrong."
     )
     a("")
     a("## Data types")

@@ -219,13 +219,13 @@ def markov_check(
     -----
     **Rows per test.** The tests read the same data, so their p-values are uniform one by one but
     not independent, and the Anderson-Darling p-value assumes independence. With every test on every
-    row (``sample_fraction=1.0``, the script of [1]_), the check rejected
-    a true graph in 9% to 21% of 1,000 simulated linear datasets per cell at ``alpha=0.05``, more
-    with more tests (10 and 20 variables, average degree 2 and 4, 200 and 1,000 rows). With each
-    test on its own random half of the rows (the default, as in the text of [1]_), the rate was 6%
-    to 9%, and with each test on new rows it was 5%. A subsample costs power: one missing edge was
-    rejected in 96% to 99% of the datasets at 1,000 rows (98% to 100% on all rows) and in 72% to
-    82% at 200 rows (89% to 93%). The verdict also depends on ``seed``, because the row draws do.
+    row (``sample_fraction=1.0``, the script of [1]_), the check rejected a true graph in 9% to 21%
+    of 1,000 simulated linear datasets per cell at ``alpha=0.05``, more with more tests (10 and 20
+    variables, average degree 2 and 4, 200 and 1,000 rows). With each test on its own random half of
+    the rows (the default, as in the text of [1]_), the rate was 6% to 9%, and with each test on new
+    rows it was 5%. A subsample costs power: one missing edge was rejected in 96% to 99% of the
+    datasets at 1,000 rows (98% to 100% on all rows) and in 72% to 82% at 200 rows (89% to 93%). The
+    verdict also depends on ``seed``, because the row draws do.
 
     **The uniformity p-value.** The Anderson-Darling p-value is exact for one tested independence.
     For two or more it is Marsaglia and Marsaglia's approximation [2]_, which was within 0.002 of

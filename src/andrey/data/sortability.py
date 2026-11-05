@@ -22,7 +22,7 @@ import numpy as np
 def directed_adjacency(edges: np.ndarray, d: int) -> np.ndarray:
     """Build a dense ``(d, d)`` binary adjacency, ``A[i, j] = 1`` iff edge ``i -> j``.
 
-    Here ``i`` is the cause, ``j`` the effect. Dense by construction (the reference sortability
+    Here ``i`` is the cause, ``j`` the effect. Dense by construction (the all-paths sortability
     estimators need it); use only for small/moderate ``d``. ``edges`` is an ``(m, 2)``
     ``(parent, child)`` array.
     """
@@ -45,8 +45,8 @@ def varsortability(x: np.ndarray, adjacency: np.ndarray, *, tol: float = 1e-9) -
     adjacency : np.ndarray of shape (d, d)
         ``adjacency[i, j] != 0`` iff edge ``i -> j``.
     tol : float, default=1e-9
-        Variance-ratio tie tolerance (the reference default; pinned so exact-0.5 results are the
-        claim, not an accident).
+        Variance-ratio tie tolerance: a path whose variance ratio is within ``tol`` of 1 scores
+        ``0.5``.
 
     Returns
     -------
@@ -55,7 +55,7 @@ def varsortability(x: np.ndarray, adjacency: np.ndarray, *, tol: float = 1e-9) -
     """
     e = np.asarray(adjacency) != 0
     d = e.shape[0]
-    var = np.var(x, axis=0, keepdims=True)  # (1, d), ddof=0 (reference convention)
+    var = np.var(x, axis=0, keepdims=True)  # (1, d), ddof=0
     ek = e.copy()
     n_paths = 0.0
     n_correct = 0.0
@@ -75,14 +75,15 @@ def varsortability(x: np.ndarray, adjacency: np.ndarray, *, tol: float = 1e-9) -
 def r2sortability(x: np.ndarray, adjacency: np.ndarray, *, tol: float = 0.0) -> float:
     """R^2-sortability of ``x`` under directed ``adjacency`` (Reisach et al. 2023), all paths.
 
-    Matches ``github.com/CausalDisco/CausalDisco`` (``analytics.py``) for ``n > d``: each node's
-    score is ``1 - 1/diag(inv(corrcoef(x)))`` (variance explained by all other variables); counts
-    directed paths ordered by increasing score. R^2 is derived from the correlation matrix, so this
-    is **unchanged by column standardization** -- the caveat varsortability cannot see.
+    Each node's score is its coefficient of determination from all other variables,
+    ``1 - 1/diag(inv(corrcoef(x)))`` (the variance they explain); counts, over directed paths of
+    every length, the fraction ordered by increasing score, and ties (scores within ``tol``) score
+    ``0.5``. R^2 is derived from the correlation matrix, so this is **unchanged by column
+    standardization** -- the caveat varsortability cannot see.
 
-    For ``n <= d`` the correlation matrix is singular and this returns ``nan`` (a reported skip),
-    rather than switching to a different estimator (CausalDisco falls back to per-variable
-    regression) -- so R^2-sortability stays one well-defined quantity or is explicitly undefined.
+    For ``n <= d`` the correlation matrix is singular and this returns ``nan`` (a reported skip)
+    rather than switching to a different estimator, so R^2-sortability stays one well-defined
+    quantity or is explicitly undefined.
 
     Returns
     -------
@@ -117,9 +118,9 @@ def r2sortability(x: np.ndarray, adjacency: np.ndarray, *, tol: float = 0.0) -> 
 def varsortability_edges(x: np.ndarray, edges: np.ndarray, *, tol: float = 1e-9) -> float:
     """Edge-only varsortability (adjacent pairs), ``O(nnz)`` -- scalable variant for large ``d``.
 
-    A documented deviation from the all-paths reference: counts only direct edges, so it never
-    materializes a dense ``(d, d)`` adjacency. Comparable across graph sizes; use for reporting at
-    ``d`` in the thousands.
+    Unlike :func:`varsortability`, which counts every directed path, this counts only direct edges,
+    so it never materializes a dense ``(d, d)`` adjacency. Comparable across graph sizes; use for
+    reporting at ``d`` in the thousands.
 
     Parameters
     ----------

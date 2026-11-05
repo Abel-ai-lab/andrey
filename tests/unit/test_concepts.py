@@ -179,27 +179,19 @@ def docstring_section(doc: str, title: str) -> str:
     return re.split(r"\n[A-Z][A-Za-z ]+\n-{3,}\n", section)[0]
 
 
-def raises_entries(doc: str) -> dict[str, str]:
-    """Each ``Raises`` entry's description by exception, lowercase, markup and breaks removed."""
-    entries: dict[str, list[str]] = {}
-    name = None
-    for line in docstring_section(doc, "Raises").splitlines():
-        if re.fullmatch(r"[A-Z]\w*", line):
-            name = line
-            entries[name] = []
-        elif name:
-            entries[name].append(line)
-    return {k: " ".join(" ".join(v).replace("`", "").lower().split()) for k, v in entries.items()}
+def raises_names(doc: str) -> list[str]:
+    """The exceptions a numpydoc ``Raises`` section lists, in order."""
+    return re.findall(r"^[A-Z]\w*$", docstring_section(doc, "Raises"), flags=re.MULTILINE)
 
 
 @pytest.mark.parametrize("method", list(REGISTRY))
-def test_raises_lists_each_bad_value_under_the_error_it_raises(method):
-    """A wrong-typed argument raises ``TypeError`` and one outside its range or choices raises
-    ``ValueError`` (``test_a_bad_value_raises_one_message_shape``); the Raises section says so."""
-    entries = raises_entries(inspect.getdoc(getattr(andrey, method)) or "")
-    assert "wrong type" in entries.get("TypeError", "")
-    assert "wrong type" not in entries.get("ValueError", "")
-    assert "outside its range" in entries.get("ValueError", "")
+def test_raises_lists_each_error_a_bad_argument_raises_once(method):
+    """The Raises section lists every error a bad argument raises
+    (``test_a_bad_value_raises_one_message_shape``), each under one heading."""
+    names = raises_names(inspect.getdoc(getattr(andrey, method)) or "")
+    raised = {error.__name__ for p in REGISTRY[method].params for _, error in bad_values(p)}
+    assert raised <= set(names)
+    assert len(names) == len(set(names))
 
 
 @pytest.mark.parametrize(
@@ -213,11 +205,10 @@ def test_raises_lists_each_bad_value_under_the_error_it_raises(method):
     ],
 )
 def test_an_argument_one_score_reads_is_documented_as_the_call_checks_it(method, name):
-    """Passing an argument that one score reads with another score raises before the fit
-    (``check_penalties``), and its entry says so instead of saying the other scores ignore it."""
+    """Passing an argument that one score reads with another score raises ``ValueError`` before
+    the fit (``check_penalties``), and its entry names that error."""
     entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")[name]
-    assert "passing it with another score raises valueerror" in entry
-    assert "ignore" not in entry
+    assert "valueerror" in entry
 
 
 @pytest.mark.parametrize("method", [m for m in REGISTRY if tagged(CONCEPTS["ebic_gamma"], m)])

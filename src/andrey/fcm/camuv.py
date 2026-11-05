@@ -41,12 +41,12 @@ Where the steps here differ from the paper's:
 - The paper does not state the kernels' bandwidth; here it is the median of the positive squared
   distances over every pair of rows.
 - The two screens of marginal dependence are not part of the paper's algorithm, which tests every
-  member of a set and every pair. Under the model they add no
-  conclusion the lemmas do not support: two independent variables share no external effect
-  (Assumption 1), so their residuals are independent too, a member with an independent other member
-  fails line 13, and such a pair is never marked. With tests at ``alpha`` they skip most sink tests
-  and the pairs whose residuals would look dependent by chance; a parent whose marginal dependence
-  the test misses, such as a weak parent beside a strong one, is not found.
+  member of a set and every pair. Under the model they add no conclusion the lemmas do not support:
+  two independent variables share no external effect (Assumption 1), so their residuals are
+  independent too, a member with an independent other member fails line 13, and such a pair is never
+  marked. With tests at ``alpha`` they skip most sink tests and the pairs whose residuals would look
+  dependent by chance; a parent whose marginal dependence the test misses, such as a weak parent
+  beside a strong one, is not found.
 - A set that holds a pair already related, one in the other's candidates, is skipped: Lemma 4
   identifies a sink only with each candidate set outside ``K``. Without the skip, line 18 resets
   ``t`` whenever a known sink is found again, and the search need not end.
