@@ -1397,8 +1397,9 @@ def hc(
         by name or 0-based position, in column order: the variables whose causal module, the
         distribution given their causes, changes across the environments, when the index is only a
         cause and no hidden common cause acts. Their descendants change in distribution too, through
-        them, and are not listed. Both are empty for a single environment, and ``metadata["score"]``
-        is the score of the DAG found over the data and the index. ``metadata["tie_break"]`` is the
+        them, and are not listed, unless the climb stops with a chain directed against the index;
+        see Notes. Both are empty for a single environment, and ``metadata["score"]`` is the score
+        of the DAG found over the data and the index. ``metadata["tie_break"]`` is the
         tie-break rule the fit ran under, ``andrey.config.tie_break``, and ``metadata`` also records
         the penalties its score used, under their parameter names.
 
