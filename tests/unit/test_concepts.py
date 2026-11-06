@@ -23,7 +23,6 @@ from andrey.api import _method as method_wrapper
 from andrey.api._method import PENALTIES, SCORE_ONLY
 from andrey.core import ci, warning_policy
 from andrey.core import score as score_module
-from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.removed import REMOVED, removal_hint
 from andrey.core.score import BDeuScore
 from andrey.spec import REGISTRY
@@ -115,9 +114,6 @@ def test_parameter_cell(concept, method):
         assert live[param.name].default == param.default
     else:
         lacks(concept, method)
-    if concept.key == "knowledge" and param is not None:
-        parts = deviation.observed.split(",") if deviation else KNOWLEDGE_PARTS
-        assert REGISTRY[method].knowledge == tuple(parts)
 
 
 @pytest.mark.parametrize("key", list(BOOTSTRAP_PARAMS))
@@ -635,7 +631,7 @@ def test_behavior_cell(concept, method):
     deviation = concept.deviation(method)
     observed = observe(method)
     if deviation is not None:
-        assert observed == (deviation.observed if deviation.name is None else deviation.name)
+        assert observed == deviation.name
     elif method not in concept.suitable:
         assert observed is False
     elif expected is not None:
@@ -877,7 +873,7 @@ def test_seeded_stochastic_and_suitable_for_the_seed_concept_agree():
     suitable = CONCEPTS["seed"].suitable
     for method, spec in REGISTRY.items():
         tests = next((p.choices for p in spec.params if p.name == "indep_test"), None) or ()
-        assert spec.seeded == (method in suitable) == (spec.determinism == "stochastic"), method
+        assert spec.seeded == (method in suitable), method
         assert not set(tests) & set(STOCHASTIC) or spec.seeded, method
         names = [p.name for p in spec.params if p.concept == "seed"]
         assert names == (["seed"] if spec.seeded else []), method

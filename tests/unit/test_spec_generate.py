@@ -91,6 +91,19 @@ def test_skill_lists_every_method_and_env_var():
     assert "andrey list" in skill and "--help --json" in skill
 
 
+def test_skill_calls_each_command_as_the_contract_does():
+    """The agent guide gives the invocation of run, bootstrap, and markov-check that
+    ``--help --json`` gives, every flag included."""
+    skill = render_skill()
+    cli = help_schema()["cli"]
+    for invocation in (
+        cli["invocation"],
+        cli["bootstrap"]["invocation"],
+        cli["markov_check"]["invocation"],
+    ):
+        assert f"`{invocation}`" in skill
+
+
 def test_skill_is_an_installable_skill_that_explains_every_edge_type():
     import yaml
 

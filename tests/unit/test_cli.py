@@ -410,7 +410,7 @@ def test_a_value_the_method_rejects_is_a_usage_error(
 
 def test_former_names_and_values_map_to_current_ones():
     """A renamed parameter, or a renamed choice, is accepted under its former name."""
-    from andrey.cli import CliError, _resolve_params
+    from andrey.cli import CliError, resolve_params
 
     spec = get_spec("pc")
     renamed = {
@@ -419,19 +419,19 @@ def test_former_names_and_values_map_to_current_ones():
     }
     params = tuple(p.model_copy(update=renamed.get(p.name, {})) for p in spec.params)
     spec = spec.model_copy(update={"params": params})
-    fkwargs, _ = _resolve_params(spec, {"level": 0.2}, ["collider_rule=votes"])
+    fkwargs, _ = resolve_params(spec, {"level": 0.2}, ["collider_rule=votes"])
     assert fkwargs["alpha"] == 0.2 and fkwargs["collider_rule"] == "majority"
     with pytest.raises(CliError) as both:
-        _resolve_params(spec, {}, ["alpha=0.1", "level=0.2"])
+        resolve_params(spec, {}, ["alpha=0.1", "level=0.2"])
     assert both.value.code == "invalid_params"
 
 
 def test_a_dropped_argument_reaches_the_facade_and_not_the_run_params():
     """A dropped argument goes on to the facade, which ignores it, and the run's params omit it."""
-    from andrey.cli import _resolve_params
+    from andrey.cli import resolve_params
 
     spec = get_spec("pc").model_copy(update={"dropped_args": ("former",)})
-    fkwargs, resolved = _resolve_params(spec, {}, ["former=3"])
+    fkwargs, resolved = resolve_params(spec, {}, ["former=3"])
     assert "former" in fkwargs and "former" not in resolved
 
 
@@ -731,11 +731,11 @@ def test_temporal_full_keeps_dense_weights(capsys, monkeypatch, csv_path):
 def test_temporal_edge_cap_is_shared_across_lags():
     """The inline-edge budget is per result, not per lag: many lags each under the limit must not
     collectively exceed it. Three lags of two edges at limit 2 keep two edges total, not six."""
-    from andrey.cli import _truncate_output
+    from andrey.cli import truncate_output
 
     two_edges = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
     struct = {"type": "temporal", "lags": [{"lag": k, "edges": list(two_edges)} for k in range(3)]}
-    cut = _truncate_output(struct, limit=2)
+    cut = truncate_output(struct, limit=2)
     total = sum(len(lag["edges"]) for lag in struct["lags"])
     assert cut is True and total == 2  # aggregate budget, not 2 per lag (would be 6)
     assert any(lag.get("edges_truncated") for lag in struct["lags"])
@@ -873,7 +873,7 @@ def test_method_contract_flag_order_and_no_io(args, capsys, monkeypatch, tmp_pat
     def forbidden(*args, **kwargs):
         pytest.fail("Introspection must not read run inputs or execute a method")
 
-    for name in ("_load_config", "_load_method_inputs", "execute_run"):
+    for name in ("load_config", "load_method_inputs", "execute_run"):
         monkeypatch.setattr(cli, name, forbidden)
     output = tmp_path / "unused.json"
     args += ["--data", "-", "--config", "missing.yaml", "-o", str(output), "unknown=bad"]

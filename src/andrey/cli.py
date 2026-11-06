@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib.metadata
+import inspect
 import io
 import json
 import math
@@ -22,11 +23,13 @@ import os
 import platform
 import re
 import sys
+import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Optional
+from typing import TYPE_CHECKING, Annotated
 
+import numpy as np
 import typer
 
 import andrey
@@ -34,34 +37,41 @@ from andrey.api._adapt import shared_labels, with_labels
 from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
-from andrey.core.knowledge import KnowledgeError
+from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError
+from andrey.core.output import summary_lines
 from andrey.core.removed import removal_hint
-from andrey.core.structure import SUMMARY_EDGES, node_labels
+from andrey.core.structure import SUMMARY_EDGES, edge_count_text, edge_lines, node_labels
+from andrey.resample import bootstrap_summary_lines
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS, MARKOV_CHECK_PARAMS
 from andrey.spec.generate import (
+    EXIT_ALGORITHM,
+    EXIT_DATA,
+    EXIT_INTERNAL,
+    EXIT_OK,
+    EXIT_USAGE,
+    cli_example,
     concepts_dict,
     env_dict,
     grammar_default,
-    grammar_example,
     render_skill,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
 
-    import numpy as np
-
     from andrey import BootstrapOutput, MarkovCheckOutput
     from andrey.core import StructureOutput
     from andrey.spec.models import InputSpec, MethodSpec, ParamSpec
 
-# Exit codes (see andrey.spec.generate.EXIT_CODES).
-EXIT_OK = 0
-EXIT_INTERNAL = 1
-EXIT_USAGE = 2
-EXIT_DATA = 3
-EXIT_ALGORITHM = 4
+#: The defaults of ``andrey.bootstrap`` and ``andrey.markov_check``, which the flags of the
+#: commands take.
+BOOTSTRAP_DEFAULTS = {
+    n: p.default for n, p in inspect.signature(andrey.bootstrap).parameters.items()
+}
+MARKOV_CHECK_DEFAULTS = {
+    n: p.default for n, p in inspect.signature(andrey.markov_check).parameters.items()
+}
 
 # Output bounds: a large graph must not flood stdout / an agent's context. The full count and the
 # edge-type breakdown survive; only the inline edge list is capped (--full / -o keep everything).
@@ -137,8 +147,6 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
     first row that mixes unquoted numbers with text (``a,1,b`` or ``1,2,bad``) is neither, so it
     surfaces as ``bad_data`` rather than being read as a header or as a truncated dataset.
     """
-    import numpy as np
-
     first = next((ln for ln in raw.splitlines() if ln.strip()), "")
     unquoted = re.sub(r'"(?:[^"]|"")*"', "", first)
     delimiter = "," if "," in unquoted else ("\t" if "\t" in unquoted else None)
@@ -191,8 +199,6 @@ def _parse_text(raw: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
 
 def load(path: str) -> tuple[np.ndarray, tuple[str, ...] | None]:
     """Load one array and its header's column names from a path (CSV / TSV / .npy) or ``-``."""
-    import numpy as np
-
     if path == "-":
         if sys.stdin.isatty():  # never block waiting on a keyboard -- "never prompts"
             raise CliError(
@@ -402,7 +408,7 @@ def _size(shape: list[int]) -> int:
     return total
 
 
-def _truncate_output(struct: dict, limit: int) -> bool:
+def truncate_output(struct: dict, limit: int) -> bool:
     """Cap a structure's inline edges (and temporal weight stacks); return if anything was cut.
 
     The summary fields (``n_edges``, ``edge_types``, the weight ``*_shape``) always survive, so a
@@ -438,7 +444,7 @@ def _truncate_output(struct: dict, limit: int) -> bool:
     return cut
 
 
-def _apply_output_cap(env: dict, limit: int) -> None:
+def apply_output_cap(env: dict, limit: int) -> None:
     """Cap inline edges and dense weight stacks across a single- or multi-output envelope.
 
     Counts and shape summaries always survive -- only bulk arrays are cut, so a large result never
@@ -447,7 +453,7 @@ def _apply_output_cap(env: dict, limit: int) -> None:
     caller how to get the whole thing back.
     """
     results = env["results"] if env.get("multi") else [env]
-    cut = [_truncate_output(r["structure"], limit) for r in results if "structure" in r]
+    cut = [truncate_output(r["structure"], limit) for r in results if "structure" in r]
     check = env.get("markov_check")
     if check is not None and len(check["tests"]) > limit:  # a Markov check keeps its smallest p
         keep = sorted(
@@ -491,15 +497,15 @@ def render_human(
     """
     limit = None if full else SUMMARY_EDGES
     if not isinstance(out, list):
-        lines = out._summary(name=spec.name, limit=limit, more=_MORE_HINT)
+        lines = summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
         return "\n".join(lines) + _run_footer(run)
     lines = [f"{spec.name}  |  {len(out)} groups"]  # multi-group: one block per group
     for k, o in enumerate(out):
         graph = o.structure
         assert isinstance(graph, GraphStructure)  # every group's result is a graph
         weights = o.to_scipy_sparse()  # every group's result is weighted
-        lines += ["", f"  group {k}  {graph.kind}  |  {graph._edge_count_text()}"]
-        edges = graph._edge_lines(weights=weights, limit=limit, more=_MORE_HINT)
+        lines += ["", f"  group {k}  {graph.kind}  |  {edge_count_text(graph)}"]
+        edges = edge_lines(graph, weights=weights, limit=limit, more=_MORE_HINT)
         lines += ["    " + line for line in edges]
     return "\n".join(lines) + _run_footer(run)
 
@@ -513,12 +519,11 @@ def render_bootstrap_human(
     """
     limit = None if full else SUMMARY_EDGES
     if not isinstance(out, list):
-        return "\n".join(out._summary(name=spec.name, limit=limit, more=_MORE_HINT)) + _run_footer(
-            run
-        )
+        lines = bootstrap_summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
+        return "\n".join(lines) + _run_footer(run)
     lines = [f"{spec.name}  |  {len(out)} groups"]
     for k, o in enumerate(out):
-        lines += ["", *o._summary(name=f"group {k}", limit=limit, more=_MORE_HINT)]
+        lines += ["", *bootstrap_summary_lines(o, name=f"group {k}", limit=limit, more=_MORE_HINT)]
     return "\n".join(lines) + _run_footer(run)
 
 
@@ -677,14 +682,13 @@ def _json_value(raw: str, name: str) -> object:
 
 def _knowledge_object(value: object, name: str) -> dict:
     """Check a knowledge object's keys; the facade checks its contents."""
-    keys = ("required", "forbidden", "allowed", "tiers")
-    if not isinstance(value, dict) or set(value) - set(keys):
+    if not isinstance(value, dict) or set(value) - set(KNOWLEDGE_PARTS):
         raise CliError(
             "bad_value",
-            f"{name} must be a JSON object whose keys are among {', '.join(keys)}; each is "
-            "optional",
+            f"{name} must be a JSON object whose keys are among {', '.join(KNOWLEDGE_PARTS)}; "
+            "each is optional",
             EXIT_USAGE,
-            valid_options=list(keys),
+            valid_options=list(KNOWLEDGE_PARTS),
         )
     return value
 
@@ -793,7 +797,7 @@ def _parse_overrides(tokens: Sequence[str]) -> tuple[dict[str, str], list[dict]]
     return raw, errors
 
 
-def _load_config(path: str) -> dict:
+def load_config(path: str) -> dict:
     """Load a `--config` YAML/JSON param file into a dict (yaml.safe_load parses JSON too)."""
     import yaml
 
@@ -837,7 +841,7 @@ def _current_names(layer: dict, former: dict[str, str], errors: list[dict]) -> d
     return renamed
 
 
-def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tuple[dict, dict]:
+def resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tuple[dict, dict]:
     """Layer spec defaults < --config < key=value overrides; coerce / validate against the spec. All
     problems collect into one `invalid_params` envelope (a `details` list).
 
@@ -898,7 +902,7 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
     return fkwargs, resolved
 
 
-def _load_method_inputs(
+def load_method_inputs(
     spec: MethodSpec, provided: dict[str, list[str] | None]
 ) -> tuple[list, tuple[str, ...] | None]:
     """Load a method's array inputs from their `--flag` value(s).
@@ -934,8 +938,6 @@ def _load_method_inputs(
                     f"{inp.flag} {vals[0]!r} names both a column of --data and a file; rename one",
                     EXIT_USAGE,
                 )
-            import numpy as np
-
             j = headers[0].index(vals[0])
             column = positional[0][:, j]
             positional.append(_env_labels(column) if inp.name == "env" else column)
@@ -955,8 +957,6 @@ def _env_labels(values: np.ndarray | list[np.ndarray]) -> np.ndarray:
     which the method's own check names. A label of ``2**53`` or more stays a float too: float64
     cannot tell such integers apart, so their integer form would not be exact.
     """
-    import numpy as np
-
     values = np.asarray(values)
     if not np.isfinite(values).all() or (np.abs(values) >= 2.0**53).any():
         return values
@@ -986,20 +986,38 @@ def column_positions(
     return positions
 
 
-def _prepare_call(
+def load_call(
+    spec: MethodSpec,
+    provided: dict[str, list[str] | None],
+    config: str | None,
+    overrides: Sequence[str] | None,
+) -> tuple[list, dict, dict, tuple[str, ...] | None]:
+    """Check the ``ANDREY_*`` variables and resolve the params from ``--config`` and the
+    overrides before reading any data, then load the inputs.
+
+    Returns the inputs, the params the call passes, every param's value, and the first input's
+    header.
+    """
+    check_environment()
+    layer = load_config(config) if config else {}
+    fkwargs, resolved = resolve_params(spec, layer, overrides or [])
+    positional, labels = load_method_inputs(spec, provided)
+    return positional, fkwargs, resolved, labels
+
+
+def prepare_call(
     spec: MethodSpec,
     positional: list,
     fkwargs: dict,
-    resolved: dict,
     labels: tuple[str, ...] | None,
-) -> tuple[list, dict, dict, tuple[str, ...] | None]:
+) -> tuple[list, dict, tuple[str, ...] | None]:
     """Shape the loaded inputs and coerced params into what the facade takes.
 
     ``categorical=`` names become positions, and ``knowledge=`` becomes an ``andrey.Knowledge``;
     the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
     it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
     (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
-    Returns the inputs, params, resolved params, and the labels still to apply to the result.
+    Returns the inputs, params, and the labels still to apply to the result.
     """
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
@@ -1026,11 +1044,11 @@ def _prepare_call(
         positional = [first, *positional[1:]]
         if spec.output.has_latents:
             labels = None
-    return positional, fkwargs, resolved, labels
+    return positional, fkwargs, labels
 
 
 @contextlib.contextmanager
-def _fit_errors() -> Generator[None]:
+def fit_errors() -> Generator[None]:
     """Turn what a fit raises into the ``CliError`` that names its exit code."""
     try:
         yield
@@ -1050,7 +1068,7 @@ def _fit_errors() -> Generator[None]:
         raise CliError("algorithm_failure", str(exc), EXIT_ALGORITHM) from exc
 
 
-def _run_info(
+def run_info(
     positional: list,
     resolved: dict,
     elapsed: float,
@@ -1065,18 +1083,18 @@ def _run_info(
         "n_samples": int(first.shape[0]),
         "n_variables": int(first.shape[1]),
         "versions": versions(),
-        "warnings": _warning_views(caught),
+        "warnings": warning_views(caught),
     }
     return run
 
 
-def _emit(env: dict, human: Callable[[], str], *, output: str | None, as_json: bool, full: bool):
+def emit(env: dict, human: Callable[[], str], *, output: str | None, as_json: bool, full: bool):
     """Write the envelope to ``output``, or print it: capped JSON, or ``human()`` on a terminal."""
     if output:  # a file is not context-bounded -> always the complete envelope
         _atomic_write(output, json.dumps(env, indent=2))
         return
     if not full:  # bound stdout so a large graph can't flood it
-        _apply_output_cap(env, EDGE_LIMIT)
+        apply_output_cap(env, EDGE_LIMIT)
     if as_json or not sys.stdout.isatty():  # piped / agent / CI / forced -> JSON
         typer.echo(json.dumps(env, indent=2))
         return
@@ -1101,14 +1119,10 @@ def execute_run(
 
     ``labels`` (the data's header) name the result's nodes.
     """
-    import time
-
-    positional, fkwargs, resolved, labels = _prepare_call(
-        spec, positional, fkwargs, resolved, labels
-    )
+    positional, fkwargs, labels = prepare_call(spec, positional, fkwargs, labels)
     fn = getattr(andrey, spec.name)
     start = time.perf_counter()
-    with _fit_errors():
+    with fit_errors():
         # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -1119,12 +1133,12 @@ def execute_run(
     else:
         out = with_labels(out, labels)
 
-    run = _run_info(positional, resolved, elapsed, caught)
+    run = run_info(positional, resolved, elapsed, caught)
     seed = (out[0] if isinstance(out, list) else out).metadata.get("seed")
     if seed is not None:  # the effective seed: resolve_seed applied the ANDREY_SEED fallback
         run["seed"] = seed
     env = envelope(spec, out, run)
-    _emit(
+    emit(
         env,
         lambda: render_human(spec, out, run, full=full),
         output=output,
@@ -1166,8 +1180,6 @@ def execute_bootstrap(
 
     The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
     """
-    import time
-
     if fkwargs.get("seed") is not None:
         raise CliError(
             "bad_value", "the bootstrap seeds each fit itself; set --seed, not seed=", EXIT_USAGE
@@ -1203,13 +1215,11 @@ def execute_bootstrap(
         raise CliError("bad_value", "; ".join(bad), EXIT_USAGE)
     fkwargs = {k: v for k, v in fkwargs.items() if k != "seed"}
     resolved = {k: v for k, v in resolved.items() if k != "seed"}
-    positional, fkwargs, resolved, labels = _prepare_call(
-        spec, positional, fkwargs, resolved, labels
-    )
+    positional, fkwargs, labels = prepare_call(spec, positional, fkwargs, labels)
     positional = [_table(positional[0], labels), *positional[1:]]
     aligned = {inp.name: x for inp, x in zip(spec.data.inputs[1:], positional[1:])}
     start = time.perf_counter()
-    with _fit_errors():
+    with fit_errors():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             out = andrey.bootstrap(
@@ -1225,9 +1235,9 @@ def execute_bootstrap(
                 **aligned,
                 **fkwargs,
             )
-    run = _run_info(positional, resolved, time.perf_counter() - start, caught)
+    run = run_info(positional, resolved, time.perf_counter() - start, caught)
     env = bootstrap_envelope(spec, out, run)
-    _emit(
+    emit(
         env,
         lambda: render_bootstrap_human(spec, out, run, full=full),
         output=output,
@@ -1242,8 +1252,6 @@ def load_graph(path: str) -> GraphStructure:
     The file is what ``StructureOutput.save`` writes (JSON or ``.npz``), or the JSON that
     ``andrey run <method> -o <file>`` writes, whose ``structure`` lists the edges.
     """
-    import numpy as np
-
     from andrey.core import StructureOutput
     from andrey.core.structure import ARROW, EDGE_DTYPE, TAIL
 
@@ -1315,8 +1323,6 @@ def execute_markov_check(
     full: bool,
 ) -> None:
     """Test the graph's implied independences against the data, then emit the check."""
-    import time
-
     graph = load_graph(graph_path)
     data, labels = load(data_path)
     bad = []
@@ -1335,7 +1341,7 @@ def execute_markov_check(
     positions = None if categorical is None else column_positions(categorical, labels)
     table = _table(data, labels)
     start = time.perf_counter()
-    with _fit_errors():
+    with fit_errors():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             out = andrey.markov_check(
@@ -1354,10 +1360,10 @@ def execute_markov_check(
         "seed": out.metadata["seed"],
         "categorical": categorical,
     }
-    run = _run_info([table], resolved, time.perf_counter() - start, caught)
+    run = run_info([table], resolved, time.perf_counter() - start, caught)
     run["seed"] = out.metadata["seed"]
     env = markov_check_envelope(out, run)
-    _emit(
+    emit(
         env,
         lambda: render_markov_check_human(out, run, full=full),
         output=output,
@@ -1366,27 +1372,10 @@ def execute_markov_check(
     )
 
 
-def _warning_views(caught: list[warnings.WarningMessage]) -> list[dict]:
+def warning_views(caught: list[warnings.WarningMessage]) -> list[dict]:
     """Each distinct warning once, in the order raised."""
     views = ({"category": w.category.__name__, "message": str(w.message)} for w in caught)
     return list({(v["category"], v["message"]): v for v in views}.values())
-
-
-def _example(spec: MethodSpec, command: str = "run") -> str:
-    """A runnable, copy-paste example for a method (list values quoted for zsh)."""
-    parts = ["andrey", command, spec.name]
-    for inp in spec.data.inputs:
-        if inp.kind == "panel":
-            parts += [inp.flag, "a.csv", inp.flag, "b.csv"]
-        else:
-            parts += [inp.flag, "data.csv" if inp.name == "data" else f"{inp.name}.csv"]
-    if spec.params:
-        p = spec.params[0]
-        val = grammar_example(p)
-        parts.append(
-            f"'{p.name}={val}'" if p.type in ("int_pair", "str_list") else f"{p.name}={val}"
-        )
-    return " ".join(parts)
 
 
 def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
@@ -1418,12 +1407,14 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
             lines.append(f"  {p.name}={grammar_default(p)}{choices}   {p.doc}")
     flags = "--config <file> (YAML/JSON base), -o <file>, --json, --full"
     if command == "bootstrap":
+        default = BOOTSTRAP_DEFAULTS
         lines += [
             "",
-            "Bootstrap flags: --n-resamples <n> (default 100), --seed <int>, --threshold <share> "
-            "(default 0.5, in [0.5, 1]), --strict,",
-            "  --resampling subsample|bootstrap (default subsample), --sample-fraction <share> "
-            "(default 0.5, a subsample's rows),",
+            f"Bootstrap flags: --n-resamples <n> (default {default['n_resamples']}), --seed <int>, "
+            f"--threshold <share> (default {default['threshold']}, in [0.5, 1]), --strict,",
+            f"  --resampling subsample|bootstrap (default {default['resampling']}), "
+            f"--sample-fraction <share> (default {default['sample_fraction']}, a subsample's "
+            "rows),",
             "  --block-length <rows> (--resampling bootstrap of a time-series method on one "
             "series). Workers follow ANDREY_N_JOBS.",
         ]
@@ -1432,7 +1423,7 @@ def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
         f"Run flags: {flags}",
         "",
         "Example:",
-        f"  {_example(spec, command)}",
+        f"  {cli_example(spec, command, files=True)}",
         "",
         f"Full schema: andrey {command} {spec.name} --help --json",
     ]
@@ -1618,13 +1609,11 @@ def render_config_help() -> str:
 
 
 def versions() -> dict:
-    import numpy
-
-    return {"andrey": andrey.__version__, "numpy": numpy.__version__, "python": _py_version()}
-
-
-def _py_version() -> str:
-    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    return {
+        "andrey": andrey.__version__,
+        "numpy": np.__version__,
+        "python": platform.python_version(),
+    }
 
 
 def _atomic_write(path: str, text: str) -> None:
@@ -1655,7 +1644,7 @@ def _version_callback(value: bool) -> None:
 
 
 @app.callback(invoke_without_command=True, add_help_option=False)
-def _root(
+def root(
     ctx: typer.Context,
     version: bool = typer.Option(
         False, "--version", callback=_version_callback, is_eager=True, help="Show version and exit."
@@ -1754,12 +1743,12 @@ def cmd_config(
 
 @app.command("calibrate")
 def cmd_calibrate(
-    workers: Optional[int] = typer.Option(
+    workers: int | None = typer.Option(
         None,
         "--workers",
         help="Pool size to measure; default: ANDREY_N_JOBS if above 1, else all usable CPUs.",
     ),
-    method: Optional[list[str]] = typer.Option(
+    method: list[str] | None = typer.Option(
         None,
         "--method",
         help="Measure only this method (ges, skeleton, or rcot); repeatable. Default: all.",
@@ -1859,7 +1848,7 @@ def render_calibration(report: dict) -> str:
     return "\n".join(lines)
 
 
-def _method_or_help(
+def method_or_help(
     ctx: typer.Context, method: str | None, show_help: bool, as_json: bool
 ) -> MethodSpec | None:
     """Return the method's spec, or ``None`` after printing its help (or the command's)."""
@@ -1898,8 +1887,8 @@ def _method_or_help(
 
 
 # The options `run` and `bootstrap` share.
-_DataOption = Annotated[
-    Optional[list[str]],
+DataOption = Annotated[
+    list[str] | None,
     typer.Option(
         "--data",
         metavar="PATH|-",
@@ -1908,26 +1897,26 @@ _DataOption = Annotated[
         "(a panel) needs the flag once per dataset.",
     ),
 ]
-_EnvOption = Annotated[
-    Optional[list[str]],
+EnvOption = Annotated[
+    list[str] | None,
     typer.Option(
         "--env",
         metavar="COLUMN|PATH",
-        help="cdnod, fci_jci, icp, gies, gnies, igsp, ut_igsp only: the environment of each row, "
-        "a column of --data's header (then not a variable) or a file with one value per row of "
-        "--data.",
+        help=", ".join(s.name for s in list_specs() if any(i.name == "env" for i in s.data.inputs))
+        + " only: the environment of each row, a column of --data's header (then not a variable) "
+        "or a file with one value per row of --data.",
     ),
 ]
-_ConfigOption = Annotated[
-    Optional[str],
+ConfigOption = Annotated[
+    str | None,
     typer.Option(
         "--config",
         metavar="PATH",
         help="YAML or JSON file of parameters; key=value arguments override it.",
     ),
 ]
-_OutputOption = Annotated[
-    Optional[str],
+OutputOption = Annotated[
+    str | None,
     typer.Option(
         "-o",
         "--output",
@@ -1935,8 +1924,8 @@ _OutputOption = Annotated[
         help="Write the complete result as JSON to PATH instead of printing it.",
     ),
 ]
-_JsonOption = Annotated[bool, typer.Option("--json", help="Use JSON even on a terminal.")]
-_HelpOption = Annotated[
+JsonOption = Annotated[bool, typer.Option("--json", help="Use JSON even on a terminal.")]
+HelpOption = Annotated[
     bool,
     typer.Option(
         "--help",
@@ -1953,31 +1942,28 @@ def cmd_run(
     method: str | None = typer.Argument(
         None, metavar="METHOD", help="Method to run (see: andrey list)."
     ),
-    overrides: Optional[list[str]] = typer.Argument(
+    overrides: list[str] | None = typer.Argument(
         None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
     ),
-    data: _DataOption = None,
-    env: _EnvOption = None,
-    config: _ConfigOption = None,
-    output: _OutputOption = None,
-    as_json: _JsonOption = False,
+    data: DataOption = None,
+    env: EnvOption = None,
+    config: ConfigOption = None,
+    output: OutputOption = None,
+    as_json: JsonOption = False,
     full: bool = typer.Option(
         False,
         "--full",
         help=f"Print every edge and weight. Without it, a terminal shows the first {SUMMARY_EDGES} "
         f"edges, and JSON output at most {EDGE_LIMIT}.",
     ),
-    show_help: _HelpOption = False,
+    show_help: HelpOption = False,
 ) -> None:
     r"""Run a method on a data file: andrey run <method> --data <path|-> \[key=value ...]."""
-    spec = _method_or_help(ctx, method, show_help, as_json)
+    spec = method_or_help(ctx, method, show_help, as_json)
     if spec is None:
         return
     provided = {"data": data, "env": env}
-    check_environment()
-    cfg = _load_config(config) if config else {}
-    fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
-    positional, labels = _load_method_inputs(spec, provided)
+    positional, fkwargs, resolved, labels = load_call(spec, provided, config, overrides)
     execute_run(
         spec,
         positional,
@@ -1996,33 +1982,33 @@ def cmd_bootstrap(
     method: str | None = typer.Argument(
         None, metavar="METHOD", help="Method to refit (see: andrey list)."
     ),
-    overrides: Optional[list[str]] = typer.Argument(
+    overrides: list[str] | None = typer.Argument(
         None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
     ),
-    data: _DataOption = None,
-    env: _EnvOption = None,
-    n_resamples: Optional[int] = typer.Option(
-        None, "--n-resamples", metavar="N", help="Number of resamples and fits. Default 100."
+    data: DataOption = None,
+    env: EnvOption = None,
+    n_resamples: int | None = typer.Option(
+        None,
+        "--n-resamples",
+        metavar="N",
+        help=f"Number of resamples and fits. Default {BOOTSTRAP_DEFAULTS['n_resamples']}.",
     ),
-    seed: Optional[int] = typer.Option(
+    seed: int | None = typer.Option(
         None,
         "--seed",
         help="Seed of the resamples. Without it, ANDREY_SEED, else 0.",
     ),
     threshold: float = typer.Option(
-        0.5,
-        "--threshold",
-        help="A pair of the averaged graph must be adjacent in more than this share of the fits, "
-        "or in all of them, in [0.5, 1].",
+        BOOTSTRAP_DEFAULTS["threshold"], "--threshold", help=BOOTSTRAP_PARAMS["threshold"].doc
     ),
     strict: bool = typer.Option(
-        False,
+        BOOTSTRAP_DEFAULTS["strict"],
         "--strict",
         help="Fail when the vote of the fits has no valid graph of the method's kind, instead of "
         "returning the resample graph nearest the others with a warning.",
     ),
     resampling: str = typer.Option(
-        "subsample",
+        BOOTSTRAP_DEFAULTS["resampling"],
         "--resampling",
         metavar="subsample|bootstrap",
         help="How a resample is drawn: a subsample (without replacement; one stretch of rows for a "
@@ -2030,45 +2016,42 @@ def cmd_bootstrap(
         "rows for such a method).",
     ),
     sample_fraction: float = typer.Option(
-        0.5,
+        BOOTSTRAP_DEFAULTS["sample_fraction"],
         "--sample-fraction",
         metavar="SHARE",
         help="Share of the rows in a subsample, in (0, 1]. Not used by bootstrap resampling.",
     ),
-    block_length: Optional[int] = typer.Option(
+    block_length: int | None = typer.Option(
         None,
         "--block-length",
         metavar="ROWS",
         help="Block bootstrap of a time-series method on one series: rows per block. Default "
         "max(ceil(rows ** (1/3)), 10 * tau_max), at most the rows.",
     ),
-    config: _ConfigOption = None,
-    output: _OutputOption = None,
-    as_json: _JsonOption = False,
+    config: ConfigOption = None,
+    output: OutputOption = None,
+    as_json: JsonOption = False,
     full: bool = typer.Option(
         False,
         "--full",
         help=f"Print every edge and frequency. Without it, a terminal shows the first "
         f"{SUMMARY_EDGES} edges, and JSON output at most {EDGE_LIMIT} of each list.",
     ),
-    show_help: _HelpOption = False,
+    show_help: HelpOption = False,
 ) -> None:
     r"""Refit a method on resamples: andrey bootstrap <method> --data <path|-> \[key=value ...]."""
-    spec = _method_or_help(ctx, method, show_help, as_json)
+    spec = method_or_help(ctx, method, show_help, as_json)
     if spec is None:
         return
     provided = {"data": data, "env": env}
-    check_environment()
-    cfg = _load_config(config) if config else {}
-    fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
-    positional, labels = _load_method_inputs(spec, provided)
+    positional, fkwargs, resolved, labels = load_call(spec, provided, config, overrides)
     execute_bootstrap(
         spec,
         positional,
         fkwargs,
         resolved,
         labels=labels,
-        n_resamples=100 if n_resamples is None else n_resamples,
+        n_resamples=BOOTSTRAP_DEFAULTS["n_resamples"] if n_resamples is None else n_resamples,
         seed=seed,
         threshold=threshold,
         strict=strict,
@@ -2091,34 +2074,37 @@ def cmd_markov_check(
     data: str = typer.Argument(
         ..., metavar="DATA", help="The data to check against: CSV, TSV, whitespace text, or .npy."
     ),
-    indep_test: Optional[str] = typer.Option(
+    indep_test: str | None = typer.Option(
         None,
         "--indep-test",
         help="The conditional-independence test, as the methods take it. Default: from the "
         "declared column types.",
     ),
     alpha: float = typer.Option(
-        0.05, "--alpha", help="The level of the uniformity test, in (0, 1). Default 0.05."
+        MARKOV_CHECK_DEFAULTS["alpha"],
+        "--alpha",
+        help="The level of the uniformity test, in (0, 1). "
+        f"Default {MARKOV_CHECK_DEFAULTS['alpha']}.",
     ),
-    categorical: Optional[list[str]] = typer.Option(
+    categorical: list[str] | None = typer.Option(
         None,
         "--categorical",
         metavar="COLUMN",
         help="A categorical column, by name or 0-based position; repeatable.",
     ),
     sample_fraction: float = typer.Option(
-        0.5,
+        MARKOV_CHECK_DEFAULTS["sample_fraction"],
         "--sample-fraction",
         metavar="SHARE",
         help="Share of the rows each test reads, in (0, 1]; 1 reads every row in every test.",
     ),
-    seed: Optional[int] = typer.Option(
+    seed: int | None = typer.Option(
         None,
         "--seed",
         help="Seed of the row draws and randomized tests. Without it, ANDREY_SEED, else 0.",
     ),
-    output: _OutputOption = None,
-    as_json: _JsonOption = False,
+    output: OutputOption = None,
+    as_json: JsonOption = False,
     full: bool = typer.Option(
         False,
         "--full",
@@ -2170,8 +2156,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             hit = re.search(r"(?i)no such option:?\s+(--[\w-]+)", msg)
             if hit:
                 key = hit.group(1).lstrip("-").replace("-", "_")
-                if key in {p.name for s in REGISTRY.values() for p in s.params}:
-                    extra = {"did_you_mean": f"{key}=<value> (params are key=value, not --flags)"}
+                hint = _flag_hint(hit.group(1))
+                if "did_you_mean" in hint:
+                    extra = {"did_you_mean": hint["did_you_mean"]}
+                    msg = _with_hint(msg, hint["message"])
                 method = next((a for a in args if a in REGISTRY), "")
                 ctx = getattr(exc, "ctx", None)
                 name = ctx.info_name if ctx is not None else ""
