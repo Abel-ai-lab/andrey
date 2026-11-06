@@ -1020,11 +1020,11 @@ _CONCEPTS = (
         summary="Each row's environment, one input with one meaning: one label per row, text or "
         "finite numbers, or the name of a column of a DataFrame data, which is then not a "
         "variable; or, with env left out, data given as one table per environment, labeled by "
-        "position or key. A method reads it one of two ways: with targets, as interventions, each "
-        "distinct label one environment that changes the mechanisms of its targets, known or "
-        "learned (gies, gnies, icp, igsp, ut_igsp); or as a context variable that no data "
-        "variable causes, the environment index, which joins the search as one more variable "
-        "(cdnod, fci_jci).",
+        "position or key. A method reads it one of two ways: as interventions, each distinct "
+        "label one environment that changes the mechanisms of its targets, known or learned "
+        "(gies, gnies, igsp, ut_igsp), or of any variables as long as it leaves the target's "
+        "mechanism alone (icp); or as a context variable that no data variable causes, the "
+        "environment index, which joins the search as one more variable (cdnod, fci_jci).",
         fragment="one label per row",
         suitable=("cdnod", "fci_jci", "icp", "gies", "gnies", "igsp", "ut_igsp"),
         exempt=(
@@ -1044,9 +1044,9 @@ _CONCEPTS = (
                 *("boss", "grasp", "boss_fci", "grasp_fci", "ges", "gfci", "hc", "tabu"),
             ),
             *_exempt(
-                "Takes no env: reading it as a context variable that no data variable causes "
-                "needs a search that keeps the index's edges pointing out of it, which this one "
-                "does not have.",
+                "Not taken yet: env suits it as a context variable that no data variable causes, "
+                "which its knowledge could hold as forbidden edges into the index, but it does not "
+                "read env.",
                 *("xges", "exact_search", "mmhc", "rsmax2"),
             ),
             *_exempt(
@@ -1056,13 +1056,13 @@ _CONCEPTS = (
             ),
             *_exempt(
                 "A time-series method: its rows are the steps of a series, read in order through "
-                "its lags, with no place for a context variable.",
+                "its lags, and it takes no context variable here.",
                 *PCMCI_FAMILY,
                 *("granger", "varma_lingam", "dynotears"),
             ),
             *_exempt(
-                "Continuous optimization over weighted adjacency matrices, with no constraint "
-                "that keeps a context variable's edges pointing out of it.",
+                "Continuous optimization of a least-squares or Gaussian likelihood loss, which "
+                "reads every column as a continuous variable; an environment label is not one.",
                 *CONTINUOUS,
                 "calm",
             ),

@@ -29,11 +29,12 @@ environment, with one meaning: one label per row, text or finite numbers, or the
 of a DataFrame `data`, which is then not a variable, or, with `env` left out, the data given as one
 table per environment (see below). `andrey run` reads it from `--env`, a column of `--data` or a
 file. A label that is missing or infinite raises a `ValueError`. The methods read `env` in one of
-two ways. `gies`, `gnies`, `icp`, `igsp`, and `ut_igsp` read it with `targets` as interventions:
-each distinct label is one environment, which changes the mechanisms of its targets, known or
-learned, and leaves the others as they are. `cdnod` and `fci_jci` read it as a context variable
-that no data variable causes, the environment index, which joins the search as one more variable;
-a numeric label, such as a time step, stays a number.
+two ways. `gies`, `gnies`, `igsp`, and `ut_igsp` read it as interventions: each distinct label is
+one environment, which changes the mechanisms of its targets, known or learned, and leaves the
+others as they are. `icp` reads it as interventions on any variables, as long as they leave the
+mechanism of its `target` alone. `cdnod` and `fci_jci` read it as a context variable that no data
+variable causes, the environment index, which joins the search as one more variable; a numeric
+label, such as a time step, stays a number.
 
 `gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
 variables, by name or position, with `[]` for an observational environment; as the name of a column
