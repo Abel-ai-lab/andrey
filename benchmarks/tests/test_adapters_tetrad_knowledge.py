@@ -142,11 +142,11 @@ def test_a_fit_without_knowledge_runs_without_the_file(monkeypatch) -> None:
 
 @pytest.mark.parametrize("adapter", [*CMD, *LIB], ids=lambda a: a.name)
 def test_possible_d_separation_runs_where_the_search_has_it(adapter) -> None:
-    """causal-cmd's fci, gfci, and grasp-fci take ``possibleMsepDone``; bfci and 7.6.10's
-    BOSS-FCI and GRaSP-FCI have no setting for it."""
+    """causal-cmd's fci and gfci take ``possibleMsepDone``; its bfci and grasp-fci and 7.6.10's
+    BOSS-FCI and GRaSP-FCI have no possible-d-separation step."""
     if isinstance(adapter, tetrad_cmd._TetradCmd):
         named = "--possibleMsepDone" in adapter._arguments(adapter.params())
-        assert named == (adapter.algorithm != "boss_fci")
+        assert named == (adapter.algorithm in ("fci", "gfci"))
     else:
         assert adapter.settings({}).get("doPossibleDsep", False) == (adapter.algorithm == "fci")
 

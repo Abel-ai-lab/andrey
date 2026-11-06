@@ -29,6 +29,7 @@ whose Reproduce table lists the driver.
 | R packages | `r_packages.py` | PC, FCI, GES, hill climbing, Tabu search | pcalg, bnlearn | 0.2.0 |
 | [FCI collider configurations](comparisons/fci-colliders.md) | `fci_latent.py` | FCI, both collider rules | causal-learn | 0.1.0, 0.2.0, 0.9.0 |
 | [GFCI](comparisons/gfci.md) | `gfci_latent.py` | GFCI | Tetrad | 0.7.0, 0.9.0 |
+| [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
@@ -48,8 +49,8 @@ whose Reproduce table lists the driver.
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
-Tetrad's FCI-JCI, BOSS-FCI, and GRaSP-FCI adapters, through both Tetrad drivers and with background
-knowledge, and pcalg's FCI-JCI adapter have no driver yet; [Tetrad on continuous
+Tetrad's FCI-JCI adapters, through both Tetrad drivers and with background knowledge, and pcalg's
+FCI-JCI adapter have no driver yet; [Tetrad on continuous
 data](comparisons/tetrad-continuous.md#knowledge-fci-jci-boss-fci-and-grasp-fci) describes them.
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,

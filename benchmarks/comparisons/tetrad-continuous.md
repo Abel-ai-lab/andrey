@@ -84,7 +84,8 @@ reported with their cause; a reference package's graph is a measurement, not a t
 
 ## Knowledge, FCI-JCI, BOSS-FCI, and GRaSP-FCI
 
-No driver runs these adapters yet; they are ready for the FCI-JCI, BOSS-FCI, and GRaSP-FCI lanes.
+The [BOSS-FCI and GRaSP-FCI](boss-fci-grasp-fci.md) lane runs the BOSS-FCI and GRaSP-FCI
+adapters; the FCI-JCI adapters are ready for their lane.
 Each Tetrad one times its search inside the JVM, as above, through either driver:
 
 | Search | tetrad-lib 7.6.10 (`tetrad_search.py`) | causal-cmd 1.12.0 (`tetrad_pag.py`) |
@@ -107,8 +108,9 @@ PAG covers every column, context variables included. pcalg's FCI-JCI (`pcalg.fci
 
 The two releases differ:
 
-- **Possible-d-separation.** causal-cmd's FCI and GRaSP-FCI run it (`--possibleMsepDone`), as
-  GFCI does; its `bfci` has no setting for it. In tetrad-lib 7.6.10, only FCI has one
+- **Possible-d-separation.** causal-cmd's FCI runs it (`--possibleMsepDone`), as its GFCI does;
+  its `bfci` and `grasp-fci` take their FCI steps from GFCI's, one pass of greedy separating sets
+  over the score search's adjacencies, and have none. In tetrad-lib 7.6.10, only FCI has one
   (`doPossibleDsep true`): BOSS-FCI and GRaSP-FCI take their FCI steps from `StarFci`, which has
   none.
 - **Knowledge and selection bias.** tetrad-lib 7.6.10's FCI steps orient by knowledge only when
@@ -120,9 +122,11 @@ The two releases differ:
 - **Starts and depth.** GRaSP-FCI runs one start from the column order. `GraspFci.setDepth` sets
   GRaSP's tuck depth and the cap on the FCI steps' separating sets alike, and Tetrad's algorithm
   interface sets it from `depth`, -1 by default, so neither adapter caps either: causal-cmd sets
-  `graspDepth` and then `depth`. tetrad-lib 7.6.10's GRaSP-FCI runs GRaSP's stages in order
-  (`ordered true`), that interface's default. tetrad-lib 7.6.10's `BossFci` has no seed or
-  column-order setting, so its BOSS starts as `PermutationSearch` does by default.
+  `graspDepth` and then `depth`. Both run GRaSP's stages in order (`ordered true`, causal-cmd's
+  `graspOrderedAlg`), the documented default. causal-cmd sets a boolean it is not given to false,
+  so its adapters name each boolean that is on by default, and its two hybrids run with no seed
+  (`seed -1`), the default. tetrad-lib 7.6.10's `BossFci` has no seed or column-order setting, so
+  its BOSS starts as `PermutationSearch` does by default.
 
 Running a source file needs a `java` with the `jdk.compiler` module, as a JDK has; the adapters'
 setup checks for it, and `ANDREY_BENCH_JAVA` names `java` when it is not on `PATH`. The jar is the
