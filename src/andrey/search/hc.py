@@ -9,7 +9,7 @@ score; lower is better.
 from __future__ import annotations
 
 import random
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from itertools import compress
 from operator import ne
 
@@ -79,14 +79,14 @@ class MoveScanner:
     (:func:`~andrey.core.score_delta.add_deltas`, :func:`~andrey.core.score_delta.remove_deltas`).
     Every scanner computes the same deltas for the same target and parents.
 
-    ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
-    ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
-    ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
-    categorical scores, and the mixed-data scores, all score-equivalent. Its finite delta is set to
-    zero to prevent rounding noise exceeding ``EPS_IMPROVE`` from creating a false improvement. A
-    BIC delta is ``inf`` when the move enters an unavailable family
-    (:func:`~andrey.core.score.local_score_bic`), so no move does.
+    ``score`` is the local score of ``delta``. ``single[v, u]`` is the add or remove delta of
+    ``u -> v``, or ``inf`` when ``v -> u`` exists or ``v`` reaches ``u``; ``low[v]`` is the row
+    minimum. Reverses use the edge list and sum an add of ``v`` at target ``u`` with a remove of
+    ``u`` at target ``v``. A covered edge ``u -> v`` (``pa(v) = pa(u) + u``) reverses to a Markov
+    equivalent DAG with equal score under BIC, the categorical scores, and the mixed-data scores,
+    all score-equivalent. Its finite delta is set to zero to prevent rounding noise exceeding
+    ``EPS_IMPROVE`` from creating a false improvement. A BIC delta is ``inf`` when the move enters
+    an unavailable family (:func:`~andrey.core.score.local_score_bic`), so no move does.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
     legal. ``None`` forbids none. ``required[v, u]`` marks edges ``u -> v`` no move removes or
@@ -113,9 +113,9 @@ class MoveScanner:
         max_parents: int | None = None,
     ) -> None:
         self._delta = delta
-        self._score = delta.score_obj
+        self.score = delta.score_obj
         self._d = d
-        self._inv_n = 1.0 / self._score.n
+        self._inv_n = 1.0 / self.score.n
         self._ranks: list[int] = np.asarray(ranks).tolist()
         self._add = np.full((d, d), np.inf)
         self._rem = np.full((d, d), np.inf)
@@ -253,7 +253,7 @@ class MoveScanner:
             )
         adds = [u for u in range(self._d) if u != v and u not in pa and not self._forbidden[v, u]]
         sets = [pa, *(sorted([*pa, u]) for u in adds), *([p for p in pa if p != u] for u in pa)]
-        scores = np.array(self._score.score_many(v, sets))
+        scores = np.array(self.score.score_many(v, sets))
         add = np.full(self._d, np.inf)
         rem = np.full(self._d, np.inf)
         add[adds] = scores[1 : 1 + len(adds)] - scores[0]
@@ -540,6 +540,135 @@ def _climb(
     return moves
 
 
+def move_rules(
+    score_func: str,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    d: int,
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+    """The tie mask of ``score_func`` and the edges a DAG search never adds and never removes.
+
+    Returns ``(mask, forbidden, required)``: ``mask`` is :func:`~andrey.core.ties.tie_mask`'s;
+    ``forbidden[v, u]`` bars an edge ``u -> v``, one from a continuous into a categorical column
+    under a mixed-data score or one the knowledge forbids; ``required[v, u]`` holds an edge the
+    knowledge requires. Each is ``None`` when it bars or holds none. Raises ``ValueError`` when the
+    knowledge requires an edge the mixed-data score does not allow.
+    """
+    mask = tie_mask(score_func, categorical, d)
+    forbidden = None
+    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
+        forbidden = mask[:, None] & ~mask[None, :]
+        if constraints is not None and (constraints.required & forbidden.T).any():
+            raise ValueError(
+                "knowledge requires an edge from a continuous into a categorical column, which a "
+                "mixed-data score does not allow"
+            )
+    if constraints is None:
+        return mask, forbidden, None
+    knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
+    forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
+    return mask, forbidden, constraints.required.T
+
+
+#: One start's search: ``search(scanner, adj_int, parents_of, max_iter)`` takes the moves of
+#: ``scanner`` from the DAG ``adj_int`` (bitset rows) and ``parents_of`` (sorted parent sets),
+#: changes both in place to the DAG it ends on, and returns the number of moves it took.
+StartSearch = Callable[[MoveScanner, list[int], dict[int, list[int]], int | None], int]
+
+
+def greedy_search(
+    data: np.ndarray,
+    search: StartSearch,
+    *,
+    method: str,
+    score_func: str,
+    penalty_discount: float,
+    ebic_gamma: float,
+    equivalent_sample_size: float,
+    max_iter: int | None,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    max_parents: int | None,
+    n_starts: int,
+    n_perturbations: int,
+    random_state: int,
+) -> tuple[GraphStructure, float]:
+    """Run ``search`` from the start DAG and from changed copies of the best DAG so far.
+
+    The first start begins from the required edges of ``constraints`` (:func:`start_dag`); each
+    later one from the best DAG so far after :func:`perturb` makes ``n_perturbations`` changes to
+    it, and replaces it only when its DAG scores lower by more than :data:`START_EPS`. Every start
+    builds its own score and :class:`MoveScanner`, with the rules of :func:`move_rules`, and a start
+    that takes ``max_iter`` moves warns once, naming ``method``. Returns the best DAG's CPDAG,
+    narrowed by the knowledge, and the DAG's total score. The other arguments are those of
+    :func:`hc`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    d = X.shape[1]
+
+    def new_score() -> LocalScore:
+        return make_score(
+            score_func,
+            X,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
+            categorical=categorical,
+        )
+
+    score = new_score()
+    mask, forbidden, required = move_rules(score_func, categorical, constraints, d)
+    adj_int, parents_of = start_dag(d, constraints, max_parents)
+    ranks = tie_ranks(X, mask)
+    best: tuple[list[int], dict[int, list[int]], float] | None = None
+    capped = False
+    for start in range(n_starts):
+        if start > 0:
+            assert best is not None  # set by start 0
+            # Each start builds its own score, deltas, and tables; the last start's are dropped.
+            score = new_score()
+            adj_int, parents_of = list(best[0]), {v: list(pa) for v, pa in best[1].items()}
+            perturb(
+                adj_int,
+                parents_of,
+                n_perturbations,
+                start_rng(random_state, start),
+                ranks=ranks,
+                forbidden=forbidden,
+                required=required,
+                max_parents=max_parents,
+            )
+        # One BLAS thread keeps the Schur updates reproducible across thread counts.
+        with backend.one_blas_thread():
+            scanner = MoveScanner(
+                make_delta(score),
+                d,
+                ranks=ranks,
+                forbidden=forbidden,
+                required=required,
+                max_parents=max_parents,
+            )
+            moves = search(scanner, adj_int, parents_of, max_iter)
+        capped |= max_iter is not None and moves == max_iter
+        total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
+        if best is None or total < best[2] - START_EPS:
+            best = (adj_int, parents_of, total)
+        del scanner
+    if capped and max_iter is not None:
+        warn_search_limit(method, "max_iter", max_iter, "moves")
+    assert best is not None  # n_starts >= 1
+    _, parents_of, total = best
+
+    # The best DAG, reduced to the CPDAG of its equivalence class.
+    dag = np.zeros((d, d), dtype=bool)
+    for v in range(d):
+        dag[parents_of[v], v] = True
+    cpdag = dag2cpdag(endpoint_marks(dag))
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    return to_structure(cpdag, kind="cpdag"), total
+
+
 def hc(
     data: np.ndarray,
     *,
@@ -617,83 +746,19 @@ def hc(
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG.
     """
-    X = np.asarray(data, dtype=np.float64)
-    d = X.shape[1]
-
-    def new_score() -> LocalScore:
-        return make_score(
-            score_func,
-            X,
-            penalty_discount=penalty_discount,
-            ebic_gamma=ebic_gamma,
-            equivalent_sample_size=equivalent_sample_size,
-            categorical=categorical,
-        )
-
-    score = new_score()
-    forbidden = None
-    mask = tie_mask(score_func, categorical, d)
-    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
-        forbidden = mask[:, None] & ~mask[None, :]
-    if constraints is not None:
-        if forbidden is not None and (constraints.required & forbidden.T).any():
-            raise ValueError(
-                "knowledge requires an edge from a continuous into a categorical column, which a "
-                "mixed-data score does not allow"
-            )
-        knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
-        forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
-    required = None if constraints is None else constraints.required.T
-
-    start_adj, start_parents = start_dag(d, constraints, max_parents)
-    ranks = tie_ranks(X, mask)
-    best: tuple[list[int], dict[int, list[int]], float] | None = None
-    capped = False
-    for start in range(n_starts):
-        if start == 0:
-            adj_int, parents_of = start_adj, start_parents
-        else:
-            assert best is not None  # set by start 0
-            # Each start builds its own score, deltas, and tables; the last start's are dropped.
-            score = new_score()
-            adj_int, parents_of = list(best[0]), {v: list(pa) for v, pa in best[1].items()}
-            perturb(
-                adj_int,
-                parents_of,
-                n_perturbations,
-                start_rng(random_state, start),
-                ranks=ranks,
-                forbidden=forbidden,
-                required=required,
-                max_parents=max_parents,
-            )
-        delta = make_delta(score)
-        # One BLAS thread keeps the Schur updates reproducible across thread counts.
-        with backend.one_blas_thread():
-            scanner = MoveScanner(
-                delta,
-                d,
-                ranks=ranks,
-                forbidden=forbidden,
-                required=required,
-                max_parents=max_parents,
-            )
-            moves = _climb(scanner, adj_int, parents_of, max_iter)
-        capped |= max_iter is not None and moves == max_iter
-        total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
-        if best is None or total < best[2] - START_EPS:
-            best = (adj_int, parents_of, total)
-        del scanner, delta
-    if capped and max_iter is not None:
-        warn_search_limit("hc", "max_iter", max_iter, "moves")
-    assert best is not None  # n_starts >= 1
-    _, parents_of, total = best
-
-    # The discovered DAG, reduced to the CPDAG of its equivalence class.
-    dag = np.zeros((d, d), dtype=bool)
-    for v in range(d):
-        dag[parents_of[v], v] = True
-    cpdag = dag2cpdag(endpoint_marks(dag))
-    if constraints is not None:
-        cpdag = mpdag(cpdag, constraints)
-    return to_structure(cpdag, kind="cpdag"), total
+    return greedy_search(
+        data,
+        _climb,
+        method="hc",
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        max_iter=max_iter,
+        categorical=categorical,
+        constraints=constraints,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        n_perturbations=n_perturbations,
+        random_state=random_state,
+    )

@@ -175,7 +175,7 @@ _SEARCH = _sem(11, 120, 9, 0.4)
 _SEARCHES = {
     "ges": ("ges", andrey.ges, {}),
     "hc": ("hc", andrey.hc, {}),
-    "tabu": ("tabu", andrey.tabu, {}),
+    "tabu": ("hc", andrey.tabu, {}),
     "boss": ("boss", andrey.boss, {"seed": 0}),
     "grasp": ("boss", andrey.grasp, {"seed": 0}),
 }

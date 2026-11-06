@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -26,9 +27,15 @@ from andrey.core.structure import endpoint_marks
 from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search.operators import check_parent_cap
 
+if TYPE_CHECKING:
+    from andrey.search.grasp import _GST
+
 # Fixed absolute score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
 _EPS = float(np.finfo(np.float64).eps)
+
+#: A permutation search's grow-shrink tree class.
+TreeT = TypeVar("TreeT")
 
 
 def ranked_score(
@@ -229,7 +236,7 @@ def _settle_kept(
 
 
 def _tightened(
-    tree: _GrowShrinkTree, base: Sequence[int], op: str, u: int | None, bound: float
+    tree: _GrowShrinkTree | _GST, base: Sequence[int], op: str, u: int | None, bound: float
 ) -> float:
     """``bound``, or the componentwise bound of the batched move ``(base, op, u)`` that gave the
     score (:meth:`~andrey.core.score_delta.DeltaBICScore.move_bound`) when it is smaller. No
@@ -777,6 +784,7 @@ def _better_mutation(
 
 def _search_state(
     X: np.ndarray,
+    make_tree: Callable[..., TreeT],
     score_func: str,
     penalty_discount: float,
     ebic_gamma: float,
@@ -784,10 +792,11 @@ def _search_state(
     categorical: np.ndarray | None,
     constraints: Constraints | None,
     max_parents: int | None,
-) -> tuple[LocalScore, np.ndarray, list[_GrowShrinkTree], np.ndarray | None]:
+) -> tuple[LocalScore, np.ndarray, list[TreeT], np.ndarray | None]:
     """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
 
-    The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
+    ``make_tree`` builds each variable's tree. The precedence (``before[a, b]``: ``a`` precedes
+    ``b``) is ``None`` without ``constraints``.
     """
     score, ranks = ranked_score(
         X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
@@ -795,14 +804,14 @@ def _search_state(
     delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
-        gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
-        return score, ranks, gsts, None
+        trees = [make_tree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        return score, ranks, trees, None
     ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
-    gsts = []
+    trees = []
     for v in range(p):
         candidates, required = parent_knowledge(ranked, v)
-        gsts.append(
-            _GrowShrinkTree(
+        trees.append(
+            make_tree(
                 v,
                 score,
                 delta,
@@ -812,20 +821,86 @@ def _search_state(
                 max_parents=max_parents,
             )
         )
-    return score, ranks, gsts, ranked.precedence()
+    return score, ranks, trees, ranked.precedence()
+
+
+def permutation_search(
+    data: np.ndarray,
+    make_tree: Callable[..., TreeT],
+    run_start: Callable[[int, random.Random, list[TreeT], np.ndarray | None], dict[int, list[int]]],
+    *,
+    score_func: str,
+    penalty_discount: float,
+    ebic_gamma: float,
+    equivalent_sample_size: float,
+    categorical: np.ndarray | None,
+    constraints: Constraints | None,
+    max_parents: int | None,
+    n_starts: int,
+    random_state: int,
+) -> tuple[GraphStructure, float]:
+    """Run ``n_starts`` permutation searches; return the best one's CPDAG and total score.
+
+    Every start builds its own score, caches, and trees (:func:`_search_state`), and
+    ``run_start(start, rng, trees, before)`` returns its parent sets over the score's variables,
+    with ``rng`` from :func:`~andrey.core.seeding.start_rng`. A start's total score is the sum of
+    the full local scores of its parent sets, lower is better, and a later start replaces the best
+    one only when it scores lower by more than ``_SCORE_EPS``. The best parent sets' DAG, mapped
+    back to the columns of ``data``, is returned as its CPDAG, narrowed by the knowledge. The other
+    arguments are those of :func:`boss`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    p = X.shape[1]
+    if p == 0:
+        return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
+
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
+    best: tuple[dict[int, list[int]], float] | None = None
+    for start in range(n_starts):
+        # Each start builds its own score, caches, and trees, so a search of many starts holds
+        # one start's state at a time.
+        score, ranks, trees, before = _search_state(
+            X,
+            make_tree,
+            score_func,
+            penalty_discount,
+            ebic_gamma,
+            equivalent_sample_size,
+            categorical,
+            constraints,
+            max_parents,
+        )
+        parents = run_start(start, start_rng(random_state, start), trees, before)
+        total = 0.0
+        for child in range(p):
+            total += score.score(child, parents[child])
+        if best is None or total < best[1] - _SCORE_EPS:
+            best = (parents, total)
+        del score, trees
+    assert best is not None  # n_starts >= 1
+    parents, total = best
+
+    dag = np.zeros((p, p), dtype=bool)
+    for child in range(p):
+        dag[parents[child], child] = True
+
+    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    return to_structure(cpdag, kind="cpdag"), float(total)
 
 
 def _search_from(
     order: list[int],
     rng: random.Random,
     gsts: list[_GrowShrinkTree],
-    score: LocalScore,
     before: np.ndarray | None,
-) -> tuple[dict[int, list[int]], float]:
-    """Sweep ``order`` (mutated) until no move improves it; return its parent sets and score.
+) -> dict[int, list[int]]:
+    """Sweep ``order`` (mutated) until no move improves it; return its parent sets.
 
-    Each sweep visits the variables in an order ``rng`` shuffles. The score is the sum of the
-    full local scores of the parent sets, lower is better.
+    Each sweep visits the variables in an order ``rng`` shuffles.
     """
     positions = {v: idx for idx, v in enumerate(order)}
     variables = list(order)
@@ -844,10 +919,7 @@ def _search_from(
         gsts[v].trace(prefix, pa)
         parents[v] = pa
         prefix.add(v)
-    total = 0.0
-    for child in range(len(order)):
-        total += score.score(child, parents[child])
-    return parents, total
+    return parents
 
 
 def boss(
@@ -920,46 +992,28 @@ def boss(
     order, and every tie follow the columns' data, and reordering the columns of ``data`` reorders
     the CPDAG's nodes. See :func:`andrey.boss` for the score tolerance.
     """
-    X = np.asarray(data, dtype=np.float64)
-    p = X.shape[1]
-    if p == 0:
-        return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
-    check_parent_cap(
-        None if constraints is None else constraints.required, max_parents, in_class=False
-    )
-    best: tuple[dict[int, list[int]], float] | None = None
-    for start in range(n_starts):
-        # Each start builds its own score, caches, and trees, so a search of many starts holds
-        # one start's state at a time.
-        score, ranks, gsts, before = _search_state(
-            X,
-            score_func,
-            penalty_discount,
-            ebic_gamma,
-            equivalent_sample_size,
-            categorical,
-            constraints,
-            max_parents,
-        )
-        rng = start_rng(random_state, start)
-        order = list(range(p))
+    def run_start(
+        start: int, rng: random.Random, trees: list[_GrowShrinkTree], before: np.ndarray | None
+    ) -> dict[int, list[int]]:
+        order = list(range(len(trees)))
         if start > 0:
             rng.shuffle(order)
         if before is not None:
             order = precedence_sort(order, before)
-        parents, total = _search_from(order, rng, gsts, score, before)
-        if best is None or total < best[1] - _SCORE_EPS:
-            best = (parents, total)
-        del score, gsts
-    assert best is not None  # n_starts >= 1
-    parents, total = best
+        return _search_from(order, rng, trees, before)
 
-    dag = np.zeros((p, p), dtype=bool)
-    for child in range(p):
-        dag[parents[child], child] = True
-
-    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
-    if constraints is not None:
-        cpdag = mpdag(cpdag, constraints)
-    return to_structure(cpdag, kind="cpdag"), float(total)
+    return permutation_search(
+        data,
+        _GrowShrinkTree,
+        run_start,
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        categorical=categorical,
+        constraints=constraints,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        random_state=random_state,
+    )

@@ -15,23 +15,15 @@ from collections.abc import Sequence
 import numpy as np
 
 from andrey.core import GraphStructure
-from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.orient import dag2cpdag, to_structure
+from andrey.core.knowledge import Constraints
 from andrey.core.score import LocalScore
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, make_delta
-from andrey.core.seeding import start_rng
-from andrey.core.structure import endpoint_marks
-from andrey.search.boss import parent_knowledge, precedence_sort, ranked_score
-from andrey.search.operators import check_parent_cap
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.search.boss import _EPS, _SCORE_EPS, _tightened, permutation_search, precedence_sort
 
-# DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
-# changes in (-tolerance, tolerance] are explored as ties. Grow recomputes full BIC scores
-# when a candidate's score is this close to the score of the current parent set or another
-# candidate, so batch rounding does not change strict improvement decisions or branch order.
-_SCORE_EPS = 1e-6
-
-
-_EPS = float(np.finfo(np.float64).eps)
+# DFS accepts a tuck when the total negated BIC increases by more than ``_SCORE_EPS``; changes in
+# (-_SCORE_EPS, _SCORE_EPS] are explored as ties. Grow recomputes full BIC scores when a
+# candidate's score is this close to the score of the current parent set or another candidate, so
+# batch rounding does not change strict improvement decisions or branch order.
 
 
 def _open_gap(a: float, a_bound: float, b: float, b_bound: float) -> float:
@@ -45,15 +37,6 @@ def _open_gap(a: float, a_bound: float, b: float, b_bound: float) -> float:
     if bound == 0.0:
         return -1.0
     return bound + 8 * _EPS * (abs(a) + abs(b))
-
-
-def _tightened(tree: _GST, base: Sequence[int], u: int | None, bound: float) -> float:
-    """``bound``, or the componentwise bound of the batched add of ``u`` to ``base`` that gave
-    the score (:meth:`~andrey.core.score_delta.DeltaBICScore.move_bound`) when it is smaller. No
-    score is computed; a full score (bound 0) stays as it is."""
-    if bound == 0.0 or u is None:
-        return bound
-    return min(bound, tree.delta.move_bound(tree.vertex, base, "add", u))
 
 
 class _GSTNode:
@@ -111,10 +94,10 @@ class _GSTNode:
             ):
                 # Tighten the bounds before scoring in full: the candidate's, and the node's own,
                 # from the move of its parent's batch.
-                bound = _tightened(tree, parents, add, bound)
+                bound = _tightened(tree, parents, "add", add, bound)
                 if not base_tightened:
                     own_base = [p for p in parents if p != self.add]
-                    self.grow_bound = _tightened(tree, own_base, self.add, self.grow_bound)
+                    self.grow_bound = _tightened(tree, own_base, "add", self.add, self.grow_bound)
                     base_tightened = True
             if gap <= _SCORE_EPS or gap <= _open_gap(
                 candidate_score, bound, self.grow_score, self.grow_bound
@@ -159,7 +142,7 @@ class _GSTNode:
             if unsure <= tightened:
                 recheck = unsure
             for branch in unsure - tightened:
-                branch.grow_bound = _tightened(tree, parents, branch.add, branch.grow_bound)
+                branch.grow_bound = _tightened(tree, parents, "add", branch.add, branch.grow_bound)
             tightened |= unsure
         # `trace` takes the first branch allowed by the prefix, so branch order determines the
         # search path. Sort the original candidate order so exact ties retain that order.
@@ -492,48 +475,6 @@ def _dfs(
     return False
 
 
-def _search_state(
-    X: np.ndarray,
-    score_func: str,
-    penalty_discount: float,
-    ebic_gamma: float,
-    equivalent_sample_size: float,
-    categorical: np.ndarray | None,
-    constraints: Constraints | None,
-    max_parents: int | None,
-) -> tuple[LocalScore, np.ndarray, list[_GST], np.ndarray | None]:
-    """A new search's score over the tie-ranked columns, its ranks, its trees, and its precedence.
-
-    The precedence (``before[a, b]``: ``a`` precedes ``b``) is ``None`` without ``constraints``.
-    """
-    score, ranks = ranked_score(
-        X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
-    )
-    delta = make_delta(score)
-    n_features = X.shape[1]
-    if constraints is None:
-        gsts = [
-            _GST(v, score, delta, n_features, max_parents=max_parents) for v in range(n_features)
-        ]
-        return score, ranks, gsts, None
-    ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
-    gsts = []
-    for v in range(n_features):
-        candidates, required = parent_knowledge(ranked, v)
-        gsts.append(
-            _GST(
-                v,
-                score,
-                delta,
-                n_features,
-                candidates=candidates,
-                required=required,
-                max_parents=max_parents,
-            )
-        )
-    return score, ranks, gsts, ranked.precedence()
-
-
 def _search_from(
     n_features: int,
     rng: random.Random,
@@ -626,43 +567,23 @@ def grasp(
         The learned CPDAG, and the total score of the settled DAG (the sum of its local scores;
         lower is better).
     """
-    X = np.asarray(data, dtype=np.float64)
-    n_features = X.shape[1]
-    if n_features == 0:
-        return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
-    check_parent_cap(
-        None if constraints is None else constraints.required, max_parents, in_class=False
+    def run_start(
+        start: int, rng: random.Random, trees: list[_GST], before: np.ndarray | None
+    ) -> dict[int, list[int]]:
+        return _search_from(len(trees), rng, trees, depth, before).parents
+
+    return permutation_search(
+        data,
+        _GST,
+        run_start,
+        score_func=score_func,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        categorical=categorical,
+        constraints=constraints,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        random_state=random_state,
     )
-    best: tuple[_Order, float] | None = None
-    for start in range(n_starts):
-        # Each start builds its own score, caches, and trees, so a search of many starts holds
-        # one start's state at a time.
-        score, ranks, gsts, before = _search_state(
-            X,
-            score_func,
-            penalty_discount,
-            ebic_gamma,
-            equivalent_sample_size,
-            categorical,
-            constraints,
-            max_parents,
-        )
-        order = _search_from(n_features, start_rng(random_state, start), gsts, depth, before)
-        total_bic = 0.0
-        for y in range(n_features):
-            total_bic += score.score(y, order.get_parents(y))
-        if best is None or total_bic < best[1] - _SCORE_EPS:
-            best = (order, total_bic)
-        del score, gsts
-    assert best is not None  # n_starts >= 1
-    order, total_bic = best
-
-    dag = np.zeros((n_features, n_features), dtype=bool)
-    for y in range(n_features):
-        dag[order.get_parents(y), y] = True
-
-    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
-    if constraints is not None:
-        cpdag = mpdag(cpdag, constraints)
-    return to_structure(cpdag, kind="cpdag"), float(total_bic)
