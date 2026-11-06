@@ -207,11 +207,8 @@ def test_embedded_pages_follow_the_host_theme_and_report_their_height(tmp_path, 
         page = (tmp_path / "data" / name).read_text()
         assert learn.FRAME_SCRIPT in page, name
         assert ':root[data-theme="dark"]' in page or ":root[data-theme=dark]" in page, name
-    # The hosts: the Space's page, and each docs page that shows an interactive example.
+    # The Space's page hosts them; docs/test_built_site.py checks the docs pages that do.
     assert 'head=f"<script>{HOST_SCRIPT}</script>"' in (APP / "app.py").read_text()
-    conf = (ROOT / "docs" / "conf.py").read_text()
-    assert '"example-frame.js", build_assets.HOST_SCRIPT' in conf
-    assert '["examples.css"], ["example-frame.js"]' in conf
     # The docs give each example its own title, so the embedded page leaves its heading out.
     pages = (
         build_assets.pc_page(heading=False),

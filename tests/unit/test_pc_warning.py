@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import re
 import warnings
 from pathlib import Path
 
@@ -46,7 +47,7 @@ def test_warning_preserves_queries_and_output_and_occurs_once_per_process(monkey
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             result = andrey.pc(data, indep_test="warning-test")
-        sizes = [str(w.message).split()[3] for w in caught]
+        sizes = [re.search(r"size (\d+)", str(w.message))[1] for w in caught]
         if fit == 0:  # Each expensive conditioning size warns with its own message.
             assert sizes[0] == "2" and len(sizes) == len(set(sizes)) >= 2, sizes
             assert all(w.category is andrey.PerformanceWarning for w in caught)

@@ -97,7 +97,7 @@ def test_the_null_mean_is_the_mean_over_every_arrangement(g_square, shape):
     n_sx = np.bincount(x, minlength=kx)[None, :]
     n_sy = np.bincount(y, minlength=ky)[None, :]
     stats = []
-    for arrangement in permutations(y):
+    for arrangement in set(permutations(y)):  # each distinct one occurs equally often
         table = np.zeros(shape)
         np.add.at(table, (x, np.array(arrangement)), 1)
         expected = np.outer(table.sum(1), table.sum(0)) / 7

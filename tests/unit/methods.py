@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import numpy as np
 
-#: Settings that shorten a slow fit; the facade path stays the same.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
+#: Settings that shorten a slow fit; the facade path stays the same, and the properties the
+#: package-wide tests check do not depend on the fit converging.
+SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}, "varma_lingam": {"max_iter": 1}}
 #: The arguments a method needs beyond its inputs: ICP's target, by position.
 REQUIRED = {"icp": {"target": 2}}
 

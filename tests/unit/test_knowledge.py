@@ -791,9 +791,10 @@ def _input(name: str, effects: dict = SERIES_EFFECTS, columns: list[str] = SERIE
 
 
 def _fit_series(name: str, data, lags: int = 2, **kwargs):
-    """Fit ``name`` over lags ``0`` to ``lags``; VARMA-LiNGAM as a pruned VAR."""
+    """Fit ``name`` over lags ``0`` to ``lags``; VARMA-LiNGAM as a pruned VAR on one likelihood
+    iteration, since the knowledge holds whether or not the fit has converged."""
     if name == "varma_lingam":
-        return andrey.varma_lingam(data, order=(lags, 0), prune=True, **kwargs)
+        return andrey.varma_lingam(data, order=(lags, 0), prune=True, max_iter=1, **kwargs)
     if name == "longitudinal_lingam":
         return andrey.longitudinal_lingam(data, tau_max=lags, **kwargs)
     return getattr(andrey, name)(data, tau_max=lags, **kwargs)

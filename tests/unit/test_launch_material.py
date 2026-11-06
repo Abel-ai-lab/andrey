@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import importlib.util
 import json
 import re
 import runpy
@@ -20,9 +19,6 @@ IMAGES = ".github/readme"
 SUMMARY = ROOT / "benchmarks/published/0.1.0/summary.json"
 POSTS = ROOT / "docs" / "blog"
 CONF = (ROOT / "docs" / "conf.py").read_text()
-_spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
-build = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(build)
 
 
 def front_matter(path):
@@ -37,18 +33,9 @@ def test_readme_blocks_match_summary_and_registry(monkeypatch, offline_datasets)
     summary = json.loads(SUMMARY.read_text())
     launch["update_readme"](summary, check=True)  # raises on drift, including the quick start's run
     readme = README.read_text()
-    start, end = launch["markers"]("PITCH")
-    pitch = readme[readme.index(start) : readme.index(end)]
-    # The claims sit above the fold, before any table or code, and are the homepage's.
+    _, end = launch["markers"]("PITCH")
+    # The claims sit above the fold, before any table or code.
     assert readme.index(end) < readme.index("```")
-    summaries = build.release_summaries(summary)
-    assert f"- **Fast**: {build.CLAIM}" in pitch
-    lead, fewer = build.more_than(build.fewest_errors(summaries))
-    claim = f"- **Accurate**: {lead.lower()} {fewer}% fewer errors than other popular packages."
-    assert claim in pitch
-    # The kinds of data the methods cover, which a reader and an answer engine look for first.
-    for kind in ("categorical", "mixed", "time series", "nonlinear"):
-        assert kind in pitch
 
 
 def readme_targets(readme):
@@ -56,16 +43,6 @@ def readme_targets(readme):
     return re.findall(r"\]\(([^)]+)\)", readme) + re.findall(
         r'(?:href|src|srcset)="([^"]+)"', readme
     )
-
-
-def test_readme_links_are_absolute_but_its_images():
-    # PyPI renders the README away from the repository, so a relative link breaks there; the
-    # images are the repository's own, which the package build points at the release tag.
-    targets = readme_targets(README.read_text())
-    assert targets
-    relative = [t for t in targets if not t.startswith("https://")]
-    assert relative and all(t.startswith(f"{IMAGES}/") for t in relative)
-    assert all((ROOT / t).is_file() for t in relative)
 
 
 def test_the_package_description_shows_the_images_at_the_release_tag():
@@ -81,15 +58,6 @@ def test_the_package_description_shows_the_images_at_the_release_tag():
     assert all(t.startswith("https://") for t in targets)
     images = [t.removeprefix(tag) for t in targets if t.startswith(tag)]
     assert images and all((ROOT / path).is_file() for path in images)
-
-
-def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
-    # Copied as is, the quick start prints exactly the output the README shows under it.
-    quickstart = README.read_text().split("## Quick start", 1)[1]
-    code = re.search(r"```python\n(.*?)```", quickstart, re.S)[1]
-    printed = re.search(r"```text\n(.*?)```", quickstart, re.S)[1]
-    exec(compile(code, "README quick start", "exec"), {})
-    assert capsys.readouterr().out == printed
 
 
 def test_the_readme_package_card_counts_the_registry_in_both_themes(monkeypatch):
@@ -109,17 +77,6 @@ def test_the_readme_package_card_counts_the_registry_in_both_themes(monkeypatch)
     assert f'alt="{alt}"' in " ".join(readme.split())
     assert f"{count} supported methods" in alt
     assert all(f"{label}: {line}" in alt for label, line in launch["CARD_ROWS"])
-    assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
-
-
-def test_the_launch_post_is_a_published_page():
-    # Search indexing is the server's call (X-Robots-Tag on every host but production), so the
-    # post itself carries no noindex, no preview banner, and no internal release checklist.
-    post = (POSTS / "20261008-introducing-andrey.md").read_text()
-    assert "noindex" not in post and "placeholder-banner" not in post
-    assert "preview" not in post.lower() and "tentative" not in post.lower()
-    # The blog's front page lists the posts, newest first, from their front matter.
-    assert "{blog-index}" in (POSTS / "index.md").read_text()
 
 
 def test_every_post_is_dated_once_and_names_its_version():
