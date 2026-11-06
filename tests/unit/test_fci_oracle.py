@@ -191,15 +191,15 @@ def test_pag_ignores_node_labels_under_exact_tests(monkeypatch, name):
 @pytest.mark.parametrize("name", sorted({**R8_GRAPHS, **ORACLE_GRAPHS}))
 @pytest.mark.parametrize("collider_rule", ["conservative", "majority"])
 def test_voting_rules_under_exact_tests(monkeypatch, name, collider_rule):
-    """With exact tests, every separating subset agrees, so no triple is ambiguous.
+    """With exact tests, the votes give the PAG the separating sets give.
 
-    Where every unshielded pair has a separating subset among its ends' neighbors, as on the R8
-    graphs, the votes decide as the separating sets do and the PAG is the same.
+    On the R8 graphs every unshielded pair has a separating subset among its ends' neighbors, so no
+    triple is ambiguous. On the others the possible-d-separation step removes a pair that only a
+    set beyond its ends' neighbors separates, so its triples are ambiguous and orient nothing.
     """
     edges = {**R8_GRAPHS, **ORACLE_GRAPHS}[name]
     n_obs = 7 if name in R8_GRAPHS else 6
     ambiguous: set = set()
     pag = _oracle_fci(monkeypatch, n_obs, edges, collider_rule=collider_rule, _ambiguous=ambiguous)
-    assert not ambiguous
-    if name in R8_GRAPHS:
-        np.testing.assert_array_equal(pag, _oracle_fci(monkeypatch, n_obs, edges))
+    assert bool(ambiguous) == (name in ORACLE_GRAPHS)
+    np.testing.assert_array_equal(pag, _oracle_fci(monkeypatch, n_obs, edges))

@@ -334,6 +334,7 @@ def test_max_depth_caps_the_conditioning_sets(name, setting, monkeypatch):
     # The packages re-export functions under their modules' names, so import the modules by path.
     for path in (
         "andrey.constraint.pc",
+        "andrey.constraint.cdnod",
         "andrey.constraint.fci",
         "andrey.constraint.fci_jci",
         "andrey.search.gfci",
