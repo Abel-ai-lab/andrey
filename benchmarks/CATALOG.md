@@ -72,8 +72,11 @@ DYNOTEARS with CausalNex; their comparison pages, [GnIES](comparisons/gnies.md),
 [CAM-UV](comparisons/camuv.md), and [DYNOTEARS](comparisons/dynotears.md), present them. Some
 summary fields come from the runs behind a lane file rather than from the file itself: ICP's rows
 split by size (`icp.json` holds each setting's sizes pooled), GnIES's intervals outside its claim,
-the speed context (ratio quartiles, per-row fit times, median errors), and the regime, coverage,
-and seed notes of GnIES, UT-IGSP, and IGSP.
+the speed context (ratio quartiles, per-row fit times, median errors), and the regime, coverage, and
+seed notes of GnIES, UT-IGSP, and IGSP. The 0.15.0 summary draws FCI-JCI's rows from
+[`published/0.15.0/fci-jci.json`](published/0.15.0/fci-jci.json), FCI-JCI with pcalg, which its
+[comparison page](comparisons/fci-jci.md) presents; its median errors, fit times, and the counts and
+means of its floor intervals come from the runs behind the file.
 
 | Release | Release card | Summary |
 |---|---|---|

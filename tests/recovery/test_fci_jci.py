@@ -23,8 +23,6 @@ from andrey.core.structure import LATENT, OBSERVED
 from andrey.data.latent import DSepOracle, marginal
 from andrey.metrics import shd, skeleton_scores
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 _ORACLE = "dsep_oracle"
 _INDEX_MARK = {"directed": TAIL, "partially_directed": CIRCLE, "bidirected": ARROW}
 

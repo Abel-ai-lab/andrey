@@ -337,6 +337,7 @@ variable.
    fci
    gfci
    cdnod
+   fci_jci
    iamb
    inter_iamb
    mmpc
@@ -413,6 +414,13 @@ step visits the pairs and nodes by a rank computed from the data, so with
 `possible_dsep="order_free"`, the default, their result does not depend on the column order unless
 two columns are identical; `"fast"` visits them in column order and is the default under
 `andrey.config(tie_break="position")`.
+
+FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data pooled from several environments,
+with the environment index as one more variable that no data variable causes, so hidden common
+causes are allowed and the index removes the edges that pooling adds. It returns a PAG over the
+data variables and lists the index's edges in `metadata["index_edges"]`; `confounded_index=False`
+assumes no hidden variable causes both the index and a data variable, as when the environment is
+set from outside.
 
 GnIES (Gamella et al. 2022) learns from linear-Gaussian data pooled from two or more environments
 that share one set of weights and differ in the noise variances of some variables, its targets,
@@ -498,7 +506,6 @@ its first call in a process.
    dagma
    boss_fci
    grasp_fci
-   fci_jci
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
@@ -510,13 +517,6 @@ BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci
 BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
 conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
 rules orient the rest into a PAG.
-
-FCI-JCI (Mooij, Magliacane, and Claassen 2020) runs FCI on data pooled from several environments,
-with the environment index as one more variable that no data variable causes, so hidden common
-causes are allowed and the index removes the edges that pooling adds. It returns a PAG over the
-data variables and lists the index's edges in `metadata["index_edges"]`; `confounded_index=False`
-assumes no hidden variable causes both the index and a data variable, as when the environment is
-set from outside.
 
 A method becomes supported once it has:
 

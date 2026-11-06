@@ -1,0 +1,3603 @@
+{
+ "release": "0.15.0",
+ "parity_rule": "paired bootstrap",
+ "generated": "2026-11-06",
+ "theme": "FCI-JCI against pcalg 2.7-12's fci with jci, the implementation by the method's authors",
+ "build": "Andrey pre-release build of 6 November 2026 (version string 0.14.0)",
+ "verdict_rule": "per cell, assumption set (jci = \"1\" with confounded_index=True, jci = \"123\" with confounded_index=False), and level: D = SHD(Andrey) - SHD(pcalg) per dataset, on the datasets both finished; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; a row with fewer than 10 paired datasets is reported, not judged; better or worse counts only if a rerun on seeds 100-119 agrees. 10,000 resamples of the datasets, default_rng(0). An in-claim row also fails when Andrey timed out on a dataset pcalg finished. Floor, in every row that records one (floor): andrey_minus_empty is the 95% interval of the mean of Andrey's error minus the empty estimate's (the empty graph, or for a target error the given targets alone, or no targets), and reference_minus_empty the same for the reference; the floor applies only where the reference's interval lies wholly below 0, where the reference itself beats the empty estimate, and there Andrey's interval must lie wholly below 0 too; elsewhere it is reported as not applied (applies false), with its numbers. The floor is judged on the first seeds; a replication's floor (the rerun on fresh seeds) only confirms a failure there",
+ "card_verdict_rule": "card_verdict, on every row: the release card's verdict on the row's comparison, 'better', 'tie', or 'worse', and null where the card judges none (rows out of claim, and rows with fewer than 10 paired datasets). Better or worse counts only where a rerun on fresh seeds agreed; one on the first seeds alone is a tie",
+ "fit_protocol": "each fit in a fresh interpreter on one core with one BLAS thread, after one untimed warm-up fit (pcalg's warm-up only at 4 and 10 variables, where it cannot double a fit that may reach the cap); a cap of 1,800 s per fit with imports and warm-up, past which a fit is a timeout, never an empty graph; Andrey's time runs from the array in memory to the returned graph, pcalg's is the transfer into R, cor(X), and the call; ratio is the median over the paired datasets of pcalg's time over Andrey's",
+ "error_metric": "shd: the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+ "complete_definition": "true when every setting has at least 10 paired datasets (both packages finished); a setting with fewer is listed in incomplete, its timeouts counted and never scored",
+ "seeds_note": "seeds is the number of datasets per setting: 20 (seeds 0-19) in every cell but P20 and P50, which ran 10 (seeds 0-9). pcalg was not run on P50, X100, X100m: on the dry run's two datasets of each (seeds 0 and 1), every pcalg fit, at both assumption sets and every level, timed out at the 1,800 s cap, and the campaign runs pcalg on such a cell only where it finished a dry-run fit; Andrey's rows there are reported against the empty graph. No in-claim row came out better or worse, so no rerun ran",
+ "regimes": {
+  "fci_jci_s4": "S4: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), small, mechanism change: 4 system variables, eps = eta = 0.5, 1 context variable, mechanism changes, 500 rows per regime (1,000 rows); in claim",
+  "fci_jci_s4p": "S4p: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), small, perfect intervention: 4 system variables, eps = eta = 0.5, 1 context variable, perfect interventions, 500 rows per regime (1,000 rows); in claim",
+  "fci_jci_l10": "L10: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), larger: 10 system variables, eps = eta = 0.25, 1 context variable, mechanism changes, 500 rows per regime (1,000 rows); in claim",
+  "fci_jci_x100": "X100: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), large: 100 system variables, eps = eta = 0.02, 1 context variable, mechanism changes, 100 rows per regime (200 rows); in claim, where pcalg finishes",
+  "fci_jci_s4m": "S4m: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), small, the paper's 2 context variables merged into one environment: 4 system variables, eps = eta = 0.5, 2 context variables, mechanism changes, 500 rows per regime (1,500 rows); out of claim",
+  "fci_jci_l10m": "L10m: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), larger, the paper's 10 context variables merged into one environment: 10 system variables, eps = eta = 0.25, 10 context variables, mechanism changes, 500 rows per regime (5,500 rows); out of claim",
+  "fci_jci_x100m": "X100m: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), large, the paper's 10 context variables merged into one environment: 100 system variables, eps = eta = 0.02, 10 context variables, mechanism changes, 100 rows per regime (1,100 rows); out of claim",
+  "fci_jci_l10n100": "L10n100: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), larger at 100 rows per regime: 10 system variables, eps = eta = 0.25, 1 context variable, mechanism changes, 100 rows per regime (200 rows); out of claim",
+  "fci_jci_l10n2000": "L10n2000: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), larger at 2,000 rows per regime: 10 system variables, eps = eta = 0.25, 1 context variable, mechanism changes, 2,000 rows per regime (4,000 rows); out of claim",
+  "fci_jci_p20": "P20: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), 20 variables at the larger setting's expected degree: 20 system variables, eps = eta = 0.1184, 1 context variable, mechanism changes, 500 rows per regime (1,000 rows); out of claim",
+  "fci_jci_p50": "P50: the simulation of Mooij, Magliacane, and Claassen 2020 (Sec. 5.2, linear Gaussian, acyclic, with hidden confounders), 50 variables at the larger setting's expected degree: 50 system variables, eps = eta = 0.0459, 1 context variable, mechanism changes, 500 rows per regime (1,000 rows); out of claim"
+ },
+ "coverage": {
+  "fci_jci_s4": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_s4p": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_l10": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_x100": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 80
+  },
+  "fci_jci_s4m": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_l10m": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_x100m": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 40
+  },
+  "fci_jci_l10n100": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_l10n2000": {
+   "planned_seeds": 20,
+   "fewest_seeds": 20,
+   "most_seeds": 20,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 0
+  },
+  "fci_jci_p20": {
+   "planned_seeds": 10,
+   "fewest_seeds": 10,
+   "most_seeds": 10,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 10,
+   "comparator_not_run": 0
+  },
+  "fci_jci_p50": {
+   "planned_seeds": 10,
+   "fewest_seeds": 10,
+   "most_seeds": 10,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  }
+ },
+ "packages": {
+  "FCI-JCI": {
+   "pcalg": "2.7-12",
+   "R": "4.6.1",
+   "NumPy (Andrey)": "2.5.4",
+   "Python (Andrey)": "3.13.11",
+   "Tetrad (context)": "tetrad-lib 7.6.10",
+   "causal-cmd (context)": "1.12.0 (tetrad-lib 7.6.3)",
+   "Java (context)": "21.0.12.1"
+  }
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 7713 64-Core Processor"
+  ],
+  "cores_per_fit": 1,
+  "lanes": {
+   "FCI-JCI": {
+    "cpu_models": [
+     "AMD EPYC 7713 64-Core Processor"
+    ],
+    "hosts": 3,
+    "cores_per_fit": 1,
+    "blas_threads": 1
+   }
+  }
+ },
+ "complete": false,
+ "pending_fits": 0,
+ "incomplete": [
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_x100",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "d": 100,
+   "n": 200,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_x100",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "d": 100,
+   "n": 200,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  },
+  {
+   "method": "FCI-JCI",
+   "lane": "fci_jci",
+   "regime": "fci_jci_x100",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "d": 100,
+   "n": 200,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  },
+  {
+   "method": "FCI-JCI",
+   "lane": "fci_jci",
+   "regime": "fci_jci_x100",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "d": 100,
+   "n": 200,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_x100m",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "d": 100,
+   "n": 1100,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_x100m",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "d": 100,
+   "n": 1100,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 20
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_p20",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "d": 20,
+   "n": 1000,
+   "paired": 4,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 6,
+   "comparator_not_run": 0
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_p20",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "d": 20,
+   "n": 1000,
+   "paired": 6,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 4,
+   "comparator_not_run": 0
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_p50",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "d": 50,
+   "n": 1000,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 10
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "lane": "fci_jci.alpha_0.01",
+   "regime": "fci_jci_p50",
+   "metric": "shd",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "d": 50,
+   "n": 1000,
+   "paired": 0,
+   "andrey_timeouts": 0,
+   "comparator_timeouts": 0,
+   "comparator_not_run": 10
+  }
+ ],
+ "methods": [
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0049,
+     "comparator_s": 0.0168,
+     "ratio": 3.975,
+     "ratio_quartiles": [
+      3.2097,
+      4.5756
+     ],
+     "same_graph": 18,
+     "andrey_shd": 4.5,
+     "comparator_shd": 4.5,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 5.95,
+     "comparator_shd_mean": 5.9,
+     "empty_shd_mean": 12.5,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.3,
+      0.45
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.55,
+       "bootstrap_95": [
+        -7.7,
+        -5.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.6,
+       "bootstrap_95": [
+        -7.7,
+        -5.5
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0043,
+     "comparator_s": 0.0176,
+     "ratio": 4.0599,
+     "ratio_quartiles": [
+      3.8292,
+      4.8495
+     ],
+     "same_graph": 19,
+     "andrey_shd": 4.5,
+     "comparator_shd": 4.5,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 5.9,
+     "comparator_shd_mean": 5.8,
+     "empty_shd_mean": 12.5,
+     "mean_D": 0.1,
+     "bootstrap_95": [
+      0.0,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.6,
+       "bootstrap_95": [
+        -7.75,
+        -5.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.7,
+       "bootstrap_95": [
+        -7.75,
+        -5.6
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0049,
+     "comparator_s": 0.0191,
+     "ratio": 4.2482,
+     "ratio_quartiles": [
+      3.6524,
+      5.1015
+     ],
+     "same_graph": 18,
+     "andrey_shd": 4.0,
+     "comparator_shd": 4.0,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 5.05,
+     "comparator_shd_mean": 5.05,
+     "empty_shd_mean": 12.5,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.15,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.45,
+       "bootstrap_95": [
+        -8.55,
+        -6.3
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.45,
+       "bootstrap_95": [
+        -8.55,
+        -6.3
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0046,
+     "comparator_s": 0.0209,
+     "ratio": 4.5992,
+     "ratio_quartiles": [
+      4.0948,
+      5.7602
+     ],
+     "same_graph": 18,
+     "andrey_shd": 4.0,
+     "comparator_shd": 4.0,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 5.0,
+     "comparator_shd_mean": 5.05,
+     "empty_shd_mean": 12.5,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.5,
+       "bootstrap_95": [
+        -8.55,
+        -6.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.45,
+       "bootstrap_95": [
+        -8.55,
+        -6.3
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4p",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0043,
+     "comparator_s": 0.0182,
+     "ratio": 4.2754,
+     "ratio_quartiles": [
+      3.7392,
+      5.2131
+     ],
+     "same_graph": 18,
+     "andrey_shd": 6.0,
+     "comparator_shd": 6.0,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 6.05,
+     "comparator_shd_mean": 6.15,
+     "empty_shd_mean": 12.5,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.45,
+       "bootstrap_95": [
+        -7.3,
+        -5.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.35,
+       "bootstrap_95": [
+        -7.2,
+        -5.5
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4p",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0043,
+     "comparator_s": 0.0185,
+     "ratio": 4.2953,
+     "ratio_quartiles": [
+      3.83,
+      5.5727
+     ],
+     "same_graph": 18,
+     "andrey_shd": 6.0,
+     "comparator_shd": 6.0,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 6.05,
+     "comparator_shd_mean": 6.15,
+     "empty_shd_mean": 12.5,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.45,
+       "bootstrap_95": [
+        -7.3,
+        -5.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.35,
+       "bootstrap_95": [
+        -7.2,
+        -5.5
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4p",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0043,
+     "comparator_s": 0.0185,
+     "ratio": 4.2553,
+     "ratio_quartiles": [
+      3.8726,
+      5.45
+     ],
+     "same_graph": 18,
+     "andrey_shd": 5.5,
+     "comparator_shd": 5.5,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 5.45,
+     "comparator_shd_mean": 5.4,
+     "empty_shd_mean": 12.5,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.05,
+       "bootstrap_95": [
+        -7.85,
+        -6.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.1,
+       "bootstrap_95": [
+        -7.95,
+        -6.2
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4p",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0044,
+     "comparator_s": 0.018,
+     "ratio": 4.2987,
+     "ratio_quartiles": [
+      3.4997,
+      5.0928
+     ],
+     "same_graph": 18,
+     "andrey_shd": 5.5,
+     "comparator_shd": 5.5,
+     "empty_shd": 13.0,
+     "andrey_shd_mean": 5.45,
+     "comparator_shd_mean": 5.4,
+     "empty_shd_mean": 12.5,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -7.05,
+       "bootstrap_95": [
+        -7.85,
+        -6.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -7.1,
+       "bootstrap_95": [
+        -7.95,
+        -6.2
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0112,
+     "comparator_s": 0.8308,
+     "ratio": 76.198,
+     "ratio_quartiles": [
+      64.1329,
+      109.4181
+     ],
+     "same_graph": 4,
+     "andrey_shd": 39.0,
+     "comparator_shd": 38.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 37.85,
+     "comparator_shd_mean": 37.8,
+     "empty_shd_mean": 54.8,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.9,
+      0.95
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 6,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.95,
+       "bootstrap_95": [
+        -18.2,
+        -15.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -17.0,
+       "bootstrap_95": [
+        -18.5,
+        -15.5
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0106,
+     "comparator_s": 0.9147,
+     "ratio": 78.971,
+     "ratio_quartiles": [
+      54.1588,
+      108.4285
+     ],
+     "same_graph": 4,
+     "andrey_shd": 39.0,
+     "comparator_shd": 38.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 37.85,
+     "comparator_shd_mean": 37.8,
+     "empty_shd_mean": 54.8,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.9,
+      0.95
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 6,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -16.95,
+       "bootstrap_95": [
+        -18.2,
+        -15.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -17.0,
+       "bootstrap_95": [
+        -18.5,
+        -15.5
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0128,
+     "comparator_s": 1.2875,
+     "ratio": 76.4631,
+     "ratio_quartiles": [
+      51.7747,
+      118.5382
+     ],
+     "same_graph": 6,
+     "andrey_shd": 38.0,
+     "comparator_shd": 38.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 36.25,
+     "comparator_shd_mean": 36.55,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -1.2,
+      0.65
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -18.55,
+       "bootstrap_95": [
+        -20.3,
+        -16.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -18.25,
+       "bootstrap_95": [
+        -19.95,
+        -16.65
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0121,
+     "comparator_s": 1.3138,
+     "ratio": 72.1676,
+     "ratio_quartiles": [
+      48.2613,
+      112.6481
+     ],
+     "same_graph": 6,
+     "andrey_shd": 38.0,
+     "comparator_shd": 38.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 36.05,
+     "comparator_shd_mean": 36.45,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.4,
+     "bootstrap_95": [
+      -1.3,
+      0.6
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -18.75,
+       "bootstrap_95": [
+        -20.45,
+        -17.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -18.35,
+       "bootstrap_95": [
+        -20.05,
+        -16.7
+       ]
+      }
+     },
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_x100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 100,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 20,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 5,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 20,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "missing": 20
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -84.25,
+      "bootstrap_95": [
+       -88.6,
+       -79.85
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_x100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 100,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 20,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 5,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 20,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "missing": 20
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -84.3,
+      "bootstrap_95": [
+       -88.65,
+       -79.9
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_x100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 100,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 20,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 7,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 20,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "missing": 20
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -64.25,
+      "bootstrap_95": [
+       -69.8,
+       -58.25
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_x100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 100,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 20,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 7,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 20,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "missing": 20
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -64.7,
+      "bootstrap_95": [
+       -70.3,
+       -58.69875000000002
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 2,
+     "rows_per_regime": 500,
+     "n": 1500,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0049,
+     "comparator_s": 0.0199,
+     "ratio": 3.8472,
+     "ratio_quartiles": [
+      3.4502,
+      4.2882
+     ],
+     "same_graph": 15,
+     "andrey_shd": 7.5,
+     "comparator_shd": 8.0,
+     "empty_shd": 15.0,
+     "andrey_shd_mean": 7.75,
+     "comparator_shd_mean": 8.05,
+     "empty_shd_mean": 14.6,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -0.7,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.85,
+       "bootstrap_95": [
+        -7.6,
+        -6.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.55,
+       "bootstrap_95": [
+        -7.2,
+        -5.95
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 2,
+     "rows_per_regime": 500,
+     "n": 1500,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.005,
+     "comparator_s": 0.0198,
+     "ratio": 3.9173,
+     "ratio_quartiles": [
+      3.7047,
+      5.1364
+     ],
+     "same_graph": 15,
+     "andrey_shd": 7.5,
+     "comparator_shd": 8.0,
+     "empty_shd": 15.0,
+     "andrey_shd_mean": 7.75,
+     "comparator_shd_mean": 8.05,
+     "empty_shd_mean": 14.6,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -0.7,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.85,
+       "bootstrap_95": [
+        -7.6,
+        -6.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.55,
+       "bootstrap_95": [
+        -7.2,
+        -5.95
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 2,
+     "rows_per_regime": 500,
+     "n": 1500,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0051,
+     "comparator_s": 0.0201,
+     "ratio": 3.7959,
+     "ratio_quartiles": [
+      3.3059,
+      4.0958
+     ],
+     "same_graph": 17,
+     "andrey_shd": 7.5,
+     "comparator_shd": 8.0,
+     "empty_shd": 15.0,
+     "andrey_shd_mean": 7.95,
+     "comparator_shd_mean": 8.1,
+     "empty_shd_mean": 14.6,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.3,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.65,
+       "bootstrap_95": [
+        -7.4,
+        -5.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.5,
+       "bootstrap_95": [
+        -7.25,
+        -5.8
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_s4m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 4,
+     "contexts": 2,
+     "rows_per_regime": 500,
+     "n": 1500,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.005,
+     "comparator_s": 0.0204,
+     "ratio": 3.8504,
+     "ratio_quartiles": [
+      3.5785,
+      4.1731
+     ],
+     "same_graph": 17,
+     "andrey_shd": 7.5,
+     "comparator_shd": 7.5,
+     "empty_shd": 15.0,
+     "andrey_shd_mean": 7.95,
+     "comparator_shd_mean": 8.0,
+     "empty_shd_mean": 14.6,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 3,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -6.65,
+       "bootstrap_95": [
+        -7.4,
+        -5.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -6.6,
+       "bootstrap_95": [
+        -7.4,
+        -5.9
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 10,
+     "rows_per_regime": 500,
+     "n": 5500,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0301,
+     "comparator_s": 1.5583,
+     "ratio": 50.0106,
+     "ratio_quartiles": [
+      40.5517,
+      65.0864
+     ],
+     "same_graph": 2,
+     "andrey_shd": 49.5,
+     "comparator_shd": 52.0,
+     "empty_shd": 70.0,
+     "andrey_shd_mean": 49.1,
+     "comparator_shd_mean": 49.3,
+     "empty_shd_mean": 71.5,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -1.55,
+      0.9
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -22.4,
+       "bootstrap_95": [
+        -24.451249999999998,
+        -20.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -22.2,
+       "bootstrap_95": [
+        -24.6,
+        -19.85
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 10,
+     "rows_per_regime": 500,
+     "n": 5500,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.031,
+     "comparator_s": 1.5651,
+     "ratio": 47.5731,
+     "ratio_quartiles": [
+      38.3845,
+      52.5249
+     ],
+     "same_graph": 2,
+     "andrey_shd": 46.0,
+     "comparator_shd": 49.5,
+     "empty_shd": 70.0,
+     "andrey_shd_mean": 46.1,
+     "comparator_shd_mean": 46.65,
+     "empty_shd_mean": 71.5,
+     "mean_D": -0.55,
+     "bootstrap_95": [
+      -1.95,
+      0.6
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -25.4,
+       "bootstrap_95": [
+        -27.6,
+        -23.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -24.85,
+       "bootstrap_95": [
+        -27.25,
+        -22.55
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 10,
+     "rows_per_regime": 500,
+     "n": 5500,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0352,
+     "comparator_s": 1.7245,
+     "ratio": 47.3929,
+     "ratio_quartiles": [
+      41.7288,
+      60.6716
+     ],
+     "same_graph": 0,
+     "andrey_shd": 50.0,
+     "comparator_shd": 51.0,
+     "empty_shd": 70.0,
+     "andrey_shd_mean": 48.85,
+     "comparator_shd_mean": 49.1,
+     "empty_shd_mean": 71.5,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.2,
+      0.7
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -22.65,
+       "bootstrap_95": [
+        -24.75,
+        -20.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -22.4,
+       "bootstrap_95": [
+        -24.5,
+        -20.35
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 10,
+     "rows_per_regime": 500,
+     "n": 5500,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0464,
+     "comparator_s": 1.7596,
+     "ratio": 38.4865,
+     "ratio_quartiles": [
+      32.1639,
+      51.823
+     ],
+     "same_graph": 0,
+     "andrey_shd": 45.0,
+     "comparator_shd": 47.0,
+     "empty_shd": 70.0,
+     "andrey_shd_mean": 45.1,
+     "comparator_shd_mean": 45.85,
+     "empty_shd_mean": 71.5,
+     "mean_D": -0.75,
+     "bootstrap_95": [
+      -1.75,
+      0.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -26.4,
+       "bootstrap_95": [
+        -28.5,
+        -24.3
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -25.65,
+       "bootstrap_95": [
+        -27.8,
+        -23.55
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_x100m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 100,
+     "contexts": 10,
+     "rows_per_regime": 100,
+     "n": 1100,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 20,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 20,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "missing": 20
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -200.75,
+      "bootstrap_95": [
+       -206.8,
+       -195.05
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_x100m",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 100,
+     "contexts": 10,
+     "rows_per_regime": 100,
+     "n": 1100,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 20,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 20,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "missing": 20
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -202.55,
+      "bootstrap_95": [
+       -208.65,
+       -196.75
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0046,
+     "comparator_s": 0.1675,
+     "ratio": 35.7468,
+     "ratio_quartiles": [
+      8.2859,
+      76.3735
+     ],
+     "same_graph": 4,
+     "andrey_shd": 43.5,
+     "comparator_shd": 43.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 44.65,
+     "comparator_shd_mean": 45.1,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -1.2,
+      0.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 6,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -10.15,
+       "bootstrap_95": [
+        -11.6,
+        -8.8
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -9.7,
+       "bootstrap_95": [
+        -10.65,
+        -8.8
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0049,
+     "comparator_s": 0.1785,
+     "ratio": 32.6181,
+     "ratio_quartiles": [
+      15.0137,
+      69.1602
+     ],
+     "same_graph": 4,
+     "andrey_shd": 43.0,
+     "comparator_shd": 43.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 44.6,
+     "comparator_shd_mean": 45.1,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.25,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 6,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -10.2,
+       "bootstrap_95": [
+        -11.65,
+        -8.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -9.7,
+       "bootstrap_95": [
+        -10.65,
+        -8.8
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0053,
+     "comparator_s": 0.3591,
+     "ratio": 63.9291,
+     "ratio_quartiles": [
+      32.3113,
+      106.1163
+     ],
+     "same_graph": 2,
+     "andrey_shd": 43.5,
+     "comparator_shd": 43.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 43.1,
+     "comparator_shd_mean": 43.35,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.2,
+      0.8
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 6,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -11.7,
+       "bootstrap_95": [
+        -13.35,
+        -10.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -11.45,
+       "bootstrap_95": [
+        -12.6,
+        -10.35
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n100",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 100,
+     "n": 200,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0049,
+     "comparator_s": 0.306,
+     "ratio": 58.2231,
+     "ratio_quartiles": [
+      37.0769,
+      99.394
+     ],
+     "same_graph": 2,
+     "andrey_shd": 43.5,
+     "comparator_shd": 43.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 43.05,
+     "comparator_shd_mean": 43.3,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.2,
+      0.8
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 6,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -11.75,
+       "bootstrap_95": [
+        -13.45,
+        -10.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -11.5,
+       "bootstrap_95": [
+        -12.65,
+        -10.4
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n2000",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 2000,
+     "n": 4000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0215,
+     "comparator_s": 1.3678,
+     "ratio": 59.7541,
+     "ratio_quartiles": [
+      38.6045,
+      75.5971
+     ],
+     "same_graph": 5,
+     "andrey_shd": 35.5,
+     "comparator_shd": 35.0,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 33.9,
+     "comparator_shd_mean": 33.95,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.9,
+      0.75
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -20.9,
+       "bootstrap_95": [
+        -22.7,
+        -19.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -20.85,
+       "bootstrap_95": [
+        -22.35,
+        -19.35
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n2000",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 2000,
+     "n": 4000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0203,
+     "comparator_s": 1.3734,
+     "ratio": 60.363,
+     "ratio_quartiles": [
+      41.5495,
+      69.0738
+     ],
+     "same_graph": 5,
+     "andrey_shd": 35.5,
+     "comparator_shd": 35.0,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 33.75,
+     "comparator_shd_mean": 33.8,
+     "empty_shd_mean": 54.8,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.9,
+      0.75
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -21.05,
+       "bootstrap_95": [
+        -22.85,
+        -19.25
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -21.0,
+       "bootstrap_95": [
+        -22.55,
+        -19.5
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n2000",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 2000,
+     "n": 4000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0206,
+     "comparator_s": 1.401,
+     "ratio": 51.3059,
+     "ratio_quartiles": [
+      38.8622,
+      69.2541
+     ],
+     "same_graph": 4,
+     "andrey_shd": 33.5,
+     "comparator_shd": 32.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 32.95,
+     "comparator_shd_mean": 32.55,
+     "empty_shd_mean": 54.8,
+     "mean_D": 0.4,
+     "bootstrap_95": [
+      -0.45,
+      1.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -21.85,
+       "bootstrap_95": [
+        -23.75,
+        -19.8
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -22.25,
+       "bootstrap_95": [
+        -23.8,
+        -20.6
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.05 (the default), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.05, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_l10n2000",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "contexts": 1,
+     "rows_per_regime": 2000,
+     "n": 4000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_timeouts": 0,
+     "comparator_ok": 20,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 0,
+     "paired": 20,
+     "andrey_s": 0.0206,
+     "comparator_s": 1.3979,
+     "ratio": 50.3,
+     "ratio_quartiles": [
+      36.0649,
+      64.5621
+     ],
+     "same_graph": 4,
+     "andrey_shd": 33.5,
+     "comparator_shd": 32.5,
+     "empty_shd": 53.0,
+     "andrey_shd_mean": 32.7,
+     "comparator_shd_mean": 32.35,
+     "empty_shd_mean": 54.8,
+     "mean_D": 0.35,
+     "bootstrap_95": [
+      -0.45,
+      1.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "pdsep_max": 8,
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0,
+      "andrey_status": {
+       "ok": 20
+      },
+      "reference_status": {
+       "ok": 20
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -22.1,
+       "bootstrap_95": [
+        -24.0,
+        -20.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -22.45,
+       "bootstrap_95": [
+        -24.0,
+        -20.8
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_p20",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 20,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "comparator_ok": 4,
+     "comparator_timeouts": 6,
+     "comparator_not_run": 0,
+     "paired": 4,
+     "andrey_s": 0.014,
+     "comparator_s": 555.7749,
+     "ratio": 38621.322,
+     "ratio_quartiles": [
+      14890.3103,
+      64977.6642
+     ],
+     "same_graph": 1,
+     "andrey_shd": 56.0,
+     "comparator_shd": 57.0,
+     "empty_shd": 87.0,
+     "andrey_shd_mean": 54.75,
+     "comparator_shd_mean": 59.25,
+     "empty_shd_mean": 87.5,
+     "mean_D": -4.5,
+     "bootstrap_95": [
+      -8.0,
+      -1.0
+     ],
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 10,
+      "andrey_short": 0,
+      "reference_short": 6,
+      "andrey_status": {
+       "ok": 10
+      },
+      "reference_status": {
+       "ok": 4,
+       "timeout": 6
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -36.4,
+       "bootstrap_95": [
+        -39.1,
+        -34.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 4,
+       "mean": -28.25,
+       "bootstrap_95": [
+        -30.25,
+        -26.0
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_p20",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 20,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "comparator_ok": 6,
+     "comparator_timeouts": 4,
+     "comparator_not_run": 0,
+     "paired": 6,
+     "andrey_s": 0.0157,
+     "comparator_s": 998.137,
+     "ratio": 61020.0765,
+     "ratio_quartiles": [
+      21582.1114,
+      93680.4556
+     ],
+     "same_graph": 1,
+     "andrey_shd": 56.0,
+     "comparator_shd": 57.0,
+     "empty_shd": 87.0,
+     "andrey_shd_mean": 60.833333333333336,
+     "comparator_shd_mean": 65.33333333333333,
+     "empty_shd_mean": 95.66666666666667,
+     "mean_D": -4.5,
+     "bootstrap_95": [
+      -7.0,
+      -2.0
+     ],
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 10,
+      "andrey_short": 0,
+      "reference_short": 4,
+      "andrey_status": {
+       "ok": 10
+      },
+      "reference_status": {
+       "ok": 6,
+       "timeout": 4
+      }
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean": -36.5,
+       "bootstrap_95": [
+        -39.2,
+        -34.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 6,
+       "mean": -30.333333333333332,
+       "bootstrap_95": [
+        -33.166666666666664,
+        -27.666666666666668
+       ]
+      }
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=True (the default)",
+   "comparator": "pcalg 2.7-12, jci = \"1\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"1\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_p50",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 50,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 10,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 10,
+      "andrey_short": 0,
+      "reference_short": 10,
+      "andrey_status": {
+       "ok": 10
+      },
+      "reference_status": {
+       "missing": 10
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 10,
+      "mean": -99.6,
+      "bootstrap_95": [
+       -105.6,
+       -94.0
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "FCI-JCI at alpha 0.01",
+   "family": "constraint",
+   "solution": "andrey.fci_jci.numpy",
+   "setting": "alpha=0.01 (the paper's), indep_test=\"fisherz\", confounded_index=False",
+   "comparator": "pcalg 2.7-12, jci = \"123\"",
+   "comparator_solution": "pcalg::fci",
+   "comparator_setting": "fci(list(C = cor(X), n = nrow(X)), indepTest = gaussCItest, alpha = 0.01, type = \"normal\", jci = \"123\", contextVars = the environment's column, selectionBias = FALSE), every other argument at its default",
+   "lane": "fci_jci.alpha_0.01",
+   "output": "PAG over the data variables and the environment",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey pre-release build of 6 November 2026",
+   "same_graph_test": "equal endpoint marks over the data variables and the environment (same_graph)",
+   "regime": "fci_jci_p50",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "the endpoint SHD over the data variables and the environment against FCI-JCI's PAG at the true distribution under the same assumptions: variable pairs whose two endpoint marks differ, so a missing or extra edge costs both. andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
+   "complete": false,
+   "rows": [
+    {
+     "d": 50,
+     "contexts": 1,
+     "rows_per_regime": 500,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "fits": 10,
+     "andrey_ok": 10,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 0,
+     "comparator_not_run": 10,
+     "paired": 0,
+     "andrey_s": null,
+     "comparator_s": null,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "same_graph": 0,
+     "andrey_shd": null,
+     "comparator_shd": null,
+     "empty_shd": null,
+     "andrey_shd_mean": null,
+     "comparator_shd_mean": null,
+     "empty_shd_mean": null,
+     "mean_D": null,
+     "bootstrap_95": null,
+     "above_zero": false,
+     "verdict": null,
+     "pdsep_max": 9,
+     "coverage": {
+      "datasets": 10,
+      "andrey_short": 0,
+      "reference_short": 10,
+      "andrey_status": {
+       "ok": 10
+      },
+      "reference_status": {
+       "missing": 10
+      }
+     },
+     "reason": "pcalg not run: every pcalg fit of the dry run (seeds 0 and 1) timed out at the 1,800 s cap",
+     "andrey_minus_empty": {
+      "paired": 10,
+      "mean": -99.7,
+      "bootstrap_95": [
+       -105.7,
+       -94.1
+      ]
+     },
+     "card_verdict": null
+    }
+   ]
+  }
+ ]
+}

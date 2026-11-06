@@ -348,7 +348,7 @@ _add(
             "n_variables",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         order_note=(
