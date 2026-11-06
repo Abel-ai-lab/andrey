@@ -379,7 +379,7 @@ def test_cdnod_reads_a_complete_domain_index_and_refuses_the_independent_change_
 
 def test_a_lagged_design_reads_the_steps_its_lagged_variables_share():
     x = _gaps(_continuous(400), 0.05)
-    design = lagged_design(x, 2)
+    design = lagged_design(x, 4)
     test = design_test("student_t", x, 2)
     columns = [0, 6, 13]  # variable 0 now, variable 1 one step back, variable 3 two steps back
     rows = ~np.isnan(design[:, columns]).any(axis=1)

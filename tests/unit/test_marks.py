@@ -48,10 +48,8 @@ def test_marks_from_signed_directed_plus_nan_pair():
     """Directed support + a per-algorithm mark on every NaN pair, in one call."""
     B = np.array([[0.0, 0.5, np.nan], [0.0, 0.0, 0.0], [np.nan, 0.0, 0.0]])
     # B[0, 1] = 0.5 => edge 1 -> 0 (arrow at 0); the 0-2 pair is NaN both ways (confounded).
-    bidirected = marks_from_signed(B, nan_mark="bidirected")
+    bidirected = marks_from_signed(B, nan_mark=ARROW)
     assert (bidirected[0, 1], bidirected[1, 0]) == (ARROW, TAIL)  # directed 1 -> 0 preserved
     assert (bidirected[0, 2], bidirected[2, 0]) == (ARROW, ARROW)  # NaN pair -> bidirected (RCD)
-    circle = marks_from_signed(B, nan_mark="circle")
+    circle = marks_from_signed(B, nan_mark=CIRCLE)
     assert (circle[0, 2], circle[2, 0]) == (CIRCLE, CIRCLE)  # NaN pair -> o-o (BottomUp)
-    with pytest.raises(ValueError, match="nan_mark"):
-        marks_from_signed(B, nan_mark="bogus")

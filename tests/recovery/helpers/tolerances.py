@@ -70,10 +70,6 @@ SPEC: dict[str, dict] = {
         "numeric": {"group_weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
     },
     # --- Temporal (lagged) methods: causal order is the cross-source slice gate.
-    "VARLiNGAM": {
-        "structural": ["causal_order"],
-        "numeric": {"adjacency_matrices": {"atol": 1e-6, "rtol": 1e-5}},
-    },
     "VARMALiNGAM": {
         "structural": ["causal_order"],
         "numeric": {
@@ -123,10 +119,10 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"lag_weights": {"atol": 5e-3, "rtol": 0.0}},
     },
-    # Granger has no causal order; its structural gate is the binary support.
+    # Granger has no causal order: the per-lag graphs exactly, the weights within rounding.
     "Granger": {
-        "structural": ["adj"],
-        "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
+        "structural": ["graph"],
+        "numeric": {"lag_weights": {"atol": 1e-6, "rtol": 1e-5}},
     },
     # CAM-UV: the PAG's marks and the pairs it marks through a hidden variable, both exact.
     "CAMUV": {

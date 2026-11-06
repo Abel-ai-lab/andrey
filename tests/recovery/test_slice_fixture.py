@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import types
-
 import numpy as np
 import pytest
 
 from andrey import GraphStructure
 from andrey.api import _adapt
-from andrey.api._temporal import _adapt_var_lingam, _adapt_varma_lingam
+from andrey.api._temporal import _adapt_varma_lingam
 from andrey.api.lingam import _canonical_weights
 from tests.recovery.helpers import harness
 from tests.recovery.helpers.project import project_output
@@ -45,30 +43,17 @@ def test_direct_lingam_roundtrip():
 
 
 # --- temporal / multi-group / pairwise: build a native output through the PRODUCTION encode path
-# (the duck-typed temporal adapters, the _adapt LiNGAM helpers) from each baseline, then round-trip.
+# (the temporal adapters, the _adapt LiNGAM helpers) from each baseline, then round-trip.
 # Covers the projection families the graph/LiNGAM tests above do not.
-
-
-def test_var_lingam_roundtrip():
-    doc = harness.load_baseline("VARLiNGAM", "var_4v_stable")
-    model = types.SimpleNamespace(
-        adjacency_matrices_=np.asarray(doc["output"]["adjacency_matrices"], dtype=float),
-        causal_order_=doc["output"]["causal_order"],
-    )
-    out = _adapt_var_lingam(model)
-    harness.assert_recorded_output(out, "VARLiNGAM", case="var_4v_stable")
 
 
 def test_varma_lingam_roundtrip():
     doc = harness.load_baseline("VARMALiNGAM", "varma_3v")
-    model = types.SimpleNamespace(
-        adjacency_matrices_=(
-            np.asarray(doc["output"]["psis"], dtype=float),
-            np.asarray(doc["output"]["omegas"], dtype=float),
-        ),
-        causal_order_=doc["output"]["causal_order"],
+    out = _adapt_varma_lingam(
+        doc["output"]["causal_order"],
+        np.asarray(doc["output"]["psis"], dtype=float),
+        np.asarray(doc["output"]["omegas"], dtype=float),
     )
-    out = _adapt_varma_lingam(model)
     harness.assert_recorded_output(out, "VARMALiNGAM", case="varma_3v")
 
 
@@ -104,4 +89,4 @@ def test_structural_mismatch_fails():
 
 def test_unregistered_algorithm_raises():
     with pytest.raises(KeyError):
-        project_output(object(), "Granger")
+        project_output(object(), "NoSuchMethod")

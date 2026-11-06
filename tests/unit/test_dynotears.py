@@ -12,7 +12,8 @@ import andrey
 from andrey.core.score import CopiedColumnsError
 from andrey.data import temporal
 from andrey.search.continuous import least_squares
-from andrey.temporal.dynotears import lagged_covariance, lagged_design
+from andrey.temporal.dynotears import lagged_covariance
+from andrey.temporal.pcmci import lagged_design
 
 # W[cause, effect]: x0 -> x1 -> x2 within a step; A_1: every series on its own past, x1 -> x3.
 W = np.zeros((4, 4))

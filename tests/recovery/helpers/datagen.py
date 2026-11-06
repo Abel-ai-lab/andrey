@@ -389,7 +389,7 @@ CASES: dict[str, dict] = {
             [0.0, -0.8, 0.0, 0.0, 0.0],
         ],
     },
-    # Stable VAR(1), non-Gaussian noise - VARLiNGAM and (linear) Granger.
+    # Stable VAR(1), non-Gaussian noise - Granger and PCMCI+.
     "var_4v_stable": {
         "model": "var",
         "noise": "uniform",
