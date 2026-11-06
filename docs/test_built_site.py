@@ -82,6 +82,9 @@ HEADER = {
     "Blog": "blog/index.html",
     "FAQ": "docs/faq.html",
 }
+# The header's sections in the order they read; Release cards, which carries the newest release's
+# dot, is checked on its own.
+NAV = ["Docs", "Examples", "Demos", "Blog", "Release cards", "FAQ"]
 
 
 @pytest.fixture(scope="module")
@@ -139,6 +142,12 @@ def _pages(html: pathlib.Path):
 def _scripts(text: str) -> list[str]:
     """The address of every script a page loads, in document order."""
     return re.findall(r'<script[^>]*\bsrc="([^"]+)"', text)
+
+
+def _stylesheets(text: str) -> list[str]:
+    """The address of every stylesheet a page links, in document order."""
+    links = re.findall(r"<link\b[^>]*>", text)
+    return [re.search(r'\bhref="([^"]+)"', link)[1] for link in links if 'rel="stylesheet"' in link]
 
 
 def _file_name(address: str) -> str:
@@ -266,6 +275,11 @@ def test_every_header_leads_home_and_to_each_section(html):
         brand = [href for cls, href in links.found if "navbar-brand" in cls]
         if not brand or _resolve(html, page, brand[0]) != html / "index.html":
             problems.append(f"{name}: the wordmark does not lead home")
+        shown = re.findall(
+            rf'<a class="nav-link nav-internal" href="[^"]+"[^>]*>{ICON}([^<]+)', header
+        )
+        if shown != NAV:
+            problems.append(f"{name}: the header's sections read {shown}, not {NAV}")
         for label, expected in HEADER.items():
             hrefs = re.findall(
                 rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{ICON}{label}</a>', header
@@ -635,8 +649,9 @@ def test_the_why_fast_scenes_load_motion_then_their_script_only_where_they_appea
     assert shown
 
 
-def test_every_page_with_an_embedded_example_loads_the_script_that_hosts_it(html):
-    # The host script passes the reader's theme into the example and sizes its frame to it.
+def test_every_page_with_an_embedded_example_loads_the_files_that_host_it(html):
+    # The host script passes the reader's theme into the example and sizes its frame to it; the
+    # stylesheet sets the frame to the article's width.
     embedding = []
     for page, text in _pages(html):
         if not re.search(r'<iframe[^>]*\bsrc="[^"]*_static/examples/', text):
@@ -644,6 +659,8 @@ def test_every_page_with_an_embedded_example_loads_the_script_that_hosts_it(html
         embedding.append(page)
         hosts = [s for s in _scripts(text) if _file_name(s) == "example-frame.js"]
         assert len(hosts) == 1 and _resolve(html, page, hosts[0]).is_file(), page
+        sheets = [s for s in _stylesheets(text) if _file_name(s) == "examples.css"]
+        assert len(sheets) == 1 and _resolve(html, page, sheets[0]).is_file(), page
     assert embedding
 
 

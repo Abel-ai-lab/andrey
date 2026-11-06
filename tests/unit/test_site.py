@@ -1527,12 +1527,14 @@ def test_the_homepage_shades_its_art_with_the_covers_fade(cards):
         assert "background: var(--cover-fade);" in body[: body.index("}")], rule
 
 
-def test_the_homepage_and_docs_css_name_no_color(cards):
+def test_the_homepage_and_docs_styles_and_scripts_name_no_color(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
-    sheets = ("site.css", "figures.css", "why-fast.css", "why-fast.js")
+    assets = ("site.css", "figures.css", "why-fast.css", "why-fast.js")
     docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")
-    for path in [*(f"site/assets/{name}" for name in sheets), *docs]:
+    for path in [*(f"site/assets/{name}" for name in assets), *docs]:
         rules = re.sub(r"/\*.*?\*/", "", (ROOT / path).read_text(), flags=re.S)
+        if path.endswith(".js"):
+            rules = re.sub(r"//[^\n]*", "", rules)
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|oklch|lab)\(", rules), path
         assert not re.search(r":\s*(black|white)\b", rules), path
     tokens = cards.grain.ground_tokens()

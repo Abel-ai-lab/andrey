@@ -549,7 +549,7 @@ def test_run_varma_temporal_envelope(capsys, csv_path):
 
 def test_run_bool_flag_recorded(capsys, csv_path):
     code, out, _ = _run(
-        ["run", "varma_lingam", "--data", str(csv_path), "prune=true", "max_iter=1"], capsys
+        ["run", "varma_lingam", "--data", str(csv_path), "prune=true", *VARMA_SHORT], capsys
     )
     env = json.loads(out)
     assert code == 0 and env["run"]["params"]["prune"] is True
@@ -617,7 +617,7 @@ def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path, 
 
     path = nongaussian_path if name in ("direct_lingam", "gin", "rcd") else csv_path
     data = str(pair_path if name == "pnl" else path)
-    short = ["max_iter=1"] if name == "varma_lingam" else []
+    short = VARMA_SHORT if name == "varma_lingam" else []
     code, out, _ = _run(["run", name, "--data", data, *short], capsys)
     env = json.loads(out)
     spec = get_spec(name)
