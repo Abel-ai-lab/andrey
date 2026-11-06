@@ -13,17 +13,15 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
-    checked_data,
-    column_labels,
     copies_named,
-    default_test,
+    fit_inputs,
     label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL
 from andrey.core.ci_missing import rows_metadata, rows_tested
-from andrey.core.knowledge import Knowledge, as_node, column_position, resolve
+from andrey.core.knowledge import Knowledge, as_node, column_position
 from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
@@ -54,19 +52,12 @@ def _fit(
     from andrey.constraint.blanket import local_set, local_structure
     from andrey.spec.concepts import BLANKET_STRUCTURES
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
-    X, mask = checked_data(
-        data,
-        categorical,
-        "indep_test",
-        indep_test,
-        method=method,
-        missing=True,
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method=method, missing=True
     )
-    labels = column_labels(data)
     d = X.shape[1]
     t = None if target is None else column_position(as_node(target, "target"), labels, d, "target")
-    constraints = resolve(knowledge, d, labels, method=method)
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,

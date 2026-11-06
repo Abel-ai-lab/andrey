@@ -10,15 +10,13 @@ from typing import TYPE_CHECKING
 
 from andrey.api._adapt import (
     categorical_metadata,
+    check_same_data,
     checked_data,
     column_labels,
     copies_named,
-    data_kind,
-    default_score,
-    default_test,
-    int_in_range,
     json_safe,
     structure_output,
+    tabu_cap,
 )
 from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
@@ -55,21 +53,11 @@ def _fit(
     """Check the settings, run the restrict and maximize phases, and wrap the CPDAG."""
     from andrey.search.hybrid import rsmax2 as _rsmax2
 
-    score_func, _ = default_score(data, score_func, categorical=categorical)
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
-    if data_kind(score_func) != data_kind(indep_test):
-        raise ValueError(
-            f"{name}'s score and test must read the data alike: score_func='bdeu' or "
-            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
-            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
-            "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
-            f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
-        )
+    check_same_data(name, score_func, indep_test)
     X, mask = checked_data(data, categorical, "indep_test", indep_test, method=name)
-    max_tabu = int_in_range(
-        tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
-    )
+    max_tabu = tabu_cap(max_tabu, tabu_length)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method=name)
     with copies_named(labels):

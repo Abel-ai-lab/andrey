@@ -31,11 +31,12 @@ from andrey.api._method import method_spec
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+    from andrey.core.knowledge import Constraints
 
 
 def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
@@ -46,6 +47,30 @@ def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
     ``dag`` built from ``W`` and the stored ``weighted_adjacency`` then share one orientation.
     """
     return np.ascontiguousarray(np.asarray(B, dtype=np.float64).T)
+
+
+def lingam_output(
+    order: npt.ArrayLike,
+    B: npt.ArrayLike,
+    constraints: Constraints | None,
+    labels: tuple[str, ...] | None,
+    metadata: Mapping[str, object] | None = None,
+) -> StructureOutput:
+    """Return a LiNGAM fit as a ``dag`` with its causal ``order``, weights, and ``metadata``.
+
+    The weights are ``B`` in Andrey's orientation (:func:`_canonical_weights`), and the ``dag`` has
+    an edge for each nonzero weight and each edge ``constraints`` requires, which stays an edge
+    when its weight is ``0``.
+    """
+    weighted = _canonical_weights(B)
+    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
+    return structure_output(
+        dag_from_adjacency(edges),
+        labels=labels,
+        ordering=order,
+        weighted_adjacency=weighted,
+        metadata=metadata,
+    )
 
 
 def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
@@ -236,14 +261,7 @@ def direct_lingam(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
     order, B = _native(X, measure=measure, constraints=constraints)
-    weighted = _canonical_weights(B)
-    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
-    return structure_output(
-        dag_from_adjacency(edges),
-        labels=labels,
-        ordering=order,
-        weighted_adjacency=weighted,
-    )
+    return lingam_output(order, B, constraints, labels)
 
 
 @method_spec("ica_lingam")
@@ -400,14 +418,7 @@ def ica_lingam(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="ica_lingam")
     order, B = _native(X, random_state=seed, max_iter=max_iter, constraints=constraints)
-    weighted = _canonical_weights(B)
-    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
-    return structure_output(
-        dag_from_adjacency(edges),
-        labels=labels,
-        ordering=order,
-        weighted_adjacency=weighted,
-    )
+    return lingam_output(order, B, constraints, labels)
 
 
 @method_spec("multi_group_direct_lingam")
@@ -548,17 +559,7 @@ def multi_group_direct_lingam(
     labels = shared_labels(column_labels(X) for X in data)
     constraints = resolve(knowledge, groups[0].shape[1], labels, method="multi_group_direct_lingam")
     order, adjacency_matrices = _native(groups, measure=measure, constraints=constraints)
-    outputs = []
-    for k, B in enumerate(adjacency_matrices):
-        weighted = _canonical_weights(B)
-        edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
-        outputs.append(
-            structure_output(
-                dag_from_adjacency(edges),
-                labels=labels,
-                ordering=order,
-                weighted_adjacency=weighted,
-                metadata={"group_index": k},
-            )
-        )
-    return outputs
+    return [
+        lingam_output(order, B, constraints, labels, {"group_index": k})
+        for k, B in enumerate(adjacency_matrices)
+    ]

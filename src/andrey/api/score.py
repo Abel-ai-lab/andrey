@@ -26,11 +26,11 @@ from andrey.api._adapt import (
     copies_named,
     data_matrix,
     declared_columns,
-    default_score,
-    int_in_range,
+    fit_inputs,
     json_safe,
     label_of,
     structure_output,
+    tabu_cap,
 )
 from andrey.api._method import method_spec
 from andrey.core import backend
@@ -320,10 +320,10 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
-    score_func, categorical = default_score(data, score_func, categorical=categorical)
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="ges")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="ges")
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="ges"
+    )
     with copies_named(labels):
         cpdag, score = _ges(
             X,
@@ -644,10 +644,10 @@ def gies(
     data, codes, _, by_code = normalize_env_targets(
         data, env, targets, require_known_targets=True, method="gies"
     )
-    score_func, categorical = default_score(data, score_func, categorical=categorical)
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="gies")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="gies")
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="gies"
+    )
     intervened = None
     if targets is not None:  # mask[i] = targets_by_code[env_codes[i]]
         rows = np.zeros((len(by_code), X.shape[1]), dtype=bool)
@@ -914,7 +914,11 @@ def gnies(
     >>> out.metadata["changing_variables"]
     ['y']
     """
-    from andrey.core.environments import normalize_env_targets
+    from andrey.core.environments import (
+        check_constant_columns,
+        check_environment_rows,
+        normalize_env_targets,
+    )
     from andrey.search.gnies import gnies as _gnies
 
     data, codes, envs, by_code = normalize_env_targets(
@@ -938,9 +942,7 @@ def gnies(
         raise ValueError(
             "gnies needs rows from two or more environments; pass env, each row's environment"
         )
-    small = [shown[k] for k in np.flatnonzero(sizes < 2)]
-    if small:
-        raise ValueError(f"gnies: each environment needs at least 2 rows; {small} have fewer")
+    check_environment_rows(codes, shown, "gnies", 2)
     n, d = X.shape
     if n - len(envs) < d:
         raise ValueError(
@@ -949,12 +951,13 @@ def gnies(
             "least as many"
         )
     for k in range(len(envs)):
-        flat = np.flatnonzero(np.ptp(X[codes == k], axis=0) == 0)
-        if flat.size:
-            raise ValueError(
-                f"gnies: column {name(int(flat[0]))} is constant in environment {shown[k]!r}; "
-                "the model needs a positive noise variance in every environment"
-            )
+        check_constant_columns(
+            X[codes == k],
+            name,
+            "gnies",
+            f"the rows of environment {shown[k]!r}, where the model needs a positive noise "
+            "variance",
+        )
     constraints = resolve(knowledge, d, labels, method="gnies")
     known = frozenset().union(*(s for s in by_code.values() if s is not None))
     fixed = all(s is not None for s in by_code.values())
@@ -1201,10 +1204,10 @@ def xges(
     """
     from andrey.search.xges import xges as _xges
 
-    score_func, categorical = default_score(data, score_func, categorical=categorical)
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="xges")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="xges")
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="xges"
+    )
     with copies_named(labels):
         cpdag, score = _xges(
             X,
@@ -1457,14 +1460,10 @@ def hc(
     """
     from andrey.search.hc import hc as _hc
 
-    score_func, categorical = default_score(
-        data,
-        score_func,
-        categorical=categorical,
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="hc"
     )
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="hc")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="hc")
     changes = X.shape[1] if n_perturbations is None else n_perturbations
     with copies_named(labels):
         cpdag, score = _hc(
@@ -1731,11 +1730,9 @@ def tabu(
     """
     from andrey.search.tabu import tabu as _tabu
 
-    score_func, categorical = default_score(data, score_func, categorical=categorical)
+    assert score_func is not None  # method_spec picks it from the column types
     X, mask = checked_data(data, categorical, "score_func", score_func, method="tabu")
-    max_tabu = int_in_range(
-        tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
-    )
+    max_tabu = tabu_cap(max_tabu, tabu_length)
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
     changes = X.shape[1] if n_perturbations is None else n_perturbations
@@ -1975,16 +1972,10 @@ def exact_search(
     from andrey.core.structure import ARROW, TAIL
     from andrey.search.exact import exact_search as _exact
 
-    score_func, categorical = default_score(data, score_func, categorical=categorical)
-    X, mask = checked_data(
-        data,
-        categorical,
-        "score_func",
-        score_func,
-        method="exact_search",
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="exact_search"
     )
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
     with copies_named(labels):
         dag = _exact(
             X,
