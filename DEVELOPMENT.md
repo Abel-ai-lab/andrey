@@ -117,8 +117,8 @@ registry. Every facade docstring has, in order:
   the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
   boundary ended on a cap. A warning from a layer many methods share, such as a CI test's
   `SampleSizeWarning`, a worker pool's `PerformanceWarning`, `BackendFallbackWarning`, or a
-  dependency's convergence warning raised again as `SearchLimitWarning`, is listed once, in the
-  warnings table of `docs/docs/api.md`.
+  dependency's convergence warning raised again as `SearchLimitWarning`, is listed in the warnings
+  table of `docs/docs/api.md`.
 - **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
   claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time
   series; observational, interventional, or multi-domain), the model assumptions that matter

@@ -1,9 +1,9 @@
 """Every method's docstring follows the docstring standard in ``DEVELOPMENT.md``.
 
 The sentences shared by many methods match the table in ``scripts/docstring_text.py``, the sections
-come in the standard's order, Warns names each of ``DataTypeWarning``, ``SearchLimitWarning``,
-``ExperimentalWarning``, and ``BoundaryWarning`` a fit can raise, Notes ends with Limitations, and
-an example whose fit draws random numbers passes ``seed=0``.
+come in the standard's order, Warns names ``DataTypeWarning``, an iteration cap's
+``SearchLimitWarning``, ``ExperimentalWarning``, and ``BoundaryWarning`` where a fit can raise them,
+Notes ends with Limitations, and an example whose fit draws random numbers passes ``seed=0``.
 """
 
 from __future__ import annotations
