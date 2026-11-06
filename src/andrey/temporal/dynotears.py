@@ -27,6 +27,7 @@ from andrey.core.ties import tie_ranks
 from andrey.search.continuous import (
     Canonical,
     augmented_lagrangian,
+    center,
     threshold_dag,
     trace_exponential,
 )
@@ -74,21 +75,24 @@ def dynotears(
     max_iter: int,
     h_tol: float,
     rho_max: float,
+    standardize: bool = False,
     constraints: LaggedConstraints | None = None,
 ) -> DynotearsResult:
     """Fit DYNOTEARS (Pamfil et al. 2020) to ``series``, one row per time step.
 
     The columns are fit in the order of their :func:`~andrey.core.ties.tie_ranks`, so the result
-    does not depend on the order they come in. ``constraints`` holds the knowledge over lags ``0``
-    to ``tau_max``: a forbidden link stays at zero, and a required one leaves the penalty and the
-    threshold and is never dropped by the cycle repair.
+    does not depend on the order they come in. ``standardize`` scales each column of the series to
+    unit variance first (:func:`~andrey.search.continuous.center`). ``constraints`` holds the
+    knowledge over lags ``0`` to ``tau_max``: a forbidden link stays at zero, and a required one
+    leaves the penalty and the threshold and is never dropped by the cycle repair.
     """
     samples = np.asarray(series, dtype=np.float64)
     d = samples.shape[1]
     lags = tau_max + 1
     order = np.argsort(tie_ranks(samples))
     back = np.argsort(order)
-    cov = lagged_covariance(samples[:, order], tau_max)
+    ordered = samples[:, order]
+    cov = lagged_covariance(center(ordered, standardize=True) if standardize else ordered, tau_max)
     if constraints is None:
         forbidden = required = np.zeros((lags, d, d), dtype=bool)
     else:

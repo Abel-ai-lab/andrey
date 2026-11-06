@@ -13,7 +13,10 @@ import multiprocessing as mp
 import numpy as np
 import pytest
 
+import andrey
 import andrey.data as data
+
+pytestmark = pytest.mark.filterwarnings("ignore::andrey.DeprecatedArgumentWarning")
 
 
 def _ensemble(n=200):
@@ -50,6 +53,20 @@ def test_task_regenerates_from_scm_and_seed(scale):
     assert np.array_equal(a.data, b.data)
     assert a.graph == b.graph
     assert b.provenance["config"]["scale"] == (scale or "standardize")
+
+
+@pytest.mark.filterwarnings("default::andrey.DeprecatedArgumentWarning")
+def test_generate_and_ensemble_warn_that_they_stop_working_in_0_16():
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(6, 2.0),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(),
+    )
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=r"Ensemble .* 0\.16\.0"):
+        ens = data.Ensemble(scms=[scm], seeds=[0], n=50)
+    with pytest.warns(andrey.DeprecatedArgumentWarning, match=r"generate .* 0\.16\.0"):
+        (ds,) = data.generate(ens)
+    assert np.array_equal(ds.data, scm.sample(n=50, seed=0).data)
 
 
 def test_serial_equals_parallel():

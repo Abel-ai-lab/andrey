@@ -106,6 +106,13 @@ def test_the_dual_steps_end_once_the_acyclicity_falls_to_h_tol(series, default_f
     assert default_fit.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
 
 
+def test_standardize_makes_the_fit_independent_of_the_units(series):
+    """Scaling by powers of two leaves the standardized series equal bit for bit."""
+    units = np.array([4.0, 0.25, 8.0, 0.5])
+    plain, rescaled = fit(series, standardize=True), fit(series * units, standardize=True)
+    np.testing.assert_array_equal(rescaled.structure.lag_weights, plain.structure.lag_weights)
+
+
 def test_tau_max_sets_the_lags_and_the_weights(series):
     out = fit(series, tau_max=3)
     assert out.structure.lags == (0, 1, 2, 3)

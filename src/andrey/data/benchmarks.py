@@ -3,7 +3,7 @@
 Each benchmark is a family parametrized by node count ``d``, spanning the mechanism/topology/noise
 combinations the benchmark grid needs (linear-Gaussian, linear-non-Gaussian, additive-nonlinear,
 post-nonlinear, and a latent-confounded family). Build one with :func:`get` (or :func:`scm`) and
-cross it with sizes and seeds via :class:`~andrey.data.generate.Ensemble`.
+draw it at each sample size and seed with :meth:`SCM.sample <andrey.data.SCM.sample>` in a loop.
 """
 
 from __future__ import annotations

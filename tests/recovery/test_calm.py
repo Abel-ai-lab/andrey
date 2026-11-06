@@ -192,6 +192,14 @@ def test_calm_solver_settings_reach_the_optimizer(name, value) -> None:
     assert not np.array_equal(andrey.calm(X, **short, **{name: value}).weighted_adjacency, base)
 
 
+def test_calm_h_final_is_the_residual_the_rounds_stop_on(sem) -> None:
+    """``h_final`` is the acyclicity residual of the gates before the thresholds, the value the
+    rounds compare with ``h_tol``, so a looser ``h_tol`` ends them at a larger one."""
+    X, _, tight = sem
+    loose = andrey.calm(X, h_tol=1e-2)
+    assert 0 < tight.metadata["h_final"] <= 1e-8 < loose.metadata["h_final"] <= 1e-2
+
+
 # ---- what the method promises --------------------------------------------------------------------
 
 

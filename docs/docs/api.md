@@ -755,7 +755,7 @@ category, except scikit-learn's `ConvergenceWarning` from FastICA and LARS, rais
 | {py:class}`~andrey.SearchLimitWarning` | A fit stopped at its iteration cap, such as `max_iter`, rather than on its own stopping rule, or FastICA or LARS did not converge. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.BoundaryWarning` | A fit larger than the largest size its method finished within the caps of the newest boundary lane, at the nearest measured setting. |
-| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one. |
+| {py:class}`~andrey.DeprecatedArgumentWarning` | A former argument name or value, which works for one more release as the current one, or a deprecated function or class, which also works for one more release. |
 | {py:class}`~andrey.DataTypeWarning` | A method that reads columns as numbers met columns that look like category codes, or a mixed-data setting inferred categorical columns from their values or found none. |
 
 A `BoundaryWarning` takes the setting whose rows, or rows per variable, are nearest the data's, and
@@ -937,10 +937,10 @@ returns, after the column shuffle, and give values and shifts in the units of th
 the `scale`. The sample under `do` draws the noise the sample without interventions draws, so every
 column the interventions do not reach is the same in the two.
 
-`envs=` on `SCM.sample` and `sample_discrete` draws several environments into one dataset: one
-mapping of interventions per environment, `{}` for none. Each environment draws its own noise, and
-the rows come pooled, environment 0 first, with `env`, each row's environment, and `targets`, each
-environment's intervened columns:
+`envs=` on `SCM.sample`, `sample_discrete`, and `sample_mixed` draws several environments into one
+dataset: one mapping of interventions per environment, `{}` for none. Each environment draws its own
+noise, and the rows come pooled, environment 0 first, with `env`, each row's environment, and
+`targets`, each environment's intervened columns:
 
 ```python
 import andrey.data as data
@@ -956,15 +956,16 @@ ds.targets  # {0: [], 1: [3], 2: [5, 8]}
 
 `"standardize"` and `"rescale"` take their means, standard deviations, and divisors from the model
 without interventions on the same noise and apply them to every environment, so a shift in one
-environment stays a shift in the data. On discrete data, `hard(category)` or `hard(probs=...)`
-gives a variable one distribution whatever its parents, and `soft()` draws its table anew. The true
-graph is the graph without interventions.
+environment stays a shift in the data. On discrete data, and on the categorical columns of mixed
+data, `hard(category)` or `hard(probs=...)` gives a variable one distribution whatever its parents,
+and `soft()` draws its table anew. The true graph is the graph without interventions.
 
-`model_seed=` on `SCM.sample` and `sample_discrete` keeps one model across datasets. The model
-comes from `model_seed`: the graph, the weights or tables, the noise scales, the column order, and
-the weights or tables a `soft` intervention draws anew. Each environment draws its own, and `params`
-holds those of the model without interventions. `seed` draws only the rows, so samples with one
-`model_seed` and different seeds are datasets of one model, with the same true graph and `params`:
+`model_seed=` on `SCM.sample`, `sample_discrete`, and `sample_mixed` keeps one model across
+datasets. The model comes from `model_seed`: the graph, the weights or tables, the noise scales, the
+column order, and the weights or tables a `soft` intervention draws anew. Each environment draws its
+own, and `params` holds those of the model without interventions. `seed` draws only the rows, so
+samples with one `model_seed` and different seeds are datasets of one model, with the same true
+graph and `params`:
 
 ```python
 datasets = [scm.sample(n=[500, 500], seed=s, model_seed=0, envs=[{}, {3: soft(weights="redraw")}])
