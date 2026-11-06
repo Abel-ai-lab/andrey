@@ -85,12 +85,12 @@ assumptions. The circle at `X` leaves that endpoint unresolved. This does not es
 effect from `X` to `Y`. A bidirected edge `X <-> Y` indicates a relation through hidden causes;
 it is not a directed feedback loop and does not identify a particular hidden variable.
 
-FCI and GFCI return `kind="pag"`. RCD, BottomUpParceLiNGAM, and CAM-UV use the same marks without
-the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD links
-through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves unordered,
-which holds the variables a hidden common cause confounds and their observed ancestors, or a pair
-that CAM-UV finds joined through a hidden variable, a common cause or a causal path, whose relation
-it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
+FCI, GFCI, and FCI-JCI return `kind="pag"`. RCD, BottomUpParceLiNGAM, and CAM-UV use the same
+marks without the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that
+RCD links through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves
+unordered, which holds the variables a hidden common cause confounds and their observed ancestors,
+or a pair that CAM-UV finds joined through a hidden variable, a common cause or a causal path,
+whose relation it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
 
 ```python
 pag = GraphStructure.from_numpy(
@@ -173,7 +173,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `gin`, `anm`, `pnl`, `icp` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
-| `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
+| `pag` | `fci`, `gfci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
@@ -183,6 +183,13 @@ edges, each `env -> variable`, are in `metadata["index_edges"]`, and
 `metadata["changing_variables"]` lists the same variables. They are the variables whose causal
 module, the distribution given their causes, changes across the environments; their descendants
 change through them and are not listed.
+
+`fci_jci` returns a `pag` over the data variables alone. The environment index is not a node:
+`metadata["index_edges"]` lists its edges as `[variable, kind]` pairs, `"directed"` for
+`index -> variable`, `"partially_directed"` for `index o-> variable`, and `"bidirected"` for
+`index <-> variable`. A variable keeps an edge to the index when its distribution changes across
+the environments and no other variable explains the change; under hidden common causes that does
+not make it a target of the change, so `fci_jci` lists no `changing_variables`.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.

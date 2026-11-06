@@ -50,7 +50,8 @@ class _RecordingTest:
 
 
 @pytest.mark.parametrize(
-    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+    "facade",
+    ["pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"],
 )
 def test_registered_test_is_dispatched_end_to_end(facade, clean_registry):
     """Every constraint facade routes its CI queries to the registered test, not FisherZ."""
@@ -63,9 +64,9 @@ def test_registered_test_is_dispatched_end_to_end(facade, clean_registry):
 
     ci.register_indep_test("recording", factory)
     x = _chain_data(d=6)
-    if facade == "cdnod":
+    if facade in ("cdnod", "fci_jci"):
         c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        andrey.cdnod(x, c, indep_test="recording")
+        getattr(andrey, facade)(x, c, indep_test="recording")
     else:
         getattr(andrey, facade)(x, indep_test="recording")
     assert recorders, f"{facade} never constructed the registered test"
@@ -136,14 +137,15 @@ def test_registry_surface(clean_registry):
 
 @pytest.mark.parametrize("indep_test", ["student_t", "normal_scores"])
 @pytest.mark.parametrize(
-    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+    "facade",
+    ["pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"],
 )
 def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(facade, indep_test):
     """Each constraint facade accepts the test by name and returns a valid graph."""
     x = _chain_data()
-    if facade == "cdnod":
+    if facade in ("cdnod", "fci_jci"):
         c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
-        out = andrey.cdnod(x, c, indep_test=indep_test)
+        out = getattr(andrey, facade)(x, c, indep_test=indep_test)
     else:
         out = getattr(andrey, facade)(x, indep_test=indep_test)
     out.structure.validate()

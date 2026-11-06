@@ -31,7 +31,7 @@ RATES = [0.05, 0.1, 0.2]
 # A test of a series method reads many lagged columns and loses far more of its rows than the share
 # of values missing, so the series methods run at the lower rates.
 SERIES_RATES = [0.05, 0.1]
-IID = ["pc", "fci", "cdnod", "iamb", "inter_iamb", "mmpc"]
+IID = ["pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc"]
 SERIES = ["pcmci", "pcmciplus", "lpcmci"]
 PAIRS = ["anm", "pnl"]
 
@@ -54,8 +54,9 @@ def _gaps(table, rate: float, seed: int = 7):
 
 
 def _fit(name: str, table, **kwargs):
-    if name == "cdnod":
-        return andrey.cdnod(table, np.repeat([0.0, 1.0], len(table) // 2), **kwargs)
+    if name in ("cdnod", "fci_jci"):
+        env = np.repeat([0.0, 1.0], len(table) // 2)
+        return getattr(andrey, name)(table, env, **kwargs)
     return getattr(andrey, name)(table, **kwargs)
 
 
@@ -74,7 +75,7 @@ def test_the_continuous_collider_separates_its_pair_clearly():
 
 
 @pytest.mark.parametrize("rate", RATES)
-@pytest.mark.parametrize("name", ["pc", "fci", "cdnod"])
+@pytest.mark.parametrize("name", ["pc", "fci", "cdnod", "fci_jci"])
 def test_a_collider_keeps_its_graph_with_missing_values(name, rate):
     complete = _fit(name, _collider())
     assert len(complete.structure.oriented_edges()) == 2

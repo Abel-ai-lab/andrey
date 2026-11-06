@@ -353,12 +353,12 @@ independences were tested, and `andrey markov-check` runs the same from the shel
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
 per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes `env`, each row's environment, `gies` and `igsp` also take
-`env` with `targets`, the variables intervened on in each environment, `gnies` takes `env` and
-learns which variables each environment's interventions changed, `icp` takes `env` and `target`,
-the variable whose parents it finds, and `multi_group_direct_lingam` and `longitudinal_lingam` take
-a list of datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph
-each one returns.
+kind of result; `cdnod` and `fci_jci` also take `env`, each row's environment, `gies` and `igsp`
+also take `env` with `targets`, the variables intervened on in each environment, `gnies` takes
+`env` and learns which variables each environment's interventions changed, `icp` takes `env` and
+`target`, the variable whose parents it finds, and `multi_group_direct_lingam` and
+`longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
+{doc}`graph-types` explains which graph each one returns.
 
 `ut_igsp` takes `env` and `targets` too, and learns the targets you do not know. Map an
 observational environment to `[]`, a setting to the targets you know, and a setting whose targets
@@ -450,8 +450,8 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`,
-`pcmci`, `pcmciplus`, and `lpcmci` take the tests; `ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`,
+`pc`, `fci`, `gfci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`,
+`ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the tests; `ges`, `gies`, `xges`, `gfci`, `hc`, `tabu`,
 `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score; `gies` scores each variable
 on the rows without an intervention on it. `gfci`, `mmhc`, and `rsmax2` take a score and a test that
 read the same kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`.
@@ -516,11 +516,12 @@ warnings under `run.warnings`.
 ## Missing values
 
 Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty or
-write `NA` or `N/A` in the data file. PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and
-LPCMCI accept missing values: each conditional-independence test reads only the rows where all of
-its variables are observed (test-wise deletion), so it keeps the rows that deleting every incomplete
-row first would drop. The pair tests ANM and PNL read the rows where both columns are observed,
-which for a pair is the same deletion. Here a tenth of the Sachs measurements go missing at random:
+write `NA` or `N/A` in the data file. PC, FCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, PCMCI,
+PCMCI+, and LPCMCI accept missing values: each conditional-independence test reads only the rows
+where all of its variables are observed (test-wise deletion), so it keeps the rows that deleting
+every incomplete row first would drop. The pair tests ANM and PNL read the rows where both columns
+are observed, which for a pair is the same deletion. Here a tenth of the Sachs measurements go
+missing at random:
 
 ```{code-cell} ipython3
 gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)

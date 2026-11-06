@@ -93,6 +93,8 @@ def project_output(out: Any, algorithm: str) -> dict:
             "causal_order": np.asarray(out.ordering),
             "weighted_adjacency": np.asarray(out.weighted_adjacency).T,
         }
+    if algorithm == "FCIJCI":  # the PAG over the data, and the index's edges
+        return {"graph": out.structure.to_numpy(), "index_edges": out.metadata["index_edges"]}
     if algorithm in _CONFOUNDED:
         candidate = {
             "graph": out.structure.to_numpy(),

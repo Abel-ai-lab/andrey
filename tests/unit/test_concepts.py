@@ -350,7 +350,8 @@ def non_value_errors(method: str) -> str:
 UNIT_CASES = {
     **dict.fromkeys(
         (
-            *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc"),
+            "rsmax2",
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
             *("igsp", "ut_igsp"),
         ),
@@ -434,7 +435,7 @@ def declared_kind(out, method: str) -> bool:
 
 #: Settings that bring out the metadata keys a default fit leaves out.
 METADATA_FITS = {
-    **dict.fromkeys(("pc", "fci", "gfci", "cdnod"), {"collider_rule": "majority"}),
+    **dict.fromkeys(("pc", "fci", "gfci", "cdnod", "fci_jci"), {"collider_rule": "majority"}),
     **dict.fromkeys(("iamb", "inter_iamb", "mmpc"), {"target": "y"}),
 }
 
@@ -894,6 +895,7 @@ CI_CASES = {
     "fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "gfci": [{}, {"possible_dsep": "fast"}],
     "cdnod": [{}, {"collider_rule": "conservative"}],
+    "fci_jci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
     "mmpc": [{}, {"target": 0}],

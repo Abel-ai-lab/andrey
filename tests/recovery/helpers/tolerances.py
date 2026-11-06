@@ -47,6 +47,8 @@ SPEC: dict[str, dict] = {
     # CALM's weights come from a torch optimizer, so only the graph is recorded.
     "CALM": GRAPH_ONLY,
     "CDNOD": GRAPH_ONLY,
+    # FCI-JCI: the PAG over the data and the index's edges.
+    "FCIJCI": {"structural": ["graph", "index_edges"], "numeric": {}},
     # ICP: the DAG into the target and the accepted sets exactly; the p-values, NaN at the target,
     # within rounding.
     "ICP": {

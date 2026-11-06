@@ -537,18 +537,20 @@ def test_cli_former_flags_are_refused_with_their_current_names(files, capsys, me
     assert code == 2 and f"{now} in 0.14.0" in message
 
 
-def test_cli_cdnod_needs_env(files, capsys):
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+def test_cli_needs_env(method, files, capsys):
     """One data file cannot hold the environments apart, so the command line needs ``--env``, and
     the help schema says so."""
-    code, _, err = _run(["run", "cdnod", "--data", str(files["plain.csv"]), "--json"], capsys)
+    code, _, err = _run(["run", method, "--data", str(files["plain.csv"]), "--json"], capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "missing_input"
-    code, out, _ = _run(["run", "cdnod", "--help", "--json"], capsys)
+    code, out, _ = _run(["run", method, "--help", "--json"], capsys)
     inputs = json.loads(out)["method"]["data"]["inputs"]
     assert code == 0 and all(i["required"] for i in inputs)
 
 
-def test_cli_bootstrap_takes_an_env_column(files, capsys):
-    argv = ["bootstrap", "cdnod", "--data", str(files["data.csv"]), "--env", "e"]
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+def test_cli_bootstrap_takes_an_env_column(method, files, capsys):
+    argv = ["bootstrap", method, "--data", str(files["data.csv"]), "--env", "e"]
     code, out, _ = _run([*argv, "--n-resamples", "2", "--json"], capsys)
     assert code == 0 and json.loads(out)["structure"]["labels"] == ["x0", "x1", "x2"]
 
@@ -562,6 +564,7 @@ def test_cli_refuses_ambiguous_or_doubled_inputs(files, tmp_path, capsys, monkey
         ["run", "gies", "--data", data, "--env", "missing.csv", f"targets={files['t.json']}"],
         ["run", "gies", "--data", data, "--env", env, "targets=[1, 2]"],
         ["run", "pc", "--data", data, "--domain-index", env],
+        ["run", "fci_jci", "--data", data, "--domain-index", env],
     ]
     for argv in usage:
         code, _, err = _run(argv, capsys)

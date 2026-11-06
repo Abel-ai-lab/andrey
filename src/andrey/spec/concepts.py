@@ -115,7 +115,10 @@ def _absent(fixed_in: Release, reason: str, *methods: str) -> tuple[Deviation, .
 
 
 # Method groups the rules below name.
-CI_SEARCHES = ("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2")
+CI_SEARCHES = (
+    *("pc", "fci", "gfci", "cdnod", "fci_jci"),
+    *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+)
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
     "ges",
@@ -147,7 +150,7 @@ _TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "igsp", "ut_igsp")
 #: The methods with no edge to name in knowledge, and ICP, whose tests take none.
 _NO_KNOWLEDGE = ("gin", "anm", "pnl", "icp")
 ALL_METHODS = (
-    *("pc", "fci", "gfci", "cdnod", "icp", "iamb", "inter_iamb", "mmpc"),
+    *("pc", "fci", "gfci", "cdnod", "fci_jci", "icp", "iamb", "inter_iamb", "mmpc"),
     *_PURE_SCORE,
     "gnies",
     "calm",
@@ -604,6 +607,7 @@ _CONCEPTS = (
                 "pc",
                 "fci",
                 "cdnod",
+                "fci_jci",
                 "iamb",
                 "inter_iamb",
                 "mmpc",
@@ -970,6 +974,7 @@ _CONCEPTS = (
             "pc",
             "fci",
             "cdnod",
+            "fci_jci",
             "iamb",
             "inter_iamb",
             "mmpc",
@@ -1047,6 +1052,24 @@ _CONCEPTS = (
         suitable=ALL_METHODS,
     ),
     Concept(
+        key="confounded_index",
+        summary="With an environment index, whether a hidden variable may cause both the index and "
+        "a data variable (FCI-JCI1, the default), or the index is set from outside, as in a "
+        "randomized experiment, so every edge it keeps points out of it (FCI-JCI123).",
+        param=_template(
+            "confounded_index",
+            "bool",
+            True,
+            "Whether a hidden variable may cause both the index and a data variable (FCI-JCI1). "
+            "false assumes the index is set from outside, as in a randomized experiment, so every "
+            "edge it keeps points out of it (FCI-JCI123).",
+        ),
+        fragment="hidden variable may cause both the index and a data variable",
+        suitable=("fci_jci",),
+        others_exempt="Not an FCI-JCI search: only those choose between JCI's assumptions on the "
+        "index.",
+    ),
+    Concept(
         key="measure",
         summary="The pairwise likelihood-ratio measure of a DirectLiNGAM order search.",
         param=_template(
@@ -1116,7 +1139,7 @@ _CONCEPTS = (
             choices=COLLIDER_RULES,
         ),
         fragment="collider",
-        suitable=("pc", "fci", "gfci", "cdnod", "pcmciplus"),
+        suitable=("pc", "fci", "gfci", "cdnod", "fci_jci", "pcmciplus"),
         exempt=(
             *_exempt(
                 "Its collider phase follows LPCMCI's own orientation rules, not yet compared with "
@@ -1142,6 +1165,7 @@ _CONCEPTS = (
                         "fci",
                         "gfci",
                         "cdnod",
+                        "fci_jci",
                         "pcmciplus",
                         "lpcmci",
                         "iamb",
