@@ -598,9 +598,9 @@ def greedy_search(
     The first start begins from the required edges of ``constraints`` (:func:`start_dag`); each
     later one from the best DAG so far after :func:`perturb` makes ``n_perturbations`` changes to
     it, and replaces it only when its DAG scores lower by more than :data:`START_EPS`. Every start
-    builds its own score and :class:`MoveScanner`, with the rules of :func:`move_rules`, and a start
-    that takes ``max_iter`` moves warns once, naming ``method``. Returns the best DAG's CPDAG,
-    narrowed by the knowledge, and the DAG's total score. The other arguments are those of
+    builds its own score and :class:`MoveScanner`, with the rules of :func:`move_rules`. The search
+    warns once, naming ``method``, if any start takes ``max_iter`` moves. Returns the best DAG's
+    CPDAG, narrowed by the knowledge, and the DAG's total score. The other arguments are those of
     :func:`hc`.
     """
     X = np.asarray(data, dtype=np.float64)

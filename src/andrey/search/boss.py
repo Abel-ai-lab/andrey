@@ -795,13 +795,13 @@ def _search_state(
     delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
-        trees = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
-        return score, ranks, trees, None
+        gsts = [_GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        return score, ranks, gsts, None
     ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
-    trees = []
+    gsts = []
     for v in range(p):
         candidates, required = parent_knowledge(ranked, v)
-        trees.append(
+        gsts.append(
             _GrowShrinkTree(
                 v,
                 score,
@@ -812,7 +812,7 @@ def _search_state(
                 max_parents=max_parents,
             )
         )
-    return score, ranks, trees, ranked.precedence()
+    return score, ranks, gsts, ranked.precedence()
 
 
 def permutation_search(
@@ -834,7 +834,7 @@ def permutation_search(
     """Run ``n_starts`` permutation searches; return the best one's CPDAG and total score.
 
     Every start builds its own score, caches, and trees (:func:`_search_state`), and
-    ``run_start(start, rng, trees, before)`` returns its parent sets over the score's variables,
+    ``run_start(start, rng, gsts, before)`` returns its parent sets over the score's variables,
     with ``rng`` from :func:`~andrey.core.seeding.start_rng`. A start's total score is the sum of
     the full local scores of its parent sets, lower is better, and a later start replaces the best
     one only when it scores lower by more than ``_SCORE_EPS``. The best parent sets' DAG, mapped
@@ -853,7 +853,7 @@ def permutation_search(
     for start in range(n_starts):
         # Each start builds its own score, caches, and trees, so a search of many starts holds
         # one start's state at a time.
-        score, ranks, trees, before = _search_state(
+        score, ranks, gsts, before = _search_state(
             X,
             score_func,
             penalty_discount,
@@ -863,13 +863,13 @@ def permutation_search(
             constraints,
             max_parents,
         )
-        parents = run_start(start, start_rng(random_state, start), trees, before)
+        parents = run_start(start, start_rng(random_state, start), gsts, before)
         total = 0.0
         for child in range(p):
             total += score.score(child, parents[child])
         if best is None or total < best[1] - _SCORE_EPS:
             best = (parents, total)
-        del score, trees
+        del score, gsts
     assert best is not None  # n_starts >= 1
     parents, total = best
 
@@ -985,14 +985,14 @@ def boss(
     """
 
     def run_start(
-        start: int, rng: random.Random, trees: list[_GrowShrinkTree], before: np.ndarray | None
+        start: int, rng: random.Random, gsts: list[_GrowShrinkTree], before: np.ndarray | None
     ) -> dict[int, list[int]]:
-        order = list(range(len(trees)))
+        order = list(range(len(gsts)))
         if start > 0:
             rng.shuffle(order)
         if before is not None:
             order = precedence_sort(order, before)
-        return _search_from(order, rng, trees, before)
+        return _search_from(order, rng, gsts, before)
 
     return permutation_search(
         data,

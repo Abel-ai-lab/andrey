@@ -22,9 +22,6 @@ from andrey.search.boss import (
     precedence_sort,
 )
 
-# DFS accepts a tuck when the total negated score increases by more than ``_SCORE_EPS``; changes
-# in (-_SCORE_EPS, _SCORE_EPS] are explored as ties.
-
 
 def _settled(tree: _GrowShrinkTree, prefix: set[int], parents: list[int]) -> float:
     """Trace ``tree`` from ``prefix`` into ``parents``; return the traced set's full negated score.
@@ -201,8 +198,9 @@ def _dfs(
 
     ``chain`` holds the DAGs of the chain of tucks that led to this order, its own DAG included.
     Visits variables and their parents in shuffled order: any edge at the first level, covered
-    edges below. A strictly improving tuck is kept (returns ``True``); a score-preserving tuck to a
-    DAG not yet in the chain is recursed through (bounded by ``depth``) before it is rolled back.
+    edges below. A tuck that raises the total negated score by more than ``_SCORE_EPS`` is kept
+    (returns ``True``); one that changes it by an amount in ``(-_SCORE_EPS, _SCORE_EPS]``, to a DAG
+    not yet in the chain, is recursed through (bounded by ``depth``) before it is rolled back.
     A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled back unscored. Returns
     ``False`` when no chain improves the score.
     """
@@ -334,9 +332,9 @@ def grasp(
     """
 
     def run_start(
-        start: int, rng: random.Random, trees: list[_GrowShrinkTree], before: np.ndarray | None
+        start: int, rng: random.Random, gsts: list[_GrowShrinkTree], before: np.ndarray | None
     ) -> dict[int, list[int]]:
-        return _search_from(len(trees), rng, trees, depth, before).parents
+        return _search_from(len(gsts), rng, gsts, depth, before).parents
 
     return permutation_search(
         data,
