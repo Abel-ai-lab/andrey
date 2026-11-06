@@ -445,6 +445,7 @@ PROSE_NAMES = {
     "boss_fci": "BOSS-FCI",
     "grasp_fci": "GRaSP-FCI",
     "cdnod": "CD-NOD",
+    "fci_jci": "FCI-JCI",
     "icp": "ICP",
     "iamb": "IAMB",
     "inter_iamb": "Inter-IAMB",

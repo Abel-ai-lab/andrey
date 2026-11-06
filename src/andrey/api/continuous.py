@@ -105,10 +105,12 @@ def notears(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"notears"``),
-        ``"h_final"`` (the acyclicity function of the fit before the threshold),
-        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
-        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
+        coefficient of edge ``i -> j``. ``metadata["algorithm"]`` is ``"notears"``,
+        ``metadata["h_final"]`` the acyclicity function of the fit before the threshold,
+        ``metadata["edges_removed"]`` the edges the threshold kept that the cycle repair dropped,
+        and ``metadata["path_steps"]`` the accepted steps of the path, ``0`` without ``robust``.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -118,16 +120,21 @@ def notears(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a finite numeric matrix of two or more rows without a constant column, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a finite
+        numeric matrix of two or more rows without a constant column, or if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
+    SearchLimitWarning
+        When the fit stops on ``max_iter`` rather than on ``h_tol`` or ``rho_max``, or, with
+        ``robust``, when the path takes ``max_path`` steps.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -327,10 +334,12 @@ def dagma(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``weighted_adjacency[i, j]`` is the
-        coefficient of edge ``i -> j``. ``metadata`` holds ``"algorithm"`` (``"dagma"``),
-        ``"h_final"`` (the log-determinant acyclicity function at ``s = 1`` before the threshold),
-        ``"edges_removed"`` (edges the threshold kept that the cycle repair dropped), and
-        ``"path_steps"`` (accepted steps of the path, ``0`` without ``robust``).
+        coefficient of edge ``i -> j``. ``metadata["algorithm"]`` is ``"dagma"``,
+        ``metadata["h_final"]`` the log-determinant acyclicity function at ``s = 1`` before the
+        threshold, ``metadata["edges_removed"]`` the edges the threshold kept that the cycle repair
+        dropped, and ``metadata["path_steps"]`` the accepted steps of the path, ``0`` without
+        ``robust``. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -340,16 +349,21 @@ def dagma(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a finite numeric matrix of two or more rows without a constant column, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a finite
+        numeric matrix of two or more rows without a constant column, or if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process: the method has no published benchmark, and its API may
         change without deprecation.
+    SearchLimitWarning
+        When the last stage takes ``max_iter`` steps without converging, or, with ``robust``, when
+        the path takes ``max_path`` steps.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----

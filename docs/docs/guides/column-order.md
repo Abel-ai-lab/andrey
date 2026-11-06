@@ -43,9 +43,9 @@ bits count as tied and go to the rank.
 What reordering the columns does to each method's result with the default settings. "Relabels" means
 you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the methods
 the setting below changes: it replaces the rank that breaks their ties, for `pc` and `cdnod` the
-p-value order of their colliders, for `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, and `grasp_fci` the
-order-free rounds of their orientation rules, and for `fci`, `gfci`, `boss_fci`, and `grasp_fci` the
-rank order of their possible-d-separation step.
+p-value order of their colliders, for `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and
+`fci_jci` the order-free rounds of their orientation rules, and for `fci`, `gfci`, `boss_fci`,
+`grasp_fci`, and `fci_jci` the rank order of their possible-d-separation step.
 
 ```{include} ../../_generated/column-order.md
 ```
@@ -132,10 +132,10 @@ export ANDREY_TIE_BREAK=position
 `rank` and `position`.
 
 What it trades: ranking reads each column once per fit, so `position` saves little time next to the
-search itself. The exception is `fci`, `gfci`, `boss_fci`, and `grasp_fci`, where the setting also
-orders the possible-d-separation step. On simulated graphs, an `fci` or `gfci` fit with the
-order-free step took 0.99 to 1.05 times as long as one in column order at up to 200 variables and
-0.78 to 1.42 times as long at 400 and 800. On some dense graphs from 400 variables, though, the
+search itself. The exception is `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci`, where the
+setting also orders the possible-d-separation step. On simulated graphs, an `fci` or `gfci` fit with
+the order-free step took 0.99 to 1.05 times as long as one in column order at up to 200 variables
+and 0.78 to 1.42 times as long at 400 and 800. On some dense graphs from 400 variables, though, the
 order-free step's visiting order needs more tests: one `gfci` dataset with 400 variables took 407 s,
 against 120 to 336 s in column order over five column orders. `position` is not more or less
 accurate, since a tie is a choice the data cannot make. Scores are still compared at the same
@@ -147,22 +147,22 @@ its causal order.
 For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented: by
 the p-value that separated each pair under `rank`, in column order under `position`. Their
 `collider_order` argument, `"p_value"` or `"column"`, overrides it for one call. Their
-`collider_rule="conservative"` and `"majority"`, and those of `fci`, `gfci`, `boss_fci`, and
-`grasp_fci`, decide each collider by a vote over the final skeleton's adjacencies, which does not
-read the column order.
+`collider_rule="conservative"` and `"majority"`, and those of `fci`, `gfci`, `boss_fci`,
+`grasp_fci`, and `fci_jci`, decide each collider by a vote over the final skeleton's adjacencies,
+which does not read the column order.
 
-The orientation rules of `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, and `grasp_fci`, Meek's rules and
-FCI's R1-R10, run in rounds under `rank`: each round sets together everything the rules imply on the
-graph as it stands, and an edge or endpoint two rules decide differently stays undirected or a
-circle, so the column order does not enter. Under `position` they fire one at a time in column
-order, and of two firings that conflict the first decides. `gfci`, `boss_fci`, and `grasp_fci` then
-also record the first subset found as the separating set of a pair their GES, BOSS, or GRaSP phase
-leaves non-adjacent, where `rank` records the union of the smallest ones.
+The orientation rules of `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci`,
+Meek's rules and FCI's R1-R10, run in rounds under `rank`: each round sets together everything the
+rules imply on the graph as it stands, and an edge or endpoint two rules decide differently stays
+undirected or a circle, so the column order does not enter. Under `position` they fire one at a time
+in column order, and of two firings that conflict the first decides. `gfci`, `boss_fci`, and
+`grasp_fci` then also record the first subset found as the separating set of a pair their GES, BOSS,
+or GRaSP phase leaves non-adjacent, where `rank` records the union of the smallest ones.
 
-`fci`, `gfci`, `boss_fci`, and `grasp_fci` take the order of their possible-d-separation step from
-the setting too: their `possible_dsep` argument, when the call gives none, is `"order_free"` under
-`rank`, which visits the step by the rank, and `"fast"` under `position`, which visits it in column
-order. A `possible_dsep` in the call overrides the setting.
+`fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` take the order of their possible-d-separation
+step from the setting too: their `possible_dsep` argument, when the call gives none, is
+`"order_free"` under `rank`, which visits the step by the rank, and `"fast"` under `position`, which
+visits it in column order. A `possible_dsep` in the call overrides the setting.
 
 The methods in the "No" rows have no rank to replace, and the setting does not change them.
 

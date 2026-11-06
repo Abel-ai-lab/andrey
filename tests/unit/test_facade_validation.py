@@ -61,6 +61,7 @@ SINGLE = {
     "fci": andrey.fci,
     "gfci": andrey.gfci,
     "cdnod": lambda data, **kw: andrey.cdnod(data, env=np.arange(len(data)) % 2, **kw),
+    "fci_jci": lambda data, **kw: andrey.fci_jci(data, env=np.arange(len(data)) % 2, **kw),
     "icp": lambda data, **kw: andrey.icp(data, env=np.arange(len(data)) % 2, target=0, **kw),
     "iamb": andrey.iamb,
     "inter_iamb": andrey.inter_iamb,

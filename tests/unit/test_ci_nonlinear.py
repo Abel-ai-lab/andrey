@@ -743,12 +743,13 @@ def test_pc_selects_each_nonlinear_test_by_name(name):
     [
         *(("fci", "pag"), ("gfci", "pag"), ("boss_fci", "pag"), ("grasp_fci", "pag")),
         ("cdnod", "cpdag"),
+        ("fci_jci", "pag"),
     ],
 )
 def test_every_constraint_method_takes_the_nonlinear_tests(method, kind):
     """The searches with a test phase select the nonlinear tests by name, as PC does."""
     data = _common_cause(seed=0, n=60, n_cond=1)
-    args = (data, np.repeat([0.0, 1.0], 30)) if method == "cdnod" else (data,)
+    args = (data, np.repeat([0.0, 1.0], 30)) if method in ("cdnod", "fci_jci") else (data,)
     for name in TESTS:
         assert getattr(andrey, method)(*args, indep_test=name).structure.kind == kind
 
