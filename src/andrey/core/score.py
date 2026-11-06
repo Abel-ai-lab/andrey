@@ -380,7 +380,8 @@ class Score(Protocol):
 class BICScore:
     """Linear-Gaussian BIC score over a fixed dataset.
 
-    Precomputes the covariance, sample count, and ``log(n)``. Memoizes negative local scores.
+    Precomputes the covariance, sample count, and ``log(n)``. :meth:`score` memoizes the negative
+    local scores; :meth:`score_many` is not memoized and agrees with :meth:`score` up to rounding.
 
     Parameters
     ----------

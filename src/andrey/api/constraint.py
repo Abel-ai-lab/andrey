@@ -100,10 +100,10 @@ def pc(
         separating set that removed the edge ``x - y``. ``"conservative"`` [11]_ and
         ``"majority"`` [3]_ test ``x`` and ``y`` again given every subset of ``x``'s neighbors and
         every subset of ``y``'s neighbors, and count the subsets that separate them
-        (``p >= alpha``): ``"conservative"`` makes ``z`` a collider when none of them contains it
-        and a non-collider when all do; ``"majority"`` when fewer than half contain it and when
-        more than half do. Any other triple is ambiguous, and no rule orients through it. Both run
-        up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+        (``p >= alpha``). If at least one does, ``"conservative"`` makes ``z`` a collider when none
+        of them contains it and a non-collider when all do; ``"majority"`` when fewer than half
+        contain it and when more than half do. Any other triple is ambiguous, and no rule orients
+        through it. Both run up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -479,11 +479,11 @@ def fci(
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
         that removed the edge ``x - y``. ``"conservative"`` [4]_ [5]_ and ``"majority"`` [4]_ test
         ``x`` and ``y`` again given every subset of ``x``'s neighbors and every subset of ``y``'s
-        neighbors, and count the subsets that separate them (``p >= alpha``): ``"conservative"``
-        makes ``z`` a collider when none of them contains it and a non-collider when all do;
-        ``"majority"`` when fewer than half contain it and when more than half do. Any other
-        triple is ambiguous, and no rule orients through it. Both run up to
-        ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+        neighbors, and count the subsets that separate them (``p >= alpha``). If at least one
+        does, ``"conservative"`` makes ``z`` a collider when none of them contains it and a
+        non-collider when all do; ``"majority"`` when fewer than half contain it and when more
+        than half do. Any other triple is ambiguous, and no rule orients through it. Both run up
+        to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -828,10 +828,10 @@ def gfci(
         is not in the recorded separating set of ``x`` and ``y``. ``"conservative"`` [3]_ [5]_ and
         ``"majority"`` [3]_ test ``x`` and ``y`` given every subset of ``x``'s neighbors and every
         subset of ``y``'s neighbors and count the subsets that separate them (``p >= alpha``), as
-        for :func:`~andrey.fci`: ``"conservative"`` makes ``z`` a collider when none of them
-        contains it and a non-collider when all do; ``"majority"`` when fewer than half contain it
-        and when more than half do. Any other triple is ambiguous, and no rule orients through it.
-        Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
+        for :func:`~andrey.fci`. If at least one does, ``"conservative"`` makes ``z`` a collider
+        when none of them contains it and a non-collider when all do; ``"majority"`` when fewer
+        than half contain it and when more than half do. Any other triple is ambiguous, and no
+        rule orients through it. Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for the mixed-data score and test: column labels
         (strings) or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and
@@ -1157,10 +1157,11 @@ def cdnod(
         How an unshielded triple ``x - z - y`` is decided, as for :func:`~andrey.pc`: by the
         separating set that removed the edge ``x - y`` (``"sepsets"``), or by a vote over the
         subsets of ``x``'s and ``y``'s neighbors that separate them, with the index among the
-        variables, which makes ``z`` a collider when none of them contains it and a non-collider
-        when all do (``"conservative"`` [3]_), or when fewer than half and when more than half do
-        (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it. A
-        triple whose middle node is the index is not voted: the index is never a collider.
+        variables, which, if at least one subset separates them, makes ``z`` a collider when none
+        of them contains it and a non-collider when all do (``"conservative"`` [3]_), or when
+        fewer than half and when more than half do (``"majority"`` [4]_). Any other triple is
+        ambiguous, and no rule orients through it. A triple whose middle node is the index is not
+        voted: the index is never a collider.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1527,10 +1528,10 @@ def fci_jci(
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
         (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
-        separate them, with the index among the variables, which makes ``z`` a collider when none
-        of them contains it and a non-collider when all do (``"conservative"`` [4]_ [5]_), or when
-        fewer than half and when more than half do (``"majority"`` [4]_). Any other triple is
-        ambiguous, and no rule orients through it.
+        separate them, with the index among the variables, which, if at least one subset separates
+        them, makes ``z`` a collider when none of them contains it and a non-collider when all do
+        (``"conservative"`` [4]_ [5]_), or when fewer than half and when more than half do
+        (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,

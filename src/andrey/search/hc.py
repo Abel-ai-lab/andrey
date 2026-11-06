@@ -271,9 +271,9 @@ class MoveScanner:
         reach, parent = self._reach, self._parent
         hit = np.logical_or.reduce(reach[:, tails], axis=1)
         hit[tails] = True
-        nodes = np.flatnonzero(hit)
+        stale = np.flatnonzero(hit)
         changed = []
-        for x in nodes[np.argsort(reach[nodes].sum(axis=1), kind="stable")].tolist():
+        for x in stale[np.argsort(reach[stale].sum(axis=1), kind="stable")].tolist():
             kids = parent[:, x]
             row = reach[kids].any(axis=0) | kids
             if not np.array_equal(row, reach[x]):

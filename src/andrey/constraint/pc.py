@@ -348,8 +348,8 @@ def adjacency_search(
     warn_expensive: bool = False,
     trace: list[dict] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
-    """The stable adjacency search of PC, CD-NOD, and FCI: the skeleton, and for every removed pair
-    its separating set and p-value.
+    """The stable adjacency search of PC, CD-NOD, RSMAX2's PC restrict, FCI, FCI-JCI, and GFCI:
+    the skeleton, and for every removed pair its separating set and p-value.
 
     Grows the conditioning size from zero, up to ``max_depth`` when one is given, over the complete
     graph on ``n_vars`` nodes, or over the boolean adjacency ``support`` when one is given. At each

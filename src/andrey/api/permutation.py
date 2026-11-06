@@ -1426,10 +1426,11 @@ def boss_fci(
         How a collider is decided on a triple ``x - z - y`` where the tests removed the BOSS edge
         between ``x`` and ``y``, as for :func:`~andrey.gfci`: by the recorded separating set
         (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
-        separate them, which makes ``z`` a collider when none of them contains it and a
-        non-collider when all do (``"conservative"``), or when fewer than half and when more than
-        half do (``"majority"``). Any other triple is ambiguous, and no rule orients through it. On
-        the other triples whose ends are not adjacent, the BOSS CPDAG decides.
+        separate them, which, if at least one subset separates them, makes ``z`` a collider when
+        none of them contains it and a non-collider when all do (``"conservative"``), or when
+        fewer than half and when more than half do (``"majority"``). Any other triple is
+        ambiguous, and no rule orients through it. On the other triples whose ends are not
+        adjacent, the BOSS CPDAG decides.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
@@ -1675,10 +1676,11 @@ def grasp_fci(
         How a collider is decided on a triple ``x - z - y`` where the tests removed the GRaSP edge
         between ``x`` and ``y``, as for :func:`~andrey.gfci`: by the recorded separating set
         (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
-        separate them, which makes ``z`` a collider when none of them contains it and a
-        non-collider when all do (``"conservative"``), or when fewer than half and when more than
-        half do (``"majority"``). Any other triple is ambiguous, and no rule orients through it. On
-        the other triples whose ends are not adjacent, the GRaSP CPDAG decides.
+        separate them, which, if at least one subset separates them, makes ``z`` a collider when
+        none of them contains it and a non-collider when all do (``"conservative"``), or when
+        fewer than half and when more than half do (``"majority"``). Any other triple is
+        ambiguous, and no rule orients through it. On the other triples whose ends are not
+        adjacent, the GRaSP CPDAG decides.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
