@@ -98,8 +98,19 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         method, the argument, what it accepts, and the value.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data``
-        does not have 2 columns.
+        method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
+        columns.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -240,8 +251,22 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         method, the argument, what it accepts, and the value.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data``
-        does not have 2 columns.
+        method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
+        columns.
+
+    Warns
+    -----
+    PerformanceWarning
+        When the worker threads asked for would hold more than 4 GiB of ``n x n`` matrices, so fewer
+        of them run; each message warns once per process.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -369,17 +394,17 @@ def rcd(
     shapiro_alpha: float = 0.01,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a linear non-Gaussian graph with hidden common causes by repetitive causal discovery.
+    """Learn a PAG of a linear non-Gaussian model with hidden common causes by RCD.
 
-    RCD [1]_ repeatedly regresses variables on candidate ancestors and tests the residuals for
-    independence, to find each variable's ancestors, then its parents, and finally the pairs that
-    share a hidden common cause.
+    Repetitive causal discovery (RCD) [1]_ repeatedly regresses variables on candidate ancestors and
+    tests the residuals for independence, to find each variable's ancestors, then its parents, and
+    finally the pairs that share a hidden common cause.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observations, one variable per column. A DataFrame's column names become the structure's
-        ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``.
     max_depth : int, default=2
         The maximum conditioning-set size of an ancestor test, at least ``1``: the most variables
         regressed out together when testing whether one variable is an ancestor of another. Larger
@@ -420,10 +445,21 @@ def rcd(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than 6 rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts
-        itself, as :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle
-        with the parents the search found.
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 6
+        rows. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists, or if its required edges close a directed cycle with the
+        parents the search found.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -493,7 +529,7 @@ def rcd(
 def bottom_up_parce_lingam(
     data: npt.ArrayLike, *, alpha: float = 0.05, knowledge: Knowledge | None = None
 ) -> StructureOutput:
-    """Learn a linear non-Gaussian causal order that tolerates hidden common causes.
+    """Learn a PAG and a partial causal order of linear non-Gaussian data with hidden common causes.
 
     BottomUpParceLiNGAM [1]_ finds sinks one at a time, from the last variable in the causal order
     up. Where a hidden common cause hides the order, it leaves the variables unordered rather than
@@ -502,8 +538,8 @@ def bottom_up_parce_lingam(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observations, one variable per column. A DataFrame's column names become the structure's
-        ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names become
+        the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
         across the remaining variables, in ``(0, 1)``. The default is the level of the method's
@@ -526,7 +562,8 @@ def bottom_up_parce_lingam(
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
         ``metadata["algorithm"]`` is ``"bottom_up_parce_lingam"``; ``metadata["partial_order"]``
         gives the order, with the unordered variables nested in one list; ``weighted_adjacency``
-        holds the edge coefficients.
+        holds the edge coefficients. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -536,9 +573,20 @@ def bottom_up_parce_lingam(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` has
-        fewer than 6 rows or no more rows than columns. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 6 rows
+        or no more rows than columns. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----

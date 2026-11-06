@@ -110,19 +110,31 @@ registry. Every facade docstring has, in order:
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
 - **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
-  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, `.ordering`, and
-  `.weighted_adjacency`.
+  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
+  `.weighted_adjacency` when the method sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
+- **Warns**: every warning a fit can raise: the method's own, the data check's `DataTypeWarning`,
+  and `BoundaryWarning` when a ladder of the method's measured boundary ended on a cap.
 - **Notes**: opens with a **When to use.** paragraph, 2 to 5 sentences giving the method's
   claim from its paper: the data it expects (continuous, discrete, or mixed; i.i.d. or time
   series; observational, interventional, or multi-domain), the model assumptions that matter
   to a user, the scale it is designed for, what it returns, and the method to use outside that
   setting. A **Limitations.** paragraph follows with the measured failures
   ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); the two do not
-  repeat each other.
+  repeat each other. Limitations is the last paragraph of Notes.
+- **References**: the papers the docstring cites.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
-  shape, `ordering`), never a repr. Stochastic methods are seeded (`seed=0`); `[torch]`-only ones
-  carry `# doctest: +SKIP`.
+  shape, `ordering`), never a repr. An example whose result depends on the seed at its settings
+  passes `seed=0`; `[torch]`-only ones carry `# doctest: +SKIP`.
+
+A facade has no `See Also`: its **When to use.** paragraph names the methods to use instead.
+
+The sentences that state one rule for many methods come from one table, `SHARED` in
+`scripts/docstring_text.py`: the openers of the Raises entries, the `seed`, `knowledge`, and `env`
+entries, the closing sentences of **Missing values.** and **Limitations.**, the `tie_break` record
+in Returns, and the shared Warns entries. To change one, edit the table and run
+`uv run python scripts/docstring_text.py`, which rewrites every copy and names a method that should
+hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
 `andrey.pc` is the model. The public core classes autodoc renders (`GraphStructure`,
 `TemporalStructure`, `SummaryGraph`, `StructureOutput`) take the same sections on their

@@ -60,13 +60,13 @@ class SCMParams:
     noise_scales : np.ndarray of shape (d,)
         Per-node exogenous-noise standard deviation. Under the location-scale functional the noise
         of a node is this constant times a scale that depends on its parents.
-    scale_weights : np.ndarray of shape (m,) or (0,), default=empty
-        Under the location-scale functional, the weight of each edge in the scale, row ``k``
-        pairing with ``edges[k]``; empty for every other functional.
     functional : str
         Functional-form name (for example, ``"linear"``).
     noise : str
         Noise-family name (for example, ``"gaussian"``).
+    scale_weights : np.ndarray of shape (m,) or (0,), default=empty
+        Under the location-scale functional, the weight of each edge in the scale, row ``k``
+        pairing with ``edges[k]``; empty for every other functional.
     """
 
     edges: np.ndarray
