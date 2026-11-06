@@ -144,11 +144,11 @@ def test_ties_are_exercised_by_the_sweep():
     x = _gaussian_sem(0, 600, 10, 0.4)
     n = x.shape[1]
     score = BICScore(x, penalty_discount=1.0)
-    from andrey.search.ges import _reachable
+    from andrey.search.ges import reachability
 
     adj = np.zeros((n, n), dtype=np.int8)
     state = pg.neighborhood_state(adj)
-    reachable = _reachable(adj)
+    reachable = reachability(adj)
     deltas: list[float] = []
     for y in range(n):
         for xx in range(n):
@@ -275,7 +275,7 @@ def test_spawn_context_parity(monkeypatch):
     x = _gaussian_sem(1, 600, 10, 0.4)
     serial_struct, serial_score = ges(x)
     monkeypatch.setattr(
-        pg, "_pick_context", lambda: __import__("multiprocessing").get_context("spawn")
+        par, "pick_context", lambda: __import__("multiprocessing").get_context("spawn")
     )
     par_struct, par_score = _parallel(x, 2)
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())

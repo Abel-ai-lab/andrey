@@ -300,9 +300,9 @@ def projected_pag(graph, p: int, confounded_index: bool) -> tuple[np.ndarray, in
     observed = range(n_obs)
     support = latent._ancestral_adjacency(dag, observed, ())
     sepsets = latent._AncestorSepsets(support, observed, anc, set())
-    marks = fci._circle_pag(support)
+    marks = fci.circle_pag(support)
     _mark_index(marks, p, confounded_index)
-    fci._orient_colliders(marks, sepsets)
+    fci.orient_colliders(marks, sepsets)
     neighbors, reach = fci._neighbor_lists(marks), fci._semidirected_reach(marks)
     largest = max(
         (
@@ -312,7 +312,7 @@ def projected_pag(graph, p: int, confounded_index: bool) -> tuple[np.ndarray, in
         ),
         default=0,
     )
-    fci._fci_orient(marks, latent.DSepOracle(dag, observed, ()), 0.5, sepsets, selection_bias=False)
+    fci.fci_orient(marks, latent.DSepOracle(dag, observed, ()), 0.5, sepsets, selection_bias=False)
     return np.asarray(marks, dtype=np.int8), largest
 
 

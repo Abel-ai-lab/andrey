@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from andrey.core.orient import (
-    _cpdag_of_pdag,
+    cpdag_of_pdag,
     dag2cpdag,
     from_structure,
     meek,
@@ -287,9 +287,9 @@ def test_cpdag_of_pdag_matches_extension_then_cpdag():
             except ValueError:
                 raised += 1
                 with pytest.raises(ValueError, match="no consistent"):
-                    _cpdag_of_pdag(pdag)
+                    cpdag_of_pdag(pdag)
                 continue
-            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
+            assert np.array_equal(cpdag_of_pdag(pdag), expected)
     assert 0 < raised < 600
 
 
@@ -305,9 +305,9 @@ def test_cpdag_of_pdag_across_word_boundary(d):
                 expected = dag2cpdag(pdag2dag(pdag))
             except ValueError:
                 with pytest.raises(ValueError, match="no consistent"):
-                    _cpdag_of_pdag(pdag)
+                    cpdag_of_pdag(pdag)
                 continue
-            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
+            assert np.array_equal(cpdag_of_pdag(pdag), expected)
 
 
 # ---- collider orientation ------------------------------------------------------------------------

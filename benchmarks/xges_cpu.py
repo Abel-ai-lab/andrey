@@ -44,7 +44,7 @@ import pandas as pd
 from xges_ges import xges_venv
 
 from andrey.core.score import BICScore
-from andrey.search.ges import _recompute_objective
+from andrey.search.ges import recompute_objective
 from andrey_bench import datasets, memcap, rundir
 from andrey_bench.adapters.andrey_ges import AndreyGES, _andrey_version
 from andrey_bench.adapters.andrey_xges import AndreyXGES
@@ -123,7 +123,7 @@ def total_bic(marks: np.ndarray, score: BICScore) -> float:
     """
     marks = np.asarray(marks)
     try:
-        return _recompute_objective(marks, score, marks.shape[0])
+        return recompute_objective(marks, score, marks.shape[0])
     except ValueError:
         return math.nan
 

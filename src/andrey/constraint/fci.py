@@ -58,12 +58,12 @@ def fci(
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`_fci_orient`).
+    of in order-free rounds (:func:`fci_orient`).
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
     possible-d-sep subsets, the collider votes, and the discriminating-path tests. With
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
     a required pair, a pair they make non-adjacent gets a separating set when the search finds one
-    (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`_knowledge_marks` sets their
+    (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
     endpoints before the orientation rules, which change circles only. A triple over a non-adjacent
     pair with no separating set is neither a collider nor a non-collider to any rule
     (:func:`~andrey.constraint._skeleton.unseparated_triples`). An arrowhead the knowledge puts at
@@ -79,7 +79,7 @@ def fci(
     X = np.asarray(data, dtype=np.float64)
 
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     allowed, keep, apart = knowledge_masks(constraints)
     skeleton, sepsets, _ = adjacency_search(
@@ -93,9 +93,9 @@ def fci(
         workers=backend.worker_count(workers),
     )
 
-    marks = _circle_pag(skeleton)
-    _knowledge_marks(marks, constraints)
-    _orient_colliders(marks, sepsets)
+    marks = circle_pag(skeleton)
+    knowledge_marks(marks, constraints)
+    orient_colliders(marks, sepsets)
     marks = possible_dsep_step(
         marks,
         X,
@@ -116,8 +116,8 @@ def fci(
         )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
-    _orient_colliders(marks, sepsets, ambiguous)
-    _fci_orient(
+    orient_colliders(marks, sepsets, ambiguous)
+    fci_orient(
         marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
     )
 
@@ -128,14 +128,14 @@ def fci(
 # ``marks[i, j]`` is the mark at node ``i`` on edge ``i-j``, as in :mod:`andrey.core.structure`.
 
 
-def _circle_pag(support: np.ndarray) -> np.ndarray:
+def circle_pag(support: np.ndarray) -> np.ndarray:
     """An all-circle PAG over the given adjacency support (every present edge becomes ``o-o``)."""
     marks = np.where(support != NULL, np.int8(CIRCLE), np.int8(NULL))
     np.fill_diagonal(marks, np.int8(NULL))
     return marks
 
 
-def _knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
+def knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
     """Set the endpoints ``constraints`` decide on the adjacent pairs, in place.
 
     A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
@@ -199,7 +199,7 @@ def _fits(cond: list[int], max_depth: int | None) -> bool:
 # ---- R0: unshielded colliders -------------------------------------------------------------------
 
 
-def _validate_possible_dsep(possible_dsep: str) -> None:
+def validate_possible_dsep(possible_dsep: str) -> None:
     if possible_dsep not in ("order_free", "fast"):
         raise ValueError(f"possible_dsep must be 'order_free' or 'fast', got {possible_dsep!r}")
 
@@ -209,7 +209,7 @@ def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:
     return (a, b, c) if a < c else (c, b, a)
 
 
-def _orient_colliders(
+def orient_colliders(
     marks: np.ndarray,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
@@ -453,7 +453,7 @@ def possible_dsep_step(
     with ``test``; ``"order_free"`` visits them in the :func:`~andrey.core.ties.tie_ranks` order,
     with an ``indep_test`` test over ``X``'s columns in that order (:func:`_test_in_rank_order`).
     The pairs the required edges of ``constraints`` join are never tested. Every kept edge then
-    becomes ``o-o``, and :func:`_knowledge_marks` sets the endpoints ``constraints`` decide. An
+    becomes ``o-o``, and :func:`knowledge_marks` sets the endpoints ``constraints`` decide. An
     arrowhead the knowledge puts at ``x`` on a kept edge ``x - y`` while its required edges lead
     from ``x`` to ``y`` raises :class:`~andrey.core.knowledge.KnowledgeError`
     (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
@@ -466,8 +466,8 @@ def possible_dsep_step(
         _remove_by_possible_dsep(
             marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
         )
-    marks = _circle_pag(marks != NULL)
-    _knowledge_marks(marks, constraints)
+    marks = circle_pag(marks != NULL)
+    knowledge_marks(marks, constraints)
     if constraints is not None:
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
     return marks
@@ -578,7 +578,7 @@ class _Implied:
         return changed
 
 
-def _fci_orient(
+def fci_orient(
     marks: np.ndarray,
     test: CITest,
     alpha: float,
@@ -592,7 +592,7 @@ def _fci_orient(
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
     Circles become tails or arrowheads only where the current marks force it; no rule changes a
-    tail or an arrowhead, so one present when the rules start, such as one :func:`_knowledge_marks`
+    tail or an arrowhead, so one present when the rules start, such as one :func:`knowledge_marks`
     set, stays. ``max_depth`` caps the conditioning sets of R4's tests (:func:`_do_ddp`). The rules
     run in rounds. In a round, every rule reads the marks as they stand when the round starts and
     records the marks it implies (:class:`_Implied`). A circle then takes the mark the rules imply

@@ -17,7 +17,7 @@ import pnl_pairs
 import pytest
 
 from andrey import GraphStructure
-from andrey.api._irregular import _pairwise_output
+from andrey.api._irregular import pairwise_output
 from andrey_bench import datasets
 from andrey_bench.adapters.andrey_pnl import AndreyPNL
 from andrey_bench.adapters.causal_learn_pnl import CausalLearnPNL
@@ -69,7 +69,7 @@ def test_causal_learn_decides_the_edge_as_andrey_does(
     monkeypatch.setattr(module, "PNL", Fake)
     adapter = CausalLearnPNL()
     marks = adapter.fit(np.zeros((10, 2)), {"alpha": alpha})
-    expected = _pairwise_output(forward, backward, alpha=alpha).structure.to_numpy()
+    expected = pairwise_output(forward, backward, alpha=alpha).structure.to_numpy()
     np.testing.assert_array_equal(marks, expected)
     assert calls == [((10, 1), (10, 1))]  # one column each, as causal-learn's PNL takes them
 

@@ -10,12 +10,12 @@ import pytest
 
 import andrey
 from andrey import BootstrapOutput, bootstrap, resample
-from andrey.constraint.fci import _fci_orient
+from andrey.constraint.fci import fci_orient
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
-from andrey.core.orient import _cpdag_of_pdag, dag2cpdag, pdag2dag
-from andrey.data.latent import DSepOracle, _AncestorSepsets, _observed_ancestors
-from andrey.resample import EDGES, _default_block_length, _draw, _Job
+from andrey.core.orient import cpdag_of_pdag, dag2cpdag, pdag2dag
+from andrey.data.latent import DSepOracle, _AncestorSepsets, observed_ancestors
+from andrey.resample import EDGES, Job, _default_block_length, _draw
 from andrey.spec import REGISTRY
 
 
@@ -194,7 +194,7 @@ def test_the_averaged_graph_is_a_valid_graph_of_the_fits_kind(kind, seed):
     if kind == "dag":
         assert np.array_equal(pdag2dag(marks), marks)  # acyclic, no undirected edge
     elif kind == "cpdag":
-        assert np.array_equal(_cpdag_of_pdag(marks), marks)
+        assert np.array_equal(cpdag_of_pdag(marks), marks)
     else:
         mag = GraphStructure.from_numpy(mag_of_pag(marks), kind="mag")
         assert mag.to_pag() == graph_
@@ -557,7 +557,7 @@ def test_a_time_series_method_resamples_blocks_and_counts_every_lag():
 
 def job_of(name, data, unit, resampling, fraction=0.5, *, seed=0, block_length=None):
     """The job a worker draws a resample from, without the call that builds it."""
-    return _Job(
+    return Job(
         name,
         data,
         {},
@@ -847,7 +847,7 @@ def mag_oracle(pag):
     sepsets = _AncestorSepsets(
         np.asarray(mag.to_numpy()) != 0,
         nodes,
-        _observed_ancestors(digraph, nodes),
+        observed_ancestors(digraph, nodes),
         _observed_ancestors_of(digraph, nodes, selection),
     )
     return DSepOracle(digraph, nodes, selection), sepsets
@@ -861,7 +861,7 @@ def test_an_averaged_pag_under_knowledge_is_closed_under_the_orientation_rules(m
     out = bootstrap(method, data, n_resamples=8, seed=0, knowledge=knowledge, keep_fits=True)
     test, sepsets = mag_oracle(BootstrapOutput.from_fits(out.fits).structure)
     marks = np.array(out.structure.to_numpy(), dtype=np.int8)
-    _fci_orient(marks, test, 0.5, sepsets)
+    fci_orient(marks, test, 0.5, sepsets)
     assert np.array_equal(marks, out.structure.to_numpy())
 
 

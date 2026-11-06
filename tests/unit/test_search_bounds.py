@@ -192,13 +192,13 @@ def subset_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
 
         monkeypatch.setattr(pcmciplus_engine, "_test_subsets", tested)
     else:
-        search = lpcmci_engine._Search.separating_subsets
+        search = lpcmci_engine.LPCMCISearch.separating_subsets
 
         def searched(self, a, b, found, sdef, p):
             sizes.append(p)
             return search(self, a, b, found, sdef, p)
 
-        monkeypatch.setattr(lpcmci_engine._Search, "separating_subsets", searched)
+        monkeypatch.setattr(lpcmci_engine.LPCMCISearch, "separating_subsets", searched)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         getattr(andrey, method)(same_step_series(0), tau_max=1, max_p_global=cap)

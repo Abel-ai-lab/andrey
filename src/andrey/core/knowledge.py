@@ -631,7 +631,7 @@ def admits(cpdag: np.ndarray, constraints: Constraints) -> bool:
     one the constraints decide, so after directing those, a consistent extension (Dor and Tarsi)
     that keeps the class's skeleton and colliders satisfies them, and one must exist.
     """
-    from .orient import _cpdag_of_pdag
+    from .orient import cpdag_of_pdag
 
     if violates(cpdag, constraints):
         return False
@@ -639,6 +639,6 @@ def admits(cpdag: np.ndarray, constraints: Constraints) -> bool:
     if np.array_equal(oriented, cpdag):
         return True
     try:
-        return bool(np.array_equal(_cpdag_of_pdag(oriented), cpdag))
+        return bool(np.array_equal(cpdag_of_pdag(oriented), cpdag))
     except ValueError:
         return False

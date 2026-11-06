@@ -60,7 +60,7 @@ EDGE_DTYPE = np.dtype([("i", "i4"), ("j", "i4"), ("mark_i", "i1"), ("mark_j", "i
 
 # ``oriented_edges`` type by mark pair on edge ``i-j``, and whether ``(i, j)`` is already
 # ``(source, target)``. The source is the tail or circle end; for ``-o`` it is the tail end.
-_EDGE_TYPES: dict[tuple[int, int], tuple[str, bool]] = {
+EDGE_TYPES: dict[tuple[int, int], tuple[str, bool]] = {
     (TAIL, ARROW): ("directed", True),
     (ARROW, TAIL): ("directed", False),
     (CIRCLE, ARROW): ("partially_directed", True),
@@ -83,8 +83,8 @@ EDGE_GLYPHS = {
 # Index into ``_TYPE_NAMES`` by mark-pair code ``mark_i * 4 + mark_j``; -1 for no type.
 _TYPE_NAMES = tuple(EDGE_GLYPHS)
 _TYPE_CODE = np.full(16, -1, dtype=np.int64)
-_TYPE_CODE[[a * 4 + b for a, b in _EDGE_TYPES]] = [
-    _TYPE_NAMES.index(t) for t, _ in _EDGE_TYPES.values()
+_TYPE_CODE[[a * 4 + b for a, b in EDGE_TYPES]] = [
+    _TYPE_NAMES.index(t) for t, _ in EDGE_TYPES.values()
 ]
 SUMMARY_EDGES = 30  # edges a printed summary lists before "... and N more"
 # Graphviz arrow shape per endpoint mark.
@@ -1421,7 +1421,7 @@ class GraphStructure(Structure):
                 yield i, j, "directed"
                 yield j, i, "directed"
                 continue
-            edge_type, forward = ("directed", True) if i == j else _EDGE_TYPES[(mi, mj)]
+            edge_type, forward = ("directed", True) if i == j else EDGE_TYPES[(mi, mj)]
             yield (i, j, edge_type) if forward else (j, i, edge_type)
 
     def _type_counts(self) -> dict[str, int]:

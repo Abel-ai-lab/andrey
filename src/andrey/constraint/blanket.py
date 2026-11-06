@@ -2,20 +2,20 @@
 :func:`andrey.inter_iamb`, and :func:`andrey.mmpc`.
 
 :func:`markov_blanket` runs IAMB or Inter-IAMB for one target and :func:`parents_children` the
-forward and backward phases of MMPC. :func:`blanket_graph` and :func:`mmpc_skeleton` run them for
-every variable and keep a pair when each lies in the other's set (the AND rule), which gives the
-moral graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and
-:func:`andrey.rsmax2` search within. Each takes any :class:`~andrey.core.ci.CITest`, and
-background knowledge as :class:`~andrey.core.knowledge.Constraints`: each end of a required edge
-is a member of the other's set from the start and never leaves it, and a pair the knowledge makes
-non-adjacent is never in a returned set. :func:`local_structure` and :func:`local_set` build the
-named CI test over the data and run the learners for every variable or for one target.
+forward and backward phases of MMPC. :func:`blanket_graph` and :func:`mmpc_sets` run them for
+every variable. Keeping a pair when each lies in the other's set (the AND rule) gives the moral
+graph and the skeleton that :func:`andrey.calm`, :func:`andrey.mmhc`, and :func:`andrey.rsmax2`
+search within. Each takes any :class:`~andrey.core.ci.CITest`, and background knowledge as
+:class:`~andrey.core.knowledge.Constraints`: each end of a required edge is a member of the other's
+set from the start and never leaves it, and a pair the knowledge makes non-adjacent is never in a
+returned set. :func:`local_structure` and :func:`local_set` build the named CI test over the data
+and run the learners for every variable or for one target.
 
 The structure learner of Margaritis (2003) turns the sets into a CPDAG: :func:`prune_spouses`
 removes from the moral graph each pair that a subset of the smaller of the two blankets separates,
 which gives the skeleton, and :func:`blanket_cpdag` decides each unshielded triple by testing its
 endpoints given the middle node and each subset of the smaller blanket
-(:func:`blanket_colliders`), orients the colliders with :func:`andrey.constraint.pc`'s code, and
+(:func:`blanket_colliders`), orients the colliders with :mod:`andrey.constraint.pc`'s code, and
 completes the result by Meek's rules.
 
 Candidates are compared by the strength of their dependence on the target: the absolute partial
@@ -32,7 +32,7 @@ from itertools import combinations, islice
 
 import numpy as np
 
-from andrey.constraint._skeleton import _CHUNK, adjacent_pairs, scan_conditioning_sets
+from andrey.constraint._skeleton import CHUNK, adjacent_pairs, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import TestwiseDeletion
@@ -285,8 +285,8 @@ def parents_children(
     start, in rank order, and neither phase tests it; a pair they make non-adjacent is never a
     candidate, as it cannot be adjacent.
 
-    This is MMPC without its symmetry check: :func:`mmpc_skeleton` keeps ``x`` in ``target``'s set
-    only when ``target`` is in ``x``'s.
+    This is MMPC without its symmetry check, which keeps ``x`` in ``target``'s set only when
+    ``target`` is in ``x``'s; :func:`local_structure` applies it to :func:`mmpc_sets`.
     """
     required = _required(constraints, target, ranks)
     every = _tests_every_set(test)
@@ -353,20 +353,6 @@ def mmpc_sets(
     for i in range(d):
         raw[i, parents_children(test, i, d, alpha, ranks, max_depth, constraints)] = True
     return raw
-
-
-def mmpc_skeleton(
-    test: CITest,
-    d: int,
-    alpha: float,
-    ranks: Sequence[int],
-    max_depth: int | None = None,
-    constraints: Constraints | None = None,
-) -> np.ndarray:
-    """MMPC's skeleton: ``[i, j]`` when each of ``i`` and ``j`` is in the other's parents and
-    children (:func:`mmpc_sets`), a symmetric boolean ``(d, d)`` matrix."""
-    raw = mmpc_sets(test, d, alpha, ranks, max_depth, constraints)
-    return raw & raw.T
 
 
 def reach(sets: np.ndarray) -> np.ndarray:
@@ -459,13 +445,13 @@ def blanket_colliders(
     hold at most ``max_depth - 1`` members, and with ``max_depth=0`` no set can be tested and the
     triple is ambiguous. The sets are tested by increasing size, and a non-collider stops at the
     chunk that holds its first separating set: the sets of one size are generated and tested in
-    chunks of ``_FIRST_CHUNK`` sets, then twice as many each time, at most ``_CHUNK``. A size of
+    chunks of ``_FIRST_CHUNK`` sets, then twice as many each time, at most ``CHUNK``. A size of
     at most ``_FIRST_CHUNK`` sets takes one call, a larger one skips the chunks after the one that
     holds the first separating set, and the memory a triple takes does not grow with the number of
     its subsets. A test that deletes rows per test tests every set of each size, in chunks of
-    ``_CHUNK`` (:func:`_tests_every_set`).
+    ``CHUNK`` (:func:`_tests_every_set`).
 
-    Returns the separating sets :func:`~andrey.constraint.pc._orient_colliders` reads, keyed
+    Returns the separating sets :func:`~andrey.constraint.pc.orient_colliders` reads, keyed
     ``(a, c)`` and holding the pair's non-collider middle nodes; each decided triple's rank, the
     weakest association over its tests (:func:`_weakest`: the smallest absolute partial correlation
     for a test that reports one, else the negated largest p-value), so the most clearly dependent
@@ -491,11 +477,11 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 conds = _collider_sets(sides, size, b)
-                width = _CHUNK if every else min(_FIRST_CHUNK, _CHUNK)
+                width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
                 while (every or p <= alpha) and (chunk := list(islice(conds, width))):
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
                     p, strength = max(p, p_chunk), min(strength, strength_chunk)
-                    width = min(2 * width, _CHUNK)
+                    width = min(2 * width, CHUNK)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break
@@ -517,19 +503,19 @@ def blanket_cpdag(
     against ``blankets``. As in :func:`andrey.constraint.pc.pc`, every edge ``constraints`` decide
     is directed first (:func:`~andrey.constraint.pc.check_knowledge_cycle` raises on a directed
     cycle), the colliders are oriented by
-    :func:`~andrey.constraint.pc._orient_colliders` in the order ``andrey.config.tie_break``
+    :func:`~andrey.constraint.pc.orient_colliders` in the order ``andrey.config.tie_break``
     selects, Meek's rules complete the result, with R4 under ``constraints``, and an edge two
     colliders of equal rank dispute is left undirected.
     """
     # pc imports this module through andrey.search, so its import waits for the call.
-    from andrey.constraint.pc import _orient_colliders, _undirect_conflicts, check_knowledge_cycle
+    from andrey.constraint.pc import check_knowledge_cycle, orient_colliders, undirect_conflicts
 
     sepsets, strengths, ambiguous = blanket_colliders(test, skeleton, blankets, alpha, max_depth)
     marks = np.where(skeleton, TAIL, NULL).astype(np.int8)
     if constraints is not None:
         marks = orient(marks, constraints)
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW))
-    pdag = _orient_colliders(
+    pdag = orient_colliders(
         marks,
         sepsets,
         {},
@@ -543,7 +529,7 @@ def blanket_cpdag(
         ambiguous=ambiguous,
         in_column_order=resolve_in_column_order(),
     )
-    return _undirect_conflicts(cpdag)
+    return undirect_conflicts(cpdag)
 
 
 def _ranked_test(

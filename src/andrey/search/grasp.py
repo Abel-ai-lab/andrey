@@ -1,7 +1,7 @@
 """GRaSP: greedy relaxation of the sparsest permutation over a BIC, BDeu, or mixed-data score.
 
 A depth-bounded search of tucks (:func:`_dfs`) relaxes a variable order; each variable's parents
-come from its persistent grow-shrink tree, BOSS's :class:`~andrey.search.boss._GrowShrinkTree`.
+come from its persistent grow-shrink tree, BOSS's :class:`~andrey.search.boss.GrowShrinkTree`.
 Scores are negated local scores, so the search maximizes. The search runs on the columns sorted by
 tie rank (:func:`~andrey.search.boss.ranked_score`), so a variable's index is its tie rank. The
 algorithm and its reference are described on :func:`andrey.grasp`.
@@ -16,14 +16,14 @@ import numpy as np
 from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints
 from andrey.search.boss import (
-    _SCORE_EPS,
-    _GrowShrinkTree,
+    SCORE_EPS,
+    GrowShrinkTree,
     permutation_search,
     precedence_sort,
 )
 
 
-def _settled(tree: _GrowShrinkTree, prefix: set[int], parents: list[int]) -> float:
+def _settled(tree: GrowShrinkTree, prefix: set[int], parents: list[int]) -> float:
     """Trace ``tree`` from ``prefix`` into ``parents``; return the traced set's full negated score.
 
     The leaf is scored in full (:meth:`~andrey.search.boss._Leaf.settle`), so the DFS compares full
@@ -50,7 +50,7 @@ class _Order:
         self,
         n_features: int,
         rng: random.Random,
-        gsts: list[_GrowShrinkTree],
+        gsts: list[GrowShrinkTree],
         before: np.ndarray | None = None,
     ) -> None:
         self.order = list(range(n_features))
@@ -130,7 +130,7 @@ def _tuck(i: int, j: int, order: _Order) -> None:
             shift += 1
 
 
-def _update(i: int, j: int, order: _Order, gsts: list[_GrowShrinkTree]) -> tuple[int, float]:
+def _update(i: int, j: int, order: _Order, gsts: list[GrowShrinkTree]) -> tuple[int, float]:
     """Re-score the span ``[j, i]`` after a tuck; return the edge-count and total-score deltas."""
     edge_bump = 0
     old_score = 0.0
@@ -190,7 +190,7 @@ def _dfs(
     depth: int,
     chain: set[frozenset[tuple[int, int]]],
     order: _Order,
-    gsts: list[_GrowShrinkTree],
+    gsts: list[GrowShrinkTree],
     rng: random.Random,
     before: np.ndarray | None = None,
 ) -> bool:
@@ -198,8 +198,8 @@ def _dfs(
 
     ``chain`` holds the DAGs of the chain of tucks that led to this order, its own DAG included.
     Visits variables and their parents in shuffled order: any edge at the first level, covered
-    edges below. A tuck that raises the total negated score by more than ``_SCORE_EPS`` is kept
-    (returns ``True``); one that changes it by an amount in ``(-_SCORE_EPS, _SCORE_EPS]``, to a DAG
+    edges below. A tuck that raises the total negated score by more than ``SCORE_EPS`` is kept
+    (returns ``True``); one that changes it by an amount in ``(-SCORE_EPS, SCORE_EPS]``, to a DAG
     not yet in the chain, is recursed through (bounded by ``depth``) before it is rolled back.
     A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled back unscored. Returns
     ``False`` when no chain improves the score.
@@ -224,10 +224,10 @@ def _dfs(
                     _restore(order, j, cache)
                     continue
             edge_bump, score_bump = _update(i, j, order, gsts)
-            if score_bump > _SCORE_EPS:
+            if score_bump > SCORE_EPS:
                 order.bump_edges(edge_bump)
                 return True
-            if depth > 0 and score_bump > -_SCORE_EPS:
+            if depth > 0 and score_bump > -SCORE_EPS:
                 key = _dag_key(order)
                 if key not in chain:
                     chain.add(key)
@@ -241,7 +241,7 @@ def _dfs(
 def _search_from(
     n_features: int,
     rng: random.Random,
-    gsts: list[_GrowShrinkTree],
+    gsts: list[GrowShrinkTree],
     depth: int,
     before: np.ndarray | None,
 ) -> _Order:
@@ -268,7 +268,7 @@ def grasp(
     ebic_gamma: float = 1.0,
     equivalent_sample_size: float = 1.0,
     depth: int = 3,
-    random_state: int = 0,
+    seed: int = 0,
     n_starts: int = 1,
     score_func: str = "bic",
     max_parents: int | None = None,
@@ -280,7 +280,7 @@ def grasp(
     Runs the greedy relaxation of the sparsest permutation: seeds a permutation, grow-shrinks each
     variable's parents from its predecessors, then relaxes the order through depth-bounded covered
     tucks until no tuck improves the total score. The settled parent sets form a DAG, returned as
-    its CPDAG. The search is stochastic and seeded from ``random_state`` for a reproducible run. It
+    its CPDAG. The search is stochastic and seeded from ``seed`` for a reproducible run. It
     runs on the columns sorted by :func:`~andrey.search.boss.ranked_score`, so the starting order,
     the visiting order, and every tie follow the columns' data, and reordering the columns of
     ``data`` reorders the CPDAG's nodes.
@@ -301,13 +301,13 @@ def grasp(
         (:class:`~andrey.core.score.BDeuScore`); positive. The other scores ignore it.
     depth : int
         Most tucks in one chain of moves, at least ``1``.
-    random_state : int
+    seed : int
         Seed for the private RNG of each start, which fixes its initial permutation and DFS
         shuffles (:func:`~andrey.core.seeding.start_rng`).
     n_starts : int
         Number of searches, each from its own seeded initial permutation, at least ``1``. The
         returned DAG is the best-scoring one; a later start replaces an earlier one only when it
-        scores better by more than ``_SCORE_EPS``.
+        scores better by more than ``SCORE_EPS``.
     score_func : str
         Local score, one of :data:`~andrey.core.score.SCORES`.
     max_parents : int or None
@@ -332,7 +332,7 @@ def grasp(
     """
 
     def run_start(
-        start: int, rng: random.Random, gsts: list[_GrowShrinkTree], before: np.ndarray | None
+        start: int, rng: random.Random, gsts: list[GrowShrinkTree], before: np.ndarray | None
     ) -> dict[int, list[int]]:
         return _search_from(len(gsts), rng, gsts, depth, before).parents
 
@@ -347,5 +347,5 @@ def grasp(
         constraints=constraints,
         max_parents=max_parents,
         n_starts=n_starts,
-        random_state=random_state,
+        seed=seed,
     )

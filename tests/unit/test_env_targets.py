@@ -19,7 +19,7 @@ import pytest
 import andrey
 from andrey.cli import main
 from andrey.constraint.cdnod import cdnod as cdnod_engine
-from andrey.resample import _job
+from andrey.resample import build_job
 from andrey.spec import get_spec
 
 N = 900
@@ -435,10 +435,12 @@ def test_bootstrap_draws_within_each_domain_given_apart(form):
     """Tables apart are one domain each, so cdnod's numbered positions draw within each domain,
     as text labels do, where a numeric index of one table draws its rows as a whole."""
     data = DOMAINS if form == "list" else dict(enumerate(DOMAINS))
-    job = _job(get_spec("cdnod"), data, {}, None, 0, "subsample", 0.5)
+    job = build_job(get_spec("cdnod"), data, {}, None, 0, "subsample", 0.5)
     assert job.strata is not None
     assert [len(rows) for rows in job.strata] == [len(t) for t in DOMAINS]
-    assert _job(get_spec("cdnod"), X, {"env": DOMAIN}, None, 0, "subsample", 0.5).strata is None
+    assert (
+        build_job(get_spec("cdnod"), X, {"env": DOMAIN}, None, 0, "subsample", 0.5).strata is None
+    )
 
 
 # --- the command line ---------------------------------------------------------------------------

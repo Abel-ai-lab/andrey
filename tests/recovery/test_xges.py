@@ -23,13 +23,13 @@ from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.core.ties import tie_ranks
 from andrey.metrics import shd, to_cpdag
-from andrey.search.ges import _recompute_objective
+from andrey.search.ges import recompute_objective
 from andrey.search.xges import (
     _UNDIRECTED,
+    XGESSearch,
     _edge_key,
     _extension_parents,
     _Graph,
-    _Search,
 )
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
@@ -187,7 +187,7 @@ def test_branches_are_scored_on_a_member_of_the_class(seed):
     cpdag = from_structure(to_cpdag(ds.graph))
     assert np.array_equal(dag2cpdag(_extension_dag(cpdag)), cpdag)
     score = BICScore(ds.data)
-    assert _marks_total(cpdag, score) == pytest.approx(_recompute_objective(cpdag, score, 15))
+    assert _marks_total(cpdag, score) == pytest.approx(recompute_objective(cpdag, score, 15))
 
 
 @pytest.mark.parametrize("seed", [0, 4])
@@ -197,7 +197,7 @@ def test_the_extended_search_scores_the_graph_it_returns(seed):
     graph's class. On seeds 0 and 4 the search keeps branches at the standard BIC."""
     x = _dense(seed).data
     score = BICScore(x, ebic_gamma=0.0)
-    search = _Search(score, x.shape[1], tie_ranks(x).tolist())
+    search = XGESSearch(score, x.shape[1], tie_ranks(x).tolist())
     with threadpool_limits(limits=1):
         search.inserts_on_empty_graph()
         search.base_search()

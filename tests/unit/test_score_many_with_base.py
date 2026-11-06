@@ -17,7 +17,7 @@ from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import boss as boss_mod
 
-EPS = boss_mod._SCORE_EPS
+EPS = boss_mod.SCORE_EPS
 
 
 def _full(score: BICScore, v: int, base: tuple[int, ...], op: str, u: int) -> float:
@@ -101,7 +101,7 @@ def test_boss_grow_decides_an_open_threshold_by_full_scores(
     parents = [1]
     score = _threshold_score(EPS + margin)
     delta = DeltaBICScore(score)
-    tree = boss_mod._GrowShrinkTree(0, score, delta, 4)
+    tree = boss_mod.GrowShrinkTree(0, score, delta, 4)
     exact = -score.score(0, parents)
     node = boss_mod._GSTNode(tree, score=exact + base_error, bound=abs(base_error))
 

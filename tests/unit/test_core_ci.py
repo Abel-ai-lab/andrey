@@ -351,7 +351,7 @@ def _eigenvalues_first(corr, x, y, conditions):
         return True, None
     inv = np.linalg.inv(stack)
     r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
-    return False, np.clip(r, -ci._ONE_MINUS_EPS, ci._ONE_MINUS_EPS)
+    return False, np.clip(r, -ci.ONE_MINUS_EPS, ci.ONE_MINUS_EPS)
 
 
 @pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
@@ -411,7 +411,7 @@ def test_guard_bound_edge(test_class, monkeypatch):
     # matrices sit just inside and just outside the inverse bound. Only the outside one takes the
     # eigenvalue test; both pass it, since the bound stays far above the eigenvalue threshold.
     size = 4
-    limit = 1.0 / (ci._BOUND_MARGIN * ci._SINGULAR_RTOL * size * size)
+    limit = 1.0 / (ci.BOUND_MARGIN * ci.SINGULAR_RTOL * size * size)
     edge = 1.0 / (size * limit)
     inside, outside = _equicorrelation(size, 1.1 * edge), _equicorrelation(size, 0.9 * edge)
     assert np.abs(np.linalg.inv(inside)).max() < limit < np.abs(np.linalg.inv(outside)).max()

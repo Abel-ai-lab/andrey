@@ -44,7 +44,7 @@ _Chunk = tuple[int, int, int, Sequence[tuple[int, ...]]]
 # One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
 # is computed independently, so the chunk boundary never changes a result.
-_CHUNK = 4096
+CHUNK = 4096
 
 # Conditioning sets per test call in a collider vote (:func:`vote_triples`). A vote keeps only the
 # separating subsets, so the tests of a pair hold one chunk however large the endpoint degrees are.
@@ -108,7 +108,7 @@ def scan_conditioning_sets(
     found = False
     top = 0.0
     while True:
-        chunk = list(islice(subsets, _CHUNK))
+        chunk = list(islice(subsets, CHUNK))
         if not chunk:
             break
         pvalues = batched(a, b, chunk)
@@ -232,7 +232,7 @@ def separating_subsets(
 ) -> list[tuple[int, ...]]:
     """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
 
-    A FisherZ, StudentT, or degenerate Gaussian test evaluates the subsets in chunks of ``_CHUNK``
+    A FisherZ, StudentT, or degenerate Gaussian test evaluates the subsets in chunks of ``CHUNK``
     canonical queries, in order. A chunk whose evaluation raises is tested again subset by subset
     with scalar ``test`` calls, so the error is the one the scalar loop raises, after the same
     queries. Another test makes one scalar call per subset.
@@ -241,7 +241,7 @@ def separating_subsets(
     if canonical is None:
         return [cond for cond in subsets if test(x, y, cond) > alpha]
     found: list[tuple[int, ...]] = []
-    while chunk := list(islice(subsets, _CHUNK)):
+    while chunk := list(islice(subsets, CHUNK)):
         try:
             pvalues = _canonical_chunk(canonical, size, x, y, chunk)
         except Exception:
@@ -413,13 +413,13 @@ def scan_pairs(
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
     and the parallel workers share it, so they stay identical. A FisherZ, StudentT, RCoT, or
     degenerate Gaussian test evaluates the chunks of consecutive pairs in one stack
-    (:func:`_stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
+    (:func:`stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
     test the same subsets in the same order. With ``trace`` given, every test is recorded in the
     order it runs.
     """
     stacked = _stacked_route(test)
     if stacked is not None:
-        return _stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
+        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
@@ -450,7 +450,7 @@ def _sides(
             yield a, b, candidates, seen
 
 
-def _stacked_scan(
+def stacked_scan(
     pvalues: Callable[..., np.ndarray],
     pairs: list[tuple[int, int]],
     neighbors: list[np.ndarray],
@@ -497,7 +497,7 @@ def _pair_chunks(
         x, y = min(a, b), max(a, b)
         for _, _, candidates, seen in _sides(neighbors, a, b, size):
             subsets = _subsets(candidates, size, seen)
-            while chunk := list(islice(subsets, _CHUNK)):
+            while chunk := list(islice(subsets, CHUNK)):
                 yield i, x, y, chunk
 
 

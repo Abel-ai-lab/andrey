@@ -5,7 +5,7 @@ improves the score: the linear-Gaussian BIC, the categorical BDeu and BIC, or a 
 extended search forces each Delete of the converged CPDAG,
 forbids re-inserting the deleted edge, reruns the base search, and keeps lower-scoring results.
 
-:class:`_Search` keeps candidates in a priority queue per operator type. A popped operator is
+:class:`XGESSearch` keeps candidates in a priority queue per operator type. A popped operator is
 dropped when it no longer applies to the current CPDAG. After a move, only the operators it can
 affect are rescored, and the CPDAG is completed locally.
 
@@ -39,11 +39,11 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
-from andrey.core.orient import to_structure
+from andrey.core.orient import cpdag_of_pdag, to_structure
 from andrey.core.score import BICScore, LocalScore, make_score
 from andrey.core.score_delta import add_deltas, full_add_deltas
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_mask, tie_ranks
-from andrey.search.ges import _recompute_objective, _reform_cpdag, required_dag
+from andrey.search.ges import recompute_objective, required_dag
 from andrey.search.operators import check_parent_cap
 
 # The extended search keeps a branch when it lowers the deviance by more than this times the sample
@@ -587,7 +587,7 @@ class _AddDeltas:
         return deltas
 
 
-class _Search:
+class XGESSearch:
     """XGES over a :class:`_Graph`, with a priority queue per operator type.
 
     Queue entries are ``(delta, seq, x, y, subset, E[, Pa(x)])``: ``seq`` orders entries of one
@@ -631,10 +631,10 @@ class _Search:
         self.deletes: list[tuple] = []
         self.seq = count()
 
-    def branch(self, snapshot: tuple[_Graph, _Paths]) -> _Search:
+    def branch(self, snapshot: tuple[_Graph, _Paths]) -> XGESSearch:
         """A copy of the graph and of the path records, each branched from its ``snapshot``, with
         empty queues and the same score cache."""
-        out = _Search.__new__(_Search)
+        out = XGESSearch.__new__(XGESSearch)
         out.add_deltas, out.d, out.seq, out.cap = self.add_deltas, self.d, self.seq, self.cap
         out.n_samples, out.tie_gap, out.ranks = self.n_samples, self.tie_gap, self.ranks
         out.constraints, out.into = self.constraints, self.into
@@ -1142,10 +1142,10 @@ def xges(
     )
     ranks = tie_ranks(X, tie_mask(score_func, categorical, d)).tolist()
     # One BLAS thread for reproducible scores and move ties.
-    start = None if constraints is None else _reform_cpdag(required_dag(constraints))
+    start = None if constraints is None else cpdag_of_pdag(required_dag(constraints))
     check_parent_cap(start, max_parents, in_class=True)
     with backend.one_blas_thread():
-        search = _Search(score, d, ranks, constraints, max_parents)
+        search = XGESSearch(score, d, ranks, constraints, max_parents)
         if start is None:
             search.inserts_on_empty_graph()
         else:
@@ -1154,7 +1154,7 @@ def xges(
         if extended_search:
             search.extend(X.shape[0])
         adj = search.g.marks()
-        total = _recompute_objective(adj, score, d)
+        total = recompute_objective(adj, score, d)
     if constraints is not None:
         adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

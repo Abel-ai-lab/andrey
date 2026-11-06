@@ -143,10 +143,10 @@ def _causal_dag(structure: GraphStructure) -> networkx.DiGraph:
     """
     import networkx as nx
 
-    from andrey.data.latent import _causal_digraph
+    from andrey.data.latent import causal_digraph
 
     structure.validate()
-    digraph = _causal_digraph(structure)
+    digraph = causal_digraph(structure)
     if not nx.is_directed_acyclic_graph(digraph):
         cycle = " -> ".join(str(u) for u, _ in nx.find_cycle(digraph))
         raise ValueError(f"the dag has the directed cycle {cycle}")
@@ -161,7 +161,7 @@ def _canonical_dag(mag: GraphStructure) -> tuple[networkx.DiGraph, list[int]]:
     """
     import networkx as nx
 
-    from andrey.data.latent import _mag_projection, _observed_ancestors
+    from andrey.data.latent import mag_projection, observed_ancestors
 
     mag.validate()
     marks = mag.to_numpy()
@@ -189,9 +189,9 @@ def _canonical_dag(mag: GraphStructure) -> tuple[networkx.DiGraph, list[int]]:
     nodes = range(n)
     is_mag = nx.is_directed_acyclic_graph(digraph)
     if is_mag:
-        anc = _observed_ancestors(digraph, nodes)
+        anc = observed_ancestors(digraph, nodes)
         up = _observed_ancestors_of(digraph, nodes, added_selection)
-        projected = _mag_projection(digraph, nodes, anc, added_selection, up)
+        projected = mag_projection(digraph, nodes, anc, added_selection, up)
         is_mag = np.array_equal(projected.to_numpy(), marks)
     if not is_mag:
         raise ValueError(
@@ -225,13 +225,13 @@ def _project(
     Every d-separation query also conditions on ``selection``. A PAG gets the endpoints
     ``constraints`` set before its orientation rules.
     """
-    from andrey.data.latent import _mag_projection, _observed_ancestors, _pag_projection
+    from andrey.data.latent import mag_projection, observed_ancestors, pag_projection
 
-    anc = _observed_ancestors(digraph, observed)
+    anc = observed_ancestors(digraph, observed)
     up = _observed_ancestors_of(digraph, observed, selection)
     if target == "mag":
-        return _mag_projection(digraph, observed, anc, selection, up)
-    return _pag_projection(digraph, observed, anc, selection, up, constraints)
+        return mag_projection(digraph, observed, anc, selection, up)
+    return pag_projection(digraph, observed, anc, selection, up, constraints)
 
 
 def _named(

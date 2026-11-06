@@ -15,11 +15,11 @@ from contextlib import contextmanager
 import numpy as np
 import pytest
 
-from andrey.core.orient import _cpdag_of_pdag
+from andrey.core.orient import cpdag_of_pdag
 from andrey.core.ties import EPS_IMPROVE
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
-from andrey.search.ges import _reachable
+from andrey.search.ges import reachability
 
 
 def insert_candidates(
@@ -134,7 +134,7 @@ def naive_clique_residuals(
 
 def full_rebuild(adj: np.ndarray, touched: list[int]) -> np.ndarray:
     """The CPDAG of ``adj`` rebuilt whole, whichever nodes the move touched."""
-    return _cpdag_of_pdag(adj)
+    return cpdag_of_pdag(adj)
 
 
 def full_rescan_best(
@@ -148,7 +148,7 @@ def full_rescan_best(
         self.n,
         self.max_parents,
         pg.neighborhood_state(adj),
-        _reachable(adj),
+        reachability(adj),
         self.ranks,
         self.forbidden,
         excluded,

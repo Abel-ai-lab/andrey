@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from andrey.api._temporal import _adapt_granger, _adapt_longitudinal_lingam, _adapt_varma_lingam
+from andrey.api._temporal import adapt_granger, adapt_longitudinal_lingam, adapt_varma_lingam
 from andrey.core import ARROW, TAIL, StructureOutput, TemporalStructure
 
 
@@ -23,7 +23,7 @@ def _varma_fit() -> tuple[list[int], np.ndarray, np.ndarray]:
 
 def test_varma_lingam_dual_stack():
     order, psis, omegas = _varma_fit()
-    out = _adapt_varma_lingam(order, psis, omegas)
+    out = adapt_varma_lingam(order, psis, omegas)
     t = out.structure
     assert isinstance(t, TemporalStructure)
     # The lag topology comes from psis (AR) only; both stacks are present and lossless.
@@ -37,7 +37,7 @@ def test_varma_lingam_dual_stack():
 
 def test_varma_lingam_json_roundtrip(tmp_path):
     order, psis, omegas = _varma_fit()
-    out = _adapt_varma_lingam(order, psis, omegas)
+    out = adapt_varma_lingam(order, psis, omegas)
     p = tmp_path / "varma.json"
     out.save(p)
     back = StructureOutput.load(p)
@@ -57,7 +57,7 @@ def _granger_coeff() -> np.ndarray:
 
 def test_granger_lag_topology_and_count():
     coeff = _granger_coeff()
-    out = _adapt_granger(coeff, maxlag=2)
+    out = adapt_granger(coeff, maxlag=2)
     t = out.structure
     assert isinstance(t, TemporalStructure)
     assert t.n_lags == 2  # no lag-0; one graph per lag 1..maxlag
@@ -78,7 +78,7 @@ def test_granger_lag_topology_and_count():
 
 
 def test_granger_json_roundtrip(tmp_path):
-    out = _adapt_granger(_granger_coeff(), maxlag=2)
+    out = adapt_granger(_granger_coeff(), maxlag=2)
     p = tmp_path / "granger.json"
     out.save(p)
     assert StructureOutput.load(p) == out
@@ -87,7 +87,7 @@ def test_granger_json_roundtrip(tmp_path):
 @pytest.mark.parametrize("shape", [(3, 5), (6,), (3, 6, 1)])
 def test_granger_rejects_bad_shape(shape):
     with pytest.raises(ValueError, match="shape"):
-        _adapt_granger(np.zeros(shape), maxlag=2)
+        adapt_granger(np.zeros(shape), maxlag=2)
 
 
 def test_orientation_invariant_weights_match_edges():
@@ -103,7 +103,7 @@ def test_orientation_invariant_weights_match_edges():
     psis[1, 0, 0] = 0.5  # lag-1: autoregressive self-loop
     psis[2, 1, 0] = 0.3  # lag-2: edge 0 -> 1 ...
     psis[2, 0, 1] = 0.2  # lag-2: ... and edge 1 -> 0, a 2-cycle
-    t = _adapt_varma_lingam([0, 1, 2], psis, np.zeros((0, n, n))).structure
+    t = adapt_varma_lingam([0, 1, 2], psis, np.zeros((0, n, n))).structure
     assert isinstance(t, TemporalStructure)
     weights = t.lag_weights
     for pos, lag_value in enumerate(t.lags):
@@ -133,7 +133,7 @@ def _longitudinal_fit() -> tuple[np.ndarray, list[list[int]]]:
 
 
 def test_longitudinal_adapter_stores_the_time_axis_losslessly():
-    out = _adapt_longitudinal_lingam(*_longitudinal_fit())
+    out = adapt_longitudinal_lingam(*_longitudinal_fit())
     t = out.structure
     assert isinstance(t, TemporalStructure)
     # occasion 0 (all-NaN) is dropped; occasions 1..3 become the explicit time axis.
@@ -151,7 +151,7 @@ def test_longitudinal_adapter_stores_the_time_axis_losslessly():
 
 
 def test_longitudinal_adapter_json_roundtrip(tmp_path):
-    out = _adapt_longitudinal_lingam(*_longitudinal_fit())
+    out = adapt_longitudinal_lingam(*_longitudinal_fit())
     p = tmp_path / "longitudinal.json"
     out.save(p)
     assert StructureOutput.load(p) == out  # (time, lag) axis + NaN weights round-trip
@@ -167,7 +167,7 @@ def test_longitudinal_adapter_gives_an_uncomputable_block_no_link_and_zero_fills
     adj[1, 0, 1, 0] = 0.5  # instantaneous 0 -> 1
     adj[1, 1] = np.zeros((p, p))
     adj[1, 1, 1, 0] = 0.3  # lag-1 (reaches occasion 0, valid)
-    t = _adapt_longitudinal_lingam(adj, [[], [0, 1]]).structure
+    t = adapt_longitudinal_lingam(adj, [[], [0, 1]]).structure
     assert t.n_times == 1 and t.times == (1,)
     assert np.isnan(t.time_weights[0, 2]).all()  # the uncomputable block is kept NaN (lossless)
     assert int(t.at(1, 2).to_numpy().sum()) == 0  # its graph has no link

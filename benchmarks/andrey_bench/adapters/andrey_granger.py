@@ -69,9 +69,9 @@ class AndreyGranger:
 
     def to_structure(self, native: np.ndarray) -> Any:
         """Rebuild the temporal structure from the coefficients outside the timed region."""
-        from andrey.api._temporal import _adapt_granger
+        from andrey.api._temporal import adapt_granger
 
-        return _adapt_granger(native, native.shape[1] // native.shape[0]).structure
+        return adapt_granger(native, native.shape[1] // native.shape[0]).structure
 
 
 def andrey_granger_adapters() -> list[AndreyGranger]:

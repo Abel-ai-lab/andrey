@@ -22,7 +22,7 @@ returns is the best of those that keep it; an Insert whose scored family alone e
 out before scoring (:func:`_over_cap`).
 
 ``ges()`` uses :func:`run_ges`; ``workers=1`` scans all targets in-process. The objective is
-recomputed from the final CPDAG by :func:`andrey.search.ges._recompute_objective`.
+recomputed from the final CPDAG by :func:`andrey.search.ges.recompute_objective`.
 """
 
 from __future__ import annotations
@@ -42,8 +42,6 @@ from andrey.core.ties import EPS_IMPROVE, KEY_DP, stable_key
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
-
-_pick_context = par.pick_context
 
 # A chunk best, or ``None`` when the chunk has no improving operator. ``key`` is the total-order
 # reduce key from :func:`move_key`; ``T`` / ``H`` carry the move to apply.
@@ -671,7 +669,7 @@ def _create_pool(
         workers,
         _init_worker,
         (cov, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
-        context=_pick_context(),
+        context=par.pick_context(),
     )
 
 

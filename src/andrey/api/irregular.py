@@ -23,9 +23,9 @@ from ._adapt import (
     with_labels,
 )
 from ._irregular import (
-    _adapt_bottom_up_parce,
-    _adapt_rcd,
-    _pairwise_output,
+    adapt_bottom_up_parce,
+    adapt_rcd,
+    pairwise_output,
 )
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ def fit_pair(
     (:func:`_complete_pairs`). With ``standardize``, each column is divided by its largest
     magnitude, so a column in tiny or huge units cannot underflow, and then standardized to zero
     mean and unit variance. ``native`` returns the forward and backward p-values and statistics,
-    and the result holds the edge they choose with ``alpha`` (:func:`_pairwise_output`).
+    and the result holds the edge they choose with ``alpha`` (:func:`pairwise_output`).
     """
     if np.ndim(data) != 2 or np.shape(data)[1] != 2:
         raise ValueError(
@@ -91,7 +91,7 @@ def fit_pair(
         X = X / np.abs(X).max(axis=0)
         X = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
     pval_forward, pval_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
-    return _pairwise_output(
+    return pairwise_output(
         pval_forward,
         pval_backward,
         stat_forward=stat_forward,
@@ -527,7 +527,7 @@ def rcd(
         shapiro_alpha=shapiro_alpha,
         constraints=constraints,
     )
-    return with_labels(_adapt_rcd(model), labels)
+    return with_labels(adapt_rcd(model), labels)
 
 
 @method_spec("bottom_up_parce_lingam")
@@ -670,8 +670,6 @@ def bottom_up_parce_lingam(
     constraints = resolve(knowledge, X.shape[1], labels, method="bottom_up_parce_lingam")
     model = _native(X, alpha=alpha, constraints=constraints)
     if constraints is None:
-        return with_labels(_adapt_bottom_up_parce(model), labels)
+        return with_labels(adapt_bottom_up_parce(model), labels)
     one_way = constraints.forbidden & ~constraints.forbidden.T
-    return with_labels(
-        _adapt_bottom_up_parce(model, one_way, required=constraints.required), labels
-    )
+    return with_labels(adapt_bottom_up_parce(model, one_way, required=constraints.required), labels)

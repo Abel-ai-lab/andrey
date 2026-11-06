@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure
-from andrey.api._irregular import _pairwise_output
+from andrey.api._irregular import pairwise_output
 from andrey_bench import datasets
 from andrey_bench.adapters.andrey_anm import AndreyANM
 from andrey_bench.adapters.causal_learn_anm import CausalLearnANM
@@ -63,7 +63,7 @@ def test_causal_learn_decides_the_edge_as_andrey_does(
     monkeypatch.setattr(module, "ANM", Fake)
     adapter = CausalLearnANM()
     marks = adapter.fit(np.zeros((10, 2)), {"alpha": alpha})
-    expected = _pairwise_output(forward, backward, alpha=alpha).structure.to_numpy()
+    expected = pairwise_output(forward, backward, alpha=alpha).structure.to_numpy()
     np.testing.assert_array_equal(marks, expected)
     assert calls == [((10, 1), (10, 1))]  # one column each, as causal-learn's ANM takes them
 

@@ -37,7 +37,7 @@ _CACHE_BYTES = 2**28
 # shared node assigns: PC fits with 8 threads ran 0.42x to 1.56x the one-thread speed on 500 rows,
 # where the eigendecomposition slows with threads, 0.72x to 2.45x on 1,000, and 1.48x to 2.88x on
 # 2,000.
-_KCI_BLAS_THREADS_FROM = 2000
+KCI_BLAS_THREADS_FROM = 2000
 
 
 def _cache_entries(floats_per_entry: int) -> int:
@@ -182,7 +182,7 @@ class KCI:
     @property
     def pin_blas(self) -> bool:
         """Whether the skeleton scans run the test on one BLAS thread: on fewer than 2,000 rows."""
-        return self._n < _KCI_BLAS_THREADS_FROM
+        return self._n < KCI_BLAS_THREADS_FROM
 
     def __init__(self, data: np.ndarray, *, ridge: float = 1e-3, rank: int | None = None) -> None:
         if not 0.0 < ridge < np.inf:

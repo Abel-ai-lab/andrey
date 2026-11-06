@@ -11,7 +11,7 @@ import pytest
 import andrey.data as ad
 from andrey import GraphStructure
 from andrey.core.structure import ARROW, EDGE_DTYPE
-from andrey.data.latent import DSepOracle, _causal_digraph
+from andrey.data.latent import DSepOracle, causal_digraph
 from andrey.metrics import to_cpdag
 
 
@@ -63,7 +63,7 @@ def _open_path(graph: GraphStructure, x: int, y: int, given: list[int]) -> bool:
 @pytest.mark.parametrize("seed", range(6))
 def test_d_separation_matches_the_oracle_and_path_enumeration(seed):
     dag = _dag(6, seed)
-    oracle = DSepOracle(_causal_digraph(dag))
+    oracle = DSepOracle(causal_digraph(dag))
     for x, y, given in _queries(6):
         answer = dag.d_separated(x, y, given)
         assert answer == (oracle(x, y, given) == 1.0)
@@ -77,7 +77,7 @@ def test_mag_and_pag_separation_match_the_dag_with_hidden_nodes(seed):
     dag = _dag(7, seed)
     hidden = [0, 1]
     observed = [v for v in range(7) if v not in hidden]
-    oracle = DSepOracle(_causal_digraph(dag))
+    oracle = DSepOracle(causal_digraph(dag))
     mag, pag = dag.to_mag(latent=hidden), dag.to_pag(latent=hidden)
     for x, y, given in _queries(len(observed)):
         truth = oracle(observed[x], observed[y], [observed[z] for z in given]) == 1.0
@@ -93,7 +93,7 @@ def test_selection_variables_join_the_conditioning_set(seed):
     dag = _dag(7, seed)
     hidden, selection = [0], [6]
     observed = [1, 2, 3, 4, 5]
-    oracle = DSepOracle(_causal_digraph(dag))
+    oracle = DSepOracle(causal_digraph(dag))
     mag = dag.to_mag(latent=hidden, selection=selection)
     pag = dag.to_pag(latent=hidden, selection=selection)
     for x, y, given in _queries(len(observed)):
@@ -150,7 +150,7 @@ def test_markov_blanket_is_the_smallest_separating_set(kind):
 def test_dag_queries_match_networkx():
     for seed in range(4):
         dag = _dag(8, seed)
-        g = _causal_digraph(dag)
+        g = causal_digraph(dag)
         for v in range(8):
             assert dag.parents(v) == sorted(g.predecessors(v))
             assert dag.children(v) == sorted(g.successors(v))

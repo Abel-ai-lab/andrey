@@ -139,12 +139,12 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
     X, mask = _random_interventional(seed, d, p, n_targets, n=40 * d)
     mask = mask if n_targets else None
     kept_graph, kept_score = gies_search.gies(X, mask)
-    kept_backward = gies_search._Search.backward_best
+    kept_backward = gies_search.GIESSearch.backward_best
 
     def forward_best(self, excluded=None):
         """The lowest-keyed valid insertion over the candidates of every target, enumerated now."""
         adj, n = self.adj, self.n
-        reachable = gies_search._reachable(adj)
+        reachable = gies_search.reachability(adj)
         valid = (
             (key, u, v, C)
             for v in range(n)
@@ -161,8 +161,8 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
         self.backward.clear()
         return kept_backward(self, excluded)
 
-    monkeypatch.setattr(gies_search._Search, "forward_best", forward_best)
-    monkeypatch.setattr(gies_search._Search, "backward_best", backward_best)
+    monkeypatch.setattr(gies_search.GIESSearch, "forward_best", forward_best)
+    monkeypatch.setattr(gies_search.GIESSearch, "backward_best", backward_best)
     full_graph, full_score = gies_search.gies(X, mask)
     assert np.array_equal(kept_graph.to_numpy(), full_graph.to_numpy())
     assert kept_score == full_score
@@ -171,7 +171,7 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
 def test_gies_step_that_does_not_lower_the_score_fails():
     X, mask = _interventional_sem([[1], [6]], n=600, seed=0)
     score = gies_search.InterventionalScore(X, mask)
-    search = gies_search._Search(score, X.shape[1], range(X.shape[1]))
+    search = gies_search.GIESSearch(score, X.shape[1], range(X.shape[1]))
     with pytest.raises(RuntimeError):
         search.apply(search.adj.copy())
 

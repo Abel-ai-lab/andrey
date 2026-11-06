@@ -113,8 +113,8 @@ def marginal(graph: GraphStructure, target: str = "mag", *, max_nodes: int = 500
         return graph  # the MAG of a causally-sufficient DAG is the DAG itself
     n_obs, dag, anc = _observed_dag(graph, max_nodes)
     if target == "mag":
-        return _mag_projection(dag, range(n_obs), anc)
-    return _pag_projection(dag, range(n_obs), anc)
+        return mag_projection(dag, range(n_obs), anc)
+    return pag_projection(dag, range(n_obs), anc)
 
 
 def _observed_dag(graph: GraphStructure, max_nodes: int):
@@ -132,11 +132,11 @@ def _observed_dag(graph: GraphStructure, max_nodes: int):
             f"marginal over {n_obs} observed nodes exceeds max_nodes={max_nodes} "
             f"(the projection is quadratic); pass max_nodes= to override"
         )
-    dag = _causal_digraph(graph)
-    return n_obs, dag, _observed_ancestors(dag, range(n_obs))
+    dag = causal_digraph(graph)
+    return n_obs, dag, observed_ancestors(dag, range(n_obs))
 
 
-def _causal_digraph(graph: GraphStructure):
+def causal_digraph(graph: GraphStructure):
     """Return the ``networkx.DiGraph`` of a DAG, each edge from its tail to its arrowhead."""
     import networkx as nx
 
@@ -150,7 +150,7 @@ def _causal_digraph(graph: GraphStructure):
     return dag
 
 
-def _observed_ancestors(dag, observed: Iterable[int]) -> dict[int, set[int]]:
+def observed_ancestors(dag, observed: Iterable[int]) -> dict[int, set[int]]:
     """Return each observed node's observed ancestors in ``dag``, the node itself excluded."""
     import networkx as nx
 
@@ -159,7 +159,7 @@ def _observed_ancestors(dag, observed: Iterable[int]) -> dict[int, set[int]]:
     return {x: nx.ancestors(dag, x) & obs_set for x in obs}
 
 
-def _mag_projection(
+def mag_projection(
     dag,
     observed: Sequence[int],
     anc: Mapping[int, set[int]],
@@ -372,7 +372,7 @@ class _AncestorSepsets(Mapping):
         return n * (n - 1) - int(np.count_nonzero(self._support))
 
 
-def _pag_projection(
+def pag_projection(
     dag,
     observed: Sequence[int],
     anc: Mapping[int, set[int]],
@@ -382,18 +382,18 @@ def _pag_projection(
 ) -> GraphStructure:
     """Build the true PAG over ``observed`` via MAG-first orientation: oracle skeleton, FCI rules.
 
-    The skeleton and separating sets are :func:`_mag_projection`'s; ``_orient_colliders`` fixes the
-    unshielded colliders and ``_fci_orient`` runs Zhang's rules to a fixed point, its R4
+    The skeleton and separating sets are :func:`mag_projection`'s; ``orient_colliders`` fixes the
+    unshielded colliders and ``fci_orient`` runs Zhang's rules to a fixed point, its R4
     discriminating-path collider answered by the same d-separation oracle, which conditions on
     ``selection`` in every query. ``constraints``, over the positions of ``observed``, set their
-    endpoints first, as ``fci`` sets them before its orientation rules (``_knowledge_marks``).
+    endpoints first, as ``fci`` sets them before its orientation rules (``knowledge_marks``).
     """
-    from andrey.constraint.fci import _circle_pag, _fci_orient, _knowledge_marks, _orient_colliders
+    from andrey.constraint.fci import circle_pag, fci_orient, knowledge_marks, orient_colliders
 
     support = _ancestral_adjacency(dag, observed, selection)
     sepsets = _AncestorSepsets(support, observed, anc, set(anc_selection))
-    marks = _circle_pag(support)
-    _knowledge_marks(marks, constraints)
-    _orient_colliders(marks, sepsets)
-    _fci_orient(marks, DSepOracle(dag, observed, selection), 0.5, sepsets)
+    marks = circle_pag(support)
+    knowledge_marks(marks, constraints)
+    orient_colliders(marks, sepsets)
+    fci_orient(marks, DSepOracle(dag, observed, selection), 0.5, sepsets)
     return GraphStructure.from_numpy(marks, kind="pag")

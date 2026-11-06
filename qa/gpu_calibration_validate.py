@@ -14,7 +14,6 @@ crossovers set `ANDREY_KCI_GPU_THRESHOLD`, `ANDREY_CMIKNN_GPU_THRESHOLD`, and
 
 from __future__ import annotations
 
-import importlib
 import math
 import os
 import tempfile
@@ -23,9 +22,7 @@ import time
 import numpy as np
 
 from andrey.core import backend, ci_cmiknn, ci_kernel, stats
-
-# `andrey.irregular.pnl` is also the name of the function the package exports.
-pnl = importlib.import_module("andrey.irregular.pnl")
+from andrey.irregular import pnl
 
 # Past this factor from the shipped default, the report suggests setting a cutoff for this machine.
 _TOLERANCE = 4.0

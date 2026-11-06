@@ -38,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 # Per-op auto-preference orders (best first) and the CPU fallback.
 _TORCH_PINNABLE = ("numpy", "cpu", "cuda", "mps")
-_TORCH_AUTO = ("cuda", "numpy")  # cpu-torch and mps are pin-only, never auto-selected
+TORCH_AUTO = ("cuda", "numpy")  # cpu-torch and mps are pin-only, never auto-selected
 
 # Each GPU op's smallest size, per device, at which `auto` runs it there; `None` means never. The
 # op's `ANDREY_*_GPU_THRESHOLD` replaces its `cuda` entry. `auto` never reaches `mps`
-# (`_TORCH_AUTO`); its entries stay `None` because no Metal crossover has been measured, and
+# (`TORCH_AUTO`); its entries stay `None` because no Metal crossover has been measured, and
 # `qa/gpu_calibration_validate.py` reads them. Re-measure after a change to the timed path: the
 # torch or numpy kernels, `to_numpy`, or the probe.
 #
@@ -468,11 +468,11 @@ def resolve(
     thresholds: dict[str, int | None] = (
         threshold
         if isinstance(threshold, dict)
-        else {b: threshold for b in _TORCH_AUTO if b != "numpy"}
+        else {b: threshold for b in TORCH_AUTO if b != "numpy"}
     )
     dev = select(
         _TORCH_PINNABLE,
-        _TORCH_AUTO,
+        TORCH_AUTO,
         metric=metric,
         thresholds=thresholds,
         amortized=amortized,

@@ -55,7 +55,7 @@ from andrey.core.score import (
 from andrey.core.ties import EPS_IMPROVE, tie_mask, tie_ranks
 from andrey.search import operators as ops
 from andrey.search._parallel_ges import move_key
-from andrey.search.ges import _reachable, _recompute_objective, required_dag
+from andrey.search.ges import reachability, recompute_objective, required_dag
 
 logger = logging.getLogger(__name__)
 
@@ -707,7 +707,7 @@ _PHASES: dict[Callable[..., np.ndarray], str] = {
 }
 
 
-class _Search:
+class GIESSearch:
     """The GIES search state: the essential graph, the cached candidates, and the objective.
 
     ``constraints`` and ``cap``, the most parents a step may give a vertex, filter the candidates,
@@ -757,7 +757,7 @@ class _Search:
         if not heap:
             return
         heapq.heapify(heap)
-        reachable = _reachable(adj)
+        reachable = reachability(adj)
         while heap:
             _key, v, i = heapq.heappop(heap)
             moves = self.forward[v]
@@ -1013,7 +1013,7 @@ def search_class(
         start = replace_unprotected(required_dag(constraints), cut)
     ops.check_parent_cap(start, max_parents, in_class=True)
     with backend.one_blas_thread():
-        search = _Search(score, n, ranks, constraints, start, max_parents)
+        search = GIESSearch(score, n, ranks, constraints, start, max_parents)
         if math.isinf(search.objective.total):
             return search.adj, math.inf
         while True:
@@ -1026,5 +1026,5 @@ def search_class(
                 changed = True
             if not changed:
                 break
-        total = _recompute_objective(search.adj, score, n)
+        total = recompute_objective(search.adj, score, n)
     return search.adj, total

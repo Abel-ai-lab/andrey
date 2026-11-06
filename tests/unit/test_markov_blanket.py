@@ -19,7 +19,6 @@ from andrey.constraint.blanket import (
     blanket_graph,
     markov_blanket,
     mmpc_sets,
-    mmpc_skeleton,
     parents_children,
     reach,
 )
@@ -95,8 +94,8 @@ def test_iamb_finds_the_true_blanket_under_an_oracle(seed, interleaved):
 def test_mmpc_finds_the_true_parents_and_children_under_an_oracle(seed):
     oracle = _oracle(seed)
     ranks = list(range(oracle.d))
-    skeleton = mmpc_skeleton(oracle, oracle.d, 0.5, ranks)
-    np.testing.assert_array_equal(skeleton, oracle.skeleton())
+    sets = mmpc_sets(oracle, oracle.d, 0.5, ranks)
+    np.testing.assert_array_equal(sets & sets.T, oracle.skeleton())
     for v in range(oracle.d):
         # Without the symmetry check, a set may also hold descendants it cannot separate.
         assert set(parents_children(oracle, v, oracle.d, 0.5, ranks)) >= oracle.parents_children(v)
@@ -112,7 +111,8 @@ def test_mmpc_symmetry_check_drops_a_descendant_the_target_cannot_separate():
     oracle = DSeparation(GraphStructure.from_numpy(marks, kind="dag"))
     ranks = list(range(4))
     assert set(parents_children(oracle, t, 4, 0.5, ranks)) == {c, x}
-    np.testing.assert_array_equal(mmpc_skeleton(oracle, 4, 0.5, ranks), oracle.skeleton())
+    sets = mmpc_sets(oracle, 4, 0.5, ranks)
+    np.testing.assert_array_equal(sets & sets.T, oracle.skeleton())
 
 
 def test_independent_columns_have_empty_sets():
@@ -120,7 +120,8 @@ def test_independent_columns_have_empty_sets():
     test = FisherZ(x)
     ranks = tie_ranks(x).tolist()
     assert not blanket_graph(test, 6, 0.01, ranks).any()
-    assert not mmpc_skeleton(test, 6, 0.01, ranks).any()
+    sets = mmpc_sets(test, 6, 0.01, ranks)
+    assert not (sets & sets.T).any()
 
 
 def _colliders_on_every_set(test, skeleton, blankets, alpha):
@@ -167,7 +168,7 @@ def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, f
     the first size that separates decides and ranks it, with fewer sets tested; a test that
     deletes rows per test tests the same sets, so the rows it reports are the same."""
     monkeypatch.setattr(blanket, "_FIRST_CHUNK", first)
-    monkeypatch.setattr(blanket, "_CHUNK", chunk)
+    monkeypatch.setattr(blanket, "CHUNK", chunk)
     x, test = _search_data(kind)
     sets = mmpc_sets(test, 15, 0.05, tie_ranks(x).tolist())
     skeleton, blankets = sets & sets.T, reach(sets)

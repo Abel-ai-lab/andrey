@@ -99,10 +99,10 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
     events = []
     snapshots = {}
     for owner, name, event in [
-        (module, "_orient_colliders", "colliders"),
+        (module, "orient_colliders", "colliders"),
         (fci_module, "_remove_by_possible_dsep", "possible_dsep"),
         (module, "vote_triples", "majority"),
-        (module, "_fci_orient", "orient"),
+        (module, "fci_orient", "orient"),
     ]:
         original = getattr(owner, name)
 
@@ -176,7 +176,7 @@ def test_rules_skip_ambiguous_triple(rule, reverse_labels):
 
     def orient(m, ties):
         if rule == "r0":
-            fci_module._orient_colliders(m, sepsets, ties)
+            fci_module.orient_colliders(m, sepsets, ties)
         elif rule == "r1":
             fci_module._rule_r1r2_cycle(m, False, ties)
         elif rule == "r3":
@@ -285,7 +285,7 @@ def test_orientation_rules_without_ambiguity_guard(rule):
             marks[2, 0] = ARROW
             expected_endpoint = (0, 2)
             expected_mark = TAIL
-    fci_module._fci_orient(marks, lambda *args: 0.0, 0.05, {}, frozenset([(0, 1, 2)]))
+    fci_module.fci_orient(marks, lambda *args: 0.0, 0.05, {}, frozenset([(0, 1, 2)]))
     assert marks[expected_endpoint] == expected_mark
 
 
@@ -298,7 +298,7 @@ def test_missing_recorded_sets(separating):
         return float(separating == "every subset" or not subset)
 
     ambiguous = vote_triples(marks, oracle, 0.05, sepsets, "majority")
-    fci_module._orient_colliders(marks, sepsets, ambiguous)
+    fci_module.orient_colliders(marks, sepsets, ambiguous)
     if separating == "empty set":
         assert sepsets == {(0, 2): (), (2, 0): ()}
         assert not ambiguous

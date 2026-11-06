@@ -83,7 +83,7 @@ def _direction(
     return 1 if forward and not backward else -1 if backward and not forward else 0
 
 
-def _pairwise_output(
+def pairwise_output(
     pval_forward: Any,
     pval_backward: Any,
     *,
@@ -137,7 +137,7 @@ def _pairwise_output(
 # ---- RCD (latent-confounder adjacency) ----------------------------------------------------------
 
 
-def _adapt_rcd(model: Any) -> StructureOutput:
+def adapt_rcd(model: Any) -> StructureOutput:
     """RCD ``adjacency_matrix_`` -> directed edges + bidirected ``<->`` for ``NaN`` cells.
 
     Finite nonzero ``B[i, j]`` is edge ``j -> i``; a ``NaN`` cell marks a latent confounder and
@@ -159,7 +159,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
 # ---- BottomUpParceLiNGAM (order-unknown adjacency) ----------------------------------------------
 
 
-def _adapt_bottom_up_parce(
+def adapt_bottom_up_parce(
     model: Any, arrowheads: np.ndarray | None = None, *, required: np.ndarray | None = None
 ) -> StructureOutput:
     """BottomUpParceLiNGAM adjacency -> directed edges + circle ``o-o`` at ``NaN`` cells.

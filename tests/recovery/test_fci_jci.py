@@ -161,7 +161,7 @@ def test_oracle_marks_agree_with_the_true_ancestral_graph(seed, confounded, monk
 
 def test_the_rules_without_selection_bias_leave_an_uncovered_circle_cycle():
     """R5 makes an uncovered o-o cycle undirected; without selection bias it stays o-o."""
-    from andrey.constraint.fci import _fci_orient
+    from andrey.constraint.fci import fci_orient
 
     def cycle() -> np.ndarray:
         marks = np.zeros((4, 4), dtype=np.int8)
@@ -171,10 +171,10 @@ def test_the_rules_without_selection_bias_leave_an_uncovered_circle_cycle():
         return marks
 
     with_r5 = cycle()
-    _fci_orient(with_r5, lambda *_: 0.0, 0.05, {})
+    fci_orient(with_r5, lambda *_: 0.0, 0.05, {})
     assert set(with_r5[with_r5 != NULL].tolist()) == {TAIL}
     without = cycle()
-    _fci_orient(without, lambda *_: 0.0, 0.05, {}, selection_bias=False)
+    fci_orient(without, lambda *_: 0.0, 0.05, {}, selection_bias=False)
     assert np.array_equal(without, cycle())
 
 

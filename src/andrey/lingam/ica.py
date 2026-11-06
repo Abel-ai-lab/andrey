@@ -11,7 +11,6 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from sklearn.decomposition import FastICA
 
-from andrey.core.seeding import resolve_seed
 from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import convergence_as_search_limit
 from andrey.lingam.adjacency import estimate
@@ -79,7 +78,7 @@ def _estimate_causal_order(
 def ica_lingam(
     X: np.ndarray,
     *,
-    random_state: int | None = None,
+    seed: int = 0,
     max_iter: int = 1000,
     constraints: Constraints | None = None,
 ) -> tuple[list[int], np.ndarray]:
@@ -93,8 +92,7 @@ def ica_lingam(
     the columns are reordered. The weights are then re-estimated from that order with
     adaptive Lasso, as DirectLiNGAM does, so they depend only on the order and the data.
 
-    ``random_state`` resolves through :func:`andrey.core.seeding.resolve_seed` (default seed ``0``)
-    and is passed straight to FastICA.
+    ``seed`` is passed straight to FastICA.
 
     With background knowledge ``constraints``, the order search reads the weight of every edge
     they forbid as ``0`` (the reverse of each required edge, and every edge into an earlier tier,
@@ -103,7 +101,6 @@ def ica_lingam(
     forbidden parents and keeps required ones unpenalized, as DirectLiNGAM's does.
     """
     X = np.asarray(X, dtype=np.float64)
-    seed = resolve_seed(random_state)
     if X.shape[1] == 1:
         return [0], np.zeros((1, 1))  # one variable: nothing to order, no edge to weigh
 

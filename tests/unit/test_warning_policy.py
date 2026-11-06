@@ -40,7 +40,7 @@ def _backend_fallback(monkeypatch):
 
     def fit():
         with andrey.config(backend="cuda"):
-            backend.select(backend._TORCH_PINNABLE, backend._TORCH_AUTO)
+            backend.select(backend._TORCH_PINNABLE, backend.TORCH_AUTO)
 
     return fit
 

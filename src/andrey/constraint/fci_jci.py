@@ -21,13 +21,13 @@ import numpy as np
 
 from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
 from andrey.constraint.fci import (
-    _circle_pag,
-    _fci_orient,
-    _knowledge_marks,
-    _orient_colliders,
-    _validate_possible_dsep,
+    circle_pag,
     fci,
+    fci_orient,
+    knowledge_marks,
+    orient_colliders,
     possible_dsep_step,
+    validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
@@ -87,7 +87,7 @@ def fci_jci(
         raise ValueError("env contains NaN or inf")
     context = context.reshape(-1, 1)
     check_collider_rule(collider_rule)
-    _validate_possible_dsep(possible_dsep)
+    validate_possible_dsep(possible_dsep)
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test.
         pag = fci(
@@ -123,10 +123,10 @@ def fci_jci(
         workers=backend.worker_count(workers),
     )
 
-    marks = _circle_pag(skeleton)
-    _knowledge_marks(marks, padded)
+    marks = circle_pag(skeleton)
+    knowledge_marks(marks, padded)
     _mark_index(marks, d, confounded_index)
-    _orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets)
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
     # the index cannot lie on a cycle the check reads.
     marks = possible_dsep_step(
@@ -150,8 +150,8 @@ def fci_jci(
         )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
-    _orient_colliders(marks, sepsets, ambiguous)
-    _fci_orient(
+    orient_colliders(marks, sepsets, ambiguous)
+    fci_orient(
         marks,
         test,
         alpha,

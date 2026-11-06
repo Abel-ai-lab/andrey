@@ -1460,7 +1460,7 @@ def hc(
     """
     from andrey.search.hc import hc as _hc
 
-    assert score_func is not None  # method_spec picks it from the column types
+    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
     X, mask, labels, constraints = fit_inputs(
         data, "score_func", score_func, categorical, knowledge, method="hc"
     )
@@ -1478,7 +1478,7 @@ def hc(
             constraints=constraints,
             n_starts=n_starts,
             n_perturbations=changes,
-            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            seed=seed,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     if n_starts > 1:
@@ -1730,7 +1730,7 @@ def tabu(
     """
     from andrey.search.tabu import tabu as _tabu
 
-    assert score_func is not None  # method_spec picks it from the column types
+    assert score_func is not None and seed is not None  # method_spec picks the score and the seed
     X, mask = checked_data(data, categorical, "score_func", score_func, method="tabu")
     max_tabu = tabu_cap(max_tabu, tabu_length)
     labels = column_labels(data)
@@ -1751,7 +1751,7 @@ def tabu(
             constraints=constraints,
             n_starts=n_starts,
             n_perturbations=changes,
-            random_state=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
+            seed=seed,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
     if n_starts > 1:

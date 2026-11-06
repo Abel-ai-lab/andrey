@@ -366,7 +366,7 @@ def start_dag(
     return adj_int, parents_of
 
 
-def _apply_move(
+def apply_move(
     adj_int: list[int], parents_of: dict[int, list[int]], move: tuple[str, int, int]
 ) -> None:
     """Apply ``move`` in place to the bitset adjacency and the sorted parent-set mirror.
@@ -491,7 +491,7 @@ def perturb(
             rest[u] &= ~(1 << v)
             if _reaches(rest, u, v):
                 continue
-        _apply_move(adj_int, parents_of, (op, u, v))
+        apply_move(adj_int, parents_of, (op, u, v))
         made += 1
         if op == "add":
             edge[i, j] = True
@@ -526,7 +526,7 @@ def _climb(
         best = scanner.best(adj_int, parents_of)
         if best is None:
             break
-        _apply_move(adj_int, parents_of, best[4])
+        apply_move(adj_int, parents_of, best[4])
         moves += 1
     return moves
 
@@ -582,7 +582,7 @@ def greedy_search(
     max_parents: int | None,
     n_starts: int,
     n_perturbations: int,
-    random_state: int,
+    seed: int,
 ) -> tuple[GraphStructure, float]:
     """Run ``search`` from the start DAG and from changed copies of the best DAG so far.
 
@@ -623,7 +623,7 @@ def greedy_search(
                 adj_int,
                 parents_of,
                 n_perturbations,
-                start_rng(random_state, start),
+                start_rng(seed, start),
                 ranks=ranks,
                 forbidden=forbidden,
                 required=required,
@@ -673,7 +673,7 @@ def hc(
     max_parents: int | None = None,
     n_starts: int = 1,
     n_perturbations: int = 1,
-    random_state: int = 0,
+    seed: int = 0,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
@@ -729,7 +729,7 @@ def hc(
         Number of climbs, at least ``1``.
     n_perturbations : int
         Random changes to the best DAG so far before each start after the first, at least ``1``.
-    random_state : int
+    seed : int
         Seed of the changes; start ``k`` draws from :func:`~andrey.core.seeding.start_rng`.
 
     Returns
@@ -751,5 +751,5 @@ def hc(
         max_parents=max_parents,
         n_starts=n_starts,
         n_perturbations=n_perturbations,
-        random_state=random_state,
+        seed=seed,
     )
