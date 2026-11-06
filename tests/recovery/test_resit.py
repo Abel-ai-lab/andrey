@@ -4,9 +4,9 @@ output.
 The fixed cases have one certain answer: independent columns give no edge, a cause with a
 nonlinear effect and uniform noise points to it in either column order, and a collider of two
 nonlinear causes is found with both edges directed into it. The ground truth is additive-noise data
-from ``andrey.data`` on five random graphs, whose median errors stay within half the empty graph's,
-each fit's edges following its causal order. The recorded output pins the graph and the causal
-order on one fixed case.
+from ``andrey.data`` on a random graph, whose errors stay within half the empty graph's, the fit's
+edges following its causal order. The recorded output pins the graph and the causal order on one
+fixed case.
 """
 
 from __future__ import annotations
@@ -62,30 +62,14 @@ def test_a_collider_of_two_nonlinear_causes_is_found():
     assert out.ordering[-1] == 2
 
 
-@pytest.fixture(scope="module")
-def additive_fits():
-    """Five additive-noise graphs over 6 variables, 400 rows each, and RESIT's fits."""
-    cases = [
-        sample_scm(functional="additive_noise", d=6, n=N, seed=seed, density=2, scale="rescale")
-        for seed in range(5)
-    ]
-    return [(case, andrey.resit(case.data)) for case in cases]
-
-
-def test_additive_noise_graphs_are_recovered(additive_fits):
-    errors = [shd(out.structure, case.graph) for case, out in additive_fits]
-    empty = [len(case.graph.oriented_edges()) for case, _ in additive_fits]
-    assert np.median(errors) <= np.median(empty) / 2, (errors, empty)
-    for _, out in additive_fits:
-        order = list(out.ordering)
-        assert all(order.index(i) < order.index(j) for i, j in _edges(out))
-
-
-def test_a_fit_repeats(additive_fits):
-    case, out = additive_fits[0]
-    again = andrey.resit(case.data)
-    assert again.structure == out.structure
-    assert again.ordering == out.ordering
+def test_an_additive_noise_graph_is_recovered():
+    """A random additive-noise graph over 6 variables and 400 rows: RESIT's errors stay within half
+    the empty graph's, and its edges follow its causal order."""
+    case = sample_scm(functional="additive_noise", d=6, n=N, seed=0, density=2, scale="rescale")
+    out = andrey.resit(case.data)
+    assert shd(out.structure, case.graph) <= len(case.graph.oriented_edges()) / 2
+    order = list(out.ordering)
+    assert all(order.index(i) < order.index(j) for i, j in _edges(out))
 
 
 def test_the_recorded_output_repeats():

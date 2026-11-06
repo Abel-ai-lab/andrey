@@ -40,6 +40,41 @@ logger = logging.getLogger(__name__)
 _TORCH_PINNABLE = ("numpy", "cpu", "cuda", "mps")
 _TORCH_AUTO = ("cuda", "numpy")  # cpu-torch and mps are pin-only, never auto-selected
 
+# Each GPU op's smallest size, per device, at which `auto` runs it there; `None` means never. The
+# op's `ANDREY_*_GPU_THRESHOLD` replaces its `cuda` entry. `auto` never reaches `mps`
+# (`_TORCH_AUTO`); its entries stay `None` because no Metal crossover has been measured, and
+# `qa/gpu_calibration_validate.py` reads them. Re-measure after a change to the timed path: the
+# torch or numpy kernels, `to_numpy`, or the probe.
+#
+# `cov` (also `corrcoef`) gates on `n*d` and `entropy` on `n*B`: element counts, because compute
+# and host-to-device transfer scale with them. DirectLiNGAM uses tall `n` by `B <= ~2d` batches, so
+# a column count alone is unsuitable. Five `qa/gpu_calibration_validate.py` runs on A100-SXM4-80GB
+# GPUs produced these brackets:
+#
+#   entropy   7,433   7,433   6,250   7,433   7,433
+#   cov     148,651 125,000  88,388  37,163 250,000
+#
+# Each result is a lattice point within `stats._BRACKET_TOL`, not an exact crossover. Defaults are
+# at the low end of each band. A cutoff that is too low costs bounded overhead near the cutoff. A
+# cutoff that is too high forfeits the speedup. Entropy forms a narrow band. Cov spans nearly `7x`.
+# Its minimum is one noisy draw of five, so its default is above that minimum. The liveness rule,
+# not this value, keeps one-shot calls off a cold device.
+#
+# `kci` gates on the kernel matrix (rows squared) of a query with a conditioning set. The same tool
+# on an A100-SXM4-80GB against 8 CPU threads found 31,250 (177 rows); per query with two
+# conditioning variables, the GPU took 0.52x the CPU's speed at 100 rows, 1.4x at 200, and 9.5x at
+# 1,000. `cmiknn` gates on the distance matrix (rows squared); the tool on an A100-SXM4-80GB found
+# its probe floor, 1,024 (32 rows); per query with 500 shuffles, the GPU was 8x the CPU's speed at
+# 100 rows and 40x at 1,000. `pnl` gates on the kernel matrix (rows squared) of a table's tests. KCI
+# and PNL compute in float64, so `mps` (float32) is never used for them.
+GPU_THRESHOLDS: dict[str, dict[str, int | None]] = {
+    "cov": {"cuda": 90_000, "mps": None},
+    "entropy": {"cuda": 6_250, "mps": None},
+    "kci": {"cuda": 31_250, "mps": None},
+    "cmiknn": {"cuda": 1_024, "mps": None},
+    "pnl": {"cuda": 26_278, "mps": None},
+}
+
 # What to install when a pinned-but-unavailable backend falls back (surfaced in the warning).
 _UNAVAILABLE_HINT = {
     "cpu": " (torch-on-CPU; install the [torch] extra)",
@@ -142,7 +177,7 @@ class _Config:
 
     ``tie_break`` sets how a method chooses between candidates that tie, such as two moves with
     equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from the
-    data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the result.
+    data (:func:`andrey.core.ties.tie_ranks`), so reordering the columns relabels the result.
     ``"position"`` orders them by column position instead, which skips computing the ranks, and the
     result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
     ``collider_order``, and ``fci`` and ``gfci`` their ``possible_dsep``, from it when the call
@@ -396,6 +431,23 @@ def select(
             continue
         return _record_dispatch(op, b)
     return _record_dispatch(op, "numpy")
+
+
+def select_by_size(op: str, setting: env.Setting[int], metric: int, *, amortized: bool) -> str:
+    """Pick ``numpy``, or torch on ``cpu`` or ``cuda``, for the op ``op`` of size ``metric``.
+
+    ``auto`` takes ``cuda`` from the op's cutoff in :data:`GPU_THRESHOLDS`, or from ``setting``
+    when it is set. ``mps`` (float32) is never taken. ``amortized`` is as in :func:`select`.
+    """
+    manual = setting.read()
+    return select(
+        ("numpy", "cpu", "cuda"),
+        ("cuda", "numpy"),
+        metric=metric,
+        thresholds=GPU_THRESHOLDS[op] if manual is None else {"cuda": manual},
+        amortized=amortized,
+        op=op,
+    )
 
 
 def resolve(

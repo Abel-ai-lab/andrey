@@ -26,6 +26,7 @@ from andrey.api._adapt import (
     default_score,
     default_test,
     json_safe,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -1295,7 +1296,7 @@ def ut_igsp(
             seed=seed,  # ty: ignore[invalid-argument-type]  # an int: method_spec resolves it
             constraints=constraints,
         )
-    variables = (lambda j: labels[j]) if labels else int
+    variables = label_of(labels)
     metadata = {
         "targets": {
             named[c]: [variables(j) for j in sorted(found.get(c, ()))] for c in sorted(by_code)
@@ -1325,7 +1326,7 @@ def _fci_hybrid(
     The score and the test are picked from the declared column types and must read the data
     alike; ``settings`` reach the engine in :mod:`andrey.search.gfci`.
     """
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search import gfci as engines
 
     score_func, _ = default_score(data, score_func, categorical=categorical)
@@ -1904,7 +1905,7 @@ def _check_environments(
     its list of targets instead.
     """
     if from_targets:
-        variable = (lambda j: labels[j]) if labels else int
+        variable = label_of(labels)
         named = [sorted(variable(j) for j in by_code[c] or ()) for c in sorted(by_code)]
     observational = [code for code, t in by_code.items() if t == frozenset()]
     if not observational and from_targets:

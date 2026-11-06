@@ -883,12 +883,6 @@ def test_run_majority_colliders(method, csv_path, capsys):
     assert result["structure"] == graph_view(expected)
 
 
-def test_cli_rejects_unknown_collider_rule(csv_path, capsys):
-    code, _, err = _run(["run", "fci", "--data", str(csv_path), "collider_rule=invalid"], capsys)
-    assert code != 0
-    assert "collider" in err
-
-
 @pytest.mark.parametrize(
     "args",
     [
@@ -1009,6 +1003,18 @@ def test_the_json_introspection_lists_the_skeleton_cutoff(args, capsys, monkeypa
     skeleton = variables["ANDREY_SKELETON_PARALLEL_MIN_WORK"]
     assert skeleton["default"] == str(MIN_POOL_QUERIES)
     assert "andrey calibrate --method skeleton" in skeleton["effect"]
+
+
+def test_the_json_introspection_lists_the_gpu_cutoffs_auto_uses(capsys):
+    """Each GPU cutoff's listed default is the cutoff ``auto`` dispatches on."""
+    from andrey.core.backend import GPU_THRESHOLDS
+
+    code, out, err = _run(["config", "--help", "--json"], capsys)
+    assert code == 0 and not err
+    variables = {v["name"]: v for v in json.loads(out)["environment"]["variables"]}
+    for op, cutoffs in GPU_THRESHOLDS.items():
+        listed = variables[f"ANDREY_{op.upper()}_GPU_THRESHOLD"]["default"]
+        assert listed == f"cuda {cutoffs['cuda']}, mps never"
 
 
 def test_config_report_is_readable_when_piped(capsys, monkeypatch):

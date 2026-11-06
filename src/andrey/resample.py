@@ -38,11 +38,12 @@ from andrey.core.structure import (
     Kind,
     Structure,
     TemporalStructure,
+    endpoint_marks,
     is_ancestral_kind,
 )
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import AndreyWarning, warn_once
 from andrey.search._parallel import pick_context
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -211,7 +212,7 @@ class BootstrapOutput:
     ) -> BootstrapOutput:
         """``from_fits``, for fits made under the knowledge ``constraints`` (``None``: none).
 
-        ``ranks`` holds each node's :func:`~andrey.search.hc.tie_ranks` rank on the data the fits
+        ``ranks`` holds each node's :func:`~andrey.core.ties.tie_ranks` rank on the data the fits
         ran on, which orients a ``dag`` vote's tied edges; ``None`` when there is no data or the
         fits' kind is not ``dag``.
         """
@@ -579,11 +580,8 @@ def _vote_graph(
         keep = np.array([_often(int(c), n_resamples, threshold) for c in s.counts], dtype=bool)
         edge = np.zeros((n, n), dtype=bool)
         edge[src[keep], dst[keep]] = True
-        marks = np.zeros((n, n), dtype=np.int8)
-        marks[edge] = TAIL
-        marks[edge.T] = ARROW  # a 2-cycle and a self-loop end as arrowheads
         return GraphStructure.from_numpy(
-            marks, kind="digraph", labels=labels, allow_self_loops=True
+            endpoint_marks(edge), kind="digraph", labels=labels, allow_self_loops=True
         )
     marks = _vote(s, n_resamples, threshold, n)
     kind = s.kind
@@ -1056,7 +1054,7 @@ def bootstrap(
     v-structure compels. So the vote is then made a valid graph of the method's kind by the
     published steps. A ``dag`` becomes a consistent extension, a DAG with the vote's skeleton,
     v-structures, and directed edges [7]_: the vote itself when it has no directed cycle, with a
-    tie edge pointing as the columns' :func:`~andrey.search.hc.tie_ranks` on ``data`` decide
+    tie edge pointing as the columns' :func:`~andrey.core.ties.tie_ranks` on ``data`` decide
     (``tie_break``, :data:`andrey.config`: ranks computed from the data, or the
     column order under ``"position"``), so reordering the columns relabels the graph. A ``cpdag``
     becomes the CPDAG [8]_ of a consistent extension, so an edge that no v-structure compels is
@@ -1204,7 +1202,7 @@ def bootstrap(
 
 
 def _column_ranks(job: _Job) -> np.ndarray:
-    """Return the variables' :func:`~andrey.search.hc.tie_ranks` on all of the job's data.
+    """Return the variables' :func:`~andrey.core.ties.tie_ranks` on all of the job's data.
 
     The variables are the columns the fit reads: a column that a row-aligned argument names, such
     as ``env="env"``, is taken out, as the method takes it out. The data are a table or an array,

@@ -8,12 +8,21 @@ definitions. Each variable's parser is in :mod:`andrey.core.env`. The human-read
 
 from __future__ import annotations
 
-from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES as _SKELETON_MIN_WORK
-from andrey.constraint._parallel_skeleton import MIN_POOL_RCOT_WORK as _RCOT_MIN_WORK
+from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES, MIN_POOL_RCOT_WORK
+from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
-from andrey.search._parallel_ges import _DEFAULT_MIN_WORK as _GES_MIN_WORK
+from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
 from .models import EnvVarSpec
+
+
+def _gpu_default(op: str) -> str:
+    """``op``'s default GPU cutoffs as the list shows them, such as ``cuda 90000, mps never``."""
+    return ", ".join(
+        f"{device} {'never' if cutoff is None else cutoff}"
+        for device, cutoff in GPU_THRESHOLDS[op].items()
+    )
+
 
 ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
@@ -52,7 +61,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_GES_PARALLEL_MIN_WORK",
         values="integer (estimated candidate evaluations)",
-        default=str(_GES_MIN_WORK),
+        default=str(MIN_POOL_GES_WORK),
         effect=(
             "Per-pass crossover gate for parallel GES: a greedy pass fans out to the worker pool "
             "only when its estimated candidate-evaluation count (density-aware, ~2^degree) exceeds "
@@ -66,7 +75,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_SKELETON_PARALLEL_MIN_WORK",
         values="integer (CI tests per conditioning-size pass)",
-        default=str(_SKELETON_MIN_WORK),
+        default=str(MIN_POOL_QUERIES),
         effect=(
             "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, BOSS-FCI, "
             'GRaSP-FCI, CD-NOD, and RSMAX2 (`restrict="pc"`) with `fisherz`, `student_t`, or '
@@ -82,7 +91,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_RCOT_PARALLEL_MIN_WORK",
         values="integer (RCoT tests times rows per conditioning-size pass)",
-        default=str(_RCOT_MIN_WORK),
+        default=str(MIN_POOL_RCOT_WORK),
         effect=(
             "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, BOSS-FCI, "
             'GRaSP-FCI, CD-NOD, and RSMAX2 (`restrict="pc"`) with `rcot`: a conditioning-size '
@@ -98,7 +107,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_COV_GPU_THRESHOLD",
         values="integer (elements: rows times columns)",
-        default="cuda 90000, mps never",
+        default=_gpu_default("cov"),
         effect=(
             "Smallest data size (rows times columns) at which `auto` computes covariance and "
             "correlation matrices, used by the CI tests and BIC scores, on a CUDA GPU. A set value "
@@ -109,7 +118,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_ENTROPY_GPU_THRESHOLD",
         values="integer (elements: rows times the columns scored at once)",
-        default="cuda 6250, mps never",
+        default=_gpu_default("entropy"),
         effect=(
             "Smallest input size at which `auto` computes the entropy terms of DirectLiNGAM-based "
             "methods on a CUDA GPU. A set value replaces the `cuda` default; it never enables "
@@ -120,7 +129,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_KCI_GPU_THRESHOLD",
         values="integer (elements: rows squared)",
-        default="cuda 31250, mps never",
+        default=_gpu_default("kci"),
         effect=(
             "Smallest kernel matrix (rows squared) at which `auto` runs a KCI query with a "
             "conditioning set on a CUDA GPU, in float64. A set value replaces the `cuda` default; "
@@ -131,7 +140,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_CMIKNN_GPU_THRESHOLD",
         values="integer (elements: rows squared)",
-        default="cuda 1024, mps never",
+        default=_gpu_default("cmiknn"),
         effect=(
             "Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA "
             "GPU. A set value replaces the `cuda` default; CMIknn never runs on `mps`."
@@ -141,7 +150,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_PNL_GPU_THRESHOLD",
         values="integer (elements: rows squared)",
-        default="cuda 26278, mps never",
+        default=_gpu_default("pnl"),
         effect=(
             "Smallest kernel matrix (rows squared) at which `auto` runs the HSIC tests of PNL's "
             "pairs on a CUDA GPU, in float64. A set value replaces the `cuda` default; PNL never "

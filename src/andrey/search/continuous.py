@@ -21,10 +21,11 @@ import numpy as np
 import scipy.linalg
 import scipy.optimize
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.orient import to_structure
+from andrey.core.structure import endpoint_marks, has_cycle
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import warn_search_limit
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -123,7 +124,7 @@ class Canonical:
     """The data in the order the solvers see it.
 
     ``cov`` is the covariance of the columns taken in order of their
-    :func:`~andrey.search.hc.tie_ranks`: fit column ``k`` is the data's column ``order[k]``. A
+    :func:`~andrey.core.ties.tie_ranks`: fit column ``k`` is the data's column ``order[k]``. A
     matrix ``fit`` in that order maps back to the data's order with ``fit[np.ix_(back, back)]``.
     ``forbidden[i, j]`` fixes ``W[i, j]`` at zero and ``required[i, j]`` keeps edge ``i -> j``
     without a penalty or a threshold; both are in the fit's column order.
@@ -455,24 +456,8 @@ def likelihood_path(
 
 
 # --------------------------------------------------------------------------------------------
-# Threshold, acyclicity repair, and endpoint marks
+# Threshold and acyclicity repair
 # --------------------------------------------------------------------------------------------
-
-
-def has_cycle(support: np.ndarray) -> bool:
-    """True if the directed graph ``support`` (``[i, j]`` is ``i -> j``) has a directed cycle."""
-    d = support.shape[0]
-    indeg = support.sum(axis=0).astype(int)
-    stack = [k for k in range(d) if indeg[k] == 0]
-    visited = 0
-    while stack:
-        node = stack.pop()
-        visited += 1
-        for nxt in np.nonzero(support[node])[0]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                stack.append(int(nxt))
-    return visited < d
 
 
 def break_cycles(
@@ -497,15 +482,6 @@ def break_cycles(
             break
         mask[i, j] = 0
     return mask
-
-
-def endpoint_marks(support: np.ndarray) -> np.ndarray:
-    """Endpoint-mark adjacency for a DAG mask (``support[i, j]`` set means ``i -> j``)."""
-    marks = np.zeros(support.shape, dtype=np.int8)
-    src, dst = np.nonzero(support)
-    marks[dst, src] = ARROW
-    marks[src, dst] = TAIL
-    return marks
 
 
 def residual_variances(weighted: np.ndarray, cov: np.ndarray) -> np.ndarray:

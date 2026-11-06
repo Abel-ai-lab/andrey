@@ -24,6 +24,7 @@ from andrey.api._adapt import (
     data_kind,
     default_score,
     default_test,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
@@ -378,7 +379,7 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
-    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
+    from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -716,7 +717,7 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -1036,7 +1037,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
     score_func, _ = default_score(data, score_func, categorical=categorical)
@@ -1378,8 +1379,8 @@ def cdnod(
     [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
-    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
     from andrey.core.environments import normalize_env_targets
+    from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     if env is None:
         raise TypeError(
@@ -1657,7 +1658,7 @@ def icp(
     from andrey.api._adapt import dag_from_adjacency, data_matrix
     from andrey.constraint.icp import icp as _icp
     from andrey.core.environments import normalize_env_targets
-    from andrey.core.knowledge import _node, column_position
+    from andrey.core.knowledge import as_node, column_position
     from andrey.core.score import check_columns
 
     data, codes, env_labels, by_code = normalize_env_targets(
@@ -1671,7 +1672,7 @@ def icp(
             "icp: pass target, the variable whose parents to find, as a column label or a 0-based "
             "position"
         )
-    t = column_position(_node(target, "target"), labels, d, "icp: target")
+    t = column_position(as_node(target, "target"), labels, d, "icp: target")
     name = column_namer(labels)
     left_out = [k for k, hit in by_code.items() if hit is not None and t in hit]
     keep = ~np.isin(codes, left_out)
@@ -1715,7 +1716,7 @@ def icp(
         max_parents=max_parents,
         environments=environments,
     )
-    node = (lambda j: labels[j]) if labels is not None else int
+    node = label_of(labels)
     adjacency = np.zeros((d, d), dtype=np.int8)
     adjacency[list(result.parents), t] = 1
     p_values = [None if j == t else float(v) for j, v in enumerate(result.p_values)]

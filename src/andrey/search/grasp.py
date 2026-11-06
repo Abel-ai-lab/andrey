@@ -14,18 +14,15 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore, LocalScore
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.core.score import LocalScore
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, make_delta
 from andrey.core.seeding import start_rng
-from andrey.search.boss import (
-    PERMUTATION_SCORES,
-    parent_knowledge,
-    precedence_sort,
-    ranked_score,
-)
+from andrey.core.structure import endpoint_marks
+from andrey.search.boss import parent_knowledge, precedence_sort, ranked_score
+from andrey.search.operators import check_parent_cap
 
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
 # changes in (-tolerance, tolerance] are explored as ties. Grow recomputes full BIC scores
@@ -512,7 +509,7 @@ def _search_state(
     score, ranks = ranked_score(
         X, score_func, penalty_discount, categorical, ebic_gamma, equivalent_sample_size
     )
-    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    delta = make_delta(score)
     n_features = X.shape[1]
     if constraints is None:
         gsts = [
@@ -608,7 +605,7 @@ def grasp(
         returned DAG is the best-scoring one; a later start replaces an earlier one only when it
         scores better by more than ``_SCORE_EPS``.
     score_func : str
-        Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
+        Local score, one of :data:`~andrey.core.score.SCORES`.
     max_parents : int or None
         Caps each node's parent set, required parents included: the grow step adds no parent to a
         set that holds ``max_parents`` members. ``None`` sets no cap. With a cap, ``constraints``
@@ -634,18 +631,9 @@ def grasp(
     if n_features == 0:
         return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
-    if score_func not in PERMUTATION_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
-        )
-    if (
-        max_parents is not None
-        and constraints is not None
-        and (constraints.required.sum(axis=0) > max_parents).any()
-    ):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents"
-        )
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
     best: tuple[_Order, float] | None = None
     for start in range(n_starts):
         # Each start builds its own score, caches, and trees, so a search of many starts holds
@@ -670,13 +658,11 @@ def grasp(
     assert best is not None  # n_starts >= 1
     order, total_bic = best
 
-    adj = np.zeros((n_features, n_features), dtype=np.int8)
+    dag = np.zeros((n_features, n_features), dtype=bool)
     for y in range(n_features):
-        for x in order.get_parents(y):
-            adj[x, y] = TAIL
-            adj[y, x] = ARROW
+        dag[order.get_parents(y), y] = True
 
-    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
+    cpdag = dag2cpdag(endpoint_marks(dag)[np.ix_(ranks, ranks)])
     if constraints is not None:
         cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), float(total_bic)

@@ -20,6 +20,7 @@ start occurs before timing, so the value suits many fits in one process (:data:`
 
 from __future__ import annotations
 
+import importlib
 import math
 import os
 import time
@@ -35,21 +36,54 @@ if TYPE_CHECKING:
 
 COMMAND = "andrey calibrate"
 
+#: The serial and pooled timing functions of a pass by size ``d``, and the pass's work at ``d``.
+Timers = tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]
+
 
 @dataclass(frozen=True)
 class Method:
     """A worker-pool cutoff: its environment variable, how the default-cutoff warning names the
-    search, and whether the gate sends a pass of exactly the cutoff's work to the pool."""
+    search, whether the gate sends a pass of exactly the cutoff's work to the pool, its built-in
+    cutoff, and the timers of the passes :func:`calibrate` measures with a number of workers.
+
+    ``default`` and ``timers`` are functions, so they import the pool modules when called: those
+    modules import this one.
+    """
 
     variable: str
     search: str
     at_cutoff: bool
+    default: Callable[[], int]
+    timers: Callable[[int], list[Timers]]
+
+
+def _constant(module: str, name: str) -> Callable[[], int]:
+    """A function that imports ``module`` and returns its ``name``."""
+    return lambda: getattr(importlib.import_module(module), name)
 
 
 METHODS = {
-    "ges": Method("ANDREY_GES_PARALLEL_MIN_WORK", "GES", at_cutoff=False),
-    "skeleton": Method("ANDREY_SKELETON_PARALLEL_MIN_WORK", "The skeleton search", at_cutoff=True),
-    "rcot": Method("ANDREY_RCOT_PARALLEL_MIN_WORK", "The RCoT skeleton search", at_cutoff=True),
+    "ges": Method(
+        "ANDREY_GES_PARALLEL_MIN_WORK",
+        "GES",
+        at_cutoff=False,
+        default=_constant("andrey.search._parallel_ges", "MIN_POOL_GES_WORK"),
+        timers=lambda workers: [fit_timers("ges", workers)],
+    ),
+    "skeleton": Method(
+        "ANDREY_SKELETON_PARALLEL_MIN_WORK",
+        "The skeleton search",
+        at_cutoff=True,
+        default=_constant("andrey.constraint._parallel_skeleton", "MIN_POOL_QUERIES"),
+        timers=lambda workers: [skeleton_timers(workers, size) for size in SKELETON_SIZES],
+    ),
+    "rcot": Method(
+        "ANDREY_RCOT_PARALLEL_MIN_WORK",
+        "The RCoT skeleton search",
+        at_cutoff=True,
+        default=_constant("andrey.constraint._parallel_skeleton", "MIN_POOL_RCOT_WORK"),
+        timers=lambda workers: [rcot_timers(workers)],
+    ),
 }
 NOTE = (
     "This value suits many fits in one process. Starting the first pool in a process costs more, "
@@ -94,25 +128,11 @@ class Crossover:
     def cutoff(self) -> int:
         if self.above is None:  # never faster: keep the pool off up to the largest size measured
             slowest = self.work(self.below if self.below is not None else _MAX_D)
-            return max(slowest + METHODS[self.method].at_cutoff, default_cutoff(self.method))
+            method = METHODS[self.method]
+            return max(slowest + method.at_cutoff, method.default())
         if self.below is None:  # faster everywhere measured: use the pool from the smallest size
             return self.work(self.above)
         return _round2(math.sqrt(self.work(self.below) * self.work(self.above)))
-
-
-def default_cutoff(method: str) -> int:
-    """The built-in cutoff of ``method``."""
-    if method == "skeleton":
-        from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES
-
-        return MIN_POOL_QUERIES
-    if method == "rcot":
-        from andrey.constraint._parallel_skeleton import MIN_POOL_RCOT_WORK
-
-        return MIN_POOL_RCOT_WORK
-    from andrey.search._parallel_ges import _DEFAULT_MIN_WORK
-
-    return _DEFAULT_MIN_WORK
 
 
 def cutoff_is_default(method: str) -> bool:
@@ -247,9 +267,7 @@ def _cutoff(var: str, value: str | None) -> Generator[None]:
             os.environ[var] = old
 
 
-def fit_timers(
-    method: str, workers: int
-) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
+def fit_timers(method: str, workers: int) -> Timers:
     """Serial and pooled timing functions for a whole ``method`` fit on :func:`sample` data.
 
     Each time is the median of three fits after one warm-up fit, or a single fit once the warm-up
@@ -297,28 +315,37 @@ class SkeletonPass:
     tests: int
 
 
+def _ring_snapshot(
+    d: int, k: int, size: int
+) -> tuple[np.ndarray, list[np.ndarray], list[tuple[int, int]], int]:
+    """The start-of-size snapshot of a skeleton over ``d`` variables, each adjacent to its ``k``
+    nearest neighbors on a ring (all the others when fewer): its adjacency, neighbor lists, and
+    adjacent pairs, and the CI tests of a pass at conditioning ``size``."""
+    from andrey.constraint._skeleton import adjacent_pairs, pair_queries
+
+    ring = np.abs(np.arange(d)[:, None] - np.arange(d)[None, :])
+    gap = np.minimum(ring, d - ring)
+    adjacency = (gap > 0) & (gap <= max(1, k // 2))
+    neighbors = [np.flatnonzero(adjacency[i]) for i in range(d)]
+    pairs = adjacent_pairs(adjacency)
+    tests = sum(pair_queries(neighbors, x, y, size) for x, y in pairs)
+    return adjacency, neighbors, pairs, tests
+
+
 def skeleton_pass(d: int, size: int) -> SkeletonPass:
     """A pass at conditioning ``size`` over ``d`` variables of :func:`sample` data.
 
     Each variable is adjacent to its ``SKELETON_SIZES[size]`` nearest neighbors on a ring (all the
     others when fewer), the start-of-size snapshot of a dense skeleton.
     """
-    from andrey.constraint._skeleton import adjacent_pairs, pair_queries
     from andrey.core.ci import make_indep_test
 
-    ring = np.abs(np.arange(d)[:, None] - np.arange(d)[None, :])
-    gap = np.minimum(ring, d - ring)
-    adjacency = (gap > 0) & (gap <= max(1, SKELETON_SIZES[size] // 2))
-    neighbors = [np.flatnonzero(adjacency[i]) for i in range(d)]
-    pairs = adjacent_pairs(adjacency)
-    tests = sum(pair_queries(neighbors, x, y, size) for x, y in pairs)
+    adjacency, neighbors, pairs, tests = _ring_snapshot(d, SKELETON_SIZES[size], size)
     test = make_indep_test("fisherz", sample(d))
     return SkeletonPass(test, adjacency, neighbors, pairs, size, tests)
 
 
-def skeleton_timers(
-    workers: int, size: int
-) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
+def skeleton_timers(workers: int, size: int) -> Timers:
     """Serial and pooled timing functions for one skeleton pass at conditioning ``size``.
 
     The pass is :func:`skeleton_pass` over ``d`` variables. The serial arm scans every pair in this
@@ -375,22 +402,14 @@ def rcot_pass(d: int) -> SkeletonPass:
     :data:`RCOT_ROWS` rows, each variable adjacent to its :data:`RCOT_NEIGHBORS` nearest neighbors
     on a ring, with an RCoT test. Its ``tests`` holds the pass's RCoT tests times the rows, the work
     the cutoff gate counts."""
-    from andrey.constraint._skeleton import adjacent_pairs, pair_queries
     from andrey.core.ci_kernel import RCoT
 
-    ring = np.abs(np.arange(d)[:, None] - np.arange(d)[None, :])
-    gap = np.minimum(ring, d - ring)
-    adjacency = (gap > 0) & (gap <= RCOT_NEIGHBORS // 2)
-    neighbors = [np.flatnonzero(adjacency[i]) for i in range(d)]
-    pairs = adjacent_pairs(adjacency)
-    tests = sum(pair_queries(neighbors, x, y, 2) for x, y in pairs)
+    adjacency, neighbors, pairs, tests = _ring_snapshot(d, RCOT_NEIGHBORS, 2)
     test = RCoT(sample(d, rows=RCOT_ROWS))
     return SkeletonPass(test, adjacency, neighbors, pairs, 2, tests * RCOT_ROWS)
 
 
-def rcot_timers(
-    workers: int, repeats: int = 3
-) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
+def rcot_timers(workers: int, repeats: int = 3) -> Timers:
     """Serial and pooled timing functions for one RCoT skeleton pass (:func:`rcot_pass`).
 
     Each timed scan takes a copy of the pass's test with empty caches, so no scan reuses another's
@@ -450,12 +469,7 @@ def calibrate(workers: int, methods: Sequence[str] = tuple(METHODS)) -> dict[str
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", andrey.AndreyWarning)
         for m in methods:
-            if m == "skeleton":
-                timers = [skeleton_timers(workers, size) for size in SKELETON_SIZES]
-            elif m == "rcot":
-                timers = [rcot_timers(workers)]
-            else:
-                timers = [fit_timers(m, workers)]
+            timers = METHODS[m].timers(workers)
             # A pooled run with next to no work times starting and closing the pool; its warm-up
             # call starts the process's first pool (the forkserver) before anything else is timed.
             start = timers[0][1](GRID[0])

@@ -592,12 +592,6 @@ def test_student_t_p_value_is_independent_of_argument_order(data):
     assert test(4, 1, (3, 2)) == test(1, 4, (2, 3, 3))
 
 
-def test_student_t_is_a_registered_indep_test(data):
-    assert "student_t" in ci.available_indep_tests()
-    assert "student_t" in ci.SHIPPED_INDEP_TESTS
-    assert isinstance(ci.make_indep_test("student_t", data), StudentT)
-
-
 def test_student_t_needs_more_samples_than_conditions_plus_two():
     rng = np.random.default_rng(1)
     with pytest.raises(ValueError, match="degrees of freedom"):

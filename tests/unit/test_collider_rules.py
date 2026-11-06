@@ -197,13 +197,13 @@ def test_cdnod_index_is_never_an_ambiguous_middle_node(rule):
     assert all(b != 6 for _, b, _ in out.metadata["ambiguous_triples"])
 
 
-@pytest.mark.parametrize("rule", VOTING)
+@pytest.mark.parametrize("rule", RULES)
 def test_cdnod_with_one_domain_is_pc(rule):
     x = data.sample_scm(d=8, n=150, density=3.0, seed=11).data
     out = andrey.cdnod(x, np.zeros(150), collider_rule=rule)
     reference = andrey.pc(x, collider_rule=rule)
     np.testing.assert_array_equal(out.structure.to_numpy(), reference.structure.to_numpy())
-    assert out.metadata["ambiguous_triples"] == reference.metadata["ambiguous_triples"]
+    assert out.metadata.get("ambiguous_triples") == reference.metadata.get("ambiguous_triples")
 
 
 @pytest.mark.parametrize("method", ["pc", "cdnod"])

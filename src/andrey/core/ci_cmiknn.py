@@ -15,21 +15,16 @@ from numbers import Integral
 import numpy as np
 from scipy.special import digamma
 
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
-from . import backend, env
-from .ci import _canonical_ranked, _checked_data, per_query
+from . import backend, env, stats
+from .ci import _canonical_ranked, per_query
 from .seeding import resolve_seed
 
 __all__ = ["CMIknn"]
 
 # The cache of CMIknn's shuffles holds about this many bytes.
 _CACHE_BYTES = 2**28
-
-# Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA GPU.
-# `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB found its probe floor, 1,024 (32 rows); per
-# query with 500 shuffles, the GPU was 8x the CPU's speed at 100 rows and 40x at 1,000.
-_CMIKNN_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 1_024, "mps": None}
 
 # Device memory one batch of shuffled estimates uses, about 20 bytes per distance-matrix entry.
 _DEVICE_BATCH_BYTES = 2**30
@@ -167,19 +162,6 @@ def _local_permutation(nearest: np.ndarray, rng: np.random.Generator) -> np.ndar
     return perm
 
 
-def _cmiknn_backend(n: int) -> str:
-    """Where a CMIknn query on ``n`` rows runs: ``numpy``, or torch on ``cpu`` or ``cuda``."""
-    manual = env.CMIKNN_GPU_THRESHOLD.read()
-    return backend.select(
-        ("numpy", "cpu", "cuda"),
-        ("cuda", "numpy"),
-        metric=n * n,
-        thresholds=_CMIKNN_GPU_THRESHOLDS if manual is None else {"cuda": manual},
-        amortized=True,
-        op="cmiknn",
-    )
-
-
 class CMIknn:
     """Conditional mutual information test with a nearest-neighbor estimator (CMIknn).
 
@@ -239,7 +221,7 @@ class CMIknn:
     and 0.26 below given one more variable. The p-value compares ``I`` with shuffled copies, which
     share the bias.
 
-    Of ``x`` and ``y``, the one with the lower :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    Of ``x`` and ``y``, the one with the lower :func:`~andrey.core.ties.tie_ranks` rank, a rank
     computed from the data, is shuffled. The tie-breaking is drawn once, from
     ``seed``, when the test is built, and each column takes its keys by that rank. The shuffles
     come from a generator seeded by ``seed`` and the ranks of the conditioning set, so every query
@@ -296,7 +278,7 @@ class CMIknn:
             raise ValueError(
                 f"k_perm and n_permutations must be at least 1, got {k_perm} and {n_permutations}"
             )
-        arr = _checked_data(data, "CMIknn", min_rows=2)
+        arr = stats.checked_matrix(data, "run a CMIknn test", min_rows=2)
         # The test holds data column j at index _tie_rank[j], which picks its tie-breaking keys
         # and seeds the shuffles of the conditioning sets that hold it.
         self._tie_rank = tie_ranks(arr).tolist()
@@ -340,7 +322,9 @@ class CMIknn:
         """
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         cond = tuple(cond)
-        dev = _cmiknn_backend(self._n)
+        dev = backend.select_by_size(
+            "cmiknn", env.CMIKNN_GPU_THRESHOLD, self._n * self._n, amortized=True
+        )
         if dev == "numpy":
             hits = self._hits(x_int, y_int, cond)
         else:

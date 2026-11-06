@@ -7,10 +7,6 @@ worker across passes, so its score caches survive. :func:`even_chunks` and
 key, :func:`collect` raises worker failures, :func:`pick_context` chooses the start method, and
 :func:`min_work` reads the crossover gate. Each learner supplies a picklable module-level worker
 initializer and task function.
-
-GES and HC share :data:`_EPS_IMPROVE`, :data:`_KEY_DP`, and :func:`stable_key`, so the chosen
-move does not depend on rounding in the Schur delta-BIC. The final objective is recomputed from
-the CPDAG.
 """
 
 from __future__ import annotations
@@ -303,34 +299,3 @@ class StableWorkerSet:
             # cancel_futures so a mid-pass failure does not wait out already-queued chunk tasks.
             pool.shutdown(wait=True, cancel_futures=True)
         self._pools = []
-
-
-# ---- determinism knobs shared by the GES and HC delta searches ----------------------------------
-# The Schur delta-BIC differs in its last bits across evaluation paths (einsum batch shape,
-# residual-cache history), so both learners select moves by the two knobs below.
-
-# Strict-improvement floor: a move counts as improving only when its raw delta is more than this
-# below zero. It sits far above float64 Schur-delta noise and below the smallest real score
-# improvement, so the accepted-move set is deterministic. Shared by hc.py and the GES chunk scans.
-_EPS_IMPROVE = 1e-9
-
-# Decimals kept when quantizing ``delta / n`` for the reduce tie-break key, where ``n`` is the
-# caller's scale factor. The BIC delta grows with the score's sample count (``delta = n_samples *
-# (log R_new - log R_old) +/- ...``), so its cross-path ULP noise does too; HC passes that sample
-# count, so ``delta / n`` tracks the O(1) signal and a fixed ``_KEY_DP`` grid neither collapses
-# distinct moves nor breaks ties badly across scales. GES passes the variable count instead: its
-# per-target batch grouping already makes each delta bit-identical serial-vs-parallel, so the key is
-# only a deterministic-remainder tie-break and never leans on the grid to absorb cross-path noise.
-_KEY_DP = 9
-
-
-def stable_key(delta: float, n: int) -> float:
-    """Scale-invariant, chunk-invariant reduce key component: ``round(delta / n, _KEY_DP)``.
-
-    ``n`` is the caller's scale factor (see :data:`_KEY_DP`): HC's sample count, GES's variable
-    count. Two cross-path ULP-equal deltas quantize to one bucket, so the reduce breaks the
-    resulting tie on the deterministic remainder of the caller's key rather than on unstable
-    low-order bits. Serial and parallel therefore select byte-identical moves however the
-    targets are chunked or the adds are batched into the einsum.
-    """
-    return round(delta / n, _KEY_DP)

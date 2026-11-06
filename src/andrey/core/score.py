@@ -409,13 +409,7 @@ class BICScore:
         ebic_gamma: float = 0.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        data = np.asarray(data, dtype=np.float64)
-        if data.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={data.ndim}"
-            )
-        if not np.isfinite(data).all():
-            raise ValueError("data contains NaN or Inf; cannot compute BIC scores")
+        data = stats.checked_matrix(data, "compute BIC scores")
         # np.cov of a single column is a 0-d variance; keep the (1, 1) matrix the score reads.
         cov = np.atleast_2d(stats.cov(data, rowvar=False))
         check_columns(cov, data.shape[0])
@@ -622,13 +616,7 @@ class BDeuScore(_CountScore):
         structure_prior: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        arr = np.asarray(data)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot compute BDeu scores")
+        arr = stats.checked_matrix(data, "compute BDeu scores", dtype=None)
         for name, value in (
             ("equivalent_sample_size", equivalent_sample_size),
             ("structure_prior", structure_prior),
@@ -719,13 +707,7 @@ class CategoricalBICScore(_CountScore):
         penalty_discount: float = 1.0,
         cache_size: int | None = 1_000_000,
     ) -> None:
-        arr = np.asarray(data)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot compute categorical BIC scores")
+        arr = stats.checked_matrix(data, "compute categorical BIC scores", dtype=None)
         self.n: int = arr.shape[0]
         self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
@@ -969,9 +951,8 @@ def make_score(
     ``"cond_gauss"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask.
     ``ebic_gamma`` weighs the extended-BIC term of the linear-Gaussian BIC; the other scores leave
     it out but still check its range, as BDeu does ``penalty_discount``'s.
-    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. A search
-    checks ``score_func`` against the names it takes before calling this. Raises
-    :class:`NotImplementedError` for any other name.
+    ``equivalent_sample_size`` is the prior weight of BDeu, which no other score reads. Raises
+    :class:`NotImplementedError` for a name outside :data:`SCORES`.
     """
     if score_func in LINEAR_SCORES:
         return BICScore(

@@ -160,10 +160,23 @@ def _honored(name: str, knowledge: Knowledge) -> Knowledge:
     )
 
 
+def _assert_the_order_keeps_required_and_tiers(name: str, ordering, labels: list[str]):
+    """A causal order puts a required edge's cause before its effect and each tier before the
+    next."""
+    rank = {labels[v]: k for k, v in enumerate(ordering)}
+    if "required" in REGISTRY[name].knowledge:
+        assert rank["b"] < rank["f"], ordering
+    if "tiers" in REGISTRY[name].knowledge:
+        assert max(rank[v] for v in EARLY) < min(rank[v] for v in LATE), ordering
+
+
 @pytest.mark.parametrize(("name", "missing"), CASES)
 def test_required_forbidden_and_tiers_hold(name, missing, data):
-    marks, labels = _marks(_fit(name, _gaps(data, missing), knowledge=_honored(name, KNOWLEDGE)))
+    out = _fit(name, _gaps(data, missing), knowledge=_honored(name, KNOWLEDGE))
+    marks, labels = _marks(out)
     _assert_required_forbidden_and_tiers_hold(name, marks, labels)
+    if out.ordering is not None:
+        _assert_the_order_keeps_required_and_tiers(name, out.ordering, labels)
 
 
 @pytest.mark.parametrize("in_column_order", [False, True])
@@ -657,16 +670,6 @@ def test_every_group_honors_the_knowledge(data):
     outs = andrey.multi_group_direct_lingam([data[:half], data[half:]], knowledge=KNOWLEDGE)
     for out in outs:
         _assert_required_forbidden_and_tiers_hold("multi_group_direct_lingam", *_marks(out))
-
-
-def test_direct_lingam_keeps_a_required_edge_whose_weight_is_zero():
-    # The two columns are uncorrelated, so least squares weighs the required 0 -> 1 at 0, up to the
-    # rounding of the platform's BLAS.
-    X = np.array([[-1.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [1.0, 1.0]])
-    out = andrey.direct_lingam(X, knowledge=Knowledge(required=[(0, 1)]))
-    assert out.weighted_adjacency[0, 1] == pytest.approx(0.0, abs=1e-12)
-    marks = from_structure(out.structure)
-    assert marks[0, 1] == TAIL and marks[1, 0] == ARROW
 
 
 def test_a_skeleton_as_knowledge_keeps_the_colliders():

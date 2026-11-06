@@ -36,9 +36,8 @@ from andrey.core import GraphStructure, backend, score_delta
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import to_structure
 from andrey.core.score import ZERO_RESIDUAL, BICScore, _solve, check_columns, ebic_penalty
-from andrey.search._parallel import _EPS_IMPROVE, stable_key
+from andrey.core.ties import EPS_IMPROVE, stable_key, tie_ranks
 from andrey.search.gies import search_class
-from andrey.search.hc import tie_ranks
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +302,7 @@ def gnies(
     whose set scores lowest while that lowers the total by more than ``1e-9``; the backward phase
     then removes a variable not in ``known`` the same way. Candidates are compared by their total
     divided by the variable count and rounded to nine decimal places, then by
-    :func:`~andrey.search.hc.tie_ranks` of the per-environment centered data. A set whose required
+    :func:`~andrey.core.ties.tie_ranks` of the per-environment centered data. A set whose required
     edges give a family the score makes unavailable totals ``inf`` and is never chosen. The fit
     runs on one BLAS thread, so the host's thread count does not change its bits.
 
@@ -374,7 +373,7 @@ def gnies(
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("outer step tie at key %r", ranked[0][0])
                 step = current ^ {ranked[0][2]}
-                if not runs[step][1] < total - _EPS_IMPROVE:
+                if not runs[step][1] < total - EPS_IMPROVE:
                     break
                 current = step
                 adj, total = runs[current]

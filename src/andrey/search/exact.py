@@ -17,7 +17,7 @@ subsets: the shortest path from the empty set to the full set gives each variabl
 set among the variables before it. Every DAG of the optimal DAG's Markov equivalence class has the
 same score, so the search's choice among them follows rounding and column order;
 :func:`_canonical_member` replaces it by one member fixed by the CPDAG and
-:func:`~andrey.search.hc.tie_ranks`.
+:func:`~andrey.core.ties.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -29,15 +29,11 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
 from andrey.core.score import (
-    DISCRETE_SCORES,
     LINEAR_SCORES,
-    MIXED_SCORES,
-    SCORES,
     ZERO_RESIDUAL,
     Score,
     check_columns,
@@ -45,10 +41,9 @@ from andrey.core.score import (
     make_score,
     penalty_weight,
 )
-from andrey.search.hc import tie_ranks
-
-#: The local scores :func:`exact_search` accepts.
-EXACT_SCORES: tuple[str, ...] = SCORES
+from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_mask, tie_ranks
+from andrey.search.operators import check_parent_cap
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
@@ -409,7 +404,7 @@ def exact_search(
 
     Every DAG of the optimal Markov equivalence class scores the same, so the result is the member
     :func:`_canonical_member` fixes: the class's reversible edges that ``constraints`` leave open
-    are oriented by the order of :func:`~andrey.search.hc.tie_ranks`, ranks computed from the data.
+    are oriented by the order of :func:`~andrey.core.ties.tie_ranks`, ranks computed from the data.
     Both searches return this member, it does not depend on last-bit rounding, and reordering the
     columns relabels it.
 
@@ -420,8 +415,8 @@ def exact_search(
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
     score_func : str
-        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"bic"``), a
-        categorical score, or a mixed-data BIC.
+        Local score, one of :data:`~andrey.core.score.SCORES`: the linear-Gaussian BIC
+        (``"bic"``), a categorical score, or a mixed-data BIC.
     penalty_discount : float
         Multiplier on the BIC penalty of ``log(n)`` per parameter; BDeu ignores it.
     ebic_gamma : float
@@ -451,18 +446,9 @@ def exact_search(
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):
         raise ValueError(f"unknown search method {search_method!r}; use 'astar' or 'dp'")
-    if score_func not in EXACT_SCORES:
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use one of {EXACT_SCORES}"
-        )
-    if (
-        max_parents is not None
-        and constraints is not None
-        and (constraints.required.sum(axis=0) > max_parents).any()
-    ):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents"
-        )
+    check_parent_cap(
+        None if constraints is None else constraints.required, max_parents, in_class=False
+    )
     n_vars = X.shape[1]
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
@@ -490,12 +476,9 @@ def exact_search(
     else:
         structures = _dp_shortest_path(parent_graphs, n_vars, tables)
 
-    adj = np.zeros((n_vars, n_vars), dtype=np.int8)
+    dag = np.zeros((n_vars, n_vars), dtype=bool)
     for child, parents in enumerate(structures):
-        for parent in parents:
-            adj[parent, child] = TAIL  # tail at the parent
-            adj[child, parent] = ARROW  # arrowhead at the child
-    mask = np.full(n_vars, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:
-        mask = column_mask(categorical, n_vars)
-    return to_structure(_canonical_member(adj, tie_ranks(X, mask), constraints), kind="dag")
+        dag[list(parents), child] = True
+    adj = endpoint_marks(dag)
+    ranks = tie_ranks(X, tie_mask(score_func, categorical, n_vars))
+    return to_structure(_canonical_member(adj, ranks, constraints), kind="dag")
