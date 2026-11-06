@@ -19,12 +19,12 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
+    check_same_data,
     checked_data,
     column_labels,
+    column_namer,
     copies_named,
-    data_kind,
-    default_score,
-    default_test,
+    fit_inputs,
     json_safe,
     label_of,
     structure_output,
@@ -291,14 +291,10 @@ def boss(
     """
     from andrey.search.boss import boss as _boss
 
-    score_func, categorical = default_score(
-        data,
-        score_func,
-        categorical=categorical,
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="boss"
     )
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="boss")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="boss")
     with copies_named(labels):
         cpdag, score = _boss(
             X,
@@ -583,14 +579,10 @@ def grasp(
     """
     from andrey.search.grasp import grasp as _grasp
 
-    score_func, categorical = default_score(
-        data,
-        score_func,
-        categorical=categorical,
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="grasp"
     )
-    X, mask = checked_data(data, categorical, "score_func", score_func, method="grasp")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="grasp")
     with copies_named(labels):
         cpdag, score = _grasp(
             X,
@@ -1314,26 +1306,18 @@ def _fci_hybrid(
 ) -> StructureOutput:
     """Run ``name``, ``"boss_fci"`` or ``"grasp_fci"``, as :func:`~andrey.gfci` runs.
 
-    The score and the test are picked from the declared column types and must read the data
-    alike; ``settings`` reach the engine in :mod:`andrey.search.gfci`.
+    The score and the test must read the data alike (:func:`~andrey.api._adapt.check_same_data`);
+    ``settings`` reach the engine in :mod:`andrey.search.gfci`.
     """
     from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search import gfci as engines
 
-    score_func, _ = default_score(data, score_func, categorical=categorical)
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
-    if data_kind(score_func) != data_kind(indep_test):
-        raise ValueError(
-            f"{name}'s score and test must read the data alike: score_func='bdeu' or "
-            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
-            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
-            "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
-            f"score_func={score_func!r}, indep_test={indep_test!r}"
-        )
-    X, mask = checked_data(data, categorical, "indep_test", indep_test, method=name)
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method=name)
+    check_same_data(name, score_func, indep_test)
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method=name
+    )
     ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels):
         pag = getattr(engines, name)(
@@ -1855,7 +1839,7 @@ def _chosen_tests(
     invariance_test: str | None,
     categorical: Sequence[str | int] | None,
 ) -> tuple[str, str, np.ndarray, np.ndarray | None]:
-    """Pick the tests of ``igsp`` or ``ut_igsp`` and check the data against them.
+    """Pick the invariance test of ``igsp`` or ``ut_igsp`` and check the data against the tests.
 
     Returns the conditional-independence test, the invariance test (``None`` picks it to match),
     the checked data, and the categorical mask. Raises ``ValueError`` when ``"gaussian"`` comes
@@ -1864,7 +1848,7 @@ def _chosen_tests(
     from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
     from andrey.core.invariance import default_invariance_test
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    assert indep_test is not None  # method_spec picks it from the column types
     invariance_test = invariance_test or default_invariance_test(indep_test)
     if invariance_test == "gaussian" and indep_test in DISCRETE_INDEP_TESTS + MIXED_INDEP_TESTS:
         raise ValueError(
@@ -1893,6 +1877,8 @@ def _check_environments(
     ``from_targets``, the environments come from the targets, and the messages name each one by
     its list of targets instead.
     """
+    from andrey.core.environments import check_constant_columns, check_environment_rows
+
     if from_targets:
         variable = label_of(labels)
         named = [sorted(variable(j) for j in by_code[c] or ()) for c in sorted(by_code)]
@@ -1915,18 +1901,10 @@ def _check_environments(
             f"{method} needs at least one interventional environment besides the observational "
             f"ones, but {rest}; for observational data use grasp or boss"
         )
-    sizes = np.bincount(codes, minlength=len(by_code))
-    small = [named[c] for c in np.flatnonzero(sizes < 3)]
-    if small:
-        which = "the rows with targets" if from_targets else "the environments"
-        raise ValueError(
-            f"{method} needs at least 3 rows in every environment; {which} {small} have fewer"
-        )
-    rows = np.isin(codes, observational)
-    constant = np.flatnonzero(np.ptp(X[rows], axis=0) == 0)
-    if constant.size:
-        columns = [labels[j] if labels else int(j) for j in constant]
-        raise ValueError(
-            f"{method}: columns {columns} are constant on the observational rows, where the "
-            "conditional-independence tests run; drop them"
-        )
+    check_environment_rows(codes, named, method, 3)
+    check_constant_columns(
+        X[np.isin(codes, observational)],
+        column_namer(labels),
+        method,
+        "the observational rows, where the conditional-independence tests run",
+    )

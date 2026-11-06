@@ -93,11 +93,14 @@ def _pairwise_output(
     labels: tuple[str, ...] | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> StructureOutput:
-    """Return a two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
+    """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    Test statistics, when given, decide a p-value tie and go in ``metadata["statistics"]`` under
-    the same keys; ``extra`` adds its entries after them.
+    Each test statistic, when given, is an HSIC statistic divided by its mean under independence:
+    with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without
+    them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the
+    same keys. A p-value or statistic may be a shape-``(1,)`` array (:func:`_coerce_float`).
+    ``extra`` adds metadata entries after them, such as ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -128,61 +131,6 @@ def _pairwise_output(
             ),
             **(extra or {}),
         },
-    )
-
-
-def _adapt_anm(
-    pval_forward: Any,
-    pval_backward: Any,
-    *,
-    stat_forward: Any = None,
-    stat_backward: Any = None,
-    alpha: float | None = None,
-    labels: tuple[str, ...] | None = None,
-    extra: Mapping[str, Any] | None = None,
-) -> StructureOutput:
-    """Convert ANM p-values, and the statistics when given, to a two-node ``dag`` and metadata.
-
-    Each statistic is an HSIC statistic divided by its mean under independence. With
-    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
-    gives no edge. ``extra`` adds metadata entries, such as ``rows_tested``.
-    """
-    return _pairwise_output(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=extra,
-    )
-
-
-def _adapt_pnl(
-    pval_forward: Any,
-    pval_backward: Any,
-    *,
-    stat_forward: Any = None,
-    stat_backward: Any = None,
-    alpha: float | None = None,
-    labels: tuple[str, ...] | None = None,
-    extra: Mapping[str, Any] | None = None,
-) -> StructureOutput:
-    """Convert PNL p-values, and the statistics when given, to a two-node ``dag`` and metadata.
-
-    Each statistic is an HSIC statistic divided by its mean under independence. With
-    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
-    gives no edge. A p-value or statistic may be a shape-``(1,)`` array; :func:`_coerce_float`
-    converts it to a Python ``float``. ``extra`` adds metadata entries, such as ``rows_tested``.
-    """
-    return _pairwise_output(
-        pval_forward,
-        pval_backward,
-        stat_forward=stat_forward,
-        stat_backward=stat_backward,
-        alpha=alpha,
-        labels=labels,
-        extra=extra,
     )
 
 

@@ -28,7 +28,6 @@ from ._adapt import (
     column_namer,
     copies_named,
     data_matrix,
-    default_test,
     int_in_range,
     shared_labels,
     with_labels,
@@ -44,11 +43,12 @@ from ._temporal import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+    from andrey.core.knowledge import LaggedConstraints
 
 
 @method_spec("varma_lingam")
@@ -691,26 +691,18 @@ def pcmci(
     from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmci import pcmci as _native
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
-    X, mask = checked_data(
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = series_inputs(
         data,
-        categorical,
-        "indep_test",
         indep_test,
+        categorical,
+        knowledge,
         method="pcmci",
-        missing=True,
-    )
-    # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
-    # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
-    min_rows = 2 * tau_max * (X.shape[1] + 1) + 3
-    if X.shape[0] < min_rows:
-        raise ValueError(
-            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
-            f"{X.shape[1]} variables, got {X.shape[0]}"
-        )
-    labels = column_labels(data)
-    constraints = resolve_lagged(
-        knowledge, X.shape[1], labels, tau_max, method="pcmci", contemporaneous=False
+        tau_max=tau_max,
+        # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
+        # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
+        min_rows=lambda n: 2 * tau_max * (n + 1) + 3,
+        contemporaneous=False,
     )
     with (
         copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
@@ -1015,25 +1007,18 @@ def pcmciplus(
     from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmciplus import pcmciplus as _native
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
-    X, mask = checked_data(
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = series_inputs(
         data,
-        categorical,
-        "indep_test",
         indep_test,
+        categorical,
+        knowledge,
         method="pcmciplus",
-        missing=True,
+        tau_max=tau_max,
+        # A test conditions on up to 2 * n * tau_max + n - 2 columns of the last
+        # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
+        min_rows=lambda n: 2 * tau_max * (n + 1) + n + 1,
     )
-    # A test conditions on up to 2 * n * tau_max + n - 2 columns of the last
-    # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
-    min_rows = 2 * tau_max * (X.shape[1] + 1) + X.shape[1] + 1
-    if X.shape[0] < min_rows:
-        raise ValueError(
-            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
-            f"{X.shape[1]} variables, got {X.shape[0]}"
-        )
-    labels = column_labels(data)
-    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="pcmciplus")
     with (
         copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
         rows_tested() as rows,
@@ -1318,25 +1303,18 @@ def lpcmci(
     from andrey.temporal.lpcmci import lpcmci as _native
     from andrey.temporal.pcmci import design_column_name
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
-    X, mask = checked_data(
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = series_inputs(
         data,
-        categorical,
-        "indep_test",
         indep_test,
+        categorical,
+        knowledge,
         method="lpcmci",
-        missing=True,
+        tau_max=tau_max,
+        # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
+        # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
+        min_rows=lambda n: n * (tau_max + 1) + 2 * tau_max + 1,
     )
-    # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
-    # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
-    min_rows = X.shape[1] * (tau_max + 1) + 2 * tau_max + 1
-    if X.shape[0] < min_rows:
-        raise ValueError(
-            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
-            f"{X.shape[1]} variables, got {X.shape[0]}"
-        )
-    labels = column_labels(data)
-    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
     with (
         copies_named(labels, design_column_name(X.shape[1], column_namer(labels))),
         rows_tested() as rows,
@@ -1533,11 +1511,7 @@ def granger(
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     min_rows = (X.shape[1] + 1) * tau_max + 2  # a degree of freedom left in every regression
-    if X.shape[0] < min_rows:
-        raise ValueError(
-            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
-            f"{X.shape[1]} variables, got {X.shape[0]}"
-        )
+    check_series_rows(X, tau_max, min_rows)
     labels = column_labels(data)
     constraints = resolve_lagged(
         knowledge, X.shape[1], labels, tau_max, method="granger", contemporaneous=False
@@ -1805,3 +1779,40 @@ def dynotears(
             constraints=constraints,
         )
     return with_labels(_adapt_dynotears(result), labels)
+
+
+def series_inputs(
+    data: npt.ArrayLike,
+    indep_test: str,
+    categorical: Sequence[str | int] | None,
+    knowledge: Knowledge | None,
+    *,
+    method: str,
+    tau_max: int,
+    min_rows: Callable[[int], int],
+    contemporaneous: bool = True,
+) -> tuple[np.ndarray, np.ndarray | None, tuple[str, ...] | None, LaggedConstraints | None]:
+    """Return a series' matrix, its categorical-column mask, its column labels, and knowledge.
+
+    For PCMCI, PCMCI+, and LPCMCI: the series is checked for ``indep_test`` and keeps ``NaN`` as
+    a missing value, which the tests delete per test (:func:`~andrey.api._adapt.checked_data`); it
+    needs ``min_rows(n)`` rows over ``n`` variables (:func:`check_series_rows`); and ``knowledge``
+    is resolved over lags ``0`` to ``tau_max``, with ``contemporaneous`` as
+    :func:`~andrey.core.knowledge.resolve_lagged` takes it. Raises what those raise, in that order.
+    """
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method=method, missing=True)
+    check_series_rows(X, tau_max, min_rows(X.shape[1]))
+    labels = column_labels(data)
+    constraints = resolve_lagged(
+        knowledge, X.shape[1], labels, tau_max, method=method, contemporaneous=contemporaneous
+    )
+    return X, mask, labels, constraints
+
+
+def check_series_rows(X: np.ndarray, tau_max: int, min_rows: int) -> None:
+    """Raise ``ValueError`` when the series ``X`` has fewer than ``min_rows`` rows (time steps)."""
+    if X.shape[0] < min_rows:
+        raise ValueError(
+            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
+            f"{X.shape[1]} variables, got {X.shape[0]}"
+        )
