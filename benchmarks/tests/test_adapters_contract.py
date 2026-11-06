@@ -27,6 +27,7 @@ from andrey_bench.adapters.andrey_calm import AndreyCALM
 from andrey_bench.adapters.andrey_direct_lingam import andrey_direct_lingam_adapters
 from andrey_bench.adapters.andrey_exact_search import AndreyExactSearch
 from andrey_bench.adapters.andrey_fci import AndreyFCI
+from andrey_bench.adapters.andrey_fci_jci import AndreyFCIJCI
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
 from andrey_bench.adapters.andrey_gfci import AndreyGFCI
 from andrey_bench.adapters.andrey_gies import AndreyGIES
@@ -68,6 +69,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyPC(),
     *[AndreyPC(test) for test in ("kci", "rcot", "cmiknn", "gpdc")],
     AndreyFCI(),
+    AndreyFCIJCI(),
     AndreyFCI("majority"),
     AndreyGFCI(),
     AndreyGFCI("parallel"),
@@ -164,6 +166,7 @@ DEFERRED_MODULES = {
     "andrey.pc.gpdc.numpy": "andrey.core.ci_gpdc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
+    "andrey.fci_jci.numpy": "andrey.constraint.fci_jci",
     "andrey.gfci.numpy": "andrey.search.gfci",
     "andrey.gfci.numpy.parallel": "andrey.search.gfci",
     "andrey.calm.torch-cpu": "andrey.search.calm",
