@@ -646,6 +646,16 @@ def test_gfci_rejects_a_score_and_test_that_read_the_data_differently(score_func
         andrey.gfci(_categories(), score_func=score_func, indep_test=indep_test)
 
 
+def test_every_method_with_a_score_and_a_test_states_one_pairing_rule():
+    """The methods take the same scores and tests, so a mismatch names the same pairs in each."""
+    rules = set()
+    for name in ("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"):
+        with pytest.raises(ValueError, match="score and test must read the data alike") as raised:
+            getattr(andrey, name)(_categories(), score_func="bdeu", indep_test="fisherz")
+        rules.add(str(raised.value).removeprefix(f"{name}'s "))
+    assert len(rules) == 1, rules
+
+
 @pytest.mark.parametrize("code", [2.0**53, -(2.0**60)])
 def test_a_categorical_setting_rejects_codes_too_large_to_stay_distinct(code):
     with pytest.raises(ValueError, match=r"2\*\*53 or more"):

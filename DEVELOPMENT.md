@@ -158,8 +158,13 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    add its name to `andrey.api.__all__`, and re-export it as `andrey.<name>` in
    `src/andrey/__init__.py`, in its imports and its `__all__`. The wrapper
    (`src/andrey/api/_method.py`) checks every argument against the method's `ParamSpec`, resolves
-   a seeded method's seed, gives the experimental warning, and sets `metadata["algorithm"]` and
-   `metadata["seed"]`, so the facade holds only the method's own logic.
+   a seeded method's seed, gives the experimental warning, picks the `indep_test` or `score_func` a
+   call leaves `None` from the declared column types, and sets `metadata["algorithm"]` and
+   `metadata["seed"]`, so the facade holds only the method's own logic. A facade with a test or a
+   score reads its data, column labels, and knowledge with `fit_inputs` in
+   `src/andrey/api/_adapt.py`, and PCMCI, PCMCI+, and LPCMCI with `series_inputs`; one that checks
+   another setting between those steps, as `tabu` checks `max_tabu` and `igsp` its environments,
+   calls the steps itself in that order.
    Open the docstring's Notes with a **When to use.** paragraph, as the
    [docstring standard](#docstring-standard) describes, and end them with a **Limitations.**
    paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and

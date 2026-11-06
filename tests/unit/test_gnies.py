@@ -419,11 +419,13 @@ def test_errors_name_an_environment_from_targets_by_its_targets(case):
     data["changed"] = np.array(["", "b", "e"], dtype=object)[env]
     one_row = data.copy()
     one_row.loc[0, "changed"] = "c"
-    with pytest.raises(ValueError, match=r"^gnies: .*\[\['c'\]\] have fewer"):
+    with pytest.raises(ValueError, match=r"^gnies needs .*\[\['c'\]\] have fewer"):
         andrey.gnies(one_row, targets="changed")
     flat = data.copy()
     flat.loc[env == 2, "a"] = 1.0
-    with pytest.raises(ValueError, match=r"^gnies: column 'a' is constant in environment \['e'\]"):
+    with pytest.raises(
+        ValueError, match=r"^gnies: data column 'a' is constant on the rows of environment \['e'\]"
+    ):
         andrey.gnies(flat, targets="changed")
 
 
@@ -432,7 +434,7 @@ def test_errors_name_an_environment_from_targets_by_its_targets(case):
     [
         ("one_environment", "two or more environments"),
         ("one_row", "at least 2 rows"),
-        ("constant_in_one", "constant in environment"),
+        ("constant_in_one", "constant on the rows of environment"),
         ("unknown_label", "does not have"),
         ("categorical", "declared categorical"),
         ("nan", "NaN"),

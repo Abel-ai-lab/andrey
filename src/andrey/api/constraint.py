@@ -17,19 +17,18 @@ import numpy as np
 from andrey.api._adapt import (
     categorical_metadata,
     check_categories,
-    checked_data,
+    check_same_data,
     column_labels,
     column_namer,
     copies_named,
     data_kind,
-    default_score,
-    default_test,
+    fit_inputs,
     label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata, rows_tested
-from andrey.core.knowledge import Knowledge, resolve
+from andrey.core.knowledge import Knowledge
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -378,17 +377,10 @@ def pc(
     from andrey.constraint.pc import pc as _pc
     from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
-    X, mask = checked_data(
-        data,
-        categorical,
-        "indep_test",
-        indep_test,
-        method="pc",
-        missing=True,
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method="pc", missing=True
     )
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     ambiguous: set[tuple[int, int, int]] = set()
     conflicts: set[tuple[int, int]] = set()
     with copies_named(labels), rows_tested() as rows:
@@ -718,17 +710,10 @@ def fci(
     from andrey.constraint.fci import fci as _fci
     from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
 
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
-    X, mask = checked_data(
-        data,
-        categorical,
-        "indep_test",
-        indep_test,
-        method="fci",
-        missing=True,
+    assert indep_test is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method="fci", missing=True
     )
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="fci")
     ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels), rows_tested() as rows:
         pag = _fci(
@@ -1047,20 +1032,12 @@ def gfci(
     from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
-    score_func, _ = default_score(data, score_func, categorical=categorical)
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
-    if data_kind(score_func) != data_kind(indep_test):
-        raise ValueError(
-            "gfci's score and test must read the data alike: score_func='bdeu' or "
-            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
-            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
-            "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
-            f"score_func={score_func!r}, indep_test={indep_test!r}"
-        )
-    X, mask = checked_data(data, categorical, "indep_test", indep_test, method="gfci")
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
+    check_same_data("gfci", score_func, indep_test)
+    X, mask, labels, constraints = fit_inputs(
+        data, "indep_test", indep_test, categorical, knowledge, method="gfci"
+    )
     ambiguous: set[tuple[int, int, int]] = set()
     with copies_named(labels):
         pag = _gfci(
@@ -1403,19 +1380,18 @@ def cdnod(
     data, codes, env_labels, _ = normalize_env_targets(
         data, env, None, require_known_targets=False, method="cdnod"
     )
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    assert indep_test is not None  # method_spec picks it from the column types
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
-    X, mask = checked_data(
+    X, mask, labels, constraints = fit_inputs(
         data,
-        categorical,
         "indep_test",
         indep_test,
-        index_categorical=True,
+        categorical,
+        knowledge,
         method="cdnod",
         missing=True,
+        index_categorical=True,
     )
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
     # Numbers reach the search as given, such as a time step; text labels as their codes.
     text = any(isinstance(label, str) for label in env_labels)
     c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
@@ -1739,19 +1715,18 @@ def fci_jci(
     data, codes, env_labels, _ = normalize_env_targets(
         data, env, None, require_known_targets=False, method="fci_jci"
     )
-    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    assert indep_test is not None  # method_spec picks it from the column types
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
-    X, mask = checked_data(
+    X, mask, labels, constraints = fit_inputs(
         data,
-        categorical,
         "indep_test",
         indep_test,
-        index_categorical=True,
+        categorical,
+        knowledge,
         method="fci_jci",
         missing=True,
+        index_categorical=True,
     )
-    labels = column_labels(data)
-    constraints = resolve(knowledge, X.shape[1], labels, method="fci_jci")
     # Numbers reach the search as given; text labels as their codes.
     text = any(isinstance(label, str) for label in env_labels)
     c = codes.astype(np.float64) if text else np.asarray(env, dtype=np.float64)
@@ -1990,7 +1965,11 @@ def icp(
     """
     from andrey.api._adapt import dag_from_adjacency, data_matrix
     from andrey.constraint.icp import icp as _icp
-    from andrey.core.environments import normalize_env_targets
+    from andrey.core.environments import (
+        check_constant_columns,
+        check_environment_rows,
+        normalize_env_targets,
+    )
     from andrey.core.knowledge import as_node, column_position
     from andrey.core.score import check_columns
 
@@ -2023,19 +2002,8 @@ def icp(
         )
     X, codes = X[keep], np.searchsorted(kept, codes[keep])
     environments = [env_labels[k] for k in kept]
-    sizes = np.bincount(codes, minlength=len(kept))
-    if sizes.min() < 3:
-        small = int(np.argmin(sizes))
-        raise ValueError(
-            f"icp: environment {environments[small]!r} has {sizes[small]} rows; every environment "
-            "needs at least 3, and ideally dozens"
-        )
-    constant = [name(j) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
-    if constant:
-        raise ValueError(
-            f"icp: data columns {', '.join(constant)} are constant on the rows of the environments "
-            "that remain; drop them before the fit"
-        )
+    check_environment_rows(codes, environments, "icp", 3)
+    check_constant_columns(X, name, "icp", "the rows of the environments that remain")
     with copies_named(labels):
         check_columns(np.atleast_2d(np.cov(X, rowvar=False)), len(X), name)
     largest = d - 1 if max_parents is None else min(max_parents, d - 1)

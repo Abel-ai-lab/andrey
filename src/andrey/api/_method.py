@@ -2,11 +2,11 @@
 
 :func:`method_spec` wraps a facade so that each call maps a former argument name or value to the
 current one, checks every argument against its :class:`~andrey.spec.models.ParamSpec`, resolves
-the seed, warns that an experimental method is experimental, and names the method, the seed, the
-test and score the fit used, the score's penalties, and the configuration's tie-break rule in the
-result's metadata. The data check that follows, in
-:func:`andrey.api._adapt.data_matrix`, warns when the data are larger than the method's measured
-boundary. A facade keeps only its method's own logic.
+the seed, warns that an experimental method is experimental, picks a test or a score the call
+leaves to the method, and names the method, the seed, the test and score the fit used, the score's
+penalties, and the configuration's tie-break rule in the result's metadata. The data check that
+follows, in :func:`andrey.api._adapt.data_matrix`, warns when the data are larger than the
+method's measured boundary. A facade keeps only its method's own logic.
 """
 
 from __future__ import annotations
@@ -18,14 +18,13 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from andrey.api._adapt import default_score, default_test
-from andrey.api._experimental import warn_experimental
 from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
 from andrey.core.seeding import resolve_seed
-from andrey.core.warning_policy import DeprecatedArgumentWarning, warn_once
+from andrey.core.warning_policy import DeprecatedArgumentWarning, ExperimentalWarning, warn_once
 
 if TYPE_CHECKING:
     from andrey.core.output import StructureOutput
@@ -56,12 +55,14 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     become one table and ``env`` (:func:`pool_environments`); a row-aligned argument that names a
     column of the data is taken out of it (:func:`take_columns`); a
     seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
-    an int; a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with a score that does
-    not use it raises ``ValueError`` (:func:`check_penalties`); an experimental method warns
-    :class:`~andrey.ExperimentalWarning`.
+    an int; an experimental method warns :class:`~andrey.ExperimentalWarning`
+    (:func:`warn_experimental`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
+    declared column types, and the facade gets the pick and the columns it reads
+    (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
+    a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
     After it: each result's ``metadata["algorithm"]`` is ``name``, ``metadata["indep_test"]`` and
     ``metadata["score_func"]`` are the test and the score the fit used, for a method that takes
-    them (:func:`chosen_settings`), with the penalties that score used (:func:`used_penalties`);
+    them, with the penalties that score used (:func:`used_penalties`);
     ``metadata["tie_break"]`` is :data:`andrey.config`'s ``tie_break`` for a method whose result it
     can change (``MethodSpec.tie_break``); and, when the fit draws random numbers
     (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used.
@@ -91,11 +92,11 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 seed = bound.arguments["seed"] = resolve_seed(bound.arguments.get("seed"))
                 if draws_random_numbers(spec, bound.arguments):
                     stamp["seed"] = seed
-            check_penalties(spec, bound.arguments)
             if spec.status == "experimental":
                 warn_experimental(name)
-            out = facade(*bound.args, **bound.kwargs)
             chosen = chosen_settings(spec, bound.arguments)
+            check_penalties(spec, bound.arguments, chosen.get("score_func"))
+            out = facade(*bound.args, **bound.kwargs)
             stamp.update(chosen)
             stamp.update(used_penalties(spec, bound.arguments, chosen.get("score_func")))
             if spec.tie_break:
@@ -107,6 +108,15 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
 
     return decorate
+
+
+def warn_experimental(name: str) -> None:
+    """Warn on the first call of experimental method ``name`` in this process."""
+    warn_once(
+        f"andrey.{name} is experimental: it has no published benchmark, and its API may change "
+        "without deprecation.",
+        ExperimentalWarning,
+    )
 
 
 def removed_name_error(
@@ -194,11 +204,11 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
     order_search = starts is not None and any(p.name == "score_func" for p in spec.params)
+    later = starts is not None and arguments.get("n_starts", starts.default) > 1
     if test is not None and not order_search:
-        later = starts is not None and arguments.get("n_starts", starts.default) > 1
         return later or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
     if any(p.concept == "n_perturbations" for p in spec.params):
-        return arguments.get("n_starts", 1) > 1
+        return later
     return True
 
 
@@ -208,25 +218,28 @@ CHOSEN = {"indep_test": default_test, "score_func": default_score}
 
 
 def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, str]:
-    """Return the test and the score a fit of ``spec`` with ``arguments`` used, by argument name.
+    """Return the test and the score a fit of ``spec`` uses, by argument name, set in ``arguments``.
 
     A method with an ``indep_test`` or a ``score_func`` has it in the result: the name the call
-    passed, or, for ``None``, the one picked from the declared column types among the method's
-    choices, as the facade picks it (:func:`~andrey.api._adapt.default_test`,
-    :func:`~andrey.api._adapt.default_score`). A registered test is its registered name.
+    passed, or, for ``None``, the one picked from the declared column types
+    (:func:`~andrey.api._adapt.default_test`, :func:`~andrey.api._adapt.default_score`), which
+    replaces ``None`` in ``arguments``. A registered test is its registered name. ``categorical``
+    in ``arguments`` becomes the columns the test reads, or the score for a method without a test:
+    a mixed-data pick lists them by position, and an all-categorical pick needs none.
     """
+    data = arguments[spec.data.inputs[0].name]
+    declared = arguments.get("categorical")
     chosen: dict[str, str] = {}
+    columns: dict[str, object] = {}
     for param in spec.params:
-        pick = CHOSEN.get(param.concept or "")
+        concept = param.concept or ""
+        pick = CHOSEN.get(concept)
         if pick is None:
             continue
-        name = arguments.get(param.name)
-        if name is None:
-            data = arguments[spec.data.inputs[0].name]
-            name, _ = pick(
-                data, None, categorical=arguments.get("categorical"), choices=param.choices
-            )
-        chosen[param.name] = name
+        name, columns[concept] = pick(data, arguments.get(param.name), categorical=declared)
+        arguments[param.name] = chosen[param.name] = name
+    if columns:
+        arguments["categorical"] = columns.get("indep_test", columns.get("score_func"))
     return chosen
 
 
@@ -263,12 +276,11 @@ def used_penalties(
     }
 
 
-def check_penalties(spec: MethodSpec, arguments: dict[str, Any]) -> None:
+def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | None) -> None:
     """Raise ``ValueError`` when the call passes an argument that only one score reads with another.
 
     ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` alone, and ``equivalent_sample_size``
-    the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). The score is the one the fit uses:
-    the call's ``score_func``, or, for ``None``, the one picked from the declared column types
+    the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). ``score`` is the one the fit uses
     (:func:`chosen_settings`). A method without ``score_func`` has one score, which reads every
     argument it takes.
     """
@@ -277,7 +289,6 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any]) -> None:
     ]
     if not passed or not any(p.concept == "score_func" for p in spec.params):
         return
-    score = chosen_settings(spec, arguments).get("score_func")
     for name, concept in passed:
         used = PENALTIES[concept or ""]
         if score not in used:

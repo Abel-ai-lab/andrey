@@ -13,10 +13,9 @@ import numpy as np
 import pytest
 
 from andrey.api._irregular import (
-    _adapt_anm,
     _adapt_bottom_up_parce,
-    _adapt_pnl,
     _adapt_rcd,
+    _pairwise_output,
 )
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
 
@@ -49,10 +48,9 @@ DECISIONS = [
 
 @pytest.mark.parametrize(("forward", "backward", "alpha", "edge"), DECISIONS)
 def test_pairwise_decision_rules(forward, backward, alpha, edge):
-    out = _adapt_pnl(forward, backward, alpha=alpha)
+    out = _pairwise_output(forward, backward, alpha=alpha)
     expected = [] if edge is None else [(*edge, "directed")]
     assert out.structure.oriented_edges() == expected
-    assert _adapt_anm(forward, backward, alpha=alpha).structure == out.structure
 
 
 # (pval_forward, pval_backward, stat_forward, stat_backward, alpha) -> the edge; None for no edge.
@@ -67,18 +65,19 @@ TIE_BREAKS = [
 ]
 
 
-@pytest.mark.parametrize("adapt", [_adapt_anm, _adapt_pnl], ids=["anm", "pnl"])
 @pytest.mark.parametrize(("forward", "backward", "stat_f", "stat_b", "alpha", "edge"), TIE_BREAKS)
 def test_pairwise_breaks_a_pvalue_tie_by_the_statistic(
-    adapt, forward, backward, stat_f, stat_b, alpha, edge
+    forward, backward, stat_f, stat_b, alpha, edge
 ):
-    out = adapt(forward, backward, stat_forward=stat_f, stat_backward=stat_b, alpha=alpha)
+    out = _pairwise_output(
+        forward, backward, stat_forward=stat_f, stat_backward=stat_b, alpha=alpha
+    )
     expected = [] if edge is None else [(*edge, "directed")]
     assert out.structure.oriented_edges() == expected
 
 
-def test_pnl_keeps_the_statistics_as_floats(tmp_path):
-    out = _adapt_pnl(
+def test_pairwise_keeps_the_statistics_as_floats(tmp_path):
+    out = _pairwise_output(
         np.array([0.0]), 0.0, stat_forward=np.float64(17.0), stat_backward=np.array([16.3])
     )
     md = out.metadata
@@ -88,8 +87,8 @@ def test_pnl_keeps_the_statistics_as_floats(tmp_path):
     _roundtrips(out, tmp_path, "pnl-stats")
 
 
-def test_anm_decided_graph_and_float_metadata(tmp_path):
-    out = _adapt_anm(0.02, 0.81)
+def test_pairwise_decided_graph_and_float_metadata(tmp_path):
+    out = _pairwise_output(0.02, 0.81)
     g = out.structure
     assert isinstance(g, GraphStructure)
     assert g.n_nodes == 2
@@ -101,12 +100,12 @@ def test_anm_decided_graph_and_float_metadata(tmp_path):
     assert all(isinstance(p, float) for p in md["p_values"].values())
     assert set(md) == {"p_values"}
     assert "p_values: forward 0.02, backward 0.81" in repr(out)
-    _roundtrips(out, tmp_path, "anm")
+    _roundtrips(out, tmp_path, "pair")
 
 
-def test_pnl_coerces_shape_one_arrays(tmp_path):
+def test_pairwise_coerces_shape_one_arrays(tmp_path):
     # PNL returns each p-value as a shape-(1,) numpy array; the adapter flattens to Python float.
-    out = _adapt_pnl(np.array([0.013]), np.array([0.47]))
+    out = _pairwise_output(np.array([0.013]), np.array([0.47]))
     md = out.metadata
     assert md["p_values"] == {"forward": 0.013, "backward": 0.47}
     assert type(md["p_values"]["forward"]) is float  # not np.float64 (JSON-safe)
