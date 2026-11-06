@@ -64,7 +64,7 @@ UNDIRECTED_STRUCTURES = [
     for choice in param.choices or ()
     if BLANKET_STRUCTURES[choice] == "undirected"
 ]
-DEPTH = ["pc", "fci", "gfci", "cdnod"]
+DEPTH = ["pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"]
 # A short schedule: the knowledge holds whether or not the fit has converged.
 SHORT_CALM = {"max_iter": 2, "subproblem_iter": 200}
 LABELS = list("abcdef")
@@ -180,7 +180,7 @@ def test_required_forbidden_and_tiers_hold(name, missing, data):
 
 
 @pytest.mark.parametrize("in_column_order", [False, True])
-@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci"])
+@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci", "boss_fci", "grasp_fci"])
 def test_knowledge_holds_whether_the_rules_run_in_rounds_or_one_at_a_time(
     name, in_column_order, data
 ):
@@ -191,14 +191,15 @@ def test_knowledge_holds_whether_the_rules_run_in_rounds_or_one_at_a_time(
         domain = np.repeat([0.0, 1.0], len(X) // 2)
         structure = importlib.import_module("andrey.constraint.cdnod").cdnod(X, domain, **kwargs)
     else:
-        module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
+        in_search = name in ("gfci", "boss_fci", "grasp_fci")
+        module = "andrey.search.gfci" if in_search else f"andrey.constraint.{name}"
         structure = getattr(importlib.import_module(module), name)(X, **kwargs)
     _assert_required_forbidden_and_tiers_hold(name, from_structure(structure), LABELS)
 
 
 @pytest.mark.parametrize("columns", [LABELS, LABELS[::-1], list("cfaebd")])
 @pytest.mark.parametrize("setting", [{}, {"possible_dsep": "fast"}], ids=["default", "fast"])
-@pytest.mark.parametrize("name", ["fci", "gfci"])
+@pytest.mark.parametrize("name", ["fci", "gfci", "boss_fci", "grasp_fci"])
 def test_knowledge_holds_through_the_possible_dsep_step_in_every_column_order(
     name, setting, columns, data
 ):
