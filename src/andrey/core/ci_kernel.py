@@ -18,8 +18,8 @@ from scipy.stats import qmc
 
 from andrey.search.hc import tie_ranks
 
-from . import backend, env
-from .ci import _canonical_ranked, _checked_data, per_query
+from . import backend, env, stats
+from .ci import _canonical_ranked, per_query
 from .independence import hsic_statistic_test
 from .seeding import resolve_seed
 from .warning_policy import SampleSizeWarning, warn_once
@@ -38,13 +38,6 @@ _CACHE_BYTES = 2**28
 # where the eigendecomposition slows with threads, 0.72x to 2.45x on 1,000, and 1.48x to 2.88x on
 # 2,000.
 _KCI_BLAS_THREADS_FROM = 2000
-
-# Smallest kernel matrix (rows squared) at which `auto` runs a KCI query with a conditioning set on
-# a CUDA GPU. `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB against 8 CPU threads found
-# 31,250 (177 rows); per query with two conditioning variables, the GPU took 0.52x the CPU's speed
-# at 100 rows, 1.4x at 200, and 9.5x at 1,000. KCI computes in float64, so `mps` (float32) is never
-# used.
-_KCI_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 31_250, "mps": None}
 
 
 def _cache_entries(floats_per_entry: int) -> int:
@@ -196,7 +189,7 @@ class KCI:
             raise ValueError(f"ridge must be positive and finite, got {ridge}")
         if rank is not None and rank < 1:
             raise ValueError(f"rank must be at least 1, got {rank}")
-        arr = _checked_data(data, "KCI", min_rows=2)
+        arr = stats.checked_matrix(data, "run a KCI test", min_rows=2)
         # The test holds data column j at index _tie_rank[j], in C order, so a query reads the
         # same values in the same order whatever the column order or memory layout.
         self._tie_rank = tie_ranks(arr).tolist()
@@ -242,7 +235,7 @@ class KCI:
             moments = self._low_rank_moments(data[:, x_int], data[:, y_int], z, width, self._rank)
         else:
             xs = np.column_stack([data[:, x_int], 0.5 * z])
-            dev = _kci_backend(n)
+            dev = backend.select_by_size("kci", env.KCI_GPU_THRESHOLD, n * n, amortized=True)
             if dev != "numpy":
                 moments = _kci_moments_torch(xs, data[:, [y_int]], z, width, self._ridge, dev)
             else:
@@ -286,20 +279,6 @@ class KCI:
         p = lxs - ls @ np.linalg.solve(inner, ls.T @ lxs)
         q = ly - ls @ np.linalg.solve(inner, ls.T @ ly)
         return _kci_moments(p @ p.T, q @ q.T)
-
-
-def _kci_backend(n: int) -> str:
-    """Where a KCI query with a conditioning set on ``n`` rows runs: ``numpy``, or torch on ``cpu``
-    or ``cuda``."""
-    manual = env.KCI_GPU_THRESHOLD.read()
-    return backend.select(
-        ("numpy", "cpu", "cuda"),
-        ("cuda", "numpy"),
-        metric=n * n,
-        thresholds=_KCI_GPU_THRESHOLDS if manual is None else {"cuda": manual},
-        amortized=True,
-        op="kci",
-    )
 
 
 def _kci_moments_torch(
@@ -527,7 +506,7 @@ class RCoT:
             raise ValueError(
                 f"feature counts must be at least 1, got {n_features} and {n_features_cond}"
             )
-        arr = _checked_data(data, "RCoT", min_rows=2)
+        arr = stats.checked_matrix(data, "run an RCoT test", min_rows=2)
         # The test holds data column j at index _tie_rank[j], in C order, so a query reads the
         # same values in the same order whatever the column order or memory layout.
         self._tie_rank = tie_ranks(arr).tolist()

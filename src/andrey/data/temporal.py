@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.structure import ARROW, NULL, TAIL, GraphStructure, TemporalStructure
+from andrey.core.structure import GraphStructure, TemporalStructure, endpoint_marks
 
 from .graphs import DAGDraw, dag_truth
 
@@ -146,7 +146,5 @@ def relabel_truth(truth: TemporalStructure, order: np.ndarray) -> TemporalStruct
 
 def _lag_digraph(a_k: np.ndarray, d: int) -> GraphStructure:
     """Build the digraph of a lag matrix's support (``a_k[i, j] != 0`` is the edge ``j -> i``)."""
-    adj = a_k.T != 0  # adj[cause, effect]
-    # mark at the row endpoint of pair (row, col)
-    marks = np.where(adj.T, ARROW, np.where(adj, TAIL, NULL)).astype(np.int8)
+    marks = endpoint_marks(a_k.T != 0)  # [cause, effect]
     return GraphStructure.from_numpy(marks, kind="digraph", allow_self_loops=True)

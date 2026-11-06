@@ -17,12 +17,13 @@ from andrey.api._adapt import (
     column_labels,
     copies_named,
     default_test,
+    label_of,
     structure_output,
 )
 from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL
 from andrey.core.ci_missing import rows_metadata, rows_tested
-from andrey.core.knowledge import Knowledge, _node, column_position, resolve
+from andrey.core.knowledge import Knowledge, as_node, column_position, resolve
 from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ def _fit(
     )
     labels = column_labels(data)
     d = X.shape[1]
-    t = None if target is None else column_position(_node(target, "target"), labels, d, "target")
+    t = None if target is None else column_position(as_node(target, "target"), labels, d, "target")
     constraints = resolve(knowledge, d, labels, method=method)
     settings = {
         "alpha": alpha,
@@ -84,7 +85,7 @@ def _fit(
             adjacent = np.zeros((d, d), dtype=bool)
             adjacent[t, members] = adjacent[members, t] = True
             marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-            name = (lambda j: labels[j]) if labels is not None else int
+            name = label_of(labels)
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
     metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
     return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)

@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from andrey.core.knowledge import column_position
-from andrey.core.structure import node_labels
+from andrey.core.structure import column_labels
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -137,7 +137,7 @@ def normalize_env_targets(
     env, targets = values.get("env", env), values.get("targets", targets)
     X = variables if hasattr(variables, "columns") else np.asarray(variables)
     n, d = np.shape(X)[0], (np.shape(X)[1] if np.ndim(X) == 2 else 0)
-    labels = _column_labels(X)
+    labels = column_labels(X)
     if targets is None:
         if env is None:
             return X, np.zeros(n, dtype=np.intp), [frozenset()], {0: frozenset()}
@@ -372,16 +372,6 @@ def _is_table(value: object) -> bool:
         return np.ndim(value) == 2  # ty: ignore[invalid-argument-type]  # a ValueError is caught
     except ValueError:  # a ragged nested list
         return False
-
-
-def _column_labels(X: Any) -> tuple[str, ...] | None:
-    """A DataFrame's column names as text, ``None`` for an array or the default names ``0..d-1``,
-    as the methods label their nodes."""
-    columns = getattr(X, "columns", None)
-    if columns is None:
-        return None
-    names = list(columns)
-    return None if names == list(range(len(names))) else node_labels(names)
 
 
 def _mapped(

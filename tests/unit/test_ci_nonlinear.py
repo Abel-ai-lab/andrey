@@ -11,7 +11,6 @@ rejection rates over many draws are a measurement, made by ``qa/ci_calibration.p
 from __future__ import annotations
 
 import importlib
-import math
 import subprocess
 import sys
 import warnings
@@ -28,7 +27,7 @@ from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.constraint.pc import pc as pc_engine
-from andrey.core import backend, ci, ci_cmiknn, ci_kernel
+from andrey.core import backend, ci, ci_cmiknn, ci_kernel, env
 from andrey.core.ci_cmiknn import (
     CMIknn,
     _distances,
@@ -776,46 +775,27 @@ def test_the_other_nonlinear_tests_use_one_blas_thread(cls):
 # ---- device dispatch ---------------------------------------------------------------------------
 
 
+_GPU_SETTINGS = {"kci": env.KCI_GPU_THRESHOLD, "cmiknn": env.CMIKNN_GPU_THRESHOLD}
+
+
 @pytest.mark.parametrize(("name", "module"), [("kci", ci_kernel), ("cmiknn", ci_cmiknn)])
 def test_device_dispatch_gates_on_rows_squared(name, module, monkeypatch):
-    """KCI and CMIknn ask for a device by rows squared, may start one, and never take ``mps``."""
+    """KCI and CMIknn ask for a device by rows squared, may start one, never take ``mps``, and read
+    their own cutoff variable."""
+    monkeypatch.delenv(_GPU_SETTINGS[name].name, raising=False)
     seen = []
 
     def spy(pinnable, auto_order, *, metric=None, thresholds=None, amortized=True, op=None):
-        seen.append((metric, amortized, op, "mps" in pinnable))
+        seen.append((metric, amortized, op, "mps" in pinnable, thresholds["cuda"]))
         return "numpy"
 
     monkeypatch.setattr(module.backend, "select", spy)
-    _build(name, _common_cause(seed=0, n=60, n_cond=1))(0, 1, [2])
-    assert set(seen) == {(60 * 60, True, name, False)}
-
-
-@pytest.mark.parametrize(
-    ("choose", "cutoffs", "var"),
-    [
-        (ci_kernel._kci_backend, ci_kernel._KCI_GPU_THRESHOLDS, "ANDREY_KCI_GPU_THRESHOLD"),
-        (
-            ci_cmiknn._cmiknn_backend,
-            ci_cmiknn._CMIKNN_GPU_THRESHOLDS,
-            "ANDREY_CMIKNN_GPU_THRESHOLD",
-        ),
-    ],
-)
-def test_device_cutoff_is_rows_squared_and_reads_its_variable(choose, cutoffs, var, monkeypatch):
-    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", var):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
-    first = math.isqrt(cutoffs["cuda"] - 1) + 1  # the fewest rows whose square reaches the cutoff
-    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
-    monkeypatch.setenv(var, "100")
-    assert (choose(9), choose(10)) == ("numpy", "cuda")
-    with andrey.config(backend="mps"):
-        assert choose(10) == "cuda"  # float32 mps is not a backend of these tests
-
-
-def test_device_cutoffs_never_choose_mps():
-    assert ci_kernel._KCI_GPU_THRESHOLDS["mps"] is None
-    assert ci_cmiknn._CMIKNN_GPU_THRESHOLDS["mps"] is None
+    data = _common_cause(seed=0, n=60, n_cond=1)
+    _build(name, data)(0, 1, [2])
+    monkeypatch.setenv(_GPU_SETTINGS[name].name, "100")
+    _build(name, data)(0, 1, [2])
+    cutoff = backend.GPU_THRESHOLDS[name]["cuda"]
+    assert set(seen) == {(60 * 60, True, name, False, cutoff), (60 * 60, True, name, False, 100)}
 
 
 @pytest.mark.parametrize("n_cond", [0, 1, 2])

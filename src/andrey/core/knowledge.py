@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from .structure import ARROW, NULL, TAIL
+from .structure import ARROW, NULL, TAIL, has_cycle
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -44,7 +44,11 @@ KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 KNOWLEDGE_PARTS: tuple[KnowledgePart, ...] = ("required", "forbidden", "allowed", "tiers")
 
 
-def _node(value: object, what: str) -> Node:
+def as_node(value: object, what: str) -> Node:
+    """Return ``value`` as a node: a column label (``str``) or a 0-based position (``int``).
+
+    Raises ``TypeError``, opening with ``what``, for any other value, a ``bool`` included.
+    """
     if isinstance(value, (bool, np.bool_)) or not isinstance(value, (str, int, np.integer)):
         raise TypeError(
             f"{what} names a node by column label or 0-based position, got {value!r} "
@@ -64,7 +68,7 @@ def _edges(values: Iterable | None, what: str, *, lagged: bool = False) -> tuple
     for pair in values:
         if isinstance(pair, (str, bytes)) or len(pair) not in ((2, 3) if lagged else (2,)):
             raise TypeError(f"{what} must be an iterable of {shape}, got {pair!r}")
-        a, b = _node(pair[0], what), _node(pair[1], what)
+        a, b = as_node(pair[0], what), as_node(pair[1], what)
         if len(pair) == 2:
             if a == b:
                 raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r})")
@@ -258,7 +262,7 @@ class Knowledge:
                 raise TypeError(
                     f"tiers must be an iterable of node iterables, got the tier {tier!r}"
                 )
-            nodes = tuple(_node(v, "tiers") for v in tier)
+            nodes = tuple(as_node(v, "tiers") for v in tier)
             for v in nodes:
                 if v in seen:
                     raise ValueError(f"tiers list {v!r} more than once")
@@ -362,7 +366,7 @@ class Constraints:
         before = self.required | (
             tiered[:, None] & tiered[None, :] & (self.tier[:, None] < self.tier[None, :])
         )
-        if _has_cycle(before):
+        if has_cycle(before):
             raise KnowledgeError(
                 "the required edges and the tiers admit no causal order: following them leads "
                 "from a column back to itself through an untiered column"
@@ -385,21 +389,6 @@ class Constraints:
         return Constraints(
             self.forbidden[np.ix_(idx, idx)], self.required[np.ix_(idx, idx)], self.tier[idx]
         )
-
-
-def _has_cycle(edges: np.ndarray) -> bool:
-    """Whether the directed graph ``edges[i, j]`` (``i -> j``) has a cycle (Kahn's algorithm)."""
-    indegree = edges.sum(axis=0)
-    ready = list(np.flatnonzero(indegree == 0))
-    seen = 0
-    while ready:
-        i = ready.pop()
-        seen += 1
-        for j in np.flatnonzero(edges[i]).tolist():
-            indegree[j] -= 1
-            if indegree[j] == 0:
-                ready.append(j)
-    return seen < edges.shape[0]
 
 
 def _given(knowledge: object) -> bool:
@@ -506,7 +495,7 @@ def resolve(
                 "(directly, by the tiers, or by leaving the pair out of allowed)"
             )
         required[i, j] = True
-    if (required & required.T).any() or _has_cycle(required):
+    if (required & required.T).any() or has_cycle(required):
         raise KnowledgeError("knowledge requires edges that form a directed cycle")
     forbidden |= required.T
     return Constraints(forbidden, required, tier)
@@ -603,7 +592,7 @@ def resolve_lagged(
                 "(directly, by the tiers, or by leaving the pair out of allowed)"
             )
         required[lag, i, j] = True
-    if (required[0] & required[0].T).any() or _has_cycle(required[0]):
+    if (required[0] & required[0].T).any() or has_cycle(required[0]):
         raise KnowledgeError("knowledge requires lag-0 links that form a directed cycle")
     forbidden[0] |= required[0].T
     return LaggedConstraints(forbidden, required, tier)

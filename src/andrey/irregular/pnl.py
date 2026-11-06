@@ -47,10 +47,6 @@ _BARRIER_FLOOR = 1e-6
 _MAX_NEWTON = 60
 _TOL = 1e-8
 
-# Smallest kernel matrix (rows squared) at which `auto` runs a table's PNL tests on a CUDA GPU.
-# PNL computes in float64, so `mps` (float32) is never used.
-_PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 26_278, "mps": None}
-
 # Device memory one batch of disturbance kernels uses.
 _DEVICE_BATCH_BYTES = 2**30
 
@@ -363,19 +359,6 @@ def _ordered_tests(
     }
 
 
-def _pnl_backend(n: int, *, amortized: bool) -> str:
-    """Where PNL's tests on ``n`` rows run: ``numpy``, or torch on ``cpu`` or ``cuda``."""
-    manual = env.PNL_GPU_THRESHOLD.read()
-    return backend.select(
-        ("numpy", "cpu", "cuda"),
-        ("cuda", "numpy"),
-        metric=n * n,
-        thresholds=_PNL_GPU_THRESHOLDS if manual is None else {"cuda": manual},
-        amortized=amortized,
-        op="pnl",
-    )
-
-
 def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
     """Return ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the pair ``x, y``.
 
@@ -387,7 +370,8 @@ def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
     value means weaker dependence. ``x`` and ``y`` are 1-D arrays of equal length.
     """
     columns = {0: _column(x), 1: _column(y)}
-    dev = _pnl_backend(columns[0].standardized.shape[0], amortized=False)
+    n = columns[0].standardized.shape[0]
+    dev = backend.select_by_size("pnl", env.PNL_GPU_THRESHOLD, n * n, amortized=False)
     tests = _ordered_tests(columns, [(0, 1), (1, 0)], backend.worker_count(), dev)
     (stat_forward, pval_forward), (stat_backward, pval_backward) = tests[0, 1], tests[1, 0]
     return pval_forward, pval_backward, stat_forward, stat_backward
@@ -423,7 +407,8 @@ def pnl_pairs(
         return np.empty((0, 4))
     columns = {k: _column(arr[:, k]) for k in sorted({k for pair in chosen for k in pair})}
     tasks = [(i, j) for i, j in chosen] + [(j, i) for i, j in chosen]
-    dev = _pnl_backend(arr.shape[0], amortized=True)
+    n = arr.shape[0]
+    dev = backend.select_by_size("pnl", env.PNL_GPU_THRESHOLD, n * n, amortized=True)
     tests = _ordered_tests(columns, tasks, backend.worker_count(n_jobs), dev)
     return np.array(
         [(tests[i, j][1], tests[j, i][1], tests[i, j][0], tests[j, i][0]) for i, j in chosen],

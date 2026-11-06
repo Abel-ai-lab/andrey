@@ -17,7 +17,8 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
 from andrey.search.hc import tie_ranks
 
-from .ci import _canonical_ranked, _checked_data, per_query
+from . import stats
+from .ci import _canonical_ranked, per_query
 from .seeding import resolve_seed
 
 __all__ = ["GPDC"]
@@ -116,7 +117,7 @@ class GPDC:
     def __init__(self, data: np.ndarray, *, n_null: int = 1000, seed: int | None = None) -> None:
         if n_null < 1:
             raise ValueError(f"n_null must be at least 1, got {n_null}")
-        arr = _checked_data(data, "GPDC", min_rows=2)
+        arr = stats.checked_matrix(data, "run a GPDC test", min_rows=2)
         # The test holds data column j at index _tie_rank[j], in C order, so a query reads the
         # same values in the same order whatever the column order or memory layout.
         self._tie_rank = tie_ranks(arr).tolist()

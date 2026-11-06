@@ -44,7 +44,7 @@ def test_pinned_device_actually_runs_on_hardware(device):
     """Guard against a silent CPU pass: prove the pin dispatches and executes on the device."""
     with andrey.config(backend=device):
         # A pin overrides the size threshold, so even a tiny call must resolve to the device.
-        assert backend.resolve(1, stats._COV_GPU_THRESHOLDS) == device
+        assert backend.resolve(1, backend.GPU_THRESHOLDS["cov"]) == device
     # describe() sees the hardware, and a real tensor lands on it at the expected precision.
     assert getattr(andrey.describe(), device) is True
     t = backend.as_tensor(np.ones(4), device)

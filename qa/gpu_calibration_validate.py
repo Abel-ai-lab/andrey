@@ -104,8 +104,8 @@ def main() -> None:
     print(f"device: {device} ({name or 'unnamed'})")
     print(f"fingerprint: {stats._device_fingerprint(device)}")
     print(
-        f"shipped defaults: entropy={stats._ENTROPY_GPU_THRESHOLDS[device]!r} "
-        f"cov={stats._COV_GPU_THRESHOLDS[device]!r}\n"
+        f"shipped defaults: entropy={backend.GPU_THRESHOLDS['entropy'][device]!r} "
+        f"cov={backend.GPU_THRESHOLDS['cov'][device]!r}\n"
     )
 
     ok = _report(
@@ -114,7 +114,7 @@ def main() -> None:
         stats._entropy_probe,
         stats.entropy,
         stats._ENTROPY_PROBE_START,
-        stats._ENTROPY_GPU_THRESHOLDS[device],
+        backend.GPU_THRESHOLDS["entropy"][device],
     )
     ok &= _report(
         "cov",
@@ -122,14 +122,14 @@ def main() -> None:
         stats._cov_probe,
         stats._cov_probe_call,
         stats._COV_PROBE_START,
-        stats._COV_GPU_THRESHOLDS[device],
+        backend.GPU_THRESHOLDS["cov"][device],
     )
 
     if device == "cuda":  # KCI, CMIknn, and PNL have no mps backend
         for op, make, call, default in (
-            ("kci", _kci_probe, _query, ci_kernel._KCI_GPU_THRESHOLDS["cuda"]),
-            ("cmiknn", _cmiknn_probe, _query, ci_cmiknn._CMIKNN_GPU_THRESHOLDS["cuda"]),
-            ("pnl", _ci_probe, _pnl_query, pnl._PNL_GPU_THRESHOLDS["cuda"]),
+            ("kci", _kci_probe, _query, backend.GPU_THRESHOLDS["kci"]["cuda"]),
+            ("cmiknn", _cmiknn_probe, _query, backend.GPU_THRESHOLDS["cmiknn"]["cuda"]),
+            ("pnl", _ci_probe, _pnl_query, backend.GPU_THRESHOLDS["pnl"]["cuda"]),
         ):
             ok &= _report(op, device, make, call, 250_000, default)
 
@@ -146,7 +146,7 @@ def main() -> None:
         stats._entropy_probe,
         stats.entropy,
         stats._ENTROPY_PROBE_START,
-        stats._ENTROPY_GPU_THRESHOLDS[device],
+        backend.GPU_THRESHOLDS["entropy"][device],
     )
     stats._CALIBRATED.clear()
     began = time.perf_counter()
@@ -156,7 +156,7 @@ def main() -> None:
         stats._entropy_probe,
         stats.entropy,
         stats._ENTROPY_PROBE_START,
-        stats._ENTROPY_GPU_THRESHOLDS[device],
+        backend.GPU_THRESHOLDS["entropy"][device],
     )
     reuse_s = time.perf_counter() - began
     reused = reuse_s < 1.0 and second == first
