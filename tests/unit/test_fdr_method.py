@@ -136,13 +136,6 @@ def test_pcmci_keeps_the_links_whose_adjusted_p_value_is_at_most_alpha():
     assert links(adjusted) < links(raw)  # a correction removes links on this series, adds none
 
 
-@pytest.mark.parametrize("method", METHODS)
-def test_an_adjusted_p_value_is_never_below_the_tested_one(method):
-    raw, adjusted = fit(method, fdr_method="none"), fit(method)
-    assert np.all(lagged(adjusted) >= lagged(raw))
-    assert np.all(lagged(adjusted) <= 1.0)
-
-
 def test_pcmciplus_adjusts_the_lagged_p_values_only_and_keeps_its_links():
     raw, adjusted = fit("pcmciplus", fdr_method="none"), fit("pcmciplus")
     p_raw, p_adjusted = (

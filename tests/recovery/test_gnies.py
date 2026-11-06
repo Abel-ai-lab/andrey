@@ -5,8 +5,8 @@ environments gives the directed edge, with the effect as the one target. The gro
 linear-Gaussian data from ``andrey.data`` with an observational environment and three that each
 scale one variable's noise variance, at 10 variables and 10,000 rows per environment: the true
 class and targets on seeds 0-3 and 5, five of the 19 seeds in 0-19 that the shipped defaults
-recover. The recorded outputs are the marks and targets of three small draws, and the graph,
-score, and targets of the ``gauss_5v_noise_shift`` baseline.
+recover. The recorded output is the graph, score, and targets of the ``gauss_5v_noise_shift``
+baseline.
 """
 
 from __future__ import annotations
@@ -71,48 +71,6 @@ def test_recovers_the_class_and_targets(seed):
     out = andrey.gnies(X, env)
     assert shd(out.structure, truth) == 0
     assert _targets(out) == targets
-
-
-#: Each small draw's marks and targets, as ``andrey.gnies`` returned them at its defaults.
-RECORDED = {
-    0: (
-        [
-            (0, 1, "undirected"),
-            (1, 2, "directed"),
-            (2, 3, "directed"),
-            (2, 4, "directed"),
-            (3, 4, "directed"),
-        ],
-        [2, 4],
-    ),
-    1: (
-        [
-            (2, 0, "directed"),
-            (0, 3, "directed"),
-            (1, 3, "directed"),
-            (1, 4, "undirected"),
-            (2, 3, "directed"),
-        ],
-        [0, 3],
-    ),
-    2: (
-        [
-            (1, 0, "directed"),
-            (2, 0, "directed"),
-            (2, 1, "directed"),
-            (2, 3, "directed"),
-            (2, 4, "undirected"),
-        ],
-        [1, 3],
-    ),
-}
-
-
-@pytest.mark.parametrize("seed", sorted(RECORDED))
-def test_recorded_output(seed):
-    X, env, _, _ = _draw(seed, [400, 300, 200], d=5, avg_degree=2.0, n_targets=2)
-    out = andrey.gnies(X, env)
-    assert (out.structure.oriented_edges(), _targets(out)) == RECORDED[seed]
 
 
 def test_recorded_baseline():

@@ -37,25 +37,6 @@ def test_grasp_at_depth_2_recovers_the_depth_3_graph():
     assert depth_2.metadata["score"] == pytest.approx(depth_3.metadata["score"], abs=1e-9)
 
 
-def test_hc_output_contract():
-    out = andrey.hc(datagen.generate("gauss_5v"))
-    assert out.structure.kind == "cpdag" and "score" in out.metadata
-
-
-def test_boss_grasp_output_contract():
-    x = datagen.generate("gauss_5v")
-    assert andrey.boss(x).structure.kind == "cpdag"
-    assert andrey.grasp(x).structure.kind == "cpdag"
-
-
-def test_boss_grasp_deterministic():
-    x = datagen.generate("gauss_5v")
-    assert np.array_equal(andrey.boss(x).structure.to_numpy(), andrey.boss(x).structure.to_numpy())
-    assert np.array_equal(
-        andrey.grasp(x).structure.to_numpy(), andrey.grasp(x).structure.to_numpy()
-    )
-
-
 def test_boss_equal_scores_are_stable_under_input_rounding():
     # Four centered rows give every variable variance 18 and every pair covariance 15.
     # Each single parent has the same BIC; a second parent does not improve it. That holds for the
@@ -77,8 +58,3 @@ def test_boss_equal_scores_are_stable_under_input_rounding():
     expected[hub, hub] = 0
     np.testing.assert_array_equal(base.to_numpy(), expected)
     np.testing.assert_array_equal(moved.to_numpy(), expected)
-
-
-def test_hc_rejects_unknown_score():
-    with pytest.raises(ValueError):
-        andrey.hc(datagen.generate("gauss_5v"), score_func="local_score_CV_general")

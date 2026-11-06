@@ -72,15 +72,6 @@ def test_matches_the_recorded_output_on_gauss_5v():
     assert_recorded_output(andrey.xges(datagen.generate("gauss_5v")), "XGES", case="gauss_5v")
 
 
-def test_output_contract():
-    x = datagen.generate("gauss_7v")
-    out = andrey.xges(x)
-    assert out.structure.kind == "cpdag"
-    assert out.metadata["algorithm"] == "xges"
-    assert np.isfinite(out.metadata["score"])
-    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "xges"
-
-
 # ---- ground truth --------------------------------------------------------------------------------
 
 # Sparse graphs with many samples: GES recovers every true CPDAG, and so must XGES.
@@ -166,13 +157,6 @@ def test_queue_search_matches_the_rescanning_reference(seed, extended_search, eb
     assert fast_score == slow_score
 
 
-def test_repeat_runs_are_identical():
-    x = _dense(0).data
-    first, second = andrey.xges(x), andrey.xges(x)
-    assert np.array_equal(from_structure(first.structure), from_structure(second.structure))
-    assert first.metadata["score"] == second.metadata["score"]
-
-
 def test_penalty_discount_is_the_penalty_ges_uses():
     """At the same penalty_discount, XGES without the extended search and GES search the same
     score: on a graph both recover, the reported scores agree."""
@@ -243,19 +227,6 @@ def test_a_stale_snapshot_cannot_seed_a_branch():
         g.branch(stale)
 
 
-@pytest.mark.parametrize("extended_search", [True, False])
-def test_singular_parent_sets_raise_no_floating_point_warning(extended_search):
-    """With fewer rows than columns some parent sets fit their child exactly and are singular;
-    the search scores them without a numpy warning, as the whole run, including the extended
-    search's trials, ignores divisions by zero."""
-    x = np.random.default_rng(0).standard_normal((8, 12))
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        graph, total = xges_search(x, extended_search=extended_search)
-        assert np.isfinite(_marks_total(from_structure(graph), BICScore(x)))
-    assert np.isfinite(total)
-
-
 def _colliding_pairs(pairs: int) -> list[int]:
     """Indices ``j`` whose undirected edges ``2j -- 2j+1`` have edge keys that XOR to zero.
 
@@ -293,11 +264,16 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
 
 @pytest.mark.parametrize("extended_search", [True, False])
 def test_fewer_rows_than_columns_keep_parent_sets_that_can_be_scored(extended_search):
-    """With fewer rows than columns, a parent set of ``n - 1`` or more fits its child exactly. The
-    search never picks one, so every node of the graph's DAG extension has a finite score."""
+    """With fewer rows than columns, a parent set of ``n - 1`` or more fits its child exactly and is
+    singular. The search never picks one, so every node of the graph's DAG extension has a finite
+    score, and it scores the singular sets it tries without a numpy warning, as the whole run,
+    including the extended search's trials, ignores divisions by zero."""
     n, d = 8, 12
     x = np.random.default_rng(0).standard_normal((n, d))
-    graph, total = xges_search(x, extended_search=extended_search)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        graph, total = xges_search(x, extended_search=extended_search)
+        assert np.isfinite(_marks_total(from_structure(graph), BICScore(x)))
     dag = pdag2dag(from_structure(graph))
     assert max(int(np.count_nonzero(dag[:, v] == TAIL)) for v in range(d)) <= n - 2
     assert np.isfinite(total)

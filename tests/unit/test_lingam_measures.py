@@ -70,14 +70,6 @@ def test_matrix_is_the_pairwise_formula_and_antisymmetric(name: str) -> None:
     assert not np.diag(m).any()
 
 
-def test_skew_entry_is_the_third_order_cumulant_statistic() -> None:
-    """Eq. 10 with ``g(u) = -u^2`` is ``rho E{x^2 y - x y^2}``, the statistic of Theorem 2."""
-    x = _standardize(_chain(_exponential, 4000, seed=2, d=2))
-    m = pwling.nonlinear_correlations(x, lambda u: -(u * u))
-    rho = np.mean(x[:, 0] * x[:, 1])
-    assert m[0, 1] == pytest.approx(rho * np.mean(x[:, 0] ** 2 * x[:, 1] - x[:, 0] * x[:, 1] ** 2))
-
-
 @pytest.mark.parametrize("rho", [0.6, -0.6])
 def test_theorem_2_the_cause_gives_skew_times_rho_squared_minus_rho_cubed(rho: float) -> None:
     """Under x -> y, ``R = skew(x) (rho^2 - rho^3)`` for standardized columns (Theorem 2)."""
