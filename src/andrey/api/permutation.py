@@ -1477,7 +1477,9 @@ def boss_fci(
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists the triples the rule left
         ambiguous, as ``[x, z, y]``: 0-based column positions, the middle node second and
-        ``x < y``, in ascending order.
+        ``x < y``, in ascending order. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
+        used, under their parameter names.
 
     Raises
     ------
@@ -1508,12 +1510,6 @@ def boss_fci(
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers; each message warns once per process.
 
-    See Also
-    --------
-    andrey.boss : The same search without the FCI phase, for data with no hidden common cause.
-    andrey.gfci : The same pipeline with GES's search.
-    andrey.grasp_fci : The same pipeline with GRaSP's search.
-
     Notes
     -----
     **When to use.** BOSS-FCI suits i.i.d. observational continuous data with linear effects and
@@ -1541,8 +1537,9 @@ def boss_fci(
     records the union of the separating subsets of the smallest size, as :func:`~andrey.gfci` does.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
-    its BOSS phase scores every variable over the same rows. Drop the incomplete rows first, or use
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    its BOSS phase scores every variable over the same rows. Drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
+    per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 20 measured variables with 4
     hidden common causes, mean degree 4, and 1,000 rows; on 7 variables simulated on the ASIA
@@ -1551,7 +1548,9 @@ def boss_fci(
     :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the same
     data, and its possible-d-separation step can test many subsets of each node's possible
     d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
-    Fisher's z test assume linear effects with Gaussian noise.
+    Fisher's z test assume linear effects with Gaussian noise. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1727,7 +1726,9 @@ def grasp_fci(
         read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
         ``"majority"``, ``metadata["ambiguous_triples"]`` lists the triples the rule left
         ambiguous, as ``[x, z, y]``: 0-based column positions, the middle node second and
-        ``x < y``, in ascending order.
+        ``x < y``, in ascending order. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
+        used, under their parameter names.
 
     Raises
     ------
@@ -1758,12 +1759,6 @@ def grasp_fci(
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers; each message warns once per process.
 
-    See Also
-    --------
-    andrey.grasp : The same search without the FCI phase, for data with no hidden common cause.
-    andrey.gfci : The same pipeline with GES's search.
-    andrey.boss_fci : The same pipeline with BOSS's search.
-
     Notes
     -----
     **When to use.** GRaSP-FCI suits i.i.d. observational continuous data with linear effects and
@@ -1782,8 +1777,9 @@ def grasp_fci(
     columns are identical.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
-    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows first, or
-    use :func:`~andrey.fci`, whose tests delete rows per test.
+    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
+    per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 20 measured variables with 4
     hidden common causes, mean degree 4, and 1,000 rows; on 7 variables simulated on the ASIA
@@ -1792,7 +1788,9 @@ def grasp_fci(
     :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on the same
     data, and its possible-d-separation step can test many subsets of each node's possible
     d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
-    Fisher's z test assume linear effects with Gaussian noise.
+    Fisher's z test assume linear effects with Gaussian noise. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

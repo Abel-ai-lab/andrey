@@ -37,6 +37,8 @@ WIDTH = 100
 SENTENCE_END = re.compile(r"\.\s+(?=[A-Z`:])")
 #: The arguments a score search records in ``metadata`` as the penalties its score used.
 PENALTIES = ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
+#: The score searches followed by FCI's tests and rules, which refuse missing values.
+FCI_SEARCHES = ("gfci", "boss_fci", "grasp_fci")
 
 
 class Shared(NamedTuple):
@@ -120,14 +122,24 @@ SHARED = {
         "of a column of the DataFrame ``data`` that holds them.",
         lambda m: any(i.name == "env" for i in REGISTRY[m].data.inputs) and m != "cdnod",
     ),
-    # gfci points to fci alone; icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
+    # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
         "**Missing values.**",
         "last",
         "Drop the incomplete rows first, which suits values missing completely at random, or use "
         ":func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
-        lambda m: refuses_missing(m, series=False) and m not in ("gfci", "icp", "igsp", "ut_igsp"),
+        lambda m: (
+            refuses_missing(m, series=False) and m not in (*FCI_SEARCHES, "icp", "igsp", "ut_igsp")
+        ),
+    ),
+    "drop_rows_fci": Shared(
+        "Notes",
+        "**Missing values.**",
+        "last",
+        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        ":func:`~andrey.fci`, whose tests delete rows per test.",
+        lambda m: m in FCI_SEARCHES,
     ),
     # longitudinal_lingam reads units at each time point, not one series.
     "fill_steps": Shared(
