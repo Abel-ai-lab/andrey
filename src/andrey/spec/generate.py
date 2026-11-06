@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
+from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
 from .concepts import BOOTSTRAP_PARAMS, CONCEPTS, MARKOV_CHECK_PARAMS
@@ -25,14 +26,34 @@ if TYPE_CHECKING:
 
 SCHEMA_VERSION = "2"
 
-# Semantic exit codes (mirrored by the CLI) -- an agent branches on these without parsing English.
+# Semantic exit codes, which the CLI exits with -- an agent branches on these without parsing
+# English.
+EXIT_OK = 0
+EXIT_INTERNAL = 1
+EXIT_USAGE = 2
+EXIT_DATA = 3
+EXIT_ALGORITHM = 4
 EXIT_CODES = {
-    "0": "success",
-    "2": "usage or validation error (fix the call)",
-    "3": "data error: bad shape, NaN, or singular input (fix the input)",
-    "4": "algorithm failure: non-convergence or numerical breakdown (retry / adjust)",
-    "1": "unexpected internal error",
+    str(EXIT_OK): "success",
+    str(EXIT_USAGE): "usage or validation error (fix the call)",
+    str(EXIT_DATA): "data error: bad shape, NaN, or singular input (fix the input)",
+    str(EXIT_ALGORITHM): (
+        "algorithm failure: non-convergence or numerical breakdown (retry / adjust)"
+    ),
+    str(EXIT_INTERNAL): "unexpected internal error",
 }
+
+# How each command is called, for the CLI contract and the skill.
+RUN_INVOCATION = "andrey run <method> --data <path|-> [key=value ...]"
+BOOTSTRAP_INVOCATION = (
+    "andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] [--threshold T] "
+    "[--strict] [--resampling subsample|bootstrap] [--sample-fraction F] [--block-length ROWS] "
+    "[key=value ...]"
+)
+MARKOV_CHECK_INVOCATION = (
+    "andrey markov-check <graph.json> <data.csv> [--indep-test T] [--alpha A] "
+    "[--categorical COLUMN ...] [--sample-fraction F] [--seed S]"
+)
 
 EXPERIMENTAL_NOTE = (
     "Methods marked experimental have no published benchmark, may change their API without "
@@ -49,22 +70,18 @@ _JSON_TYPES: dict[str, dict] = {
     "knowledge": {
         "type": "object",
         "properties": {
-            **{
-                part: {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": {"type": ["string", "integer"]},
-                        "minItems": 2,
-                        "maxItems": 2 if part == "allowed" else 3,
-                    },
-                }
-                for part in ("required", "forbidden", "allowed")
-            },
-            "tiers": {
+            part: {
                 "type": "array",
-                "items": {"type": "array", "items": {"type": ["string", "integer"]}},
-            },
+                "items": {"type": "array", "items": {"type": ["string", "integer"]}}
+                if part == "tiers"
+                else {
+                    "type": "array",
+                    "items": {"type": ["string", "integer"]},
+                    "minItems": 2,
+                    "maxItems": 2 if part == "allowed" else 3,
+                },
+            }
+            for part in KNOWLEDGE_PARTS
         },
         "additionalProperties": False,
     },
@@ -174,15 +191,25 @@ def _example_token(p: ParamSpec) -> str:
     return f"'{p.name}={val}'" if p.type in ("int_pair", "str_list") else f"{p.name}={val}"
 
 
-def cli_example(spec: MethodSpec) -> str:
-    parts = ["andrey", "run", spec.name]
-    multi_input = len(spec.data.inputs) > 1  # only one input can read stdin, so no `-` when >1
+def cli_example(spec: MethodSpec, command: str = "run", *, files: bool = False) -> str:
+    """A call of the method on the command line with one ``key=value`` override.
+
+    Each input reads ``<path>``, or ``<path|->`` when it is the only input, since only one input
+    can read stdin; ``files`` names example files instead: ``data.csv``, ``a.csv`` and ``b.csv``
+    for a panel, whose flag repeats, and ``<name>.csv`` for another input.
+    """
+    parts = ["andrey", command, spec.name]
+    lone = len(spec.data.inputs) == 1
     for inp in spec.data.inputs:
-        if inp.kind == "panel":  # >= 2 datasets: repeat the flag
-            parts += [inp.flag, "<path>", inp.flag, "<path>"]
+        if inp.kind == "panel":
+            paths = ["a.csv", "b.csv"] if files else ["<path>", "<path>"]
+        elif files:
+            paths = ["data.csv" if inp.name == "data" else f"{inp.name}.csv"]
         else:
-            parts += [inp.flag, "<path>" if multi_input else "<path|->"]
-    if spec.params:  # one runnable key=value override
+            paths = ["<path|->" if lone else "<path>"]
+        for path in paths:
+            parts += [inp.flag, path]
+    if spec.params:
         parts.append(_example_token(spec.params[0]))
     return " ".join(parts)
 
@@ -236,24 +263,12 @@ def to_json_schema(spec: MethodSpec) -> dict:
 
 
 def env_dict() -> dict:
-    return {
-        "variables": [
-            {
-                "name": v.name,
-                "values": v.values,
-                "default": v.default,
-                "effect": v.effect,
-                "group": v.group,
-            }
-            for v in ENV_VARS
-        ],
-        "precedence": list(PRECEDENCE),
-    }
+    return {"variables": [v.model_dump() for v in ENV_VARS], "precedence": list(PRECEDENCE)}
 
 
 def cli_meta() -> dict:
     return {
-        "invocation": "andrey run <method> --data <path|-> [key=value ...]",
+        "invocation": RUN_INVOCATION,
         "params": (
             "hyperparameters are `key=value` after the method (or a `--config <file>` YAML/JSON "
             "base; overrides win). Types / choices are in each method's `params` schema below -- "
@@ -294,11 +309,7 @@ def cli_meta() -> dict:
             "fit's warnings (category, message)",
         },
         "bootstrap": {
-            "invocation": (
-                "andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] "
-                "[--threshold T] [--strict] [--resampling subsample|bootstrap] "
-                "[--sample-fraction F] [--block-length ROWS] [key=value ...]"
-            ),
+            "invocation": BOOTSTRAP_INVOCATION,
             "what": (
                 "refits the method on resamples of the rows and reports how often each edge "
                 "appears: by default subsamples of --sample-fraction (0.5) of the rows drawn "
@@ -319,10 +330,7 @@ def cli_meta() -> dict:
             ),
         },
         "markov_check": {
-            "invocation": (
-                "andrey markov-check <graph.json> <data.csv> [--indep-test T] [--alpha A] "
-                "[--categorical COLUMN ...] [--sample-fraction F] [--seed S]"
-            ),
+            "invocation": MARKOV_CHECK_INVOCATION,
             "what": (
                 "tests the conditional independences a DAG or CPDAG implies against the data, one "
                 "p-value each, and tests whether those p-values are uniform (Anderson-Darling). "
@@ -462,7 +470,7 @@ def render_skill() -> str:
     a("")
     a("1. `andrey list` -- enumerate every method with its status and summary (start here).")
     a("2. `andrey run <method> --help --json` -- the method contract: inputs, params, output.")
-    a("3. `andrey run <method> --data <path|-> [key=value ...]` -- execute; envelope to stdout.")
+    a(f"3. `{RUN_INVOCATION}` -- execute; envelope to stdout.")
     a("")
     a(
         "Data is passed by file path or `-` for stdin (CSV / TSV / .npy), never inline. A header "
@@ -504,8 +512,7 @@ def render_skill() -> str:
     a("## How stable an edge is")
     a("")
     a(
-        "`andrey bootstrap <method> --data <path|-> [--n-resamples N] [--seed S] [--threshold T] "
-        "[--strict] [--resampling subsample|bootstrap] [--sample-fraction F] [key=value ...]` "
+        f"`{BOOTSTRAP_INVOCATION}` "
         "refits the method on resamples of the rows and answers how often each edge appears. It "
         "takes the inputs and `key=value` params of `andrey run`, and not `gin`. Its envelope is "
         "a run's, with `structure` the averaged graph: each pair keeps its most frequent edge "
@@ -532,8 +539,7 @@ def render_skill() -> str:
     a("## Whether the data support a graph")
     a("")
     a(
-        "`andrey markov-check <graph.json> <data.csv> [--indep-test T] [--alpha A] "
-        "[--categorical COLUMN ...] [--sample-fraction F] [--seed S]` tests a DAG or CPDAG (the "
+        f"`{MARKOV_CHECK_INVOCATION}` tests a DAG or CPDAG (the "
         "JSON of `andrey run <method> -o`) against data: each ordered local Markov independence, "
         "a variable and an earlier non-parent given its parents, gets a p-value, and the check "
         "asks whether those p-values are uniform. Its envelope holds `markov_check`, with "

@@ -15,7 +15,7 @@ from andrey import Knowledge
 from andrey.cli import main
 from andrey.constraint.fci import _fci_orient, _remove_by_possible_dsep
 from andrey.core import ARROW, NULL, TAIL
-from andrey.core.knowledge import KnowledgeError, admits, resolve, resolve_lagged
+from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError, admits, resolve, resolve_lagged
 from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
@@ -420,11 +420,6 @@ def test_names_need_column_labels():
         resolve(Knowledge(required=[("a", "b")]), 3, None, method="pc")
 
 
-def test_a_part_a_method_does_not_honor_raises():
-    with pytest.raises(NotImplementedError, match="does not honor"):
-        resolve(Knowledge(tiers=[[0], [1]]), 2, None, method="m", honors=("required",))
-
-
 def test_order_searches_reject_tiers_and_required_edges_without_an_order():
     # c -> b -> a is allowed edge by edge, but puts a before c against the tiers.
     k = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
@@ -557,7 +552,7 @@ def test_schema_lists_the_parts_each_method_honors():
 
     for name in (*METHODS, *TEMPORAL):
         schema = to_json_schema(REGISTRY[name])
-        assert schema["knowledge"] == list(REGISTRY[name].knowledge)
+        assert schema["knowledge"] == list(KNOWLEDGE_PARTS)
         assert schema["params"]["properties"]["knowledge"]["type"] == ["object", "null"]
 
 

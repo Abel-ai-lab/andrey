@@ -9,7 +9,7 @@ display the parameter defaults defined here.
 from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
-from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
+from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
 from .concepts import CONCEPTS, concept_param
@@ -131,7 +131,6 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -140,7 +139,6 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -173,7 +171,6 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -182,7 +179,6 @@ _add(
             '`tie_break="position"` fires the orientation rules one at a time in column order, and '
             'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -215,7 +211,6 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -225,7 +220,6 @@ _add(
             'records the first separating subset found, and it or `possible_dsep="fast"` visits '
             "the possible-d-separation step in column order."
         ),
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -287,7 +281,6 @@ _add(
             "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
             "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -296,7 +289,6 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -355,7 +347,6 @@ _add(
             "[x, z, y] triples the rule left ambiguous, by 0-based position, the index numbered "
             "n_variables",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
@@ -364,7 +355,6 @@ _add(
             '`tie_break="position"` fires the orientation rules one at a time in column order, and '
             'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
         ),
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -413,7 +403,6 @@ _add(
             "metadata['p_values'] and metadata['confidence_intervals'] per column, "
             "metadata['accepted_sets'], metadata['model_rejected']",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -534,12 +523,10 @@ for _name, _summary, _key, _structure, _kind, _refs in (
                 graph_kind=_kind,
                 doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
-            determinism="stochastic",
             accel="numpy",
             status="supported",
             column_order="relabels",
             tie_break=True,
-            seeded=True,
             params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
             references=_refs,
         )
@@ -563,7 +550,6 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -616,7 +602,6 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -678,7 +663,6 @@ _add(
             "some two environments, in column order; with env, its labels in "
             "metadata['environments']",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -727,7 +711,6 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -768,12 +751,10 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read" + _RESTART_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -816,12 +797,10 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read" + _RESTART_DOC,
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -883,7 +862,6 @@ _add(
             doc="metadata['dag'] lists the edges [i, j] of the optimal DAG the search found; "
             "metadata['categorical'] lists the categorical columns a mixed-data setting read",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -920,7 +898,6 @@ _add(
             weighted=True,
             doc="weighted DAG; no score.",
         ),
-        determinism="stochastic",
         accel="torch",
         status="supported",
         column_order="relabels",
@@ -929,7 +906,6 @@ _add(
             "Repeats on one machine with one torch version; on another platform the graph "
             "can differ."
         ),
-        seeded=True,
         params=(
             concept_param(
                 "lambda1",
@@ -1103,7 +1079,6 @@ _add(
         "Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
-        determinism="deterministic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
@@ -1163,7 +1138,6 @@ _add(
         "Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
-        determinism="deterministic",
         accel="numpy",
         status="experimental",
         column_order="relabels",
@@ -1243,12 +1217,10 @@ _add(
             graph_kind="cpdag",
             doc="score in metadata['score']",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -1277,12 +1249,10 @@ _add(
             graph_kind="cpdag",
             doc="score in metadata['score']",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             ParamSpec(
                 name="restrict",
@@ -1355,12 +1325,10 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -1389,12 +1357,10 @@ _add(
             doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
             "a mixed-data setting read",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -1478,7 +1444,6 @@ for _name, _summary, _own, _refs in (
                 "read; under collider_rule=conservative or majority, metadata['ambiguous_triples'] "
                 "lists the [x, z, y] triples the rule left ambiguous, by 0-based position",
             ),
-            determinism="stochastic",
             accel="numpy",
             status="experimental",
             column_order="relabels",
@@ -1488,7 +1453,6 @@ for _name, _summary, _own, _refs in (
                 "and records the first separating subset found, and it or "
                 '`possible_dsep="fast"` visits the possible-d-separation step in column order.'
             ),
-            seeded=True,
             params=(
                 _SCORE_FUNC,
                 _PENALTY_DISCOUNT,
@@ -1537,12 +1501,10 @@ _add(
             "I-contradicting edges; metadata['invariance_test'] names the invariance test; "
             "metadata['alpha'] is the level of the conditional-independence tests",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             ParamSpec(
                 name="targets",
@@ -1631,12 +1593,10 @@ _add(
             "metadata['invariance_test'] names the invariance test; metadata['alpha'] is the "
             "level of the conditional-independence tests",
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels",
         tie_break=True,
-        seeded=True,
         params=(
             ParamSpec(
                 name="targets",
@@ -1703,7 +1663,6 @@ _add(
         output=OutputSpec(
             structure_type="graph", graph_kind="dag", weighted=True, has_ordering=True
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1731,7 +1690,6 @@ _add(
         output=OutputSpec(
             structure_type="graph", graph_kind="dag", weighted=True, has_ordering=True
         ),
-        determinism="stochastic",
         accel="numpy",
         status="supported",
         column_order="relabels_if_converged",
@@ -1740,7 +1698,6 @@ _add(
             "At few rows per variable, FastICA can reach another solution under a new "
             "column order or on another machine."
         ),
-        seeded=True,
         params=(
             concept_param(
                 "seed",
@@ -1781,7 +1738,6 @@ _add(
             multi=True,
             doc="one StructureOutput per group; shared ordering, per-group weights.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1815,7 +1771,6 @@ _add(
             has_ordering=True,
             doc="DAG after pruning; ordering is a causal order of the search's DAG before pruning.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1851,7 +1806,6 @@ _add(
             has_ordering=True,
             doc="DAG after the edge removal; ordering is the causal order of the sink search.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1890,7 +1844,6 @@ _add(
             has_ordering=True,
             doc="lag_weights (AR, lag 0 = instantaneous) + lag_weights_ma (MA) + order.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -1970,7 +1923,6 @@ _add(
             graph_kind=None,
             doc="instantaneous-plus-lagged lag_weights; per-time causal orders in metadata.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2013,8 +1965,6 @@ _add(
             doc="lag graphs for lags 1..tau_max; MCI p_values and statistics, and the PC1 parents, "
             "in metadata.",
         ),
-        determinism="stochastic",
-        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2083,8 +2033,6 @@ _add(
             doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max; p_values, statistics, the "
             "lagged parents, conflicting and ambiguous orientations in metadata.",
         ),
-        determinism="stochastic",
-        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2161,8 +2109,6 @@ _add(
             "with its marks, p_values, statistics, the preliminary parents, and the conflicting "
             "marks in metadata.",
         ),
-        determinism="stochastic",
-        seeded=True,
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2221,7 +2167,6 @@ _add(
             doc="lag_weights at lags 1..tau_max (the regression coefficients of the significant "
             "links, no lag 0); no ordering.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2265,7 +2210,6 @@ _add(
             doc="a dag at lag 0 and lag graphs for lags 1..tau_max, with their lag_weights; "
             "h_final and edges_removed in metadata.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2371,7 +2315,6 @@ _add(
             "statistics map forward (x->y) and backward (y->x) to the p-value and the HSIC "
             "statistic, divided by its mean under independence, of each test.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2418,7 +2361,6 @@ _add(
             "statistics map forward (x->y) and backward (y->x) to the p-value and the HSIC "
             "statistic, divided by its mean under independence, of each test.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2447,7 +2389,6 @@ _add(
             has_latents=True,
             doc="observed + latent nodes; metadata clusters, cluster_order + unordered.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="can_change",
@@ -2524,7 +2465,6 @@ _add(
             doc="PAG over the observed variables; metadata confounded_pairs lists the <-> pairs, "
             "which share a hidden common cause.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2554,7 +2494,6 @@ _add(
             doc="PAG over the observed variables; o-o joins the variables a hidden common "
             "cause leaves unordered, and metadata partial_order nests them.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2601,7 +2540,6 @@ _add(
             "common cause or a causal path, metadata latent_pairs lists those pairs, and "
             "cycle_edges the edges dropped from directed cycles.",
         ),
-        determinism="deterministic",
         accel="numpy",
         status="supported",
         column_order="relabels",
@@ -2757,24 +2695,17 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors: every part.
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
-    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
-)
 _MAX_DEPTH = concept_param("max_depth")
 
 for _name, _how in _KNOWLEDGE_HOW.items():
     _knowledge = concept_param(
         "knowledge",
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
+        f"adjacent, and temporal tiers. Honors {', '.join(KNOWLEDGE_PARTS)}. {_how}",
     )
     _depth = (_MAX_DEPTH,) if _name in CONCEPTS["max_depth"].conforming else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={
-            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
-            "knowledge": _KNOWLEDGE_PARTS[_name],
-        }
+        update={"params": (*REGISTRY[_name].params, *_depth, _knowledge)}
     )
 
 #: The parent cap of the score searches that take it as the concept's template; ges has its own doc.

@@ -41,7 +41,7 @@ dependencies = [
   "pandas>=2.2",             # andrey.data.load_sachs returns a DataFrame
   "networkx>=3",             # GraphStructure conversion
   "pydantic>=2",             # MethodSpec registry (andrey.spec)
-  "typer>=0.12",             # `andrey` CLI
+  "typer>=0.12.4",           # `andrey` CLI
   "pyyaml>=6",               # `andrey run --config <file>`
 ]
 

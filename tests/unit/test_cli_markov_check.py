@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.cli import _apply_output_cap, main, render_markov_check_human
+from andrey.cli import apply_output_cap, main, render_markov_check_human
 from andrey.spec import SCHEMA_VERSION, help_schema, render_skill
 from andrey.spec.concepts import MARKOV_CHECK_PARAMS
 
@@ -95,7 +95,7 @@ def test_a_capped_table_keeps_the_smallest_p_values_and_says_so():
         {"x": k, "y": 0, "given": [], "p_value": p} for k, p in enumerate([0.9, 0.01, 0.5, 0.2])
     ]
     env = {"markov_check": {"tests": tests}}
-    _apply_output_cap(env, 2)
+    apply_output_cap(env, 2)
     assert [t["p_value"] for t in env["markov_check"]["tests"]] == [0.01, 0.2]
     assert env["markov_check"]["tests_truncated"] and "capped" in env["note"]
 

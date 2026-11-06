@@ -33,7 +33,7 @@ Edit the spec, not the surfaces.
 | `src/andrey/spec/concepts.py` | The package-wide parameter rules: one `Concept` per shared parameter or behavior, with its template `ParamSpec`, the suitable and exempt methods, and each cell that still differs. |
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
-| `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
+| `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, the exit codes, and each command's invocation. |
 | `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, `run`, `bootstrap`, and `markov-check`; `run` and `bootstrap` validate `<method>` and its `key=value` overrides (and `--config`) against the registry. |
 | `src/andrey/resample.py` | `andrey.bootstrap` and `BootstrapOutput`: the refits on resamples, the counts of each edge by endpoint marks, and the averaged graph, a valid graph of the method's kind. |
 | `src/andrey/markov.py` | `andrey.markov_check` and `MarkovCheckOutput`: the independences a DAG or CPDAG implies, tested against the data. |
@@ -155,10 +155,11 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 ### Add a method
 
 1. Implement the facade in `src/andrey/api/<family>.py`, decorated with `@method_spec("<name>")`,
-   and add its name to `andrey.api.__all__`. The wrapper (`src/andrey/api/_method.py`) checks every
-   argument against the method's `ParamSpec`, resolves a seeded method's seed, gives the
-   experimental warning, and sets `metadata["algorithm"]` and `metadata["seed"]`, so the facade
-   holds only the method's own logic.
+   add its name to `andrey.api.__all__`, and re-export it as `andrey.<name>` in
+   `src/andrey/__init__.py`, in its imports and its `__all__`. The wrapper
+   (`src/andrey/api/_method.py`) checks every argument against the method's `ParamSpec`, resolves
+   a seeded method's seed, gives the experimental warning, and sets `metadata["algorithm"]` and
+   `metadata["seed"]`, so the facade holds only the method's own logic.
    Open the docstring's Notes with a **When to use.** paragraph, as the
    [docstring standard](#docstring-standard) describes, and end them with a **Limitations.**
    paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and
@@ -205,11 +206,11 @@ removed after a release goes in `MethodSpec.dropped_args` for one release: the w
 with the same warning. Bounds go in the `ParamSpec`, which the wrapper checks; a facade checks only
 what depends on the data or on another parameter.
 
-A method that draws random numbers sets `seeded=True` and takes `seed` (`concept_param("seed")`),
-and the wrapper resolves it and records `metadata["seed"]`. A search that tests independence
-passes the seed to `make_indep_test`, which gives it to the tests in `STOCHASTIC_INDEP_TESTS` and
-only to them, at every place the search builds a test. A method takes no execution setting such as
-`n_jobs`; it reads them from `andrey.config`.
+A method that draws random numbers takes `seed` (`concept_param("seed")`), which makes its spec
+`seeded` and `stochastic`, and the wrapper resolves it and records `metadata["seed"]`. A search
+that tests independence passes the seed to `make_indep_test`, which gives it to the tests in
+`STOCHASTIC_INDEP_TESTS` and only to them, at every place the search builds a test. A method takes
+no execution setting such as `n_jobs`; it reads them from `andrey.config`.
 
 ### Publish a boundary lane
 
