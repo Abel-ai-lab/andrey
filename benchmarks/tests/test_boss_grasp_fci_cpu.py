@@ -45,6 +45,11 @@ def test_forward_graph_has_degree_times_d_over_2_edges_and_hides_at_most_l(degre
         assert X.shape == (50, truth["observed"])
 
 
+def test_a_cell_with_nothing_hidden_measures_every_node() -> None:
+    X, truth = lane.dataset(_cell(latents=0, n=50), 0)
+    assert truth["latents_hidden"] == 0 and truth["observed"] == truth["nodes"] == X.shape[1] == 20
+
+
 def test_hiding_nodes_keeps_the_graph() -> None:
     """The draw with nothing hidden and the one with ``L`` hidden share the graph (the graph stream
     does not read the hidden count), so counting the candidates first is sound."""

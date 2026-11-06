@@ -210,7 +210,8 @@ def dataset(cell: Cell, seed: int) -> tuple[np.ndarray, dict]:
         if _degrees(arcs_of(ds.graph.to_numpy()), total) != _degrees(drawn, total):
             raise ValueError(f"{cell.name} seed {seed}: hiding nodes changed the graph")
     full = ds.graph.to_numpy()
-    types = np.asarray(ds.graph.node_types)
+    kinds = ds.graph.node_types  # None when nothing is hidden
+    types = np.zeros(len(full), dtype=int) if kinds is None else np.asarray(kinds)
     observed = int((types == 0).sum())
     X = np.ascontiguousarray(ds.data, dtype=np.float64)
     if X.shape[1] != observed or (types[:observed] != 0).any():
