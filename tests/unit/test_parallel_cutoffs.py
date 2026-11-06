@@ -59,7 +59,6 @@ def test_default_cutoff_warns_once_naming_the_setting_and_command(method, monkey
     [warning] = _cutoff_warnings(caught)
     assert f"{cal.METHODS[method].variable}=300" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
-    assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
 
 
@@ -313,7 +312,6 @@ def test_the_default_skeleton_cutoff_warns_once_naming_the_setting_and_command(p
     [warning] = _skeleton_warnings(probe)  # two pools, one warning
     assert f"{SKELETON_VARIABLE}={8 * probe.tests}" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
-    assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
 
 

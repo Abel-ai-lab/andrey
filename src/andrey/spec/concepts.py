@@ -1167,10 +1167,10 @@ _CONCEPTS = (
             "sepsets",
             "How colliders are decided on x - z - y: sepsets = z is a collider when it is not in "
             "the separating set of x and y; conservative and majority = test x and y given every "
-            "subset of each one's neighbors, and z is a collider when none (conservative) or fewer "
-            "than half (majority) of the separating subsets contain it, a non-collider when all or "
-            "more than half do, and ambiguous otherwise, never oriented through. Both cost up to "
-            "2**degree tests per pair.",
+            "subset of each one's neighbors and, if at least one subset separates them, z is a "
+            "collider when none (conservative) or fewer than half (majority) of the separating "
+            "subsets contain it, a non-collider when all or more than half do, and ambiguous "
+            "otherwise, never oriented through. Both cost up to 2**degree tests per pair.",
             choices=COLLIDER_RULES,
         ),
         fragment="collider",

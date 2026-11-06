@@ -30,6 +30,7 @@ import numpy as np
 from andrey.core import NULL, backend
 from andrey.core.ci import CITest, DGTest, FisherZ, NormalScores, StudentT, pins_blas
 from andrey.core.ci_missing import GaussianDeletion
+from andrey.core.orient import separating_set
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -49,7 +50,7 @@ _CHUNK = 4096
 # separating subsets, so the tests of a pair hold one chunk however large the endpoint degrees are.
 _VOTE_CHUNK = 64
 
-#: How PC, CD-NOD, FCI, and GFCI decide an unshielded triple (:func:`vote_triples`).
+#: How the PC and FCI families and PCMCI+ decide an unshielded triple (:func:`vote_triples`).
 COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
@@ -655,29 +656,35 @@ def vote_triples(
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     rule: str,
     *,
-    unseparated: str,
     max_depth: int | None = None,
     skip: Collection[tuple[int, int, int]] = frozenset(),
 ) -> frozenset[tuple[int, int, int]]:
-    """Decide every unshielded triple of ``marks`` by ``rule``; rewrite ``sepsets`` to match and
-    return the ambiguous triples.
+    """Decide every unshielded triple of ``marks`` by ``rule``, ``"conservative"`` or
+    ``"majority"``; rewrite ``sepsets`` to match and return the ambiguous triples.
 
     ``marks`` is the final skeleton, a pair adjacent where its entry is not ``NULL``. For each
     unshielded triple ``(a, b, c)``, ``a < c``, the pair ``(a, c)`` is tested given every subset of
     ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
     members when one is given: a subset both endpoints offer is tested and counted twice. A subset
     separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
-    triple from the separating subsets; a pair no subset separates takes the verdict
-    ``unseparated``, ``"collider"`` or ``"ambiguous"``. A collider removes ``b`` from the pair's
-    separating sets and a non-collider adds it, under both key orders, a missing order taking the
-    other's set first; an ambiguous triple leaves them as they are. The separating sets already
-    recorded do not vote. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither
-    voted nor returned.
+    triple from the separating subsets, and a pair no subset separates leaves its triples ambiguous:
+    the conservative and majority rules call a triple unambiguous only when at least one subset of
+    its ends' neighbors separates them [1]_ (Section 4.2), in PC and, after the
+    possible-d-separation step, in FCI (Section 4.4). The separating sets already recorded do not
+    vote. A collider removes ``b`` from the pair's separating sets and a non-collider adds it, under
+    both key orders, a missing order taking the other's set first; an ambiguous triple leaves them
+    as they are. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither voted nor
+    returned.
 
     Each pair is tested once, however many middle nodes it has, in chunks of ``_VOTE_CHUNK``
     subsets, through the test's ``batched_call`` when it has one. The chunks do not depend on the
     middle node, so every middle node counts the p-values one test of the pair gives. The cost
     grows as ``2**degree`` per pair.
+
+    References
+    ----------
+    .. [1] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
     """
     neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
     votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
@@ -688,19 +695,14 @@ def vote_triples(
                 continue
             if (a, c) not in votes:
                 votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
-            separating = votes[a, c]
-            verdict = collider_verdict(separating, b, rule) if separating else unseparated
+            verdict = collider_verdict(votes[a, c], b, rule)
             if verdict == "ambiguous":
                 ambiguous.add((a, b, c))
                 continue
             for pair in ((a, c), (c, a)):
-                recorded = sepsets.get(pair)
-                if recorded is None:
-                    recorded = sepsets.get(pair[::-1], ())
-                if verdict == "non-collider":
-                    sepsets[pair] = recorded if b in recorded else (*recorded, b)
-                else:
-                    sepsets[pair] = tuple(node for node in recorded if node != b)
+                recorded = separating_set(sepsets, *pair) or frozenset()
+                updated = recorded | {b} if verdict == "non-collider" else recorded - {b}
+                sepsets[pair] = tuple(sorted(updated))
     return frozenset(ambiguous)
 
 

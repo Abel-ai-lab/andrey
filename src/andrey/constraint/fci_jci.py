@@ -19,20 +19,17 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples
+from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
 from andrey.constraint.fci import (
     _circle_pag,
-    _fast_adjacency_search,
     _fci_orient,
     _knowledge_marks,
     _orient_colliders,
-    _remove_by_possible_dsep,
-    _test_in_rank_order,
     _validate_possible_dsep,
-    _vote_sepsets,
     fci,
+    possible_dsep_step,
 )
-from andrey.constraint.pc import check_knowledge_cycle
+from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
 
@@ -114,42 +111,42 @@ def fci_jci(
     mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
     padded = None if constraints is None else constraints.padded(d + 1)
     test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
-    allowed = keep = apart = None
-    if padded is not None:
-        allowed = padded.support()
-        keep = padded.required | padded.required.T
-        apart = ~allowed
-    support, sepsets = _fast_adjacency_search(
-        augmented,
+    allowed, keep, apart = knowledge_masks(padded)
+    skeleton, sepsets, _ = adjacency_search(
         test,
+        d + 1,
         alpha,
-        workers=backend.worker_count(workers),
         support=allowed,
         keep=keep,
         apart=apart,
         max_depth=max_depth,
+        workers=backend.worker_count(workers),
     )
 
-    marks = _circle_pag(support)
+    marks = _circle_pag(skeleton)
     _knowledge_marks(marks, padded)
     _mark_index(marks, d, confounded_index)
     _orient_colliders(marks, sepsets)
-    if possible_dsep == "fast":
-        _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
-    else:
-        by_rank, ranked_test = _test_in_rank_order(augmented, indep_test, mask, seed)
-        _remove_by_possible_dsep(
-            marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
-        )
-    marks = _circle_pag(marks != NULL)
-    _knowledge_marks(marks, padded)
+    # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
+    # the index cannot lie on a cycle the check reads.
+    marks = possible_dsep_step(
+        marks,
+        augmented,
+        test,
+        alpha,
+        sepsets,
+        possible_dsep=possible_dsep,
+        indep_test=indep_test,
+        categorical=mask,
+        seed=seed,
+        max_depth=max_depth,
+        constraints=padded,
+    )
     _mark_index(marks, d, confounded_index)
-    if padded is not None:
-        check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
     ambiguous = unseparated_triples(marks != NULL, sepsets, padded)
     if collider_rule != "sepsets":
-        ambiguous |= _vote_sepsets(
-            marks, test, alpha, sepsets, rule=collider_rule, max_depth=max_depth, skip=ambiguous
+        ambiguous |= vote_triples(
+            marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)

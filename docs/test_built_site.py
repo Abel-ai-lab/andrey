@@ -8,6 +8,7 @@ checks are unit tests, which the docs workflow runs first.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import pathlib
 import posixpath
@@ -79,7 +80,11 @@ HEADER = {
     "Examples": "docs/examples/index.html",
     "Demos": "docs/demos/index.html",
     "Blog": "blog/index.html",
+    "FAQ": "docs/faq.html",
 }
+# The header's sections in the order they read; Release cards, which carries the newest release's
+# dot, is checked on its own.
+NAV = ["Docs", "Examples", "Demos", "Blog", "Release cards", "FAQ"]
 
 
 @pytest.fixture(scope="module")
@@ -132,6 +137,21 @@ def _pages(html: pathlib.Path):
         text = page.read_text(encoding="utf-8")
         if 'id="pst-header"' in text:
             yield page, text
+
+
+def _scripts(text: str) -> list[str]:
+    """The address of every script a page loads, in document order."""
+    return re.findall(r'<script[^>]*\bsrc="([^"]+)"', text)
+
+
+def _stylesheets(text: str) -> list[str]:
+    """The address of every stylesheet a page links, in document order."""
+    links = re.findall(r"<link\b[^>]*>", text)
+    return [re.search(r'\bhref="([^"]+)"', link)[1] for link in links if 'rel="stylesheet"' in link]
+
+
+def _file_name(address: str) -> str:
+    return posixpath.basename(urlsplit(address).path)
 
 
 def test_the_docs_write_math_in_katex_not_unicode():
@@ -247,12 +267,19 @@ def test_every_header_leads_home_and_to_each_section(html):
     problems = []
     for page, text in _pages(html):
         name = page.relative_to(html)
+        if text.count("<header") != 1:
+            problems.append(f"{name}: {text.count('<header')} headers, not one")
         header = text[text.index('id="pst-header"') : text.index("</header>")]
         links = _Links()
         links.feed(header)
         brand = [href for cls, href in links.found if "navbar-brand" in cls]
         if not brand or _resolve(html, page, brand[0]) != html / "index.html":
             problems.append(f"{name}: the wordmark does not lead home")
+        shown = re.findall(
+            rf'<a class="nav-link nav-internal" href="[^"]+"[^>]*>{ICON}([^<]+)', header
+        )
+        if shown != NAV:
+            problems.append(f"{name}: the header's sections read {shown}, not {NAV}")
         for label, expected in HEADER.items():
             hrefs = re.findall(
                 rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{ICON}{label}</a>', header
@@ -607,6 +634,45 @@ def test_every_page_ends_on_the_same_footer(html):
         assert "Built by" not in footer, page
         for href in re.findall(r'href="([^"#:]+\.html)"', footer):
             assert (page.parent / href).resolve().is_file(), (page, href)
+
+
+def test_the_why_fast_scenes_load_motion_then_their_script_only_where_they_appear(html):
+    shown = []
+    for page, text in _pages(html):
+        scripts = [_file_name(s) for s in _scripts(text)]
+        scripts = [name for name in scripts if name in ("motion.js", "why-fast.js")]
+        if '<figure class="wf wf-scene"' in text:
+            shown.append(page)
+            assert scripts == ["motion.js", "why-fast.js"], page
+        else:
+            assert not scripts, page
+    assert shown
+
+
+def test_every_page_with_an_embedded_example_loads_the_files_that_host_it(html):
+    # The host script passes the reader's theme into the example and sizes its frame to it; the
+    # stylesheet sets the frame to the article's width.
+    embedding = []
+    for page, text in _pages(html):
+        if not re.search(r'<iframe[^>]*\bsrc="[^"]*_static/examples/', text):
+            continue
+        embedding.append(page)
+        hosts = [s for s in _scripts(text) if _file_name(s) == "example-frame.js"]
+        assert len(hosts) == 1 and _resolve(html, page, hosts[0]).is_file(), page
+        sheets = [s for s in _stylesheets(text) if _file_name(s) == "examples.css"]
+        assert len(sheets) == 1 and _resolve(html, page, sheets[0]).is_file(), page
+    assert embedding
+
+
+def test_the_demos_page_shows_the_live_demo_only_once_its_space_is_public(html):
+    spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
+    site = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(site)
+    page = (html / "docs" / "demos" / "index.html").read_text(encoding="utf-8")
+    if site.DEMO_URL:
+        assert page.count(f'href="{site.DEMO_URL}"') == 1
+    else:
+        assert 'id="live-demo"' not in page and "huggingface.co" not in page
 
 
 def test_the_brand_kit_offers_every_file_it_shows_and_zips_them(html):

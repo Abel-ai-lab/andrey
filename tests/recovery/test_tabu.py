@@ -69,7 +69,9 @@ def test_tabu_finds_no_edges_between_independent_columns():
     assert out.metadata["score"] == _bic(x, out.structure)
 
 
-@pytest.mark.parametrize("seed", range(12))
+# Tabu search reaches the optimum below hill climbing's score (seed 2), stops with hill climbing
+# above the optimum (4), and stops strictly between the two (6).
+@pytest.mark.parametrize("seed", [2, 4, 6])
 def test_tabu_score_lies_between_the_optimum_and_hill_climbing(seed):
     x = _er_sample(8, seed).data
     found = andrey.tabu(x).metadata["score"]

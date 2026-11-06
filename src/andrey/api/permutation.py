@@ -484,10 +484,11 @@ def grasp(
     of its simulations [1]_; the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP
     does not. The final parent sets form a DAG, which is reduced to its CPDAG.
 
-    Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
-    :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged. Under
-    the linear-Gaussian BIC each comparison is decided as full local scores decide it, as for
-    :func:`~andrey.boss`.
+    Tucks and parent changes must improve the score by more than ``1e-6``, the fixed absolute
+    tolerance used by :func:`~andrey.boss`, and candidate parents within it of the best count as
+    ties, as for :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score
+    unchanged. Under the linear-Gaussian BIC each comparison is decided as full local scores decide
+    it, as for :func:`~andrey.boss`.
 
     **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
@@ -1410,10 +1411,11 @@ def boss_fci(
         How a collider is decided on a triple ``x - z - y`` where the tests removed the BOSS edge
         between ``x`` and ``y``, as for :func:`~andrey.gfci`: by the recorded separating set
         (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
-        separate them, which makes ``z`` a collider when none of them contains it and a
-        non-collider when all do (``"conservative"``), or when fewer than half and when more than
-        half do (``"majority"``). Any other triple is ambiguous, and no rule orients through it. On
-        the other triples whose ends are not adjacent, the BOSS CPDAG decides.
+        separate them, which, if at least one subset separates them, makes ``z`` a collider when
+        none of them contains it and a non-collider when all do (``"conservative"``), or when
+        fewer than half and when more than half do (``"majority"``). Any other triple is
+        ambiguous, and no rule orients through it. On the other triples whose ends are not
+        adjacent, the BOSS CPDAG decides.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
@@ -1659,10 +1661,11 @@ def grasp_fci(
         How a collider is decided on a triple ``x - z - y`` where the tests removed the GRaSP edge
         between ``x`` and ``y``, as for :func:`~andrey.gfci`: by the recorded separating set
         (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
-        separate them, which makes ``z`` a collider when none of them contains it and a
-        non-collider when all do (``"conservative"``), or when fewer than half and when more than
-        half do (``"majority"``). Any other triple is ambiguous, and no rule orients through it. On
-        the other triples whose ends are not adjacent, the GRaSP CPDAG decides.
+        separate them, which, if at least one subset separates them, makes ``z`` a collider when
+        none of them contains it and a non-collider when all do (``"conservative"``), or when
+        fewer than half and when more than half do (``"majority"``). Any other triple is
+        ambiguous, and no rule orients through it. On the other triples whose ends are not
+        adjacent, the GRaSP CPDAG decides.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
