@@ -54,7 +54,7 @@ from .interventions import (
     check_columns,
     env_labels,
     env_targets,
-    environments,
+    pooled_rows,
     record,
 )
 from .latent import latent_order
@@ -101,6 +101,39 @@ def _column_order(root: np.random.SeedSequence, n_observed: int, shuffle: bool) 
     if not shuffle:
         return np.arange(n_observed)
     return _component_rng(root, _COLUMNS).permutation(n_observed)
+
+
+def dataset_provenance(
+    root: np.random.SeedSequence,
+    model: np.random.SeedSequence,
+    columns: np.ndarray,
+    graph: GraphSpec,
+    d: int,
+    config: dict,
+) -> dict:
+    """Return the provenance of a sampled dataset: its seeds, column order, settings, and versions.
+
+    ``columns`` is the drawn index of each output column, ``graph`` the spec the ``d``-node graph
+    was drawn from, and ``config`` the sampler's own settings, listed after the graph's. The model's
+    seed is recorded when it is not the root's.
+    """
+    return {
+        "root_entropy": str(root.entropy),
+        "spawn_key": list(root.spawn_key),
+        **({} if model is root else {"model_entropy": str(model.entropy)}),
+        "seed_scheme": _SEED_SCHEME,
+        "column_order": columns.tolist(),
+        "config": {
+            "graph": {
+                "model": graph.name,
+                "num_nodes": d,
+                "density": graph.density,
+                "params": graph.params,
+            },
+            **config,
+        },
+        "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
+    }
 
 
 def _options(functional: Functional, noise: Noise) -> dict:
@@ -347,18 +380,11 @@ class SCM:
             )
         if self.interventions:
             envs = [dict(self.interventions)]
-        pooled = None
-        if envs is None:
-            if not isinstance(n, int | np.integer):
-                raise TypeError(f"n is one row count without envs, got {n!r}")
-            rows = int(n)
-        else:
-            if self.functional.is_temporal:
-                raise ValueError("temporal functionals take no interventions")
-            if screen is not None:
-                raise ValueError("screen is not supported under interventions")
-            pooled = environments(envs, n)
-            rows = sum(size for _, size in pooled)
+        if envs is not None and self.functional.is_temporal:
+            raise ValueError("temporal functionals take no interventions")
+        if envs is not None and screen is not None:
+            raise ValueError("screen is not supported under interventions")
+        rows, pooled = pooled_rows(envs, n)
         root = np.random.SeedSequence(seed)
         if screen is None:
             model = root if model_seed is None else np.random.SeedSequence(model_seed)
@@ -464,19 +490,13 @@ class SCM:
             functional=self.functional.name,
             noise=self.noise.name,
         )
-        provenance = {
-            "root_entropy": str(root.entropy),
-            "spawn_key": list(root.spawn_key),
-            **({} if model is root else {"model_entropy": str(model.entropy)}),
-            "seed_scheme": _SEED_SCHEME,
-            "column_order": columns.tolist(),
-            "config": {
-                "graph": {
-                    "model": self.graph.name,
-                    "num_nodes": draw.d,
-                    "density": self.graph.density,
-                    "params": self.graph.params,
-                },
+        provenance = dataset_provenance(
+            root,
+            model,
+            columns,
+            self.graph,
+            draw.d,
+            {
                 "functional": self.functional.name,
                 "noise": self.noise.name,
                 **_options(self.functional, self.noise),
@@ -487,8 +507,7 @@ class SCM:
                 "shuffle": bool(shuffle),
                 **({} if envs is None else {"envs": record(envs)}),
             },
-            "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
-        }
+        )
         # Sortability is a property of the observed data over observed-observed edges.
         obs_mask = (edges[:, 0] < n_obs) & (edges[:, 1] < n_obs)
         report = qa.report(data, edges[obs_mask], n_obs, scale=scale)
@@ -636,19 +655,13 @@ class SCM:
             functional=self.functional.name,
             noise=self.noise.name,
         )
-        provenance = {
-            "root_entropy": str(root.entropy),
-            "spawn_key": list(root.spawn_key),
-            **({} if model is root else {"model_entropy": str(model.entropy)}),
-            "seed_scheme": _SEED_SCHEME,
-            "column_order": order.tolist(),
-            "config": {
-                "graph": {
-                    "model": self.graph.name,
-                    "num_nodes": draw.d,
-                    "density": self.graph.density,
-                    "params": self.graph.params,
-                },
+        provenance = dataset_provenance(
+            root,
+            model,
+            order,
+            self.graph,
+            draw.d,
+            {
                 "functional": self.functional.name,
                 "noise": self.noise.name,
                 **_options(self.functional, self.noise),
@@ -662,8 +675,7 @@ class SCM:
                 ),  # VARMA MA order (None for VAR)
                 "shuffle": bool(shuffle),
             },
-            "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
-        }
+        )
         # Sortability targets iid data; it does not apply to a time series.
         report = QAReport(scale=scale)
         return CausalDataset(

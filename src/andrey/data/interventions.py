@@ -2,8 +2,9 @@
 
 :func:`hard` cuts a variable from its parents and sets it from outside; :func:`soft` changes its
 mechanism and keeps its parents. :meth:`~andrey.data.SCM.do` applies them to a model, and
-``envs=`` on :meth:`~andrey.data.SCM.sample` and :func:`~andrey.data.sample_discrete` draws several
-environments, each with its own interventions, into one dataset:
+``envs=`` on :meth:`~andrey.data.SCM.sample`, :func:`~andrey.data.sample_discrete`, and
+:func:`~andrey.data.sample_mixed` draws several environments, each with its own interventions, into
+one dataset:
 
 >>> import andrey.data as data
 >>> from andrey.data.interventions import hard, soft
@@ -119,23 +120,24 @@ def soft(
         ``shift``.
     weight_scale : float, default=1.0
         Multiplies the weight of each of the variable's parents; under the location-scale
-        functional, its weights in the location and in the scale. A variable without parents has
-        no weights to change.
+        functional, its weights in the location and in the scale, and in mixed data, a categorical
+        parent's shifts. A variable without parents has no weights to change.
     noise_scale : float or (float, float), default=1.0
         Multiplies the variable's noise, so its noise standard deviation. A pair ``(low, high)``,
         ``low < high``, multiplies the noise of each row by its own draw from ``U[low, high]``, so
         the noise follows a new distribution, a scale mixture of the one it had (Peters et al.
         2016, Appendix G).
     weights : {"keep", "redraw"}, default="keep"
-        ``"redraw"`` draws the weight of each of the variable's parents anew, each on its own,
-        from the functional's own weight distribution: magnitude ``U[weight_range]``, with a
-        random sign, or positive when the functional draws positive weights. The new weights
-        come from that ``weight_range``, not from a range of their own as in Peters et al. (2016,
-        Appendix G). Under the location-scale functional, the weights in the location and in the
-        scale are drawn anew. A variable without parents has no weights to draw anew. The new
-        weights are part of the model: samples with the same model seed draw the same ones. Each
-        environment draws its own: the sample under :meth:`~andrey.data.SCM.do` and each
-        environment of ``envs=`` draw different new weights for the same intervention, and the
+        ``"redraw"`` draws the weight of each of the variable's parents anew, each on its own, from
+        the functional's own weight distribution: magnitude ``U[weight_range]``, with a random sign,
+        or positive when the functional draws positive weights. The new weights come from that
+        ``weight_range``, not from a range of their own as in Peters et al. (2016, Appendix G).
+        Under the location-scale functional, the weights in the location and in the scale are drawn
+        anew, and in mixed data, each continuous parent's weight and categorical parent's shifts, as
+        :func:`~andrey.data.sample_mixed` draws them. A variable without parents has no weights to
+        draw anew. The new weights are part of the model: samples with the same model seed draw the
+        same ones. Each environment draws its own: the sample under :meth:`~andrey.data.SCM.do` and
+        each environment of ``envs=`` draw different new weights for the same intervention, and the
         dataset's ``params`` holds the weights without interventions. ``"redraw"`` takes
         ``weight_scale=1``.
 
@@ -243,6 +245,21 @@ def environments(envs: Sequence[Mapping], n: int | Sequence[int]) -> list[Enviro
     ):
         raise ValueError(f"every environment takes a whole number of rows >= 1, got n={n}")
     return [(as_interventions(spec), int(size)) for spec, size in zip(envs, sizes, strict=True)]
+
+
+def pooled_rows(
+    envs: Sequence[Mapping] | None, n: int | Sequence[int]
+) -> tuple[int, list[Environment] | None]:
+    """Return the rows of a sample and its :func:`environments`, ``None`` without ``envs``.
+
+    Without ``envs``, ``n`` is one row count; with them, the rows are those of every environment.
+    """
+    if envs is None:
+        if not isinstance(n, int | np.integer):
+            raise TypeError(f"n is one row count without envs, got {n!r}")
+        return int(n), None
+    pooled = environments(envs, n)
+    return sum(size for _, size in pooled), pooled
 
 
 def check_columns(envs: Sequence[Environment], n_columns: int) -> None:
