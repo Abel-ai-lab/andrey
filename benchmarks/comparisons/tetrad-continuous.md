@@ -84,8 +84,8 @@ reported with their cause; a reference package's graph is a measurement, not a t
 
 ## Knowledge, FCI-JCI, BOSS-FCI, and GRaSP-FCI
 
-The [BOSS-FCI and GRaSP-FCI](boss-fci-grasp-fci.md) lane runs the BOSS-FCI and GRaSP-FCI
-adapters; the FCI-JCI adapters are ready for their lane.
+The [FCI-JCI](fci-jci.md) lane runs the FCI-JCI adapters, and the [BOSS-FCI and
+GRaSP-FCI](boss-fci-grasp-fci.md) lane runs the BOSS-FCI and GRaSP-FCI adapters.
 Each Tetrad one times its search inside the JVM, as above, through either driver:
 
 | Search | tetrad-lib 7.6.10 (`tetrad_search.py`) | causal-cmd 1.12.0 (`tetrad_pag.py`) |

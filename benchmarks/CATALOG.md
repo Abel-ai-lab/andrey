@@ -30,6 +30,7 @@ whose Reproduce table lists the driver.
 | [FCI collider configurations](comparisons/fci-colliders.md) | `fci_latent.py` | FCI, both collider rules | causal-learn | 0.1.0, 0.2.0, 0.9.0 |
 | [GFCI](comparisons/gfci.md) | `gfci_latent.py` | GFCI | Tetrad | 0.7.0, 0.9.0 |
 | [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | |
+| [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
@@ -48,10 +49,6 @@ whose Reproduce table lists the driver.
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
-
-Tetrad's FCI-JCI adapters, through both Tetrad drivers and with background knowledge, and pcalg's
-FCI-JCI adapter have no driver yet; [Tetrad on continuous
-data](comparisons/tetrad-continuous.md#knowledge-fci-jci-boss-fci-and-grasp-fci) describes them.
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`,
