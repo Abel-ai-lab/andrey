@@ -50,7 +50,11 @@ class _RecordingTest:
 
 
 @pytest.mark.parametrize(
-    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+    "facade",
+    [
+        *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"),
+        *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+    ],
 )
 def test_registered_test_is_dispatched_end_to_end(facade, clean_registry):
     """Every constraint facade routes its CI queries to the registered test, not FisherZ."""
@@ -136,7 +140,11 @@ def test_registry_surface(clean_registry):
 
 @pytest.mark.parametrize("indep_test", ["student_t", "normal_scores"])
 @pytest.mark.parametrize(
-    "facade", ["pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"]
+    "facade",
+    [
+        *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"),
+        *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+    ],
 )
 def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(facade, indep_test):
     """Each constraint facade accepts the test by name and returns a valid graph."""

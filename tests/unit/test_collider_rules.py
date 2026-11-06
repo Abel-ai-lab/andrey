@@ -161,7 +161,7 @@ def _ambiguous_back(triples: list[list[int]], order: np.ndarray) -> list[tuple[i
     return sorted((min(a, c), b, max(a, c)) for a, b, c in back)
 
 
-@pytest.mark.parametrize("method", ["pc", "fci", "gfci", "cdnod"])
+@pytest.mark.parametrize("method", ["pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"])
 @pytest.mark.parametrize("rule", VOTING)
 def test_results_do_not_depend_on_the_column_order(method, rule):
     """Five column orders give the same graph and the same ambiguous triples once mapped back."""

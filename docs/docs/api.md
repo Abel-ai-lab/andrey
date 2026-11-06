@@ -134,28 +134,28 @@ as [Missing values](guides/getting-started.md#missing-values) describes; each me
 why.
 
 % concept: indep_test
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `igsp`, `ut_igsp`,
-`pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices: `"fisherz"`, `"student_t"`,
-and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
-`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
-`"cmiknn"`, and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
-`None`, the default, picks from the declared column types, `"fisherz"` for continuous data. `pcmci`,
-`pcmciplus`, and `lpcmci` run each test on the lagged values of the series, and order the candidate
-conditions by the test's statistic, as tigramite does: the partial correlation, the chi-square
-statistic, the likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's
-distance correlation. A test you register that reports only p-values is ordered by its p-value,
-smallest first.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`,
+`rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test` choices:
+`"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and `"gsq"` for
+categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests
+`"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
+tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
+`"fisherz"` for continuous data. `pcmci`, `pcmciplus`, and `lpcmci` run each test on the lagged
+values of the series, and order the candidate conditions by the test's statistic, as tigramite does:
+the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's conditional mutual
+information estimate, or GPDC's distance correlation. A test you register that reports only p-values
+is ordered by its p-value, smallest first.
 
 % concept: knowledge
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`, `gnies`, `xges`, `hc`,
-`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`,
-`dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
-`longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
-`bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of
-required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. Every required edge is in the result, whatever its
-weight, test, or score says. For the time-series methods, an edge `(cause, effect, lag)` is the
-link from `cause` at time `t - lag` to `effect` at time `t`.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `ges`, `gies`,
+`gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `exact_search`,
+`calm`, `notears`, `dagma`, `cam`, `resit`, `direct_lingam`, `ica_lingam`,
+`multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`,
+`granger`, `dynotears`, `rcd`, `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a
+{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent, and
+temporal tiers; each method's `knowledge` parameter says how it honors them. Every required edge is
+in the result, whatever its weight, test, or score says. For the time-series methods, an edge
+`(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at time `t`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
@@ -184,14 +184,13 @@ links in the skeleton phase and reports the adjusted values in `metadata["p_valu
 changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum conditioning-set size of their
-conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2` cap their
-restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and `inter_iamb`
-stop growing at the cap.
-`rcd`'s cap is the most variables it regresses out together, and `camuv`'s the most variables a
-sink test adds together as a variable's candidate parents, each with a default of 2, its paper's
-setting.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`,
+`rsmax2`, `pcmci`, `pcmciplus`, `rcd`, and `camuv` take `max_depth`, the maximum conditioning-set
+size of their conditional-independence tests; `None`, the default, sets no cap. `mmhc` and `rsmax2`
+cap their restrict phase and `pcmci` and `pcmciplus` their PC1 step; the blankets of `iamb` and
+`inter_iamb` stop growing at the cap. `rcd`'s cap is the most variables it regresses out together,
+and `camuv`'s the most variables a sink test adds together as a variable's candidate parents, each
+with a default of 2, its paper's setting.
 
 % concept: max_p_global
 `lpcmci` and `pcmciplus` take `max_p_global`, tigramite's name for the most conditions a test takes
@@ -211,51 +210,55 @@ other parents, so it has no moral graph. These are the defaults of the correspon
 the R package bnlearn. With a `target`, each returns that variable's set, whatever `structure` is.
 
 % concept: collider_rule
-`pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
-an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
-that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"`
-(Colombo and Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors
-and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
-triple the vote cannot decide is ambiguous: no rule orients through it, and
-`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. `pcmciplus`
-takes the same three rules for its same-step colliders, with `"majority"` as its default, as in
-tigramite, since its orientations do not depend on the order of the variables.
+`pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, and `grasp_fci` take `collider_rule`, which decides
+whether the middle node of an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default,
+reads the separating set that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes
+2006) and `"majority"` (Colombo and Maathuis 2014) test `x` and `y` again given every subset of
+either one's neighbors and make `z` a collider when none, or fewer than half, of the separating
+subsets contain it. A triple the vote cannot decide is ambiguous: no rule orients through it, and
+`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. `pcmciplus` takes
+the same three rules for its same-step colliders, with `"majority"` as its default, as in tigramite,
+since its orientations do not depend on the order of the variables.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents: no DAG the returned
-graph represents gives a node more than that many parents. `None`, the default, sets no cap. `ges`,
-`gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
-the cap, `boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets
-within it, and `cam`'s order search adds no edge past it. `icp` tests only the sets of at most that
-many variables, and its guarantee then needs the target to have no more parents. `gfci` caps its
-GES phase; the PAG its tests then orient can put more arrowheads at a node.
+`gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:
+no DAG the returned graph represents gives a node more than that many parents. `None`, the default,
+sets no cap. `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and
+`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, `exact_search`
+scores only the parent sets within it, and `cam`'s order search adds no edge past it. `icp` tests
+only the sets of at most that many variables, and its guarantee then needs the target to have no
+more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
+tests then orient can put more arrowheads at a node.
 
 % concept: seed
-`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`,
-`pcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`, and
-`ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws. `None`,
-the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one,
-so a call repeats exactly. The methods that test independence draw random numbers only under
-`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and `ut_igsp` also with `n_starts` above 1,
-and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`,
+`rsmax2`, `pcmci`, `pcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`, `calm`,
+and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random draws.
+`None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random
+one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase
+visits the variables in a random order on every fit, the methods that test independence draw random
+numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `igsp` and `ut_igsp` also with
+`n_starts` above 1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes
+nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend on
+`ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the number of searches a fit
-runs: the first from the start the method describes, each later one from a start drawn from `seed`
-and the search's index. `boss` and `grasp` start it from a random order, `igsp` and `ut_igsp` from a
-minimum-degree order with its ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far
-after `n_perturbations` random edge changes. The fit returns the best-scoring search; a later one
-replaces an earlier one only when it scores better by more than `1e-6` (for `igsp`, fewer edges,
-then fewer I-contradicting edges; for `ut_igsp`, a lower count of edges and targets). `igsp` and
-`ut_igsp` run 10 by default. On one set of simulated datasets in `igsp`'s papers' settings, at
-`alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19 of 87 groups and were worse in
-none, and tied with each other in every group; for `ut_igsp`, on 15 groups of simulated datasets, 12
-of them in its paper's setting, 10 searches had fewer SHD errors than 5 in 4 groups, 2 of them in
-that setting, and more in none. Each search builds its own caches and drops the previous one's, so
-more starts take more time but little more memory. `1`, the default for the others, runs one search.
+`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
+number of searches a fit runs: the first from the start the method describes, each later one from a
+start drawn from `seed` and the search's index. `boss`, `grasp`, `boss_fci`, and `grasp_fci` start
+it from a random order, `igsp` and `ut_igsp` from a minimum-degree order with its ties drawn from
+`seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations` random edge changes.
+The fit returns the best-scoring search; a later one replaces an earlier one only when it scores
+better by more than `1e-6` (for `igsp`, fewer edges, then fewer I-contradicting edges; for
+`ut_igsp`, a lower count of edges and targets), and `boss_fci` and `grasp_fci` run their tests on
+the best search's CPDAG. `igsp` and `ut_igsp` run 10 by default. On one set of simulated datasets in
+`igsp`'s papers' settings, at `alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19
+of 87 groups and were worse in none, and tied with each other in every group; for `ut_igsp`, on 15
+groups of simulated datasets, 12 of them in its paper's setting, 10 searches had fewer SHD errors
+than 5 in 4 groups, 2 of them in that setting, and more in none. Each search builds its own caches
+and drops the previous one's, so more starts take more time but little more memory. `1`, the default
+for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -270,33 +273,33 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
-`rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per parameter, the term of
-Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the default, with
-`ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC penalty per
+parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and `1.0`, the
+default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty, and
 `metadata["penalty_discount"]` records the value the score used.
 
 % concept: ebic_gamma
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and
-`rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1 (Chen and Chen 2008): their
-linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1, n_parents)` to each variable's
-score, a penalty that grows with the number of variables. `gfci` defaults to `ebic_gamma=0.0`, the
-standard BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice and
-{py:func}`~andrey.gfci` says why its default differs. Only `score_func="bic"` adds the term, so
-passing `ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
-`metadata["ebic_gamma"]` records the value a `"bic"` fit used. `gnies`, which has one score, always
-adds it.
+`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1
+(Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1,
+n_parents)` to each variable's score, a penalty that grows with the number of variables. `gfci`,
+`boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the standard BIC, and the others to `1.0`;
+{py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its default
+differs. Only `score_func="bic"` adds the term, so passing `ebic_gamma` with another score, named or
+picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the value a `"bic"` fit
+used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `mmhc`, and `rsmax2`
-take `equivalent_sample_size`, the equivalent sample size of the BDeu score (Heckerman, Geiger and
-Chickering 1995; Buntine 1991): the number of rows its uniform prior over each variable's
-conditional distributions is worth, a positive number. `1.0`, the default, is what the score used
-before the argument existed. A larger value weighs the prior more against the data, and the learned
-graph can change with it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value.
-Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size` with another score, named or
-picked by `None`, raises a `ValueError`; `metadata["equivalent_sample_size"]` records the value a
-`"bdeu"` fit used.
+`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`grasp_fci`, `mmhc`, and `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the
+BDeu score (Heckerman, Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform
+prior over each variable's conditional distributions is worth, a positive number. `1.0`, the
+default, is what the score used before the argument existed. A larger value weighs the prior more
+against the data, and the learned graph can change with it (Silander, Kontkanen and Myllymaki 2007),
+so compare fits at one value. Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size`
+with another score, named or picked by `None`, raises a `ValueError`;
+`metadata["equivalent_sample_size"]` records the value a `"bdeu"` fit used.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -490,12 +493,19 @@ its first call in a process.
 
    notears
    dagma
+   boss_fci
+   grasp_fci
 ```
 
 NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
 under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
 with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+BOSS-FCI and GRaSP-FCI ({py:func}`~andrey.boss_fci`, {py:func}`~andrey.grasp_fci`) are GFCI with a
+BOSS or GRaSP search in place of GES (Ramsey, Andrews, and Spirtes 2025): the search gives a CPDAG,
+conditional-independence tests remove the adjacencies that hidden common causes explain, and FCI's
+rules orient the rest into a PAG.
 
 A method becomes supported once it has:
 

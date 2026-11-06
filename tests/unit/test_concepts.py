@@ -352,7 +352,7 @@ UNIT_CASES = {
         (
             *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("igsp", "ut_igsp"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),
@@ -434,7 +434,9 @@ def declared_kind(out, method: str) -> bool:
 
 #: Settings that bring out the metadata keys a default fit leaves out.
 METADATA_FITS = {
-    **dict.fromkeys(("pc", "fci", "gfci", "cdnod"), {"collider_rule": "majority"}),
+    **dict.fromkeys(
+        ("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"), {"collider_rule": "majority"}
+    ),
     **dict.fromkeys(("iamb", "inter_iamb", "mmpc"), {"target": "y"}),
 }
 
@@ -707,13 +709,25 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
     assert out.metadata["seed"] == 11
 
 
+#: The CI searches whose score search visits the variables in a random order on every fit.
+ORDER_SEARCH_FIRST = ("boss_fci", "grasp_fci")
+
+
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     """A method without a seed, a CI search under a deterministic test, and a search that changes
     the best DAG at random only before a later start, run with one start, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
     for method in (*CI_SEARCHES, *PCMCI_FAMILY, *CONCEPTS["n_perturbations"].suitable):
+        if method in ORDER_SEARCH_FIRST:
+            continue
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
+
+
+@pytest.mark.parametrize("method", ORDER_SEARCH_FIRST)
+def test_a_search_over_random_orders_records_its_seed_under_a_deterministic_test(method):
+    out, _ = fit(method, codes=False, seed=7)
+    assert out.metadata["seed"] == 7
 
 
 def named_setting(method: str, key: str) -> str:
@@ -893,6 +907,8 @@ CI_CASES = {
     "pc": [{}, {"collider_rule": "conservative"}],
     "fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "gfci": [{}, {"possible_dsep": "fast"}],
+    "boss_fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
+    "grasp_fci": [{}, {"possible_dsep": "fast"}],
     "cdnod": [{}, {"collider_rule": "conservative"}],
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
