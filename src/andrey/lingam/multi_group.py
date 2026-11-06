@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ties import tie_ranks
 from andrey.lingam import adjacency, pwling
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -65,7 +65,7 @@ def _find_shared_causal_order(
 
     Mirrors :func:`pwling.find_causal_order` but sums the candidate scores across groups (each
     weighted by ``n_g / total_n``) and residualizes every group independently against the pick.
-    Ties are broken by :func:`~andrey.search.hc.tie_ranks` of the stacked input groups. Columns
+    Ties are broken by :func:`~andrey.core.ties.tie_ranks` of the stacked input groups. Columns
     that are copies in any group form one copy group (:func:`pwling.copy_groups`), scored by its
     representative and followed directly by the other copies. With ``precedence``, as for
     :func:`pwling.find_causal_order`, no copy group is formed, and the pick is the best candidate

@@ -93,17 +93,19 @@ in a `dag` or `digraph`, and an arrowhead in an `undirected` graph.
   reports the same for every lag from 0, plus `conflicts` and `ambiguous_triples`. Granger reports
   each lagged link's `p_values`. By default, `fdr_method="fdr_bh"`, all three report the
   Benjamini-Hochberg adjusted lagged `p_values`; with `"none"` they report the p-values as tested.
-  PC, CD-NOD, FCI, and GFCI with `collider_rule="conservative"` or `"majority"` report
-  `ambiguous_triples`, the `[x, z, y]` triples, by column position, whose middle node the vote left
-  undecided. `conflicts` lists the links two colliders ask to orient both ways: `[x, y]` pairs in PC
-  and CD-NOD, and `[i, k, j]` links (variable `i` at lag `k`, and `j`) in PCMCI+ and LPCMCI, which
-  also reports every link with all its marks as `links`, plus `p_values`, `statistics`, and its
-  preliminary `parents`. An order that is not a total order of the variables has its own key:
-  BottomUpParceLiNGAM's `partial_order` nests the unordered variables in a list, and GIN's
-  `cluster_order` orders its latent clusters. CD-NOD and GnIES list the variables whose mechanism
-  changes across the environments as `changing_variables`, and CD-NOD also the environment index's
-  edges into them as `index_edges`, `[variable, "directed"]` pairs; UT-IGSP reports the targets it
-  learns for each environment as `targets`.
+  PC, CD-NOD, FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI with `collider_rule="conservative"` or
+  `"majority"` report `ambiguous_triples`, the `[x, z, y]` triples, by column position, whose middle
+  node the vote left undecided. `conflicts` lists the links two colliders ask to orient both ways:
+  `[x, y]` pairs in PC and CD-NOD, and `[i, k, j]` links (variable `i` at lag `k`, and `j`) in
+  PCMCI+ and LPCMCI, which also reports every link with all its marks as `links`, plus `p_values`,
+  `statistics`, and its preliminary `parents`. An order that is not a total order of the variables
+  has its own key: BottomUpParceLiNGAM's `partial_order` nests the unordered variables in a list,
+  and GIN's `cluster_order` orders its latent clusters. CD-NOD and GnIES list the variables whose
+  mechanism changes across the environments as `changing_variables`, and CD-NOD also the environment
+  index's edges into them as `index_edges`, `[variable, "directed"]` pairs. FCI-JCI lists the
+  index's neighbors as `index_edges`, `[variable, kind]` pairs with `kind` `"directed"`,
+  `"partially_directed"`, or `"bidirected"`, and no `changing_variables`; UT-IGSP reports the
+  targets it learns for each environment as `targets`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results

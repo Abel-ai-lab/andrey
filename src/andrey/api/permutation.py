@@ -6,7 +6,9 @@ candidate parent additions through the batched Schur delta-BIC surface over the 
 (:class:`andrey.core.score.BICScore`), or by full local scores over BDeu, the multinomial BIC, or a
 mixed-data BIC. Their search order is drawn from a private RNG seeded by ``seed`` (or the global
 ``ANDREY_SEED``), so a run is reproducible. ``igsp`` and ``ut_igsp`` search variable orders over
-minimal I-MAPs with interventional data (:mod:`andrey.search.igsp`).
+minimal I-MAPs with interventional data (:mod:`andrey.search.igsp`). ``boss_fci`` and ``grasp_fci``
+run GFCI's test phase (:func:`andrey.search.gfci.fci_from_pattern`) on the CPDAG of a BOSS or GRaSP
+search.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
+    data_kind,
     default_score,
     default_test,
     json_safe,
@@ -27,6 +30,7 @@ from andrey.api._adapt import (
     structure_output,
 )
 from andrey.api._method import method_spec
+from andrey.api.constraint import _ambiguous_metadata
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -51,7 +55,7 @@ def boss(
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a CPDAG with BOSS (Best Order Score Search).
+    """Learn a CPDAG from observational data with BOSS (Best Order Score Search).
 
     BOSS searches variable orders (permutations) using linear-Gaussian BIC (Bayesian information
     criterion). It converts the best-scoring order to a CPDAG, which represents an equivalence class
@@ -104,7 +108,7 @@ def boss(
         CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
         the same largest number of parents). A cap can stop the search short of the lowest-scoring
         graph. ``None`` sets no cap.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -131,6 +135,9 @@ def boss(
         lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
         the equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]``
         lists the categorical columns it read, by name or 0-based position.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
@@ -141,13 +148,13 @@ def boss(
         :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if the required
-        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
-        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
-        also if a column repeats another up to scale and shift given more than two rows or, with
-        more rows than columns, is a linear function of other columns. One message names every group
-        of copies and says to keep one column per group. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if the required edges of
+        ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or ``categorical``
+        does not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -155,14 +162,11 @@ def boss(
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.grasp : Greedy relaxation of the sparsest permutation algorithm [2]_, searching the
-        same space of orders with different moves.
-    andrey.ges : Searches over equivalence classes for the same kind of data.
-    andrey.fci : Allows unmeasured common causes and selection bias.
-    andrey.direct_lingam : Orients every edge when the noise is non-Gaussian.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -171,8 +175,9 @@ def boss(
     column is categorical, the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``, and
     ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. It was designed for hundreds of
     highly connected variables [1]_; it returns a CPDAG. When unmeasured common causes are
-    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
-    oriented, use :func:`~andrey.direct_lingam`.
+    plausible, use :func:`~andrey.boss_fci`, the same search followed by FCI's tests and rules, or
+    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`.
 
     **Choosing seed.** The search visits variables in a random order and stops when no move improves
     the order. Different seeds can therefore reach different graphs; comparing a few shows whether
@@ -185,16 +190,17 @@ def boss(
     (SHD) over 20 datasets from 7.9 to 2.1 and took a median of 7.7 times as long as one start.
 
     **How it works.** BOSS searches variable orders for the best DAG with the lowest total score
-    [1]_. Each variable uses a grow-shrink tree to cache its best parent set for any set of
-    variables allowed to precede it. Each sweep moves every variable to the position that most
-    improves the total score. Sweeps repeat until no move improves it. The final parent sets form a
-    DAG, which is reduced to its CPDAG.
+    [1]_; :func:`~andrey.grasp` [2]_ searches the same orders with different moves. Each variable
+    uses a grow-shrink tree to cache its best parent set for any set of variables allowed to precede
+    it. Each sweep moves every variable to the position that most improves the total score. Sweeps
+    repeat until no move improves it. The final parent sets form a DAG, which is reduced to its
+    CPDAG.
 
     A move or parent change must improve the score by more than ``1e-6``, a fixed absolute tolerance
-    shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
-    earliest order position wins; among candidate parents, the column with the lowest tie rank
-    wins. Under the linear-Gaussian BIC each comparison is decided as full local scores decide it:
-    a fast update whose rounding-error bound could change the comparison is scored in full.
+    shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties.
+    The earliest order position wins; among candidate parents, the column with the lowest tie rank
+    wins. Under the linear-Gaussian BIC each comparison is decided as full local scores decide it: a
+    fast update whose rounding-error bound could change the comparison is scored in full.
 
     **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
@@ -280,7 +286,7 @@ def boss(
     >>> x = rng.standard_normal(500)
     >>> y = rng.standard_normal(500)
     >>> z = x + y + 0.5 * rng.standard_normal(500)
-    >>> boss(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
+    >>> boss(pd.DataFrame({"x": x, "y": y, "z": z}), seed=0).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
     from andrey.search.boss import boss as _boss
@@ -325,12 +331,13 @@ def grasp(
     categorical: Sequence[str | int] | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
-    """Learn a CPDAG with GRaSP (Greedy Relaxation of the Sparsest Permutation).
+    """Learn a CPDAG from observational data with GRaSP.
 
-    GRaSP searches variable orders (permutations) using linear-Gaussian BIC (Bayesian information
-    criterion). It converts the best-scoring order to a CPDAG, which represents an equivalence class
-    of graphs. It searches the same space as :func:`~andrey.boss` using chains of up to
-    ``grasp_depth`` tucks [1]_, the moves described in Notes.
+    GRaSP (Greedy Relaxation of the Sparsest Permutation) searches variable orders (permutations)
+    using linear-Gaussian BIC (Bayesian information criterion). It converts the best-scoring order
+    to a CPDAG, which represents an equivalence class of graphs. It searches the same space as
+    :func:`~andrey.boss` using chains of up to ``grasp_depth`` tucks [1]_, the moves described in
+    Notes.
 
     Parameters
     ----------
@@ -384,7 +391,7 @@ def grasp(
         CPDAG represents gives a node more than ``max_parents`` parents (every DAG of a class has
         the same largest number of parents). A cap can stop the search short of the lowest-scoring
         graph. ``None`` sets no cap.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical score reads every column as
@@ -411,6 +418,9 @@ def grasp(
         lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
         the equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]``
         lists the categorical columns it read, by name or 0-based position.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
 
     Raises
     ------
@@ -421,13 +431,13 @@ def grasp(
         :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if the required
-        edges of ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or
-        ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
-        also if a column repeats another up to scale and shift given more than two rows or, with
-        more rows than columns, is a linear function of other columns. One message names every group
-        of copies and says to keep one column per group. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if the required edges of
+        ``knowledge`` give a node more than ``max_parents`` parents; if ``data`` or ``categorical``
+        does not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -435,14 +445,11 @@ def grasp(
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.boss : Searches the same space of orders with different moves; faster on the published
-        benchmarks at 400 variables.
-    andrey.ges : Searches over equivalence classes for the same kind of data.
-    andrey.fci : Allows unmeasured common causes and selection bias.
-    andrey.direct_lingam : Orients every edge when the noise is non-Gaussian.
+    BoundaryWarning
+        When the data are larger than the largest size whose fits finished within the time and
+        memory caps of the published benchmark, at the measured setting nearest the data's rows, and
+        fits of the next size ran past a cap. It warns once per process and names that size and the
+        release card; the size is a reference, not a hard limit.
 
     Notes
     -----
@@ -451,8 +458,9 @@ def grasp(
     column is categorical, the default score is ``"bdeu"``, on mixed data ``"cond_gauss"``, and
     ``"discrete_bic"`` and ``"degen_gauss"`` also score those data. Its authors report accurate
     search even on dense graphs [1]_; it returns a CPDAG. When unmeasured common causes are
-    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
-    oriented, use :func:`~andrey.direct_lingam`.
+    plausible, use :func:`~andrey.grasp_fci`, the same search followed by FCI's tests and rules, or
+    :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
+    :func:`~andrey.direct_lingam`.
 
     **GRaSP or BOSS.** Both search the same space of orders with different moves. Either can reach
     the better score on a given dataset. On the published benchmarks, GRaSP took far longer than
@@ -570,7 +578,7 @@ def grasp(
     >>> x = rng.standard_normal(500)
     >>> y = rng.standard_normal(500)
     >>> z = x + y + 0.5 * rng.standard_normal(500)
-    >>> grasp(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
+    >>> grasp(pd.DataFrame({"x": x, "y": y, "z": z}), seed=0).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
     from andrey.search.grasp import grasp as _grasp
@@ -637,10 +645,10 @@ def igsp(
         A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
-    env : array-like of shape (n_samples,), str, or None, default=None
-        The environment each row comes from: one label per row, strings or numbers, not both, or
-        the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
-        environments from ``targets``: its distinct values.
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name of
+        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
+        ``targets``: its distinct values.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, named by column label or 0-based position.
         A mapping ``{label: [variables]}`` takes each label of ``env`` to a list of its targets;
@@ -696,7 +704,7 @@ def igsp(
         not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
         the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
         another test, the result does not depend on it.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -715,15 +723,15 @@ def igsp(
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential graph
         of the DAG found under the observational environment and each setting's targets: directed
-        marks (``->``) are the edges that every DAG of the class orients alike, undirected
-        (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"igsp"``;
-        ``metadata["score"]`` is the DAG's number of edges, lower is better, and
-        ``metadata["n_contradicting"]`` its number of I-contradicting edges, the second part of
-        the objective; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the
-        tests used, and ``metadata["alpha"]`` is the level of the conditional-independence tests;
-        ``metadata["seed"]`` is the seed used when the fit draws random numbers.
-        Under a mixed-data test, ``metadata["categorical"]`` lists the categorical columns it
-        read.
+        marks (``->``) are the edges that every DAG of the class orients alike, undirected (``--``)
+        the ones it leaves open. ``metadata["algorithm"]`` is ``"igsp"``; ``metadata["score"]`` is
+        the DAG's number of edges, lower is better, and ``metadata["n_contradicting"]`` its number
+        of I-contradicting edges, the second part of the objective; ``metadata["indep_test"]`` and
+        ``metadata["invariance_test"]`` name the tests used, and ``metadata["alpha"]`` is the level
+        of the conditional-independence tests; ``metadata["seed"]`` is the seed used when the fit
+        draws random numbers. Under a mixed-data test, ``metadata["categorical"]`` lists the
+        categorical columns it read. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -734,28 +742,22 @@ def igsp(
         :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. If ``env`` or
-        ``targets`` is malformed, or leaves an environment's targets unknown, as
-        :func:`~andrey.gies` lists; if no environment is observational, or every one is, as with
-        ``env`` and ``targets`` both ``None``; if an environment has fewer than 3 rows; if
-        ``invariance_test="gaussian"`` comes with a categorical or mixed-data ``indep_test``; if
-        ``data`` holds a missing or infinite value, a column constant on every row or on the
-        observational rows, or does not suit the test, as for :func:`~andrey.pc`. With a
-        partial-correlation test, also if a column repeats another up to scale and shift on the
-        observational rows; one message names every group of copies. Also if ``knowledge`` names a
-        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. If ``env`` or ``targets`` is
+        malformed, or leaves an environment's targets unknown, as :func:`~andrey.gies` lists; if no
+        environment is observational, or every one is, as with ``env`` and ``targets`` both
+        ``None``; if an environment has fewer than 3 rows; if ``invariance_test="gaussian"`` comes
+        with a categorical or mixed-data ``indep_test``; if ``data`` holds a missing or infinite
+        value, a column constant on every row or on the observational rows, or does not suit the
+        test, as for :func:`~andrey.pc`. With a partial-correlation test, also if a column repeats
+        another up to scale and shift on the observational rows; one message names every group of
+        copies. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which a continuous test reads as numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.gies : Learns the same kind of graph from the same inputs by a score search.
-    andrey.ut_igsp : Learns the targets too, when some are unknown.
-    andrey.grasp : Searches variable orders on observational data.
 
     Notes
     -----
@@ -866,11 +868,11 @@ def igsp(
     graphs are slow. The search's cost grows with the number of I-covered edges to the power of its
     depth, and each start tests every pair given all other variables, so time grows fast with the
     number of variables. Unmeasured common causes are outside its model and not measured. One level
-    serves both tests unless ``invariance_alpha`` is given. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
-    In :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG without the targets, so an edge
-    that only the settings orient comes back undirected there; each fit and the edge frequencies
-    keep its direction.
+    serves both tests unless ``invariance_alpha`` is given. In :func:`~andrey.bootstrap`, the
+    averaged graph is made a CPDAG without the targets, so an edge that only the settings orient
+    comes back undirected there; each fit and the edge frequencies keep its direction. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -896,7 +898,8 @@ def igsp(
     >>> env = np.repeat(["observed", "set y"], 2000)
     >>> x = rng.standard_normal(4000)
     >>> y = np.where(env == "set y", rng.standard_normal(4000), x + rng.standard_normal(4000))
-    >>> out = igsp(pd.DataFrame({"x": x, "y": y}), env, targets={"observed": [], "set y": ["y"]})
+    >>> targets = {"observed": [], "set y": ["y"]}
+    >>> out = igsp(pd.DataFrame({"x": x, "y": y}), env, targets=targets, seed=0)
     >>> out.structure.oriented_edges()
     [('x', 'y', 'directed')]
     """
@@ -976,10 +979,10 @@ def ut_igsp(
         A list of DataFrames or 2-D arrays gives each environment's rows apart, labeled by
         position ``0, 1, ...``, and a mapping labels each by its key: the rows are stacked in that
         order, ``env`` stays ``None``, and ``targets`` maps those labels to their variables.
-    env : array-like of shape (n_samples,), str, or None, default=None
-        The environment each row comes from: one label per row, strings or numbers, not both, or
-        the name of a column of the DataFrame ``data`` that holds them. ``None`` takes the
-        environments from ``targets``: its distinct values.
+    env : array-like of shape (n_samples,) or (n_samples, 1), str, or None, default=None
+        The environment of each row: one label per row, strings or numbers, not both, or the name of
+        a column of the DataFrame ``data`` that holds them. ``None`` takes the environments from
+        ``targets``: its distinct values.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The known targets of each environment, named by column label or 0-based position. A
         mapping ``{label: [variables]}`` takes a label of ``env`` to its known targets: ``[]``
@@ -1038,7 +1041,7 @@ def ut_igsp(
         not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
         the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
         another test, the result does not depend on it.
-    categorical : sequence of str or int, optional
+    categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
         never a column by its values. ``[]`` marks none. A categorical test reads every column as
@@ -1067,19 +1070,21 @@ def ut_igsp(
         or from ``andrey run --json``, whose keys are the labels' JSON text. Passed back, the
         targets are known, the least each setting has: UT-IGSP may still learn more, so its refit
         can differ, while :func:`~andrey.gies` refits the graph under exactly these targets. A
-        setting where no target was found maps to ``[]``, which ``targets=`` reads as
-        observational and pools with the observational rows: a different fit, which raises when
-        every setting maps to ``[]``. Compared with the true targets, such as those of
-        :mod:`andrey.data`, the mapping holds the known targets it was given, and each setting's
-        targets are its differences from the environments marked ``[]``, the true ones only when
-        those environments are observational. Without ``env``, an environment's key is its known
-        targets joined by commas, labels sorted as text or positions sorted, ``""`` for the
-        observational one: a name, not a label of ``env``. ``metadata["score"]`` is the objective
-        of the DAG found, its number of edges plus its number of targets over the settings, lower
-        is better; ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests
-        used, and ``metadata["alpha"]`` is the level of the conditional-independence tests;
-        ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a
-        mixed-data test, ``metadata["categorical"]`` lists the categorical columns it read.
+        setting where no target was found maps to ``[]``, which ``targets=`` reads as observational
+        and pools with the observational rows: a different fit, which raises when every setting maps
+        to ``[]``. Compared with the true targets, such as those of :mod:`andrey.data`, the mapping
+        holds the known targets it was given, and each setting's targets are its differences from
+        the environments marked ``[]``, the true ones only when those environments are
+        observational. Without ``env``, an environment's key is its known targets joined by commas,
+        labels sorted as text or positions sorted, ``""`` for the observational one: a name, not a
+        label of ``env``. ``metadata["score"]`` is the objective of the DAG found, its number of
+        edges plus its number of targets over the settings, lower is better;
+        ``metadata["indep_test"]`` and ``metadata["invariance_test"]`` name the tests used, and
+        ``metadata["alpha"]`` is the level of the conditional-independence tests;
+        ``metadata["seed"]`` is the seed used when the fit draws random numbers. Under a mixed-data
+        test, ``metadata["categorical"]`` lists the categorical columns it read.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1090,30 +1095,23 @@ def ut_igsp(
         :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. If ``env`` or
-        ``targets`` is malformed, or ``data`` holds each environment's rows apart in a form it
-        cannot read, as :func:`~andrey.gies` lists; if no environment is
-        observational, or every one is; if an environment has fewer than 3 rows; if, without
-        ``env``, two environments' known targets join to one key, as when a column label holds a
-        comma; if ``invariance_test="gaussian"`` comes with a categorical or mixed-data
-        ``indep_test``; if ``data`` holds a missing or infinite value, a column constant on every
-        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`.
-        With a partial-correlation test, also if a column repeats another up to scale and shift on
-        the observational rows; one message names every group of copies. Also if ``knowledge``
-        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. If ``env`` or ``targets`` is
+        malformed, or ``data`` holds each environment's rows apart in a form it cannot read, as
+        :func:`~andrey.gies` lists; if no environment is observational, or every one is; if an
+        environment has fewer than 3 rows; if, without ``env``, two environments' known targets join
+        to one key, as when a column label holds a comma; if ``invariance_test="gaussian"`` comes
+        with a categorical or mixed-data ``indep_test``; if ``data`` holds a missing or infinite
+        value, a column constant on every row or on the observational rows, or does not suit the
+        test, as for :func:`~andrey.pc`. With a partial-correlation test, also if a column repeats
+        another up to scale and shift on the observational rows; one message names every group of
+        copies. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which a continuous test reads as numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.gies : Learns the same kind of graph when every environment's targets are known.
-    andrey.cdnod : Learns from data pooled over environments without targets, as a changing
-        context.
-    andrey.grasp : Searches variable orders on observational data.
 
     Notes
     -----
@@ -1240,7 +1238,8 @@ def ut_igsp(
     >>> x = rng.standard_normal(3000) + 2.0 * (env == "shift x")
     >>> y = x + rng.standard_normal(3000) + 2.0 * (env == "unknown")
     >>> data = pd.DataFrame({"x": x, "y": y})
-    >>> out = ut_igsp(data, env, targets={"observed": [], "shift x": ["x"], "unknown": None})
+    >>> targets = {"observed": [], "shift x": ["x"], "unknown": None}
+    >>> out = ut_igsp(data, env, targets=targets, seed=0)
     >>> out.structure.oriented_edges()
     [('x', 'y', 'directed')]
     >>> out.metadata["targets"]
@@ -1249,7 +1248,7 @@ def ut_igsp(
     Number labels stay numbers, so the result passes back as ``targets``:
 
     >>> codes = np.repeat([0, 1, 2], 1000)
-    >>> ut_igsp(data, codes, targets={0: [], 1: ["x"], 2: None}).metadata["targets"]
+    >>> ut_igsp(data, codes, targets={0: [], 1: ["x"], 2: None}, seed=0).metadata["targets"]
     {0: [], 1: ['x'], 2: ['y']}
     """
     from andrey.core.environments import normalize_env_targets
@@ -1299,6 +1298,542 @@ def ut_igsp(
         **categorical_metadata(mask, data),
     }
     return structure_output(graph, labels=labels, metadata=metadata)
+
+
+def _fci_hybrid(
+    name: str,
+    data: npt.ArrayLike,
+    *,
+    score_func: str | None,
+    indep_test: str | None,
+    categorical: Sequence[str | int] | None,
+    collider_rule: str,
+    possible_dsep: str | None,
+    knowledge: Knowledge | None,
+    **settings: object,
+) -> StructureOutput:
+    """Run ``name``, ``"boss_fci"`` or ``"grasp_fci"``, as :func:`~andrey.gfci` runs.
+
+    The score and the test are picked from the declared column types and must read the data
+    alike; ``settings`` reach the engine in :mod:`andrey.search.gfci`.
+    """
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
+    from andrey.search import gfci as engines
+
+    score_func, _ = default_score(data, score_func, categorical=categorical)
+    indep_test, categorical = default_test(data, indep_test, categorical=categorical)
+    # Both phases read the same data, so the score and the test must agree on its type.
+    if data_kind(score_func) != data_kind(indep_test):
+        raise ValueError(
+            f"{name}'s score and test must read the data alike: score_func='bdeu' or "
+            "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
+            "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
+            "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
+            f"score_func={score_func!r}, indep_test={indep_test!r}"
+        )
+    X, mask = checked_data(data, categorical, "indep_test", indep_test, method=name)
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method=name)
+    ambiguous: set[tuple[int, int, int]] = set()
+    with copies_named(labels):
+        pag = getattr(engines, name)(
+            X,
+            score_func=score_func,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
+            _ambiguous=ambiguous,
+            **settings,
+        )
+    metadata = {
+        **categorical_metadata(mask, data),
+        **_ambiguous_metadata(collider_rule, ambiguous),
+    }
+    return structure_output(pag, labels=labels, metadata=metadata)
+
+
+@method_spec("boss_fci")
+def boss_fci(
+    data: npt.ArrayLike,
+    *,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    indep_test: str | None = None,
+    alpha: float = 0.05,
+    collider_rule: str = "sepsets",
+    categorical: Sequence[str | int] | None = None,
+    possible_dsep: str | None = None,
+    seed: int | None = None,
+    n_starts: int = 1,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a PAG with BOSS-FCI: BOSS's adjacencies, pruned by tests and oriented by FCI's rules.
+
+    BOSS-FCI [1]_ is GFCI [2]_ with the Best Order Score Search [3]_ in place of GES: one
+    :func:`~andrey.boss` search gives a CPDAG, conditional-independence tests remove the adjacencies
+    that hidden common causes explain, and FCI's rules orient the rest into a PAG. It allows hidden
+    common causes, as :func:`~andrey.gfci` does, with a search its authors designed for highly
+    connected variables.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : str or None, default=None
+        Local score driving the BOSS phase, as for :func:`~andrey.boss`: ``"bic"``, the
+        linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
+        numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
+        BIC for mixed data. ``None`` picks from the declared column types, as for
+        :func:`~andrey.boss`. ``metadata["score_func"]`` names the score the fit used: the one
+        picked from the declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the BOSS phase. Larger
+        values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
+        finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC, the default as for :func:`~andrey.gfci`. Must be from 0 to 1. Only ``"bic"``
+        uses it: passing it with another score raises ``ValueError``.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
+    indep_test : str or None, default=None
+        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`:
+        ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"``
+        and ``"gsq"`` for categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data,
+        and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, which also detect nonlinear
+        dependence in continuous data, at a far higher cost per test. It must read the same kind of
+        data as ``score_func``. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
+        picked from the declared column types when this is ``None``.
+    alpha : float, default=0.05
+        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How a collider is decided on a triple ``x - z - y`` where the tests removed the BOSS edge
+        between ``x`` and ``y``, as for :func:`~andrey.gfci`: by the recorded separating set
+        (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
+        separate them, which makes ``z`` a collider when none of them contains it and a
+        non-collider when all do (``"conservative"``), or when fewer than half and when more than
+        half do (``"majority"``). Any other triple is ambiguous, and no rule orients through it. On
+        the other triples whose ends are not adjacent, the BOSS CPDAG decides.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
+        names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
+        columns, never a column by its values. ``[]`` marks none. A categorical setting reads every
+        column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
+        named here or by its type. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    possible_dsep : {"order_free", "fast"} or None, default=None
+        The order of the possible-d-separation step, as for :func:`~andrey.gfci`; ``None`` follows
+        ``andrey.config.tie_break``.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random order in which the BOSS phase
+        visits variables, as for :func:`~andrey.boss`, and for the random draws of ``indep_test``,
+        which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make. Different seeds can reach
+        different graphs.
+    n_starts : int, default=1
+        Number of BOSS searches, at least ``1``, as for :func:`~andrey.boss`: the first starts from
+        the columns' tie-rank order, each later one from a random order drawn from ``seed`` and its
+        own index. The test phase starts from the best-scoring search's CPDAG.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps every test of
+        the FCI phase, as for :func:`~andrey.gfci`, but not the BOSS phase.
+    max_parents : int or None, default=None
+        A cap on every node's parents in the BOSS phase, at least ``0``, as :func:`~andrey.boss`
+        applies it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node
+        of the PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
+        orientation rules put at a node. ``None`` sets no cap.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The BOSS phase honors it as
+        :func:`~andrey.boss` does, and the test phase starts from the adjacencies BOSS found and
+        never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
+        an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"boss_fci"`` and ``metadata["seed"]`` the seed used. Endpoints carry arrowheads, tails, or
+        circle marks (``o``); a bidirected edge (``<->``) marks a probable hidden common cause.
+        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
+        read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
+        ``"majority"``, ``metadata["ambiguous_triples"]`` lists the triples the rule left
+        ambiguous, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
+        used, under their parameter names.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``score_func`` and
+        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
+        ``categorical`` does not suit them, as for :func:`~andrey.gfci`. With the BIC score, also
+        if a column repeats another up to scale and shift given more than two rows or, with more
+        rows than columns, is a linear function of other columns. One message names every group of
+        copies and says to keep one column per group. Also if a given ``max_parents`` is below the
+        parents some graph of the required edges of ``knowledge`` gives a node, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When the mixed-data score or test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** BOSS-FCI suits i.i.d. observational continuous data with linear effects and
+    Gaussian noise where unmeasured common causes are plausible [1]_. Its authors simulate 20
+    measured variables with 0, 4, or 8 hidden common causes, mean degree 2 to 6, and 200 to 5,000
+    rows, and 100 measured variables with 10 hidden ones and 1,000 rows, scored by the BIC with a
+    penalty discount of 2 and tested by Fisher's z at an alpha of 0.01. They pick BOSS's search for
+    its accuracy on densely connected graphs. It returns a PAG. When no common cause is hidden, use
+    :func:`~andrey.boss`; :func:`~andrey.grasp_fci` and :func:`~andrey.gfci` run the same pipeline
+    with GRaSP's and GES's searches.
+
+    The steps are :func:`~andrey.gfci`'s with the CPDAG from :func:`~andrey.boss`: FCI's adjacency
+    search starts from the CPDAG's adjacencies and removes a pair that a subset of either end's
+    neighbors separates; the CPDAG decides the colliders on triples whose ends it leaves
+    non-adjacent, and the separating sets decide the others; FCI's possible-d-separation step and
+    Zhang's rules R1-R10 [4]_ follow. No step adds an edge, so the PAG's adjacencies are a subset of
+    the BOSS CPDAG's. Reordering the columns reorders the nodes and changes nothing else, unless two
+    columns are identical, as for both phases on their own.
+
+    **The published method.** Ramsey, Andrews, and Spirtes [1]_ define BOSS-FCI by a template (their
+    Algorithm 5) that removes edges in one pass, each at the first subset of either end's neighbors
+    that separates it, and leaves out GFCI's possible-d-separation step: they prove the method
+    correct with that step, as GFCI is, and conjecture that it is not needed. Andrey keeps the
+    step, and FCI's adjacency search, which grows the conditioning size over all edges together and
+    records the union of the separating subsets of the smallest size, as :func:`~andrey.gfci` does.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
+    its BOSS phase scores every variable over the same rows. Drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
+    per test.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 measured variables with 4
+    hidden common causes, mean degree 4, and 1,000 rows; on 7 variables simulated on the ASIA
+    network with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with
+    the mixed-data score and test, on 5 variables with 3,000 rows. It runs a full
+    :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the same
+    data, and its possible-d-separation step can test many subsets of each node's possible
+    d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
+    Fisher's z test assume linear effects with Gaussian noise. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
+
+    References
+    ----------
+    .. [1] Ramsey, J., Andrews, B., and Spirtes, P. (2025). Efficient latent variable causal
+       discovery: combining score search and targeted testing. arXiv:2510.04263.
+       https://arxiv.org/abs/2510.04263
+    .. [2] Ogarrio, J. M., Spirtes, P., and Ramsey, J. (2016). A hybrid causal search algorithm
+       for latent variable models. PGM, PMLR 52, 368-379.
+    .. [3] Andrews, B., Ramsey, J., Sanchez Romero, R., Camchong, J., and Kummerfeld, E. (2023).
+       Fast Scalable and Accurate Discovery of DAGs Using the Best Order Score Search and Grow
+       Shrink Trees. NeurIPS 36. https://doi.org/10.52202/075280-2794
+    .. [4] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+       1873-1896.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import boss_fci
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = x + 0.1 * rng.standard_normal(500)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     boss_fci(np.column_stack([x, y]), seed=0).structure.kind
+    'pag'
+    """
+    return _fci_hybrid(
+        "boss_fci",
+        data,
+        score_func=score_func,
+        indep_test=indep_test,
+        categorical=categorical,
+        collider_rule=collider_rule,
+        possible_dsep=possible_dsep,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        alpha=alpha,
+        max_depth=max_depth,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        seed=seed,
+    )
+
+
+@method_spec("grasp_fci")
+def grasp_fci(
+    data: npt.ArrayLike,
+    *,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    grasp_depth: int = 3,
+    indep_test: str | None = None,
+    alpha: float = 0.05,
+    collider_rule: str = "sepsets",
+    categorical: Sequence[str | int] | None = None,
+    possible_dsep: str | None = None,
+    seed: int | None = None,
+    n_starts: int = 1,
+    max_depth: int | None = None,
+    max_parents: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a PAG with GRaSP-FCI: GRaSP's adjacencies, pruned by tests, oriented by FCI's rules.
+
+    GRaSP-FCI [1]_ is GFCI [2]_ with the greedy relaxation of the sparsest permutation [3]_ in place
+    of GES: one :func:`~andrey.grasp` search gives a CPDAG, conditional-independence tests remove
+    the adjacencies that hidden common causes explain, and FCI's rules orient the rest into a PAG.
+    It allows hidden common causes, as :func:`~andrey.gfci` does, with GRaSP's search over variable
+    orders.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : str or None, default=None
+        Local score driving the GRaSP phase, as for :func:`~andrey.grasp`: ``"bic"``, the
+        linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
+        numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
+        BIC for mixed data. ``None`` picks from the declared column types, as for
+        :func:`~andrey.grasp`. ``metadata["score_func"]`` names the score the fit used: the one
+        picked from the declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GRaSP phase. Larger
+        values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
+        finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=0.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC, the default as for :func:`~andrey.gfci`. Must be from 0 to 1. Only ``"bic"``
+        uses it: passing it with another score raises ``ValueError``.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
+    grasp_depth : int, default=3
+        Maximum number of tucks in one chain of moves of the GRaSP phase, at least ``1``, as for
+        :func:`~andrey.grasp`. Larger depths search more chains, which can reach a better score,
+        and run longer.
+    indep_test : str or None, default=None
+        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`:
+        ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"``
+        and ``"gsq"`` for categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data,
+        and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, which also detect nonlinear
+        dependence in continuous data, at a far higher cost per test. It must read the same kind of
+        data as ``score_func``. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
+        picked from the declared column types when this is ``None``.
+    alpha : float, default=0.05
+        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        How a collider is decided on a triple ``x - z - y`` where the tests removed the GRaSP edge
+        between ``x`` and ``y``, as for :func:`~andrey.gfci`: by the recorded separating set
+        (``"sepsets"``), or by a vote over the subsets of ``x``'s and ``y``'s neighbors that
+        separate them, which makes ``z`` a collider when none of them contains it and a
+        non-collider when all do (``"conservative"``), or when fewer than half and when more than
+        half do (``"majority"``). Any other triple is ambiguous, and no rule orients through it. On
+        the other triples whose ends are not adjacent, the GRaSP CPDAG decides.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
+        names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text
+        columns, never a column by its values. ``[]`` marks none. A categorical setting reads every
+        column as categorical, and a continuous setting raises ``ValueError`` on a declared column,
+        named here or by its type. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    possible_dsep : {"order_free", "fast"} or None, default=None
+        The order of the possible-d-separation step, as for :func:`~andrey.gfci`; ``None`` follows
+        ``andrey.config.tie_break``.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random starting order and the order
+        in which the GRaSP phase visits variables, as for :func:`~andrey.grasp`, and for the random
+        draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make.
+        Different seeds can reach different graphs.
+    n_starts : int, default=1
+        Number of GRaSP searches, at least ``1``, as for :func:`~andrey.grasp`, each from its own
+        random starting order: the first from ``seed``'s, each later one from an order drawn from
+        ``seed`` and its own index. The test phase starts from the best-scoring search's CPDAG.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps every test of
+        the FCI phase, as for :func:`~andrey.gfci`, but not the GRaSP phase.
+    max_parents : int or None, default=None
+        A cap on every node's parents in the GRaSP phase, at least ``0``, as :func:`~andrey.grasp`
+        applies it. The test phase starts from that CPDAG's adjacencies and removes edges, so a node
+        of the PAG keeps at most its CPDAG neighbors; the cap does not bound the arrowheads the
+        orientation rules put at a node. ``None`` sets no cap.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The GRaSP phase honors it as
+        :func:`~andrey.grasp` does, and the test phase starts from the adjacencies GRaSP found and
+        never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
+        an arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"grasp_fci"`` and ``metadata["seed"]`` the seed used. Endpoints carry arrowheads, tails,
+        or circle marks (``o``); a bidirected edge (``<->``) marks a probable hidden common cause.
+        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
+        read, by name or 0-based position. With ``collider_rule`` ``"conservative"`` or
+        ``"majority"``, ``metadata["ambiguous_triples"]`` lists the triples the rule left
+        ambiguous, as ``[x, z, y]``: 0-based column positions, the middle node second and
+        ``x < y``, in ascending order. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score
+        used, under their parameter names.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``score_func`` and
+        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
+        ``categorical`` does not suit them, as for :func:`~andrey.gfci`. With the BIC score, also
+        if a column repeats another up to scale and shift given more than two rows or, with more
+        rows than columns, is a linear function of other columns. One message names every group of
+        copies and says to keep one column per group. Also if a given ``max_parents`` is below the
+        parents some graph of the required edges of ``knowledge`` gives a node, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When the mixed-data score or test finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers; each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** GRaSP-FCI suits i.i.d. observational continuous data with linear effects and
+    Gaussian noise where unmeasured common causes are plausible [1]_. Its authors simulate it in the
+    setting of :func:`~andrey.boss_fci`: 20 measured variables with 0, 4, or 8 hidden common causes,
+    mean degree 2 to 6, and 200 to 5,000 rows, and 100 measured variables with 10 hidden ones and
+    1,000 rows. They describe GRaSP's search as favoring sparse graphs, a trade of accuracy against
+    time beside BOSS's. It returns a PAG. When no common cause is hidden, use :func:`~andrey.grasp`;
+    :func:`~andrey.boss_fci` and :func:`~andrey.gfci` run the same pipeline with BOSS's and GES's
+    searches.
+
+    The steps are :func:`~andrey.boss_fci`'s with the CPDAG from :func:`~andrey.grasp`, and differ
+    from the published template [1]_ as that function's Notes describe: Andrey keeps GFCI's
+    possible-d-separation step. No step adds an edge, so the PAG's adjacencies are a subset of the
+    GRaSP CPDAG's. Reordering the columns reorders the nodes and changes nothing else, unless two
+    columns are identical.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
+    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows first, which
+    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
+    per test.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 measured variables with 4
+    hidden common causes, mean degree 4, and 1,000 rows; on 7 variables simulated on the ASIA
+    network with one hidden, with 2,000 rows; on the 11 Sachs measurements with 853 rows; and, with
+    the mixed-data score and test, on 5 variables with 3,000 rows. It runs a full
+    :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on the same
+    data, and its possible-d-separation step can test many subsets of each node's possible
+    d-separating set, so its cost can grow fast with the number of variables. Its BIC score and
+    Fisher's z test assume linear effects with Gaussian noise. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
+
+    References
+    ----------
+    .. [1] Ramsey, J., Andrews, B., and Spirtes, P. (2025). Efficient latent variable causal
+       discovery: combining score search and targeted testing. arXiv:2510.04263.
+       https://arxiv.org/abs/2510.04263
+    .. [2] Ogarrio, J. M., Spirtes, P., and Ramsey, J. (2016). A hybrid causal search algorithm
+       for latent variable models. PGM, PMLR 52, 368-379.
+    .. [3] Lam, W.-Y., Andrews, B., and Ramsey, J. (2022). Greedy Relaxations of the Sparsest
+       Permutation Algorithm. UAI, PMLR 180:1052-1062. https://proceedings.mlr.press/v180/lam22a.html
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import grasp_fci
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = x + 0.1 * rng.standard_normal(500)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     grasp_fci(np.column_stack([x, y]), seed=0).structure.kind
+    'pag'
+    """
+    return _fci_hybrid(
+        "grasp_fci",
+        data,
+        score_func=score_func,
+        indep_test=indep_test,
+        categorical=categorical,
+        collider_rule=collider_rule,
+        possible_dsep=possible_dsep,
+        knowledge=knowledge,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        grasp_depth=grasp_depth,
+        alpha=alpha,
+        max_depth=max_depth,
+        max_parents=max_parents,
+        n_starts=n_starts,
+        seed=seed,
+    )
 
 
 def _env_name(label: object, from_targets: bool, labels: tuple[str, ...] | None) -> object:

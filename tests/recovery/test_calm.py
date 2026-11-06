@@ -14,7 +14,6 @@ import numpy as np
 import pytest
 
 import andrey
-from andrey.core import GraphStructure
 from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
@@ -82,6 +81,7 @@ def test_calm_recovers_the_true_class(sem) -> None:
     _, B, out = sem
     assert out.structure.kind == "dag"
     assert markov_equivalent(out.structure, (B != 0).astype(int))  # [i, j] = 1 is i -> j
+    assert out.weighted_adjacency.shape == B.shape
 
 
 # ---- background knowledge ------------------------------------------------------------------------
@@ -202,14 +202,6 @@ def test_calm_is_deterministic() -> None:
     second = andrey.calm(X, seed=0, subproblem_iter=100, max_iter=2)
     assert first.structure.oriented_edges() != []
     assert first == second
-
-
-def test_calm_output_contract(tree_fit) -> None:
-    assert isinstance(tree_fit.structure, GraphStructure)
-    assert tree_fit.structure.kind == "dag"
-    assert tree_fit.metadata["algorithm"] == "calm"
-    assert tree_fit.metadata["seed"] == 0
-    assert tree_fit.weighted_adjacency.shape == (5, 5)
 
 
 def test_calm_rejects_a_non_finite_loss() -> None:

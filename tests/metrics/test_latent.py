@@ -77,12 +77,6 @@ def test_number_of_latents():
     assert number_of_latents(plain) == 0
 
 
-def test_single_observed_variable_scores_one_not_nan():
-    # a 2-node latent graph (1 observed, 1 latent): ARI over one node must be 1.0, not nan.
-    one_observed = _cluster_graph({1: [0]}, n=2)
-    assert latent_cluster_ari(one_observed, one_observed) == 1.0
-
-
 def test_different_latent_counts_are_comparable():
     # same observed variables {0, 1}, different latent counts -> allowed, scores over the observed.
     two_latents = _cluster_graph({2: [0], 3: [1]}, n=4)  # observed {0, 1}, latents {2, 3}

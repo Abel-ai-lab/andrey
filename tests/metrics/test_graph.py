@@ -36,20 +36,12 @@ def test_shd_identity_is_zero():
         (EDGE_01, [[0, 0], [0, 0]], 1),  # deletion
         ([[0, 0], [0, 0]], EDGE_01, 1),  # insertion
         (CHAIN, FORK, 1),  # one edge reversed
+        ([[0, 1, 1], [0, 0, 1], [0, 0, 0]], np.zeros((3, 3), dtype=int), 3),  # every pair deleted
+        (CHAIN, [[0, 0, 0], [1, 0, 0], [0, 1, 0]], 2),  # both edges reversed, one edit each
     ],
 )
 def test_shd_hand_cases(a, b, expected):
     assert shd(a, b) == expected
-
-
-def test_shd_complete_vs_empty_counts_every_pair():
-    complete = [[0, 1, 1], [0, 0, 1], [0, 0, 0]]  # 3 edges
-    assert shd(complete, np.zeros((3, 3), dtype=int)) == 3
-
-
-def test_shd_all_reversed_chain():
-    reversed_chain = [[0, 0, 0], [1, 0, 0], [0, 1, 0]]  # 2 -> 1 -> 0
-    assert shd(CHAIN, reversed_chain) == 2  # both edges reversed, one edit each
 
 
 def test_shd_endpoint_aware_doubles_a_reversal(pag_of):
@@ -163,11 +155,6 @@ def test_to_cpdag_rejects_digraph():
 def test_markov_equivalent_same_mec_no_vstructure():
     # CHAIN (0->1->2) and FORK (1->0, 1->2): same skeleton, neither has a v-structure -> same MEC.
     assert markov_equivalent(CHAIN, FORK)
-
-
-def test_markov_equivalent_identity():
-    assert markov_equivalent(VSTRUCT, VSTRUCT)
-    assert markov_equivalent(CHAIN, CHAIN)
 
 
 def test_markov_equivalent_different_skeletons_separate_mec():

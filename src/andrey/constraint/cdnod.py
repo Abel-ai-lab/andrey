@@ -32,7 +32,7 @@ arrow into ``vk`` puts ``z`` in the deconfounding set ``Z1``; any other qualifyi
 walk that ends in an arrow into ``vk`` or an undirected edge at ``vk`` puts it in the potential
 set ``Z2``.
 
-The step runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed
+The step runs on the data columns sorted by :func:`~andrey.core.ties.tie_ranks`, a rank computed
 from the data, so the order in which it visits the pairs, the directions of a pair, and the subsets
 of ``Z2``, and the order of the columns in each kernel, do not depend on the column order.
 Reordering the columns relabels the step's orientations and changes nothing else, unless two columns
@@ -63,7 +63,7 @@ from andrey.core.ci import make_indep_test
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -286,7 +286,7 @@ def _orient_by_independent_changes(
     skipped, since the causal graph is acyclic. After an orientation the pairs are visited again;
     ``n`` grows until no undirected pair has that many candidates. Returns an updated copy.
 
-    The search runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, so a column's
+    The search runs on the data columns sorted by :func:`~andrey.core.ties.tie_ranks`, so a column's
     index in it is its rank. It visits the pairs, their two directions, and the subsets of ``Z2``
     in rank order, and each kernel stacks its columns in rank order, so reordering the columns
     relabels the orientations and changes nothing else, unless two columns are identical. With

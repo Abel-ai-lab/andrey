@@ -169,14 +169,13 @@ class Knowledge:
         required edge that is forbidden, directly, by the tiers, or by ``allowed``, or required
         edges forming a cycle. ``boss``, ``grasp``, and the LiNGAM methods that search a causal
         order also raise it when the required edges and the tiers admit no causal order, through a
-        column in no tier. ``pc``,
-        ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a directed
-        cycle over the adjacencies the search kept; ``fci`` when a directed path of required edges
-        leads from ``a`` to ``b`` while ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the
-        edge between them. ``rcd`` raises it when the required edges close a directed cycle with
-        the parents it found. A time-series search raises it for a required link without a lag, or
-        at a lag the search does not learn; ``varma_lingam`` also for a forbidden lagged link with
-        ``prune=False``.
+        column in no tier. ``pc``, ``cdnod``, and ``pcmciplus`` raise it when the edges the
+        knowledge orients form a directed cycle over the adjacencies the search kept; ``fci`` and
+        ``fci_jci`` when a directed path of required edges leads from ``a`` to ``b`` while
+        ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the edge between them. ``rcd``
+        raises it when the required edges close a directed cycle with the parents it found. A
+        time-series search raises it for a required link without a lag, or at a lag the search does
+        not learn; ``varma_lingam`` also for a forbidden lagged link with ``prune=False``.
     NotImplementedError
         A method that learns no time lags raises it for an edge with a lag.
 

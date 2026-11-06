@@ -1,14 +1,15 @@
-"""GFCI, the engine behind :func:`andrey.gfci`.
+"""GFCI, BOSS-FCI, and GRaSP-FCI: the engines behind :func:`andrey.gfci`, :func:`andrey.boss_fci`,
+and :func:`andrey.grasp_fci`.
 
-The algorithm, its settings, and its references are described on :func:`andrey.gfci`.
+The algorithms, their settings, and their references are described on those functions.
 
-The steps follow Algorithm 1 of Ogarrio, Spirtes, and Ramsey (2016). GES returns a CPDAG, the
-pattern. FCI's adjacency search, started from the pattern's adjacencies instead of a complete graph,
-removes the pairs a subset of either endpoint's neighbors separates. An unshielded triple of the
-result is a collider when it is one in the pattern, or, when the pattern shields it, when the
-separating set of its endpoints leaves out its middle node. The possible-d-separation and R0-R10
-passes of :mod:`andrey.constraint.fci` follow, with its rule implementations,
-conditional-independence tests, and mark convention.
+The steps follow Algorithm 1 of Ogarrio, Spirtes, and Ramsey (2016). GES, BOSS, or GRaSP returns a
+CPDAG, the pattern, and :func:`fci_from_pattern` runs the rest. FCI's adjacency search, started from
+the pattern's adjacencies instead of a complete graph, removes the pairs a subset of either
+endpoint's neighbors separates. An unshielded triple of the result is a collider when it is one in
+the pattern, or, when the pattern shields it, when the separating set of its endpoints leaves out
+its middle node. The possible-d-separation and R0-R10 passes of :mod:`andrey.constraint.fci`
+follow, with its rule implementations, conditional-independence tests, and mark convention.
 """
 
 from __future__ import annotations
@@ -40,7 +41,9 @@ from andrey.constraint.fci import (
 from andrey.core import ARROW, NULL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 from andrey.core.orient import from_structure
+from andrey.search.boss import boss
 from andrey.search.ges import ges
+from andrey.search.grasp import grasp
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -70,7 +73,7 @@ def gfci(
 
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
-    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    visits the nodes in: the :func:`~andrey.core.ties.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
     of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
     ``max_parents`` reaches the GES phase as :func:`~andrey.search.ges.ges`'s cap.
@@ -105,7 +108,168 @@ def gfci(
         constraints=constraints,
         workers=workers,
     )
-    pattern = from_structure(cpdag_structure)
+    return fci_from_pattern(
+        X,
+        cpdag_structure,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=categorical,
+        possible_dsep=possible_dsep,
+        max_depth=max_depth,
+        constraints=constraints,
+        in_column_order=in_column_order,
+        workers=workers,
+        seed=seed,
+        _ambiguous=_ambiguous,
+    )
+
+
+def boss_fci(
+    data: np.ndarray,
+    *,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    max_parents: int | None = None,
+    n_starts: int = 1,
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+    collider_rule: str = "sepsets",
+    categorical: np.ndarray | None = None,
+    possible_dsep: str = "order_free",
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+    in_column_order: bool = False,
+    workers: int | None = None,
+    seed: int | None = None,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+) -> GraphStructure:
+    """Discover a PAG with BOSS adjacency and FCI orientation.
+
+    The score settings, ``max_parents``, ``n_starts``, and ``constraints`` reach the BOSS search
+    (:func:`~andrey.search.boss.boss`), with ``seed`` as its ``random_state``, and the rest act as
+    for :func:`gfci`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    check_collider_rule(collider_rule)
+    _validate_possible_dsep(possible_dsep)
+    pattern, _score = boss(
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        random_state=0 if seed is None else seed,
+        n_starts=n_starts,
+        score_func=score_func,
+        max_parents=max_parents,
+        categorical=categorical,
+        constraints=constraints,
+    )
+    return fci_from_pattern(
+        X,
+        pattern,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=categorical,
+        possible_dsep=possible_dsep,
+        max_depth=max_depth,
+        constraints=constraints,
+        in_column_order=in_column_order,
+        workers=backend.worker_count(workers),
+        seed=seed,
+        _ambiguous=_ambiguous,
+    )
+
+
+def grasp_fci(
+    data: np.ndarray,
+    *,
+    score_func: str = "bic",
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 0.0,
+    equivalent_sample_size: float = 1.0,
+    grasp_depth: int = 3,
+    max_parents: int | None = None,
+    n_starts: int = 1,
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+    collider_rule: str = "sepsets",
+    categorical: np.ndarray | None = None,
+    possible_dsep: str = "order_free",
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+    in_column_order: bool = False,
+    workers: int | None = None,
+    seed: int | None = None,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+) -> GraphStructure:
+    """Discover a PAG with GRaSP adjacency and FCI orientation.
+
+    The score settings, ``grasp_depth``, ``max_parents``, ``n_starts``, and ``constraints`` reach
+    the GRaSP search (:func:`~andrey.search.grasp.grasp`), with ``seed`` as its ``random_state``,
+    and the rest act as for :func:`gfci`.
+    """
+    X = np.asarray(data, dtype=np.float64)
+    check_collider_rule(collider_rule)
+    _validate_possible_dsep(possible_dsep)
+    pattern, _score = grasp(
+        X,
+        penalty_discount=penalty_discount,
+        ebic_gamma=ebic_gamma,
+        equivalent_sample_size=equivalent_sample_size,
+        depth=grasp_depth,
+        random_state=0 if seed is None else seed,
+        n_starts=n_starts,
+        score_func=score_func,
+        max_parents=max_parents,
+        categorical=categorical,
+        constraints=constraints,
+    )
+    return fci_from_pattern(
+        X,
+        pattern,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=categorical,
+        possible_dsep=possible_dsep,
+        max_depth=max_depth,
+        constraints=constraints,
+        in_column_order=in_column_order,
+        workers=backend.worker_count(workers),
+        seed=seed,
+        _ambiguous=_ambiguous,
+    )
+
+
+def fci_from_pattern(
+    X: np.ndarray,
+    cpdag: GraphStructure,
+    *,
+    alpha: float,
+    indep_test: str,
+    collider_rule: str,
+    categorical: np.ndarray | None,
+    possible_dsep: str,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
+    in_column_order: bool,
+    workers: int = 1,
+    seed: int | None = None,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
+) -> GraphStructure:
+    """Prune and orient the score search's ``cpdag`` with FCI's tests and rules: a PAG.
+
+    FCI's adjacency search starts from the pattern's adjacencies; the pattern then decides the
+    colliders on triples whose ends it leaves non-adjacent, and the separating sets the others,
+    before the possible-d-separation step and the rules R1-R10. ``max_depth``, ``constraints``,
+    ``workers`` (a worker count), ``seed``, and ``_ambiguous`` act on the test phase as for
+    :func:`gfci`.
+    """
+    pattern = from_structure(cpdag)
 
     test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
     keep = None if constraints is None else constraints.required | constraints.required.T

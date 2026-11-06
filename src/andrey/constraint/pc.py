@@ -32,8 +32,8 @@ from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, to_structure
 from andrey.core.structure import has_cycle
+from andrey.core.ties import KEY_DP
 from andrey.core.warning_policy import PerformanceWarning, warn_once
-from andrey.search._parallel import _KEY_DP
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -134,37 +134,6 @@ def pc(
     )
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
-
-
-def resolve_collider_order(collider_order: str | None) -> str:
-    """Return ``collider_order``, or for ``None`` the order ``andrey.config.tie_break`` selects.
-
-    ``"rank"`` selects ``"p_value"`` and ``"position"`` selects ``"column"``. An explicit
-    ``collider_order`` is returned as given, without reading the setting.
-    """
-    if collider_order is not None:
-        return collider_order
-    return "column" if backend.config.tie_break == "position" else "p_value"
-
-
-def resolve_in_column_order() -> bool:
-    """Whether ``andrey.config.tie_break`` is ``"position"``, which fires the orientation rules.
-
-    Under ``"position"``, Meek's rules and FCI's rules R1-R10 fire one at a time in column order
-    (``in_column_order``); under ``"rank"``, they run in order-free rounds.
-    """
-    return backend.config.tie_break == "position"
-
-
-def resolve_possible_dsep(possible_dsep: str | None) -> str:
-    """Return ``possible_dsep``, or for ``None`` the order ``andrey.config.tie_break`` selects.
-
-    ``"rank"`` selects ``"order_free"`` and ``"position"`` selects ``"fast"``. An explicit
-    ``possible_dsep`` is returned as given, without reading the setting.
-    """
-    if possible_dsep is not None:
-        return possible_dsep
-    return "fast" if backend.config.tie_break == "position" else "order_free"
 
 
 def check_collider_order(collider_order: str) -> None:
@@ -274,7 +243,7 @@ def _orient_colliders(
 
     With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
-    are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``_KEY_DP``
+    are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``KEY_DP``
     decimals are each checked against the marks set before their rank, then all set: an edge two of
     them dispute ends bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's
     rules. The result depends on the ranks, not on the column order. With ``ranks``, keyed like
@@ -308,7 +277,7 @@ def _orient_colliders(
     if ranked:
 
         def rank(triple: tuple) -> float:
-            return round(triple[0], _KEY_DP)
+            return round(triple[0], KEY_DP)
 
         triples.sort(key=rank, reverse=True)
         groups = [list(tied) for _, tied in groupby(triples, key=rank)]

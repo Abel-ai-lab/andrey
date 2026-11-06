@@ -16,7 +16,7 @@ from collections.abc import Callable
 import numpy as np
 
 from andrey.core import stats
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 #: The measures a DirectLiNGAM order search takes, in the order the facades list them.
 MEASURES = ("pwling", "skew", "tanh")
@@ -157,7 +157,7 @@ def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
     ``scores`` are aligned with ``candidates`` and ``<= 0`` or NaN; two tie when their
     ``sqrt(-score)`` values both lie within ``_TIE_TOL`` of the best one. A NaN score ranks highest,
     as under ``np.argmax``; all NaN candidates then tie. ``ranks`` is indexed by column, as
-    :func:`~andrey.search.hc.tie_ranks` returns for the input data.
+    :func:`~andrey.core.ties.tie_ranks` returns for the input data.
     """
     norm = np.sqrt(-np.asarray(scores, dtype=np.float64))
     nan = np.isnan(norm)
@@ -210,7 +210,7 @@ def find_causal_order(
 
     Each pick is residualized out of the rest. Only one column of each copy group
     (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
-    Ties and copy representatives are decided by :func:`~andrey.search.hc.tie_ranks` of the input
+    Ties and copy representatives are decided by :func:`~andrey.core.ties.tie_ranks` of the input
     columns, which are identical on every machine and keep their ranks when the columns are
     reordered; residualized columns differ in the last bits across machines. Single-dataset;
     MultiGroupDirectLiNGAM runs its own group loop (per-group residualization), reusing

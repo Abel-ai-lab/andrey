@@ -98,10 +98,10 @@ def cam(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     alpha : float, default=0.001
-        The significance level of the pruning test: a parent stays when its smooth term's p-value
-        is at most ``alpha``, in ``(0, 1)``. ``0.001`` is the paper's value at every sample size. A
-        larger value keeps more of the true edges a small sample tests weakly, and more false edges
-        with them (see Notes).
+        Significance level of the pruning test, in ``(0, 1)``: a parent stays when its smooth term's
+        p-value is at most ``alpha``. ``0.001`` is the paper's value at every sample size. A larger
+        value keeps more of the true edges a small sample tests weakly, and more false edges with
+        them (see Notes).
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the order search adds no edge that gives a
         node more, so no node of the returned DAG has more than ``max_parents`` parents. A cap can
@@ -118,8 +118,9 @@ def cam(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"cam"`` and ``metadata["tie_break"]`` the rule ties followed. ``ordering`` is a causal
-        order of the search's DAG before pruning, as a tuple of column indices, causes first.
+        ``"cam"``. ``ordering`` is a causal order of the search's DAG before pruning, as a tuple of
+        column indices, causes first. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -129,26 +130,19 @@ def cam(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column,
-        a column of fewer than 3 distinct values, or a column that repeats another up to scale and
-        shift, each named in the message. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists; if its required edges give a node
-        more than ``max_parents`` parents; or if a column's required parents need more
-        coefficients than ``data`` has rows, naming the column.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, or with a constant column, a column of
+        fewer than 3 distinct values, or a column that repeats another up to scale and shift, each
+        named in the message. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists; if its required edges give a node more than
+        ``max_parents`` parents; or if a column's required parents need more coefficients than
+        ``data`` has rows, naming the column.
 
     Warns
     -----
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which the fit reads as numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.anm : Decides the direction between two variables under an additive noise model.
-    andrey.direct_lingam : Linear effects with non-Gaussian noise.
-    andrey.pc, andrey.ges : Return the equivalence class, which is what linear Gaussian data
-        identify.
 
     Notes
     -----
@@ -226,10 +220,7 @@ def cam(
     column with fewer than 3 distinct values, are not supported: a smooth term needs at least 3, so
     such a column raises ``ValueError``. Categorical columns are not modeled: text labels raise
     ``ValueError``, and integer codes are read as numbers, a smooth function of the code, with a
-    :class:`~andrey.DataTypeWarning`. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
-
-    **Large graphs and many rows.** On the rescaled additive-noise data with 1,000 rows, over five
+    :class:`~andrey.DataTypeWarning`. On the rescaled additive-noise data with 1,000 rows, over five
     graphs at 200 variables, three at 500, and two at 1,000 and at 2,000, its median errors stayed
     below the empty graph's at every size but grew faster than the variables, from 8% of the empty
     graph's at 100 variables to 37% at 2,000. Nearly all of them were extra edges, and on one graph
@@ -245,22 +236,21 @@ def cam(
     5,000 rows and 17.5 s at 20,000 and peaked at 140 MB and 214 MB, about 100 MB of it the imports;
     the median errors stayed at 2. Above 2,000 distinct values a column's thin plate basis is built
     on a fixed subsample of 2,000 of them: at 5,000 and 20,000 rows that returned the same graph as
-    knots on every value in 6 of 6 fits, in up to a fifth less time.
-
-    **Small samples and skewed causes.** With few rows per variable it keeps false edges: on
-    independent columns it kept a median of 26 at 40 rows and 60 variables and 7.5 at 200 rows and
-    60 variables, against 0 at 500 rows and 20. The search keeps each variable's best-fitting
-    candidates and the pruning tests them on the same rows, and the smooth-term tests run slightly
-    liberal at small samples: an unrelated parent among five reached a p-value of at most 0.01 in
-    3.3% of fits at 100 rows. A larger ``alpha`` trades false edges for true ones: at 100 rows,
-    ``alpha=0.01`` found 2 more of 100 true adjacencies on additive-noise graphs of 10 variables and
-    5 more false ones. A strongly skewed cause can be reversed: with a lognormal cause of log-scale
-    2 and an effect of ``log(x)`` plus noise, it reversed the edge in 6 of 10 fits. A
+    knots on every value in 6 of 6 fits, in up to a fifth less time. With few rows per variable it
+    keeps false edges: on independent columns it kept a median of 26 at 40 rows and 60 variables and
+    7.5 at 200 rows and 60 variables, against 0 at 500 rows and 20. The search keeps each variable's
+    best-fitting candidates and the pruning tests them on the same rows, and the smooth-term tests
+    run slightly liberal at small samples: an unrelated parent among five reached a p-value of at
+    most 0.01 in 3.3% of fits at 100 rows. A larger ``alpha`` trades false edges for true ones: at
+    100 rows, ``alpha=0.01`` found 2 more of 100 true adjacencies on additive-noise graphs of 10
+    variables and 5 more false ones. A strongly skewed cause can be reversed: with a lognormal cause
+    of log-scale 2 and an effect of ``log(x)`` plus noise, it reversed the edge in 6 of 10 fits. A
     variance-stabilizing transform such as the log of a positive column suits data whose effect
     stays nonlinear on the new scale: with an effect of ``sin(2 log(x) / 3)`` at log-scale 3, it
     found the edge in 6 of 10 fits on ``x`` and 10 of 10 on ``log(x)``. An effect that becomes
     linear, as ``log(x)`` itself does, leaves a linear Gaussian pair, whose direction no fit
-    identifies.
+    identifies. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -282,20 +272,17 @@ def cam(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import cam
     >>> rng = np.random.default_rng(0)
     >>> x = rng.uniform(-2, 2, 300)
     >>> y = np.sin(2 * x) + 0.3 * rng.standard_normal(300)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = cam(np.column_stack([x, y]))
+    >>> out = cam(np.column_stack([x, y]))
     >>> out.structure.kind, out.ordering
     ('dag', (0, 1))
     """
+    from andrey.core.ties import tie_ranks
     from andrey.fcm.cam import cam as _cam
-    from andrey.search.hc import tie_ranks
 
     X = data_matrix(data, method="cam")
     labels = column_labels(data)
@@ -364,9 +351,9 @@ def resit(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     alpha : float, default=0.05
-        The significance level of the edge-removal tests: a parent goes when the residual without
-        it is independent of the variable's predecessors at a p-value above ``alpha``, in
-        ``(0, 1)``. The causal order does not read it. ``0.05`` is the paper's value.
+        Significance level of the edge-removal tests, in ``(0, 1)``: a parent goes when the residual
+        without it is independent of the variable's predecessors at a p-value above ``alpha``. The
+        causal order does not read it. ``0.05`` is the paper's value.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. A variable is the next sink only
@@ -379,8 +366,9 @@ def resit(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"resit"`` and ``metadata["tie_break"]`` the rule ties followed. ``ordering`` is the
-        causal order of the sink search, as a tuple of column indices, causes first.
+        ``"resit"``. ``ordering`` is the causal order of the sink search, as a tuple of column
+        indices, causes first. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -390,21 +378,20 @@ def resit(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or
-        fewer than twice as many rows as columns, or with a constant column, a column of fewer than
-        3 distinct values, or a column that repeats another up to scale and shift, each named in
-        the message. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or fewer than twice
+        as many rows as columns, or with a constant column, a column of fewer than 3 distinct
+        values, or a column that repeats another up to scale and shift, each named in the message.
+        Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
         :class:`~andrey.Knowledge` lists.
     FloatingPointError
         If an HSIC test gives a non-finite value, rather than let it steer a choice.
 
-    See Also
-    --------
-    andrey.cam : Additive effects with Gaussian noise, scored by the likelihood.
-    andrey.anm : Decides the direction between two variables under an additive noise model.
-    andrey.pc, andrey.ges : Return the equivalence class, which is what linear Gaussian data
-        identify.
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -438,7 +425,7 @@ def resit(
 
     The kernels read the columns centered and divided by their standard deviations, and each smooth
     term reads a variable through an affine map to a fixed interval, so rescaling or shifting a
-    column changes no step; the centering also keeps a large offset from cancelling the distances'
+    column changes no step; the centering also keeps a large offset from canceling the distances'
     digits. The fit draws no random numbers and runs on one BLAS thread.
 
     **Ties.** p-values are compared as their logarithms rounded to 9 decimal places, as
@@ -512,20 +499,17 @@ def resit(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import resit
     >>> rng = np.random.default_rng(0)
     >>> x = rng.uniform(-2, 2, 300)
     >>> y = np.sin(2 * x) + 0.3 * rng.standard_normal(300)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = resit(np.column_stack([x, y]))
+    >>> out = resit(np.column_stack([x, y]))
     >>> out.structure.kind, out.ordering
     ('dag', (0, 1))
     """
+    from andrey.core.ties import tie_ranks
     from andrey.fcm.resit import resit as _resit
-    from andrey.search.hc import tie_ranks
 
     X = data_matrix(data, method="resit", min_rows=MIN_ROWS)
     labels = column_labels(data)
@@ -573,8 +557,8 @@ def camuv(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     alpha : float, default=0.01
-        The significance level of every HSIC independence test, in ``(0, 1)``: of the sink tests,
-        the tests that remove a candidate parent, and the tests that mark a pair. ``0.01`` is the
+        Significance level of every HSIC independence test, in ``(0, 1)``: of the sink tests, the
+        tests that remove a candidate parent, and the tests that mark a pair. ``0.01`` is the
         paper's value.
     max_depth : int, default=2
         The maximum conditioning-set size of a sink test, at least ``1``: the most variables
@@ -598,9 +582,10 @@ def camuv(
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` for a pair joined through a hidden variable, whose relation the method cannot
         determine, with an arrowhead where ``knowledge`` sets one. ``metadata["algorithm"]`` is
-        ``"camuv"``, ``metadata["latent_pairs"]`` lists the marked pairs as sorted ``[i, j]``
-        lists, ``metadata["cycle_edges"]`` lists as ``[i, j]`` each edge ``i -> j`` dropped from a
-        directed cycle, and ``metadata["tie_break"]`` is the rule ties followed.
+        ``"camuv"``, ``metadata["latent_pairs"]`` lists the marked pairs as sorted ``[i, j]`` lists,
+        and ``metadata["cycle_edges"]`` lists as ``[i, j]`` each edge ``i -> j`` dropped from a
+        directed cycle. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -610,13 +595,12 @@ def camuv(
         ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
-        method, the argument, what it accepts, and the value. Also if ``data`` is
-        not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or
-        fewer than twice as many rows as columns, or with a constant column, a column of fewer than
-        3 distinct values, a column that repeats another up to scale and shift, or a column that is
-        a linear function of others, such as a total, each named in the message. Also if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than 6 rows or fewer than twice
+        as many rows as columns, or with a constant column, a column of fewer than 3 distinct
+        values, a column that repeats another up to scale and shift, or a column that is a linear
+        function of others, such as a total, each named in the message. Also if ``knowledge`` names
+        a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
     FloatingPointError
         If an HSIC test gives a non-finite value, rather than let it steer a choice.
 
@@ -625,12 +609,6 @@ def camuv(
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes,
         which the fit reads as numbers. Each message warns once per process.
-
-    See Also
-    --------
-    andrey.cam, andrey.resit : Nonlinear additive effects with no hidden variables.
-    andrey.rcd : Linear non-Gaussian effects with hidden common causes.
-    andrey.fci : Hidden variables with any effects, from conditional independence alone.
 
     Notes
     -----
@@ -695,7 +673,7 @@ def camuv(
     Every step reads the columns divided by their standard deviations, so rescaling a column
     changes no step; the paper's joint kernel reads raw residuals and so weighs each by its units,
     which is the same on standardized data. The kernels read the residuals centered, which keeps an
-    offset from cancelling the distances' digits. The fit draws no random numbers and runs on one
+    offset from canceling the distances' digits. The fit draws no random numbers and runs on one
     BLAS thread.
 
     **Ties.** p-values are compared as their logarithms rounded to 9 decimal places, as
@@ -745,17 +723,15 @@ def camuv(
     or 3 and an effect of its logarithm plus noise, on 500 rows, it marked the pair ``o-o`` in 10 of
     10 fits, and replacing the cause by its ranks found the edge in 9 of them. One value of 1e6 in
     the middle variable of a nonlinear chain of 800 rows turned both of its edges into ``o-o`` marks
-    in 5 of 5 fits. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
-
-    **Large graphs and many rows.** With one hidden variable per ten observed ones, a fit took 16 s
-    at 20 observed variables and 91 s at 50, and its cost grows about as ``d^2``: in the separate
-    check up to 400 observed variables, a fit passed about a minute near 40 variables, 10 minutes
-    near 130, and an hour near 300. Each HSIC test builds matrices with one row and one column per
-    sample, so time and memory grow with the square of ``n_samples``: at 5 variables a fit took
-    1.5 s and 0.21 GB with 1,000 rows and 78 s and 3.6 GB with 8,000, and at 20 variables
-    6.1 minutes and 1.7 GB with 4,000. The kernels kept between tests stay within 1 GiB, so above
-    about 11,600 rows none is kept.
+    in 5 of 5 fits. With one hidden variable per ten observed ones, a fit took 16 s at 20 observed
+    variables and 91 s at 50, and its cost grows about as ``d^2``: in the separate check up to 400
+    observed variables, a fit passed about a minute near 40 variables, 10 minutes near 130, and an
+    hour near 300. Each HSIC test builds matrices with one row and one column per sample, so time
+    and memory grow with the square of ``n_samples``: at 5 variables a fit took 1.5 s and 0.21 GB
+    with 1,000 rows and 78 s and 3.6 GB with 8,000, and at 20 variables 6.1 minutes and 1.7 GB with
+    4,000. The kernels kept between tests stay within 1 GiB, so above about 11,600 rows none is
+    kept. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -768,20 +744,17 @@ def camuv(
 
     Examples
     --------
-    >>> import warnings
     >>> import numpy as np
     >>> from andrey import camuv
     >>> rng = np.random.default_rng(0)
     >>> x = rng.uniform(-2, 2, 300)
     >>> y = np.sin(2 * x) + 0.3 * rng.uniform(-1, 1, 300)
-    >>> with warnings.catch_warnings():
-    ...     warnings.simplefilter("ignore")
-    ...     out = camuv(np.column_stack([x, y]))
+    >>> out = camuv(np.column_stack([x, y]))
     >>> out.structure.kind, out.structure.oriented_edges()
     ('pag', [(0, 1, 'directed')])
     """
+    from andrey.core.ties import tie_ranks
     from andrey.fcm.camuv import camuv as _camuv
-    from andrey.search.hc import tie_ranks
 
     X = data_matrix(data, method="camuv", min_rows=MIN_ROWS)
     labels = column_labels(data)
