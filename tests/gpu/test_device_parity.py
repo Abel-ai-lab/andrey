@@ -1,12 +1,12 @@
 """GPU device parity: the CUDA and MPS paths match the NumPy float64 result and run on the device.
 
 The one check the free hosted runners cannot run. NumPy float64 is the reference. The kernels
-(``cov``, ``corrcoef``, ``entropy``) and the methods that read them (PC with Fisher-Z, GES with
-BIC, DirectLiNGAM) run on ``cuda`` or ``mps``; KCI, CMIknn, and PNL run on ``cuda`` only. Tolerance
-is per device: ``cuda`` computes in float64 (tight, ~1e-9), ``mps`` in float32 (the GPU tier,
-``atol 1e-3``). The device is pinned via ``andrey.config`` (higher precedence than any env), each
-test reads the dispatch counts of its device calls, and a hardware canary checks the device, so a
-silent numpy fallback fails.
+(``cov``, ``corrcoef``, ``entropy``) and the methods that read them (PC with Fisher-Z, GES with BIC,
+BOSS-FCI and GRaSP-FCI with both, DirectLiNGAM) run on ``cuda`` or ``mps``; KCI, CMIknn, and PNL run
+on ``cuda`` only. Tolerance is per device: ``cuda`` computes in float64 (tight, ~1e-9), ``mps`` in
+float32 (the GPU tier, ``atol 1e-3``). The device is pinned via ``andrey.config`` (higher precedence
+than any env), each test reads the dispatch counts of its device calls, and a hardware canary checks
+the device, so a silent numpy fallback fails.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from andrey.core import backend, stats
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_kernel import KCI
 from andrey.irregular.pnl import pnl_pairs
+from tests.recovery.helpers import datagen
 
 pytest.importorskip("torch")
 
@@ -163,6 +164,26 @@ def test_kci_and_cmiknn_match_the_cpu(device, nonlinear):
     assert np.allclose(got_kci, cpu_kci, rtol=0, atol=1e-9)
     assert got_cmiknn == cpu_cmiknn
     assert [g.oriented_edges() for g in graphs] == [g.oriented_edges() for g in cpu_graphs]
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", ["boss_fci", "grasp_fci"])
+def test_permutation_fci_matches_the_cpu(device, method):
+    """The score search and the FCI phase read the device's covariances and correlations, and give
+    the PAG they give on NumPy for a planted hidden common cause."""
+    x = datagen.generate("confounded_gauss_5v")
+    fit = getattr(andrey, method)
+    with andrey.config(backend="numpy", n_jobs=1):
+        expected = fit(x, seed=0).structure
+
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device, n_jobs=1):
+        actual = fit(x, seed=0).structure
+
+    counts = backend.dispatch_stats()
+    assert counts.get(("cov", device), 0) > 0
+    assert counts.get(("corrcoef", device), 0) > 0
+    assert actual == expected
 
 
 def test_pnl_matches_the_cpu(device):

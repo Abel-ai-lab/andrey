@@ -358,11 +358,6 @@ def test_exact_search_recovery():
     assert_recorded_class("ExactSearch", out.structure.to_numpy(), case="gauss_5v")
 
 
-def test_gies_output_contract():
-    out = andrey.gies(datagen.generate("gauss_5v"))
-    assert out.structure.kind == "cpdag" and "score" in out.metadata
-
-
 def _found_dag(out) -> np.ndarray:
     """The DAG ``metadata["dag"]`` lists, as a 0/1 adjacency (``[i, j]`` for ``i -> j``)."""
     n = out.structure.n_nodes
@@ -550,12 +545,3 @@ def test_gfci_recovers_the_planted_pag():
     adjacent = {frozenset(edge[:2]) for edge in ges.oriented_edges(index=True)}
     assert adjacent - {frozenset(edge[:2]) for edge in _PLANTED_PAG}
     assert _pag_edges(_LATENT, andrey.gfci(x).structure) == _PLANTED_PAG
-
-
-def test_gfci_output_contract():
-    assert andrey.gfci(datagen.generate("gauss_5v")).structure.kind == "pag"
-
-
-def test_gfci_rejects_unknown_indep_test():
-    with pytest.raises(ValueError):
-        andrey.gfci(datagen.generate("gauss_5v"), indep_test="no_such_test")

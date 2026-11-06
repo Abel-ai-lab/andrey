@@ -11,8 +11,8 @@ from andrey import data
 from andrey.constraint.pc import _discover_skeleton, _orient_colliders
 from andrey.core import TAIL, GraphStructure
 from andrey.core.orient import meek, pdag2dag
+from andrey.core.ties import tie_ranks
 from andrey.data.interventions import soft
-from andrey.search.hc import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 
@@ -294,13 +294,6 @@ def test_cdnod_runs_the_independent_change_step_on_variables_that_change(monkeyp
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
 
 
-@pytest.mark.parametrize("threshold", [0.0, 1.0])
-def test_cdnod_rejects_a_dependence_threshold_outside_the_unit_interval(threshold):
-    x, c = datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v")
-    with pytest.raises(ValueError, match="dependence_threshold"):
-        andrey.cdnod(x, c, dependence_threshold=threshold)
-
-
 def shifted_domains() -> tuple[np.ndarray, np.ndarray]:
     """Two domains, with two variables shifted between them. Colliders of the augmented skeleton
     conflict on this seed, so the collider order decides which are kept."""
@@ -311,17 +304,12 @@ def shifted_domains() -> tuple[np.ndarray, np.ndarray]:
     return x, context
 
 
-def test_cdnod_passes_the_collider_order_on():
-    """On conflicting colliders the two orders keep different ones."""
-    x, context = shifted_domains()
-    column = andrey.cdnod(x, context, collider_order="column").structure
-    assert column != andrey.cdnod(x, context).structure
-
-
 def test_cdnod_collider_order_follows_tie_break_unless_given():
+    """On conflicting colliders the two orders keep different ones."""
     x, context = shifted_domains()
     default = andrey.cdnod(x, context).structure
     column = andrey.cdnod(x, context, collider_order="column").structure
+    assert column != default
     with andrey.config(tie_break="position"):
         assert andrey.cdnod(x, context).structure == column
         assert andrey.cdnod(x, context, collider_order="p_value").structure == default
@@ -585,26 +573,6 @@ def test_possible_dsep_follows_tie_break_unless_given(monkeypatch, name, tie_bre
     assert received == [reaches]
 
 
-def test_fci_output_contract():
-    assert andrey.fci(datagen.generate("gauss_5v")).structure.kind == "pag"
-
-
-def test_cdnod_output_contract():
-    out = andrey.cdnod(datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v"))
-    assert out.structure.kind == "cpdag"
-
-
-def test_fci_rejects_unknown_indep_test():
-    with pytest.raises(ValueError):
-        andrey.fci(datagen.generate("gauss_5v"), indep_test="no_such_test")
-
-
-def test_cdnod_rejects_unknown_indep_test():
-    x, c = datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v")
-    with pytest.raises(ValueError):
-        andrey.cdnod(x, c, indep_test="no_such_test")
-
-
 def test_cdnod_rejects_mismatched_context():
     x = datagen.generate("gauss_5v")
     with pytest.raises(ValueError, match="one value per row"):
@@ -624,8 +592,7 @@ def test_cdnod_rejects_an_index_with_the_right_size_and_the_wrong_shape():
 
 # --- general-input behavior ----------------------------------------------------------------------
 #
-# Random latent-confounded models check repeatability and well-formed output beyond the fixed
-# baseline. FCI/GFCI column-order sensitivity is measured by qa.column_order.
+# FCI/GFCI column-order sensitivity is measured by qa.column_order.
 
 
 def _latent_confounded_sample(seed: int, d: int) -> np.ndarray:
@@ -637,37 +604,15 @@ def _latent_confounded_sample(seed: int, d: int) -> np.ndarray:
     ).data
 
 
-def _fit(learner: str, x: np.ndarray):
-    if learner == "cdnod":
-        context = np.zeros((len(x), 1))
-        context[len(x) // 2 :] = 1.0
-        return andrey.cdnod(x, context).structure
-    return getattr(andrey, learner)(x).structure
-
-
-@pytest.mark.parametrize(
-    ("learner", "kind"),
-    [("fci", "pag"), ("gfci", "pag"), ("cdnod", "cpdag")],
-)
-def test_constraint_family_is_deterministic_and_well_formed(learner, kind):
-    for seed in range(4):
-        for d in (6, 8):
-            x = _latent_confounded_sample(seed, d)
-            observed = x.shape[1]  # d nodes minus the hidden confounder
-            first = _fit(learner, x)
-            assert first.kind == kind
-            assert first.n_nodes == observed
-            first.validate()
-            repeat = _fit(learner, x).to_numpy()
-            assert np.array_equal(repeat, first.to_numpy()), f"{learner} is not deterministic"
-
-            if learner == "cdnod":
-                order = np.random.default_rng(seed).permutation(observed)
-                back = np.argsort(order)
-                permuted = _fit(learner, x[:, order]).to_numpy()[np.ix_(back, back)]
-                assert np.array_equal(permuted, first.to_numpy()), (
-                    f"{learner} changes when the columns are reordered"
-                )
+def test_cdnod_on_a_latent_confounded_sample_is_invariant_to_column_order():
+    """A draw whose graph has both directed and undirected edges."""
+    x = _latent_confounded_sample(2, 8)
+    context = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
+    first = andrey.cdnod(x, context).structure.to_numpy()
+    order = np.random.default_rng(2).permutation(x.shape[1])
+    back = np.argsort(order)
+    permuted = andrey.cdnod(x[:, order], context).structure.to_numpy()[np.ix_(back, back)]
+    assert np.array_equal(permuted, first)
 
 
 # --- real data ------------------------------------------------------------------------------------

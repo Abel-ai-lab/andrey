@@ -19,9 +19,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.ties import tie_ranks
 from andrey.core.units import unit_factors
 from andrey.lingam.direct import direct_lingam
-from andrey.search.hc import tie_ranks
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints, LaggedConstraints
@@ -180,7 +180,7 @@ class LongitudinalLiNGAM:
     def fit(self, X_list: list[np.ndarray]) -> LongitudinalLiNGAM:
         """Estimate instantaneous and lagged structure from the panel; return ``self``.
 
-        The fit runs on the variables sorted by their :func:`~andrey.search.hc.tie_ranks` over all
+        The fit runs on the variables sorted by their :func:`~andrey.core.ties.tie_ranks` over all
         time points, so reordering the columns relabels the result and changes nothing else, unless
         two columns are identical.
         """

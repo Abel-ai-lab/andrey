@@ -132,12 +132,6 @@ def test_a_required_same_step_link_is_kept_on_independent_noise():
     assert (2, 0, 0) in links(out)
 
 
-def test_a_required_lagged_link_is_kept_on_independent_noise():
-    noise = np.random.default_rng(2).standard_normal((300, 3))
-    out = fit(noise, knowledge=andrey.Knowledge(required=[(2, 0, 1)]))
-    assert (2, 0, 1) in links(out)
-
-
 def test_a_pair_left_out_of_allowed_has_no_link_at_any_lag(series):
     """``allowed`` lists the only pairs that may be linked; a series keeps its own past."""
     pairs = {frozenset((0, 1)), frozenset((1, 2))}

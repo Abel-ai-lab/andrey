@@ -161,7 +161,7 @@ def _ambiguous_back(triples: list[list[int]], order: np.ndarray) -> list[tuple[i
     return sorted((min(a, c), b, max(a, c)) for a, b, c in back)
 
 
-@pytest.mark.parametrize("method", ["pc", "fci", "gfci", "cdnod"])
+@pytest.mark.parametrize("method", ["pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"])
 @pytest.mark.parametrize("rule", VOTING)
 def test_results_do_not_depend_on_the_column_order(method, rule):
     """Five column orders give the same graph and the same ambiguous triples once mapped back."""
@@ -197,13 +197,13 @@ def test_cdnod_index_is_never_an_ambiguous_middle_node(rule):
     assert all(b != 6 for _, b, _ in out.metadata["ambiguous_triples"])
 
 
-@pytest.mark.parametrize("rule", VOTING)
+@pytest.mark.parametrize("rule", RULES)
 def test_cdnod_with_one_domain_is_pc(rule):
     x = data.sample_scm(d=8, n=150, density=3.0, seed=11).data
     out = andrey.cdnod(x, np.zeros(150), collider_rule=rule)
     reference = andrey.pc(x, collider_rule=rule)
     np.testing.assert_array_equal(out.structure.to_numpy(), reference.structure.to_numpy())
-    assert out.metadata["ambiguous_triples"] == reference.metadata["ambiguous_triples"]
+    assert out.metadata.get("ambiguous_triples") == reference.metadata.get("ambiguous_triples")
 
 
 @pytest.mark.parametrize("method", ["pc", "cdnod"])

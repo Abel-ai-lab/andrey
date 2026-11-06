@@ -375,7 +375,7 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
-    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
+    from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -716,7 +716,7 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
 
     indep_test, categorical = default_test(data, indep_test, categorical=categorical)
     X, mask = checked_data(
@@ -1044,7 +1044,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
+    from andrey.core.ties import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
     score_func, _ = default_score(data, score_func, categorical=categorical)
@@ -1392,8 +1392,8 @@ def cdnod(
     [('x', 'y', 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
-    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
     from andrey.core.environments import normalize_env_targets
+    from andrey.core.ties import resolve_collider_order, resolve_in_column_order
 
     if env is None:
         raise TypeError(

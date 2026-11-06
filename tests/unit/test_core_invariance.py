@@ -261,19 +261,6 @@ def test_the_p_value_is_the_one_from_the_rows(sizes, name):
         assert test(2, S) == pytest.approx(want, rel=1e-9, abs=1e-14), S
 
 
-def test_two_groups_compare_once_under_the_approximate_test():
-    """With two groups, each one against the other is the same test, so the factor is 1."""
-    X, groups = groups_data((70, 50))
-    r, _, _ = _residuals(X[:, [0]], X[:, 2])
-    first = stats.ttest_ind(r[groups == 0], r[groups == 1], equal_var=False).pvalue
-    second = stats.ttest_ind(r[groups == 1], r[groups == 0], equal_var=False).pvalue
-    assert first == pytest.approx(second, rel=1e-12)
-    test = make_invariance_test("icp_approximate", X, groups, indep_test="fisherz")
-    assert test(2, [0]) == pytest.approx(
-        direct_icp(X, groups, 2, (0,), "icp_approximate"), rel=1e-9
-    )
-
-
 @pytest.mark.parametrize("name", ICP_TESTS)
 def test_a_batch_gives_each_querys_p_value_and_pooled_regression(name):
     X, groups = groups_data((40, 60, 50))

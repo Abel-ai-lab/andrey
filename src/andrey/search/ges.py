@@ -12,12 +12,11 @@ import numpy as np
 
 from andrey.core import GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
-from andrey.core.mixed import column_mask
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, Score, make_score
+from andrey.core.score import Score, make_score
 from andrey.core.structure import endpoint_marks
+from andrey.core.ties import tie_mask, tie_ranks
 from andrey.search import operators as ops
-from andrey.search.hc import tie_ranks
 
 
 def _reform_cpdag(adj: np.ndarray) -> np.ndarray:
@@ -71,10 +70,6 @@ def _parent_limits(
     if max_parents is None:
         return n / 2, None
     return (max_parents, None) if rule == "gate" else (None, max_parents)
-
-
-#: The local scores :func:`ges` accepts.
-GES_SCORES: tuple[str, ...] = SCORES
 
 
 def ges(
@@ -154,8 +149,6 @@ def ges(
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
     gate, cap = _parent_limits(n, max_parents, _parent_rule)
-    if score_func not in GES_SCORES:
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")
     score = make_score(
         score_func,
         X,
@@ -168,21 +161,14 @@ def ges(
     adj = np.zeros((n, n), dtype=np.int8)
     if constraints is not None and constraints.required.any():
         adj = _cpdag_of_pdag(required_dag(constraints))
-    if cap is not None and ops.exceeds_parent_cap(adj, cap):
-        raise ValueError(
-            f"the required edges give a node more than max_parents={max_parents} parents "
-            "in some graph of their class"
-        )
+    ops.check_parent_cap(adj, cap, in_class=True)
     # Local import breaks the ges <-> _parallel_ges cycle.
     from andrey.search import _parallel_ges
 
     # Pin BLAS to one thread for the score-diff loops (the covariance above is already computed):
     # multi-thread BLAS reduction order is not bit-stable, so pinning makes the score host- and
     # thread-count-reproducible and equal to the (1-thread) parallel workers.
-    mask = np.full(n, score_func in DISCRETE_SCORES)
-    if score_func in MIXED_SCORES:
-        mask = column_mask(categorical, n)
-    ranks = tie_ranks(X, mask).tolist()
+    ranks = tie_ranks(X, tie_mask(score_func, categorical, n)).tolist()
     with backend.one_blas_thread():
         workers = backend.worker_count(workers) if n > 1 else 1
         adj = _parallel_ges.run_ges(

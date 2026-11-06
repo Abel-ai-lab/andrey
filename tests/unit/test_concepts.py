@@ -36,6 +36,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.unit.methods import REQUIRED, SHORT, domains, environments
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -263,11 +264,6 @@ CONTEXT = {
 }
 
 
-def environments(n: int) -> np.ndarray:
-    """Three environments of about ``n / 3`` rows each, in row order."""
-    return np.arange(n) * 3 // n
-
-
 def facade(method: str):
     """The method's facade, with the settings ``CONTEXT`` and ``REQUIRED`` give it."""
     return functools.partial(
@@ -295,14 +291,11 @@ def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
         elif inp.kind == "panel":
             args.append(frames)
         else:
-            args.append(np.repeat([0.0, 1.0], N // 2).reshape(-1, 1))
+            args.append(domains(N))
     return args
 
 
-#: Settings that shorten a slow fit, and the settings that stop each loop at its cap.
-SHORT = {"calm": {"max_iter": 1, "subproblem_iter": 20}}
-#: The arguments a method needs beyond its inputs: ICP's target, by position.
-REQUIRED = {"icp": {"target": 2}}
+#: The settings that stop each loop at its cap.
 AT_CAP = {"calm": {"max_iter": 1, "subproblem_iter": 1}, "dagma": {"stages": 1, "max_iter": 1}}
 
 
@@ -352,7 +345,7 @@ UNIT_CASES = {
         (
             *("pc", "fci", "gfci", "cdnod", "iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("igsp", "ut_igsp"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),
@@ -434,7 +427,9 @@ def declared_kind(out, method: str) -> bool:
 
 #: Settings that bring out the metadata keys a default fit leaves out.
 METADATA_FITS = {
-    **dict.fromkeys(("pc", "fci", "gfci", "cdnod"), {"collider_rule": "majority"}),
+    **dict.fromkeys(
+        ("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod"), {"collider_rule": "majority"}
+    ),
     **dict.fromkeys(("iamb", "inter_iamb", "mmpc"), {"target": "y"}),
 }
 
@@ -477,7 +472,7 @@ def args_for(method: str, tables: list[pd.DataFrame]) -> list:
     """The arguments of ``method`` over ``tables``: the first as its data, all as a panel, and a
     domain column for CD-NOD and GnIES."""
     kinds = (i.kind for i in REGISTRY[method].data.inputs if needed(method, i))
-    domain = np.repeat([0.0, 1.0], len(tables[0]) // 2).reshape(-1, 1)
+    domain = domains(len(tables[0]))
     args = [
         tables if kind == "panel" else tables[0] if kind == "matrix" else domain for kind in kinds
     ]
@@ -707,13 +702,25 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
     assert out.metadata["seed"] == 11
 
 
+#: The CI searches whose score search visits the variables in a random order on every fit.
+ORDER_SEARCH_FIRST = ("boss_fci", "grasp_fci")
+
+
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():
     """A method without a seed, a CI search under a deterministic test, and a search that changes
     the best DAG at random only before a later start, run with one start, record none."""
     assert all("seed" not in coded_fit(m)[0].metadata for m in REGISTRY if m not in SEEDED)
     for method in (*CI_SEARCHES, *PCMCI_FAMILY, *CONCEPTS["n_perturbations"].suitable):
+        if method in ORDER_SEARCH_FIRST:
+            continue
         out, _ = fit(method, codes=False, seed=7)
         assert "seed" not in out.metadata, method
+
+
+@pytest.mark.parametrize("method", ORDER_SEARCH_FIRST)
+def test_a_search_over_random_orders_records_its_seed_under_a_deterministic_test(method):
+    out, _ = fit(method, codes=False, seed=7)
+    assert out.metadata["seed"] == 7
 
 
 def named_setting(method: str, key: str) -> str:
@@ -893,6 +900,8 @@ CI_CASES = {
     "pc": [{}, {"collider_rule": "conservative"}],
     "fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "gfci": [{}, {"possible_dsep": "fast"}],
+    "boss_fci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
+    "grasp_fci": [{}, {"possible_dsep": "fast"}],
     "cdnod": [{}, {"collider_rule": "conservative"}],
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
@@ -922,10 +931,12 @@ def test_every_search_with_a_ci_test_has_cases():
 def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings, gaps, monkeypatch):
     """A test registered with the single-query call alone runs every search that takes
     ``indep_test``, on complete data and, where the method takes missing values, on data with gaps,
-    and gives the graph of Fisher's z-test it wraps."""
+    is the test the search asks, and gives the graph of Fisher's z-test it wraps."""
     expected, _ = fit(method, codes=False, gaps=gaps, **settings)
     monkeypatch.setitem(ci._CI_REGISTRY, "p_value_only", PValueOnly)
+    monkeypatch.setattr(PValueOnly, "queries", 0)
     out, _ = fit(method, codes=False, gaps=gaps, indep_test="p_value_only", **settings)
+    assert PValueOnly.queries > 0
     assert out.structure == expected.structure
 
 
@@ -1190,13 +1201,6 @@ def test_a_former_value_maps_to_the_current_one_with_one_warning(monkeypatch):
     with pytest.warns(andrey.DeprecatedArgumentWarning, match="indep_test='student' is now"):
         out = andrey.pc(*data, indep_test="student")
     assert out == expected
-
-
-def test_an_indep_test_takes_the_registered_tests(monkeypatch):
-    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz_copy", ci._CI_REGISTRY["fisherz"])
-    data = inputs("pc", codes=False)
-    out = andrey.pc(*data, indep_test="fisherz_copy")
-    assert out.structure == andrey.pc(*data, indep_test="fisherz").structure
 
 
 # --- surfaces -------------------------------------------------------------------------------------

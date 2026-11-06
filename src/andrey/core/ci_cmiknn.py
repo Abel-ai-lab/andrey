@@ -15,7 +15,7 @@ from numbers import Integral
 import numpy as np
 from scipy.special import digamma
 
-from andrey.search.hc import tie_ranks
+from andrey.core.ties import tie_ranks
 
 from . import backend, env, stats
 from .ci import _canonical_ranked, per_query
@@ -221,7 +221,7 @@ class CMIknn:
     and 0.26 below given one more variable. The p-value compares ``I`` with shuffled copies, which
     share the bias.
 
-    Of ``x`` and ``y``, the one with the lower :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    Of ``x`` and ``y``, the one with the lower :func:`~andrey.core.ties.tie_ranks` rank, a rank
     computed from the data, is shuffled. The tie-breaking is drawn once, from
     ``seed``, when the test is built, and each column takes its keys by that rank. The shuffles
     come from a generator seeded by ``seed`` and the ranks of the conditioning set, so every query
